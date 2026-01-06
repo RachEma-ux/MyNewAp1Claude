@@ -18,6 +18,8 @@ services:
         value: https://example.com
       - key: VITE_APP_ID
         value: demo-app
+      - key: DEV_MODE
+        value: true
 
 databases:
   - name: app-db
