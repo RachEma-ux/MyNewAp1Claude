@@ -1,0 +1,24 @@
+{
+  "query": "SELECT * FROM wcp_executions",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute SELECT * FROM wcp_executions",
+  "rows": [
+    {
+      "id": "1",
+      "workflowId": "1",
+      "workflowName": "Test Workflow",
+      "status": "completed",
+      "startedAt": "2026-01-04 03:13:27",
+      "completedAt": "NULL",
+      "duration": "NULL",
+      "executionLog": "NULL",
+      "errorMessage": "NULL",
+      "triggerType": "manual",
+      "triggerData": "NULL",
+      "createdAt": "2026-01-04 03:13:27"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tworkflowId\tworkflowName\tstatus\tstartedAt\tcompletedAt\tduration\texecutionLog\terrorMessage\ttriggerType\ttriggerData\tcreatedAt\n1\t1\tTest Workflow\tcompleted\t2026-01-04 03:13:27\tNULL\tNULL\tNULL\tNULL\tmanual\tNULL\t2026-01-04 03:13:27\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

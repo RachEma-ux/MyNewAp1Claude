@@ -1,0 +1,9 @@
+{
+  "query": "SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'trigger_registry' AND COLUMN_NAME IN ('maxStateSize', 'throughputExpectation', 'typeId');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'trigger_registry' AND COLUMN_NAME IN ('maxStateSize', 'throughputExpectation', 'typeId');",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 402
+}

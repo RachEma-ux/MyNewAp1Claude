@@ -1,0 +1,21 @@
+{
+  "query": "SELECT * FROM providers LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute SELECT * FROM providers LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "OpenAI",
+      "type": "openai",
+      "enabled": "1",
+      "priority": "50",
+      "config": "{\"apiKey\": \"proj-izQn5nCP-bktxMG7iVFKEXULO4Gaop4W8ce7G1qmCczwjtC1MN1dLXNq8OaHpT-hYoleLDmLNjT3BlbkFJ_xV9kzQ_C_m6aoBxDXd63hr0JfSSSwoaI3UKRoXzzcEg109E36_d9yvMo5HZHbN9CxrL6EmIEA\", \"defaultModel\": \"gpt-4o\", \"maxTokens\": 4096, \"temperature\": 0.7}",
+      "costPer1kTokens": "NULL",
+      "createdAt": "2025-12-16 00:39:57",
+      "updatedAt": "2025-12-21 04:12:24"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttype\tenabled\tpriority\tconfig\tcostPer1kTokens\tcreatedAt\tupdatedAt\n1\tOpenAI\topenai\t1\t50\t{\"apiKey\": \"proj-izQn5nCP-bktxMG7iVFKEXULO4Gaop4W8ce7G1qmCczwjtC1MN1dLXNq8OaHpT-hYoleLDmLNjT3BlbkFJ_xV9kzQ_C_m6aoBxDXd63hr0JfSSSwoaI3UKRoXzzcEg109E36_d9yvMo5HZHbN9CxrL6EmIEA\", \"defaultModel\": \"gpt-4o\", \"maxTokens\": 4096, \"temperature\": 0.7}\tNULL\t2025-12-16 00:39:57\t2025-12-21 04:12:24\n",
+  "stderr": "",
+  "execution_time_ms": 808
+}

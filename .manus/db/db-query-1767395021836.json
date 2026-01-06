@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE trigger_registry MODIFY COLUMN category ENUM('time', 'event', 'data', 'user', 'system', 'integration') NOT NULL",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute ALTER TABLE trigger_registry MODIFY COLUMN category ENUM('time', 'event', 'data', 'user', 'system', 'integration') NOT NULL",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 529
+}

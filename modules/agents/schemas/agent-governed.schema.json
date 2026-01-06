@@ -1,0 +1,185 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Governed Agent Specification",
+  "description": "MVA + MVPf (Minimum Viable Anatomy + Minimum Viable Proof)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mode", "agent", "local_constraints", "governance", "proof"],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "const": "governed"
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "description", "role_class", "anatomy"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "role_class": {
+          "type": "string",
+          "enum": ["compliance", "analysis", "ideation"]
+        },
+        "anatomy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reasoning", "inputs", "actions", "memory"],
+          "properties": {
+            "reasoning": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "model", "temperature"],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["llm", "rules", "hybrid"]
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "temperature": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            },
+            "inputs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "actions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "side_effects"],
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "side": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "memory": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["short_term", "long_term"],
+              "properties": {
+                "short_term": {
+                  "type": "boolean"
+                },
+                "long_term": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "local_constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_steps"],
+      "properties": {
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_set", "capabilities", "economics"],
+      "properties": {
+        "policy_set": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "economics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["monthly_budget_usd", "rate_limit_per_min"],
+          "properties": {
+            "monthly_budget_usd": {
+              "type": "number",
+              "minimum": 0
+            },
+            "rate_limit_per_min": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_decision", "policy_hash", "spec_hash", "signature"],
+      "properties": {
+        "policy_decision": {
+          "type": "string",
+          "enum": ["PASS", "FAIL"]
+        },
+        "policy_hash": {
+          "type": "string",
+          "pattern": "^sha256:"
+        },
+        "spec_hash": {
+          "type": "string",
+          "pattern": "^sha256:"
+        },
+        "signature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["authority", "signed_at", "sig"],
+          "properties": {
+            "authority": {
+              "type": "string",
+              "minLength": 1
+            },
+            "signed_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "sig": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

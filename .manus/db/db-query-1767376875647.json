@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS secrets (\n  id INT PRIMARY KEY AUTO_INCREMENT,\n  userId INT NOT NULL,\n  `key` VARCHAR(255) NOT NULL,\n  encryptedValue TEXT NOT NULL,\n  description TEXT,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  UNIQUE KEY unique_user_key (userId, `key`),\n  INDEX idx_userId (userId)\n)",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute CREATE TABLE IF NOT EXISTS secrets (\n  id INT PRIMARY KEY AUTO_INCREMENT,\n  userId INT NOT NULL,\n  `key` VARCHAR(255) NOT NULL,\n  encryptedValue TEXT NOT NULL,\n  description TEXT,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  UNIQUE KEY unique_user_key (userId, `key`),\n  INDEX idx_userId (userId)\n)",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1169
+}

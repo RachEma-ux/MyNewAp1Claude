@@ -1,0 +1,48 @@
+{
+  "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist",
+    "**/*.test.ts",
+    "**/agents/**",
+    "**/agent*",
+    "**/policies*",
+    "**/promotion*",
+    "**/drift*",
+    "**/remediation*",
+    "**/runtime*",
+    "**/executor*",
+    "**/metrics*",
+    "**/interceptor*",
+    "**/routers/**",
+    "**/services/**",
+    "features/**",
+    "modules/**",
+    "client/src/**"
+  ],
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
+    "noEmit": true,
+    "module": "ESNext",
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "noImplicitThis": false,
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "preserve",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "allowImportingTsExtensions": true,
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@/*": ["./client/src/*"],
+      "@shared/*": ["./shared/*"]
+    }
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "query": "SHOW COLUMNS FROM agents;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute SHOW COLUMNS FROM agents;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "varchar(191)",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "workspaceId",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "MUL",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "name",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "description",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "mode",
+      "Type": "enum('draft','sandbox','governed')",
+      "Null": "YES",
+      "Key": "MUL",
+      "Default": "draft",
+      "Extra": ""
+    },
+    {
+      "Field": "governanceStatus",
+      "Type": "enum('SANDBOX','GOVERNED_VALID','GOVERNED_RESTRICTED','GOVERNED_INVALIDATED')",
+      "Null": "YES",
+      "Key": "MUL",
+      "Default": "SANDBOX",
+      "Extra": ""
+    },
+    {
+      "Field": "spec",
+      "Type": "json",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "proofBundle",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "capabilities",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "budget",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "llm",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "expiresAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "createdBy",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "createdAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updatedAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tvarchar(191)\tNO\tPRI\tNULL\t\nworkspaceId\tint(11)\tYES\tMUL\tNULL\t\nname\tvarchar(255)\tNO\t\tNULL\t\ndescription\ttext\tYES\t\tNULL\t\nmode\tenum('draft','sandbox','governed')\tYES\tMUL\tdraft\t\ngovernanceStatus\tenum('SANDBOX','GOVERNED_VALID','GOVERNED_RESTRICTED','GOVERNED_INVALIDATED')\tYES\tMUL\tSANDBOX\t\nspec\tjson\tNO\t\tNULL\t\nproofBundle\tjson\tYES\t\tNULL\t\ncapabilities\tjson\tYES\t\tNULL\t\nbudget\tjson\tYES\t\tNULL\t\nllm\tjson\tYES\t\tNULL\t\nexpiresAt\ttimestamp\tYES\t\tNULL\t\ncreatedBy\tint(11)\tNO\t\tNULL\t\ncreatedAt\ttimestamp\tYES\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tYES\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\n",
+  "stderr": "",
+  "execution_time_ms": 71
+}

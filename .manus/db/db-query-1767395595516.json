@@ -1,0 +1,362 @@
+{
+  "query": "DESCRIBE trigger_registry;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute DESCRIBE trigger_registry;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "triggerId",
+      "Type": "varchar(100)",
+      "Null": "NO",
+      "Key": "UNI",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "name",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "category",
+      "Type": "enum('time','event','data','user','system','integration')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "semanticVersion",
+      "Type": "varchar(20)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "owner",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "status",
+      "Type": "enum('draft','active','deprecated','disabled')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "draft",
+      "Extra": ""
+    },
+    {
+      "Field": "icon",
+      "Type": "varchar(50)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "purpose",
+      "Type": "text",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "guarantees",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "nonGoals",
+      "Type": "json",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "eventInputSchema",
+      "Type": "json",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "workflowContextSchema",
+      "Type": "json",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ingestionMode",
+      "Type": "enum('event','poll','schedule')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "deduplicationEnabled",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "deduplicationKey",
+      "Type": "varchar(100)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ordering",
+      "Type": "enum('none','fifo')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "none",
+      "Extra": ""
+    },
+    {
+      "Field": "ingestionRetryPolicy",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "pollingInterval",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "sideEffects",
+      "Type": "json",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "authenticationType",
+      "Type": "enum('none','hmac','jwt','mTLS','api_key')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "authorizationScopes",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "sourceVerification",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "maxEventsPerMinute",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "errorTaxonomy",
+      "Type": "json",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "observabilityConfig",
+      "Type": "json",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "maxPayloadKb",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "maxEventsPerSecond",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "supportsDryRun",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "1",
+      "Extra": ""
+    },
+    {
+      "Field": "eventStub",
+      "Type": "json",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "deprecatedAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "sunsetAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "replacementTriggerId",
+      "Type": "varchar(100)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "uiIntegrationSpec",
+      "Type": "json",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "riskLevel",
+      "Type": "enum('low','medium','high','critical')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "complianceScore",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "criticalViolations",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "approvalStatus",
+      "Type": "enum('pending','approved','rejected')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "pending",
+      "Extra": ""
+    },
+    {
+      "Field": "approvedBy",
+      "Type": "varchar(255)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "approvedAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "rejectionReason",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "createdBy",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "createdAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updatedAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint(11)\tNO\tPRI\tNULL\tauto_increment\ntriggerId\tvarchar(100)\tNO\tUNI\tNULL\t\nname\tvarchar(255)\tNO\t\tNULL\t\ncategory\tenum('time','event','data','user','system','integration')\tNO\t\tNULL\t\nsemanticVersion\tvarchar(20)\tNO\t\tNULL\t\nowner\tvarchar(255)\tNO\t\tNULL\t\nstatus\tenum('draft','active','deprecated','disabled')\tNO\t\tdraft\t\nicon\tvarchar(50)\tYES\t\tNULL\t\npurpose\ttext\tNO\t\tNULL\t\nguarantees\tjson\tYES\t\tNULL\t\nnonGoals\tjson\tNO\t\tNULL\t\neventInputSchema\tjson\tNO\t\tNULL\t\nworkflowContextSchema\tjson\tNO\t\tNULL\t\ningestionMode\tenum('event','poll','schedule')\tNO\t\tNULL\t\ndeduplicationEnabled\ttinyint(1)\tNO\t\t0\t\ndeduplicationKey\tvarchar(100)\tYES\t\tNULL\t\nordering\tenum('none','fifo')\tNO\t\tnone\t\ningestionRetryPolicy\tjson\tYES\t\tNULL\t\npollingInterval\tint(11)\tYES\t\tNULL\t\nsideEffects\tjson\tNO\t\tNULL\t\nauthenticationType\tenum('none','hmac','jwt','mTLS','api_key')\tNO\t\tNULL\t\nauthorizationScopes\tjson\tYES\t\tNULL\t\nsourceVerification\ttinyint(1)\tNO\t\t0\t\nmaxEventsPerMinute\tint(11)\tYES\t\tNULL\t\nerrorTaxonomy\tjson\tNO\t\tNULL\t\nobservabilityConfig\tjson\tNO\t\tNULL\t\nmaxPayloadKb\tint(11)\tNO\t\tNULL\t\nmaxEventsPerSecond\tint(11)\tNO\t\tNULL\t\nsupportsDryRun\ttinyint(1)\tNO\t\t1\t\neventStub\tjson\tNO\t\tNULL\t\ndeprecatedAt\ttimestamp\tYES\t\tNULL\t\nsunsetAt\ttimestamp\tYES\t\tNULL\t\nreplacementTriggerId\tvarchar(100)\tYES\t\tNULL\t\nuiIntegrationSpec\tjson\tNO\t\tNULL\t\nriskLevel\tenum('low','medium','high','critical')\tNO\t\tNULL\t\ncomplianceScore\tint(11)\tNO\t\t0\t\ncriticalViolations\tjson\tYES\t\tNULL\t\napprovalStatus\tenum('pending','approved','rejected')\tNO\t\tpending\t\napprovedBy\tvarchar(255)\tYES\t\tNULL\t\napprovedAt\ttimestamp\tYES\t\tNULL\t\nrejectionReason\ttext\tYES\t\tNULL\t\ncreatedBy\tvarchar(255)\tNO\t\tNULL\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\n",
+  "stderr": "",
+  "execution_time_ms": 389
+}

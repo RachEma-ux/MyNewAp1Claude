@@ -1,0 +1,38 @@
+{
+  "query": "SELECT id, title, slug, isPublished, views FROM wiki_pages LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute SELECT id, title, slug, isPublished, views FROM wiki_pages LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "title": "Governance Test Report",
+      "slug": "governance-test-report",
+      "isPublished": "1",
+      "views": "0"
+    },
+    {
+      "id": "2",
+      "title": "Governance Coverage Report",
+      "slug": "governance-coverage-report",
+      "isPublished": "1",
+      "views": "0"
+    },
+    {
+      "id": "3",
+      "title": "Governance Gap Analysis",
+      "slug": "governance-gap-analysis",
+      "isPublished": "1",
+      "views": "0"
+    },
+    {
+      "id": "4",
+      "title": "Governance Requirements Mapping",
+      "slug": "governance-requirements-mapping",
+      "isPublished": "1",
+      "views": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tslug\tisPublished\tviews\n1\tGovernance Test Report\tgovernance-test-report\t1\t0\n2\tGovernance Coverage Report\tgovernance-coverage-report\t1\t0\n3\tGovernance Gap Analysis\tgovernance-gap-analysis\t1\t0\n4\tGovernance Requirements Mapping\tgovernance-requirements-mapping\t1\t0\n",
+  "stderr": "",
+  "execution_time_ms": 223
+}

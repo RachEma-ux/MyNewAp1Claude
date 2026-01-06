@@ -1,0 +1,100 @@
+{
+  "query": "SELECT id, workflowId, workflowName, status, startedAt, completedAt, errorMessage FROM wcp_executions ORDER BY startedAt DESC LIMIT 10",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute SELECT id, workflowId, workflowName, status, startedAt, completedAt, errorMessage FROM wcp_executions ORDER BY startedAt DESC LIMIT 10",
+  "rows": [
+    {
+      "id": "60005",
+      "workflowId": "30004",
+      "workflowName": "BB WCP Workflow",
+      "status": "running",
+      "startedAt": "2026-01-04 11:38:22",
+      "completedAt": "NULL",
+      "errorMessage": "NULL"
+    },
+    {
+      "id": "60004",
+      "workflowId": "30003",
+      "workflowName": "33 WCP Workflow",
+      "status": "running",
+      "startedAt": "2026-01-04 11:36:24",
+      "completedAt": "NULL",
+      "errorMessage": "NULL"
+    },
+    {
+      "id": "60003",
+      "workflowId": "30004",
+      "workflowName": "BB WCP Workflow",
+      "status": "running",
+      "startedAt": "2026-01-04 11:35:20",
+      "completedAt": "NULL",
+      "errorMessage": "NULL"
+    },
+    {
+      "id": "60002",
+      "workflowId": "30004",
+      "workflowName": "BB WCP Workflow",
+      "status": "running",
+      "startedAt": "2026-01-04 11:34:33",
+      "completedAt": "NULL",
+      "errorMessage": "NULL"
+    },
+    {
+      "id": "60001",
+      "workflowId": "30004",
+      "workflowName": "BB WCP Workflow",
+      "status": "running",
+      "startedAt": "2026-01-04 11:32:10",
+      "completedAt": "NULL",
+      "errorMessage": "NULL"
+    },
+    {
+      "id": "30004",
+      "workflowId": "30004",
+      "workflowName": "BB WCP Workflow",
+      "status": "running",
+      "startedAt": "2026-01-04 04:24:50",
+      "completedAt": "NULL",
+      "errorMessage": "NULL"
+    },
+    {
+      "id": "30003",
+      "workflowId": "30003",
+      "workflowName": "33 WCP Workflow",
+      "status": "running",
+      "startedAt": "2026-01-04 04:23:29",
+      "completedAt": "NULL",
+      "errorMessage": "NULL"
+    },
+    {
+      "id": "30002",
+      "workflowId": "30001",
+      "workflowName": "77 WCP Workflow",
+      "status": "running",
+      "startedAt": "2026-01-04 03:47:48",
+      "completedAt": "NULL",
+      "errorMessage": "NULL"
+    },
+    {
+      "id": "30001",
+      "workflowId": "12",
+      "workflowName": "ZZ WCP Workflow",
+      "status": "running",
+      "startedAt": "2026-01-04 03:44:25",
+      "completedAt": "NULL",
+      "errorMessage": "NULL"
+    },
+    {
+      "id": "2",
+      "workflowId": "1",
+      "workflowName": "Test Workflow",
+      "status": "running",
+      "startedAt": "2026-01-04 03:25:50",
+      "completedAt": "NULL",
+      "errorMessage": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tworkflowId\tworkflowName\tstatus\tstartedAt\tcompletedAt\terrorMessage\n60005\t30004\tBB WCP Workflow\trunning\t2026-01-04 11:38:22\tNULL\tNULL\n60004\t30003\t33 WCP Workflow\trunning\t2026-01-04 11:36:24\tNULL\tNULL\n60003\t30004\tBB WCP Workflow\trunning\t2026-01-04 11:35:20\tNULL\tNULL\n60002\t30004\tBB WCP Workflow\trunning\t2026-01-04 11:34:33\tNULL\tNULL\n60001\t30004\tBB WCP Workflow\trunning\t2026-01-04 11:32:10\tNULL\tNULL\n30004\t30004\tBB WCP Workflow\trunning\t2026-01-04 04:24:50\tNULL\tNULL\n30003\t30003\t33 WCP Workflow\trunning\t2026-01-04 04:23:29\tNULL\tNULL\n30002\t30001\t77 WCP Workflow\trunning\t2026-01-04 03:47:48\tNULL\tNULL\n30001\t12\tZZ WCP Workflow\trunning\t2026-01-04 03:44:25\tNULL\tNULL\n2\t1\tTest Workflow\trunning\t2026-01-04 03:25:50\tNULL\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 53
+}

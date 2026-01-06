@@ -1,0 +1,1 @@
+ALTER TABLE `workflows` MODIFY COLUMN `status` enum('draft','validated','published','active','paused','archived','deleted') DEFAULT 'draft';

@@ -1,0 +1,22 @@
+{
+  "query": "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'workflows' AND TABLE_SCHEMA = DATABASE() AND COLUMN_NAME IN ('userId', 'nodes', 'edges', 'status');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'workflows' AND TABLE_SCHEMA = DATABASE() AND COLUMN_NAME IN ('userId', 'nodes', 'edges', 'status');",
+  "rows": [
+    {
+      "COLUMN_NAME": "userId"
+    },
+    {
+      "COLUMN_NAME": "nodes"
+    },
+    {
+      "COLUMN_NAME": "edges"
+    },
+    {
+      "COLUMN_NAME": "status"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\nuserId\nnodes\nedges\nstatus\n",
+  "stderr": "",
+  "execution_time_ms": 69
+}

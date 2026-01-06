@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE workflows \nADD COLUMN IF NOT EXISTS userId INT NOT NULL DEFAULT 1,\nADD COLUMN IF NOT EXISTS nodes TEXT NOT NULL DEFAULT '[]',\nADD COLUMN IF NOT EXISTS edges TEXT NOT NULL DEFAULT '[]',\nADD COLUMN IF NOT EXISTS status ENUM('draft', 'active', 'paused') DEFAULT 'draft',\nMODIFY COLUMN workspaceId INT NULL,\nMODIFY COLUMN triggerType ENUM('time', 'event', 'webhook', 'manual') DEFAULT 'manual',\nMODIFY COLUMN triggerConfig JSON NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute ALTER TABLE workflows \nADD COLUMN IF NOT EXISTS userId INT NOT NULL DEFAULT 1,\nADD COLUMN IF NOT EXISTS nodes TEXT NOT NULL DEFAULT '[]',\nADD COLUMN IF NOT EXISTS edges TEXT NOT NULL DEFAULT '[]',\nADD COLUMN IF NOT EXISTS status ENUM('draft', 'active', 'paused') DEFAULT 'draft',\nMODIFY COLUMN workspaceId INT NULL,\nMODIFY COLUMN triggerType ENUM('time', 'event', 'webhook', 'manual') DEFAULT 'manual',\nMODIFY COLUMN triggerConfig JSON NULL;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'workspaceId' in 'workflows'"
+  ]
+}

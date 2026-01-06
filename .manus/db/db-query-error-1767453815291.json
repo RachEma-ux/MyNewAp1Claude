@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE agents \nADD COLUMN mode ENUM('sandbox', 'governed') DEFAULT 'sandbox' AFTER policyContext,\nADD COLUMN governanceStatus ENUM('SANDBOX', 'GOVERNED_VALID', 'GOVERNED_RESTRICTED', 'GOVERNED_INVALIDATED') DEFAULT 'SANDBOX' AFTER mode,\nADD COLUMN governance JSON AFTER governanceStatus,\nADD COLUMN version INT DEFAULT 1 AFTER governance,\nADD COLUMN roleClass VARCHAR(50) DEFAULT 'assistant' AFTER version,\nADD COLUMN sandboxConstraints JSON AFTER roleClass,\nADD COLUMN expiresAt TIMESTAMP NULL AFTER sandboxConstraints,\nADD COLUMN proofId VARCHAR(255) AFTER expiresAt;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute ALTER TABLE agents \nADD COLUMN mode ENUM('sandbox', 'governed') DEFAULT 'sandbox' AFTER policyContext,\nADD COLUMN governanceStatus ENUM('SANDBOX', 'GOVERNED_VALID', 'GOVERNED_RESTRICTED', 'GOVERNED_INVALIDATED') DEFAULT 'SANDBOX' AFTER mode,\nADD COLUMN governance JSON AFTER governanceStatus,\nADD COLUMN version INT DEFAULT 1 AFTER governance,\nADD COLUMN roleClass VARCHAR(50) DEFAULT 'assistant' AFTER version,\nADD COLUMN sandboxConstraints JSON AFTER roleClass,\nADD COLUMN expiresAt TIMESTAMP NULL AFTER sandboxConstraints,\nADD COLUMN proofId VARCHAR(255) AFTER expiresAt;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1060 (42S21) at line 1: Duplicate column name 'mode'"
+  ]
+}

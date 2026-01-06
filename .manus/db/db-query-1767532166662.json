@@ -1,0 +1,82 @@
+{
+  "query": "SELECT id, name, userId, status FROM workflows WHERE userId = 1 LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute SELECT id, name, userId, status FROM workflows WHERE userId = 1 LIMIT 20;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Untitled Workflow",
+      "userId": "1",
+      "status": "draft"
+    },
+    {
+      "id": "30001",
+      "name": "Untitled Workflow",
+      "userId": "1",
+      "status": "draft"
+    },
+    {
+      "id": "30002",
+      "name": "Untitled Workflow",
+      "userId": "1",
+      "status": "draft"
+    },
+    {
+      "id": "60001",
+      "name": "Test Workflow for Integration",
+      "userId": "1",
+      "status": "draft"
+    },
+    {
+      "id": "60002",
+      "name": "Test Workflow for Integration",
+      "userId": "1",
+      "status": "draft"
+    },
+    {
+      "id": "60003",
+      "name": "Untitled Workflow",
+      "userId": "1",
+      "status": "published"
+    },
+    {
+      "id": "60004",
+      "name": "22 Workflow",
+      "userId": "1",
+      "status": "published"
+    },
+    {
+      "id": "90001",
+      "name": "99 Workflow",
+      "userId": "1",
+      "status": "published"
+    },
+    {
+      "id": "120001",
+      "name": "TT Workflow",
+      "userId": "1",
+      "status": "published"
+    },
+    {
+      "id": "120002",
+      "name": "Untitled Workflow",
+      "userId": "1",
+      "status": "published"
+    },
+    {
+      "id": "120003",
+      "name": "Kk Workflow",
+      "userId": "1",
+      "status": "published"
+    },
+    {
+      "id": "120004",
+      "name": "Untitled Workflow",
+      "userId": "1",
+      "status": "draft"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tuserId\tstatus\n1\tUntitled Workflow\t1\tdraft\n30001\tUntitled Workflow\t1\tdraft\n30002\tUntitled Workflow\t1\tdraft\n60001\tTest Workflow for Integration\t1\tdraft\n60002\tTest Workflow for Integration\t1\tdraft\n60003\tUntitled Workflow\t1\tpublished\n60004\t22 Workflow\t1\tpublished\n90001\t99 Workflow\t1\tpublished\n120001\tTT Workflow\t1\tpublished\n120002\tUntitled Workflow\t1\tpublished\n120003\tKk Workflow\t1\tpublished\n120004\tUntitled Workflow\t1\tdraft\n",
+  "stderr": "",
+  "execution_time_ms": 72
+}

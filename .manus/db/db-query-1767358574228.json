@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE workflows ADD COLUMN triggerType ENUM('time', 'event', 'webhook', 'manual') DEFAULT 'manual' AFTER edges;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute ALTER TABLE workflows ADD COLUMN triggerType ENUM('time', 'event', 'webhook', 'manual') DEFAULT 'manual' AFTER edges;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 421
+}

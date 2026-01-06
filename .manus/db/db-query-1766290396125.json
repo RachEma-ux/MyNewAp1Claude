@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, name, type, enabled, config FROM providers;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute SELECT id, name, type, enabled, config FROM providers;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "OpenAI",
+      "type": "openai",
+      "enabled": "1",
+      "config": "{\"apiKey\": \"proj-izQn5nCP-bktxMG7iVFKEXULO4Gaop4W8ce7G1qmCczwjtC1MN1dLXNq8OaHpT-hYoleLDmLNjT3BlbkFJ_xV9kzQ_C_m6aoBxDXd63hr0JfSSSwoaI3UKRoXzzcEg109E36_d9yvMo5HZHbN9CxrL6EmIEA\", \"defaultModel\": \"gpt-4o\", \"maxTokens\": 4096, \"temperature\": 0.7}"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttype\tenabled\tconfig\n1\tOpenAI\topenai\t1\t{\"apiKey\": \"proj-izQn5nCP-bktxMG7iVFKEXULO4Gaop4W8ce7G1qmCczwjtC1MN1dLXNq8OaHpT-hYoleLDmLNjT3BlbkFJ_xV9kzQ_C_m6aoBxDXd63hr0JfSSSwoaI3UKRoXzzcEg109E36_d9yvMo5HZHbN9CxrL6EmIEA\", \"defaultModel\": \"gpt-4o\", \"maxTokens\": 4096, \"temperature\": 0.7}\n",
+  "stderr": "",
+  "execution_time_ms": 51
+}

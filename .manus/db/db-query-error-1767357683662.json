@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE workflows \nADD COLUMN userId INT NOT NULL DEFAULT 1 AFTER id,\nADD COLUMN nodes TEXT NOT NULL DEFAULT '[]' AFTER description,\nADD COLUMN edges TEXT NOT NULL DEFAULT '[]' AFTER nodes,\nADD COLUMN status ENUM('draft', 'active', 'paused') DEFAULT 'draft' AFTER triggerConfig;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute ALTER TABLE workflows \nADD COLUMN userId INT NOT NULL DEFAULT 1 AFTER id,\nADD COLUMN nodes TEXT NOT NULL DEFAULT '[]' AFTER description,\nADD COLUMN edges TEXT NOT NULL DEFAULT '[]' AFTER nodes,\nADD COLUMN status ENUM('draft', 'active', 'paused') DEFAULT 'draft' AFTER triggerConfig;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1060 (42S21) at line 1: Duplicate column name 'userId'"
+  ]
+}

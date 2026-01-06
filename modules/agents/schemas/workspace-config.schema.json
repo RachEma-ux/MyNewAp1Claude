@@ -1,0 +1,224 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Workspace Configuration",
+  "description": "Configuration for agent governance runtime and policies",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["workspaceId", "name", "env", "agentsRuntime", "signing", "policy", "sandbox", "economics"],
+  "properties": {
+    "workspaceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "env": {
+      "type": "string",
+      "enum": ["dev", "staging", "prod"]
+    },
+    "agentsRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "embedded", "external"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["embedded", "external"]
+        },
+        "embedded": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "admissionInterceptor", "policyHotReload"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "admissionInterceptor": {
+              "type": "boolean"
+            },
+            "policyHotReload": {
+              "type": "boolean"
+            }
+          }
+        },
+        "external": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "baseUrl", "apiKeyRef", "timeoutsMs", "retry", "tls"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "baseUrl": {
+              "type": "string"
+            },
+            "apiKeyRef": {
+              "type": "string"
+            },
+            "timeoutsMs": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["connect", "request"],
+              "properties": {
+                "connect": {
+                  "type": "integer",
+                  "minimum": 100
+                },
+                "request": {
+                  "type": "integer",
+                  "minimum": 1000
+                }
+              }
+            },
+            "retry": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["maxAttempts", "backoffMs"],
+              "properties": {
+                "maxAttempts": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5
+                },
+                "backoffMs": {
+                  "type": "integer",
+                  "minimum": 100
+                }
+              }
+            },
+            "tls": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["verify", "caCertPemRef"],
+              "properties": {
+                "verify": {
+                  "type": "boolean"
+                },
+                "caCertPemRef": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["workspace", "org", "external"]
+        },
+        "workspaceSigner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["authorityId", "keyRef"],
+          "properties": {
+            "authorityId": {
+              "type": "string"
+            },
+            "keyRef": {
+              "type": "string"
+            }
+          }
+        },
+        "externalSigner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "baseUrl", "apiKeyRef"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "baseUrl": {
+              "type": "string"
+            },
+            "apiKeyRef": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policySet", "hotReload"],
+      "properties": {
+        "policySet": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hotReload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "revalidateOnUpdate", "defaultOnMismatch"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "revalidateOnUpdate": {
+              "type": "boolean"
+            },
+            "defaultOnMismatch": {
+              "type": "string",
+              "enum": ["invalidate", "restrict", "deny-start"]
+            }
+          }
+        }
+      }
+    },
+    "sandbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "autoExpiryHours", "maxCostUsd", "denyExternalCalls", "denyPersistentWrites"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "autoExpiryHours": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 168
+        },
+        "maxCostUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "denyExternalCalls": {
+          "type": "boolean"
+        },
+        "denyPersistentWrites": {
+          "type": "boolean"
+        }
+      }
+    },
+    "economics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "workspaceMonthlyBudgetUsd", "defaultAgentMonthlyBudgetUsd", "rateLimitPerMin"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "workspaceMonthlyBudgetUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "defaultAgentMonthlyBudgetUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "rateLimitPerMin": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE workflow_versions (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  workflowId INT NOT NULL,\n  version INT NOT NULL,\n  name VARCHAR(255) NOT NULL,\n  description TEXT,\n  nodes TEXT NOT NULL,\n  edges TEXT NOT NULL,\n  schemaVersion INT NOT NULL,\n  triggerType ENUM('time', 'event', 'webhook', 'manual'),\n  triggerConfig JSON,\n  publishedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  publishedBy INT NOT NULL,\n  changeNotes TEXT,\n  status ENUM('published', 'archived') NOT NULL DEFAULT 'published',\n  INDEX idx_workflowId (workflowId),\n  INDEX idx_version (workflowId, version)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute CREATE TABLE workflow_versions (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  workflowId INT NOT NULL,\n  version INT NOT NULL,\n  name VARCHAR(255) NOT NULL,\n  description TEXT,\n  nodes TEXT NOT NULL,\n  edges TEXT NOT NULL,\n  schemaVersion INT NOT NULL,\n  triggerType ENUM('time', 'event', 'webhook', 'manual'),\n  triggerConfig JSON,\n  publishedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  publishedBy INT NOT NULL,\n  changeNotes TEXT,\n  status ENUM('published', 'archived') NOT NULL DEFAULT 'published',\n  INDEX idx_workflowId (workflowId),\n  INDEX idx_version (workflowId, version)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 201
+}

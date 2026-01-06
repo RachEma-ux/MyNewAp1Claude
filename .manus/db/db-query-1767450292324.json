@@ -1,0 +1,9 @@
+{
+  "query": "SHOW COLUMNS FROM agents LIKE '%lifecycle%'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute SHOW COLUMNS FROM agents LIKE '%lifecycle%'",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 50
+}

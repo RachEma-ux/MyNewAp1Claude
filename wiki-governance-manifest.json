@@ -1,0 +1,42 @@
+{
+  "category": "Governance Follow Up",
+  "description": "Governance module testing reports and analysis",
+  "reports": [
+    {
+      "name": "Test Report",
+      "slug": "governance-test-report",
+      "description": "Comprehensive test coverage and validation results for the governance module",
+      "file": "/home/ubuntu/GOVERNANCE_TEST_REPORT.md",
+      "size": "14.35",
+      "lines": 482,
+      "createdAt": "2026-01-05T00:58:41.695Z"
+    },
+    {
+      "name": "Coverage Report",
+      "slug": "governance-coverage-report",
+      "description": "Code coverage analysis and testing metrics for governance features",
+      "file": "/home/ubuntu/GOVERNANCE_COVERAGE_REPORT.md",
+      "size": "14.70",
+      "lines": 596,
+      "createdAt": "2026-01-05T00:58:41.699Z"
+    },
+    {
+      "name": "Gap Analysis",
+      "slug": "governance-gap-analysis",
+      "description": "Identified gaps between requirements and current implementation",
+      "file": "/home/ubuntu/GOVERNANCE_GAP_ANALYSIS.md",
+      "size": "17.92",
+      "lines": 676,
+      "createdAt": "2026-01-05T00:58:41.699Z"
+    },
+    {
+      "name": "Requirements Mapping",
+      "slug": "governance-requirements-mapping",
+      "description": "Detailed mapping of requirements to implementation components",
+      "file": "/home/ubuntu/GOVERNANCE_MAPPING.md",
+      "size": "26.19",
+      "lines": 1036,
+      "createdAt": "2026-01-05T00:58:41.699Z"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "query": "ALTER TABLE agents \nADD COLUMN lifecycleState ENUM('draft', 'sandbox', 'governed', 'disabled') DEFAULT 'draft',\nADD COLUMN lifecycleVersion INT DEFAULT 1,\nADD COLUMN origin VARCHAR(50) DEFAULT 'scratch',\nADD COLUMN trigger JSON,\nADD COLUMN limits JSON,\nADD COLUMN anatomy JSON,\nADD COLUMN policyContext JSON",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mRYiUGqDHCaXxC.root --database Y5Wav99nvtrRC8pT5fEnKy --execute ALTER TABLE agents \nADD COLUMN lifecycleState ENUM('draft', 'sandbox', 'governed', 'disabled') DEFAULT 'draft',\nADD COLUMN lifecycleVersion INT DEFAULT 1,\nADD COLUMN origin VARCHAR(50) DEFAULT 'scratch',\nADD COLUMN trigger JSON,\nADD COLUMN limits JSON,\nADD COLUMN anatomy JSON,\nADD COLUMN policyContext JSON",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 5 column 19 near \"trigger JSON,",
+    "ADD COLUMN limits JSON,",
+    "ADD COLUMN anatomy JSON,",
+    "ADD COLUMN policyContext JSON\""
+  ]
+}
