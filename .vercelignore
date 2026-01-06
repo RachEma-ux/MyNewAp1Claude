@@ -1,0 +1,16 @@
+node_modules
+.env
+.env.local
+*.md
+!VERCEL_DEPLOYMENT.md
+.git
+.gitignore
+drizzle
+migrations
+tests
+*.test.ts
+*.test.tsx
+.manus
+logs
+*.log
+.DS_Store
