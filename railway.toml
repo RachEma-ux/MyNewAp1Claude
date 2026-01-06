@@ -1,0 +1,14 @@
+[build]
+builder = "NIXPACKS"
+
+[build.nixpacksPlan]
+providers = ["node"]
+
+[build.nixpacksConfig]
+packageManager = "pnpm"
+
+[deploy]
+startCommand = "pnpm build && pnpm start"
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
