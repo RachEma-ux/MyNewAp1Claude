@@ -14,6 +14,10 @@ services:
         fromDatabase:
           name: app-db
           property: connectionString
+      - key: VITE_OAUTH_PORTAL_URL
+        value: https://example.com
+      - key: VITE_APP_ID
+        value: demo-app
 
 databases:
   - name: app-db
