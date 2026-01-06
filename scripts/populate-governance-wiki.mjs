@@ -27,7 +27,7 @@ function parseDbUrl(dbUrl) {
   }
 }
 
-const dbConfig = parseDbUrl(process.env.DATABASE_URL || 'mysql://root@localhost/mynewappv1');
+const dbConfig = parseDbUrl(process.env.DATABASE_URL || 'mysql://root@localhost/app');
 
 const reports = [
   {
