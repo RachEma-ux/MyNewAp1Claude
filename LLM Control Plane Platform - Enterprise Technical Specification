@@ -1,0 +1,2689 @@
+LLM Control Plane Platform - Enterprise Technical Specification
+
+Executive Summary
+
+Business Justification
+
+The LLM Control Plane Platform addresses critical enterprise requirements for AI governance, compliance, and operational reliability in multi-agent LLM deployments. This platform enables organizations to deploy, manage, and monitor LLMs in production with enterprise-grade security, auditability, and failure resilience.
+
+Key Value Propositions
+
+· Governance-First: Policy-as-code ensures compliance before execution
+· Zero-Trust Architecture: Runtime attestation and drift detection prevent unauthorized execution
+· Multi-Agent Ready: Native support for orchestrating complex AI agent workflows
+· Enterprise Compliance: Complete audit trail, promotion gates, and separation of duties
+· Production Reliability: Chaos testing and fail-closed design ensure operational resilience
+
+1. Architecture Overview
+
+1.1 System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Presentation Layer                        │
+├─────────────────────────────────────────────────────────────┤
+│  LLM Dashboard │ Control Plane UI │ Wizard │ Storybook     │
+└─────────────────────────────────────────────────────────────┘
+                           │
+┌─────────────────────────────────────────────────────────────┐
+│                    API Gateway Layer                         │
+├─────────────────────────────────────────────────────────────┤
+│  Rate Limiting │ Authentication │ Request Logging │ TLS    │
+└─────────────────────────────────────────────────────────────┘
+                           │
+┌─────────────────────────────────────────────────────────────┐
+│                    Application Services                       │
+├─────────────────────────────────────────────────────────────┤
+│  Registry Service  │ Policy Service  │ Attestation Service  │
+│  Promotion Service │ Drift Service   │ Audit Service        │
+│  Guard Service     │ Orchestrator    │                      │
+└─────────────────────────────────────────────────────────────┘
+                           │
+┌─────────────────────────────────────────────────────────────┐
+│                    Data & Infrastructure                      │
+├─────────────────────────────────────────────────────────────┤
+│  PostgreSQL │ NATS │ Object Storage │ KMS │ Kubernetes      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+1.2 Component Interaction Flow
+
+```
+1. User → Dashboard → Wizard
+2. Wizard → Policy Service (simulation)
+3. Wizard → Registry Service (create version)
+4. Runtime → Attestation Service (submit evidence)
+5. Orchestrator → Guard Service (pre-flight check)
+6. Guard → [Policy + Attestation + Drift] → Allow/Deny
+7. All actions → Audit Service (immutable logging)
+```
+
+2. Detailed Technical Specifications
+
+2.1 LLM Registry Service
+
+2.1.1 Database Schema (PostgreSQL)
+
+```sql
+-- Core LLM Identity
+CREATE TABLE llms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    external_id VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    role VARCHAR(50) NOT NULL CHECK (role IN (
+        'planner', 'executor', 'router', 'guard', 
+        'observer', 'embedder', 'orchestrator'
+    )),
+    owner_team VARCHAR(255) NOT NULL,
+    owner_email VARCHAR(255),
+    cost_center VARCHAR(100),
+    compliance_tier VARCHAR(50) DEFAULT 'standard',
+    archived BOOLEAN DEFAULT FALSE,
+    archived_at TIMESTAMP WITH TIME ZONE,
+    archived_by VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    version INTEGER DEFAULT 1
+);
+
+-- LLM Versions (Immutable)
+CREATE TABLE llm_versions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    llm_id UUID NOT NULL REFERENCES llms(id) ON DELETE RESTRICT,
+    version_number INTEGER NOT NULL,
+    environment VARCHAR(50) NOT NULL CHECK (environment IN (
+        'sandbox', 'governed', 'production'
+    )),
+    
+    -- Configuration
+    config JSONB NOT NULL,
+    config_hash VARCHAR(64) NOT NULL,
+    
+    -- Policy
+    policy_bundle_ref VARCHAR(512),
+    policy_hash VARCHAR(64),
+    policy_result JSONB,
+    
+    -- Attestation
+    attestation_contract JSONB,
+    expected_image_digest VARCHAR(64),
+    expected_config_hash VARCHAR(64),
+    
+    -- Status
+    status VARCHAR(50) DEFAULT 'draft' CHECK (status IN (
+        'draft', 'active', 'deprecated', 'revoked'
+    )),
+    callable BOOLEAN DEFAULT FALSE,
+    
+    -- Metadata
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by VARCHAR(255) NOT NULL,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    approved_by VARCHAR(255),
+    
+    -- Indexes
+    UNIQUE(llm_id, version_number),
+    UNIQUE(config_hash)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_llm_versions_llm_id ON llm_versions(llm_id);
+CREATE INDEX idx_llm_versions_environment ON llm_versions(environment);
+CREATE INDEX idx_llm_versions_callable ON llm_versions(callable) WHERE callable = true;
+CREATE INDEX idx_llm_versions_created_at ON llm_versions(created_at DESC);
+
+-- Attestation Records
+CREATE TABLE attestations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    llm_version_id UUID NOT NULL REFERENCES llm_versions(id) ON DELETE RESTRICT,
+    
+    -- Evidence
+    evidence JSONB NOT NULL,
+    evidence_hash VARCHAR(64) NOT NULL,
+    
+    -- Verification
+    verified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    verified_by VARCHAR(255) DEFAULT 'system',
+    verification_result VARCHAR(50) CHECK (verification_result IN (
+        'success', 'failed', 'error'
+    )),
+    
+    -- Status
+    attestation_status VARCHAR(50) DEFAULT 'pending' CHECK (attestation_status IN (
+        'pending', 'attested', 'stale', 'revoked'
+    )),
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Indexes
+    UNIQUE(llm_version_id, evidence_hash)
+);
+
+-- Drift Detection Events
+CREATE TABLE drift_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    llm_version_id UUID NOT NULL REFERENCES llm_versions(id) ON DELETE RESTRICT,
+    
+    -- Drift Details
+    severity VARCHAR(20) NOT NULL CHECK (severity IN (
+        'critical', 'suspicious', 'benign'
+    )),
+    drift_type VARCHAR(100) NOT NULL,
+    
+    -- State Comparison
+    expected_state JSONB,
+    observed_state JSONB,
+    diff JSONB,
+    
+    -- Response
+    auto_remediated BOOLEAN DEFAULT FALSE,
+    remediation_action VARCHAR(255),
+    requires_manual_intervention BOOLEAN DEFAULT FALSE,
+    
+    -- Metadata
+    detected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    resolved_by VARCHAR(255),
+    
+    -- Indexes
+    INDEX idx_drift_events_llm_version ON drift_events(llm_version_id),
+    INDEX idx_drift_events_severity ON drift_events(severity),
+    INDEX idx_drift_events_detected_at ON drift_events(detected_at DESC)
+);
+
+-- Promotion Gates
+CREATE TABLE promotions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_llm_version_id UUID NOT NULL REFERENCES llm_versions(id) ON DELETE RESTRICT,
+    target_llm_version_id UUID REFERENCES llm_versions(id) ON DELETE SET NULL,
+    
+    -- Gate Details
+    source_environment VARCHAR(50) NOT NULL,
+    target_environment VARCHAR(50) NOT NULL,
+    promotion_type VARCHAR(50) DEFAULT 'standard' CHECK (promotion_type IN (
+        'standard', 'emergency', 'rollback'
+    )),
+    
+    -- Status
+    status VARCHAR(50) DEFAULT 'requested' CHECK (status IN (
+        'requested', 'simulated', 'approved', 'rejected', 
+        'completed', 'failed'
+    )),
+    
+    -- Approval Chain
+    requested_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    requested_by VARCHAR(255) NOT NULL,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    approved_by VARCHAR(255),
+    approval_required_from JSONB, -- Array of required approver roles
+    
+    -- Evidence
+    simulation_result JSONB,
+    policy_diff JSONB,
+    risk_assessment JSONB,
+    
+    -- Metadata
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Constraints
+    CHECK (source_environment != target_environment)
+);
+
+-- Audit Trail
+CREATE TABLE audit_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id VARCHAR(64) UNIQUE NOT NULL,
+    
+    -- Event Details
+    event_type VARCHAR(100) NOT NULL,
+    event_subtype VARCHAR(100),
+    
+    -- Actors
+    actor_id VARCHAR(255) NOT NULL,
+    actor_type VARCHAR(50) CHECK (actor_type IN ('user', 'service', 'system')),
+    
+    -- Resources
+    resource_type VARCHAR(100) NOT NULL,
+    resource_id VARCHAR(255),
+    llm_version_id UUID REFERENCES llm_versions(id),
+    
+    -- Context
+    environment VARCHAR(50),
+    workspace_id VARCHAR(255),
+    
+    -- Data
+    previous_state JSONB,
+    new_state JSONB,
+    changes JSONB,
+    
+    -- Integrity
+    hash_chain_previous VARCHAR(64),
+    hash_chain_current VARCHAR(64) NOT NULL,
+    digital_signature TEXT,
+    
+    -- Metadata
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    source_ip INET,
+    user_agent TEXT,
+    
+    -- Indexes
+    INDEX idx_audit_events_event_type ON audit_events(event_type),
+    INDEX idx_audit_events_created_at ON audit_events(created_at DESC),
+    INDEX idx_audit_events_actor ON audit_events(actor_id, created_at DESC),
+    INDEX idx_audit_events_resource ON audit_events(resource_type, resource_id)
+);
+```
+
+2.1.2 API Specifications (OpenAPI 3.1)
+
+```yaml
+openapi: 3.1.0
+info:
+  title: LLM Registry API
+  version: 1.0.0
+  description: Enterprise LLM Control Plane Registry
+  contact:
+    name: Platform Engineering
+    email: platform@company.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://llm-registry.production.company.com/v1
+    description: Production environment
+  - url: https://llm-registry.staging.company.com/v1
+    description: Staging environment
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  
+  schemas:
+    LLM:
+      type: object
+      required:
+        - id
+        - name
+        - role
+        - owner_team
+      properties:
+        id:
+          type: string
+          format: uuid
+        external_id:
+          type: string
+        name:
+          type: string
+          maxLength: 255
+        role:
+          type: string
+          enum:
+            - planner
+            - executor
+            - router
+            - guard
+            - observer
+            - embedder
+            - orchestrator
+        owner_team:
+          type: string
+          maxLength: 255
+        compliance_tier:
+          type: string
+          enum:
+            - standard
+            - high
+            - maximum
+        archived:
+          type: boolean
+          default: false
+
+    LLMVersion:
+      type: object
+      required:
+        - llm_id
+        - version_number
+        - environment
+        - config
+      properties:
+        config:
+          type: object
+          properties:
+            runtime:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - container
+                    - vm
+                    - serverless
+                image:
+                  type: string
+                entrypoint:
+                  type: array
+                  items:
+                    type: string
+            model:
+              type: object
+              properties:
+                provider:
+                  type: string
+                name:
+                  type: string
+                context_length:
+                  type: integer
+                max_tokens:
+                  type: integer
+            parameters:
+              type: object
+              properties:
+                temperature:
+                  type: number
+                  minimum: 0
+                  maximum: 2
+                top_p:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+
+    PolicyEvaluationRequest:
+      type: object
+      required:
+        - config
+        - environment
+        - role
+      properties:
+        config:
+          $ref: '#/components/schemas/LLMVersion/properties/config'
+        environment:
+          type: string
+          enum:
+            - sandbox
+            - governed
+            - production
+        role:
+          type: string
+        simulation_id:
+          type: string
+          description: For linking multiple evaluations
+
+    PolicyEvaluationResult:
+      type: object
+      required:
+        - decision
+        - timestamp
+      properties:
+        decision:
+          type: string
+          enum:
+            - allow
+            - deny
+            - error
+        deny_reasons:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+              severity:
+                type: string
+                enum:
+                  - low
+                  - medium
+                  - high
+                  - critical
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyWarning'
+        mutations:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              from:
+                type: any
+              to:
+                type: any
+        policy_hash:
+          type: string
+        evaluation_duration_ms:
+          type: number
+
+paths:
+  /llms:
+    get:
+      summary: List LLMs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: environment
+          in: query
+          schema:
+            type: string
+            enum:
+              - sandbox
+              - governed
+              - production
+        - name: role
+          in: query
+          schema:
+            type: string
+        - name: archived
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of LLMs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LLM'
+    
+    post:
+      summary: Create LLM
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - role
+                - owner_team
+              properties:
+                name:
+                  type: string
+                role:
+                  type: string
+                owner_team:
+                  type: string
+      responses:
+        '201':
+          description: LLM created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLM'
+
+  /llms/{llm_id}/versions:
+    post:
+      summary: Create LLM version
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: llm_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - config
+                - environment
+              properties:
+                config:
+                  $ref: '#/components/schemas/LLMVersion/properties/config'
+                environment:
+                  type: string
+                simulation_id:
+                  type: string
+      responses:
+        '201':
+          description: Version created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMVersion'
+        '400':
+          description: Invalid configuration
+
+  /policy/evaluate:
+    post:
+      summary: Evaluate policies
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyEvaluationRequest'
+      responses:
+        '200':
+          description: Policy evaluation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyEvaluationResult'
+
+  /dispatch/guard:
+    post:
+      summary: Orchestrator dispatch guard
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - graph_id
+                - llm_versions
+              properties:
+                graph_id:
+                  type: string
+                llm_versions:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                environment:
+                  type: string
+      responses:
+        '200':
+          description: Guard check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allowed:
+                    type: boolean
+                  reasons:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        message:
+                          type: string
+                        llm_version_id:
+                          type: string
+                  required_actions:
+                    type: array
+                    items:
+                      type: object
+```
+
+2.2 Policy Engine Implementation
+
+2.2.1 Policy Bundle Structure
+
+```
+policies/
+├── bundles/
+│   ├── base/
+│   │   ├── rego/
+│   │   │   ├── runtime.rego
+│   │   │   ├── security.rego
+│   │   │   └── compliance.rego
+│   │   └── data/
+│   │       └── allowed_images.json
+│   ├── environment/
+│   │   ├── sandbox/
+│   │   │   └── policies.rego
+│   │   ├── governed/
+│   │   │   └── policies.rego
+│   │   └── production/
+│   │       └── policies.rego
+│   └── role/
+│       ├── planner/
+│       │   └── policies.rego
+│       ├── guard/
+│       │   └── policies.rego
+│       └── orchestrator/
+│           └── policies.rego
+├── tests/
+│   └── integration/
+│       └── test_cases.yaml
+└── Makefile
+```
+
+2.2.2 Sample Rego Policies
+
+```rego
+# policies/bundles/base/rego/runtime.rego
+package llm.runtime
+
+import future.keywords
+
+# Deny local runtime in production
+deny[msg] {
+    input.environment == "production"
+    input.config.runtime.type == "local"
+    msg := "Local runtime not allowed in production"
+}
+
+# Require GPU for models above certain size
+warn[msg] {
+    input.config.model.context_length > 128000
+    not input.config.runtime.gpu
+    msg := "High context length models may require GPU acceleration"
+}
+
+# Enforce image signing
+deny[msg] {
+    input.config.runtime.type == "container"
+    not startswith(input.config.runtime.image, "ghcr.io/company/")
+    msg := "Only approved container images are allowed"
+}
+
+# policies/bundles/environment/production/policies.rego
+package llm.environment.production
+
+import data.llm.runtime
+
+# Production-specific policies
+deny[msg] {
+    input.config.parameters.temperature > 1.0
+    msg := "Temperature must be ≤ 1.0 in production"
+}
+
+deny[msg] {
+    count(input.config.model.name) == 0
+    msg := "Model name must be specified in production"
+}
+
+# policies/bundles/role/guard/policies.rego
+package llm.role.guard
+
+# Guard-specific policies
+deny[msg] {
+    input.role == "guard"
+    not input.config.security.scan_input
+    msg := "Guard LLMs must have input scanning enabled"
+}
+
+allow {
+    # Allow guard to have higher temperature for creativity in moderation
+    input.role == "guard"
+    input.config.parameters.temperature <= 1.5
+}
+```
+
+2.2.3 Policy Service Implementation (Go)
+
+```go
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/open-policy-agent/opa/ast"
+	"github.com/open-policy-agent/opa/rego"
+	"github.com/open-policy-agent/opa/storage"
+	"github.com/open-policy-agent/opa/storage/inmem"
+	"github.com/open-policy-agent/opa/util"
+)
+
+type PolicyService struct {
+	store    storage.Store
+	compiler *ast.Compiler
+	cache    *PolicyCache
+}
+
+type PolicyEvaluationRequest struct {
+	Config      json.RawMessage `json:"config"`
+	Environment string          `json:"environment"`
+	Role        string          `json:"role"`
+	Action      string          `json:"action"`
+}
+
+type PolicyEvaluationResult struct {
+	Decision         string          `json:"decision"`
+	DenyReasons      []DenyReason    `json:"deny_reasons,omitempty"`
+	Warnings         []Warning       `json:"warnings,omitempty"`
+	Mutations        []Mutation      `json:"mutations,omitempty"`
+	PolicyHash       string          `json:"policy_hash"`
+	EvaluationTimeMS int64           `json:"evaluation_time_ms"`
+	Trace            json.RawMessage `json:"trace,omitempty"`
+}
+
+func NewPolicyService(policyDir string) (*PolicyService, error) {
+	// Load policies from directory
+	modules, err := loadPolicyModules(policyDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create storage with policy data
+	store := inmem.New()
+	compiler, err := ast.CompileModules(modules)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PolicyService{
+		store:    store,
+		compiler: compiler,
+		cache:    NewPolicyCache(1000, 5*time.Minute),
+	}, nil
+}
+
+func (s *PolicyService) Evaluate(ctx context.Context, req *PolicyEvaluationRequest) (*PolicyEvaluationResult, error) {
+	start := time.Now()
+	
+	// Create input for OPA
+	input := map[string]interface{}{
+		"config":      req.Config,
+		"environment": req.Environment,
+		"role":        req.Role,
+		"action":      req.Action,
+		"timestamp":   time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Prepare query
+	query := rego.New(
+		rego.Compiler(s.compiler),
+		rego.Store(s.store),
+		rego.Input(input),
+		rego.Query("data.llm.policy"),
+	)
+
+	// Execute query
+	rs, err := query.Eval(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("policy evaluation failed: %w", err)
+	}
+
+	// Parse results
+	result := &PolicyEvaluationResult{
+		Decision:         "allow",
+		EvaluationTimeMS: time.Since(start).Milliseconds(),
+	}
+
+	if len(rs) > 0 && len(rs[0].Expressions) > 0 {
+		policyResult := rs[0].Expressions[0].Value.(map[string]interface{})
+		
+		if denies, ok := policyResult["deny"].([]interface{}); ok && len(denies) > 0 {
+			result.Decision = "deny"
+			for _, d := range denies {
+				denyMap := d.(map[string]interface{})
+				result.DenyReasons = append(result.DenyReasons, DenyReason{
+					Code:     denyMap["code"].(string),
+					Message:  denyMap["message"].(string),
+					Severity: denyMap["severity"].(string),
+				})
+			}
+		}
+
+		if warns, ok := policyResult["warn"].([]interface{}); ok {
+			for _, w := range warns {
+				warnMap := w.(map[string]interface{})
+				result.Warnings = append(result.Warnings, Warning{
+					Message:  warnMap["message"].(string),
+					Severity: warnMap["severity"].(string),
+				})
+			}
+		}
+	}
+
+	// Generate policy hash
+	result.PolicyHash = s.generatePolicyHash()
+
+	return result, nil
+}
+
+func (s *PolicyService) Simulate(ctx context.Context, req *PolicyEvaluationRequest) (*PolicyEvaluationResult, error) {
+	// Add simulation flag
+	simulationReq := &PolicyEvaluationRequest{
+		Config:      req.Config,
+		Environment: req.Environment,
+		Role:        req.Role,
+		Action:      "simulate",
+	}
+	
+	return s.Evaluate(ctx, simulationReq)
+}
+
+func (s *PolicyService) HTTPHandler() http.Handler {
+	mux := http.NewServeMux()
+	
+	mux.HandleFunc("/v1/policy/evaluate", func(w http.ResponseWriter, r *http.Request) {
+		var req PolicyEvaluationRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		result, err := s.Evaluate(r.Context(), &req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+	})
+
+	mux.HandleFunc("/v1/policy/simulate", func(w http.ResponseWriter, r *http.Request) {
+		var req PolicyEvaluationRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		result, err := s.Simulate(r.Context(), &req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+	})
+
+	return mux
+}
+```
+
+2.3 Attestation Service
+
+2.3.1 Attestation Contract
+
+```json
+{
+  "schema_version": "1.0.0",
+  "llm_version_id": "uuid",
+  "runtime_evidence": {
+    "container_runtime": {
+      "image_digest": "sha256:...",
+      "container_id": "docker://...",
+      "runtime": "containerd",
+      "pid": 1234
+    },
+    "hardware": {
+      "tpm_measurements": [
+        {
+          "pcr": 0,
+          "hash": "sha256:..."
+        }
+      ],
+      "secure_boot": true,
+      "confidential_computing": {
+        "enabled": true,
+        "type": "sev-snp"
+      }
+    }
+  },
+  "config_verification": {
+    "config_hash": "sha256:...",
+    "verified_files": [
+      {
+        "path": "/etc/llm/config.yaml",
+        "hash": "sha256:..."
+      }
+    ]
+  },
+  "identity": {
+    "workload_identity": "spiffe://example.com/ns/production/sa/llm-runner",
+    "service_account": "llm-runner@project.iam.gserviceaccount.com"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "signature": {
+    "algorithm": "RSASSA-PSS",
+    "public_key": "-----BEGIN PUBLIC KEY-----...",
+    "signature": "base64..."
+  }
+}
+```
+
+2.3.2 Attestation Verification
+
+```python
+# attestation/verifier.py
+import hashlib
+import json
+import logging
+from datetime import datetime, timezone
+from typing import Dict, Optional, Tuple
+
+import cryptography.exceptions
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from sigstore.verify import Verifier, VerificationMaterials
+
+class AttestationVerifier:
+    def __init__(self, trusted_keys: Dict[str, str], policy_engine):
+        self.trusted_keys = trusted_keys
+        self.policy_engine = policy_engine
+        self.logger = logging.getLogger(__name__)
+    
+    async def verify(self, attestation: Dict) -> Tuple[bool, Optional[str]]:
+        """Verify an attestation document."""
+        
+        # 1. Verify signature
+        if not await self._verify_signature(attestation):
+            return False, "Invalid signature"
+        
+        # 2. Verify timestamp (not too old)
+        if not self._verify_timestamp(attestation.get('timestamp')):
+            return False, "Timestamp verification failed"
+        
+        # 3. Verify config hash matches
+        llm_version_id = attestation.get('llm_version_id')
+        if not llm_version_id:
+            return False, "Missing llm_version_id"
+        
+        config_hash = await self._get_expected_config_hash(llm_version_id)
+        if config_hash != attestation.get('config_verification', {}).get('config_hash'):
+            return False, "Config hash mismatch"
+        
+        # 4. Verify image signature (if container)
+        if 'container_runtime' in attestation.get('runtime_evidence', {}):
+            if not await self._verify_container_image(attestation):
+                return False, "Container image verification failed"
+        
+        # 5. Verify TPM measurements (if present)
+        if 'tpm_measurements' in attestation.get('runtime_evidence', {}).get('hardware', {}):
+            if not await self._verify_tpm_measurements(attestation):
+                return False, "TPM measurements verification failed"
+        
+        # 6. Check against attestation policies
+        policy_result = await self.policy_engine.evaluate_attestation(attestation)
+        if not policy_result.get('allow', False):
+            return False, f"Policy violation: {policy_result.get('reason', 'Unknown')}"
+        
+        return True, None
+    
+    async def _verify_signature(self, attestation: Dict) -> bool:
+        """Verify digital signature of attestation."""
+        try:
+            signature_info = attestation.get('signature', {})
+            public_key_pem = self.trusted_keys.get(signature_info.get('public_key_id'))
+            
+            if not public_key_pem:
+                self.logger.error("Unknown public key ID")
+                return False
+            
+            public_key = serialization.load_pem_public_key(
+                public_key_pem.encode()
+            )
+            
+            # Remove signature for verification
+            attestation_copy = attestation.copy()
+            attestation_copy.pop('signature', None)
+            
+            message = json.dumps(attestation_copy, sort_keys=True).encode()
+            signature = signature_info.get('signature')
+            
+            if isinstance(public_key, rsa.RSAPublicKey):
+                public_key.verify(
+                    signature,
+                    message,
+                    padding.PSS(
+                        mgf=padding.MGF1(hashes.SHA256()),
+                        salt_length=padding.PSS.MAX_LENGTH
+                    ),
+                    hashes.SHA256()
+                )
+                return True
+                
+        except cryptography.exceptions.InvalidSignature:
+            self.logger.error("Signature verification failed")
+            return False
+        except Exception as e:
+            self.logger.error(f"Signature verification error: {e}")
+            return False
+        
+        return False
+    
+    async def _verify_container_image(self, attestation: Dict) -> bool:
+        """Verify container image signature using sigstore."""
+        try:
+            runtime_info = attestation['runtime_evidence']['container_runtime']
+            image_ref = runtime_info.get('image_reference')
+            
+            if not image_ref:
+                return False
+            
+            # Use sigstore to verify image signature
+            verifier = Verifier.production()
+            materials = VerificationMaterials.from_dsse(
+                runtime_info.get('dsse_envelope'),
+                runtime_info.get('signature_certificate'),
+                runtime_info.get('rekor_bundle')
+            )
+            
+            result = verifier.verify(
+                materials,
+                policy=Verifier.any_publisher()
+            )
+            
+            return result.success
+            
+        except Exception as e:
+            self.logger.error(f"Container image verification error: {e}")
+            return False
+    
+    async def _verify_tpm_measurements(self, attestation: Dict) -> bool:
+        """Verify TPM measurements against expected values."""
+        # This would integrate with a TPM verification service
+        # For now, return True if measurements are present
+        measurements = attestation['runtime_evidence']['hardware']['tpm_measurements']
+        return bool(measurements)  # Simplified for example
+    
+    def _verify_timestamp(self, timestamp_str: str) -> bool:
+        """Verify attestation timestamp is recent."""
+        try:
+            attestation_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            current_time = datetime.now(timezone.utc)
+            
+            # Attestation must be from last 5 minutes
+            time_diff = current_time - attestation_time
+            return time_diff.total_seconds() <= 300
+            
+        except Exception as e:
+            self.logger.error(f"Timestamp verification error: {e}")
+            return False
+    
+    async def _get_expected_config_hash(self, llm_version_id: str) -> Optional[str]:
+        """Retrieve expected config hash from registry."""
+        # This would query the registry service
+        # Simplified for example
+        return "expected_hash_from_registry"
+```
+
+2.4 Drift Detection Service
+
+2.4.1 Drift Detection Rules
+
+```yaml
+# drift-detection/rules.yaml
+rules:
+  - id: image_digest_mismatch
+    name: Container Image Digest Mismatch
+    severity: critical
+    description: Detects when running container digest differs from attested digest
+    check_type: periodic
+    interval_seconds: 300
+    query: |
+      SELECT 
+        lv.id as llm_version_id,
+        lv.expected_image_digest,
+        k8s.container_image_digest as actual_digest
+      FROM llm_versions lv
+      JOIN kubernetes_pods k8s ON k8s.llm_version_id = lv.id
+      WHERE lv.expected_image_digest != k8s.container_image_digest
+        AND lv.callable = true
+  
+  - id: config_file_modification
+    name: Configuration File Modification
+    severity: suspicious
+    description: Detects unauthorized modifications to configuration files
+    check_type: realtime
+    triggers:
+      - file_system_watcher
+    query: |
+      SELECT 
+        lv.id as llm_version_id,
+        cf.path,
+        cf.expected_hash,
+        cf.actual_hash
+      FROM llm_versions lv
+      JOIN config_files cf ON cf.llm_version_id = lv.id
+      WHERE cf.expected_hash != cf.actual_hash
+  
+  - id: environment_variable_drift
+    name: Environment Variable Drift
+    severity: medium
+    description: Detects changes to environment variables
+    check_type: on_startup
+    query: |
+      SELECT 
+        lv.id as llm_version_id,
+        ev.name,
+        ev.expected_value,
+        ev.actual_value
+      FROM llm_versions lv
+      JOIN env_variables ev ON ev.llm_version_id = lv.id
+      WHERE ev.expected_value != ev.actual_value
+  
+  - id: resource_constraint_violation
+    name: Resource Constraint Violation
+    severity: low
+    description: Detects when runtime exceeds resource constraints
+    check_type: continuous
+    query: |
+      SELECT 
+        lv.id as llm_version_id,
+        rc.metric_name,
+        rc.current_value,
+        rc.threshold
+      FROM llm_versions lv
+      JOIN resource_consumption rc ON rc.llm_version_id = lv.id
+      WHERE rc.current_value > rc.threshold
+        AND rc.check_time > NOW() - INTERVAL '5 minutes'
+
+actions:
+  critical:
+    - action: revoke_callable
+      immediate: true
+    - action: notify_security
+      channels: [pagerduty, slack_security]
+    - action: create_incident
+      severity: sev1
+  
+  suspicious:
+    - action: block_new_executions
+      immediate: true
+    - action: notify_owner
+      channels: [email, slack_team]
+    - action: require_manual_review
+  
+  medium:
+    - action: warn_owner
+      channels: [slack_team]
+    - action: schedule_auto_remediation
+  
+  low:
+    - action: log_only
+    - action: aggregate_for_reporting
+```
+
+2.4.2 Drift Detection Implementation
+
+```python
+# drift/detector.py
+import asyncio
+import json
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
+import asyncpg
+import yaml
+from prometheus_client import Counter, Gauge, Histogram
+
+class DriftDetector:
+    def __init__(self, db_pool, rules_file: str, notification_service):
+        self.db_pool = db_pool
+        self.rules = self._load_rules(rules_file)
+        self.notification_service = notification_service
+        self.logger = logging.getLogger(__name__)
+        
+        # Metrics
+        self.drift_detected = Counter(
+            'llm_drift_detected_total',
+            'Total drift events detected',
+            ['severity', 'rule_id']
+        )
+        self.detection_duration = Histogram(
+            'llm_drift_detection_duration_seconds',
+            'Time spent detecting drift'
+        )
+        self.active_checks = Gauge(
+            'llm_drift_active_checks',
+            'Number of active drift checks'
+        )
+    
+    async def run_periodic_checks(self):
+        """Run all periodic drift detection checks."""
+        periodic_rules = [r for r in self.rules if r['check_type'] == 'periodic']
+        
+        while True:
+            self.active_checks.set(len(periodic_rules))
+            
+            for rule in periodic_rules:
+                try:
+                    await self._check_rule(rule)
+                except Exception as e:
+                    self.logger.error(f"Error checking rule {rule['id']}: {e}")
+            
+            # Wait for next interval
+            await asyncio.sleep(60)  # Check every minute
+    
+    async def _check_rule(self, rule: Dict):
+        """Execute a single drift detection rule."""
+        with self.detection_duration.time():
+            self.logger.debug(f"Checking rule: {rule['id']}")
+            
+            # Execute rule query
+            async with self.db_pool.acquire() as conn:
+                results = await conn.fetch(rule['query'])
+            
+            # Process results
+            for row in results:
+                drift_event = {
+                    'rule_id': rule['id'],
+                    'severity': rule['severity'],
+                    'llm_version_id': row['llm_version_id'],
+                    'detected_at': datetime.utcnow(),
+                    'evidence': dict(row)
+                }
+                
+                # Record drift
+                await self._record_drift(drift_event)
+                
+                # Take actions based on severity
+                await self._take_actions(rule, drift_event)
+                
+                # Update metrics
+                self.drift_detected.labels(
+                    severity=rule['severity'],
+                    rule_id=rule['id']
+                ).inc()
+    
+    async def _record_drift(self, drift_event: Dict):
+        """Record drift event in database."""
+        async with self.db_pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO drift_events (
+                    llm_version_id,
+                    severity,
+                    drift_type,
+                    expected_state,
+                    observed_state,
+                    diff,
+                    detected_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            """, 
+                drift_event['llm_version_id'],
+                drift_event['severity'],
+                drift_event['rule_id'],
+                json.dumps(drift_event['evidence'].get('expected')),
+                json.dumps(drift_event['evidence'].get('actual')),
+                json.dumps(drift_event['evidence']),
+                drift_event['detected_at']
+            )
+    
+    async def _take_actions(self, rule: Dict, drift_event: Dict):
+        """Take actions based on drift severity."""
+        severity = rule['severity']
+        actions = rule.get('actions', {}).get(severity, [])
+        
+        for action_config in actions:
+            action = action_config['action']
+            
+            if action == 'revoke_callable':
+                await self._revoke_callable(drift_event['llm_version_id'])
+            
+            elif action == 'notify_security':
+                await self.notification_service.notify_security(
+                    f"Critical drift detected: {rule['name']}",
+                    drift_event
+                )
+            
+            elif action == 'create_incident':
+                await self._create_incident(drift_event, action_config.get('severity', 'sev2'))
+            
+            elif action == 'notify_owner':
+                await self._notify_owner(drift_event['llm_version_id'], drift_event)
+    
+    async def _revoke_callable(self, llm_version_id: str):
+        """Revoke callable status for an LLM version."""
+        async with self.db_pool.acquire() as conn:
+            await conn.execute("""
+                UPDATE llm_versions 
+                SET callable = false, 
+                    status = 'revoked'
+                WHERE id = $1
+            """, llm_version_id)
+            
+            # Also update any dependent orchestrator graphs
+            await self._update_orchestrator_graphs(llm_version_id)
+    
+    async def on_realtime_event(self, event_type: str, data: Dict):
+        """Handle real-time events for drift detection."""
+        if event_type == 'container_started':
+            await self._check_container_start(data)
+        elif event_type == 'file_modified':
+            await self._check_file_modification(data)
+        elif event_type == 'config_updated':
+            await self._check_config_update(data)
+    
+    def _load_rules(self, rules_file: str) -> List[Dict]:
+        """Load drift detection rules from YAML file."""
+        with open(rules_file, 'r') as f:
+            return yaml.safe_load(f)['rules']
+```
+
+2.5 Frontend Implementation
+
+2.5.1 Wizard State Machine (XState)
+
+```typescript
+// frontend/src/lib/wizard/machine.ts
+import { createMachine, assign, send } from 'xstate';
+import { PolicyEvaluationResult } from '../types';
+
+interface WizardContext {
+  llms: LLM[];
+  selectedLLMId: string | null;
+  draft: LLMDraft | null;
+  simulationResults: PolicyEvaluationResult | null;
+  stepData: Record<string, any>;
+  errors: Record<string, string[]>;
+}
+
+type WizardEvent =
+  | { type: 'OPEN_WIZARD' }
+  | { type: 'CLOSE_WIZARD' }
+  | { type: 'NEXT' }
+  | { type: 'BACK' }
+  | { type: 'SELECT_LLM'; llmId: string }
+  | { type: 'UPDATE_DRAFT'; data: Partial<LLMDraft> }
+  | { type: 'SIMULATE' }
+  | { type: 'SUBMIT' }
+  | { type: 'CANCEL' };
+
+export const wizardMachine = createMachine<WizardContext, WizardEvent>(
+  {
+    id: 'llmWizard',
+    initial: 'closed',
+    context: {
+      llms: [],
+      selectedLLMId: null,
+      draft: null,
+      simulationResults: null,
+      stepData: {},
+      errors: {}
+    },
+    states: {
+      closed: {
+        on: {
+          OPEN_WIZARD: [
+            {
+              cond: 'noLLMs',
+              target: '.creating'
+            },
+            {
+              target: '.managing'
+            }
+          ]
+        },
+        initial: 'idle',
+        states: {
+          idle: {},
+          creating: {
+            entry: ['initializeCreateDraft'],
+            target: '#llmWizard.create.step1'
+          },
+          managing: {
+            target: '#llmWizard.manage.select'
+          }
+        }
+      },
+
+      create: {
+        id: 'create',
+        initial: 'step1',
+        states: {
+          step1: {
+            entry: ['clearErrors'],
+            on: {
+              NEXT: {
+                target: 'step2',
+                actions: ['validateStep1']
+              },
+              UPDATE_DRAFT: {
+                actions: ['updateDraft']
+              }
+            }
+          },
+          step2: {
+            entry: ['clearErrors'],
+            on: {
+              NEXT: {
+                target: 'step3',
+                actions: ['validateStep2']
+              },
+              BACK: 'step1',
+              UPDATE_DRAFT: {
+                actions: ['updateDraft']
+              }
+            }
+          },
+          step3: {
+            entry: ['clearErrors'],
+            on: {
+              NEXT: {
+                target: 'step4',
+                actions: ['validateStep3']
+              },
+              BACK: 'step2',
+              UPDATE_DRAFT: {
+                actions: ['updateDraft']
+              }
+            }
+          },
+          step4: {
+            entry: ['clearErrors'],
+            on: {
+              NEXT: {
+                target: 'review',
+                actions: ['validateStep4']
+              },
+              BACK: 'step3',
+              UPDATE_DRAFT: {
+                actions: ['updateDraft']
+              },
+              SIMULATE: {
+                target: '.simulating',
+                actions: ['prepareSimulation']
+              }
+            },
+            initial: 'idle',
+            states: {
+              idle: {},
+              simulating: {
+                invoke: {
+                  src: 'simulatePolicies',
+                  onDone: {
+                    target: 'idle',
+                    actions: ['handleSimulationResults']
+                  },
+                  onError: {
+                    target: 'idle',
+                    actions: ['handleSimulationError']
+                  }
+                }
+              }
+            }
+          },
+          review: {
+            entry: ['validateAll'],
+            on: {
+              BACK: 'step4',
+              SUBMIT: 'submitting'
+            }
+          },
+          submitting: {
+            invoke: {
+              src: 'submitLLM',
+              onDone: {
+                target: '#llmWizard.closed',
+                actions: ['notifySuccess']
+              },
+              onError: {
+                target: 'review',
+                actions: ['handleSubmitError']
+              }
+            }
+          }
+        }
+      },
+
+      manage: {
+        id: 'manage',
+        initial: 'select',
+        states: {
+          select: {
+            on: {
+              SELECT_LLM: {
+                actions: ['selectLLM']
+              },
+              EDIT: {
+                target: 'edit.step1',
+                actions: ['initializeEditDraft']
+              },
+              CLONE: {
+                target: 'clone.step1',
+                actions: ['initializeCloneDraft']
+              },
+              CREATE_NEW: '#create.step1'
+            }
+          },
+          edit: {
+            initial: 'step1',
+            states: {
+              step1: {
+                on: {
+                  NEXT: 'step2',
+                  BACK: '#manage.select',
+                  UPDATE_DRAFT: {
+                    actions: ['updateDraft']
+                  }
+                }
+              },
+              step2: {
+                on: {
+                  NEXT: 'review',
+                  BACK: 'step1',
+                  UPDATE_DRAFT: {
+                    actions: ['updateDraft']
+                  }
+                }
+              },
+              review: {
+                on: {
+                  BACK: 'step2',
+                  SUBMIT: 'submitting'
+                }
+              },
+              submitting: {
+                invoke: {
+                  src: 'updateLLM',
+                  onDone: {
+                    target: '#llmWizard.closed',
+                    actions: ['notifySuccess']
+                  },
+                  onError: {
+                    target: 'review',
+                    actions: ['handleSubmitError']
+                  }
+                }
+              }
+            }
+          },
+          clone: {
+            initial: 'step1',
+            states: {
+              step1: {
+                on: {
+                  NEXT: 'review',
+                  BACK: '#manage.select',
+                  UPDATE_DRAFT: {
+                    actions: ['updateDraft']
+                  }
+                }
+              },
+              review: {
+                on: {
+                  BACK: 'step1',
+                  SUBMIT: 'submitting'
+                }
+              },
+              submitting: {
+                invoke: {
+                  src: 'cloneLLM',
+                  onDone: {
+                    target: '#llmWizard.closed',
+                    actions: ['notifySuccess']
+                  },
+                  onError: {
+                    target: 'review',
+                    actions: ['handleSubmitError']
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    guards: {
+      noLLMs: (ctx) => ctx.llms.length === 0
+    },
+    actions: {
+      initializeCreateDraft: assign({
+        draft: () => ({
+          mode: 'create',
+          config: {
+            runtime: { type: 'container' },
+            model: { provider: 'openai' },
+            parameters: { temperature: 0.7 }
+          },
+          environment: 'sandbox'
+        })
+      }),
+      updateDraft: assign({
+        draft: (ctx, event) => ({
+          ...ctx.draft!,
+          ...event.data
+        })
+      }),
+      handleSimulationResults: assign({
+        simulationResults: (_, event) => event.data
+      })
+    },
+    services: {
+      simulatePolicies: async (ctx) => {
+        const response = await fetch('/api/v1/policy/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            config: ctx.draft!.config,
+            environment: ctx.draft!.environment,
+            role: ctx.draft!.config.role
+          })
+        });
+        return response.json();
+      },
+      submitLLM: async (ctx) => {
+        const response = await fetch('/api/v1/llms/versions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            llm_id: ctx.selectedLLMId || undefined,
+            config: ctx.draft!.config,
+            environment: ctx.draft!.environment
+          })
+        });
+        return response.json();
+      }
+    }
+  }
+);
+```
+
+2.5.2 Dashboard Components
+
+```tsx
+// frontend/src/components/llm/Dashboard.tsx
+import React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
+  PieChart, Pie, Cell, ResponsiveContainer 
+} from 'recharts';
+import { useQuery } from '@tanstack/react-query';
+import { AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+
+const Dashboard: React.FC = () => {
+  const { data: dashboardData, isLoading, refetch } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: async () => {
+      const response = await fetch('/api/v1/dashboard');
+      return response.json();
+    },
+    refetchInterval: 30000 // Refresh every 30 seconds
+  });
+
+  const { data: attestationStatus } = useQuery({
+    queryKey: ['attestation-status'],
+    queryFn: async () => {
+      const response = await fetch('/api/v1/attestations/summary');
+      return response.json();
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  const roleDistribution = [
+    { name: 'Planner', value: dashboardData?.roles?.planner || 0, color: '#8884d8' },
+    { name: 'Executor', value: dashboardData?.roles?.executor || 0, color: '#82ca9d' },
+    { name: 'Guard', value: dashboardData?.roles?.guard || 0, color: '#ffc658' },
+    { name: 'Router', value: dashboardData?.roles?.router || 0, color: '#ff8042' },
+    { name: 'Observer', value: dashboardData?.roles?.observer || 0, color: '#0088fe' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">LLM Control Plane</h1>
+          <p className="text-muted-foreground">
+            Governed, auditable LLM registry and orchestration platform
+          </p>
+        </div>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={() => window.location.href = '/llm/control-plane'}>
+            Control Plane
+          </Button>
+          <Button onClick={() => window.location.href = '/llm/wizard'}>
+            Create LLM
+          </Button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total LLMs</CardTitle>
+            <div className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardData?.total || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              {dashboardData?.active || 0} active, {dashboardData?.archived || 0} archived
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Attestation Status</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {attestationStatus?.attested || 0}
+              <span className="text-sm font-normal text-muted-foreground"> / {dashboardData?.total || 0}</span>
+            </div>
+            <div className="flex space-x-1 mt-2">
+              <Badge variant="outline" className="bg-green-50 text-green-700">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                {attestationStatus?.attested || 0} Attested
+              </Badge>
+              {attestationStatus?.stale > 0 && (
+                <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {attestationStatus?.stale || 0} Stale
+                </Badge>
+              )}
+              {attestationStatus?.failed > 0 && (
+                <Badge variant="outline" className="bg-red-50 text-red-700">
+                  <XCircle className="h-3 w-3 mr-1" />
+                  {attestationStatus?.failed || 0} Failed
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Policy Compliance</CardTitle>
+            <div className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {dashboardData?.compliant || 0}%
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+              <div 
+                className="bg-green-600 h-2.5 rounded-full" 
+                style={{ width: `${dashboardData?.compliant || 0}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Environment Distribution</CardTitle>
+            <div className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-sm">Sandbox</span>
+                <span className="text-sm font-medium">{dashboardData?.environments?.sandbox || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm">Governed</span>
+                <span className="text-sm font-medium">{dashboardData?.environments?.governed || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm">Production</span>
+                <span className="text-sm font-medium">{dashboardData?.environments?.production || 0}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>LLM Distribution by Role</CardTitle>
+            <CardDescription>Current distribution of LLM agent roles</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={roleDistribution}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {roleDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly LLM Creation</CardTitle>
+            <CardDescription>LLM creation trend over the last 6 months</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dashboardData?.creationTrend || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="created" fill="#8884d8" name="LLMs Created" />
+                  <Bar dataKey="promoted" fill="#82ca9d" name="Promoted" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Activity</CardTitle>
+          <CardDescription>Latest LLM configuration changes and events</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {(dashboardData?.recentActivity || []).map((activity: any, index: number) => (
+              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-full ${getActivityColor(activity.type)}`}>
+                    {getActivityIcon(activity.type)}
+                  </div>
+                  <div>
+                    <p className="font-medium">{activity.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {activity.llm_name} • {formatTime(activity.timestamp)}
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline">{activity.environment}</Badge>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// Helper functions
+const getActivityColor = (type: string) => {
+  switch (type) {
+    case 'created': return 'bg-blue-100 text-blue-600';
+    case 'updated': return 'bg-yellow-100 text-yellow-600';
+    case 'promoted': return 'bg-green-100 text-green-600';
+    case 'attested': return 'bg-purple-100 text-purple-600';
+    default: return 'bg-gray-100 text-gray-600';
+  }
+};
+
+const getActivityIcon = (type: string) => {
+  switch (type) {
+    case 'created': return <CheckCircle className="h-4 w-4" />;
+    case 'updated': return <RefreshCw className="h-4 w-4" />;
+    case 'promoted': return <AlertTriangle className="h-4 w-4" />;
+    default: return <div className="h-4 w-4" />;
+  }
+};
+
+const formatTime = (timestamp: string) => {
+  return new Date(timestamp).toLocaleString();
+};
+
+export default Dashboard;
+```
+
+3. Implementation Phases
+
+Phase 1: Foundation (Weeks 1-4)
+
+Objective: Basic registry with policy simulation
+
+Week 1: Infrastructure Setup
+
+```bash
+# Terraform Infrastructure
+terraform/
+├── modules/
+│   ├── network/
+│   ├── database/
+│   ├── kubernetes/
+│   ├── monitoring/
+│   └── security/
+└── environments/
+    ├── development/
+    ├── staging/
+    └── production/
+
+# Helm Charts
+charts/
+├── llm-registry/
+├── policy-service/
+├── attestation-service/
+├── audit-service/
+└── ingress-controller/
+```
+
+Week 2: Database & Core API
+
+· PostgreSQL schema implementation
+· Basic CRUD endpoints for LLMs and versions
+· Authentication and authorization setup
+· OpenAPI documentation generation
+
+Week 3: Policy Engine Integration
+
+· OPA deployment and configuration
+· Policy bundle structure
+· Simulation API endpoints
+· Policy testing framework
+
+Week 4: Frontend Foundation
+
+· Dashboard and wizard shell
+· Basic UI components
+· State management setup
+· Storybook configuration
+
+Phase 2: Governance (Weeks 5-8)
+
+Objective: Complete wizard with policy enforcement
+
+Week 5: Wizard Implementation
+
+· Step-by-step wizard flows
+· Policy integration in UI
+· Real-time validation
+· Draft management
+
+Week 6: Attestation Service
+
+· Runtime evidence collection
+· Verification logic
+· Status tracking
+· Integration with registry
+
+Week 7: Control Plane UI
+
+· LLM listing and filtering
+· Version history
+· Status indicators
+· Bulk operations
+
+Week 8: Audit System
+
+· Event emission
+· Hash chaining
+· Search and export
+· Retention policies
+
+Phase 3: Production Readiness (Weeks 9-12)
+
+Objective: Enterprise features and reliability
+
+Week 9: Drift Detection
+
+· Rule engine implementation
+· Periodic checks
+· Real-time monitoring
+· Remediation actions
+
+Week 10: Promotion Gates
+
+· Gate workflows
+· Approval chains
+· Evidence collection
+· Environment transitions
+
+Week 11: Orchestrator Integration
+
+· Guard service implementation
+· Graph validation
+· Runtime enforcement
+· Failure handling
+
+Week 12: Chaos Engineering
+
+· Failure injection scenarios
+· Recovery testing
+· Performance benchmarking
+· Documentation
+
+4. Deployment Strategy
+
+4.1 Environment Strategy
+
+```yaml
+# environments/values.yaml
+environments:
+  development:
+    replicaCount: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+    database:
+      size: "10Gi"
+    monitoring:
+      enabled: false
+    chaos:
+      enabled: false
+  
+  staging:
+    replicaCount: 2
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+    database:
+      size: "50Gi"
+    monitoring:
+      enabled: true
+    chaos:
+      enabled: true
+      scenarios: ["policy-outage", "database-latency"]
+  
+  production:
+    replicaCount: 3
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    database:
+      size: "100Gi"
+      readReplicas: 2
+    monitoring:
+      enabled: true
+      alerting: true
+    chaos:
+      enabled: true
+      scenarios: 
+        - "policy-outage"
+        - "database-failover"
+        - "network-partition"
+        - "audit-service-failure"
+```
+
+4.2 Deployment Pipeline
+
+```yaml
+# .github/workflows/deploy.yaml
+name: Deploy LLM Control Plane
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run unit tests
+        run: make test-unit
+        
+      - name: Run integration tests
+        run: make test-integration
+        
+      - name: Security scan
+        uses: anchore/scan-action@v3
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build Docker images
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/registry:${{ github.sha }} -f Dockerfile.registry .
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/policy:${{ github.sha }} -f Dockerfile.policy .
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/attestation:${{ github.sha }} -f Dockerfile.attestation .
+          
+      - name: Push Docker images
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/registry:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/policy:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/attestation:${{ github.sha }}
+          
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy to staging
+        run: |
+          kubectl config use-context staging
+          helm upgrade --install llm-control-plane ./charts/llm-control-plane \
+            --namespace llm-system \
+            --set image.tag=${{ github.sha }} \
+            --values ./environments/staging/values.yaml
+            
+      - name: Run smoke tests
+        run: |
+          ./scripts/smoke-tests.sh --environment staging
+          
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy to production (canary)
+        run: |
+          kubectl config use-context production
+          helm upgrade --install llm-control-plane ./charts/llm-control-plane \
+            --namespace llm-system \
+            --set image.tag=${{ github.sha }} \
+            --values ./environments/production/values.yaml \
+            --set canary.enabled=true \
+            --set canary.percentage=10
+            
+      - name: Monitor canary
+        run: |
+          ./scripts/monitor-canary.sh --timeout 300
+          
+      - name: Rollout to 100%
+        if: success()
+        run: |
+          helm upgrade llm-control-plane ./charts/llm-control-plane \
+            --namespace llm-system \
+            --set image.tag=${{ github.sha }} \
+            --values ./environments/production/values.yaml \
+            --set canary.enabled=false
+```
+
+5. Monitoring and Observability
+
+5.1 Metrics Collection
+
+```yaml
+# monitoring/prometheus-rules.yaml
+groups:
+  - name: llm-control-plane
+    rules:
+      # Availability
+      - alert: LLMRegistryDown
+        expr: up{job="llm-registry"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "LLM Registry service is down"
+          description: "The LLM Registry service has been down for more than 5 minutes"
+          
+      # Performance
+      - alert: HighPolicyEvaluationLatency
+        expr: histogram_quantile(0.95, rate(policy_evaluation_duration_seconds_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High policy evaluation latency"
+          description: "95th percentile of policy evaluation latency is above 2 seconds"
+          
+      # Business Metrics
+      - alert: HighDriftRate
+        expr: rate(drift_events_total[1h]) > 10
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "High rate of drift detection"
+          description: "More than 10 drift events detected in the last hour"
+          
+      # Security
+      - alert: UnattestedLLMsInProduction
+        expr: llm_versions_total{environment="production", attested="false"} > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Unattested LLMs in production"
+          description: "There are LLMs in production environment without valid attestation"
+```
+
+5.2 Logging Strategy
+
+```python
+# logging/config.py
+import structlog
+import logging
+import json
+from datetime import datetime
+
+def configure_logging():
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.UnicodeDecoder(),
+            
+            # Custom processor for audit logs
+            audit_log_processor,
+            
+            structlog.processors.JSONRenderer()
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
+def audit_log_processor(logger, method_name, event_dict):
+    """Processor for audit log events."""
+    if event_dict.get('log_type') == 'audit':
+        # Ensure audit logs have required fields
+        required_fields = ['event_type', 'actor', 'resource_type', 'action']
+        for field in required_fields:
+            if field not in event_dict:
+                event_dict[field] = 'unknown'
+        
+        # Add audit-specific metadata
+        event_dict['audit_version'] = '1.0'
+        event_dict['audit_timestamp'] = datetime.utcnow().isoformat()
+        
+        # Remove non-audit fields
+        event_dict.pop('log_type', None)
+    
+    return event_dict
+
+# Example usage
+logger = structlog.get_logger()
+
+# Business log
+logger.info("Policy evaluation completed", 
+           llm_version_id="uuid", 
+           decision="allow", 
+           duration_ms=150)
+
+# Audit log
+logger.info("llm.version.created",
+           log_type="audit",
+           event_type="llm.version.created",
+           actor="user:alice",
+           resource_type="llm_version",
+           resource_id="uuid",
+           action="create",
+           environment="production",
+           changes={"from": None, "to": {"status": "active"}})
+```
+
+5.3 Distributed Tracing
+
+```yaml
+# tracing/jaeger-config.yaml
+service:
+  name: llm-control-plane
+  namespace: llm-system
+
+tracing:
+  enabled: true
+  provider: jaeger
+  sampling_rate: 0.1  # Sample 10% of requests
+  
+  # Custom spans
+  spans:
+    policy_evaluation:
+      enabled: true
+      attributes:
+        - llm_version_id
+        - environment
+        - decision
+        
+    attestation_verification:
+      enabled: true
+      attributes:
+        - llm_version_id
+        - verification_result
+        - duration_ms
+        
+    drift_detection:
+      enabled: true
+      attributes:
+        - rule_id
+        - severity
+        - llm_version_id
+
+# Integration with services
+integrations:
+  - name: opentelemetry
+    config:
+      service_name: llm-control-plane
+      endpoint: jaeger-collector:4317
+      insecure: false
+      
+  - name: prometheus
+    config:
+      metrics_path: /metrics
+      scrape_interval: 15s
+```
+
+6. Security Implementation
+
+6.1 Authentication and Authorization
+
+```yaml
+# security/auth-config.yaml
+authentication:
+  providers:
+    - type: oidc
+      name: okta
+      issuer: https://company.okta.com
+      client_id: ${OIDC_CLIENT_ID}
+      client_secret: ${OIDC_CLIENT_SECRET}
+      scopes:
+        - openid
+        - profile
+        - email
+        - groups
+        
+    - type: service_account
+      name: kubernetes
+      audiences:
+        - llm-control-plane
+        
+authorization:
+  rbac:
+    enabled: true
+    roles:
+      - name: llm_viewer
+        permissions:
+          - llms:read
+          - versions:read
+          - policies:read
+          
+      - name: llm_editor
+        permissions:
+          - llms:write
+          - versions:create
+          - versions:update
+          - policies:evaluate
+          
+      - name: llm_approver
+        permissions:
+          - promotions:approve
+          - attestations:verify
+          - policies:override
+          
+      - name: llm_admin
+        permissions:
+          - '*'
+          
+  abac:
+    enabled: true
+    policies:
+      - id: environment_access
+        description: "Users can only access LLMs in their environment"
+        rule: |
+          input.user.environments.contains(input.resource.environment)
+          
+      - id: team_ownership
+        description: "Users can only modify LLMs owned by their team"
+        rule: |
+          input.user.teams.contains(input.resource.owner_team)
+```
+
+6.2 Network Security
+
+```hcl
+# terraform/modules/security/network-policies.tf
+resource "kubernetes_network_policy" "llm_registry_ingress" {
+  metadata {
+    name      = "llm-registry-ingress"
+    namespace = "llm-system"
+  }
+
+  spec {
+    pod_selector {
+      match_labels = {
+        app = "llm-registry"
+      }
+    }
+
+    policy_types = ["Ingress"]
+
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = {
+            name = "frontend-system"
+          }
+        }
+        pod_selector {
+          match_labels = {
+            app = "llm-dashboard"
+          }
+        }
+      }
+      
+      from {
+        pod_selector {
+          match_labels = {
+            app = "policy-service"
+          }
+        }
+      }
+      
+      from {
+        pod_selector {
+          match_labels = {
+            app = "orchestrator"
+          }
+        }
+      }
+
+      ports {
+        port     = 8080
+        protocol = "TCP"
+      }
+    }
+  }
+}
+
+resource "kubernetes_network_policy" "llm_registry_egress" {
+  metadata {
+    name      = "llm-registry-egress"
+    namespace = "llm-system"
+  }
+
+  spec {
+    pod_selector {
+      match_labels = {
+        app = "llm-registry"
+      }
+    }
+
+    policy_types = ["Egress"]
+
+    egress {
+      to {
+        ip_block {
+          cidr = "10.0.0.0/8"
+        }
+      }
+      
+      ports {
+        port     = 5432
+        protocol = "TCP"
+      }
+    }
+    
+    egress {
+      to {
+        pod_selector {
+          match_labels = {
+            app = "audit-service"
+          }
+        }
+      }
+      
+      ports {
+        port     = 8080
+        protocol = "TCP"
+      }
+    }
+  }
+}
+```
+
+6.3 Secret Management
+
+```yaml
+# security/secrets.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: llm-control-plane-secrets
+  namespace: llm-system
+spec:
+  refreshInterval: 1h
+  
+  secretStoreRef:
+    name: vault-backend
+    kind: SecretStore
+    
+  target:
+    name: llm-secrets
+    creationPolicy: Owner
+    
+  data:
+    - secretKey: DATABASE_PASSWORD
+      remoteRef:
+        key: secrets/data/llm-control-plane
+        property: database_password
+        
+    - secretKey: JWT_SIGNING_KEY
+      remoteRef:
+        key: secrets/data/llm-control-plane
+        property: jwt_signing_key
+        
+    - secretKey: ENCRYPTION_KEY
+      remoteRef:
+        key: secrets/data/llm-control-plane
+        property: encryption_key
+        
+  dataFrom:
+    - extract:
+        key: secrets/data/llm-control-plane/service-accounts
+```
+
+7. Testing Strategy
+
+7.1 Unit Tests
+
+```python
+# tests/unit/test_policy_service.py
+import pytest
+from unittest.mock import Mock, patch
+from policy.service import PolicyService
+from policy.exceptions import PolicyEvaluationError
+
+class TestPolicyService:
+    @pytest.fixture
+    def policy_service(self):
+        return PolicyService(policy_dir="tests/fixtures/policies")
+    
+    def test_evaluate_allow(self, policy_service):
+        """Test successful policy evaluation."""
+        request = {
+            "config": {"runtime": {"type": "container"}},
+            "environment": "sandbox",
+            "role": "executor"
+        }
+        
+        result = policy_service.evaluate(request)
+        
+        assert result.decision == "allow"
+        assert len(result.deny_reasons) == 0
+        assert result.policy_hash is not None
+    
+    def test_evaluate_deny(self, policy_service):
+        """Test policy evaluation that results in denial."""
+        request = {
+            "config": {"runtime": {"type": "local"}},
+            "environment": "production",
+            "role": "executor"
+        }
+        
+        result = policy_service.evaluate(request)
+        
+        assert result.decision == "deny"
+        assert len(result.deny_reasons) > 0
+        assert "Local runtime not allowed in production" in [
+            r.message for r in result.deny_reasons
+        ]
+    
+    def test_simulation_mode(self, policy_service):
+        """Test simulation mode doesn't persist."""
+        request = {
+            "config": {"runtime": {"type": "container"}},
+            "environment": "sandbox",
+            "role": "executor",
+            "simulation": True
+        }
+        
+        result = policy_service.evaluate(request)
+        
+        assert result.decision in ["allow", "deny"]
+        # Verify no audit log was created for simulation
+        assert not policy_service.audit_logger.called
+    
+    @patch('policy.service.OPAClient')
+    def test_op
