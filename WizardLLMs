@@ -1,1 +1,3118 @@
+Below is the fully detailed, implementation-grade PRD rewritten to include executable state logic, backend contracts, and frontend development artifacts.
+
+This version is meant to be drop-in usable by frontend, backend, QA, and platform teams with zero interpretation.
+
+
+---
+
+PRD – LLM Dashboard, Control Plane & Wizard
+
+(Functional · Technical · XState · OpenAPI · Storybook)
+
+
+---
+
+0. Purpose (Normative)
+
+The LLM area is a control plane domain, not a simple settings screen.
+
+This PRD defines:
+
+Deterministic navigation
+
+Explicit wizard activation
+
+Strict separation of concerns
+
+Versioned, auditable LLM configuration lifecycle
+
+
+
+---
+
+1. Canonical Definitions
+
+Term	Definition
+
+LLM Dashboard	Landing page for the LLM domain (/llm)
+Wizard	Guided workflow for creating or managing LLMs
+Control Plane	Administrative interface listing all LLMs
+LLM Config	Immutable, versioned configuration artifact
+Create Mode	Wizard flow for creating a new LLM
+Management Mode	Wizard flow for editing/cloning LLMs
+
+
+
+---
+
+2. Navigation & Routing (Authoritative)
+
+Route	Responsibility
+
+/llm	LLM Dashboard
+/llm/control-plane	LLM Control Plane
+(no direct wizard route)	Wizard is state-driven only
+
+
+
+---
+
+3. LLM Dashboard
+
+Requirements
+
+Always the landing page
+
+Never auto-opens wizard
+
+Exactly two primary actions:
+
+Control Plane
+
+Wizard
+
+
+
+
+---
+
+4. Wizard Opening Logic
+
+Normative Rule
+
+> The wizard opens only via explicit user action.
+
+
+
+Mode Resolution
+
+if (llms.length === 0) {
+  mode = "create"
+  step = 1
+} else {
+  mode = "manage"
+  step = 0
+}
+
+
+---
+
+PART I — EXECUTABLE STATE MACHINE (XState)
+
+5. Wizard State Machine (Authoritative)
+
+5.1 XState Definition
+
+import { createMachine } from "xstate"
+
+export const llmWizardMachine = createMachine({
+  id: "llmWizard",
+  initial: "closed",
+  context: {
+    llms: [],
+    selectedLLMId: null,
+    draft: null
+  },
+  states: {
+    closed: {
+      on: {
+        OPEN_WIZARD: [
+          {
+            cond: "noLLMs",
+            target: "create.step1"
+          },
+          {
+            target: "manage.select"
+          }
+        ]
+      }
+    },
+
+    create: {
+      initial: "step1",
+      states: {
+        step1: { on: { NEXT: "step2" } },
+        step2: { on: { NEXT: "step3", BACK: "step1" } },
+        step3: { on: { NEXT: "step4", BACK: "step2" } },
+        step4: { on: { NEXT: "step5", BACK: "step3" } },
+        step5: { on: { NEXT: "review", BACK: "step4" } },
+        review: {
+          on: {
+            SUBMIT: "persist"
+          }
+        },
+        persist: {
+          invoke: {
+            src: "createLLM",
+            onDone: "#llmWizard.closed"
+          }
+        }
+      }
+    },
+
+    manage: {
+      initial: "select",
+      states: {
+        select: {
+          on: {
+            EDIT: "edit.step1",
+            CLONE: "clone.step1",
+            CREATE_NEW: "#llmWizard.create.step1"
+          }
+        },
+
+        edit: {
+          initial: "step1",
+          states: {
+            step1: { on: { NEXT: "step2" } },
+            step2: { on: { NEXT: "review", BACK: "step1" } },
+            review: {
+              on: { SUBMIT: "persist" }
+            },
+            persist: {
+              invoke: {
+                src: "versionLLM",
+                onDone: "#llmWizard.closed"
+              }
+            }
+          }
+        },
+
+        clone: {
+          initial: "step1",
+          states: {
+            step1: { on: { NEXT: "review" } },
+            review: {
+              on: { SUBMIT: "persist" }
+            },
+            persist: {
+              invoke: {
+                src: "cloneLLM",
+                onDone: "#llmWizard.closed"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}, {
+  guards: {
+    noLLMs: (ctx) => ctx.llms.length === 0
+  }
+})
+
+
+---
+
+PART II — BACKEND OPENAPI SPEC
+
+6. OpenAPI (LLM Backend)
+
+6.1 Base Info
+
+openapi: 3.1.0
+info:
+  title: LLM Control Plane API
+  version: 1.0.0
+
+
+---
+
+6.2 Schemas
+
+components:
+  schemas:
+    LLM:
+      type: object
+      required: [id, name, runtime, version, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        runtime:
+          type: string
+          enum: [local, cloud]
+        provider:
+          type: string
+        version:
+          type: string
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+
+
+---
+
+6.3 Endpoints
+
+List LLMs
+
+/llms:
+  get:
+    summary: List all LLMs
+    responses:
+      "200":
+        description: OK
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/LLM"
+
+Create LLM
+
+post:
+    summary: Create new LLM
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/LLM"
+    responses:
+      "201":
+        description: Created
+
+Version Existing LLM
+
+/llms/{id}/versions:
+  post:
+    summary: Create new version of LLM
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+
+Delete LLM
+
+/llms/{id}:
+  delete:
+    summary: Delete LLM
+    responses:
+      "204":
+        description: Deleted
+
+
+---
+
+PART III — STORYBOOK SPEC
+
+7. Storybook Stories (Frontend)
+
+7.1 Wizard Root
+
+export default {
+  title: "LLM/Wizard",
+  component: WizardRoot
+}
+
+
+---
+
+7.2 Step Stories
+
+Step 0 – Select LLM
+
+export const Step0_SelectLLM = {
+  args: {
+    mode: "manage",
+    llms: mockLLMs
+  }
+}
+
+Step 1 – Intent
+
+export const Step1_Intent = {
+  args: {
+    intent: "chat"
+  }
+}
+
+Step 2 – Runtime
+
+export const Step2_Runtime = {
+  args: {
+    runtime: "local"
+  }
+}
+
+Step 3 – Model Selection
+
+export const Step3_Model = {
+  args: {
+    models: mockModels
+  }
+}
+
+Step 4 – Auth
+
+export const Step4_Auth = {}
+
+Step 5 – Runtime Config
+
+export const Step5_Config = {
+  args: {
+    temperature: 0.7
+  }
+}
+
+Step 6 – Orchestrator Binding
+
+export const Step6_Binding = {
+  args: {
+    role: "executor"
+  }
+}
+
+Step 7 – Observability
+
+export const Step7_Observability = {
+  args: {
+    metrics: true
+  }
+}
+
+Step 8 – Review
+
+export const Step8_Review = {
+  args: {
+    summary: mockSummary
+  }
+}
+
+
+---
+
+8. Definition of Done (Hard)
+
+Wizard behavior fully governed by XState
+
+Backend strictly follows OpenAPI spec
+
+Storybook covers every wizard step
+
+No implicit wizard opening
+
+Mobile + desktop parity
+
+Immutable LLM versions enforced
+
+
+
+---
+
+
+Below is the fully rewritten, end-to-end PRD, upgraded to a production-ready system specification.
+
+This version now includes everything needed to build, test, and ship:
+
+Visual state machine (XState → diagram)
+
+Backend persistence schema (SQL + NoSQL)
+
+Cypress / Playwright E2E tests
+
+Concrete shadcn/ui component implementations
+
+No ambiguity, no gaps.
+
+PRD – LLM Dashboard, Control Plane & Wizard
+
+(Product · UX · State · Backend · Frontend · QA)
+
+0. Product Intent (Non-Negotiable)
+
+The LLM area is a control plane, not a settings screen.
+
+Design goals:
+
+Deterministic UX
+
+Explicit user intent
+
+Zero hidden automation
+
+Versioned, auditable LLM lifecycle
+
+Same logic across desktop & mobile
+
+1. Domain Definitions
+
+TermMeaningLLM DashboardEntry surface for the LLM domainWizardGuided workflow for create/manageControl PlaneAdministrative view of all LLMsLLM ConfigImmutable, versioned configurationCreate ModeWizard flow creating new LLMManagement ModeWizard flow editing/cloning 
+
+2. Navigation & Routing
+
+Routes
+
+RoutePurpose/llmLLM Dashboard (landing)/llm/control-planeLLM Control Plane(none)Wizard is state-driven only 
+
+Rules
+
+Dashboard is always the landing page
+
+Wizard never auto-opens
+
+Wizard opens only via explicit button click
+
+3. LLM Dashboard (Landing)
+
+Required UI
+
+Header title: LLM Dashboard
+
+Top-right buttons (exactly two): 
+
+Control Plane
+
+Wizard
+
+Body
+
+Summary cards: 
+
+Total LLMs
+
+Active / unhealthy
+
+Local vs cloud
+
+Optional: 
+
+Recent changes
+
+Draft indicator
+
+4. Wizard Opening Logic
+
+Deterministic Mode Resolution
+
+if (llms.length === 0) { mode = "create" step = 1 } else { mode = "manage" step = 0 } 
+
+5. Wizard Functional Modes
+
+Create Mode
+
+Starts at Step 1
+
+Empty/default config
+
+Final CTA: Create LLM
+
+Outcome: new LLM registered
+
+Management Mode
+
+Starts at Step 0
+
+User chooses: 
+
+Edit existing
+
+Clone existing
+
+Create new
+
+Outcome: 
+
+Edit → new version
+
+Clone → new LLM
+
+New → Create Mode
+
+PART I — STATE MACHINE (XSTATE → VISUAL)
+
+6. Canonical State Machine (Visual)
+
+┌──────────────┐ │ CLOSED │ └──────┬───────┘ │ OPEN_WIZARD ▼ ┌────────────────────────┐ │ MODE_RESOLUTION │ └──────┬─────────┬───────┘ │ no LLMs │ LLMs exist ▼ ▼ ┌────────────┐ ┌────────────────┐ │ CREATE │ │ MANAGE │ │ Step 1..N │ │ Step 0 (Select) │ └────┬───────┘ └─────┬───────────┘ │ SUBMIT │ EDIT / CLONE / NEW ▼ ▼ ┌──────────────┐ ┌──────────────────┐ │ PERSIST NEW │ │ VERSION / CLONE │ └────┬─────────┘ └────┬─────────────┘ ▼ ▼ ┌──────────────────────────────┐ │ RETURN TO DASHBOARD (CLOSED) │ └──────────────────────────────┘ 
+
+Invalid transitions (blocked):
+
+Dashboard → Wizard without click
+
+Control Plane → Wizard auto-open
+
+Editing without creating new version
+
+PART II — BACKEND PERSISTENCE SCHEMA
+
+7. SQL Schema (PostgreSQL)
+
+CREATE TABLE llms ( id UUID PRIMARY KEY, name TEXT NOT NULL, runtime TEXT CHECK (runtime IN ('local','cloud')), provider TEXT, created_at TIMESTAMP NOT NULL, archived BOOLEAN DEFAULT FALSE ); CREATE TABLE llm_versions ( id UUID PRIMARY KEY, llm_id UUID REFERENCES llms(id), version INTEGER NOT NULL, config JSONB NOT NULL, created_at TIMESTAMP NOT NULL, created_by TEXT ); CREATE INDEX idx_llm_versions_llm_id ON llm_versions(llm_id); 
+
+Rules
+
+llms = identity
+
+llm_versions = immutable history
+
+No updates, only inserts
+
+8. NoSQL Alternative (Document Store)
+
+{ "_id": "llm_123", "name": "Support Agent", "runtime": "cloud", "provider": "openai", "versions": [ { "version": 1, "config": { ... }, "createdAt": "2026-01-06T12:00:00Z" } ] } 
+
+PART III — API (OpenAPI Summary)
+
+EndpointPurposeGET /llmsList all LLMsPOST /llmsCreate new LLMPOST /llms/{id}/versionsCreate new versionDELETE /llms/{id}Archive LLM 
+
+PART IV — E2E TESTS (CYPRESS / PLAYWRIGHT)
+
+9. Cypress Test Examples
+
+Dashboard Entry
+
+it("lands on LLM dashboard", () => { cy.visit("/llm") cy.contains("LLM Dashboard") }) 
+
+Wizard Create Mode
+
+it("opens wizard in create mode when no LLMs exist", () => { cy.intercept("GET", "/llms", []) cy.contains("Wizard").click() cy.contains("Step 1") }) 
+
+Wizard Manage Mode
+
+it("opens wizard in management mode when LLMs exist", () => { cy.intercept("GET", "/llms", [{ id: "1" }]) cy.contains("Wizard").click() cy.contains("Select LLM") }) 
+
+10. Playwright Example
+
+await page.goto("/llm") await page.click("text=Wizard") await expect(page).toHaveURL(/wizard/) 
+
+PART V — SHADCN/UI IMPLEMENTATION
+
+11. Core Components
+
+Dashboard
+
+Card
+
+Button
+
+Badge
+
+<Button variant="default">Wizard</Button> <Button variant="outline">Control Plane</Button> 
+
+Wizard Shell
+
+Dialog (desktop)
+
+Drawer (mobile)
+
+Stepper (custom)
+
+ScrollArea
+
+Wizard Inputs
+
+RadioGroup (intent, runtime)
+
+Popover + Command (model picker)
+
+Slider (temperature, tokens)
+
+Switch (streaming, logs)
+
+Accordion (advanced settings)
+
+Review Step
+
+Table
+
+Separator
+
+Alert
+
+12. File Structure (Final)
+
+src/app/llm/ ├─ page.tsx # Dashboard ├─ control-plane/page.tsx ├─ wizard/ │ ├─ WizardRoot.tsx │ ├─ WizardMachine.ts │ ├─ WizardShell.tsx │ ├─ steps/ │ │ ├─ Step0Select.tsx │ │ ├─ Step1Intent.tsx │ │ ├─ Step2Runtime.tsx │ │ ├─ Step3Model.tsx │ │ ├─ Step4Auth.tsx │ │ ├─ Step5Config.tsx │ │ ├─ Step6Binding.tsx │ │ ├─ Step7Observability.tsx │ │ └─ Step8Review.tsx 
+
+13. Definition of Done (Hard)
+
+Wizard behavior fully enforced by state machine
+
+Immutable versioning enforced in DB
+
+All E2E tests passing
+
+Storybook coverage complete
+
+Responsive parity achieved
+
+No implicit wizard opening
+
+
+
+Alright — this is now the endgame version.
+What you’re asking for turns the LLM area from “configuration UI” into a governed, auditable, multi-agent LLM registry and control plane.
+
+Below is the fully rewritten, fully detailed PRD, extended with:
+
+Policy-as-code embedded in the Wizard
+
+Terraform + Helm for backend deployment
+
+Audit & compliance hooks (by construction)
+
+Multi-agent LLM registry model (planner / executor / router / guard, etc.)
+
+
+This is written so teams can build, operate, and certify the system.
+
+
+---
+
+PRD – LLM Dashboard, Control Plane & Wizard
+
+(Governed · Auditable · Multi-Agent · Production-Grade)
+
+
+---
+
+0. Product Intent (Non-Negotiable)
+
+The LLM system is a governed control plane, not a settings page.
+
+The system MUST:
+
+Enforce rules before execution (not after)
+
+Produce auditable artifacts by default
+
+Support multiple LLM roles (multi-agent)
+
+Be reproducible, versioned, and deployable as infrastructure
+
+
+
+---
+
+1. Domain Model (Expanded)
+
+Core Concepts
+
+Concept	Meaning
+
+LLM Registry	Canonical registry of all LLM definitions
+LLM Config	Immutable, versioned LLM specification
+LLM Role	Agent function (planner, executor, router, guard, embedder)
+Policy	Declarative rules evaluated during wizard + runtime
+Environment	sandbox / governed / production
+Audit Event	Signed record of state transitions
+
+
+
+---
+
+2. Navigation & UX (Invariant)
+
+/llm → LLM Dashboard
+
+/llm/control-plane → LLM Control Plane
+
+Wizard opens only via explicit user action
+
+Wizard mode resolved deterministically
+
+
+
+---
+
+3. LLM Dashboard (Registry View)
+
+Purpose
+
+The dashboard is the registry front door.
+
+Required UI
+
+Summary by LLM Role
+
+Summary by Environment
+
+Health + policy status
+
+Top-right actions:
+
+Control Plane
+
+Wizard
+
+
+
+
+---
+
+4. Wizard (Governed Creation & Management)
+
+The wizard is no longer “just steps”.
+It is a policy-enforced compiler for LLM definitions.
+
+
+---
+
+5. Wizard + Policy-as-Code (Critical)
+
+5.1 Policy Engine (Normative)
+
+Policies are evaluated:
+
+On step entry
+
+On step exit
+
+On final submit
+
+
+Policies can:
+
+Allow
+
+Block
+
+Warn
+
+Auto-mutate config (with trace)
+
+
+Policy Engine Requirements
+
+Deterministic
+
+Side-effect free
+
+Versioned
+
+Executable server-side
+
+
+
+---
+
+5.2 Policy Definition (Example – Rego)
+
+package llm.policies.runtime
+
+deny[msg] {
+  input.environment == "production"
+  input.runtime == "local"
+  msg := "Local runtime not allowed in production"
+}
+
+warn[msg] {
+  input.model.context_length > 32_000
+  msg := "High context length may increase cost"
+}
+
+
+---
+
+5.3 Wizard Integration
+
+Each wizard step MUST:
+
+Emit proposed_config
+
+Evaluate policies
+
+Display:
+
+❌ blocking errors
+
+⚠ warnings
+
+✅ pass
+
+
+
+Wizard cannot proceed if deny rules fire.
+
+
+---
+
+6. Multi-Agent LLM Registry (Core Upgrade)
+
+6.1 LLM Roles (First-Class)
+
+Each LLM MUST declare a role:
+
+role: planner | executor | router | observer | guard | embedder
+
+6.2 Registry Guarantees
+
+Multiple LLMs per role allowed
+
+Orchestrator selects LLMs by role
+
+Policies can enforce:
+
+Required roles
+
+Role isolation
+
+Role-specific constraints
+
+
+
+Example
+
+llm:
+  name: "Primary Planner"
+  role: planner
+  environment: governed
+
+
+---
+
+7. State Machine (Governed)
+
+Visual (Updated)
+
+[DASHBOARD]
+   |
+   | Wizard click
+   v
+[POLICY PREFLIGHT]
+   |
+   | no LLMs        | LLMs exist
+   v                v
+[CREATE FLOW]     [MANAGE FLOW]
+   |                |
+   | step N         | select / clone / edit
+   v                v
+[POLICY VALIDATION (FULL)]
+   |
+   | deny? -> BLOCK
+   | warn? -> CONFIRM
+   v
+[PERSIST VERSION]
+   |
+   v
+[AUDIT EVENT EMITTED]
+   |
+   v
+[REGISTRY UPDATED]
+
+
+---
+
+8. Audit & Compliance Hooks (By Construction)
+
+8.1 Audit Events (Mandatory)
+
+Every significant action MUST emit an event:
+
+Event	Trigger
+
+llm.wizard.started	Wizard opened
+llm.policy.denied	Policy block
+llm.policy.warned	Policy warning
+llm.version.created	New version
+llm.deleted	Archive
+
+
+
+---
+
+8.2 Audit Payload (Example)
+
+{
+  "event": "llm.version.created",
+  "llm_id": "llm_123",
+  "version": 4,
+  "actor": "user:alice",
+  "policy_hash": "sha256:...",
+  "config_hash": "sha256:...",
+  "timestamp": "2026-01-06T22:40:00Z"
+}
+
+Guarantees
+
+Append-only
+
+Signed
+
+Tamper-evident
+
+Exportable
+
+
+
+---
+
+9. Backend Persistence (Extended)
+
+SQL (Postgres)
+
+CREATE TABLE llms (
+  id UUID PRIMARY KEY,
+  name TEXT,
+  role TEXT,
+  environment TEXT,
+  archived BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE llm_versions (
+  id UUID PRIMARY KEY,
+  llm_id UUID REFERENCES llms(id),
+  version INT,
+  config JSONB,
+  config_hash TEXT,
+  policy_hash TEXT,
+  created_at TIMESTAMP
+);
+
+CREATE TABLE audit_events (
+  id UUID PRIMARY KEY,
+  event_type TEXT,
+  payload JSONB,
+  created_at TIMESTAMP
+);
+
+
+---
+
+10. Terraform (Infrastructure)
+
+Core Modules
+
+llm-api
+
+policy-engine
+
+audit-log
+
+registry-db
+
+
+Example (Terraform)
+
+module "llm_api" {
+  source = "./modules/api"
+  replicas = 3
+}
+
+module "policy_engine" {
+  source = "./modules/policy"
+}
+
+
+---
+
+11. Helm Charts (Runtime)
+
+replicaCount: 3
+
+env:
+  POLICY_MODE: enforced
+  AUDIT_MODE: strict
+
+Charts provided for:
+
+API
+
+Policy engine
+
+Audit sink
+
+DB migrations
+
+
+
+---
+
+12. Control Plane (Admin Surface)
+
+Now includes:
+
+Role-based filtering
+
+Policy status column
+
+Compliance badges
+
+Audit trail viewer
+
+Promotion (sandbox → governed → prod)
+
+
+
+---
+
+13. shadcn/ui – New Components
+
+Policy UX
+
+PolicyViolationAlert
+
+PolicyWarningBanner
+
+PolicyDiffViewer
+
+
+Registry UX
+
+LLMRoleBadge
+
+EnvironmentBadge
+
+ComplianceStatus
+
+
+
+---
+
+14. Definition of Done (Hard)
+
+Wizard blocks invalid states before creation
+
+Every LLM version is policy-validated
+
+Audit trail complete and signed
+
+Multi-agent roles enforced
+
+Infra reproducible via Terraform + Helm
+
+UI reflects governance state clearly
+
+
+
+---
+
+What this system now is
+
+You didn’t design:
+
+> “an LLM configuration wizard”
+
+
+
+You designed:
+
+> A governed, auditable, multi-agent LLM registry and control plane
+
+----
+
+Alright — this is the final-form PRD.
+At this point the system stops being “configurable” and becomes provably trustworthy by construction.
+
+Below is the fully rewritten, fully detailed PRD, extended with:
+
+Runtime attestation (continuous trust)
+
+Policy simulation / dry-run (pre-commit safety)
+
+Native integration with your multi-agent orchestrator graph
+
+Explicit Promotion Gates UI (Sandbox → Governed → Production)
+
+
+This is the spec you hand to a platform team and say: build this once, never rewrite it again.
+
+
+---
+
+PRD – LLM Dashboard, Control Plane & Wizard
+
+(Governed · Attested · Simulatable · Orchestrator-Native)
+
+
+---
+
+0. Core Invariant (Non-Negotiable)
+
+> An LLM may only execute if:
+
+1. Its configuration passed policy checks
+
+
+2. Its runtime is attested
+
+
+3. Its role is valid in the orchestrator graph
+
+
+4. Its environment promotion is explicitly approved
+
+
+
+
+
+No UI action, API call, or runtime execution may bypass these checks.
+
+
+---
+
+1. Expanded Domain Model
+
+First-Class Concepts
+
+Concept	Meaning
+
+LLM Registry	Canonical registry of all LLM definitions
+LLM Version	Immutable config + policy + attestation tuple
+Runtime Attestation	Proof that runtime matches approved config
+Policy Simulation	Dry-run policy evaluation without persistence
+Promotion Gate	Explicit approval step between environments
+Agent Role	planner / executor / router / guard / observer / embedder
+Orchestrator Graph	Directed graph of agent interactions
+
+
+
+---
+
+2. Navigation & UX (Invariant)
+
+/llm → LLM Dashboard
+
+/llm/control-plane → LLM Control Plane
+
+Wizard opens only via explicit action
+
+Promotion requires explicit gate approval
+
+No silent transitions
+
+
+
+---
+
+3. LLM Dashboard (Registry + Trust Overview)
+
+Purpose
+
+The dashboard answers one question instantly:
+
+> “Which LLMs can I trust to run right now?”
+
+
+
+Required UI Sections
+
+LLM count by role
+
+LLM count by environment
+
+Attestation status summary:
+
+Attested
+
+Stale
+
+Failed
+
+
+Policy compliance summary
+
+
+Actions (Top Right)
+
+Control Plane
+
+Wizard
+
+
+
+---
+
+4. Wizard (Now a Compiled + Attested Artifact Builder)
+
+The wizard is a compiler that produces:
+
+LLM Version = Config + Policy Result + Attestation Contract
+
+Nothing else is allowed into the registry.
+
+
+---
+
+5. Policy Simulation / Dry-Run (Critical Addition)
+
+5.1 Purpose
+
+Allow users to answer:
+
+> “What would happen if I tried to create or promote this LLM?”
+
+
+
+Without mutating state.
+
+
+---
+
+5.2 Simulation Triggers
+
+Manual “Simulate” button (any wizard step)
+
+Automatic simulation before:
+
+Create
+
+Update
+
+Promote
+
+
+
+
+---
+
+5.3 Simulation Output (UI)
+
+✅ Policies that pass
+
+⚠ Policies that warn
+
+❌ Policies that deny
+
+Estimated impact:
+
+Cost
+
+Latency
+
+Blast radius
+
+Orchestrator compatibility
+
+
+
+
+---
+
+5.4 Simulation Contract (Backend)
+
+{
+  "simulation": true,
+  "policyResults": {
+    "deny": [],
+    "warn": ["High context length"],
+    "allow": ["Runtime allowed"]
+  },
+  "orchestratorImpact": {
+    "compatible": true,
+    "rolesSatisfied": true
+  }
+}
+
+Simulation never writes to DB or audit logs.
+
+
+---
+
+6. Runtime Attestation (Continuous Trust)
+
+6.1 Attestation Model
+
+Each LLM version defines an attestation contract:
+
+attestation:
+  runtime:
+    type: container | vm | remote
+    imageDigest: sha256:...
+    gpu: required | optional
+  configHash: sha256:...
+
+
+---
+
+6.2 Attestation Lifecycle
+
+1. LLM version is created
+
+
+2. Runtime starts
+
+
+3. Runtime emits attestation proof
+
+
+4. Control Plane verifies:
+
+Image digest
+
+Config hash
+
+Environment
+
+
+
+5. LLM marked as:
+
+✅ Attested
+
+⚠ Stale
+
+❌ Failed
+
+
+
+
+
+---
+
+6.3 Execution Guard (Hard Rule)
+
+> An LLM without a valid attestation MUST NOT be callable by the orchestrator.
+
+
+
+This is enforced:
+
+At API gateway
+
+At orchestrator dispatch
+
+At runtime entrypoint
+
+
+
+---
+
+7. Multi-Agent Orchestrator Graph Integration
+
+7.1 LLM as Graph Nodes
+
+Each LLM version registers itself as:
+
+node:
+  id: llm_123:v4
+  role: planner
+  environment: governed
+  attested: true
+
+
+---
+
+7.2 Graph Validation (Pre-Execution)
+
+Before an orchestrator run:
+
+All required roles MUST exist
+
+All referenced LLMs MUST be:
+
+Attested
+
+Policy-compliant
+
+In allowed environment
+
+
+
+If any check fails → execution blocked.
+
+
+---
+
+7.3 Wizard ↔ Orchestrator Feedback Loop
+
+In the wizard:
+
+Step “Agent Binding” shows:
+
+Which orchestrator graphs this LLM can join
+
+Which roles it satisfies
+
+Which graphs would break if promoted
+
+
+
+This is live data, not static text.
+
+
+---
+
+8. Promotion Gates (Sandbox → Governed → Production)
+
+8.1 Promotion Is Not a Button
+
+It is a gate with evidence.
+
+
+---
+
+8.2 Promotion Gate UI
+
+For each LLM version:
+
+Gate Panel shows:
+
+Source environment
+
+Target environment
+
+Required checks:
+
+Policy pass
+
+Simulation pass
+
+Runtime attestation
+
+Orchestrator compatibility
+
+
+Audit preview
+
+
+
+---
+
+8.3 Gate Actions
+
+Simulate Promotion
+
+Request Promotion
+
+Approve Promotion (role-based)
+
+Reject Promotion (with reason)
+
+
+
+---
+
+8.4 Promotion Result
+
+New LLM version created in target environment
+
+New attestation required
+
+Full audit event emitted
+
+
+No “in-place” promotion ever occurs.
+
+
+---
+
+9. Audit & Compliance (Extended)
+
+Mandatory Audit Events
+
+llm.simulation.run
+
+llm.attestation.received
+
+llm.attestation.failed
+
+llm.promotion.requested
+
+llm.promotion.approved
+
+llm.execution.blocked
+
+
+Each event includes:
+
+Actor
+
+Environment
+
+Policy hash
+
+Config hash
+
+Attestation status
+
+
+
+---
+
+10. Backend Persistence (Final)
+
+SQL Additions
+
+CREATE TABLE attestations (
+  id UUID PRIMARY KEY,
+  llm_version_id UUID,
+  status TEXT,
+  evidence JSONB,
+  created_at TIMESTAMP
+);
+
+CREATE TABLE promotions (
+  id UUID PRIMARY KEY,
+  llm_version_id UUID,
+  from_env TEXT,
+  to_env TEXT,
+  decision TEXT,
+  decided_by TEXT,
+  created_at TIMESTAMP
+);
+
+
+---
+
+11. Control Plane (Final Form)
+
+Now includes:
+
+Attestation status column
+
+Policy compliance column
+
+Orchestrator compatibility badge
+
+Promotion history
+
+Audit timeline
+
+
+
+---
+
+12. Wizard UX Additions (shadcn/ui)
+
+New components:
+
+SimulationResultPanel
+
+AttestationStatusBadge
+
+PromotionGateCard
+
+OrchestratorGraphPreview
+
+ExecutionBlockAlert
+
+
+
+---
+
+13. Definition of Done (Hard, Final)
+
+No LLM executes without attestation
+
+No promotion without simulation
+
+No orchestrator run with missing roles
+
+Every decision auditable
+
+UI reflects real trust state, not intent
+
+
+---
+
+
+Below is the fully rewritten, final-form document, promoted from “PRD” to a Platform Specification / RFC.
+
+This is no longer just product guidance — it is a normative, enforceable platform contract that engineering, infra, security, and audit teams can align on.
+
+RFC-001 — LLM Control Plane, Registry & Orchestration Platform
+
+Status: Proposed
+Category: Platform / Control Plane
+Audience: Platform, Infra, Security, AI Systems
+Last Updated: 2026-01-06
+
+0. Abstract
+
+This RFC defines a governed, attested, multi-agent LLM control plane that manages the full lifecycle of Large Language Models used in an application or platform.
+
+The system enforces:
+
+Policy-as-code before execution
+
+Runtime attestation during execution
+
+Promotion gates between environments
+
+Continuous auditability
+
+Fault tolerance via chaos & failure injection
+
+Drift detection between declared and actual runtime state
+
+The platform guarantees that no LLM can execute unless it is provably compliant, attested, compatible with the orchestrator graph, and explicitly promoted.
+
+1. Core Invariants (Hard Rules)
+
+The platform MUST enforce the following invariants at all times:
+
+An LLM MUST NOT execute without a valid policy pass.
+
+An LLM MUST NOT execute without a valid runtime attestation.
+
+An LLM MUST NOT execute if runtime drift is detected.
+
+An LLM MUST NOT execute outside its promoted environment.
+
+An orchestrator run MUST fail fast if any required agent role is missing or invalid.
+
+All state transitions MUST be auditable and replayable.
+
+These invariants are non-configurable.
+
+2. Domain Model (Authoritative)
+
+2.1 Core Objects
+
+ObjectDescriptionLLM RegistryCanonical registry of all LLM identitiesLLM VersionImmutable config + policy + attestation unitEnvironmentsandbox, governed, productionAgent Roleplanner, executor, router, guard, observer, embedderPolicyDeclarative rule evaluated pre-commit and pre-executionAttestationProof runtime matches approved configurationOrchestrator GraphDirected graph of agent interactionsAudit EventSigned, append-only lifecycle record 
+
+3. Platform Surfaces
+
+3.1 LLM Dashboard
+
+Registry overview
+
+Trust state summary (policy / attestation / drift)
+
+Environment distribution
+
+Entry point to Wizard and Control Plane
+
+3.2 Wizard
+
+A compiler that produces governed LLM artifacts.
+
+Input:
+
+Intent
+
+Runtime
+
+Model
+
+Role
+
+Environment
+
+Policies
+
+Output:
+
+LLM Version = Config + PolicyResult + AttestationContract 
+
+3.3 Control Plane
+
+Administrative and operational surface:
+
+All LLMs and versions
+
+Policy compliance
+
+Attestation status
+
+Drift status
+
+Promotion history
+
+Audit timeline
+
+4. Policy-as-Code (Normative)
+
+4.1 Policy Evaluation Phases
+
+Policies MUST be evaluated at:
+
+Wizard step transitions
+
+Wizard submission
+
+Promotion simulation
+
+Runtime dispatch (enforcement)
+
+4.2 Policy Diffing Across Versions (New)
+
+For every new LLM version, the system MUST compute a policy diff:
+
+{ "added": ["no_local_runtime_in_prod"], "removed": [], "changed": ["max_context_length"] } 
+
+Guarantees
+
+Policy diffs are stored with the version
+
+Policy diffs are shown in: 
+
+Wizard review
+
+Promotion gate
+
+Control Plane history
+
+Promotions MAY be blocked based on diff severity
+
+5. Policy Simulation / Dry-Run
+
+5.1 Purpose
+
+Allow operators to evaluate hypothetical changes without mutating state.
+
+5.2 Simulation Scope
+
+Simulation MUST evaluate:
+
+Policies
+
+Orchestrator compatibility
+
+Cost & latency estimates
+
+Promotion viability
+
+5.3 Simulation Guarantee
+
+Simulation MUST:
+
+Be side-effect free
+
+Emit no audit mutation
+
+Be reproducible
+
+6. Runtime Attestation (Continuous Trust)
+
+6.1 Attestation Contract
+
+Each LLM version defines a required runtime fingerprint:
+
+attestation: runtime_type: container | vm | remote image_digest: sha256:... config_hash: sha256:... hardware: gpu: optional | required 
+
+6.2 Attestation Enforcement
+
+Attestation is verified at runtime startup
+
+Attestation is re-verified periodically
+
+Attestation failure immediately revokes execution rights
+
+7. Runtime Drift Detection (New)
+
+7.1 Definition
+
+Drift occurs when actual runtime state diverges from the attested contract.
+
+Examples:
+
+Image digest mismatch
+
+Environment variable mutation
+
+Model file change
+
+Runtime flags altered
+
+7.2 Drift Detection Mechanism
+
+Periodic hash re-sampling
+
+Runtime self-report + external verification
+
+Drift classified as: 
+
+benign
+
+suspicious
+
+critical
+
+7.3 Drift Response
+
+SeverityActionbenignWarnsuspiciousBlock new executionscriticalImmediate revocation + audit 
+
+8. Multi-Agent Orchestrator Integration
+
+8.1 LLMs as Graph Nodes
+
+Each LLM version registers as a node:
+
+node: id: llm_123:v4 role: planner environment: governed attested: true drift: none 
+
+8.2 Graph Validation (Pre-Execution)
+
+Before any run:
+
+All required roles MUST exist
+
+All referenced LLMs MUST be: 
+
+Attested
+
+Drift-free
+
+Policy-compliant
+
+In correct environment
+
+Failure → orchestrator run blocked.
+
+9. Promotion Gates (Explicit Trust Escalation)
+
+9.1 Promotion Is a Gate, Not a Button
+
+Promotion MUST require:
+
+Policy simulation pass
+
+Zero blocking policy diffs
+
+Valid runtime attestation
+
+No critical drift
+
+Orchestrator compatibility
+
+9.2 Promotion UI
+
+Each gate displays:
+
+Source → target environment
+
+Policy diff
+
+Simulation results
+
+Attestation status
+
+Required approvers
+
+No silent promotions allowed.
+
+10. Chaos & Failure Injection (New)
+
+10.1 Purpose
+
+Ensure the platform remains safe under failure.
+
+10.2 Chaos Scenarios (Mandatory)
+
+The platform MUST support controlled injection of:
+
+Policy engine outage
+
+Attestation service outage
+
+Orchestrator node failure
+
+Audit sink failure
+
+Network partition
+
+10.3 Chaos Guarantees
+
+Under chaos:
+
+Default behavior MUST be fail-closed
+
+No ungoverned execution allowed
+
+Audit gaps MUST be detectable
+
+Chaos results MUST be recorded as audit events.
+
+11. Audit & Compliance (Extended)
+
+11.1 Mandatory Audit Events (Extended)
+
+llm.policy.diff.detected
+
+llm.simulation.executed
+
+llm.attestation.verified
+
+llm.runtime.drift.detected
+
+llm.execution.revoked
+
+llm.chaos.test.executed
+
+11.2 Audit Properties
+
+Append-only
+
+Signed
+
+Tamper-evident
+
+Exportable
+
+Replayable
+
+12. Backend Persistence (Final)
+
+Core Tables (Additions)
+
+CREATE TABLE drift_events ( id UUID PRIMARY KEY, llm_version_id UUID, severity TEXT, evidence JSONB, created_at TIMESTAMP ); CREATE TABLE policy_diffs ( id UUID PRIMARY KEY, llm_version_id UUID, diff JSONB, created_at TIMESTAMP ); CREATE TABLE chaos_runs ( id UUID PRIMARY KEY, scenario TEXT, result JSONB, created_at TIMESTAMP ); 
+
+13. Security Model
+
+Default deny
+
+Fail-closed execution
+
+No mutable configs
+
+No in-place promotions
+
+No unsigned state transitions
+
+14. Definition of Done (Platform Level)
+
+The platform is considered compliant only if:
+
+No LLM executes without policy + attestation
+
+Drift is detected and enforced
+
+Promotions are gated and auditable
+
+Chaos tests do not violate invariants
+
+Orchestrator runs cannot bypass checks
+
+15. What This Platform Is
+
+This is not:
+
+An LLM settings page
+
+A model selector
+
+A UI-only workflow
+
+This is:
+
+A self-governing, policy-driven, attested, failure-resilient multi-agent execution platform
+
+It is suitable for:
+
+Enterprise deployment
+
+Regulated environments
+
+Long-lived multi-agent systems
+
+Safety-critical AI workflows
+
+-------
+
+Done.
+I’ve combined everything from this conversation into a single, clean, authoritative Markdown file and generated it for you.
+
+👉 Download the full platform spec (.md)
+
+What this file contains
+
+Full PRD → promoted to Platform RFC
+
+LLM Dashboard + Control Plane + Wizard
+
+Policy-as-code + policy diffing
+
+Policy simulation / dry-run
+
+Runtime attestation + drift detection
+
+Promotion gates (Sandbox → Governed → Production)
+
+Multi-agent LLM registry + orchestrator integration
+
+Chaos & failure injection
+
+Audit & compliance model
+
+Backend persistence model
+
+Infra (Terraform / Helm) concepts
+
+QA + E2E strategy
+
+Clear non-negotiable invariants
+
+You’re right — thanks for calling that out 👍
+You asked for a global file that preserves all versions developed during the session, not just the final RFC snapshot.
+
+I’ve now fixed that properly.
+
+👉 Download the full evolution spec (.md)
+
+What this file contains (explicitly)
+
+This Markdown file is chronological and additive. Nothing is overwritten.
+
+It includes:
+
+Version 1 – Initial LLM wizard concept
+
+Version 2 – Responsive & cross-device UX
+
+Version 3 – Dashboard-first navigation model
+
+Version 4 – Create vs Management wizard modes
+
+Version 5 – PRD with acceptance criteria
+
+Version 6 – Technical PRD (routing, APIs, state)
+
+Version 7 – State machine formalization (XState)
+
+Version 8 – Backend contracts & persistence
+
+Version 9 – Frontend engineering artifacts (shadcn/ui, Storybook)
+
+Version 10 – Policy-as-code + multi-agent registry
+
+Version 11 – Runtime attestation & promotion gates
+
+Version 12 – Orchestrator graph integration
+
+Version 13 – Chaos testing, drift detection, policy diffing
+
+Version 14 – Platform RFC (governed, auditable system)
+
+Version 15 – Final platform identity statement
+
+Each version extends the previous, making it suitable for:
+
+Design review history
+
+Architecture decision records (ADR/RFC chain)
+
+Explaining why the system evolved the way it did
+
+Splitting later into multiple RFCs if needed
+
+---'z
+
+Cool — then the right next step is to turn the abstract boxes into a concrete “implementation pick list” (with defaults you can ship) and lock the interfaces so teams can work in parallel.
+
+Here’s a practical set of “production-safe defaults” for governance-heavy teams, plus what decisions you need to make.
+
+Concrete implementations to pick (recommended defaults)
+
+1) Policy-as-code engine
+
+Default pick: OPA (Open Policy Agent) + Rego
+
+Why: mature, widely adopted for governance, good tooling, easy to version and test.
+
+How it fits: Wizard calls Policy API for simulate/enforce; Orchestrator calls Policy API pre-dispatch.
+
+Alternatives
+
+Cedar (AWS-style ABAC) if you want simpler RBAC/ABAC and less expressive logic.
+
+JSONLogic for lightweight client-side checks (still keep server as source of truth).
+
+Decision to lock: Rego vs Cedar; and whether policies run as:
+
+sidecar per service (strong isolation) or
+
+centralized service (simpler ops)
+
+2) Runtime attestation
+
+Default pick (Kubernetes): Sigstore/cosign for image signing + Kyverno or Gatekeeper admission rules
+
+Ensures only signed images run.
+
+Then your attestation service verifies: 
+
+image digest
+
+config hash
+
+runtime identity
+
+If you need hardware attestation (stronger):
+
+SPIFFE/SPIRE for workload identity + optional TPM/TEE (Nitro Enclaves/Confidential VMs) later.
+
+Decision to lock:
+
+“Signed image enforcement” only (good baseline) vs “hardware-backed attestation” (stronger, higher cost).
+
+3) Drift detection
+
+Default pick: periodic verifier job + runtime self-report
+
+Store “expected fingerprint” in llm_versions (digest + config hash + allowed env vars).
+
+A verifier reconciles “expected vs observed” every N minutes.
+
+Critical drift flips status to revoked and blocks dispatch.
+
+Decision to lock:
+
+Where “observed state” comes from: 
+
+Kubernetes API + image digests + configmap/secret refs
+
+runtime agent sidecar report
+
+both (best)
+
+4) Audit log (tamper-evident)
+
+Default pick: Postgres append-only table + object-store archive + signatures
+
+Store events in DB for queryability.
+
+Periodically seal batches to object storage (S3/GCS/Azure) with hash chaining.
+
+If you want stronger immutability:
+
+WORM storage / retention policies on object store.
+
+Decision to lock:
+
+hash chain scheme + signing key management (KMS).
+
+5) Eventing / async workflow
+
+Default pick: NATS JetStream or Kafka
+
+Use it for: 
+
+attestation events
+
+drift events
+
+promotion requests/approvals
+
+chaos run outcomes
+
+Decision to lock: NATS (lighter ops) vs Kafka (heavier, standard at scale).
+
+6) Orchestrator integration (your multi-agent graph)
+
+Default pick: treat LLM Versions as typed nodes with hard preflight
+
+Preflight checks: 
+
+policy: pass
+
+attestation: valid
+
+drift: none
+
+env: allowed
+
+role: satisfied
+
+Block dispatch otherwise.
+
+Decision to lock: graph storage:
+
+Postgres (simple) vs dedicated graph DB (usually unnecessary).
+
+7) Chaos & failure injection
+
+Default pick: LitmusChaos (K8s) or Chaos Mesh
+
+Start with controlled scenarios: 
+
+policy engine down → fail closed
+
+audit sink down → fail closed (or “degraded but block promotions”)
+
+network partition → block new runs
+
+Decision to lock: which actions fail closed vs degraded.
+
+My recommendation: execution fail-closed; UI can degrade.
+
+A “selection matrix” to finalize quickly
+
+If you want a fast decision path, ship with:
+
+Policy: OPA/Rego
+
+Signed images: cosign + admission control (Kyverno/Gatekeeper)
+
+Identity: SPIFFE/SPIRE (optional but very nice)
+
+Audit: Postgres + batch-sealed object store + KMS signing
+
+Events: NATS JetStream
+
+Chaos: Chaos Mesh (or Litmus)
+
+Storage: Postgres for registry + versions + audit + promotions
+
+That stack is realistic, well-supported, and governance-friendly.
+
+What to lock next (so teams can start coding)
+
+Policy API contract (simulate + enforce + diff endpoints)
+
+Attestation evidence format (exact JSON schema)
+
+Dispatch guard interface in orchestrator (canDispatch(llmVersionId, graphId) -> decision)
+
+Promotion gate workflow (who approves, what evidence is required)
+
+Failure mode table (fail-closed vs degraded by subsystem)
+
+-------
+
+Cool — here’s RFC-002: Implementation Selections + Interface Contracts (production-ready, so teams can start building in parallel without stepping on each other).
+
+
+---
+
+RFC-002 — Concrete Implementations & Contracts for the LLM Control Plane Platform
+
+Status: Proposed (Ready for sign-off)
+Depends on: RFC-001
+Audience: Platform / Infra / Security / Backend / Frontend / QA
+Goal: Replace abstract boxes with concrete tech choices + lock interfaces/events.
+
+
+---
+
+1) Decisions Summary (Ship-ready defaults)
+
+Governance / Policy
+
+Policy Engine: OPA (Open Policy Agent) + Rego
+
+Policy Packaging: Git-versioned bundles (OCI artifacts) or simple repo + CI publish
+
+Policy Execution Mode: centralized policy service (v1), optional per-service sidecar later
+
+
+Runtime Attestation & Integrity
+
+Image signing: Sigstore/cosign
+
+Admission enforcement: Kyverno (default) or Gatekeeper (if you already run it)
+
+Workload identity (optional but recommended): SPIFFE/SPIRE
+
+
+Eventing
+
+Event bus: NATS JetStream (default)
+(Kafka acceptable if you already have it)
+
+
+Storage
+
+Primary DB: PostgreSQL
+
+JSON config: jsonb for LLM configs, evidence payloads, diffs
+
+Archive: Object storage (S3/GCS/Azure) for sealed audit batches
+
+
+Audit / Compliance
+
+Audit store: append-only DB table + hash chaining + signatures with KMS
+
+Export: periodic sealed bundles to object storage with retention policy (WORM if required)
+
+
+Chaos Engineering
+
+Chaos framework: Chaos Mesh (default) or LitmusChaos
+
+
+
+---
+
+2) Component Architecture (Concrete)
+
+Services
+
+1. llm-registry-api
+
+
+
+Owns: LLM identities, versions, promotion records
+
+Exposes: OpenAPI endpoints used by UI + orchestrator
+
+
+2. policy-service
+
+
+
+Wraps OPA
+
+Provides simulate/enforce/diff endpoints (locked below)
+
+
+3. attestation-service
+
+
+
+Verifies: (image digest, signature, config hash, workload identity)
+
+Maintains attestation status (attested/stale/failed/revoked)
+
+
+4. drift-verifier
+
+
+
+Periodic reconciler (K8s API + runtime reports)
+
+Emits drift events and flips execution state if needed
+
+
+5. audit-sink
+
+
+
+Writes append-only audit events
+
+Hash chains + signs batches (KMS)
+
+Periodically seals to object storage
+
+
+6. orchestrator
+
+
+
+Calls registry + policy + attestation checks via a single guard interface
+
+Blocks dispatch if any invariant fails
+
+
+
+---
+
+3) Locked Data Contracts (Schemas)
+
+3.1 LLM Identity (stable)
+
+{
+  "id": "llm_123",
+  "name": "Primary Planner",
+  "role": "planner",
+  "ownerTeam": "platform-ai",
+  "archived": false,
+  "createdAt": "2026-01-06T21:00:00Z"
+}
+
+3.2 LLM Version (immutable)
+
+{
+  "id": "llmv_456",
+  "llmId": "llm_123",
+  "version": 4,
+  "environment": "governed",
+  "config": { "runtime": { "type": "cloud", "provider": "openai" }, "model": { "name": "gpt-4.1" } },
+  "configHash": "sha256:...",
+  "policyBundleRef": "oci://policies/llm:2026.01.06",
+  "policyHash": "sha256:...",
+  "attestationContract": {
+    "runtimeType": "container",
+    "imageDigest": "sha256:...",
+    "workloadId": "spiffe://prod/ns/llm/sa/runner",
+    "configHash": "sha256:..."
+  },
+  "status": {
+    "policy": "pass",
+    "attestation": "attested",
+    "drift": "none",
+    "callable": true
+  },
+  "createdAt": "2026-01-06T22:00:00Z",
+  "createdBy": "user:alice"
+}
+
+3.3 Policy Decision Output
+
+{
+  "decision": "allow",
+  "deny": [],
+  "warn": ["High context length may increase cost"],
+  "mutations": [],
+  "policyHash": "sha256:...",
+  "explainRef": "policytrace_789"
+}
+
+3.4 Drift Event
+
+{
+  "llmVersionId": "llmv_456",
+  "severity": "critical",
+  "signal": "image_digest_mismatch",
+  "expected": { "imageDigest": "sha256:aaa" },
+  "observed": { "imageDigest": "sha256:bbb" },
+  "detectedAt": "2026-01-06T22:10:00Z"
+}
+
+
+---
+
+4) Locked API Contracts (OpenAPI-level)
+
+4.1 Registry API
+
+GET /llms → list identities (+ latest version summary)
+
+GET /llms/{llmId} → identity detail
+
+GET /llms/{llmId}/versions → version history
+
+GET /llm-versions/{llmVersionId} → version detail (full config + trust state)
+
+POST /llms → create identity (name, role, ownerTeam)
+
+POST /llms/{llmId}/versions → create new version (create/edit/clone)
+
+POST /llm-versions/{llmVersionId}/promotions/simulate → simulate promotion
+
+POST /llm-versions/{llmVersionId}/promotions/request → request promotion
+
+POST /promotions/{promotionId}/approve → approve
+
+POST /promotions/{promotionId}/reject → reject
+
+DELETE /llms/{llmId} → archive identity (never hard delete in v1)
+
+
+4.2 Policy Service API
+
+POST /policy/simulate
+
+input: proposed config + target env + role + context
+
+output: decision (deny/warn/allow) + explainRef
+
+
+POST /policy/enforce
+
+same as simulate, but used for final submit and runtime dispatch
+
+
+POST /policy/diff
+
+input: old policy bundle/hash + new bundle/hash
+
+output: added/removed/changed rules + severity score
+
+
+
+4.3 Attestation Service API
+
+POST /attestations/submit
+
+input: evidence payload from runtime
+
+
+GET /attestations/{llmVersionId}/status
+
+output: attested/stale/failed/revoked + evidence summary
+
+
+POST /attestations/{llmVersionId}/revoke
+
+admin/automated revoke
+
+
+
+4.4 Drift Verifier API (optional public)
+
+POST /drift/verify (trigger on-demand)
+
+GET /drift/{llmVersionId}/status
+
+
+
+---
+
+5) Locked Event Types (NATS subjects)
+
+Required subjects
+
+llm.wizard.started
+
+llm.policy.simulated
+
+llm.policy.denied
+
+llm.policy.diff.computed
+
+llm.version.created
+
+llm.attestation.submitted
+
+llm.attestation.verified
+
+llm.drift.detected
+
+llm.execution.revoked
+
+llm.promotion.requested
+
+llm.promotion.approved
+
+llm.promotion.rejected
+
+llm.chaos.run.completed
+
+
+All events MUST include:
+
+eventId, timestamp, actor, llmId, llmVersionId (if applicable), environment, configHash, policyHash
+
+
+
+---
+
+6) Orchestrator Guard Interface (single gate)
+
+The orchestrator calls ONE thing before dispatch:
+
+POST /dispatch/guard
+
+Request
+
+{
+  "graphId": "graph_support_agent_v2",
+  "requestedNodes": [
+    { "role": "planner", "llmVersionId": "llmv_456" },
+    { "role": "guard", "llmVersionId": "llmv_999" }
+  ],
+  "environment": "governed"
+}
+
+Response
+
+{
+  "allow": false,
+  "reasons": [
+    { "type": "ATTESTATION", "message": "llmv_999 is not attested" }
+  ],
+  "requiredActions": [
+    { "type": "RE_ATTEST", "llmVersionId": "llmv_999" }
+  ]
+}
+
+This guard implementation may internally call registry + policy + attestation + drift checks, but the orchestrator only needs this one contract.
+
+
+---
+
+7) Failure Modes (Fail-Closed Table)
+
+Component down	Execution	Wizard create/edit	Promotions	Read-only views
+
+Policy service	BLOCK	BLOCK	BLOCK	ALLOW
+Attestation service	BLOCK	ALLOW (draft) / BLOCK (finalize)	BLOCK	ALLOW
+Audit sink	BLOCK (strict)	BLOCK (strict)	BLOCK	ALLOW
+Registry DB	BLOCK	BLOCK	BLOCK	BLOCK
+Event bus	ALLOW (with local buffering) or BLOCK (strict)	ALLOW	ALLOW	ALLOW
+Drift verifier	ALLOW but mark “drift-unknown” and BLOCK promotions	ALLOW	BLOCK	ALLOW
+
+
+Default stance for governance teams: strict = fail-closed for execution, create, promotions.
+
+
+---
+
+8) Terraform / Helm Deliverables (what infra will ship)
+
+Terraform modules (minimum)
+
+modules/postgres
+
+modules/nats
+
+modules/llm_registry_api
+
+modules/policy_service
+
+modules/attestation_service
+
+modules/audit_sink
+
+modules/drift_verifier
+
+modules/ingress (gateway, certs, WAF if needed)
+
+
+Helm charts (minimum)
+
+charts/llm-registry-api
+
+charts/policy-service (OPA + wrapper)
+
+charts/attestation-service
+
+charts/audit-sink
+
+charts/drift-verifier
+
+
+Each chart MUST expose values for:
+
+replicas
+
+resource limits
+
+env vars
+
+liveness/readiness probes
+
+network policy toggles
+
+KMS config (audit signing)
+
+OPA bundle ref (policy-service)
+
+
+
+---
+
+9) Wizard UI Requirements (tie-back to shadcn/ui)
+
+Policy UX (must-have)
+
+Inline PolicyResultPanel per step: allow/warn/deny
+
+“Simulate” button everywhere (step + review)
+
+Policy Diff viewer on review + promotion gate
+
+
+Attestation / Drift UX (must-have)
+
+Status badges:
+
+Policy: pass/warn/deny
+
+Attestation: attested/stale/failed/revoked
+
+Drift: none/suspicious/critical
+
+
+“Re-attest” and “Investigate drift” actions (role-gated)
+
+
+Promotion Gates UI (must-have)
+
+Gate card:
+
+evidence checklist
+
+policy diff summary
+
+simulate promotion
+
+request/approve/reject
+
+
+
+
+---
+
+10) Test Strategy (minimum production bar)
+
+Contract tests
+
+OpenAPI schema validation for every endpoint
+
+Policy regression tests per bundle (golden inputs)
+
+Attestation verification tests (good/bad evidence)
+
+
+E2E (Playwright)
+
+Dashboard → Wizard (create/manage)
+
+Wizard simulate → deny blocks Next
+
+Create version → appears in control plane
+
+Promotion simulate → request → approve → new version created
+
+Drift detected → callable false → orchestrator guard blocks
+
+
+Chaos tests (weekly)
+
+kill policy-service → execution blocked
+
+partition audit-sink → strict mode blocks creates/promotions
+
+degrade attestation → dispatch blocks
+
+
+
+---
+
+11) Rollout Plan (safe sequence)
+
+1. Ship Registry + Dashboard + Control Plane (read-only)
+
+
+2. Ship Wizard create/manage (no promotion)
+
+
+3. Add policy simulate/enforce (block on deny)
+
+
+4. Add attestation contract + status (block dispatch when unattested)
+
+
+5. Add promotion gates (sandbox→governed)
+
+
+6. Add drift verifier (block promotions on drift)
+
+
+7. Add chaos suite + weekly automation
+
+
+
+
+---
+
+12) Open Decisions (explicit)
+
+Pick one per line and lock:
+
+Kyverno vs Gatekeeper
+
+NATS vs Kafka
+
+Strict audit fail-closed vs “degraded read-only mode”
+
+SPIFFE/SPIRE now vs later
+
+Hardware-backed attestation now vs later
+
+
+
+---
+
+RFC-002 into:
+
+Perfect — here are the two deliverables you asked for, clean, concrete, and sign-off ready.
+
+
+---
+
+RFC-002A — Implementation Decision Record (Leadership Sign-off)
+
+This section is designed to be approved, frozen, and referenced.
+Once signed, teams can build without re-litigating fundamentals.
+
+1. Final Technology Decisions (Recommended Defaults)
+
+Area	Decision	Rationale	Status
+
+Policy Engine	OPA + Rego	Industry standard for governance, expressive, testable, mature tooling	⬜ Approve
+Policy Execution	Centralized service (v1)	Simpler ops, single source of truth	⬜ Approve
+Image Signing	Sigstore / cosign	Strong supply-chain security, cloud-native	⬜ Approve
+Admission Control	Kyverno	Easier UX than Gatekeeper, good policy ergonomics	⬜ Approve
+Workload Identity	SPIFFE / SPIRE (Phase 2)	Strong identity, not required for v1	⬜ Defer
+Runtime Attestation	Image digest + config hash	Strong baseline, hardware attestation optional later	⬜ Approve
+Drift Detection	Verifier job + runtime self-report	Balanced accuracy / complexity	⬜ Approve
+Event Bus	NATS JetStream	Lightweight, reliable, good for control planes	⬜ Approve
+Primary Database	PostgreSQL	ACID, JSONB, strong operational maturity	⬜ Approve
+Audit Storage	Postgres + sealed object storage	Queryable + tamper-evident	⬜ Approve
+Chaos Framework	Chaos Mesh	Kubernetes-native, expressive scenarios	⬜ Approve
+Promotion Model	Gate-based, versioned only	No in-place mutation, audit-safe	⬜ Approve
+Failure Mode	Fail-closed for execution & promotion	Governance-grade safety	⬜ Approve
+
+
+Executive Invariant (to sign)
+
+> No LLM may execute, promote, or mutate state unless policy, attestation, drift, and audit invariants are satisfied.
+
+
+
+
+---
+
+2. Explicitly Deferred (Not v1)
+
+These are intentionally postponed to avoid scope creep:
+
+Hardware-backed attestation (TEE / TPM)
+
+Multi-tenant isolation policies
+
+External regulatory mapping (EU AI Act, ISO)
+
+Cost enforcement at runtime (reporting only in v1)
+
+
+
+---
+
+RFC-002B — Team Split & Ownership Plan
+
+This is the parallel execution blueprint.
+Teams can work independently with minimal coordination overhead.
+
+
+---
+
+1. Platform / Infrastructure Team
+
+Owns: Trust, safety, runtime guarantees
+
+Responsibilities
+
+Terraform modules
+
+Helm charts
+
+Policy service deployment
+
+Attestation service
+
+Drift verifier
+
+Chaos testing
+
+KMS + secrets
+
+
+Owned Components
+
+infra/
+ ├─ terraform/
+ │   ├─ postgres/
+ │   ├─ nats/
+ │   ├─ llm-registry-api/
+ │   ├─ policy-service/
+ │   ├─ attestation-service/
+ │   ├─ audit-sink/
+ │   └─ drift-verifier/
+ ├─ helm/
+ │   ├─ llm-registry-api/
+ │   ├─ policy-service/
+ │   ├─ attestation-service/
+ │   ├─ audit-sink/
+ │   └─ drift-verifier/
+
+Success Criteria
+
+All services deployable from scratch
+
+Fail-closed behavior verified
+
+Chaos tests passing without invariant violations
+
+
+
+---
+
+2. Backend / Control Plane Team
+
+Owns: Business logic & APIs
+
+Responsibilities
+
+LLM registry API
+
+Versioning logic
+
+Promotion workflows
+
+Audit event emission
+
+Orchestrator guard endpoint
+
+
+Owned Components
+
+backend/
+ ├─ registry/
+ │   ├─ llms.ts
+ │   ├─ versions.ts
+ │   ├─ promotions.ts
+ │   └─ roles.ts
+ ├─ policy-client/
+ ├─ attestation-client/
+ ├─ drift-client/
+ ├─ audit/
+ └─ dispatch-guard/
+
+Hard Rules
+
+No mutable configs
+
+No execution decisions without guard
+
+All state transitions emit audit events
+
+
+
+---
+
+3. Frontend / UX Team
+
+Owns: User intent, clarity, governance visibility
+
+Responsibilities
+
+LLM Dashboard
+
+Wizard (create / manage / simulate)
+
+Control Plane UI
+
+Promotion Gates UI
+
+Policy / attestation / drift visibility
+
+
+Owned Components
+
+frontend/
+ ├─ app/llm/
+ │   ├─ dashboard/
+ │   ├─ control-plane/
+ │   ├─ wizard/
+ │   │   ├─ WizardRoot.tsx
+ │   │   ├─ WizardMachine.ts
+ │   │   ├─ steps/
+ │   │   ├─ PolicyResultPanel.tsx
+ │   │   ├─ SimulationPanel.tsx
+ │   │   └─ PromotionGateCard.tsx
+
+UX Invariants
+
+Wizard never auto-opens
+
+All blocks explain why
+
+Simulation always available before commit
+
+Trust state always visible (never implicit)
+
+
+
+---
+
+4. Orchestrator / Agent Team
+
+Owns: Execution correctness
+
+Responsibilities
+
+Orchestrator graph
+
+Role enforcement
+
+Dispatch guard integration
+
+Fail-fast execution
+
+
+Owned Components
+
+orchestrator/
+ ├─ graph/
+ ├─ dispatch/
+ │   └─ guardClient.ts
+ ├─ roles/
+ └─ execution/
+
+Hard Rule
+
+> The orchestrator may not bypass /dispatch/guard — ever.
+
+
+
+
+---
+
+5. Security / Compliance Team
+
+Owns: Assurance, audit, review
+
+Responsibilities
+
+Policy authoring & review
+
+Audit log review
+
+Promotion approvals (governed → prod)
+
+Drift & chaos incident analysis
+
+
+Deliverables
+
+Policy bundles
+
+Approval SLAs
+
+Audit export procedures
+
+
+
+---
+
+6. QA / Reliability Team
+
+Owns: Proof that invariants hold
+
+Responsibilities
+
+Contract tests
+
+E2E tests (Playwright)
+
+Chaos validation
+
+Regression tests for policies
+
+
+Required Coverage
+
+Wizard deny blocks
+
+Promotion gate enforcement
+
+Drift revocation
+
+Attestation failure handling
+
+
+
+---
+
+7. Parallel Build Timeline (Realistic)
+
+Week	Milestone
+
+1	Registry API + Dashboard (read-only)
+2	Wizard create/manage + policy simulate
+3	Attestation enforcement + guard
+4	Promotion gates + audit sealing
+5	Drift detection + chaos tests
+6	Production hardening & sign-off
+
+
+
+---
+
+Final Statement (for leadership)
+
+This platform is:
+
+Governance-first
+
+Fail-closed
+
+Auditable by design
+
+Multi-agent native
+
+Operationally realistic
+
+
+
 
