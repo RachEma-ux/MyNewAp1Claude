@@ -1087,7 +1087,8 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
 
   console.log('[createLLM] Inserting data:', JSON.stringify(data));
 
-  // Ensure all fields have explicit values (MySQL doesn't handle DEFAULT keyword well)
+  // Use raw SQL to avoid Drizzle's DEFAULT keyword issues
+  const now = new Date();
   const insertData = {
     name: data.name,
     description: data.description ?? null,
@@ -1095,27 +1096,47 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
     ownerTeam: data.ownerTeam ?? null,
     archived: data.archived ?? false,
     createdBy: data.createdBy,
-    createdAt: data.createdAt ?? new Date(),
-    updatedAt: data.updatedAt ?? new Date(),
+    createdAt: data.createdAt ?? now,
+    updatedAt: data.updatedAt ?? now,
   };
 
   console.log('[createLLM] Normalized insert data:', JSON.stringify(insertData));
 
   try {
-    const [llm] = await db.insert(llms).values(insertData).$returningId();
+    // Use raw SQL to bypass Drizzle's DEFAULT keyword generation
+    const result = await db.execute(
+      sql`INSERT INTO llms (name, description, role, ownerTeam, archived, createdBy, createdAt, updatedAt)
+          VALUES (${insertData.name}, ${insertData.description}, ${insertData.role}, ${insertData.ownerTeam}, ${insertData.archived}, ${insertData.createdBy}, ${insertData.createdAt}, ${insertData.updatedAt})`
+    );
+
+    const insertId = (result as any).insertId || (result as any)[0]?.insertId;
+
+    if (!insertId) {
+      throw new Error('Failed to get inserted LLM ID');
+    }
+
+    console.log('[createLLM] Successfully inserted with ID:', insertId);
 
     // Emit audit event
     await emitLLMAuditEvent({
       eventType: "llm.created",
-      llmId: llm.id,
+      llmId: insertId,
       actor: data.createdBy,
       actorType: "user",
       payload: { name: data.name, role: data.role },
     });
 
-    return (await db.select().from(llms).where(eq(llms.id, llm.id)))[0];
+    // Fetch and return the created LLM
+    const created = await db.select().from(llms).where(eq(llms.id, insertId)).limit(1);
+    return created[0];
   } catch (error: any) {
     console.error('[createLLM] Insert failed:', error);
+    console.error('[createLLM] Error details:', {
+      message: error.message,
+      code: error.code,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage,
+    });
     console.error('[createLLM] Data was:', JSON.stringify(insertData));
     throw new Error(`Failed to create LLM: ${error.message}`);
   }
