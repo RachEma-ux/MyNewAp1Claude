@@ -39,6 +39,7 @@ import { ENV } from "./_core/env";
 import mysql from 'mysql2/promise';
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let _rawConnection: mysql.Connection | null = null;
 
 export function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -50,6 +51,18 @@ export function getDb() {
     }
   }
   return _db;
+}
+
+async function getRawConnection() {
+  if (!_rawConnection && process.env.DATABASE_URL) {
+    try {
+      _rawConnection = await mysql.createConnection(process.env.DATABASE_URL);
+    } catch (error) {
+      console.warn("[Database] Failed to create raw connection:", error);
+      _rawConnection = null;
+    }
+  }
+  return _rawConnection;
 }
 
 // ============================================================================
@@ -1087,7 +1100,7 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
 
   console.log('[createLLM] Inserting data:', JSON.stringify(data));
 
-  // Use raw SQL to avoid Drizzle's DEFAULT keyword issues
+  // Use raw MySQL2 connection to completely bypass Drizzle
   const now = new Date();
   const insertData = {
     name: data.name,
@@ -1103,13 +1116,27 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
   console.log('[createLLM] Normalized insert data:', JSON.stringify(insertData));
 
   try {
-    // Use raw SQL to bypass Drizzle's DEFAULT keyword generation
-    const result = await db.execute(
-      sql`INSERT INTO llms (name, description, role, ownerTeam, archived, createdBy, createdAt, updatedAt)
-          VALUES (${insertData.name}, ${insertData.description}, ${insertData.role}, ${insertData.ownerTeam}, ${insertData.archived}, ${insertData.createdBy}, ${insertData.createdAt}, ${insertData.updatedAt})`
+    // Get raw MySQL2 connection to completely bypass Drizzle's query builder
+    const conn = await getRawConnection();
+    if (!conn) throw new Error("Raw database connection not available");
+
+    // Execute raw parameterized query
+    const [result] = await conn.execute(
+      `INSERT INTO llms (name, description, role, ownerTeam, archived, createdBy, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        insertData.name,
+        insertData.description,
+        insertData.role,
+        insertData.ownerTeam,
+        insertData.archived,
+        insertData.createdBy,
+        insertData.createdAt,
+        insertData.updatedAt,
+      ]
     );
 
-    const insertId = (result as any).insertId || (result as any)[0]?.insertId;
+    const insertId = (result as any).insertId;
 
     if (!insertId) {
       throw new Error('Failed to get inserted LLM ID');
@@ -1126,7 +1153,7 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
       payload: { name: data.name, role: data.role },
     });
 
-    // Fetch and return the created LLM
+    // Fetch and return the created LLM using Drizzle
     const created = await db.select().from(llms).where(eq(llms.id, insertId)).limit(1);
     return created[0];
   } catch (error: any) {
@@ -1134,6 +1161,7 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
     console.error('[createLLM] Error details:', {
       message: error.message,
       code: error.code,
+      errno: error.errno,
       sqlState: error.sqlState,
       sqlMessage: error.sqlMessage,
     });
