@@ -57,23 +57,23 @@ export default function LLMDashboard() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
+    <div className="container mx-auto py-4 sm:py-8 px-4 max-w-7xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-4xl font-bold mb-2">LLM Control Plane</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">LLM Control Plane</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Governed, auditable LLM registry and orchestration platform
           </p>
         </div>
 
-        <div className="flex gap-3">
-          <Button variant="outline" size="lg" onClick={openControlPlane}>
-            <Settings className="mr-2 h-5 w-5" />
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+          <Button variant="outline" size="lg" onClick={openControlPlane} className="w-full sm:w-auto">
+            <Settings className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
             Control Plane
           </Button>
-          <Button size="lg" onClick={openWizard}>
-            <Wand2 className="mr-2 h-5 w-5" />
+          <Button size="lg" onClick={openWizard} className="w-full sm:w-auto">
+            <Wand2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
             Wizard
           </Button>
         </div>
@@ -142,7 +142,7 @@ export default function LLMDashboard() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-1 text-sm">
+            <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 text-xs sm:text-sm">
               <span>Planner: {stats?.byRole.planner || 0}</span>
               <span>Executor: {stats?.byRole.executor || 0}</span>
               <span>Router: {stats?.byRole.router || 0}</span>

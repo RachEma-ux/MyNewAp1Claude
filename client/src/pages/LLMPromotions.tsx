@@ -174,7 +174,7 @@ export default function LLMPromotions() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
+    <div className="container mx-auto py-4 sm:py-8 px-4 max-w-7xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
@@ -232,7 +232,7 @@ export default function LLMPromotions() {
               <p className="text-muted-foreground">Loading promotions...</p>
             </div>
           ) : promotions && promotions.length > 0 ? (
-            <div className="border rounded-lg">
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

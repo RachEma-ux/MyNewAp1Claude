@@ -87,20 +87,20 @@ export default function LLMControlPlane() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
+    <div className="container mx-auto py-4 sm:py-8 px-4 max-w-7xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/llm")}>
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">LLM Control Plane</h1>
-            <p className="text-muted-foreground">Manage all LLM identities and versions</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">LLM Control Plane</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">Manage all LLM identities and versions</p>
           </div>
         </div>
 
-        <Button onClick={() => setLocation("/llm/wizard")}>
+        <Button onClick={() => setLocation("/llm/wizard")} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Create LLM
         </Button>
@@ -165,15 +165,15 @@ export default function LLMControlPlane() {
               <p className="text-muted-foreground">Loading LLMs...</p>
             </div>
           ) : filteredLLMs && filteredLLMs.length > 0 ? (
-            <div className="border rounded-lg">
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Role</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Owner Team</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead className="hidden md:table-cell">Description</TableHead>
+                    <TableHead className="hidden lg:table-cell">Owner Team</TableHead>
+                    <TableHead className="hidden sm:table-cell">Created</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -184,24 +184,24 @@ export default function LLMControlPlane() {
                       <TableCell>
                         <Badge className={getRoleBadgeColor(llm.role)}>{llm.role}</Badge>
                       </TableCell>
-                      <TableCell className="max-w-md truncate">
+                      <TableCell className="hidden md:table-cell max-w-md truncate">
                         {llm.description || <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {llm.ownerTeam || <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
                         {new Date(llm.createdAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-1 sm:gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setLocation(`/llm/${llm.id}`)}
                           >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
+                            <Eye className="h-4 w-4 sm:mr-1" />
+                            <span className="hidden sm:inline">View</span>
                           </Button>
                           <Button
                             variant="ghost"
@@ -209,8 +209,8 @@ export default function LLMControlPlane() {
                             onClick={() => handleArchive(llm.id, llm.name)}
                             disabled={archiveMutation.isPending}
                           >
-                            <Archive className="h-4 w-4 mr-1" />
-                            Archive
+                            <Archive className="h-4 w-4 sm:mr-1" />
+                            <span className="hidden sm:inline">Archive</span>
                           </Button>
                         </div>
                       </TableCell>
