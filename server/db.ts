@@ -1085,18 +1085,26 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  const [llm] = await db.insert(llms).values(data).$returningId();
+  console.log('[createLLM] Inserting data:', JSON.stringify(data));
 
-  // Emit audit event
-  await emitLLMAuditEvent({
-    eventType: "llm.created",
-    llmId: llm.id,
-    actor: data.createdBy,
-    actorType: "user",
-    payload: { name: data.name, role: data.role },
-  });
+  try {
+    const [llm] = await db.insert(llms).values(data).$returningId();
 
-  return (await db.select().from(llms).where(eq(llms.id, llm.id)))[0];
+    // Emit audit event
+    await emitLLMAuditEvent({
+      eventType: "llm.created",
+      llmId: llm.id,
+      actor: data.createdBy,
+      actorType: "user",
+      payload: { name: data.name, role: data.role },
+    });
+
+    return (await db.select().from(llms).where(eq(llms.id, llm.id)))[0];
+  } catch (error: any) {
+    console.error('[createLLM] Insert failed:', error);
+    console.error('[createLLM] Data was:', JSON.stringify(data));
+    throw new Error(`Failed to create LLM: ${error.message}`);
+  }
 }
 
 /**

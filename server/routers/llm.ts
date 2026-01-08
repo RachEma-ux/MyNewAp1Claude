@@ -92,13 +92,24 @@ export const llmRouter = router({
   create: protectedProcedure
     .input(createLLMSchema)
     .mutation(async ({ ctx, input }) => {
-      const llm = await createLLM({
+      // Ensure user is authenticated
+      if (!ctx.user?.id) {
+        throw new Error("User not authenticated");
+      }
+
+      console.log('[LLM Create] User ID:', ctx.user.id, 'Input:', input);
+
+      const insertData = {
         name: input.name,
-        description: input.description ?? null,
+        description: input.description || null,
         role: input.role,
-        ownerTeam: input.ownerTeam ?? null,
+        ownerTeam: input.ownerTeam || null,
         createdBy: ctx.user.id,
-      });
+      };
+
+      console.log('[LLM Create] Insert data:', insertData);
+
+      const llm = await createLLM(insertData);
 
       return llm;
     }),
