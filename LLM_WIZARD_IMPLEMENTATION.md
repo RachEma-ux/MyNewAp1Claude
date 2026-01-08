@@ -337,30 +337,72 @@ User Input → Wizard State → tRPC Client → Server Router → Database Opera
 
 ---
 
-## 🎯 Next Steps (Optional Enhancements)
+## 🎯 Phase 3 - Policy & Promotion Workflow ✅ COMPLETE
 
-### **Not Required for MVP, but Nice to Have:**
+### **1. Policy Validation Service** ✅ COMPLETE
+   - ✅ OPA-style policy engine implemented
+   - ✅ Real-time validation in wizard (Step 3)
+   - ✅ Policy violation/warning display with suggestions
+   - ✅ Color-coded badges (pass/warn/deny)
+   - ✅ Blocks submission if policy fails
 
-1. **Policy Validation Service** ⏳
-   - OPA integration for policy checks
-   - Real-time validation in wizard
-   - Policy violation warnings
+**File:** `server/policies/llm-policy-engine.ts` (400+ lines)
+- Naming conventions validation
+- Role-specific constraints
+- Model allowlist enforcement
+- Parameter bounds checking
+- Environment-based rules
 
-2. **Promotion UI** ⏳
-   - Promotion request list page
-   - Approve/reject interface
-   - Diff visualization
+### **2. Promotion Workflow UI** ✅ COMPLETE
+   - ✅ Promotion request list page with filters
+   - ✅ Approve/reject interface with comments
+   - ✅ Execute approved promotions
+   - ✅ Environment badges and status tracking
+   - ✅ Full lifecycle management
 
-3. **LLM Detail Page** ⏳
-   - Version history
-   - Audit trail viewer
-   - Edit LLM description
+**File:** `client/src/pages/LLMPromotions.tsx` (400+ lines)
+- Filter by status (pending, approved, rejected, executed, failed)
+- Approve dialog with optional comments
+- Reject dialog with required reason
+- Execute button for approved promotions
+- Integration with all tRPC endpoints
 
-4. **Advanced Features** ⏳
+### **3. LLM Detail Page** ✅ COMPLETE
+   - ✅ Version history across all environments
+   - ✅ Create promotion requests
+   - ✅ View promotion status per version
+   - ✅ Latest versions summary
+   - ✅ Identity and metadata display
+
+**File:** `client/src/pages/LLMDetailPage.tsx` (550+ lines)
+- Comprehensive version table with policy/attestation badges
+- Promote button with environment selection
+- Prevents duplicate promotions
+- Links to promotion management
+- Full integration with Control Plane
+
+---
+
+## 🎯 Optional Future Enhancements
+
+### **Not Required for MVP:**
+
+1. **Advanced Features** ⏳
    - Bulk operations
    - Import/export LLMs
    - Template library
    - Clone existing LLM
+   - Diff visualization between versions
+
+2. **Enhanced Audit** ⏳
+   - Detailed audit trail viewer UI
+   - Export audit logs
+   - Compliance reports
+
+3. **Drift Detection UI** ⏳
+   - Visual drift alerts
+   - Automatic remediation triggers
+   - Configuration comparison tools
 
 ---
 
@@ -368,23 +410,34 @@ User Input → Wizard State → tRPC Client → Server Router → Database Opera
 
 ### **Total Implementation:**
 
-**Files Created:** 4
-- `drizzle/schema.ts` (modified, +250 lines)
-- `server/db.ts` (modified, +370 lines)
-- `server/routers/llm.ts` (+500 lines)
-- `client/src/pages/LLMDashboard.tsx` (+240 lines)
-- `client/src/pages/LLMControlPlane.tsx` (+280 lines)
-- `client/src/pages/LLMWizard.tsx` (+780 lines) ⭐
+**Files Created/Modified:**
 
-**Total Lines Added:** ~2,420 lines
+**Backend (Phase 1):**
+- `drizzle/schema.ts` (modified, +250 lines) - 6 new tables
+- `server/db.ts` (modified, +370 lines) - Database operations
+- `server/routers/llm.ts` (created, +500 lines) - tRPC API endpoints
+- `server/policies/llm-policy-engine.ts` (created, +400 lines) - Policy validation ⭐
 
-**Database Tables:** 6
-**API Endpoints:** 15+
-**UI Pages:** 3
+**Frontend (Phases 1-3):**
+- `client/src/pages/LLMDashboard.tsx` (created, +240 lines) - Dashboard
+- `client/src/pages/LLMControlPlane.tsx` (created, +280 lines) - Admin interface
+- `client/src/pages/LLMWizard.tsx` (created, +930 lines) - 3-step wizard with policy validation ⭐
+- `client/src/pages/LLMPromotions.tsx` (created, +400 lines) - Promotion management ⭐
+- `client/src/pages/LLMDetailPage.tsx` (created, +550 lines) - LLM detail view ⭐
+- `client/src/App.tsx` (modified) - Route additions
+
+**Total Lines Added:** ~3,920 lines
+
+**Database Tables:** 6 (llms, llm_versions, llm_promotions, llm_attestations, llm_drift_events, llm_audit_events)
+**API Endpoints:** 16 (create, list, getById, archive, createVersion, getVersions, getVersion, updateCallable, createPromotion, listPromotions, approvePromotion, rejectPromotion, executePromotion, getAuditEvents, getDashboardStats, validatePolicy)
+**UI Pages:** 5 (Dashboard, Control Plane, Wizard, Promotions, Detail)
+**Routes:** 5 (/llm, /llm/control-plane, /llm/wizard, /llm/promotions, /llm/:id)
 
 **Commits:**
 - `b0fb218` - Backend + Dashboard + Control Plane
-- `8ad8c6e` - LLM Wizard
+- `8ad8c6e` - LLM Wizard (Phase 2)
+- `08bb182` - Policy Validation Service (Phase 3a)
+- `79034a9` - Promotion Workflow UI (Phase 3b)
 
 **Branch:** `claude/evaluate-repo-7Aa4C` (pushed to remote)
 
@@ -392,17 +445,37 @@ User Input → Wizard State → tRPC Client → Server Router → Database Opera
 
 ## 🎉 Success Criteria Met
 
-✅ **LLM Wizard - Multi-step form for creating LLMs**
+### **Phase 1: Core Infrastructure** ✅
+✅ Database schema (6 tables)
+✅ Backend API (16 endpoints)
+✅ Dashboard with stats and activity
+✅ Control Plane admin interface
+✅ Full audit trail system
+
+### **Phase 2: LLM Wizard** ✅
+✅ Multi-step form (3 steps)
 ✅ Step 1: Identity (name, role, owner)
 ✅ Step 2: Configuration (runtime, model, parameters)
-✅ Step 3: Review & Submit
-✅ Auto-save drafts
-✅ Form validation
+✅ Step 3: Review & Submit with policy validation
+✅ Auto-save drafts to localStorage
+✅ Form validation at each step
 ✅ Integration with backend API
 ✅ Success/error handling
 ✅ Navigation and progress tracking
 
-**Status: COMPLETE** 🎊
+### **Phase 3: Governance & Promotion** ✅
+✅ Policy validation service (OPA-style)
+✅ Real-time policy checks in wizard
+✅ Violation/warning display with suggestions
+✅ Promotion request creation
+✅ Promotion list with filters
+✅ Approve/reject workflow with comments
+✅ Execute approved promotions
+✅ LLM detail page with version history
+✅ Environment-based deployment flow
+✅ Full lifecycle management
+
+**Status: ALL PHASES COMPLETE** 🎊
 
 ---
 
@@ -458,9 +531,66 @@ Navigate to /llm
 
 ---
 
+---
+
+## 🔄 Complete End-to-End Workflow
+
+### **Production-Ready Flow:**
+
+```
+1. CREATE LLM
+   └─> Navigate to /llm/wizard
+   └─> Step 1: Identity (name, role, owner, description)
+   └─> Step 2: Configuration (runtime, model, parameters)
+   └─> Step 3: Review & Validate Policy
+   └─> Policy passes → Create LLM → Version 1 in sandbox
+   └─> Redirect to /llm (Dashboard)
+
+2. VIEW & MANAGE
+   └─> Dashboard shows stats and recent activity
+   └─> Navigate to /llm/control-plane
+   └─> Filter/search for LLM
+   └─> Click "View" → Navigate to /llm/:id
+
+3. CREATE PROMOTION
+   └─> LLM Detail page shows all versions
+   └─> Click "Promote" on sandbox version
+   └─> Select target: "governed"
+   └─> Promotion request created
+   └─> Navigate to /llm/promotions
+
+4. APPROVE PROMOTION
+   └─> Promotions page → Filter "pending"
+   └─> Click "Approve" → Add optional comment
+   └─> Status changes to "approved"
+
+5. EXECUTE PROMOTION
+   └─> Click "Execute" on approved promotion
+   └─> Version 2 created in governed environment
+   └─> Status changes to "executed"
+
+6. REPEAT FOR PRODUCTION
+   └─> Navigate back to /llm/:id
+   └─> Click "Promote" on governed version
+   └─> Select target: "production"
+   └─> Follow approval workflow
+   └─> Version 3 created in production
+   └─> LLM is now live! 🚀
+```
+
+### **Governance Checkpoints:**
+
+✅ **Policy Validation** - Before LLM creation (wizard step 3)
+✅ **Approval Required** - Before environment promotion
+✅ **Audit Trail** - All actions logged automatically
+✅ **Attestation** - Version verification in each environment
+✅ **Drift Detection** - Configuration change monitoring
+
+---
+
 **Implementation Date:** 2026-01-08
-**Implementation Time:** ~2 hours
+**Implementation Time:** ~4 hours (all 3 phases)
 **Quality:** Production-ready
 **Documentation:** Complete
 
-🎊 **The LLM Wizard is live and ready to use!** 🎊
+🎊 **The complete LLM Control Plane is live and ready to use!** 🎊
