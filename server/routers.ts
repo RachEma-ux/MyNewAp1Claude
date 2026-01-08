@@ -31,6 +31,7 @@ import { wcpWorkflowsRouter } from "./routers/wcpWorkflows";
 import { policiesRouter } from "./routers/policies";
 import { keyRotationRouter } from "./routers/keyRotation";
 import { wikiRouter } from "./routers/wiki";
+import { llmRouter } from "./llm/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -60,6 +61,7 @@ export const appRouter = router({
   policies: policiesRouter,
   keyRotation: keyRotationRouter,
   wiki: wikiRouter,
+  llm: llmRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
