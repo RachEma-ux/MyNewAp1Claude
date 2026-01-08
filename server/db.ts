@@ -1087,8 +1087,22 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
 
   console.log('[createLLM] Inserting data:', JSON.stringify(data));
 
+  // Ensure all fields have explicit values (MySQL doesn't handle DEFAULT keyword well)
+  const insertData = {
+    name: data.name,
+    description: data.description ?? null,
+    role: data.role,
+    ownerTeam: data.ownerTeam ?? null,
+    archived: data.archived ?? false,
+    createdBy: data.createdBy,
+    createdAt: data.createdAt ?? new Date(),
+    updatedAt: data.updatedAt ?? new Date(),
+  };
+
+  console.log('[createLLM] Normalized insert data:', JSON.stringify(insertData));
+
   try {
-    const [llm] = await db.insert(llms).values(data).$returningId();
+    const [llm] = await db.insert(llms).values(insertData).$returningId();
 
     // Emit audit event
     await emitLLMAuditEvent({
@@ -1102,7 +1116,7 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
     return (await db.select().from(llms).where(eq(llms.id, llm.id)))[0];
   } catch (error: any) {
     console.error('[createLLM] Insert failed:', error);
-    console.error('[createLLM] Data was:', JSON.stringify(data));
+    console.error('[createLLM] Data was:', JSON.stringify(insertData));
     throw new Error(`Failed to create LLM: ${error.message}`);
   }
 }
