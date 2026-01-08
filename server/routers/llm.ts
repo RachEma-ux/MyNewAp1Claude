@@ -25,6 +25,7 @@ import {
   getLLMAuditEvents,
 } from "../db";
 import { LLMPolicyEngine } from "../policies/llm-policy-engine";
+import * as providers from "../llm/providers";
 
 // ============================================================================
 // Input Validation Schemas
@@ -500,5 +501,72 @@ export const llmRouter = router({
       });
 
       return result;
+    }),
+
+  // ============================================================================
+  // Provider Registry
+  // ============================================================================
+
+  /**
+   * List all available LLM providers from MultiChat
+   * Returns 14 providers: Anthropic, OpenAI, Google, Meta, etc.
+   */
+  listProviders: protectedProcedure.query(async () => {
+    return providers.getAllProviders();
+  }),
+
+  /**
+   * Get a specific provider by ID
+   */
+  getProvider: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const provider = providers.getProvider(input.id);
+      if (!provider) {
+        throw new Error(`Provider not found: ${input.id}`);
+      }
+      return provider;
+    }),
+
+  /**
+   * Get models for a specific provider
+   */
+  getProviderModels: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      return providers.getProviderModels(input.providerId);
+    }),
+
+  /**
+   * List all provider presets
+   * Returns 5 presets: coding, creative, research, general, fast
+   */
+  listPresets: protectedProcedure.query(async () => {
+    return providers.getAllPresets();
+  }),
+
+  /**
+   * Get a specific preset by ID
+   */
+  getPreset: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const preset = providers.getPreset(input.id);
+      if (!preset) {
+        throw new Error(`Preset not found: ${input.id}`);
+      }
+      return preset;
     }),
 });
