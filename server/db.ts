@@ -1,5 +1,5 @@
 import { eq, and, desc, sql, inArray, ne } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "../drizzle/schema";
 import {
   InsertUser,
@@ -36,10 +36,10 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
-import mysql from 'mysql2/promise';
+import { Pool } from 'pg';
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
-let _rawConnection: mysql.Connection | null = null;
+let _pgPool: Pool | null = null;
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -64,20 +64,23 @@ export function getDb() {
   return _db;
 }
 
-async function getRawConnection(): Promise<mysql.Connection | null> {
-  // Check if existing connection is alive
-  if (_rawConnection) {
+async function getPgPool(): Promise<Pool | null> {
+  // Return existing pool if available
+  if (_pgPool) {
     try {
-      await _rawConnection.ping();
-      return _rawConnection;
+      // Test connection
+      const client = await _pgPool.connect();
+      client.release();
+      return _pgPool;
     } catch (error) {
-      console.warn("[Database] Existing connection is dead, will create new one");
-      _rawConnection = null;
+      console.warn("[Database] Existing pool failed, creating new one");
+      await _pgPool.end();
+      _pgPool = null;
     }
   }
 
   if (!process.env.DATABASE_URL) {
-    console.error("[Database] ❌ DATABASE_URL not set - cannot create raw connection");
+    console.error("[Database] ❌ DATABASE_URL not set - cannot create connection pool");
     return null;
   }
 
@@ -85,34 +88,42 @@ async function getRawConnection(): Promise<mysql.Connection | null> {
   const sanitizedUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':****@');
   console.log("[Database] DATABASE_URL format:", sanitizedUrl);
 
-  // Try to establish connection with retries (use local counter per call)
+  // Try to establish connection with retries
   const maxAttempts = 5;
   const retryDelay = 2000;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      console.log(`[Database] Attempting raw connection (attempt ${attempt}/${maxAttempts})...`);
-      console.log(`[Database] Connection string format: ${sanitizedUrl}`);
+      console.log(`[Database] Attempting PostgreSQL connection (attempt ${attempt}/${maxAttempts})...`);
 
-      _rawConnection = await mysql.createConnection(process.env.DATABASE_URL);
+      _pgPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        max: 10, // Maximum pool size
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+      });
 
-      console.log("[Database] ✅ Raw connection established successfully");
-      return _rawConnection;
+      // Test the connection
+      const client = await _pgPool.connect();
+      client.release();
+
+      console.log("[Database] ✅ PostgreSQL connection established successfully");
+      return _pgPool;
     } catch (error: any) {
       console.error(`[Database] ❌ Connection attempt ${attempt} failed:`, error.message);
       console.error('[Database] Error code:', error.code);
-      console.error('[Database] Error errno:', error.errno);
+
+      if (_pgPool) {
+        await _pgPool.end();
+        _pgPool = null;
+      }
 
       if (attempt < maxAttempts) {
-        const delay = retryDelay * attempt; // Exponential backoff
+        const delay = retryDelay * attempt;
         console.log(`[Database] Retrying in ${delay}ms...`);
         await sleep(delay);
       } else {
         console.error("[Database] Max connection attempts reached");
-        console.error("[Database] Please check:");
-        console.error("  1. DATABASE_URL is set correctly");
-        console.error("  2. Database service is running");
-        console.error("  3. Network connectivity to database");
         return null;
       }
     }
@@ -1156,7 +1167,7 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
 
   console.log('[createLLM] Inserting data:', JSON.stringify(data));
 
-  // Use raw MySQL2 connection to completely bypass Drizzle
+  // Use PostgreSQL pool for raw queries
   const now = new Date();
   const insertData = {
     name: data.name,
@@ -1172,14 +1183,15 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
   console.log('[createLLM] Normalized insert data:', JSON.stringify(insertData));
 
   try {
-    // Get raw MySQL2 connection to completely bypass Drizzle's query builder
-    const conn = await getRawConnection();
-    if (!conn) throw new Error("Raw database connection not available");
+    // Get PostgreSQL connection pool
+    const pool = await getPgPool();
+    if (!pool) throw new Error("PostgreSQL connection pool not available");
 
-    // Execute raw parameterized query
-    const [result] = await conn.execute(
-      `INSERT INTO llms (name, description, role, ownerTeam, archived, createdBy, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    // Execute raw parameterized query (PostgreSQL uses $1, $2, etc. instead of ?)
+    const result = await pool.query(
+      `INSERT INTO llms (name, description, role, "ownerTeam", archived, "createdBy", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
       [
         insertData.name,
         insertData.description,
@@ -1192,7 +1204,7 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
       ]
     );
 
-    const insertId = (result as any).insertId;
+    const insertId = result.rows[0]?.id;
 
     if (!insertId) {
       throw new Error('Failed to get inserted LLM ID');
@@ -1217,9 +1229,8 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
     console.error('[createLLM] Error details:', {
       message: error.message,
       code: error.code,
-      errno: error.errno,
-      sqlState: error.sqlState,
-      sqlMessage: error.sqlMessage,
+      detail: error.detail,
+      hint: error.hint,
     });
     console.error('[createLLM] Data was:', JSON.stringify(insertData));
     throw new Error(`Failed to create LLM: ${error.message}`);
