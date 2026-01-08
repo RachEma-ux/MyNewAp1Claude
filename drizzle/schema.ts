@@ -1842,3 +1842,245 @@ export const keyRotationSchedules = mysqlTable("key_rotation_schedules", {
 
 export type KeyRotationSchedule = typeof keyRotationSchedules.$inferSelect;
 export type InsertKeyRotationSchedule = typeof keyRotationSchedules.$inferInsert;
+
+// ============================================================================
+// LLM Control Plane & Registry
+// ============================================================================
+
+/**
+ * LLMs - Canonical registry of all LLM identities
+ * Each LLM represents a unique AI model configuration in the system
+ */
+export const llms = mysqlTable("llms", {
+  id: int("id").autoincrement().primaryKey(),
+
+  // Identity
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+
+  // Classification
+  role: mysqlEnum("role", ["planner", "executor", "router", "guard", "observer", "embedder"]).notNull(),
+  ownerTeam: varchar("ownerTeam", { length: 255 }),
+
+  // Status
+  archived: boolean("archived").default(false),
+
+  // Metadata
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  nameIdx: index("idx_llm_name").on(table.name),
+  roleIdx: index("idx_llm_role").on(table.role),
+}));
+
+export type LLM = typeof llms.$inferSelect;
+export type InsertLLM = typeof llms.$inferInsert;
+
+/**
+ * LLM Versions - Immutable, versioned LLM configurations
+ * Each version is a complete snapshot with policy validation and attestation contract
+ */
+export const llmVersions = mysqlTable("llm_versions", {
+  id: int("id").autoincrement().primaryKey(),
+  llmId: int("llmId").notNull(),
+
+  // Versioning
+  version: int("version").notNull(),
+  environment: mysqlEnum("environment", ["sandbox", "governed", "production"]).notNull().default("sandbox"),
+
+  // Configuration (complete LLM config as JSON)
+  config: json("config").notNull(), // { runtime, provider, model, params, etc. }
+  configHash: varchar("configHash", { length: 64 }).notNull(), // SHA256 of config
+
+  // Policy validation
+  policyBundleRef: varchar("policyBundleRef", { length: 512 }), // OCI reference to policy bundle
+  policyHash: varchar("policyHash", { length: 64 }), // SHA256 of policy bundle
+  policyDecision: mysqlEnum("policyDecision", ["pass", "warn", "deny"]).default("pass"),
+  policyViolations: json("policyViolations"), // Array of violation objects
+
+  // Attestation contract
+  attestationContract: json("attestationContract"), // Required runtime fingerprint
+  attestationStatus: mysqlEnum("attestationStatus", ["pending", "attested", "stale", "failed", "revoked"]).default("pending"),
+
+  // Runtime state
+  driftStatus: mysqlEnum("driftStatus", ["none", "benign", "suspicious", "critical"]).default("none"),
+  callable: boolean("callable").default(false), // Can this version be dispatched?
+
+  // Metadata
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+
+  // Change tracking
+  changeNotes: text("changeNotes"),
+  promotionRequestId: int("promotionRequestId"), // FK if created via promotion
+}, (table) => ({
+  llmIdIdx: index("idx_llm_version_llm_id").on(table.llmId),
+  environmentIdx: index("idx_llm_version_env").on(table.environment),
+  callableIdx: index("idx_llm_version_callable").on(table.callable),
+  uniqueLlmVersion: uniqueIndex("unique_llm_version").on(table.llmId, table.version),
+}));
+
+export type LLMVersion = typeof llmVersions.$inferSelect;
+export type InsertLLMVersion = typeof llmVersions.$inferInsert;
+
+/**
+ * LLM Promotions - Promotion requests between environments
+ * Gate-based workflow with simulation, approval, and execution
+ */
+export const llmPromotions = mysqlTable("llm_promotions", {
+  id: int("id").autoincrement().primaryKey(),
+  llmVersionId: int("llmVersionId").notNull(),
+
+  // Promotion details
+  fromEnvironment: mysqlEnum("fromEnvironment", ["sandbox", "governed", "production"]).notNull(),
+  toEnvironment: mysqlEnum("toEnvironment", ["sandbox", "governed", "production"]).notNull(),
+
+  // Status
+  status: mysqlEnum("status", ["pending", "simulated", "approved", "rejected", "executed", "failed"]).notNull().default("pending"),
+
+  // Simulation results
+  simulationResults: json("simulationResults"), // Policy check, compatibility, cost estimate
+  simulatedAt: timestamp("simulatedAt"),
+
+  // Approval workflow
+  requestedBy: int("requestedBy").notNull(),
+  requestedAt: timestamp("requestedAt").defaultNow().notNull(),
+
+  approvedBy: int("approvedBy"),
+  approvedAt: timestamp("approvedAt"),
+  approvalComment: text("approvalComment"),
+
+  rejectedBy: int("rejectedBy"),
+  rejectedAt: timestamp("rejectedAt"),
+  rejectionReason: text("rejectionReason"),
+
+  // Execution
+  executedAt: timestamp("executedAt"),
+  executionError: text("executionError"),
+  newVersionId: int("newVersionId"), // FK to created llm_version in target environment
+
+  // Metadata
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  llmVersionIdx: index("idx_promotion_version").on(table.llmVersionId),
+  statusIdx: index("idx_promotion_status").on(table.status),
+}));
+
+export type LLMPromotion = typeof llmPromotions.$inferSelect;
+export type InsertLLMPromotion = typeof llmPromotions.$inferInsert;
+
+/**
+ * LLM Attestations - Runtime attestation evidence
+ * Continuous trust verification through runtime attestation
+ */
+export const llmAttestations = mysqlTable("llm_attestations", {
+  id: int("id").autoincrement().primaryKey(),
+  llmVersionId: int("llmVersionId").notNull(),
+
+  // Attestation status
+  status: mysqlEnum("status", ["attested", "stale", "failed", "revoked"]).notNull(),
+
+  // Evidence payload
+  evidence: json("evidence").notNull(), // Runtime-provided attestation evidence
+  evidenceHash: varchar("evidenceHash", { length: 64 }),
+
+  // Verification details
+  imageDigest: varchar("imageDigest", { length: 255 }),
+  configHash: varchar("configHash", { length: 64 }),
+  workloadIdentity: varchar("workloadIdentity", { length: 512 }), // SPIFFE ID or similar
+
+  // Timestamps
+  submittedAt: timestamp("submittedAt").notNull(),
+  verifiedAt: timestamp("verifiedAt"),
+  expiresAt: timestamp("expiresAt"),
+
+  // Revocation
+  revokedAt: timestamp("revokedAt"),
+  revokedBy: int("revokedBy"),
+  revocationReason: text("revocationReason"),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  llmVersionIdx: index("idx_attestation_version").on(table.llmVersionId),
+  statusIdx: index("idx_attestation_status").on(table.status),
+}));
+
+export type LLMAttestation = typeof llmAttestations.$inferSelect;
+export type InsertLLMAttestation = typeof llmAttestations.$inferInsert;
+
+/**
+ * LLM Drift Events - Runtime drift detection results
+ * Tracks when actual runtime diverges from declared config
+ */
+export const llmDriftEvents = mysqlTable("llm_drift_events", {
+  id: int("id").autoincrement().primaryKey(),
+  llmVersionId: int("llmVersionId").notNull(),
+
+  // Drift classification
+  severity: mysqlEnum("severity", ["benign", "suspicious", "critical"]).notNull(),
+  signal: varchar("signal", { length: 255 }).notNull(), // "image_digest_mismatch", "config_mutation", etc.
+
+  // Drift details
+  expected: json("expected").notNull(), // Expected state
+  observed: json("observed").notNull(), // Observed state
+
+  // Response
+  responseAction: mysqlEnum("responseAction", ["warn", "block_new", "immediate_revoke"]),
+  responseTaken: boolean("responseTaken").default(false),
+
+  // Timestamps
+  detectedAt: timestamp("detectedAt").notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  llmVersionIdx: index("idx_drift_version").on(table.llmVersionId),
+  severityIdx: index("idx_drift_severity").on(table.severity),
+}));
+
+export type LLMDriftEvent = typeof llmDriftEvents.$inferSelect;
+export type InsertLLMDriftEvent = typeof llmDriftEvents.$inferInsert;
+
+/**
+ * LLM Audit Events - Complete audit trail
+ * Immutable, signed record of all LLM lifecycle events
+ */
+export const llmAuditEvents = mysqlTable("llm_audit_events", {
+  id: int("id").autoincrement().primaryKey(),
+
+  // Event classification
+  eventType: varchar("eventType", { length: 100 }).notNull(), // "llm.wizard.started", "llm.version.created", etc.
+
+  // References
+  llmId: int("llmId"),
+  llmVersionId: int("llmVersionId"),
+  promotionId: int("promotionId"),
+
+  // Actor
+  actor: int("actor"), // User ID
+  actorType: mysqlEnum("actorType", ["user", "system"]).default("user"),
+
+  // Event payload
+  payload: json("payload").notNull(), // Event-specific data
+
+  // Trust chain
+  configHash: varchar("configHash", { length: 64 }),
+  policyHash: varchar("policyHash", { length: 64 }),
+  eventSignature: text("eventSignature"), // Cryptographic signature of event
+
+  // Environment context
+  environment: mysqlEnum("environment", ["sandbox", "governed", "production"]),
+
+  // Timestamps
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  eventTypeIdx: index("idx_audit_event_type").on(table.eventType),
+  llmIdIdx: index("idx_audit_llm_id").on(table.llmId),
+  timestampIdx: index("idx_audit_timestamp").on(table.timestamp),
+}));
+
+export type LLMAuditEvent = typeof llmAuditEvents.$inferSelect;
+export type InsertLLMAuditEvent = typeof llmAuditEvents.$inferInsert;

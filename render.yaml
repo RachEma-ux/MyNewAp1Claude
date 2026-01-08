@@ -1,9 +1,14 @@
+# Render.com Configuration for MyNewAp1Claude
+# This file configures automatic deployment on Render
+
 services:
   - type: web
-    name: app
+    name: mynewap1claude
     env: node
-    plan: free
-    buildCommand: pnpm install && pnpm build
+    region: oregon # Change to your preferred region
+    plan: free # Change to your plan: free, starter, standard, pro
+    branch: main # Deploy from main branch
+    buildCommand: pnpm install --frozen-lockfile && pnpm run build && pnpm run db:push
     startCommand: pnpm start
     envVars:
       - key: NODE_ENV
@@ -20,9 +25,32 @@ services:
         value: demo-app
       - key: DEV_MODE
         value: true
+      - key: ANTHROPIC_API_KEY
+        sync: false # Optional: Set manually if using Claude models
+      - key: OPENAI_API_KEY
+        sync: false # Optional: Set manually if using GPT models
+      - key: GOOGLE_API_KEY
+        sync: false # Optional: Set manually if using Gemini models
+
+    healthCheckPath: /
+
+    autoDeploy: true # Automatically deploy on git push
+
+    # Auto-scaling (available on paid plans)
+    # scaling:
+    #   minInstances: 1
+    #   maxInstances: 3
+    #   targetCPUPercent: 70
 
 databases:
   - name: app-db
     plan: free
     databaseName: app
     user: app
+
+# Notes:
+# 1. Push this file to your repository
+# 2. Render will auto-detect it and configure your service
+# 3. DATABASE_URL is automatically set from app-db database
+# 4. Migration 0017 will run during build via db:push command
+# 5. LLM Control Plane system will be deployed with all features

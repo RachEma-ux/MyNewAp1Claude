@@ -66,6 +66,11 @@ import ToolsManagementPage from "@/pages/ToolsManagementPage";
 import WikiPage from "@/pages/WikiPage";
 import WikiArticle from "@/pages/WikiArticle";
 import WikiEditor from "@/pages/WikiEditor";
+import LLMDashboard from "@/pages/LLMDashboard";
+import LLMControlPlane from "@/pages/LLMControlPlane";
+import LLMWizard from "@/pages/LLMWizard";
+import LLMPromotions from "@/pages/LLMPromotions";
+import LLMDetailPage from "@/pages/LLMDetailPage";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -155,6 +160,12 @@ function Router() {
       <Route path="/wiki" component={() => <ProtectedRoute component={WikiPage} />} />
       <Route path="/wiki/:slug" component={() => <ProtectedRoute component={WikiArticle} />} />
       <Route path="/wiki/edit/:id" component={() => <ProtectedRoute component={WikiEditor} />} />
+      {/* LLM Control Plane Routes */}
+      <Route path="/llm" component={() => <ProtectedRoute component={LLMDashboard} />} />
+      <Route path="/llm/control-plane" component={() => <ProtectedRoute component={LLMControlPlane} />} />
+      <Route path="/llm/wizard" component={() => <ProtectedRoute component={LLMWizard} />} />
+      <Route path="/llm/promotions" component={() => <ProtectedRoute component={LLMPromotions} />} />
+      <Route path="/llm/:id" component={() => <ProtectedRoute component={LLMDetailPage} />} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
