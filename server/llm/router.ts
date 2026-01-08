@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { protectedProcedure, router } from '../_core/trpc';
 import * as llmDb from './db';
+import * as providers from './providers';
 
 /**
  * LLM Control Plane Router
@@ -237,5 +238,66 @@ export const llmRouter = router({
         throw new Error(`No versions found for LLM: ${input.llmId}`);
       }
       return version;
+    }),
+
+  // ============================================================================
+  // Provider Registry
+  // ============================================================================
+
+  /**
+   * List all available providers
+   */
+  listProviders: protectedProcedure
+    .query(async () => {
+      return providers.getAllProviders();
+    }),
+
+  /**
+   * Get a specific provider
+   */
+  getProvider: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const provider = providers.getProvider(input.id);
+      if (!provider) {
+        throw new Error(`Provider not found: ${input.id}`);
+      }
+      return provider;
+    }),
+
+  /**
+   * Get models for a specific provider
+   */
+  getProviderModels: protectedProcedure
+    .input(z.object({
+      providerId: z.string(),
+    }))
+    .query(async ({ input }) => {
+      return providers.getProviderModels(input.providerId);
+    }),
+
+  /**
+   * List all provider presets
+   */
+  listPresets: protectedProcedure
+    .query(async () => {
+      return providers.getAllPresets();
+    }),
+
+  /**
+   * Get a specific preset
+   */
+  getPreset: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const preset = providers.getPreset(input.id);
+      if (!preset) {
+        throw new Error(`Preset not found: ${input.id}`);
+      }
+      return preset;
     }),
 });
