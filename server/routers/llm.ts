@@ -93,7 +93,10 @@ export const llmRouter = router({
     .input(createLLMSchema)
     .mutation(async ({ ctx, input }) => {
       const llm = await createLLM({
-        ...input,
+        name: input.name,
+        description: input.description ?? null,
+        role: input.role,
+        ownerTeam: input.ownerTeam ?? null,
         createdBy: ctx.user.id,
       });
 
