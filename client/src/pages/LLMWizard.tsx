@@ -36,6 +36,8 @@ import {
   AlertTriangle,
   Info,
   Loader2,
+  Shield,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -624,13 +626,52 @@ function ConfigurationStep({
 function ReviewStep({ state, onSuccess }: { state: WizardState; onSuccess: () => void }) {
   const createLLMMutation = trpc.llm.create.useMutation();
   const createVersionMutation = trpc.llm.createVersion.useMutation();
+  const validatePolicyMutation = trpc.llm.validatePolicy.useMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [policyResult, setPolicyResult] = useState<any>(null);
+  const [showPolicyResults, setShowPolicyResults] = useState(false);
+
+  const handleValidatePolicy = async () => {
+    try {
+      const result = await validatePolicyMutation.mutateAsync({
+        identity: state.identity,
+        configuration: state.configuration,
+        environment: "sandbox",
+      });
+
+      setPolicyResult(result);
+      setShowPolicyResults(true);
+
+      if (result.decision === "allow") {
+        toast.success("Policy validation passed!");
+      } else if (result.decision === "warn") {
+        toast.warning(`Policy validation passed with ${result.warnings.length} warnings`);
+      } else {
+        toast.error(`Policy validation failed with ${result.violations.length} errors`);
+      }
+    } catch (error: any) {
+      toast.error(`Policy validation error: ${error.message}`);
+    }
+  };
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
 
     try {
-      // Step 1: Create LLM identity
+      // Step 1: Validate policy first
+      if (!policyResult) {
+        toast.error("Please validate policy before submitting");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (policyResult.decision === "deny") {
+        toast.error("Cannot create LLM: Policy validation failed");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Step 2: Create LLM identity
       const llm = await createLLMMutation.mutateAsync({
         name: state.identity.name,
         role: state.identity.role,
@@ -640,7 +681,7 @@ function ReviewStep({ state, onSuccess }: { state: WizardState; onSuccess: () =>
 
       toast.success(`LLM "${llm.name}" created`);
 
-      // Step 2: Create initial version in sandbox
+      // Step 3: Create initial version in sandbox
       const version = await createVersionMutation.mutateAsync({
         llmId: llm.id,
         environment: "sandbox",
@@ -750,6 +791,128 @@ function ReviewStep({ state, onSuccess }: { state: WizardState; onSuccess: () =>
               environment. You can promote to governed/production after validation.
             </AlertDescription>
           </Alert>
+        </CardContent>
+      </Card>
+
+      {/* Policy Validation */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Policy Validation</CardTitle>
+          <CardDescription>
+            Validate configuration against governance policies
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={handleValidatePolicy}
+              disabled={validatePolicyMutation.isPending}
+            >
+              {validatePolicyMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Validating...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Validate Policy
+                </>
+              )}
+            </Button>
+
+            {policyResult && (
+              <div className="flex items-center gap-2">
+                {policyResult.decision === "allow" && (
+                  <Badge variant="default" className="bg-green-600">
+                    <Check className="h-3 w-3 mr-1" />
+                    Passed
+                  </Badge>
+                )}
+                {policyResult.decision === "warn" && (
+                  <Badge variant="secondary" className="bg-yellow-600">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Warnings
+                  </Badge>
+                )}
+                {policyResult.decision === "deny" && (
+                  <Badge variant="destructive">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Failed
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Policy Results */}
+          {showPolicyResults && policyResult && (
+            <div className="space-y-3 mt-4">
+              {/* Violations */}
+              {policyResult.violations && policyResult.violations.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-destructive">
+                    Policy Violations ({policyResult.violations.length})
+                  </h4>
+                  {policyResult.violations.map((violation: any, index: number) => (
+                    <Alert key={index} variant="destructive">
+                      <XCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <div>
+                          <strong>{violation.rule}</strong>
+                          {violation.field && <span className="text-xs"> ({violation.field})</span>}
+                        </div>
+                        <div className="text-sm mt-1">{violation.message}</div>
+                        {violation.suggestion && (
+                          <div className="text-xs mt-1 opacity-80">
+                            💡 {violation.suggestion}
+                          </div>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              )}
+
+              {/* Warnings */}
+              {policyResult.warnings && policyResult.warnings.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-yellow-600">
+                    Warnings ({policyResult.warnings.length})
+                  </h4>
+                  {policyResult.warnings.map((warning: any, index: number) => (
+                    <Alert key={index}>
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription>
+                        <div>
+                          <strong>{warning.rule}</strong>
+                          {warning.field && <span className="text-xs"> ({warning.field})</span>}
+                        </div>
+                        <div className="text-sm mt-1">{warning.message}</div>
+                        {warning.suggestion && (
+                          <div className="text-xs mt-1 opacity-80">
+                            💡 {warning.suggestion}
+                          </div>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              )}
+
+              {/* Success Message */}
+              {policyResult.decision === "allow" &&
+                (!policyResult.warnings || policyResult.warnings.length === 0) && (
+                  <Alert>
+                    <Check className="h-4 w-4 text-green-600" />
+                    <AlertDescription>
+                      All policy checks passed! Configuration is compliant and ready for deployment.
+                    </AlertDescription>
+                  </Alert>
+                )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

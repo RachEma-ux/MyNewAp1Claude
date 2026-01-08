@@ -23,6 +23,7 @@ import {
   rejectPromotion,
   getLLMAuditEvents,
 } from "../db";
+import { LLMPolicyEngine } from "../policies/llm-policy-engine";
 
 // ============================================================================
 // Input Validation Schemas
@@ -423,4 +424,38 @@ export const llmRouter = router({
 
     return stats;
   }),
+
+  // ============================================================================
+  // Policy Validation
+  // ============================================================================
+
+  /**
+   * Validate LLM configuration against policies
+   * Returns policy decision and any violations/warnings
+   */
+  validatePolicy: protectedProcedure
+    .input(
+      z.object({
+        identity: z.object({
+          name: z.string(),
+          role: llmRoleSchema,
+          ownerTeam: z.string().optional(),
+        }),
+        configuration: llmConfigSchema,
+        environment: environmentSchema.optional().default("sandbox"),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const result = LLMPolicyEngine.evaluate({
+        identity: {
+          name: input.identity.name,
+          role: input.identity.role,
+          ownerTeam: input.identity.ownerTeam,
+        },
+        configuration: input.configuration,
+        environment: input.environment,
+      });
+
+      return result;
+    }),
 });
