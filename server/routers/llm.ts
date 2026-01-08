@@ -9,6 +9,7 @@ import { z } from "zod";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import {
   createLLM,
+  updateLLM,
   getLLMs,
   getLLMById,
   archiveLLM,
@@ -36,6 +37,14 @@ const createLLMSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   role: llmRoleSchema,
+  ownerTeam: z.string().max(255).optional(),
+});
+
+const updateLLMSchema = z.object({
+  id: z.number().int().positive(),
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().optional(),
+  role: llmRoleSchema.optional(),
   ownerTeam: z.string().max(255).optional(),
 });
 
@@ -110,6 +119,26 @@ export const llmRouter = router({
       console.log('[LLM Create] Insert data:', insertData);
 
       const llm = await createLLM(insertData);
+
+      return llm;
+    }),
+
+  /**
+   * Update an existing LLM
+   */
+  update: protectedProcedure
+    .input(updateLLMSchema)
+    .mutation(async ({ ctx, input }) => {
+      // Ensure user is authenticated
+      if (!ctx.user?.id) {
+        throw new Error("User not authenticated");
+      }
+
+      const { id, ...updateData } = input;
+
+      console.log('[LLM Update] User ID:', ctx.user.id, 'LLM ID:', id, 'Data:', updateData);
+
+      const llm = await updateLLM(id, updateData, ctx.user.id);
 
       return llm;
     }),

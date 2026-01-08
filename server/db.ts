@@ -1238,6 +1238,58 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
 }
 
 /**
+ * Update an existing LLM
+ */
+export async function updateLLM(
+  id: number,
+  data: Partial<Pick<InsertLLM, "name" | "description" | "role" | "ownerTeam">>,
+  updatedBy: number
+): Promise<LLM> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  console.log('[updateLLM] Updating LLM ID:', id, 'with data:', JSON.stringify(data));
+
+  try {
+    // Update using Drizzle
+    const updateData: any = {
+      ...data,
+      updatedAt: new Date(),
+    };
+
+    await db
+      .update(llms)
+      .set(updateData)
+      .where(eq(llms.id, id));
+
+    console.log('[updateLLM] Successfully updated LLM ID:', id);
+
+    // Emit audit event
+    await emitLLMAuditEvent({
+      eventType: "llm.updated",
+      llmId: id,
+      actor: updatedBy,
+      actorType: "user",
+      payload: { changes: data },
+    });
+
+    // Fetch and return the updated LLM
+    const updated = await db.select().from(llms).where(eq(llms.id, id)).limit(1);
+    if (!updated || updated.length === 0) {
+      throw new Error(`LLM with ID ${id} not found after update`);
+    }
+    return updated[0];
+  } catch (error: any) {
+    console.error('[updateLLM] Update failed:', error);
+    console.error('[updateLLM] Error details:', {
+      message: error.message,
+      code: error.code,
+    });
+    throw new Error(`Failed to update LLM: ${error.message}`);
+  }
+}
+
+/**
  * Get all LLMs (optionally filtered)
  */
 export async function getLLMs(filter?: {

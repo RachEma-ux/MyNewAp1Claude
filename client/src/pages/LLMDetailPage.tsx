@@ -14,6 +14,9 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -46,6 +49,7 @@ import {
   Eye,
   AlertTriangle,
   Loader2,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -60,7 +64,15 @@ export default function LLMDetailPage() {
   const [selectedVersion, setSelectedVersion] = useState<any>(null);
   const [targetEnvironment, setTargetEnvironment] = useState<Environment | "">("");
 
-  const { data: llm, isLoading: llmLoading } = trpc.llm.getById.useQuery(
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+    role: "",
+    ownerTeam: "",
+  });
+
+  const { data: llm, isLoading: llmLoading, refetch: refetchLLM } = trpc.llm.getById.useQuery(
     { id: llmId! },
     { enabled: !!llmId }
   );
@@ -88,6 +100,17 @@ export default function LLMDetailPage() {
     },
   });
 
+  const updateLLMMutation = trpc.llm.update.useMutation({
+    onSuccess: () => {
+      toast.success("LLM updated successfully");
+      setEditDialogOpen(false);
+      refetchLLM();
+    },
+    onError: (error) => {
+      toast.error(`Failed to update LLM: ${error.message}`);
+    },
+  });
+
   const handlePromote = (version: any) => {
     setSelectedVersion(version);
     setTargetEnvironment("");
@@ -105,6 +128,31 @@ export default function LLMDetailPage() {
       fromEnvironment: selectedVersion.environment,
       toEnvironment: targetEnvironment,
     });
+  };
+
+  const handleEdit = () => {
+    if (llm) {
+      setEditForm({
+        name: llm.name,
+        description: llm.description || "",
+        role: llm.role,
+        ownerTeam: llm.ownerTeam || "",
+      });
+      setEditDialogOpen(true);
+    }
+  };
+
+  const confirmEdit = async () => {
+    if (!llm) return;
+
+    // Build update data with only changed fields
+    const updateData: any = { id: llm.id };
+    if (editForm.name !== llm.name) updateData.name = editForm.name;
+    if (editForm.description !== (llm.description || "")) updateData.description = editForm.description;
+    if (editForm.role !== llm.role) updateData.role = editForm.role;
+    if (editForm.ownerTeam !== (llm.ownerTeam || "")) updateData.ownerTeam = editForm.ownerTeam;
+
+    await updateLLMMutation.mutateAsync(updateData);
   };
 
   const getValidTargetEnvironments = (fromEnv: Environment): Environment[] => {
@@ -253,6 +301,10 @@ export default function LLMDetailPage() {
             </p>
           </div>
         </div>
+        <Button onClick={handleEdit} variant="outline">
+          <Pencil className="mr-2 h-4 w-4" />
+          Edit
+        </Button>
       </div>
 
       {/* LLM Metadata */}
@@ -481,6 +533,86 @@ export default function LLMDetailPage() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               Create Promotion Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit LLM</DialogTitle>
+            <DialogDescription>
+              Update the LLM identity and metadata
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="Enter LLM name"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                placeholder="Enter description (optional)"
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="role">Role</Label>
+              <Select
+                value={editForm.role}
+                onValueChange={(value) => setEditForm({ ...editForm, role: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="planner">Planner</SelectItem>
+                  <SelectItem value="executor">Executor</SelectItem>
+                  <SelectItem value="router">Router</SelectItem>
+                  <SelectItem value="guard">Guard</SelectItem>
+                  <SelectItem value="observer">Observer</SelectItem>
+                  <SelectItem value="embedder">Embedder</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="ownerTeam">Owner Team</Label>
+              <Input
+                id="ownerTeam"
+                value={editForm.ownerTeam}
+                onChange={(e) => setEditForm({ ...editForm, ownerTeam: e.target.value })}
+                placeholder="Enter owner team (optional)"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmEdit}
+              disabled={!editForm.name || updateLLMMutation.isPending}
+            >
+              {updateLLMMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
