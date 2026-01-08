@@ -7,7 +7,7 @@ services:
     env: node
     region: oregon # Change to your preferred region
     plan: free # Change to your plan: free, starter, standard, pro
-    branch: main # Deploy from main branch
+    branch: claude/YVcio-7Aa4C # Deploy from YVcio branch
     buildCommand: pnpm install --frozen-lockfile && pnpm run build && pnpm run db:push
     startCommand: pnpm start
     envVars:
