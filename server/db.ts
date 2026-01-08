@@ -661,7 +661,7 @@ export async function createWorkflow(input: {
       lastRunAt: null,
       lastRunStatus: null,
     })
-    .$returningId();
+    .returning({ id: workflows.id });
 
   const created = await db
     .select()
@@ -1327,7 +1327,7 @@ export async function createLLMVersion(data: Omit<InsertLLMVersion, "configHash"
     configHash,
   };
 
-  const [version] = await db.insert(llmVersions).values(insertData).$returningId();
+  const [version] = await db.insert(llmVersions).values(insertData).returning({ id: llmVersions.id });
 
   // Emit audit event
   await emitLLMAuditEvent({
@@ -1434,7 +1434,7 @@ export async function createPromotion(data: Omit<InsertLLMPromotion, "requestedA
   const [promotion] = await db.insert(llmPromotions).values({
     ...data,
     requestedAt: new Date(),
-  }).$returningId();
+  }).returning({ id: llmPromotions.id });
 
   const version = await getLLMVersion(data.llmVersionId);
 
