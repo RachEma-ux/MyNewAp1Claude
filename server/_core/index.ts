@@ -14,23 +14,52 @@ import { handleAgentChatStream } from "../agents/stream";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import { getDb } from "../db";
 
-async function runMigrations() {
-  console.log("🔄 Running database migrations...");
-  try {
-    const db = getDb();
-    if (!db) {
-      console.warn("⚠️  Database not available, skipping migrations");
-      return;
-    }
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-    await migrate(db, { migrationsFolder: "./drizzle" });
-    console.log("✅ Database migrations completed successfully");
-  } catch (error: any) {
-    // Only log error if it's not about migrations already applied
-    if (!error.message?.includes("no new migrations")) {
-      console.error("❌ Migration error:", error.message);
-    } else {
-      console.log("✅ All migrations already applied");
+async function runMigrations(maxRetries = 3) {
+  console.log("🔄 Running database migrations...");
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const db = getDb();
+      if (!db) {
+        console.warn("⚠️  Database not available, skipping migrations");
+        return;
+      }
+
+      await migrate(db, { migrationsFolder: "./drizzle" });
+      console.log("✅ Database migrations completed successfully");
+      return;
+    } catch (error: any) {
+      // Check if it's just "no new migrations"
+      if (error.message?.includes("no new migrations")) {
+        console.log("✅ All migrations already applied");
+        return;
+      }
+
+      // Check for connection errors
+      if (error.code === 'ECONNREFUSED' || error.errno === 'ECONNREFUSED') {
+        console.error(`❌ Migration attempt ${attempt}/${maxRetries} failed: Database connection refused`);
+
+        if (attempt < maxRetries) {
+          const delay = 2000 * attempt;
+          console.log(`   Retrying in ${delay}ms...`);
+          await sleep(delay);
+          continue;
+        } else {
+          console.error("❌ Max migration retries reached. App will start but database operations may fail.");
+          return;
+        }
+      }
+
+      // Other errors
+      console.error(`❌ Migration error (attempt ${attempt}/${maxRetries}):`, error.message);
+
+      if (attempt < maxRetries) {
+        await sleep(2000);
+      }
     }
   }
 }

@@ -40,29 +40,70 @@ import mysql from 'mysql2/promise';
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let _rawConnection: mysql.Connection | null = null;
+let _connectionAttempts = 0;
+const MAX_CONNECTION_ATTEMPTS = 5;
+const CONNECTION_RETRY_DELAY = 2000; // 2 seconds
+
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       _db = drizzle(process.env.DATABASE_URL, { schema, mode: "default" });
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.warn("[Database] Failed to create Drizzle instance:", error);
       _db = null;
     }
   }
   return _db;
 }
 
-async function getRawConnection() {
-  if (!_rawConnection && process.env.DATABASE_URL) {
+async function getRawConnection(): Promise<mysql.Connection | null> {
+  if (_rawConnection) {
     try {
-      _rawConnection = await mysql.createConnection(process.env.DATABASE_URL);
+      // Test if connection is still alive
+      await _rawConnection.ping();
+      return _rawConnection;
     } catch (error) {
-      console.warn("[Database] Failed to create raw connection:", error);
+      console.warn("[Database] Existing connection is dead, will create new one");
       _rawConnection = null;
     }
   }
-  return _rawConnection;
+
+  if (!process.env.DATABASE_URL) {
+    console.warn("[Database] DATABASE_URL not set");
+    return null;
+  }
+
+  // Retry logic for initial connection
+  while (_connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
+    try {
+      _connectionAttempts++;
+      console.log(`[Database] Attempting raw connection (attempt ${_connectionAttempts}/${MAX_CONNECTION_ATTEMPTS})...`);
+
+      _rawConnection = await mysql.createConnection(process.env.DATABASE_URL);
+
+      console.log("[Database] ✅ Raw connection established successfully");
+      _connectionAttempts = 0; // Reset on success
+      return _rawConnection;
+    } catch (error: any) {
+      console.error(`[Database] ❌ Connection attempt ${_connectionAttempts} failed:`, error.message);
+
+      if (_connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
+        const delay = CONNECTION_RETRY_DELAY * _connectionAttempts; // Exponential backoff
+        console.log(`[Database] Retrying in ${delay}ms...`);
+        await sleep(delay);
+      } else {
+        console.error("[Database] Max connection attempts reached. Database operations will fail.");
+        _connectionAttempts = 0; // Reset for future attempts
+        return null;
+      }
+    }
+  }
+
+  return null;
 }
 
 // ============================================================================
