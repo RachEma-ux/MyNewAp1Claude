@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database, Plus, Settings, Rocket, ArrowRight, Archive, Edit, Copy } from "lucide-react";
+import { Database, Plus, Settings, Rocket, ArrowRight, Archive, Edit, Copy, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
@@ -52,12 +52,20 @@ export default function LlmDashboard() {
             Manage your LLM configurations with immutable versioning
           </p>
         </div>
-        <Link href="/llm/control-plane">
-          <Button size="lg">
-            <Plus className="mr-2 h-4 w-4" />
-            Create New LLM
-          </Button>
-        </Link>
+        <div className="flex gap-3">
+          <Link href="/llm/wizard">
+            <Button size="lg" variant="default">
+              <Sparkles className="mr-2 h-4 w-4" />
+              Provider Wizard
+            </Button>
+          </Link>
+          <Link href="/llm/control-plane">
+            <Button size="lg" variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Manual Setup
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -128,12 +136,20 @@ export default function LlmDashboard() {
                   Get started by creating your first LLM configuration
                 </p>
               </div>
-              <Link href="/llm/control-plane">
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Your First LLM
-                </Button>
-              </Link>
+              <div className="flex gap-3 justify-center">
+                <Link href="/llm/wizard">
+                  <Button>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Use Provider Wizard
+                  </Button>
+                </Link>
+                <Link href="/llm/control-plane">
+                  <Button variant="outline">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Manual Setup
+                  </Button>
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -211,16 +227,30 @@ export default function LlmDashboard() {
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+          <Link href="/llm/wizard">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Provider Wizard
+              </CardTitle>
+              <CardDescription>
+                Configure a provider from our library of 14 LLM providers
+              </CardDescription>
+            </CardHeader>
+          </Link>
+        </Card>
+
         <Card className="hover:border-primary/50 transition-colors cursor-pointer">
           <Link href="/llm/control-plane">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Plus className="h-5 w-5" />
-                Create New LLM
+                Manual Setup
               </CardTitle>
               <CardDescription>
-                Start the wizard to create a new LLM configuration from scratch
+                Create a custom LLM configuration manually
               </CardDescription>
             </CardHeader>
           </Link>
