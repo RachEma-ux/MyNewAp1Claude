@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: app
+    env: node
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: app-db
+          property: connectionString
+      - key: VITE_OAUTH_PORTAL_URL
+        value: https://example.com
+      - key: VITE_APP_ID
+        value: demo-app
+      # DEV_MODE removed for security - enable OAuth authentication in production
+      # Uncomment ONLY for local testing (bypasses OAuth):
+      # - key: DEV_MODE
+      #   value: true
+
+databases:
+  - name: app-db
+    plan: free
+    databaseName: app
+    user: app
