@@ -1,13 +1,46 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Database, Plus, Settings, Rocket, ArrowRight, Archive, Edit, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LlmDashboard() {
-  const { data: llms, isLoading } = trpc.llm.listWithVersions.useQuery({ includeArchived: false });
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const { data: llms, isLoading, refetch } = trpc.llm.listWithVersions.useQuery({ includeArchived: false });
+  const archiveMutation = trpc.llm.archive.useMutation({
+    onSuccess: () => {
+      toast({
+        title: "LLM Archived",
+        description: "The LLM has been archived successfully.",
+      });
+      refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEdit = (llmId: number) => {
+    setLocation(`/llm/control-plane?llmId=${llmId}&mode=edit`);
+  };
+
+  const handleClone = (llmId: number) => {
+    setLocation(`/llm/control-plane?llmId=${llmId}&mode=clone`);
+  };
+
+  const handleArchive = (llmId: number, llmName: string) => {
+    if (confirm(`Are you sure you want to archive "${llmName}"? It can be restored later.`)) {
+      archiveMutation.mutate({ id: llmId });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -113,13 +146,29 @@ export default function LlmDashboard() {
                         <CardDescription>{item.llm.description || 'No description'}</CardDescription>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(item.llm.id)}
+                          title="Edit LLM (creates new version)"
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleClone(item.llm.id)}
+                          title="Clone LLM"
+                        >
                           <Copy className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleArchive(item.llm.id, item.llm.name)}
+                          disabled={archiveMutation.isPending}
+                          title="Archive LLM"
+                        >
                           <Archive className="h-4 w-4" />
                         </Button>
                       </div>

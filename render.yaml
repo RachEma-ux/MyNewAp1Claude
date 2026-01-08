@@ -18,8 +18,10 @@ services:
         value: https://example.com
       - key: VITE_APP_ID
         value: demo-app
-      - key: DEV_MODE
-        value: true
+      # DEV_MODE removed for security - enable OAuth authentication in production
+      # Uncomment ONLY for local testing (bypasses OAuth):
+      # - key: DEV_MODE
+      #   value: true
 
 databases:
   - name: app-db

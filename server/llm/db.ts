@@ -92,16 +92,48 @@ export async function getLlmWithLatestVersion(llmId: number): Promise<{ llm: Llm
 
 /**
  * Get all LLMs with their latest versions
+ * Optimized with a single query using LEFT JOIN to avoid N+1 problem
  */
 export async function listLlmsWithLatestVersions(includeArchived: boolean = false): Promise<Array<{ llm: Llm; version: LlmVersion | undefined }>> {
-  const allLlms = await listLlms(includeArchived);
-
-  const llmsWithVersions = await Promise.all(
-    allLlms.map(async (llm) => {
-      const version = await getLatestLlmVersion(llm.id);
-      return { llm, version };
+  // Subquery to get the latest version ID for each LLM
+  const latestVersionSubquery = db!
+    .select({
+      llmId: llmVersions.llmId,
+      maxVersion: desc(llmVersions.version),
     })
-  );
+    .from(llmVersions)
+    .groupBy(llmVersions.llmId)
+    .as('latest_versions');
 
-  return llmsWithVersions;
+  // Main query with LEFT JOIN to get LLMs with their latest versions
+  const query = db!
+    .select({
+      llm: llms,
+      version: llmVersions,
+    })
+    .from(llms)
+    .leftJoin(llmVersions, eq(llms.id, llmVersions.llmId))
+    .orderBy(desc(llms.createdAt));
+
+  // Apply archived filter if needed
+  const results = includeArchived
+    ? await query
+    : await query.where(eq(llms.archived, false));
+
+  // Group results by LLM and get the latest version for each
+  const llmMap = new Map<number, { llm: Llm; version: LlmVersion | undefined }>();
+
+  for (const row of results) {
+    if (!llmMap.has(row.llm.id)) {
+      llmMap.set(row.llm.id, { llm: row.llm, version: row.version || undefined });
+    } else {
+      // If we already have this LLM, check if current version is newer
+      const existing = llmMap.get(row.llm.id)!;
+      if (row.version && (!existing.version || row.version.version > existing.version.version)) {
+        existing.version = row.version;
+      }
+    }
+  }
+
+  return Array.from(llmMap.values());
 }
