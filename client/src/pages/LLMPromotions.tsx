@@ -9,7 +9,7 @@
  */
 
 import { useState } from "react";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,7 @@ import {
 import { toast } from "sonner";
 
 export default function LLMPromotions() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedPromotion, setSelectedPromotion] = useState<any>(null);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
@@ -178,7 +178,7 @@ export default function LLMPromotions() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/llm")}>
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/llm")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

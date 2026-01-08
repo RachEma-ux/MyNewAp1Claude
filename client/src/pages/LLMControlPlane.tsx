@@ -10,7 +10,7 @@
  */
 
 import { useState } from "react";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ import {
 import { toast } from "sonner";
 
 export default function LLMControlPlane() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const [roleFilter, setRoleFilter] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -91,7 +91,7 @@ export default function LLMControlPlane() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/llm")}>
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/llm")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -100,7 +100,7 @@ export default function LLMControlPlane() {
           </div>
         </div>
 
-        <Button onClick={() => navigate("/llm/wizard")}>
+        <Button onClick={() => setLocation("/llm/wizard")}>
           <Plus className="mr-2 h-4 w-4" />
           Create LLM
         </Button>
@@ -198,7 +198,7 @@ export default function LLMControlPlane() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => navigate(`/llm/${llm.id}`)}
+                            onClick={() => setLocation(`/llm/${llm.id}`)}
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View
@@ -231,7 +231,7 @@ export default function LLMControlPlane() {
                   : "Create your first LLM to get started"}
               </p>
               {!searchQuery && !roleFilter && (
-                <Button onClick={() => navigate("/llm/wizard")}>
+                <Button onClick={() => setLocation("/llm/wizard")}>
                   <Plus className="mr-2 h-4 w-4" />
                   Create LLM
                 </Button>

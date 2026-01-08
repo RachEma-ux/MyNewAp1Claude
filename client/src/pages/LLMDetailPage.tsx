@@ -9,7 +9,7 @@
  */
 
 import { useState } from "react";
-import { useRoute, useNavigate } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,7 @@ import { toast } from "sonner";
 type Environment = "sandbox" | "governed" | "production";
 
 export default function LLMDetailPage() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const [, params] = useRoute("/llm/:id");
   const llmId = params?.id ? parseInt(params.id, 10) : null;
 
@@ -200,7 +200,7 @@ export default function LLMDetailPage() {
       <div className="container mx-auto py-8 px-4 max-w-7xl">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Invalid LLM ID</h1>
-          <Button onClick={() => navigate("/llm/control-plane")}>
+          <Button onClick={() => setLocation("/llm/control-plane")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Control Plane
           </Button>
@@ -225,7 +225,7 @@ export default function LLMDetailPage() {
       <div className="container mx-auto py-8 px-4 max-w-7xl">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">LLM Not Found</h1>
-          <Button onClick={() => navigate("/llm/control-plane")}>
+          <Button onClick={() => setLocation("/llm/control-plane")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Control Plane
           </Button>
@@ -239,7 +239,7 @@ export default function LLMDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/llm/control-plane")}>
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/llm/control-plane")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -399,7 +399,7 @@ export default function LLMDetailPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => navigate("/llm/promotions")}
+                                onClick={() => setLocation("/llm/promotions")}
                               >
                                 <Eye className="h-4 w-4 mr-1" />
                                 {versionPromotions.length} promotion{versionPromotions.length !== 1 ? "s" : ""}

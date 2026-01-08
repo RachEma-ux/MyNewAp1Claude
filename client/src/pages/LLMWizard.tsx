@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -113,7 +113,7 @@ const defaultConfiguration: LLMConfiguration = {
 // ============================================================================
 
 export default function LLMWizard() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState<WizardStep>("identity");
   const [state, setState] = useState<WizardState>({
     identity: defaultIdentity,
@@ -215,7 +215,7 @@ export default function LLMWizard() {
     <div className="container mx-auto py-8 px-4 max-w-5xl">
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/llm")}>
+        <Button variant="ghost" size="icon" onClick={() => setLocation("/llm")}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div>
@@ -283,7 +283,7 @@ export default function LLMWizard() {
             state={state}
             onSuccess={() => {
               clearDraft();
-              navigate("/llm");
+              setLocation("/llm");
             }}
           />
         )}

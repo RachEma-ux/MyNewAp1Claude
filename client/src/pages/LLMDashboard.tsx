@@ -11,7 +11,7 @@
  */
 
 import { useState } from "react";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,18 +31,18 @@ import {
 } from "lucide-react";
 
 export default function LLMDashboard() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Fetch dashboard statistics
   const { data: stats, isLoading } = trpc.llm.getDashboardStats.useQuery();
 
   const openWizard = () => {
-    navigate("/llm/wizard");
+    setLocation("/llm/wizard");
   };
 
   const openControlPlane = () => {
-    navigate("/llm/control-plane");
+    setLocation("/llm/control-plane");
   };
 
   if (isLoading) {
@@ -222,7 +222,7 @@ export default function LLMDashboard() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => navigate("/llm/promotions")}
+                onClick={() => setLocation("/llm/promotions")}
               >
                 <Activity className="mr-2 h-4 w-4" />
                 View Promotions
