@@ -34,32 +34,48 @@ async function runMigrations(maxRetries = 3) {
       return;
     } catch (error: any) {
       // Check if it's just "no new migrations"
-      if (error.message?.includes("no new migrations")) {
+      if (error.message?.includes("no new migrations") || error.message?.includes("No new migrations")) {
         console.log("✅ All migrations already applied");
         return;
       }
 
+      // Log full error details
+      console.error(`❌ Migration attempt ${attempt}/${maxRetries} failed`);
+      console.error('   Error message:', error.message || 'No message');
+      console.error('   Error code:', error.code || 'No code');
+      console.error('   Error errno:', error.errno || 'No errno');
+      console.error('   SQL State:', error.sqlState || 'No SQL state');
+      console.error('   SQL Message:', error.sqlMessage || 'No SQL message');
+
+      if (error.sql) {
+        console.error('   Failed SQL:', error.sql);
+      }
+
+      if (error.cause) {
+        console.error('   Cause:', JSON.stringify(error.cause, null, 2));
+      }
+
       // Check for connection errors
       if (error.code === 'ECONNREFUSED' || error.errno === 'ECONNREFUSED') {
-        console.error(`❌ Migration attempt ${attempt}/${maxRetries} failed: Database connection refused`);
+        console.error(`   → Database connection refused`);
 
         if (attempt < maxRetries) {
           const delay = 2000 * attempt;
           console.log(`   Retrying in ${delay}ms...`);
           await sleep(delay);
           continue;
-        } else {
-          console.error("❌ Max migration retries reached. App will start but database operations may fail.");
-          return;
         }
       }
 
-      // Other errors
-      console.error(`❌ Migration error (attempt ${attempt}/${maxRetries}):`, error.message);
-
-      if (attempt < maxRetries) {
-        await sleep(2000);
+      // If it's the last attempt, log but don't crash
+      if (attempt >= maxRetries) {
+        console.error("❌ Max migration retries reached");
+        console.error("   App will continue starting - migrations may already be applied");
+        return;
       }
+
+      // Otherwise retry
+      await sleep(2000);
     }
   }
 }
