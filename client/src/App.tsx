@@ -68,6 +68,7 @@ import WikiArticle from "@/pages/WikiArticle";
 import WikiEditor from "@/pages/WikiEditor";
 import LLMDashboard from "@/pages/LLMDashboard";
 import LLMControlPlane from "@/pages/LLMControlPlane";
+import LLMWizard from "@/pages/LLMWizard";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -160,6 +161,7 @@ function Router() {
       {/* LLM Control Plane Routes */}
       <Route path="/llm" component={() => <ProtectedRoute component={LLMDashboard} />} />
       <Route path="/llm/control-plane" component={() => <ProtectedRoute component={LLMControlPlane} />} />
+      <Route path="/llm/wizard" component={() => <ProtectedRoute component={LLMWizard} />} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
