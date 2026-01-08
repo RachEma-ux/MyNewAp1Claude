@@ -66,6 +66,8 @@ import ToolsManagementPage from "@/pages/ToolsManagementPage";
 import WikiPage from "@/pages/WikiPage";
 import WikiArticle from "@/pages/WikiArticle";
 import WikiEditor from "@/pages/WikiEditor";
+import LlmDashboard from "@/pages/LlmDashboard";
+import LlmControlPlane from "@/pages/LlmControlPlane";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -155,6 +157,8 @@ function Router() {
       <Route path="/wiki" component={() => <ProtectedRoute component={WikiPage} />} />
       <Route path="/wiki/:slug" component={() => <ProtectedRoute component={WikiArticle} />} />
       <Route path="/wiki/edit/:id" component={() => <ProtectedRoute component={WikiEditor} />} />
+      <Route path="/llm" component={() => <ProtectedRoute component={LlmDashboard} />} />
+      <Route path="/llm/control-plane" component={() => <ProtectedRoute component={LlmControlPlane} />} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

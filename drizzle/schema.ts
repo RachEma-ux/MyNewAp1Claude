@@ -1842,3 +1842,63 @@ export const keyRotationSchedules = mysqlTable("key_rotation_schedules", {
 
 export type KeyRotationSchedule = typeof keyRotationSchedules.$inferSelect;
 export type InsertKeyRotationSchedule = typeof keyRotationSchedules.$inferInsert;
+
+// ============================================================================
+// LLM Registry (Control Plane)
+// ============================================================================
+
+/**
+ * LLMs - Core LLM registry table
+ * Stores the base LLM configuration with immutable versioning
+ */
+export const llms = mysqlTable("llms", {
+  id: int("id").autoincrement().primaryKey(),
+
+  // Identity
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+
+  // Runtime configuration
+  runtime: mysqlEnum("runtime", ["local", "cloud"]).notNull(),
+  provider: varchar("provider", { length: 255 }), // e.g., "openai", "anthropic", "ollama", "llamacpp"
+
+  // Status
+  archived: boolean("archived").default(false),
+
+  // Metadata
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Llm = typeof llms.$inferSelect;
+export type InsertLlm = typeof llms.$inferInsert;
+
+/**
+ * LLM Versions - Immutable version history
+ * Each change creates a new version (no updates, only inserts)
+ */
+export const llmVersions = mysqlTable("llm_versions", {
+  id: int("id").autoincrement().primaryKey(),
+  llmId: int("llmId").notNull(), // FK to llms
+
+  // Version tracking
+  version: int("version").notNull(), // Incremental version number (1, 2, 3...)
+
+  // Configuration snapshot (full LLM config as JSON)
+  config: json("config").notNull(), // Complete configuration for this version
+
+  // Change tracking
+  changeNotes: text("changeNotes"), // Description of what changed
+  changeType: mysqlEnum("changeType", ["created", "edited", "cloned"]).notNull(),
+
+  // Metadata
+  createdBy: int("createdBy").notNull(), // FK to users
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  llmIdIdx: index("idx_llm_versions_llm_id").on(table.llmId),
+  llmIdVersionIdx: uniqueIndex("unique_llm_version").on(table.llmId, table.version),
+}));
+
+export type LlmVersion = typeof llmVersions.$inferSelect;
+export type InsertLlmVersion = typeof llmVersions.$inferInsert;
