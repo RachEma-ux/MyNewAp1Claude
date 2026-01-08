@@ -12,6 +12,7 @@ import { initializeProviders } from "../providers/init";
 import { handleChatStream } from "../chat/stream";
 import { handleAgentChatStream } from "../agents/stream";
 import { migrate } from "drizzle-orm/mysql2/migrator";
+import { sql } from "drizzle-orm";
 import { getDb } from "../db";
 
 async function sleep(ms: number) {
@@ -105,12 +106,43 @@ async function startServer() {
 
   // Initialize providers from database
   await initializeProviders();
-  
+
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Health check endpoint
+  app.get("/api/health", async (req, res) => {
+    const health = {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      database: "unknown",
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        DATABASE_URL_SET: !!process.env.DATABASE_URL,
+      }
+    };
+
+    try {
+      const db = getDb();
+      if (db) {
+        // Test database connection
+        await db.execute(sql`SELECT 1 as test`);
+        health.database = "connected";
+      } else {
+        health.database = "not_initialized";
+        health.status = "degraded";
+      }
+    } catch (error: any) {
+      health.database = `error: ${error.message}`;
+      health.status = "degraded";
+    }
+
+    res.json(health);
+  });
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // File upload endpoint

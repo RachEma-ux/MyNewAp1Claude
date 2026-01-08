@@ -48,11 +48,18 @@ async function sleep(ms: number) {
 export function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
+      // Log sanitized DATABASE_URL for debugging (hide password)
+      const dbUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':****@');
+      console.log("[Database] Initializing Drizzle with URL:", dbUrl);
+
       _db = drizzle(process.env.DATABASE_URL, { schema, mode: "default" });
+      console.log("[Database] ✅ Drizzle instance created successfully");
     } catch (error) {
-      console.warn("[Database] Failed to create Drizzle instance:", error);
+      console.error("[Database] ❌ Failed to create Drizzle instance:", error);
       _db = null;
     }
+  } else if (!process.env.DATABASE_URL) {
+    console.error("[Database] ❌ DATABASE_URL environment variable is not set!");
   }
   return _db;
 }
@@ -70,9 +77,13 @@ async function getRawConnection(): Promise<mysql.Connection | null> {
   }
 
   if (!process.env.DATABASE_URL) {
-    console.warn("[Database] DATABASE_URL not set");
+    console.error("[Database] ❌ DATABASE_URL not set - cannot create raw connection");
     return null;
   }
+
+  // Log sanitized connection string
+  const sanitizedUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':****@');
+  console.log("[Database] DATABASE_URL format:", sanitizedUrl);
 
   // Try to establish connection with retries (use local counter per call)
   const maxAttempts = 5;
@@ -81,6 +92,7 @@ async function getRawConnection(): Promise<mysql.Connection | null> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       console.log(`[Database] Attempting raw connection (attempt ${attempt}/${maxAttempts})...`);
+      console.log(`[Database] Connection string format: ${sanitizedUrl}`);
 
       _rawConnection = await mysql.createConnection(process.env.DATABASE_URL);
 
