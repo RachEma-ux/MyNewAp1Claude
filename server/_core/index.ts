@@ -11,6 +11,29 @@ import { serveStatic, setupVite } from "./vite";
 import { initializeProviders } from "../providers/init";
 import { handleChatStream } from "../chat/stream";
 import { handleAgentChatStream } from "../agents/stream";
+import { migrate } from "drizzle-orm/mysql2/migrator";
+import { getDb } from "../db";
+
+async function runMigrations() {
+  console.log("🔄 Running database migrations...");
+  try {
+    const db = getDb();
+    if (!db) {
+      console.warn("⚠️  Database not available, skipping migrations");
+      return;
+    }
+
+    await migrate(db, { migrationsFolder: "./drizzle" });
+    console.log("✅ Database migrations completed successfully");
+  } catch (error: any) {
+    // Only log error if it's not about migrations already applied
+    if (!error.message?.includes("no new migrations")) {
+      console.error("❌ Migration error:", error.message);
+    } else {
+      console.log("✅ All migrations already applied");
+    }
+  }
+}
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -32,6 +55,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Run database migrations first
+  await runMigrations();
+
   // Initialize providers from database
   await initializeProviders();
   
