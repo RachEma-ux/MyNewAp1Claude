@@ -47,7 +47,7 @@ export default function LLMDashboard() {
   };
 
   const openProviderWizard = () => {
-    setLocation("/llm/provider-wizard");
+    setLocation("/providers");
   };
 
   if (isLoading) {
