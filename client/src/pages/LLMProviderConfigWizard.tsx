@@ -428,6 +428,15 @@ export default function LLMProviderConfigWizard() {
         </CardHeader>
 
         <CardContent className="min-h-[400px]">
+          {/* Debug Info (Remove after fixing) */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
+              <strong>Debug:</strong> Step={state.step} | ProviderId={state.providerId} |
+              ProviderType={state.providerType} | InstallStatus={state.installationStatus} |
+              SelectedProviderType={selectedProvider?.type}
+            </div>
+          )}
+
           {/* Step 1: Select Provider */}
           {state.step === "select" && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
