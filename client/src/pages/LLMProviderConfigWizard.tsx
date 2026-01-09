@@ -3,7 +3,7 @@
  * Step-by-step wizard for configuring LLM providers with encryption & testing
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,15 +26,99 @@ import {
   AlertCircle,
   CheckCircle,
   Star,
+  Download,
+  Package,
+  Terminal,
+  ExternalLink,
+  RefreshCw,
+  Cpu,
+  HardDrive,
+  Monitor,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
-type WizardStep = "select" | "configure" | "test" | "review";
+// Helper component to show model compatibility
+function ModelCompatibilityBadge({ model, deviceSpecs }: { model: any; deviceSpecs: any }) {
+  if (!model.systemRequirements || !deviceSpecs) {
+    return null;
+  }
+
+  const req = model.systemRequirements;
+  const specs = deviceSpecs;
+
+  // Check critical requirements
+  const hasEnoughRAM = specs.ram.totalGB >= req.minRAM;
+  const hasEnoughDisk = specs.disk.availableGB >= req.minDiskSpace;
+  const hasGPU = !req.gpuRequired || specs.gpu?.detected;
+
+  const isCompatible = hasEnoughRAM && hasEnoughDisk && hasGPU;
+  const isRecommended = specs.ram.totalGB >= req.recommendedRAM;
+
+  if (!isCompatible) {
+    return (
+      <Badge variant="destructive" className="text-xs">
+        <AlertCircle className="h-3 w-3 mr-1" />
+        Incompatible
+      </Badge>
+    );
+  }
+
+  if (!isRecommended) {
+    return (
+      <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
+        <AlertCircle className="h-3 w-3 mr-1" />
+        Below Recommended
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+      <CheckCircle className="h-3 w-3 mr-1" />
+      Compatible
+    </Badge>
+  );
+}
+
+// Helper component to show system requirements
+function SystemRequirements({ model }: { model: any }) {
+  if (!model.systemRequirements) {
+    return null;
+  }
+
+  const req = model.systemRequirements;
+
+  return (
+    <div className="mt-3 p-3 bg-muted/50 rounded-lg border">
+      <p className="text-xs font-semibold mb-2">System Requirements:</p>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="flex items-center gap-1">
+          <Cpu className="h-3 w-3" />
+          <span>RAM: {req.minRAM}GB min / {req.recommendedRAM}GB rec</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <HardDrive className="h-3 w-3" />
+          <span>Disk: {req.minDiskSpace}GB</span>
+        </div>
+        {req.gpuRequired && (
+          <div className="flex items-center gap-1">
+            <Monitor className="h-3 w-3" />
+            <span>GPU: Required{req.minVRAM ? ` (${req.minVRAM}GB VRAM)` : ''}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type WizardStep = "select" | "install" | "models" | "configure" | "test" | "review";
 
 interface WizardState {
   step: WizardStep;
   providerId: string;
   providerName: string;
+  providerType: "cloud" | "local" | "custom";
   credentials: {
     apiKey?: string;
     apiSecret?: string;
@@ -48,6 +132,8 @@ interface WizardState {
     message: string;
     latency?: number;
   };
+  installationStatus?: "installed" | "not_installed" | "checking" | "error";
+  selectedModels: string[];
 }
 
 export default function LLMProviderConfigWizard() {
@@ -56,28 +142,94 @@ export default function LLMProviderConfigWizard() {
     step: "select",
     providerId: "",
     providerName: "",
+    providerType: "cloud",
     credentials: {},
     setAsDefault: false,
+    selectedModels: [],
   });
 
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCheckingInstallation, setIsCheckingInstallation] = useState(false);
 
   // Queries
   const { data: providers = [] } = trpc.llm.listProviders.useQuery();
   const testConnectionMutation = trpc.llm.testProviderConnection.useMutation();
 
+  // Installation queries (only for local providers)
+  const { data: installationCheck, refetch: refetchInstallation } = trpc.llm.checkProviderInstallation.useQuery(
+    { providerId: state.providerId },
+    { enabled: state.providerType === "local" && !!state.providerId }
+  );
+
+  const { data: installationInstructions } = trpc.llm.getInstallationInstructions.useQuery(
+    { providerId: state.providerId },
+    { enabled: state.providerType === "local" && !!state.providerId }
+  );
+
+  const { data: availableModels = [] } = trpc.llm.getAvailableModels.useQuery(
+    { providerId: state.providerId },
+    { enabled: state.providerType === "local" && state.installationStatus === "installed" }
+  );
+
+  const { data: installedModels = [] } = trpc.llm.getInstalledModels.useQuery(
+    { providerId: state.providerId },
+    { enabled: state.providerType === "local" && state.installationStatus === "installed" }
+  );
+
+  // Device specs and compatibility checking
+  const { data: deviceSpecs } = trpc.llm.getDeviceSpecs.useQuery(
+    undefined,
+    { enabled: state.providerType === "local" && state.step === "models" }
+  );
+
   const selectedProvider = providers.find((p) => p.id === state.providerId);
+
+  // Auto-check installation status every 5 seconds when on install step
+  useEffect(() => {
+    if (state.step === "install" && state.providerType === "local") {
+      const interval = setInterval(() => {
+        refetchInstallation();
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [state.step, state.providerType, refetchInstallation]);
+
+  // Update installation status when check result changes
+  useEffect(() => {
+    if (installationCheck) {
+      setState((prev) => {
+        const newState = {
+          ...prev,
+          installationStatus: installationCheck.status,
+        };
+
+        // Auto-advance to models step if installation detected
+        if (prev.step === "install" && installationCheck.status === "installed") {
+          toast.success("Installation detected!");
+          return { ...newState, step: "models" as WizardStep };
+        }
+
+        return newState;
+      });
+    }
+  }, [installationCheck]);
 
   const updateState = (updates: Partial<WizardState>) => {
     setState((prev) => ({ ...prev, ...updates }));
   };
 
-  const handleSelectProvider = (providerId: string, providerName: string) => {
+  const handleSelectProvider = (providerId: string, providerName: string, providerType: "cloud" | "local" | "custom") => {
+    // For local providers, go to install step first
+    // For cloud providers, go directly to configure
+    const nextStep: WizardStep = providerType === "local" ? "install" : "configure";
+
     updateState({
       providerId,
       providerName,
-      step: "configure",
+      providerType,
+      step: nextStep,
     });
   };
 
@@ -135,6 +287,12 @@ export default function LLMProviderConfigWizard() {
     switch (state.step) {
       case "select":
         return !!state.providerId;
+      case "install":
+        // Can proceed if installation is detected
+        return state.installationStatus === "installed";
+      case "models":
+        // Can always proceed from models step (models are optional)
+        return true;
       case "configure":
         return selectedProvider?.requiresApiKey ? !!state.credentials.apiKey : true;
       case "test":
@@ -143,6 +301,41 @@ export default function LLMProviderConfigWizard() {
         return true;
       default:
         return false;
+    }
+  };
+
+  const getNextStep = (): WizardStep | null => {
+    const allSteps: WizardStep[] = state.providerType === "local"
+      ? ["select", "install", "models", "configure", "test", "review"]
+      : ["select", "configure", "test", "review"];
+
+    const currentIndex = allSteps.indexOf(state.step);
+    return currentIndex < allSteps.length - 1 ? allSteps[currentIndex + 1] : null;
+  };
+
+  const getPreviousStep = (): WizardStep | null => {
+    const allSteps: WizardStep[] = state.providerType === "local"
+      ? ["select", "install", "models", "configure", "test", "review"]
+      : ["select", "configure", "test", "review"];
+
+    const currentIndex = allSteps.indexOf(state.step);
+    return currentIndex > 0 ? allSteps[currentIndex - 1] : null;
+  };
+
+  const handleCheckInstallation = async () => {
+    setIsCheckingInstallation(true);
+    try {
+      await refetchInstallation();
+
+      if (installationCheck?.status === "installed") {
+        toast.success("Installation verified successfully!");
+      } else {
+        toast.error("Installation not detected. Please complete installation first.");
+      }
+    } catch (error: any) {
+      toast.error(`Installation check failed: ${error.message}`);
+    } finally {
+      setIsCheckingInstallation(false);
     }
   };
 
@@ -160,40 +353,57 @@ export default function LLMProviderConfigWizard() {
 
       {/* Progress Indicator */}
       <div className="mb-8">
-        <div className="flex items-center justify-between">
-          {(["select", "configure", "test", "review"] as const).map((step, index) => (
-            <div key={step} className="flex items-center">
-              <div
-                className={`
-                  w-10 h-10 rounded-full flex items-center justify-center font-semibold
-                  ${state.step === step ? "bg-primary text-primary-foreground ring-4 ring-primary/20" : ""}
-                  ${["select", "configure", "test", "review"].indexOf(state.step) > index ? "bg-primary text-primary-foreground" : ""}
-                  ${["select", "configure", "test", "review"].indexOf(state.step) < index ? "bg-muted text-muted-foreground" : ""}
-                `}
-              >
-                {["select", "configure", "test", "review"].indexOf(state.step) > index ? (
-                  <Check className="h-5 w-5" />
-                ) : (
-                  index + 1
+        <div className="flex items-center justify-center gap-2 overflow-x-auto">
+          {(state.providerType === "local"
+            ? ([
+                { step: "select", label: "Select" },
+                { step: "install", label: "Install" },
+                { step: "models", label: "Models" },
+                { step: "configure", label: "Configure" },
+                { step: "test", label: "Test" },
+                { step: "review", label: "Review" },
+              ] as const)
+            : ([
+                { step: "select", label: "Select" },
+                { step: "configure", label: "Configure" },
+                { step: "test", label: "Test" },
+                { step: "review", label: "Review" },
+              ] as const)
+          ).map((item, index, array) => {
+            const allSteps = array.map((s) => s.step);
+            const currentIndex = allSteps.indexOf(state.step as any);
+            const isCompleted = currentIndex > index;
+            const isCurrent = state.step === item.step;
+
+            return (
+              <div key={item.step} className="flex items-center">
+                <div className="flex flex-col items-center min-w-max">
+                  <div
+                    className={`
+                      w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all
+                      ${isCurrent ? "bg-primary text-primary-foreground ring-4 ring-primary/20" : ""}
+                      ${isCompleted ? "bg-primary text-primary-foreground" : ""}
+                      ${!isCurrent && !isCompleted ? "bg-muted text-muted-foreground" : ""}
+                    `}
+                  >
+                    {isCompleted ? (
+                      <Check className="h-5 w-5" />
+                    ) : (
+                      index + 1
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-2">{item.label}</span>
+                </div>
+                {index < array.length - 1 && (
+                  <div
+                    className={`h-1 w-12 mx-2 mb-6 transition-all ${
+                      isCompleted ? "bg-primary" : "bg-muted"
+                    }`}
+                  />
                 )}
               </div>
-              {index < 3 && (
-                <div
-                  className={`h-1 w-16 mx-2 ${
-                    ["select", "configure", "test", "review"].indexOf(state.step) > index
-                      ? "bg-primary"
-                      : "bg-muted"
-                  }`}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-          <span>Select</span>
-          <span>Configure</span>
-          <span>Test</span>
-          <span>Review</span>
+            );
+          })}
         </div>
       </div>
 
@@ -201,12 +411,16 @@ export default function LLMProviderConfigWizard() {
         <CardHeader>
           <CardTitle>
             {state.step === "select" && "Select Provider"}
+            {state.step === "install" && `Install ${state.providerName}`}
+            {state.step === "models" && "Download Models"}
             {state.step === "configure" && "Configure Credentials"}
             {state.step === "test" && "Test Connection"}
             {state.step === "review" && "Review & Save"}
           </CardTitle>
           <CardDescription>
-            {state.step === "select" && "Choose from 14 LLM providers"}
+            {state.step === "select" && "Choose from 14+ LLM providers (cloud, local, custom)"}
+            {state.step === "install" && "Install the provider on your local machine"}
+            {state.step === "models" && "Browse and download models from the library"}
             {state.step === "configure" && "Enter your API credentials (securely encrypted)"}
             {state.step === "test" && "Verify your connection works"}
             {state.step === "review" && "Confirm your configuration"}
@@ -220,9 +434,9 @@ export default function LLMProviderConfigWizard() {
               {providers.map((provider) => (
                 <button
                   key={provider.id}
-                  onClick={() => handleSelectProvider(provider.id, provider.name)}
+                  onClick={() => handleSelectProvider(provider.id, provider.name, provider.type)}
                   className={`
-                    p-4 rounded-lg border-2 transition-all text-left
+                    p-4 rounded-lg border-2 transition-all text-left relative
                     ${state.providerId === provider.id
                       ? "border-primary bg-primary/5"
                       : "border-border hover:border-primary/50"
@@ -235,7 +449,13 @@ export default function LLMProviderConfigWizard() {
                   <h3 className="font-semibold">{provider.name}</h3>
                   <p className="text-xs text-muted-foreground mt-1">{provider.company}</p>
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {provider.strengths.slice(0, 2).map((strength) => (
+                    {provider.type === "local" && (
+                      <Badge variant="outline" className="text-xs">
+                        <Package className="h-3 w-3 mr-1" />
+                        Local
+                      </Badge>
+                    )}
+                    {provider.strengths.slice(0, provider.type === "local" ? 1 : 2).map((strength) => (
                       <Badge key={strength} variant="secondary" className="text-xs">
                         {strength}
                       </Badge>
@@ -252,7 +472,254 @@ export default function LLMProviderConfigWizard() {
             </div>
           )}
 
-          {/* Step 2: Configure Credentials */}
+          {/* Step 2: Install (Local Providers Only) */}
+          {state.step === "install" && selectedProvider && installationInstructions && (
+            <div className="space-y-6">
+              {/* Installation Status */}
+              <Alert variant={state.installationStatus === "installed" ? "default" : "destructive"}>
+                {state.installationStatus === "installed" ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : state.installationStatus === "checking" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <AlertCircle className="h-4 w-4" />
+                )}
+                <AlertDescription>
+                  <p className="font-semibold">
+                    {state.installationStatus === "installed" && `${selectedProvider.name} is installed and running!`}
+                    {state.installationStatus === "not_installed" && `${selectedProvider.name} is not installed`}
+                    {state.installationStatus === "checking" && `Checking installation...`}
+                    {state.installationStatus === "error" && `Error checking installation`}
+                  </p>
+                </AlertDescription>
+              </Alert>
+
+              {state.installationStatus !== "installed" && (
+                <>
+                  {/* Installation Instructions */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Download className="h-5 w-5" />
+                      Installation Steps
+                    </h3>
+                    <ol className="list-decimal list-inside space-y-2 text-sm">
+                      {installationInstructions.instructions.map((instruction, index) => (
+                        <li key={index}>{instruction}</li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <Separator />
+
+                  {/* Download Links */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Download Links</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {installationInstructions.downloadUrls.windows && (
+                        <a
+                          href={installationInstructions.downloadUrls.windows}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors"
+                        >
+                          <span className="font-medium">Windows</span>
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                      {installationInstructions.downloadUrls.macos && (
+                        <a
+                          href={installationInstructions.downloadUrls.macos}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors"
+                        >
+                          <span className="font-medium">macOS</span>
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                      {installationInstructions.downloadUrls.linux && (
+                        <a
+                          href={installationInstructions.downloadUrls.linux}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors"
+                        >
+                          <span className="font-medium">Linux</span>
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                      {installationInstructions.downloadUrls.dockerImage && (
+                        <div className="md:col-span-2 p-4 border rounded-lg bg-muted">
+                          <p className="text-sm font-medium mb-2">Docker:</p>
+                          <code className="text-xs bg-background px-2 py-1 rounded">
+                            {installationInstructions.downloadUrls.dockerImage}
+                          </code>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Check Installation Button */}
+                  <div className="flex justify-center">
+                    <Button
+                      size="lg"
+                      onClick={handleCheckInstallation}
+                      disabled={isCheckingInstallation}
+                    >
+                      {isCheckingInstallation ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Checking...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Check Installation
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Models (Local Providers Only) */}
+          {state.step === "models" && selectedProvider && (
+            <div className="space-y-6">
+              {/* Device Specifications */}
+              {deviceSpecs && (
+                <Alert>
+                  <Zap className="h-4 w-4" />
+                  <AlertDescription>
+                    <p className="font-semibold mb-2">Your System:</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Cpu className="h-4 w-4" />
+                        <span>{deviceSpecs.ram.totalGB}GB RAM</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <HardDrive className="h-4 w-4" />
+                        <span>{deviceSpecs.disk.availableGB}GB Free</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Monitor className="h-4 w-4" />
+                        <span>{deviceSpecs.gpu?.detected ? deviceSpecs.gpu.name : 'No GPU'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        <span>{deviceSpecs.cpu.cores} CPU Cores</span>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>
+                  Models are installed and managed locally. Compatibility is checked against your system specs.
+                </AlertDescription>
+              </Alert>
+
+              {/* Installed Models */}
+              {installedModels.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    Installed Models ({installedModels.length})
+                  </h3>
+                  <div className="grid gap-2">
+                    {installedModels.map((model) => (
+                      <div key={model.id} className="flex items-center justify-between p-3 border rounded-lg bg-accent/50">
+                        <div>
+                          <p className="font-medium">{model.name}</p>
+                          <p className="text-xs text-muted-foreground">{model.size}</p>
+                        </div>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          Installed
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Separator />
+
+              {/* Available Models */}
+              <div className="space-y-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Download className="h-5 w-5" />
+                  Available Models
+                </h3>
+                <div className="grid gap-3">
+                  {availableModels.map((model) => {
+                    const isInstalled = installedModels.some((im) => im.id === model.id);
+
+                    return (
+                      <div
+                        key={model.id}
+                        className={`p-4 border rounded-lg ${model.recommended ? "border-primary bg-primary/5" : ""}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-medium flex items-center gap-2 flex-wrap">
+                              {model.name}
+                              {model.recommended && (
+                                <Badge variant="default" className="text-xs">
+                                  <Star className="h-3 w-3 mr-1" />
+                                  Recommended
+                                </Badge>
+                              )}
+                              <ModelCompatibilityBadge model={model} deviceSpecs={deviceSpecs} />
+                            </h4>
+                            <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
+                              {model.size && <span>{model.size}</span>}
+                              {model.contextLength && <span>• {model.contextLength.toLocaleString()} tokens</span>}
+                            </div>
+                          </div>
+                          {isInstalled && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              Installed
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* System Requirements */}
+                        <SystemRequirements model={model} />
+
+                        {/* Download Command */}
+                        {!isInstalled && (
+                          <div className="mt-3 p-2 bg-muted rounded text-xs font-mono">
+                            <div className="flex items-center justify-between">
+                              <code>ollama pull {model.id}</code>
+                              <Terminal className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Alert variant="default">
+                <Terminal className="h-4 w-4" />
+                <AlertDescription>
+                  <p className="font-semibold mb-1">How to download models:</p>
+                  <p className="text-sm">
+                    Open your terminal and run the command shown above for the model you want to download.
+                    The model will be downloaded and ready to use immediately.
+                  </p>
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
+          {/* Step 4 (or 2): Configure Credentials */}
           {state.step === "configure" && selectedProvider && (
             <div className="space-y-6">
               <Alert>
@@ -450,13 +917,12 @@ export default function LLMProviderConfigWizard() {
           <Button
             variant="outline"
             onClick={() => {
-              const steps: WizardStep[] = ["select", "configure", "test", "review"];
-              const currentIndex = steps.indexOf(state.step);
-              if (currentIndex > 0) {
-                updateState({ step: steps[currentIndex - 1] });
+              const prevStep = getPreviousStep();
+              if (prevStep) {
+                updateState({ step: prevStep });
               }
             }}
-            disabled={state.step === "select"}
+            disabled={!getPreviousStep()}
           >
             <ChevronLeft className="h-4 w-4 mr-2" />
             Back
@@ -470,10 +936,9 @@ export default function LLMProviderConfigWizard() {
             {state.step !== "review" ? (
               <Button
                 onClick={() => {
-                  const steps: WizardStep[] = ["select", "configure", "test", "review"];
-                  const currentIndex = steps.indexOf(state.step);
-                  if (currentIndex < steps.length - 1) {
-                    updateState({ step: steps[currentIndex + 1] });
+                  const nextStep = getNextStep();
+                  if (nextStep) {
+                    updateState({ step: nextStep });
                   }
                 }}
                 disabled={!canProceed()}

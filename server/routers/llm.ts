@@ -677,4 +677,153 @@ export const llmRouter = router({
         message: "Credentials deleted successfully",
       };
     }),
+
+  // ============================================================================
+  // Provider Installation & Model Management
+  // ============================================================================
+
+  /**
+   * Check if a local provider (e.g., Ollama) is installed
+   * Returns installation status and installed models
+   */
+  checkProviderInstallation: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { checkProviderInstallation } = await import("../llm/provider-installation");
+      return await checkProviderInstallation(input.providerId);
+    }),
+
+  /**
+   * Get installation instructions for a provider
+   * Returns OS-specific download URLs and step-by-step instructions
+   */
+  getInstallationInstructions: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getInstallationInstructions } = await import("../llm/provider-installation");
+      return getInstallationInstructions(input.providerId);
+    }),
+
+  /**
+   * Get list of available models for a provider
+   * Returns models from provider's library/catalog
+   */
+  getAvailableModels: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getAvailableModels } = await import("../llm/provider-installation");
+      return await getAvailableModels(input.providerId);
+    }),
+
+  /**
+   * Get list of installed models for a local provider
+   * Only works for providers that are already installed
+   */
+  getInstalledModels: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getInstalledModels } = await import("../llm/provider-installation");
+      return await getInstalledModels(input.providerId);
+    }),
+
+  /**
+   * Get command to download a model for a local provider
+   * Returns command and instructions for user to execute
+   */
+  downloadModel: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        modelId: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { downloadModel } = await import("../llm/provider-installation");
+      return await downloadModel(input.providerId, input.modelId);
+    }),
+
+  /**
+   * Get command to remove a model from a local provider
+   * Returns command and instructions for user to execute
+   */
+  removeModel: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        modelId: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { removeModel } = await import("../llm/provider-installation");
+      return await removeModel(input.providerId, input.modelId);
+    }),
+
+  // ============================================================================
+  // Device Detection & Compatibility
+  // ============================================================================
+
+  /**
+   * Get current device specifications
+   * Returns RAM, CPU, GPU, disk space, and OS information
+   */
+  getDeviceSpecs: protectedProcedure.query(async () => {
+    const { detectDeviceSpecs } = await import("../llm/device-detection");
+    return await detectDeviceSpecs();
+  }),
+
+  /**
+   * Check if device is compatible with a specific model
+   * Returns compatibility status, warnings, and recommendations
+   */
+  checkModelCompatibility: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        modelId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { detectDeviceSpecs, checkCompatibility } = await import("../llm/device-detection");
+      const { getProvider } = await import("../llm/providers");
+
+      const provider = getProvider(input.providerId);
+      if (!provider) {
+        throw new Error(`Provider not found: ${input.providerId}`);
+      }
+
+      const model = provider.models.find((m) => m.id === input.modelId);
+      if (!model) {
+        throw new Error(`Model not found: ${input.modelId}`);
+      }
+
+      if (!model.systemRequirements) {
+        return {
+          compatible: true,
+          warnings: [],
+          errors: [],
+          recommendations: [],
+          deviceSpecs: await detectDeviceSpecs(),
+          requirements: null,
+        };
+      }
+
+      const deviceSpecs = await detectDeviceSpecs();
+      return checkCompatibility(deviceSpecs, model.systemRequirements);
+    }),
 });
