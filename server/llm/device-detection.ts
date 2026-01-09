@@ -45,7 +45,7 @@ export interface SystemRequirements {
   minDiskSpace: number; // GB
   gpuRequired: boolean;
   minVRAM?: number; // GB (if GPU required)
-  supportedOS?: string[]; // ['windows', 'macos', 'linux']
+  supportedOS?: string[]; // ['windows', 'macos', 'linux', 'android']
   supportedArchitectures?: string[]; // ['x64', 'arm64']
 }
 
@@ -59,12 +59,39 @@ export interface CompatibilityCheck {
 }
 
 /**
+ * Detect if running on Android
+ */
+function isAndroid(): boolean {
+  try {
+    // Check if running on Android (Termux or similar)
+    if (os.platform() === 'linux') {
+      // Check for Android-specific paths or properties
+      if (process.env.ANDROID_ROOT || process.env.ANDROID_DATA) {
+        return true;
+      }
+      // Check if /system/build.prop exists (Android indicator)
+      if (fs.existsSync('/system/build.prop')) {
+        return true;
+      }
+    }
+    return false;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
  * Detect current device specifications
  */
 export async function detectDeviceSpecs(): Promise<DeviceSpecs> {
-  const platform = os.platform();
+  let platform = os.platform();
   const totalRAM = os.totalmem();
   const freeRAM = os.freemem();
+
+  // Detect Android
+  if (isAndroid()) {
+    platform = 'android' as any;
+  }
 
   // Get disk space
   const disk = getDiskSpace();
@@ -332,6 +359,7 @@ export function checkCompatibility(
       win32: 'windows',
       darwin: 'macos',
       linux: 'linux',
+      android: 'android',
     };
     const currentOS = platformMap[deviceSpecs.os.platform];
 
