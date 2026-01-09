@@ -1,24 +1,56 @@
 /**
- * LLM Provider Definitions from MultiChat
- * 14 providers with their models and configurations
+ * LLM Provider Definitions with In-App Installation Support
+ * 14+ providers with models, configurations, and installation flows
  */
+
+export type ProviderType = 'cloud' | 'local' | 'custom';
 
 export interface ProviderModel {
   id: string;
   name: string;
   contextLength?: number;
   strengths?: string[];
+  size?: string; // For local models (e.g., "3.8GB")
+  recommended?: boolean;
+}
+
+export interface InstallationMetadata {
+  required: boolean; // Does this provider need installation?
+  detectionEndpoint: string; // URL to check if installed (e.g., "http://localhost:11434/api/tags")
+  downloadUrls: {
+    windows?: string;
+    macos?: string;
+    linux?: string;
+    dockerImage?: string;
+  };
+  instructions: string[];
+  defaultPort?: number;
+}
+
+export interface ModelManagement {
+  enabled: boolean; // Can user download/manage models?
+  listEndpoint?: string; // Endpoint to list available models
+  downloadCommand?: (modelId: string) => string; // Command to download model
+  removeCommand?: (modelId: string) => string; // Command to remove model
+  libraryUrl?: string; // URL to model library/marketplace
 }
 
 export interface Provider {
   id: string;
   name: string;
   company: string;
+  type: ProviderType; // cloud, local, or custom
   color: string;
   strengths: string[];
   models: ProviderModel[];
   requiresApiKey: boolean;
   baseUrl?: string;
+
+  // Installation support (for local providers)
+  installation?: InstallationMetadata;
+
+  // Model management (for providers with downloadable models)
+  modelManagement?: ModelManagement;
 }
 
 export const PROVIDERS: Record<string, Provider> = {
@@ -26,6 +58,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'anthropic',
     name: 'Anthropic',
     company: 'Anthropic',
+    type: 'cloud',
     color: 'bg-orange-500',
     strengths: ['reasoning', 'ethics', 'long-form'],
     requiresApiKey: true,
@@ -41,6 +74,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'openai',
     name: 'OpenAI',
     company: 'OpenAI',
+    type: 'cloud',
     color: 'bg-green-500',
     strengths: ['creative', 'code', 'general'],
     requiresApiKey: true,
@@ -57,6 +91,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'google',
     name: 'Google',
     company: 'Google',
+    type: 'cloud',
     color: 'bg-blue-500',
     strengths: ['multimodal', 'search', 'analysis'],
     requiresApiKey: true,
@@ -75,6 +110,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'meta',
     name: 'Meta',
     company: 'Meta',
+    type: 'cloud',
     color: 'bg-blue-600',
     strengths: ['open-source', 'coding', 'general'],
     requiresApiKey: false,
@@ -93,6 +129,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'mistral',
     name: 'Mistral AI',
     company: 'Mistral AI',
+    type: 'cloud',
     color: 'bg-orange-600',
     strengths: ['efficient', 'coding', 'multilingual'],
     requiresApiKey: true,
@@ -108,6 +145,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'microsoft',
     name: 'Microsoft',
     company: 'Microsoft',
+    type: 'cloud',
     color: 'bg-blue-400',
     strengths: ['efficient', 'reasoning', 'coding'],
     requiresApiKey: true,
@@ -123,6 +161,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'qwen',
     name: 'Qwen',
     company: 'Alibaba / Qwen',
+    type: 'cloud',
     color: 'bg-red-500',
     strengths: ['multilingual', 'coding', 'general'],
     requiresApiKey: false,
@@ -141,6 +180,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'xai',
     name: 'xAI',
     company: 'xAI',
+    type: 'cloud',
     color: 'bg-yellow-500',
     strengths: ['reasoning', 'general', 'real-time'],
     requiresApiKey: true,
@@ -154,6 +194,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'cohere',
     name: 'Cohere',
     company: 'Cohere',
+    type: 'cloud',
     color: 'bg-teal-500',
     strengths: ['enterprise', 'embeddings', 'reranking'],
     requiresApiKey: true,
@@ -170,6 +211,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'butterfly',
     name: 'Butterfly',
     company: 'Butterfly Effect Technology',
+    type: 'cloud',
     color: 'bg-pink-500',
     strengths: ['general', 'creative'],
     requiresApiKey: true,
@@ -182,6 +224,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'moonshot',
     name: 'Moonshot',
     company: 'Moonshot AI',
+    type: 'cloud',
     color: 'bg-cyan-500',
     strengths: ['conversation', 'general'],
     requiresApiKey: true,
@@ -194,6 +237,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'palantir',
     name: 'Palantir',
     company: 'Palantir',
+    type: 'cloud',
     color: 'bg-slate-700',
     strengths: ['data-integration', 'analytics', 'enterprise'],
     requiresApiKey: true,
@@ -209,6 +253,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'perplexity',
     name: 'Perplexity',
     company: 'Perplexity',
+    type: 'cloud',
     color: 'bg-indigo-500',
     strengths: ['research', 'citations', 'facts'],
     requiresApiKey: true,
@@ -222,6 +267,7 @@ export const PROVIDERS: Record<string, Provider> = {
     id: 'deepseek',
     name: 'DeepSeek',
     company: 'DeepSeek',
+    type: 'cloud',
     color: 'bg-purple-500',
     strengths: ['technical', 'coding', 'math'],
     requiresApiKey: true,
@@ -229,6 +275,65 @@ export const PROVIDERS: Record<string, Provider> = {
       { id: 'deepseek-v3', name: 'DeepSeek V3' },
       { id: 'deepseek-coder', name: 'DeepSeek Coder' },
       { id: 'deepseek-chat', name: 'DeepSeek Chat' },
+    ],
+  },
+
+  // LOCAL PROVIDERS - Run on user's machine
+
+  ollama: {
+    id: 'ollama',
+    name: 'Ollama',
+    company: 'Ollama',
+    type: 'local',
+    color: 'bg-slate-600',
+    strengths: ['local', 'privacy', 'offline', 'free'],
+    requiresApiKey: false,
+    baseUrl: 'http://localhost:11434',
+
+    // Installation support
+    installation: {
+      required: true,
+      detectionEndpoint: 'http://localhost:11434/api/tags',
+      downloadUrls: {
+        windows: 'https://ollama.ai/download/windows',
+        macos: 'https://ollama.ai/download/mac',
+        linux: 'https://ollama.ai/download/linux',
+        dockerImage: 'docker pull ollama/ollama',
+      },
+      instructions: [
+        'Download Ollama installer for your OS',
+        'Run the installer',
+        'Ollama will start automatically',
+        'Click "Check Installation" to verify',
+        'Download models from the Model Library',
+      ],
+      defaultPort: 11434,
+    },
+
+    // Model management support
+    modelManagement: {
+      enabled: true,
+      listEndpoint: 'http://localhost:11434/api/tags',
+      downloadCommand: (modelId: string) => `ollama pull ${modelId}`,
+      removeCommand: (modelId: string) => `ollama rm ${modelId}`,
+      libraryUrl: 'https://ollama.ai/library',
+    },
+
+    // Popular Ollama models
+    models: [
+      { id: 'llama2', name: 'Llama 2', size: '3.8GB', contextLength: 4096, recommended: true },
+      { id: 'llama2:13b', name: 'Llama 2 13B', size: '7.3GB', contextLength: 4096, recommended: false },
+      { id: 'llama2:70b', name: 'Llama 2 70B', size: '39GB', contextLength: 4096, recommended: false },
+      { id: 'mistral', name: 'Mistral', size: '4.1GB', contextLength: 8192, recommended: true },
+      { id: 'mixtral', name: 'Mixtral 8x7B', size: '26GB', contextLength: 32768, recommended: false },
+      { id: 'codellama', name: 'Code Llama', size: '3.8GB', contextLength: 16384, recommended: true },
+      { id: 'codellama:34b', name: 'Code Llama 34B', size: '19GB', contextLength: 16384, recommended: false },
+      { id: 'phi', name: 'Phi', size: '1.6GB', contextLength: 2048, recommended: true },
+      { id: 'neural-chat', name: 'Neural Chat', size: '4.1GB', contextLength: 8192, recommended: false },
+      { id: 'starling-lm', name: 'Starling', size: '4.1GB', contextLength: 8192, recommended: false },
+      { id: 'orca-mini', name: 'Orca Mini', size: '1.9GB', contextLength: 4096, recommended: true },
+      { id: 'vicuna', name: 'Vicuna', size: '3.8GB', contextLength: 2048, recommended: false },
+      { id: 'llama2-uncensored', name: 'Llama 2 Uncensored', size: '3.8GB', contextLength: 4096, recommended: false },
     ],
   },
 };

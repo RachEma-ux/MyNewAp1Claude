@@ -677,4 +677,100 @@ export const llmRouter = router({
         message: "Credentials deleted successfully",
       };
     }),
+
+  // ============================================================================
+  // Provider Installation & Model Management
+  // ============================================================================
+
+  /**
+   * Check if a local provider (e.g., Ollama) is installed
+   * Returns installation status and installed models
+   */
+  checkProviderInstallation: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { checkProviderInstallation } = await import("../llm/provider-installation");
+      return await checkProviderInstallation(input.providerId);
+    }),
+
+  /**
+   * Get installation instructions for a provider
+   * Returns OS-specific download URLs and step-by-step instructions
+   */
+  getInstallationInstructions: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getInstallationInstructions } = await import("../llm/provider-installation");
+      return getInstallationInstructions(input.providerId);
+    }),
+
+  /**
+   * Get list of available models for a provider
+   * Returns models from provider's library/catalog
+   */
+  getAvailableModels: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getAvailableModels } = await import("../llm/provider-installation");
+      return await getAvailableModels(input.providerId);
+    }),
+
+  /**
+   * Get list of installed models for a local provider
+   * Only works for providers that are already installed
+   */
+  getInstalledModels: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getInstalledModels } = await import("../llm/provider-installation");
+      return await getInstalledModels(input.providerId);
+    }),
+
+  /**
+   * Get command to download a model for a local provider
+   * Returns command and instructions for user to execute
+   */
+  downloadModel: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        modelId: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { downloadModel } = await import("../llm/provider-installation");
+      return await downloadModel(input.providerId, input.modelId);
+    }),
+
+  /**
+   * Get command to remove a model from a local provider
+   * Returns command and instructions for user to execute
+   */
+  removeModel: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        modelId: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { removeModel } = await import("../llm/provider-installation");
+      return await removeModel(input.providerId, input.modelId);
+    }),
 });
