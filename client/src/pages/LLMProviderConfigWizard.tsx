@@ -578,6 +578,17 @@ export default function LLMProviderConfigWizard() {
                           <ExternalLink className="h-4 w-4" />
                         </a>
                       )}
+                      {installationInstructions.downloadUrls.android && (
+                        <a
+                          href={installationInstructions.downloadUrls.android}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors"
+                        >
+                          <span className="font-medium">Android</span>
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
                       {installationInstructions.downloadUrls.dockerImage && (
                         <div className="md:col-span-2 p-4 border rounded-lg bg-muted">
                           <p className="text-sm font-medium mb-2">Docker:</p>
