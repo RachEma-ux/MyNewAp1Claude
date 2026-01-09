@@ -68,6 +68,7 @@ export default function Providers() {
   const [, navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<ProviderType>("openai");
+  const [selectedMultiChatProvider, setSelectedMultiChatProvider] = useState<string>("");
   const [formData, setFormData] = useState<ProviderFormData>({
     name: "",
     type: "openai",
@@ -79,6 +80,7 @@ export default function Providers() {
   });
 
   const { data: providers, isLoading, refetch } = trpc.providers.list.useQuery();
+  const { data: multiChatProviders = [] } = trpc.llm.listProviders.useQuery();
   const createProvider = trpc.providers.create.useMutation({
     onSuccess: () => {
       toast.success("Provider created successfully");
@@ -120,6 +122,7 @@ export default function Providers() {
       defaultModel: "",
     });
     setSelectedType("openai");
+    setSelectedMultiChatProvider("");
   };
 
   const handleCreateProvider = () => {
@@ -188,6 +191,49 @@ export default function Providers() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                {/* MultiChat Provider Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="multichat-provider">Select from MultiChat Providers (14 providers)</Label>
+                  <Select value={selectedMultiChatProvider} onValueChange={(value) => {
+                    setSelectedMultiChatProvider(value);
+                    const provider = multiChatProviders.find(p => p.id === value);
+                    if (provider) {
+                      setFormData({ ...formData, name: provider.name });
+                      // Auto-select type based on provider
+                      if (provider.type === 'local') {
+                        setSelectedType('local-ollama');
+                      } else if (provider.id === 'openai') {
+                        setSelectedType('openai');
+                      } else if (provider.id === 'anthropic') {
+                        setSelectedType('anthropic');
+                      } else if (provider.id === 'google') {
+                        setSelectedType('google');
+                      } else {
+                        setSelectedType('custom');
+                      }
+                    }
+                  }}>
+                    <SelectTrigger id="multichat-provider">
+                      <SelectValue placeholder="Select a provider..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {multiChatProviders.map((provider) => (
+                        <SelectItem key={provider.id} value={provider.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{provider.name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {provider.type}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Choose from Anthropic, OpenAI, Google, Meta, Mistral, Microsoft, Qwen, xAI, Cohere, Butterfly, Moonshot, Palantir, Perplexity, DeepSeek, or Ollama
+                  </p>
+                </div>
+
                 {/* Provider Type Selection */}
                 <div className="space-y-2">
                   <Label>Provider Type</Label>
