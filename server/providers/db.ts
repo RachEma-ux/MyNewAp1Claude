@@ -38,10 +38,20 @@ export async function getProviderById(id: number): Promise<Provider | undefined>
 export async function getAllProviders(): Promise<Provider[]> {
   const db = getDb();
   if (!db) {
+    console.warn("[Providers DB] Database not available");
     return [];
   }
 
-  return await db.select().from(providers).orderBy(desc(providers.priority));
+  try {
+    const result = await db.select().from(providers).orderBy(desc(providers.priority));
+    return result;
+  } catch (error: any) {
+    console.error("[Providers DB] Failed to fetch providers:", error.message);
+    if (error.code === 'ECONNREFUSED') {
+      console.error("[Providers DB] Database connection refused. The database might not be ready yet.");
+    }
+    return [];
+  }
 }
 
 export async function getProvidersByType(type: string): Promise<Provider[]> {

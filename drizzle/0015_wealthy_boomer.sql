@@ -1,1 +1,0 @@
-ALTER TABLE `wcp_workflows` MODIFY COLUMN `status` enum('draft','active','paused','archived','deleted') NOT NULL DEFAULT 'draft';
