@@ -1,1 +1,0 @@
-ALTER TABLE `promotion_requests` ADD `approvers` json DEFAULT ('[]');

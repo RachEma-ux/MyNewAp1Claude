@@ -31,10 +31,12 @@ import { wcpWorkflowsRouter } from "./routers/wcpWorkflows";
 import { policiesRouter } from "./routers/policies";
 import { keyRotationRouter } from "./routers/keyRotation";
 import { wikiRouter } from "./routers/wiki";
-import { llmRouter } from "./llm/router";
+import { llmRouter } from "./routers/llm";
+import { diagnosticRouter } from "./routers/diagnostic";
 
 export const appRouter = router({
   system: systemRouter,
+  diagnostic: diagnosticRouter, // Diagnostic endpoints for debugging
   providers: providerRouter,
   providerAnalytics: providerAnalyticsRouter,
   chat: chatRouter,
@@ -61,7 +63,7 @@ export const appRouter = router({
   policies: policiesRouter,
   keyRotation: keyRotationRouter,
   wiki: wikiRouter,
-  llm: llmRouter,
+  llm: llmRouter, // LLM Control Plane
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
