@@ -569,4 +569,261 @@ export const llmRouter = router({
       }
       return preset;
     }),
+
+  // ============================================================================
+  // Provider Configuration & Testing
+  // ============================================================================
+
+  /**
+   * Test provider connection with credentials
+   * Validates API key and connectivity
+   */
+  testProviderConnection: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        credentials: z.object({
+          apiKey: z.string().optional(),
+          endpoint: z.string().optional(),
+        }),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { testProviderConnection } = await import("../llm/provider-test");
+      return await testProviderConnection(input.providerId, input.credentials);
+    }),
+
+  /**
+   * Configure provider credentials (encrypted storage)
+   * Stores API keys securely with encryption
+   */
+  configureProvider: protectedProcedure
+    .input(
+      z.object({
+        dbProviderId: z.number(), // The database provider ID
+        providerId: z.string(), // The provider type (openai, anthropic, etc.)
+        credentials: z.object({
+          apiKey: z.string().optional(),
+          apiSecret: z.string().optional(),
+          endpoint: z.string().optional(),
+          organizationId: z.string().optional(),
+          projectId: z.string().optional(),
+        }),
+        setAsDefault: z.boolean().optional().default(false),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { storeProviderCredentials } = await import("../llm/provider-credentials");
+
+      // Store encrypted credentials
+      await storeProviderCredentials(input.dbProviderId, input.credentials);
+
+      // If setting as default, update user preferences
+      if (input.setAsDefault) {
+        // TODO: Store user's default provider preference
+        console.log(`[LLM Router] Set provider ${input.providerId} as default for user ${ctx.user.id}`);
+      }
+
+      return {
+        success: true,
+        message: "Provider configured successfully",
+      };
+    }),
+
+  /**
+   * Get provider credentials (masked for security)
+   */
+  getProviderCredentials: protectedProcedure
+    .input(
+      z.object({
+        dbProviderId: z.number(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getProviderCredentials, maskCredential } = await import("../llm/provider-credentials");
+
+      const credentials = await getProviderCredentials(input.dbProviderId);
+
+      if (!credentials) {
+        return null;
+      }
+
+      // Mask sensitive fields before returning
+      return {
+        apiKey: credentials.apiKey ? maskCredential(credentials.apiKey) : undefined,
+        apiSecret: credentials.apiSecret ? maskCredential(credentials.apiSecret) : undefined,
+        endpoint: credentials.endpoint,
+        organizationId: credentials.organizationId,
+        projectId: credentials.projectId,
+      };
+    }),
+
+  /**
+   * Delete provider credentials
+   */
+  deleteProviderCredentials: protectedProcedure
+    .input(
+      z.object({
+        dbProviderId: z.number(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { deleteProviderCredentials } = await import("../llm/provider-credentials");
+
+      await deleteProviderCredentials(input.dbProviderId);
+
+      return {
+        success: true,
+        message: "Credentials deleted successfully",
+      };
+    }),
+
+  // ============================================================================
+  // Provider Installation & Model Management
+  // ============================================================================
+
+  /**
+   * Check if a local provider (e.g., Ollama) is installed
+   * Returns installation status and installed models
+   */
+  checkProviderInstallation: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { checkProviderInstallation } = await import("../llm/provider-installation");
+      return await checkProviderInstallation(input.providerId);
+    }),
+
+  /**
+   * Get installation instructions for a provider
+   * Returns OS-specific download URLs and step-by-step instructions
+   */
+  getInstallationInstructions: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getInstallationInstructions } = await import("../llm/provider-installation");
+      return getInstallationInstructions(input.providerId);
+    }),
+
+  /**
+   * Get list of available models for a provider
+   * Returns models from provider's library/catalog
+   */
+  getAvailableModels: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getAvailableModels } = await import("../llm/provider-installation");
+      return await getAvailableModels(input.providerId);
+    }),
+
+  /**
+   * Get list of installed models for a local provider
+   * Only works for providers that are already installed
+   */
+  getInstalledModels: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getInstalledModels } = await import("../llm/provider-installation");
+      return await getInstalledModels(input.providerId);
+    }),
+
+  /**
+   * Get command to download a model for a local provider
+   * Returns command and instructions for user to execute
+   */
+  downloadModel: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        modelId: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { downloadModel } = await import("../llm/provider-installation");
+      return await downloadModel(input.providerId, input.modelId);
+    }),
+
+  /**
+   * Get command to remove a model from a local provider
+   * Returns command and instructions for user to execute
+   */
+  removeModel: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        modelId: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { removeModel } = await import("../llm/provider-installation");
+      return await removeModel(input.providerId, input.modelId);
+    }),
+
+  // ============================================================================
+  // Device Detection & Compatibility
+  // ============================================================================
+
+  /**
+   * Get current device specifications
+   * Returns RAM, CPU, GPU, disk space, and OS information
+   */
+  getDeviceSpecs: protectedProcedure.query(async () => {
+    const { detectDeviceSpecs } = await import("../llm/device-detection");
+    return await detectDeviceSpecs();
+  }),
+
+  /**
+   * Check if device is compatible with a specific model
+   * Returns compatibility status, warnings, and recommendations
+   */
+  checkModelCompatibility: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        modelId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { detectDeviceSpecs, checkCompatibility } = await import("../llm/device-detection");
+      const { getProvider } = await import("../llm/providers");
+
+      const provider = getProvider(input.providerId);
+      if (!provider) {
+        throw new Error(`Provider not found: ${input.providerId}`);
+      }
+
+      const model = provider.models.find((m) => m.id === input.modelId);
+      if (!model) {
+        throw new Error(`Model not found: ${input.modelId}`);
+      }
+
+      if (!model.systemRequirements) {
+        return {
+          compatible: true,
+          warnings: [],
+          errors: [],
+          recommendations: [],
+          deviceSpecs: await detectDeviceSpecs(),
+          requirements: null,
+        };
+      }
+
+      const deviceSpecs = await detectDeviceSpecs();
+      return checkCompatibility(deviceSpecs, model.systemRequirements);
+    }),
 });
