@@ -5,6 +5,16 @@
 
 export type ProviderType = 'cloud' | 'local' | 'custom';
 
+export interface SystemRequirements {
+  minRAM: number; // GB
+  recommendedRAM: number; // GB
+  minDiskSpace: number; // GB
+  gpuRequired: boolean;
+  minVRAM?: number; // GB (if GPU required)
+  supportedOS?: string[]; // ['windows', 'macos', 'linux']
+  supportedArchitectures?: string[]; // ['x64', 'arm64']
+}
+
 export interface ProviderModel {
   id: string;
   name: string;
@@ -12,6 +22,7 @@ export interface ProviderModel {
   strengths?: string[];
   size?: string; // For local models (e.g., "3.8GB")
   recommended?: boolean;
+  systemRequirements?: SystemRequirements; // For local models
 }
 
 export interface InstallationMetadata {
@@ -319,21 +330,207 @@ export const PROVIDERS: Record<string, Provider> = {
       libraryUrl: 'https://ollama.ai/library',
     },
 
-    // Popular Ollama models
+    // Popular Ollama models with system requirements
     models: [
-      { id: 'llama2', name: 'Llama 2', size: '3.8GB', contextLength: 4096, recommended: true },
-      { id: 'llama2:13b', name: 'Llama 2 13B', size: '7.3GB', contextLength: 4096, recommended: false },
-      { id: 'llama2:70b', name: 'Llama 2 70B', size: '39GB', contextLength: 4096, recommended: false },
-      { id: 'mistral', name: 'Mistral', size: '4.1GB', contextLength: 8192, recommended: true },
-      { id: 'mixtral', name: 'Mixtral 8x7B', size: '26GB', contextLength: 32768, recommended: false },
-      { id: 'codellama', name: 'Code Llama', size: '3.8GB', contextLength: 16384, recommended: true },
-      { id: 'codellama:34b', name: 'Code Llama 34B', size: '19GB', contextLength: 16384, recommended: false },
-      { id: 'phi', name: 'Phi', size: '1.6GB', contextLength: 2048, recommended: true },
-      { id: 'neural-chat', name: 'Neural Chat', size: '4.1GB', contextLength: 8192, recommended: false },
-      { id: 'starling-lm', name: 'Starling', size: '4.1GB', contextLength: 8192, recommended: false },
-      { id: 'orca-mini', name: 'Orca Mini', size: '1.9GB', contextLength: 4096, recommended: true },
-      { id: 'vicuna', name: 'Vicuna', size: '3.8GB', contextLength: 2048, recommended: false },
-      { id: 'llama2-uncensored', name: 'Llama 2 Uncensored', size: '3.8GB', contextLength: 4096, recommended: false },
+      {
+        id: 'llama2',
+        name: 'Llama 2',
+        size: '3.8GB',
+        contextLength: 4096,
+        recommended: true,
+        systemRequirements: {
+          minRAM: 8,
+          recommendedRAM: 16,
+          minDiskSpace: 5,
+          gpuRequired: false,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64', 'arm64'],
+        },
+      },
+      {
+        id: 'llama2:13b',
+        name: 'Llama 2 13B',
+        size: '7.3GB',
+        contextLength: 4096,
+        recommended: false,
+        systemRequirements: {
+          minRAM: 16,
+          recommendedRAM: 32,
+          minDiskSpace: 10,
+          gpuRequired: false,
+          minVRAM: 8,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64', 'arm64'],
+        },
+      },
+      {
+        id: 'llama2:70b',
+        name: 'Llama 2 70B',
+        size: '39GB',
+        contextLength: 4096,
+        recommended: false,
+        systemRequirements: {
+          minRAM: 64,
+          recommendedRAM: 128,
+          minDiskSpace: 50,
+          gpuRequired: true,
+          minVRAM: 40,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64'],
+        },
+      },
+      {
+        id: 'mistral',
+        name: 'Mistral',
+        size: '4.1GB',
+        contextLength: 8192,
+        recommended: true,
+        systemRequirements: {
+          minRAM: 8,
+          recommendedRAM: 16,
+          minDiskSpace: 6,
+          gpuRequired: false,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64', 'arm64'],
+        },
+      },
+      {
+        id: 'mixtral',
+        name: 'Mixtral 8x7B',
+        size: '26GB',
+        contextLength: 32768,
+        recommended: false,
+        systemRequirements: {
+          minRAM: 32,
+          recommendedRAM: 64,
+          minDiskSpace: 35,
+          gpuRequired: true,
+          minVRAM: 24,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64'],
+        },
+      },
+      {
+        id: 'codellama',
+        name: 'Code Llama',
+        size: '3.8GB',
+        contextLength: 16384,
+        recommended: true,
+        systemRequirements: {
+          minRAM: 8,
+          recommendedRAM: 16,
+          minDiskSpace: 5,
+          gpuRequired: false,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64', 'arm64'],
+        },
+      },
+      {
+        id: 'codellama:34b',
+        name: 'Code Llama 34B',
+        size: '19GB',
+        contextLength: 16384,
+        recommended: false,
+        systemRequirements: {
+          minRAM: 32,
+          recommendedRAM: 48,
+          minDiskSpace: 25,
+          gpuRequired: true,
+          minVRAM: 20,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64'],
+        },
+      },
+      {
+        id: 'phi',
+        name: 'Phi',
+        size: '1.6GB',
+        contextLength: 2048,
+        recommended: true,
+        systemRequirements: {
+          minRAM: 4,
+          recommendedRAM: 8,
+          minDiskSpace: 3,
+          gpuRequired: false,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64', 'arm64'],
+        },
+      },
+      {
+        id: 'neural-chat',
+        name: 'Neural Chat',
+        size: '4.1GB',
+        contextLength: 8192,
+        recommended: false,
+        systemRequirements: {
+          minRAM: 8,
+          recommendedRAM: 16,
+          minDiskSpace: 6,
+          gpuRequired: false,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64', 'arm64'],
+        },
+      },
+      {
+        id: 'starling-lm',
+        name: 'Starling',
+        size: '4.1GB',
+        contextLength: 8192,
+        recommended: false,
+        systemRequirements: {
+          minRAM: 8,
+          recommendedRAM: 16,
+          minDiskSpace: 6,
+          gpuRequired: false,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64', 'arm64'],
+        },
+      },
+      {
+        id: 'orca-mini',
+        name: 'Orca Mini',
+        size: '1.9GB',
+        contextLength: 4096,
+        recommended: true,
+        systemRequirements: {
+          minRAM: 4,
+          recommendedRAM: 8,
+          minDiskSpace: 3,
+          gpuRequired: false,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64', 'arm64'],
+        },
+      },
+      {
+        id: 'vicuna',
+        name: 'Vicuna',
+        size: '3.8GB',
+        contextLength: 2048,
+        recommended: false,
+        systemRequirements: {
+          minRAM: 8,
+          recommendedRAM: 16,
+          minDiskSpace: 5,
+          gpuRequired: false,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64', 'arm64'],
+        },
+      },
+      {
+        id: 'llama2-uncensored',
+        name: 'Llama 2 Uncensored',
+        size: '3.8GB',
+        contextLength: 4096,
+        recommended: false,
+        systemRequirements: {
+          minRAM: 8,
+          recommendedRAM: 16,
+          minDiskSpace: 5,
+          gpuRequired: false,
+          supportedOS: ['windows', 'macos', 'linux'],
+          supportedArchitectures: ['x64', 'arm64'],
+        },
+      },
     ],
   },
 };

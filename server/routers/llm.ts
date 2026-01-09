@@ -773,4 +773,57 @@ export const llmRouter = router({
       const { removeModel } = await import("../llm/provider-installation");
       return await removeModel(input.providerId, input.modelId);
     }),
+
+  // ============================================================================
+  // Device Detection & Compatibility
+  // ============================================================================
+
+  /**
+   * Get current device specifications
+   * Returns RAM, CPU, GPU, disk space, and OS information
+   */
+  getDeviceSpecs: protectedProcedure.query(async () => {
+    const { detectDeviceSpecs } = await import("../llm/device-detection");
+    return await detectDeviceSpecs();
+  }),
+
+  /**
+   * Check if device is compatible with a specific model
+   * Returns compatibility status, warnings, and recommendations
+   */
+  checkModelCompatibility: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        modelId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { detectDeviceSpecs, checkCompatibility } = await import("../llm/device-detection");
+      const { getProvider } = await import("../llm/providers");
+
+      const provider = getProvider(input.providerId);
+      if (!provider) {
+        throw new Error(`Provider not found: ${input.providerId}`);
+      }
+
+      const model = provider.models.find((m) => m.id === input.modelId);
+      if (!model) {
+        throw new Error(`Model not found: ${input.modelId}`);
+      }
+
+      if (!model.systemRequirements) {
+        return {
+          compatible: true,
+          warnings: [],
+          errors: [],
+          recommendations: [],
+          deviceSpecs: await detectDeviceSpecs(),
+          requirements: null,
+        };
+      }
+
+      const deviceSpecs = await detectDeviceSpecs();
+      return checkCompatibility(deviceSpecs, model.systemRequirements);
+    }),
 });

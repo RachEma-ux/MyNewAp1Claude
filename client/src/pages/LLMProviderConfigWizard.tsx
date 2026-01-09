@@ -31,8 +31,86 @@ import {
   Terminal,
   ExternalLink,
   RefreshCw,
+  Cpu,
+  HardDrive,
+  Monitor,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+
+// Helper component to show model compatibility
+function ModelCompatibilityBadge({ model, deviceSpecs }: { model: any; deviceSpecs: any }) {
+  if (!model.systemRequirements || !deviceSpecs) {
+    return null;
+  }
+
+  const req = model.systemRequirements;
+  const specs = deviceSpecs;
+
+  // Check critical requirements
+  const hasEnoughRAM = specs.ram.totalGB >= req.minRAM;
+  const hasEnoughDisk = specs.disk.availableGB >= req.minDiskSpace;
+  const hasGPU = !req.gpuRequired || specs.gpu?.detected;
+
+  const isCompatible = hasEnoughRAM && hasEnoughDisk && hasGPU;
+  const isRecommended = specs.ram.totalGB >= req.recommendedRAM;
+
+  if (!isCompatible) {
+    return (
+      <Badge variant="destructive" className="text-xs">
+        <AlertCircle className="h-3 w-3 mr-1" />
+        Incompatible
+      </Badge>
+    );
+  }
+
+  if (!isRecommended) {
+    return (
+      <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
+        <AlertCircle className="h-3 w-3 mr-1" />
+        Below Recommended
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+      <CheckCircle className="h-3 w-3 mr-1" />
+      Compatible
+    </Badge>
+  );
+}
+
+// Helper component to show system requirements
+function SystemRequirements({ model }: { model: any }) {
+  if (!model.systemRequirements) {
+    return null;
+  }
+
+  const req = model.systemRequirements;
+
+  return (
+    <div className="mt-3 p-3 bg-muted/50 rounded-lg border">
+      <p className="text-xs font-semibold mb-2">System Requirements:</p>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="flex items-center gap-1">
+          <Cpu className="h-3 w-3" />
+          <span>RAM: {req.minRAM}GB min / {req.recommendedRAM}GB rec</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <HardDrive className="h-3 w-3" />
+          <span>Disk: {req.minDiskSpace}GB</span>
+        </div>
+        {req.gpuRequired && (
+          <div className="flex items-center gap-1">
+            <Monitor className="h-3 w-3" />
+            <span>GPU: Required{req.minVRAM ? ` (${req.minVRAM}GB VRAM)` : ''}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 type WizardStep = "select" | "install" | "models" | "configure" | "test" | "review";
 
@@ -97,6 +175,12 @@ export default function LLMProviderConfigWizard() {
   const { data: installedModels = [] } = trpc.llm.getInstalledModels.useQuery(
     { providerId: state.providerId },
     { enabled: state.providerType === "local" && state.installationStatus === "installed" }
+  );
+
+  // Device specs and compatibility checking
+  const { data: deviceSpecs } = trpc.llm.getDeviceSpecs.useQuery(
+    undefined,
+    { enabled: state.providerType === "local" && state.step === "models" }
   );
 
   const selectedProvider = providers.find((p) => p.id === state.providerId);
@@ -505,10 +589,38 @@ export default function LLMProviderConfigWizard() {
           {/* Step 3: Models (Local Providers Only) */}
           {state.step === "models" && selectedProvider && (
             <div className="space-y-6">
+              {/* Device Specifications */}
+              {deviceSpecs && (
+                <Alert>
+                  <Zap className="h-4 w-4" />
+                  <AlertDescription>
+                    <p className="font-semibold mb-2">Your System:</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Cpu className="h-4 w-4" />
+                        <span>{deviceSpecs.ram.totalGB}GB RAM</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <HardDrive className="h-4 w-4" />
+                        <span>{deviceSpecs.disk.availableGB}GB Free</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Monitor className="h-4 w-4" />
+                        <span>{deviceSpecs.gpu?.detected ? deviceSpecs.gpu.name : 'No GPU'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        <span>{deviceSpecs.cpu.cores} CPU Cores</span>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <Alert>
                 <Package className="h-4 w-4" />
                 <AlertDescription>
-                  Models are installed and managed locally. You can download models directly through terminal commands.
+                  Models are installed and managed locally. Compatibility is checked against your system specs.
                 </AlertDescription>
               </Alert>
 
@@ -553,14 +665,16 @@ export default function LLMProviderConfigWizard() {
                         className={`p-4 border rounded-lg ${model.recommended ? "border-primary bg-primary/5" : ""}`}
                       >
                         <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h4 className="font-medium flex items-center gap-2">
+                          <div className="flex-1">
+                            <h4 className="font-medium flex items-center gap-2 flex-wrap">
                               {model.name}
                               {model.recommended && (
                                 <Badge variant="default" className="text-xs">
+                                  <Star className="h-3 w-3 mr-1" />
                                   Recommended
                                 </Badge>
                               )}
+                              <ModelCompatibilityBadge model={model} deviceSpecs={deviceSpecs} />
                             </h4>
                             <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
                               {model.size && <span>{model.size}</span>}
@@ -574,6 +688,10 @@ export default function LLMProviderConfigWizard() {
                           )}
                         </div>
 
+                        {/* System Requirements */}
+                        <SystemRequirements model={model} />
+
+                        {/* Download Command */}
                         {!isInstalled && (
                           <div className="mt-3 p-2 bg-muted rounded text-xs font-mono">
                             <div className="flex items-center justify-between">
