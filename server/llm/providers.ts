@@ -33,6 +33,7 @@ export interface InstallationMetadata {
     windows?: string;
     macos?: string;
     linux?: string;
+    android?: string;
     dockerImage?: string;
   };
   instructions: string[];
@@ -310,6 +311,7 @@ export const PROVIDERS: Record<string, Provider> = {
         windows: 'https://ollama.ai/download/windows',
         macos: 'https://ollama.ai/download/mac',
         linux: 'https://ollama.ai/download/linux',
+        android: 'https://ollama.ai/download/android',
         dockerImage: 'docker pull ollama/ollama',
       },
       instructions: [
