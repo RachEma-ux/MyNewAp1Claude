@@ -15,6 +15,7 @@ export interface SystemRequirements {
   supportedArchitectures?: string[]; // ['x64', 'arm64']
 }
 
+
 export interface ProviderModel {
   id: string;
   name: string;
