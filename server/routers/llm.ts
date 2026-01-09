@@ -569,4 +569,112 @@ export const llmRouter = router({
       }
       return preset;
     }),
+
+  // ============================================================================
+  // Provider Configuration & Testing
+  // ============================================================================
+
+  /**
+   * Test provider connection with credentials
+   * Validates API key and connectivity
+   */
+  testProviderConnection: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.string(),
+        credentials: z.object({
+          apiKey: z.string().optional(),
+          endpoint: z.string().optional(),
+        }),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { testProviderConnection } = await import("../llm/provider-test");
+      return await testProviderConnection(input.providerId, input.credentials);
+    }),
+
+  /**
+   * Configure provider credentials (encrypted storage)
+   * Stores API keys securely with encryption
+   */
+  configureProvider: protectedProcedure
+    .input(
+      z.object({
+        dbProviderId: z.number(), // The database provider ID
+        providerId: z.string(), // The provider type (openai, anthropic, etc.)
+        credentials: z.object({
+          apiKey: z.string().optional(),
+          apiSecret: z.string().optional(),
+          endpoint: z.string().optional(),
+          organizationId: z.string().optional(),
+          projectId: z.string().optional(),
+        }),
+        setAsDefault: z.boolean().optional().default(false),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { storeProviderCredentials } = await import("../llm/provider-credentials");
+
+      // Store encrypted credentials
+      await storeProviderCredentials(input.dbProviderId, input.credentials);
+
+      // If setting as default, update user preferences
+      if (input.setAsDefault) {
+        // TODO: Store user's default provider preference
+        console.log(`[LLM Router] Set provider ${input.providerId} as default for user ${ctx.user.id}`);
+      }
+
+      return {
+        success: true,
+        message: "Provider configured successfully",
+      };
+    }),
+
+  /**
+   * Get provider credentials (masked for security)
+   */
+  getProviderCredentials: protectedProcedure
+    .input(
+      z.object({
+        dbProviderId: z.number(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { getProviderCredentials, maskCredential } = await import("../llm/provider-credentials");
+
+      const credentials = await getProviderCredentials(input.dbProviderId);
+
+      if (!credentials) {
+        return null;
+      }
+
+      // Mask sensitive fields before returning
+      return {
+        apiKey: credentials.apiKey ? maskCredential(credentials.apiKey) : undefined,
+        apiSecret: credentials.apiSecret ? maskCredential(credentials.apiSecret) : undefined,
+        endpoint: credentials.endpoint,
+        organizationId: credentials.organizationId,
+        projectId: credentials.projectId,
+      };
+    }),
+
+  /**
+   * Delete provider credentials
+   */
+  deleteProviderCredentials: protectedProcedure
+    .input(
+      z.object({
+        dbProviderId: z.number(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { deleteProviderCredentials } = await import("../llm/provider-credentials");
+
+      await deleteProviderCredentials(input.dbProviderId);
+
+      return {
+        success: true,
+        message: "Credentials deleted successfully",
+      };
+    }),
 });

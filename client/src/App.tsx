@@ -69,6 +69,7 @@ import WikiEditor from "@/pages/WikiEditor";
 import LLMDashboard from "@/pages/LLMDashboard";
 import LLMControlPlane from "@/pages/LLMControlPlane";
 import LLMWizard from "@/pages/LLMWizard";
+import LLMProviderConfigWizard from "@/pages/LLMProviderConfigWizard";
 import LLMPromotions from "@/pages/LLMPromotions";
 import LLMDetailPage from "@/pages/LLMDetailPage";
 import { Loader2 } from "lucide-react";
@@ -164,6 +165,7 @@ function Router() {
       <Route path="/llm" component={() => <ProtectedRoute component={LLMDashboard} />} />
       <Route path="/llm/control-plane" component={() => <ProtectedRoute component={LLMControlPlane} />} />
       <Route path="/llm/wizard" component={() => <ProtectedRoute component={LLMWizard} />} />
+      <Route path="/llm/provider-wizard" component={() => <ProtectedRoute component={LLMProviderConfigWizard} />} />
       <Route path="/llm/promotions" component={() => <ProtectedRoute component={LLMPromotions} />} />
       <Route path="/llm/:id" component={() => <ProtectedRoute component={LLMDetailPage} />} />
       <Route path="/404" component={NotFound} />
