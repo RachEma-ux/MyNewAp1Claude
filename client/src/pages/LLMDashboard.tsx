@@ -28,6 +28,7 @@ import {
   Layers,
   Shield,
   Cpu,
+  Key,
 } from "lucide-react";
 
 export default function LLMDashboard() {
@@ -43,6 +44,10 @@ export default function LLMDashboard() {
 
   const openControlPlane = () => {
     setLocation("/llm/control-plane");
+  };
+
+  const openProviderWizard = () => {
+    setLocation("/llm/provider-wizard");
   };
 
   if (isLoading) {
@@ -218,6 +223,10 @@ export default function LLMDashboard() {
               <Button variant="outline" className="w-full" onClick={openControlPlane}>
                 <Settings className="mr-2 h-4 w-4" />
                 Control Plane
+              </Button>
+              <Button variant="outline" className="w-full" onClick={openProviderWizard}>
+                <Key className="mr-2 h-4 w-4" />
+                Configure Providers
               </Button>
               <Button
                 variant="outline"
