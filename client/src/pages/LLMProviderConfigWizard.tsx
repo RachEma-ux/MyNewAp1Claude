@@ -156,6 +156,17 @@ export default function LLMProviderConfigWizard() {
   const { data: providers = [] } = trpc.llm.listProviders.useQuery();
   const testConnectionMutation = trpc.llm.testProviderConnection.useMutation();
 
+  // Debug: Log providers when loaded
+  useEffect(() => {
+    if (providers.length > 0) {
+      console.log('[Providers Loaded]', {
+        count: providers.length,
+        ollama: providers.find(p => p.id === 'ollama'),
+        providerTypes: providers.map(p => ({ id: p.id, type: p.type })),
+      });
+    }
+  }, [providers]);
+
   // Installation queries (only for local providers)
   const { data: installationCheck, refetch: refetchInstallation } = trpc.llm.checkProviderInstallation.useQuery(
     { providerId: state.providerId },
@@ -224,6 +235,14 @@ export default function LLMProviderConfigWizard() {
     // For local providers, go to install step first
     // For cloud providers, go directly to configure
     const nextStep: WizardStep = providerType === "local" ? "install" : "configure";
+
+    console.log('[Provider Selection]', {
+      providerId,
+      providerName,
+      providerType,
+      nextStep,
+      isLocal: providerType === "local",
+    });
 
     updateState({
       providerId,
@@ -349,6 +368,8 @@ export default function LLMProviderConfigWizard() {
         <p className="text-muted-foreground mt-2">
           Set up your LLM provider with secure credential storage
         </p>
+        {/* Deployment verification marker */}
+        <p className="text-xs text-gray-400 mt-1">Build: 2026-01-09-v3-with-device-detection</p>
       </div>
 
       {/* Progress Indicator */}
