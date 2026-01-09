@@ -166,9 +166,9 @@ function Router() {
       <Route path="/llm/control-plane" component={() => <ProtectedRoute component={LLMControlPlane} />} />
       <Route path="/llm/wizard" component={() => <ProtectedRoute component={LLMWizard} />} />
       <Route path="/llm/promotions" component={() => <ProtectedRoute component={LLMPromotions} />} />
+      {/* Provider Configuration Wizard */}
+      <Route path="/llm/provider-wizard" component={() => <ProtectedRoute component={LLMProviderConfigWizard} />} />
       <Route path="/llm/:id" component={() => <ProtectedRoute component={LLMDetailPage} />} />
-      {/* Provider Configuration */}
-      <Route path="/providers" component={() => <ProtectedRoute component={LLMProviderConfigWizard} />} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
