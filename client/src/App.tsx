@@ -72,6 +72,7 @@ import LLMWizard from "@/pages/LLMWizard";
 import LLMProviderConfigWizard from "@/pages/LLMProviderConfigWizard";
 import LLMPromotions from "@/pages/LLMPromotions";
 import LLMDetailPage from "@/pages/LLMDetailPage";
+import DeploymentStatus from "@/pages/DeploymentStatus";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -168,6 +169,8 @@ function Router() {
       <Route path="/llm/promotions" component={() => <ProtectedRoute component={LLMPromotions} />} />
       {/* Provider Configuration Wizard */}
       <Route path="/llm/provider-wizard" component={() => <ProtectedRoute component={LLMProviderConfigWizard} />} />
+      {/* Deployment Status Page */}
+      <Route path="/deployment-status" component={() => <ProtectedRoute component={DeploymentStatus} />} />
       <Route path="/llm/:id" component={() => <ProtectedRoute component={LLMDetailPage} />} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
