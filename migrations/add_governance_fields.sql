@@ -11,6 +11,7 @@ ADD COLUMN limits JSON AFTER trigger,
 ADD COLUMN anatomy JSON AFTER limits,
 ADD COLUMN policyContext JSON AFTER anatomy;
 
+
 -- Add index for lifecycle queries
 CREATE INDEX idx_lifecycle_state ON agents(lifecycleState);
 CREATE INDEX idx_lifecycle_version ON agents(lifecycleVersion);
