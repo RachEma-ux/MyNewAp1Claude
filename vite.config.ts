@@ -24,6 +24,18 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 2000,
+    sourcemap: false,
+    minify: 'esbuild',
+    target: 'es2020',
+    rollupOptions: {
+      output: {
+        // Let Vite handle chunking automatically for memory efficiency
+        manualChunks: undefined,
+      },
+      // Reduce memory usage during transformation
+      maxParallelFileOps: 2,
+    },
   },
   server: {
     host: true,
