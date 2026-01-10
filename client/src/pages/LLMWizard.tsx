@@ -1,11 +1,17 @@
 /**
- * LLM Wizard - Multi-step form for creating and configuring LLMs
+ * LLM Quick Setup - Fast registration wizard for existing LLMs
+ *
+ * Purpose: Register existing models (Claude, GPT-4, Ollama) in the governance system
+ * Use when: You want to manage/govern existing models without training
  *
  * RFC-001 Compliant Wizard Implementation:
  * - 3-step flow: Identity → Configuration → Review
  * - Auto-save drafts to localStorage
  * - Policy validation on submit
  * - Creates version in sandbox environment
+ *
+ * NOTE: This does NOT train models. For full model training/fine-tuning,
+ * use "LLM Creation (Full Lifecycle)" wizard at /llm/create
  */
 
 import { useState, useEffect } from "react";
@@ -205,8 +211,8 @@ export default function LLMWizard() {
 
   const steps = [
     { id: "identity", title: "Identity", description: "Name and role" },
-    { id: "configuration", title: "Configuration", description: "Runtime and model" },
-    { id: "review", title: "Review", description: "Review and submit" },
+    { id: "configuration", title: "Configuration", description: "Point to existing model" },
+    { id: "review", title: "Review", description: "Register in governance" },
   ];
 
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
@@ -221,9 +227,9 @@ export default function LLMWizard() {
         <div>
           <div className="flex items-center gap-3">
             <Wand2 className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">LLM Wizard</h1>
+            <h1 className="text-3xl font-bold">LLM Quick Setup</h1>
           </div>
-          <p className="text-muted-foreground">Create and configure a new LLM identity</p>
+          <p className="text-muted-foreground">Register an existing model in the governance system</p>
         </div>
       </div>
 
@@ -344,7 +350,7 @@ function IdentityStep({
     <Card>
       <CardHeader>
         <CardTitle>LLM Identity</CardTitle>
-        <CardDescription>Define the identity and purpose of this LLM</CardDescription>
+        <CardDescription>Define the identity and purpose of this LLM (Quick Setup - for existing models)</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Name */}
