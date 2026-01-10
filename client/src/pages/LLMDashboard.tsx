@@ -237,6 +237,10 @@ export default function LLMDashboard() {
                 <Cpu className="mr-2 h-4 w-4" />
                 Train Custom Model
               </Button>
+              <Button variant="outline" className="w-full" onClick={() => setLocation("/llm/training")}>
+                <Activity className="mr-2 h-4 w-4" />
+                Training Monitor
+              </Button>
               <Button variant="outline" className="w-full" onClick={openControlPlane}>
                 <Settings className="mr-2 h-4 w-4" />
                 Control Plane
