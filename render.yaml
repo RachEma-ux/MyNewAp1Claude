@@ -7,7 +7,7 @@ services:
     env: node
     region: oregon # Change to your preferred region
     plan: free # Change to your plan: free, starter, standard, pro
-    branch: claude/fix-render-lifecycle-error-FTWot # Deploy from current branch
+    branch: claude/review-mynewap1claude-bC3wv # Deploy from current branch
     buildCommand: pnpm install && pnpm run build
     startCommand: pnpm start
     envVars:
