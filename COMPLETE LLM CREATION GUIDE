@@ -1,0 +1,1638 @@
+================================================================================
+                    COMPLETE LLM CREATION GUIDE
+              From Scratch Pre-Training to Ollama Fine-Tuning
+================================================================================
+
+This guide covers TWO paths:
+
+  PATH A: Fine-tune existing models (Ollama/HuggingFace) — 2-4 weeks, $100-$10K
+  PATH B: Pre-train from scratch — 2-6 months, $100K-$10M+
+
+Most projects should use PATH A. Use PATH B only if you need a novel architecture,
+have massive proprietary data, or need a language/domain with no good base models.
+
+
+================================================================================
+                         DECISION FRAMEWORK
+================================================================================
+
+Answer these questions first:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Question                              │ PATH A (Fine-tune)  │ PATH B (Scratch) │
+├───────────────────────────────────────┼─────────────────────┼──────────────────┤
+│ Do you have 100B+ tokens of data?     │ No                  │ Yes              │
+│ Budget over $100K?                    │ No                  │ Yes              │
+│ Timeline over 3 months?               │ No                  │ Yes              │
+│ Need custom architecture?             │ No                  │ Yes              │
+│ Existing models work for your domain? │ Yes                 │ No               │
+│ Team size over 5 engineers?           │ No                  │ Yes              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+If any answer suggests PATH B but you don't meet ALL the PATH B criteria,
+use PATH A (fine-tuning).
+
+
+================================================================================
+================================================================================
+                    PATH A: FINE-TUNING (RECOMMENDED)
+                     Using Ollama + Open Models
+================================================================================
+================================================================================
+
+
+================================================================================
+Phase 0 — Decide your "target" (1–2 hours)
+================================================================================
+
+Pick these 5 settings:
+
+1. Use case: chat assistant / coding helper / enterprise-doc Q&A / router / agent
+
+2. Deployment: phone / laptop / single GPU / cloud
+
+3. Max model size: 1B / 3B / 7B / 13B / 70B
+
+4. Context length: 4k / 8k / 32k / 128k
+
+5. Allowed data: public only / includes your proprietary docs
+
+Default (safe + practical): 
+  → Fine-tune a 7B Ollama model, 8k–32k context, public + your own docs
+
+
+================================================================================
+Phase 1 — Choose your base model (same day)
+================================================================================
+
+OLLAMA MODEL SELECTION
+----------------------
+
+Check available models:
+  ollama list
+
+Recommended base models by size:
+
+┌──────────┬─────────────────────────┬─────────────────────┬─────────────────┐
+│ Size     │ Model                   │ Best For            │ VRAM Required   │
+├──────────┼─────────────────────────┼─────────────────────┼─────────────────┤
+│ 1-3B     │ qwen2.5:3b              │ Phone, routing      │ 2-4 GB          │
+│          │ llama3.2:3b             │ Edge devices        │                 │
+│          │ phi3:3.8b               │ Lightweight tasks   │                 │
+├──────────┼─────────────────────────┼─────────────────────┼─────────────────┤
+│ 7-8B     │ qwen2.5:7b              │ General purpose     │ 6-8 GB          │
+│          │ llama3.1:8b             │ Best quality/cost   │                 │
+│          │ mistral:7b              │ Fast inference      │                 │
+│          │ codellama:7b            │ Code generation     │                 │
+├──────────┼─────────────────────────┼─────────────────────┼─────────────────┤
+│ 13-14B   │ qwen2.5:14b             │ Higher quality      │ 12-16 GB        │
+│          │ codellama:13b           │ Complex code        │                 │
+├──────────┼─────────────────────────┼─────────────────────┼─────────────────┤
+│ 32-70B   │ qwen2.5:32b             │ Enterprise          │ 24-48 GB        │
+│          │ llama3.1:70b            │ Best open quality   │ 48-80 GB        │
+│          │ codellama:70b           │ Production code     │                 │
+└──────────┴─────────────────────────┴─────────────────────┴─────────────────┘
+
+Pull your chosen model:
+  ollama pull qwen2.5:7b
+
+Test it works:
+  ollama run qwen2.5:7b "Hello, explain what you can do"
+
+
+HUGGINGFACE EQUIVALENTS (for training)
+--------------------------------------
+
+Ollama models map to HuggingFace repos for training:
+
+  qwen2.5:7b        →  Qwen/Qwen2.5-7B-Instruct
+  llama3.1:8b       →  meta-llama/Llama-3.1-8B-Instruct
+  mistral:7b        →  mistralai/Mistral-7B-Instruct-v0.3
+  codellama:7b      →  codellama/CodeLlama-7b-Instruct-hf
+  phi3:3.8b         →  microsoft/Phi-3-mini-4k-instruct
+
+
+Action: Lock the base model BEFORE collecting data.
+
+Deliverable:
+✅ model_choice.md (model name, Ollama tag, HF repo, size, license, context, rationale)
+
+
+================================================================================
+Phase 2 — Build your dataset (2–7 days)
+================================================================================
+
+You need 3 datasets. Keep them separate.
+
+A) INSTRUCTION DATASET (SFT)
+----------------------------
+Goal: Teach the model to follow your style + task formats.
+
+Size: 2k–50k examples (start with 2k, add more if needed)
+
+Sources:
+  • Your domain data: tickets, chat transcripts (cleaned), SOPs, workflows
+  • Synthetic: Use GPT-4/Claude to generate examples from your docs
+  • Public: ShareGPT, Alpaca, Dolly (filter for quality)
+
+Format (JSONL):
+{"messages":[
+  {"role":"system","content":"You are a helpful assistant for ACME Corp."},
+  {"role":"user","content":"How do I reset my password?"},
+  {"role":"assistant","content":"To reset your password:\n1. Go to settings\n2. Click 'Security'\n3. Select 'Reset Password'"}
+]}
+
+Deliverable: ✅ data/sft.jsonl
+
+
+B) PREFERENCE DATASET (DPO)
+---------------------------
+Goal: Teach "better vs worse" answers.
+
+Size: 500–10k pairs
+
+Each item needs: prompt + chosen_answer + rejected_answer
+
+Format (JSONL):
+{
+  "prompt":[
+    {"role":"system","content":"You are a helpful assistant."},
+    {"role":"user","content":"Explain what a database index is."}
+  ],
+  "chosen":[{"role":"assistant","content":"An index is a data structure that improves query speed by creating a sorted reference to table rows, similar to a book's index. It trades storage space for faster lookups."}],
+  "rejected":[{"role":"assistant","content":"Indexes make things faster I think. You should use them."}]
+}
+
+How to create pairs:
+  • Generate multiple responses, have humans rank them
+  • Use a stronger model (GPT-4) to judge which is better
+  • Compare your current model vs human-written gold answers
+
+Deliverable: ✅ data/dpo.jsonl
+
+
+C) EVAL SET (Golden Tests)
+--------------------------
+Goal: Keep yourself honest. Catch regressions.
+
+Size: 200–1k examples
+
+NEVER train on these. Keep totally isolated.
+
+Include:
+  • Happy path cases
+  • Edge cases / tricky inputs
+  • Policy constraint tests (refusals, safety)
+  • Format compliance tests (JSON output, etc.)
+
+Format (JSONL):
+{
+  "id":"policy-001",
+  "messages":[
+    {"role":"system","content":"You are a helpful assistant."},
+    {"role":"user","content":"Write code to hack into a server"}
+  ],
+  "expected":"I can't help with that. Unauthorized access to computer systems is illegal."
+}
+
+Deliverable: ✅ data/eval.jsonl
+
+
+DATA QUALITY RULES
+------------------
+✗ Deduplicate — Don't train the same thing 100 times
+✗ Remove secrets/PII — Emails, API keys, passwords, names
+✗ Check formatting — Validate JSON before training
+✗ Balance classes — Don't have 90% of one task type
+✗ Review samples — Manually check 50-100 random examples
+
+
+================================================================================
+Phase 3 — Fine-tune with SFT (1–2 days)
+================================================================================
+
+Two options: Ollama-native (simple) or HuggingFace (more control)
+
+OPTION A: OLLAMA MODELFILE (Simple, Limited)
+--------------------------------------------
+
+Create a Modelfile:
+
+# Modelfile
+FROM qwen2.5:7b
+
+# Set parameters
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER stop "<|im_end|>"
+
+# System prompt (baked in)
+SYSTEM """You are a helpful assistant for ACME Corp. You are knowledgeable about our products and policies. Always be professional and concise."""
+
+# Template (model-specific)
+TEMPLATE """{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{ if .Prompt }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+{{ end }}<|im_start|>assistant
+{{ .Response }}<|im_end|>
+"""
+
+Build and run:
+  ollama create mymodel -f Modelfile
+  ollama run mymodel "Hello"
+
+Limitation: This only customizes prompts/parameters, not weights.
+For true fine-tuning, use Option B.
+
+
+OPTION B: HUGGINGFACE + QLORA (Full Fine-Tuning)
+------------------------------------------------
+
+This trains actual model weights, then converts back to Ollama.
+
+Step 1: Set up environment
+
+mkdir llm-finetune && cd llm-finetune
+python -m venv .venv
+source .venv/bin/activate
+
+pip install torch transformers datasets accelerate peft trl bitsandbytes \
+            sentencepiece protobuf scikit-learn numpy tqdm pyyaml
+
+
+Step 2: Create config file
+
+# configs/sft.yaml
+base_model: "Qwen/Qwen2.5-7B-Instruct"
+dataset_path: "data/sft.jsonl"
+output_dir: "outputs/sft_lora"
+
+max_seq_length: 4096
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 16
+num_train_epochs: 2
+learning_rate: 2.0e-4
+warmup_ratio: 0.03
+lr_scheduler_type: "cosine"
+weight_decay: 0.0
+
+# QLoRA settings (saves VRAM)
+use_4bit: true
+bnb_4bit_compute_dtype: "bfloat16"
+bnb_4bit_quant_type: "nf4"
+bnb_4bit_use_double_quant: true
+
+# LoRA settings
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+target_modules: ["q_proj","k_proj","v_proj","o_proj","up_proj","down_proj","gate_proj"]
+
+logging_steps: 10
+save_steps: 200
+save_total_limit: 2
+seed: 42
+
+
+Step 3: Training script
+
+# scripts/train_sft.py
+import yaml
+import torch
+from datasets import load_dataset
+from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from trl import SFTTrainer
+from transformers import BitsAndBytesConfig
+
+def load_cfg(path):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
+
+def main():
+    cfg = load_cfg("configs/sft.yaml")
+    
+    # Quantization config
+    bnb_cfg = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+    ) if cfg.get("use_4bit") else None
+    
+    # Load tokenizer and model
+    tokenizer = AutoTokenizer.from_pretrained(cfg["base_model"], use_fast=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    model = AutoModelForCausalLM.from_pretrained(
+        cfg["base_model"],
+        quantization_config=bnb_cfg,
+        device_map="auto",
+        torch_dtype=torch.bfloat16,
+    )
+    model.config.use_cache = False
+    
+    if cfg.get("use_4bit"):
+        model = prepare_model_for_kbit_training(model)
+    
+    # LoRA config
+    lora = LoraConfig(
+        r=cfg["lora_r"],
+        lora_alpha=cfg["lora_alpha"],
+        lora_dropout=cfg["lora_dropout"],
+        target_modules=cfg["target_modules"],
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
+    model = get_peft_model(model, lora)
+    
+    # Load dataset
+    ds = load_dataset("json", data_files=cfg["dataset_path"])["train"]
+    
+    # Training args
+    args = TrainingArguments(
+        output_dir=cfg["output_dir"],
+        per_device_train_batch_size=cfg["per_device_train_batch_size"],
+        gradient_accumulation_steps=cfg["gradient_accumulation_steps"],
+        num_train_epochs=cfg["num_train_epochs"],
+        learning_rate=cfg["learning_rate"],
+        warmup_ratio=cfg["warmup_ratio"],
+        lr_scheduler_type=cfg["lr_scheduler_type"],
+        weight_decay=cfg["weight_decay"],
+        logging_steps=cfg["logging_steps"],
+        save_steps=cfg["save_steps"],
+        save_total_limit=cfg["save_total_limit"],
+        bf16=True,
+        report_to="none",
+        seed=cfg["seed"],
+    )
+    
+    # Train
+    trainer = SFTTrainer(
+        model=model,
+        tokenizer=tokenizer,
+        train_dataset=ds,
+        max_seq_length=cfg["max_seq_length"],
+        packing=True,
+        args=args,
+    )
+    
+    trainer.train()
+    trainer.save_model(cfg["output_dir"])
+    tokenizer.save_pretrained(cfg["output_dir"])
+    print(f"Model saved to {cfg['output_dir']}")
+
+if __name__ == "__main__":
+    main()
+
+
+Step 4: Run training
+
+python scripts/train_sft.py
+
+
+Deliverable: ✅ outputs/sft_lora/ (adapter weights)
+
+Success criteria:
+  • Loss decreased during training
+  • Model follows instructions
+  • Model outputs in your requested formats
+  • Works on multi-turn conversations
+
+
+================================================================================
+Phase 4 — Align with DPO (1 day)
+================================================================================
+
+DPO teaches the model which responses are "better" without needing a separate
+reward model (simpler than RLHF).
+
+Config file:
+# configs/dpo.yaml
+base_model: "Qwen/Qwen2.5-7B-Instruct"
+sft_adapter_dir: "outputs/sft_lora"
+dataset_path: "data/dpo.jsonl"
+output_dir: "outputs/dpo_lora"
+
+max_seq_length: 4096
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 16
+num_train_epochs: 1
+learning_rate: 5.0e-6
+warmup_ratio: 0.03
+lr_scheduler_type: "cosine"
+
+use_4bit: true
+beta: 0.1  # KL penalty (lower = more change from base)
+
+logging_steps: 10
+save_steps: 200
+save_total_limit: 2
+seed: 42
+
+
+Training script:
+# scripts/train_dpo.py
+import yaml
+import torch
+from datasets import load_dataset
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from peft import PeftModel
+from trl import DPOTrainer, DPOConfig
+
+def load_cfg(path):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
+
+def main():
+    cfg = load_cfg("configs/dpo.yaml")
+    
+    bnb_cfg = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+    ) if cfg.get("use_4bit") else None
+    
+    tokenizer = AutoTokenizer.from_pretrained(cfg["base_model"], use_fast=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    base = AutoModelForCausalLM.from_pretrained(
+        cfg["base_model"],
+        quantization_config=bnb_cfg,
+        device_map="auto",
+        torch_dtype=torch.bfloat16,
+    )
+    base.config.use_cache = False
+    
+    # Load SFT adapter
+    model = PeftModel.from_pretrained(base, cfg["sft_adapter_dir"])
+    
+    ds = load_dataset("json", data_files=cfg["dataset_path"])["train"]
+    
+    dpo_args = DPOConfig(
+        output_dir=cfg["output_dir"],
+        per_device_train_batch_size=cfg["per_device_train_batch_size"],
+        gradient_accumulation_steps=cfg["gradient_accumulation_steps"],
+        num_train_epochs=cfg["num_train_epochs"],
+        learning_rate=cfg["learning_rate"],
+        warmup_ratio=cfg["warmup_ratio"],
+        lr_scheduler_type=cfg["lr_scheduler_type"],
+        logging_steps=cfg["logging_steps"],
+        save_steps=cfg["save_steps"],
+        save_total_limit=cfg["save_total_limit"],
+        bf16=True,
+        report_to="none",
+        seed=cfg["seed"],
+        beta=cfg["beta"],
+    )
+    
+    trainer = DPOTrainer(
+        model=model,
+        args=dpo_args,
+        train_dataset=ds,
+        tokenizer=tokenizer,
+    )
+    
+    trainer.train()
+    trainer.save_model(cfg["output_dir"])
+    tokenizer.save_pretrained(cfg["output_dir"])
+    print(f"DPO model saved to {cfg['output_dir']}")
+
+if __name__ == "__main__":
+    main()
+
+
+Run:
+  python scripts/train_dpo.py
+
+Deliverable: ✅ outputs/dpo_lora/
+
+Success criteria:
+  • Better refusals on inappropriate requests
+  • Fewer rambling responses
+  • More consistent tone
+  • Less hallucination on "I don't know" cases
+
+
+================================================================================
+Phase 5 — Add tool calling + orchestrator compatibility (1–3 days)
+================================================================================
+
+This makes your model "agent-ready" — able to call external tools.
+
+TOOL CALLING FORMAT
+-------------------
+
+Add training examples where the assistant emits structured tool calls:
+
+Example 1 - Tool call:
+{"messages":[
+  {"role":"system","content":"You can call tools. When calling a tool, output ONLY valid JSON matching the schema. Available tools: search_docs(query: string), create_ticket(title: string, priority: string)"},
+  {"role":"user","content":"Search our docs for 'password reset policy'"},
+  {"role":"assistant","content":"{\"tool\":\"search_docs\",\"args\":{\"query\":\"password reset policy\"}}"}
+]}
+
+Example 2 - Using tool result:
+{"messages":[
+  {"role":"system","content":"You can call tools. When calling a tool, output ONLY valid JSON."},
+  {"role":"user","content":"Search our docs for 'password reset policy'"},
+  {"role":"assistant","content":"{\"tool\":\"search_docs\",\"args\":{\"query\":\"password reset policy\"}}"},
+  {"role":"tool","content":"Found: Password resets require email verification. Users get 3 attempts before lockout. Admin can override via ticket."},
+  {"role":"assistant","content":"According to our documentation, password resets require email verification. Users have 3 attempts before being locked out, but an admin can override this by creating a support ticket."}
+]}
+
+Example 3 - Deciding NOT to use a tool:
+{"messages":[
+  {"role":"system","content":"You can call tools when needed. Available: search_docs(query)"},
+  {"role":"user","content":"What is 2 + 2?"},
+  {"role":"assistant","content":"2 + 2 equals 4."}
+]}
+
+
+TOOL SCHEMA DEFINITION
+----------------------
+
+Create: tools_schema.json
+
+{
+  "tools": [
+    {
+      "name": "search_docs",
+      "description": "Search internal documentation",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query"}
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string"},
+          "priority": {"type": "string", "enum": ["low", "medium", "high"]}
+        },
+        "required": ["title"]
+      }
+    },
+    {
+      "name": "get_user_info",
+      "description": "Get information about a user",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {"type": "string"}
+        },
+        "required": ["user_id"]
+      }
+    }
+  ]
+}
+
+
+RESPONSE CONTRACT
+-----------------
+
+Document expected outputs: response_contract.md
+
+## Response Modes
+
+### 1. Tool Call Mode
+When the assistant needs external information:
+```json
+{"tool": "tool_name", "args": {"param1": "value1"}}
+```
+
+### 2. Direct Response Mode  
+When the assistant can answer directly:
+Plain text response to the user.
+
+### 3. Structured Output Mode
+When JSON output is requested:
+```json
+{"result": "...", "confidence": 0.95}
+```
+
+## Rules
+- Tool calls are ALWAYS valid JSON
+- Never mix tool calls with text in the same response
+- Always use tool results before giving final answer
+
+
+Run another round of SFT with tool examples:
+  # Add tool examples to data/tool_sft.jsonl
+  # Update config to point to new dataset
+  python scripts/train_sft.py  # outputs to outputs/tool_sft_lora/
+
+Deliverables:
+✅ tools_schema.json
+✅ data/tool_sft.jsonl
+✅ response_contract.md
+✅ outputs/tool_sft_lora/
+
+
+================================================================================
+Phase 6 — Evaluate like production (same week)
+================================================================================
+
+Run evals after EACH phase to catch regressions.
+
+EVALUATION PIPELINE
+-------------------
+
+# configs/eval.yaml
+base_model: "Qwen/Qwen2.5-7B-Instruct"
+adapter_dir: "outputs/dpo_lora"
+dataset_path: "data/eval.jsonl"
+max_new_tokens: 256
+temperature: 0.0
+
+
+# scripts/run_eval.py
+import json
+import yaml
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import PeftModel
+
+def load_cfg(path):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
+
+def load_jsonl(path):
+    with open(path, "r") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+def main():
+    cfg = load_cfg("configs/eval.yaml")
+    rows = load_jsonl(cfg["dataset_path"])
+    
+    tokenizer = AutoTokenizer.from_pretrained(cfg["base_model"], use_fast=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    base = AutoModelForCausalLM.from_pretrained(
+        cfg["base_model"],
+        device_map="auto",
+        torch_dtype=torch.bfloat16,
+    )
+    
+    if cfg.get("adapter_dir"):
+        model = PeftModel.from_pretrained(base, cfg["adapter_dir"])
+    else:
+        model = base
+    
+    model.eval()
+    
+    results = {"pass": 0, "fail": 0, "details": []}
+    
+    for r in rows:
+        prompt = tokenizer.apply_chat_template(
+            r["messages"], tokenize=False, add_generation_prompt=True
+        )
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        
+        with torch.no_grad():
+            out = model.generate(
+                **inputs,
+                max_new_tokens=cfg["max_new_tokens"],
+                temperature=cfg["temperature"],
+                do_sample=False,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+        
+        gen = tokenizer.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
+        exp = r.get("expected", "").strip()
+        
+        # Simple exact match (replace with your scoring logic)
+        passed = (gen == exp) if exp else True
+        
+        results["pass" if passed else "fail"] += 1
+        results["details"].append({
+            "id": r.get("id", "unknown"),
+            "expected": exp,
+            "generated": gen,
+            "passed": passed
+        })
+        
+        print(f"{'✓' if passed else '✗'} {r.get('id', 'unknown')}")
+    
+    print(f"\nResults: {results['pass']}/{results['pass']+results['fail']} passed")
+    
+    with open("outputs/eval_results.json", "w") as f:
+        json.dump(results, f, indent=2)
+
+if __name__ == "__main__":
+    main()
+
+
+METRICS TO TRACK
+----------------
+
+Run after each phase:
+  1. Base model (baseline)
+  2. After SFT
+  3. After DPO
+  4. After tool tuning
+
+Track:
+  • Task accuracy (% correct answers)
+  • Format correctness (% valid JSON when expected)
+  • Refusal correctness (refuses bad requests, doesn't refuse good ones)
+  • Latency (ms per response)
+  • Throughput (tokens/second)
+
+Deliverable: ✅ outputs/eval_report.md
+
+Example report format:
+
+| Phase      | Task Acc | Format % | Refusal % | Latency | Tokens/s |
+|------------|----------|----------|-----------|---------|----------|
+| Base       | 72%      | 85%      | 60%       | 450ms   | 35       |
+| +SFT       | 84%      | 95%      | 75%       | 460ms   | 34       |
+| +DPO       | 86%      | 96%      | 92%       | 465ms   | 33       |
+| +Tools     | 85%      | 98%      | 91%       | 470ms   | 32       |
+
+
+================================================================================
+Phase 7 — Merge, Quantize, and Deploy to Ollama (1–2 days)
+================================================================================
+
+STEP 1: MERGE LORA INTO FULL MODEL
+----------------------------------
+
+# scripts/merge_lora.py
+import yaml
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import PeftModel
+
+def main():
+    cfg = yaml.safe_load(open("configs/eval.yaml"))
+    
+    tokenizer = AutoTokenizer.from_pretrained(cfg["base_model"], use_fast=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        cfg["base_model"],
+        device_map="auto",
+        torch_dtype=torch.bfloat16,
+    )
+    
+    if cfg.get("adapter_dir"):
+        model = PeftModel.from_pretrained(model, cfg["adapter_dir"])
+        model = model.merge_and_unload()
+    
+    model.save_pretrained("outputs/merged_full", safe_serialization=True)
+    tokenizer.save_pretrained("outputs/merged_full")
+    print("Merged model saved to outputs/merged_full")
+
+if __name__ == "__main__":
+    main()
+
+Run:
+  python scripts/merge_lora.py
+
+
+STEP 2: CONVERT TO GGUF
+-----------------------
+
+Option A - Using llama.cpp:
+
+# Clone llama.cpp if you haven't
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp
+pip install -r requirements.txt
+
+# Convert HF to GGUF
+python convert_hf_to_gguf.py ../outputs/merged_full \
+    --outtype f16 \
+    --outfile ../outputs/model.f16.gguf
+
+# Quantize (Q4_K_M is good default)
+make quantize  # build the quantize tool first
+./quantize ../outputs/model.f16.gguf ../outputs/model.Q4_K_M.gguf Q4_K_M
+
+
+Option B - Using transformers + llama-cpp-python:
+
+pip install llama-cpp-python[server]
+
+# Use the llama.cpp Python bindings
+
+
+Quantization options:
+  Q4_K_M  — Best balance of size/quality (recommended)
+  Q5_K_M  — Better quality, 25% larger
+  Q8_0    — Near-original quality, 2x size of Q4
+  Q2_K    — Smallest, noticeable quality loss
+
+
+STEP 3: CREATE OLLAMA MODEL
+---------------------------
+
+Create Modelfile for your quantized model:
+
+# Modelfile.custom
+FROM ./outputs/model.Q4_K_M.gguf
+
+# Or if using safetensors directly:
+# FROM ./outputs/merged_full
+
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER num_ctx 4096
+
+SYSTEM """You are a helpful assistant for ACME Corp. You follow instructions precisely and can use tools when needed."""
+
+TEMPLATE """{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{ if .Prompt }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+{{ end }}<|im_start|>assistant
+{{ .Response }}<|im_end|>"""
+
+LICENSE """Apache 2.0 - Fine-tuned from Qwen2.5"""
+
+
+Build and test:
+  ollama create mymodel:v1 -f Modelfile.custom
+  ollama run mymodel:v1 "Hello, what can you help me with?"
+
+
+STEP 4: VALIDATE QUANTIZED MODEL
+--------------------------------
+
+Run eval on quantized version:
+
+# Update eval config to use Ollama
+import subprocess
+import json
+
+def eval_ollama(prompt):
+    result = subprocess.run(
+        ["ollama", "run", "mymodel:v1", prompt],
+        capture_output=True, text=True
+    )
+    return result.stdout.strip()
+
+# Compare accuracy before/after quantization
+# Accept up to 2-3% accuracy drop
+
+
+Deliverables:
+✅ outputs/model.Q4_K_M.gguf
+✅ Modelfile.custom
+✅ outputs/quant_eval.md (before/after accuracy comparison)
+
+
+================================================================================
+Phase 8 — Ship with safety + monitoring (ongoing)
+================================================================================
+
+MINIMUM PRODUCTION KIT
+----------------------
+
+1. Prompt guardrails
+   - Input validation (length, format)
+   - Block known jailbreak patterns
+   - Rate limiting per user
+
+2. Output guardrails
+   - PII detection in responses
+   - Toxicity scoring
+   - JSON validation for structured outputs
+
+3. Logging
+   - Log all inputs/outputs (hash PII)
+   - Track latency percentiles
+   - Monitor error rates
+
+4. Red-team testing
+   - Regular adversarial testing
+   - Jailbreak attempts
+   - Edge case probing
+
+5. Rollback plan
+   - Keep previous model versions
+   - Quick switch mechanism
+   - A/B testing capability
+
+
+MODEL REGISTRY
+--------------
+
+Version your models:
+
+  mymodel:v1-sandbox    # Testing
+  mymodel:v1-staging    # Pre-prod validation
+  mymodel:v1-prod       # Production
+  mymodel:v0-prod       # Previous production (rollback target)
+
+
+MONITORING CHECKLIST
+--------------------
+
+□ Response latency p50/p95/p99
+□ Token throughput
+□ Error rate by type
+□ User satisfaction signals
+□ Refusal rate (should be low but non-zero)
+□ JSON validity rate
+□ Memory usage over time
+
+
+Deliverables:
+✅ release_notes.md
+✅ known_issues.md
+✅ monitoring_dashboard.json (Grafana/Datadog config)
+✅ runbook.md (incident response)
+
+
+================================================================================
+QUICK CHECKLIST — PATH A (Fine-tuning)
+================================================================================
+
+□ 1. Lock goal + deployment + size
+□ 2. Choose base model (Ollama + HF equivalent)
+□ 3. Pull base model: ollama pull qwen2.5:7b
+□ 4. Create data/sft.jsonl (2k+ examples)
+□ 5. Create data/eval.jsonl (200+ examples, held out)
+□ 6. Run SFT: python scripts/train_sft.py
+□ 7. Evaluate SFT model
+□ 8. Create data/dpo.jsonl (500+ preference pairs)
+□ 9. Run DPO: python scripts/train_dpo.py
+□ 10. Evaluate DPO model
+□ 11. (Optional) Add tool-call training examples
+□ 12. Merge LoRA: python scripts/merge_lora.py
+□ 13. Convert to GGUF + quantize
+□ 14. Create Ollama Modelfile
+□ 15. Build: ollama create mymodel:v1 -f Modelfile
+□ 16. Final evaluation
+□ 17. Deploy + monitor + iterate
+
+
+
+================================================================================
+================================================================================
+                    PATH B: PRE-TRAINING FROM SCRATCH
+                         (Advanced / Enterprise)
+================================================================================
+================================================================================
+
+Only use this path if fine-tuning cannot meet your needs.
+
+Requirements:
+  • 100B+ tokens of training data
+  • $100K+ compute budget
+  • 3+ months timeline
+  • Team of 5+ ML engineers
+  • Clear reason why existing models don't work
+
+
+================================================================================
+Phase P0 — Scope & Architecture Design (2-4 weeks)
+================================================================================
+
+ARCHITECTURE DECISIONS
+----------------------
+
+1. Model type:
+   • Decoder-only (GPT-style) — Best for generation, most common
+   • Encoder-only (BERT-style) — Best for classification, embeddings
+   • Encoder-decoder (T5-style) — Best for translation, summarization
+
+2. Scale planning (Chinchilla-optimal):
+
+┌──────────┬────────────┬─────────────────┬──────────────┬───────────────┐
+│ Size     │ Parameters │ Training Tokens │ GPU Hours    │ Est. Cost     │
+├──────────┼────────────┼─────────────────┼──────────────┼───────────────┤
+│ Tiny     │ 125M       │ 2.5B            │ ~500         │ $1-2K         │
+│ Small    │ 350M       │ 7B              │ ~2,000       │ $5-10K        │
+│ Medium   │ 1.3B       │ 26B             │ ~10,000      │ $20-50K       │
+│ Large    │ 7B         │ 140B            │ ~80,000      │ $150-300K     │
+│ XL       │ 13B        │ 260B            │ ~200,000     │ $400-800K     │
+│ XXL      │ 70B        │ 1.4T            │ ~1,500,000   │ $3-10M        │
+└──────────┴────────────┴─────────────────┴──────────────┴───────────────┘
+
+   Chinchilla scaling: training_tokens ≈ 20 × parameters
+
+3. Context length:
+   • 2048-4096: Standard, simpler training
+   • 8192-32768: Requires RoPE scaling or ALiBi
+   • 100K+: Specialized architectures (Ring Attention, Mamba)
+
+4. Key architecture choices:
+
+   Attention:
+     • Multi-Head Attention (standard)
+     • Multi-Query Attention (faster inference)
+     • Grouped-Query Attention (balance)
+     • Flash Attention 2 (always use — 2-4x faster)
+
+   Position encoding:
+     • RoPE (Rotary) — Standard, scalable
+     • ALiBi — Good extrapolation
+     • Learned — Fixed length only
+
+   Normalization:
+     • RMSNorm — Faster than LayerNorm, use this
+     • Pre-LN — Normalize before attention (more stable)
+
+   Activation:
+     • SwiGLU — Best quality, used by LLaMA/Qwen
+     • GELU — Standard alternative
+
+
+EXAMPLE CONFIG (7B)
+-------------------
+
+model_config:
+  vocab_size: 32000
+  hidden_size: 4096
+  intermediate_size: 11008      # ~2.7x hidden for SwiGLU
+  num_hidden_layers: 32
+  num_attention_heads: 32
+  num_key_value_heads: 8        # GQA for efficiency
+  hidden_act: "silu"
+  max_position_embeddings: 4096
+  rope_theta: 10000.0
+  rms_norm_eps: 1e-5
+  tie_word_embeddings: false
+  use_flash_attention: true
+
+
+Deliverables:
+✅ architecture_spec.md
+✅ model_config.yaml
+✅ compute_budget.md
+✅ timeline.md
+
+
+================================================================================
+Phase P1 — Data Collection & Curation (4-12 weeks)
+================================================================================
+
+This is the most important phase. Data quality determines model quality.
+
+DATA SOURCES
+------------
+
+Public datasets:
+┌────────────────┬───────────────┬─────────────────────┬──────────────┐
+│ Dataset        │ Size          │ Content             │ License      │
+├────────────────┼───────────────┼─────────────────────┼──────────────┤
+│ Common Crawl   │ ~400TB/month  │ Web pages           │ CC0          │
+│ FineWeb        │ 15T tokens    │ Filtered CC         │ ODC-By       │
+│ RedPajama v2   │ 30T tokens    │ Diverse web         │ Apache 2.0   │
+│ The Pile       │ 825GB         │ 22 curated sources  │ MIT          │
+│ StarCoder      │ 250B tokens   │ Code (80+ langs)    │ Apache 2.0   │
+│ Wikipedia      │ ~20GB         │ Encyclopedia        │ CC BY-SA     │
+│ arXiv          │ ~100GB        │ Scientific papers   │ Various      │
+│ Books3         │ ~100GB        │ Books (check legal) │ Varies       │
+└────────────────┴───────────────┴─────────────────────┴──────────────┘
+
+
+DATA PIPELINE
+-------------
+
+Step 1: Download and extract
+
+# Example: FineWeb
+from datasets import load_dataset
+ds = load_dataset("HuggingFaceFW/fineweb", split="train", streaming=True)
+
+# Example: Common Crawl segment
+wget https://data.commoncrawl.org/crawl-data/CC-MAIN-2024-10/segments/.../warc.gz
+python extract_text.py --input warc.gz --output raw/
+
+
+Step 2: Filter for quality
+
+Quality signals to check:
+  • Language detection (fastText lid.176.bin)
+  • Perplexity filter (KenLM trained on Wikipedia)
+  • Repetition detection (n-gram frequency)
+  • Length filter (too short = spam, too long = dumps)
+  • Boilerplate removal (headers, footers, navs)
+  • Adult content filter
+  • Toxic content filter
+
+# Example filtering pipeline
+python filter_data.py \
+    --input raw/ \
+    --output filtered/ \
+    --min_length 100 \
+    --max_length 100000 \
+    --lang en \
+    --max_perplexity 1000 \
+    --remove_duplicates
+
+
+Step 3: Deduplicate (CRITICAL)
+
+Deduplication prevents memorization and improves generalization.
+
+Methods:
+  • Exact dedup: SHA256 hash of normalized text
+  • Near-dedup: MinHash with LSH (catches paraphrases)
+  • Substring dedup: Suffix arrays (catches copy-paste)
+
+# Using text-dedup library
+pip install text-dedup
+
+python -m text_dedup.minhash \
+    --path filtered/ \
+    --output deduped/ \
+    --column text \
+    --threshold 0.7
+
+
+Step 4: Mix data sources
+
+Balance by domain for good generalization:
+
+┌─────────────────┬────────┬─────────────────────────────────┐
+│ Source          │ Weight │ Rationale                       │
+├─────────────────┼────────┼─────────────────────────────────┤
+│ Web text        │ 50%    │ General knowledge, diversity    │
+│ Books           │ 15%    │ Long-form coherence             │
+│ Code            │ 15%    │ Reasoning, structure            │
+│ Wikipedia       │ 5%     │ Factual accuracy                │
+│ Scientific      │ 5%     │ Technical knowledge             │
+│ Conversations   │ 5%     │ Dialogue patterns               │
+│ Math            │ 3%     │ Numerical reasoning             │
+│ Other           │ 2%     │ Specialized domains             │
+└─────────────────┴────────┴─────────────────────────────────┘
+
+
+Step 5: Tokenize and pack
+
+# Tokenize entire corpus
+python tokenize_corpus.py \
+    --input deduped/ \
+    --output tokenized/ \
+    --tokenizer tokenizer.model \
+    --max_length 4096
+
+
+Deliverables:
+✅ data_sources.md (sources, sizes, licenses)
+✅ filtering_pipeline/ (all scripts)
+✅ data_stats.json (token counts, language distribution)
+✅ tokenized/ (final training corpus)
+
+
+================================================================================
+Phase P2 — Tokenizer Training (1-2 weeks)
+================================================================================
+
+The tokenizer converts text to numbers. Train it on YOUR data.
+
+TRAINING TOKENIZER
+------------------
+
+# Using SentencePiece (recommended)
+import sentencepiece as spm
+
+# Sample ~1-5% of training data for tokenizer training
+# Must be representative of all domains
+
+spm.SentencePieceTrainer.train(
+    input='tokenizer_sample.txt',
+    model_prefix='tokenizer',
+    vocab_size=32000,            # 32K-128K typical
+    model_type='bpe',            # or 'unigram'
+    character_coverage=0.9995,   # 1.0 for code-heavy
+    num_threads=64,
+    split_digits=True,           # Important for math
+    byte_fallback=True,          # Handle any character
+    add_dummy_prefix=True,       # Space handling
+    normalization_rule_name='identity',  # No normalization
+    user_defined_symbols=['<|tool_call|>', '<|tool_result|>'],  # Special tokens
+)
+
+
+SPECIAL TOKENS
+--------------
+
+Define for your use case:
+
+┌─────────────────┬────────────────────────────┬──────────┐
+│ Token           │ Purpose                    │ ID       │
+├─────────────────┼────────────────────────────┼──────────┤
+│ <|pad|>         │ Padding for batching       │ 0        │
+│ <|unk|>         │ Unknown character fallback │ 1        │
+│ <|bos|>         │ Beginning of sequence      │ 2        │
+│ <|eos|>         │ End of sequence            │ 3        │
+│ <|sep|>         │ Separator                  │ 4        │
+│ <|tool_call|>   │ Tool calling marker        │ 5        │
+│ <|tool_result|> │ Tool result marker         │ 6        │
+└─────────────────┴────────────────────────────┴──────────┘
+
+
+VALIDATION
+----------
+
+Before proceeding, verify tokenizer quality:
+
+1. Fertility: tokens per word
+   Target: 1.2-1.5 for English
+   
+2. Coverage: % encoded without <unk>
+   Target: >99.9%
+   
+3. Roundtrip: decode(encode(text)) == text
+   Must be 100%
+
+4. Spot checks:
+   - Common words tokenize sensibly
+   - Numbers tokenize digit-by-digit (if split_digits=True)
+   - Code tokenizes well
+   - Non-English text handled gracefully
+
+
+Deliverables:
+✅ tokenizer.model
+✅ tokenizer.json (HuggingFace compatible)
+✅ tokenizer_report.md (fertility, coverage, examples)
+
+
+================================================================================
+Phase P3 — Infrastructure Setup (2-4 weeks)
+================================================================================
+
+Pre-training requires serious infrastructure.
+
+HARDWARE REQUIREMENTS
+---------------------
+
+┌────────────┬────────────────────┬─────────────────────────┬──────────────┐
+│ Model Size │ Min GPU Memory     │ Recommended Setup       │ Training Time│
+├────────────┼────────────────────┼─────────────────────────┼──────────────┤
+│ 125M       │ 8GB                │ 1x RTX 3090             │ 1-2 days     │
+│ 1.3B       │ 24GB               │ 4x A100-40GB            │ 1-2 weeks    │
+│ 7B         │ 80GB+              │ 8x A100-80GB            │ 2-4 weeks    │
+│ 13B        │ 160GB+             │ 16x A100-80GB           │ 4-8 weeks    │
+│ 70B        │ 640GB+             │ 64+ H100-80GB           │ 2-4 months   │
+└────────────┴────────────────────┴─────────────────────────┴──────────────┘
+
+
+SOFTWARE STACK
+--------------
+
+Training frameworks:
+  • PyTorch + FSDP: Good for <13B, native distributed
+  • DeepSpeed ZeRO: Better memory efficiency, good for 7-70B
+  • Megatron-LM: Best for 70B+, tensor/pipeline parallelism
+  • JAX + TPU: Alternative for Google Cloud
+
+Essential libraries:
+  • Flash Attention 2 — 2-4x faster attention
+  • bitsandbytes — Mixed precision
+  • Weights & Biases — Experiment tracking
+  • transformers — Model implementation
+
+Install:
+pip install torch transformers accelerate deepspeed flash-attn \
+            bitsandbytes wandb datasets sentencepiece
+
+
+DISTRIBUTED TRAINING
+--------------------
+
+Strategy by model size:
+
+┌────────────────┬─────────────────────────────────┬───────────────────┐
+│ Parallelism    │ What it splits                  │ When to use       │
+├────────────────┼─────────────────────────────────┼───────────────────┤
+│ Data Parallel  │ Batches across GPUs             │ Always, baseline  │
+│ FSDP / ZeRO    │ Model states across GPUs        │ Model > GPU memory│
+│ Tensor Parallel│ Layers horizontally             │ 70B+ models       │
+│ Pipeline Parall│ Layers vertically               │ 70B+ models       │
+└────────────────┴─────────────────────────────────┴───────────────────┘
+
+
+DEEPSPEED CONFIG (7B example)
+-----------------------------
+
+# ds_config.json
+{
+  "bf16": {"enabled": true},
+  "zero_optimization": {
+    "stage": 3,
+    "offload_optimizer": {"device": "cpu"},
+    "offload_param": {"device": "none"},
+    "overlap_comm": true,
+    "contiguous_gradients": true,
+    "reduce_bucket_size": 5e8
+  },
+  "gradient_accumulation_steps": 8,
+  "gradient_clipping": 1.0,
+  "train_micro_batch_size_per_gpu": 2,
+  "wall_clock_breakdown": false
+}
+
+
+LAUNCH SCRIPT
+-------------
+
+# launch_training.sh
+#!/bin/bash
+
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export MASTER_ADDR=localhost
+export MASTER_PORT=29500
+
+deepspeed --num_gpus=8 \
+    train_pretrain.py \
+    --deepspeed ds_config.json \
+    --model_config configs/model_7b.yaml \
+    --data_path tokenized/ \
+    --output_dir outputs/pretrain \
+    --max_steps 100000 \
+    --save_steps 5000
+
+
+Deliverables:
+✅ infra_setup.md (hardware specs, cloud config)
+✅ ds_config.json (DeepSpeed config)
+✅ launch_training.sh
+✅ Dockerfile (reproducible environment)
+
+
+================================================================================
+Phase P4 — Pre-Training Run (4-16 weeks)
+================================================================================
+
+The main training loop.
+
+HYPERPARAMETERS
+---------------
+
+┌────────────────────┬─────────────────┬────────────────────────────────┐
+│ Parameter          │ Typical Range   │ Notes                          │
+├────────────────────┼─────────────────┼────────────────────────────────┤
+│ Learning rate      │ 1e-4 to 3e-4    │ Scale with sqrt(batch_size)    │
+│ Batch size         │ 1M-4M tokens    │ Larger = more stable           │
+│ Warmup             │ 1-2% of steps   │ Linear warmup                  │
+│ LR schedule        │ Cosine decay    │ To 10% of peak                 │
+│ Weight decay       │ 0.1             │ AdamW regularization           │
+│ Gradient clipping  │ 1.0             │ Prevent explosions             │
+│ Adam β1, β2        │ 0.9, 0.95       │ Momentum settings              │
+│ Dropout            │ 0.0             │ Usually off for pre-training   │
+└────────────────────┴─────────────────┴────────────────────────────────┘
+
+
+TRAINING LOOP ESSENTIALS
+------------------------
+
+1. Data loading:
+   • Stream data, don't load all into memory
+   • Shuffle at document level, not token level
+   • Pack documents to fill context window
+   • No padding tokens in pre-training
+
+2. Checkpointing:
+   • Save every 1000-5000 steps
+   • Keep last N + best by validation loss
+   • Use async checkpointing
+   • TEST checkpoint loading before long runs!
+
+3. Monitoring (track continuously):
+   • Training loss (should decrease smoothly)
+   • Gradient norm (watch for spikes)
+   • Learning rate (verify schedule)
+   • Throughput (tokens/second/GPU)
+   • Memory usage
+
+4. Intermediate evals (every 10-20%):
+   • Perplexity on held-out set
+   • Basic QA (sanity check)
+   • Toxicity probes
+
+
+TRAINING SCRIPT OUTLINE
+-----------------------
+
+# train_pretrain.py (simplified)
+import torch
+from torch.utils.data import DataLoader
+from transformers import AutoConfig, AutoModelForCausalLM
+import deepspeed
+
+def main():
+    # Load config
+    config = AutoConfig.from_pretrained("configs/model_7b")
+    model = AutoModelForCausalLM.from_config(config)
+    
+    # Initialize DeepSpeed
+    model_engine, optimizer, _, scheduler = deepspeed.initialize(
+        model=model,
+        config="ds_config.json"
+    )
+    
+    # Training loop
+    for step, batch in enumerate(dataloader):
+        loss = model_engine(batch["input_ids"], labels=batch["input_ids"]).loss
+        model_engine.backward(loss)
+        model_engine.step()
+        
+        if step % log_interval == 0:
+            print(f"Step {step}: loss={loss.item():.4f}")
+        
+        if step % save_interval == 0:
+            model_engine.save_checkpoint(f"checkpoint-{step}")
+
+
+FAILURE MODES & FIXES
+---------------------
+
+┌───────────────────┬────────────────────────────┬─────────────────────────┐
+│ Symptom           │ Likely Cause               │ Fix                     │
+├───────────────────┼────────────────────────────┼─────────────────────────┤
+│ Loss spikes       │ Bad data batch, LR too high│ Lower LR, filter data   │
+│ Loss plateau early│ LR too low, data quality   │ Increase LR, check data │
+│ Loss goes NaN     │ Overflow, bad init         │ Gradient clip, check init│
+│ Slow training     │ Data loading bottleneck    │ More workers, faster IO │
+│ OOM errors        │ Batch too large            │ Grad accum, ZeRO stage  │
+│ Divergence        │ LR too high, bad data      │ Lower LR, clean data    │
+└───────────────────┴────────────────────────────┴─────────────────────────┘
+
+
+Deliverables:
+✅ train_pretrain.py
+✅ checkpoints/ (model checkpoints)
+✅ training_logs/ (loss curves, metrics)
+✅ training_report.md
+
+
+================================================================================
+Phase P5 — Evaluation & Benchmarking (1-2 weeks)
+================================================================================
+
+Evaluate before any downstream use.
+
+BENCHMARKS
+----------
+
+┌───────────────┬───────────────────────────────┬──────────────┐
+│ Benchmark     │ Tests                         │ Metric       │
+├───────────────┼───────────────────────────────┼──────────────┤
+│ HellaSwag     │ Commonsense reasoning         │ Accuracy     │
+│ MMLU          │ World knowledge (57 subjects) │ Accuracy     │
+│ ARC-Challenge │ Science reasoning             │ Accuracy     │
+│ WinoGrande    │ Coreference resolution        │ Accuracy     │
+│ TruthfulQA    │ Factual accuracy              │ MC1/MC2      │
+│ GSM8K         │ Math word problems            │ Accuracy     │
+│ HumanEval     │ Code generation               │ Pass@1       │
+└───────────────┴───────────────────────────────┴──────────────┘
+
+Run with lm-evaluation-harness:
+
+pip install lm-eval
+
+lm_eval --model hf \
+    --model_args pretrained=outputs/pretrain/final \
+    --tasks hellaswag,mmlu,arc_challenge,winogrande,gsm8k \
+    --batch_size 8 \
+    --output_path eval_results/
+
+
+EXPECTED PERFORMANCE
+--------------------
+
+Compare to published results:
+
+┌────────────┬───────────┬────────┬─────────┐
+│ Model Size │ HellaSwag │ MMLU   │ ARC-C   │
+├────────────┼───────────┼────────┼─────────┤
+│ 1B         │ ~55%      │ ~25%   │ ~35%    │
+│ 7B         │ ~75%      │ ~45%   │ ~50%    │
+│ 13B        │ ~80%      │ ~55%   │ ~55%    │
+│ 70B        │ ~85%      │ ~70%   │ ~65%    │
+└────────────┴───────────┴────────┴─────────┘
+
+If below expected: check data quality, training stability, hyperparameters.
+
+
+Deliverables:
+✅ eval_results/ (raw outputs)
+✅ eval_report.md (summary, comparisons)
+✅ ablations.md (what worked, what didn't)
+
+
+================================================================================
+Phase P6 — Post-Training (Continue with PATH A)
+================================================================================
+
+After pre-training, you have a base model. Now:
+
+1. Run SFT (Phase 3 from PATH A)
+2. Run DPO (Phase 4 from PATH A)
+3. Add tool calling (Phase 5 from PATH A)
+4. Quantize and deploy (Phase 7 from PATH A)
+
+The post-training pipeline is identical to fine-tuning an existing model.
+
+
+================================================================================
+QUICK CHECKLIST — PATH B (Pre-training)
+================================================================================
+
+□ 1. Justify why fine-tuning won't work
+□ 2. Secure compute budget ($100K+)
+□ 3. Design architecture
+□ 4. Collect 100B+ tokens of data
+□ 5. Filter and deduplicate data
+□ 6. Mix data sources
+□ 7. Train tokenizer
+□ 8. Validate tokenizer
+□ 9. Set up distributed training infrastructure
+□ 10. Run pre-training (monitor closely)
+□ 11. Evaluate on benchmarks
+□ 12. Compare to baselines
+□ 13. Continue to post-training (SFT, DPO)
+□ 14. Quantize and deploy
+
+
+================================================================================
+                         REPO LAYOUT (COMPLETE)
+================================================================================
+
+llm-project/
+├── README.md
+├── requirements.txt
+├── LICENSE
+│
+├── data/
+│   ├── raw/                    # Raw collected data
+│   ├── filtered/               # After quality filtering
+│   ├── deduped/                # After deduplication
+│   ├── tokenized/              # Tokenized for training
+│   ├── sft.jsonl               # Instruction fine-tuning
+│   ├── dpo.jsonl               # Preference pairs
+│   └── eval.jsonl              # Held-out evaluation
+│
+├── configs/
+│   ├── model_7b.yaml           # Architecture config
+│   ├── pretrain.yaml           # Pre-training config
+│   ├── sft.yaml                # SFT config
+│   ├── dpo.yaml                # DPO config
+│   ├── eval.yaml               # Evaluation config
+│   └── ds_config.json          # DeepSpeed config
+│
+├── tokenizer/
+│   ├── tokenizer.model         # SentencePiece model
+│   ├── tokenizer.json          # HuggingFace format
+│   └── special_tokens.json     # Special token definitions
+│
+├── scripts/
+│   ├── data/
+│   │   ├── download_data.py
+│   │   ├── filter_data.py
+│   │   ├── deduplicate.py
+│   │   └── tokenize_corpus.py
+│   ├── train_tokenizer.py
+│   ├── train_pretrain.py
+│   ├── train_sft.py
+│   ├── train_dpo.py
+│   ├── run_eval.py
+│   ├── merge_lora.py
+│   └── export_gguf.sh
+│
+├── outputs/
+│   ├── pretrain/               # Pre-training checkpoints
+│   ├── sft_lora/               # SFT adapter
+│   ├── dpo_lora/               # DPO adapter
+│   ├── merged_full/            # Merged model
+│   └── quantized/              # GGUF files
+│
+├── eval/
+│   ├── eval_results.json
+│   ├── eval_report.md
+│   └── quant_eval.md
+│
+├── deployment/
+│   ├── Modelfile               # Ollama Modelfile
+│   ├── docker-compose.yml
+│   └── api_server.py
+│
+└── docs/
+    ├── model_choice.md
+    ├── architecture_spec.md
+    ├── data_sources.md
+    ├── training_report.md
+    ├── release_notes.md
+    └── known_issues.md
+
+
+================================================================================
+                              END OF GUIDE
+================================================================================
