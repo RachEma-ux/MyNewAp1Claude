@@ -222,3 +222,24 @@ Next steps:
 1. Complete Phase 5 navigation integration
 2. Implement Phase 9 testing suite
 3. Add Phase 10 documentation
+
+---
+
+## Phase 11: LLM Provider Integration (NEW)
+
+### LLM Creation Wizard Update
+- [ ] **Update LLM Creation wizard to select from configured providers**
+  - **Priority:** High
+  - **Status:** Pending
+  - **Issue:** Currently `/llm/wizard` Step 2 shows hardcoded provider strings ("anthropic", "openai", "google") instead of linking to actual configured providers from `/providers` with API keys
+  - **Required Changes:**
+    - Update `client/src/pages/LLMWizard.tsx` ConfigurationStep component
+    - Add query: `trpc.providers.list.useQuery()` to fetch user's configured providers
+    - Replace hardcoded provider dropdown with list of actual providers
+    - Show provider name, type, enabled/disabled status in dropdown
+    - Store provider ID reference instead of provider string
+    - Add empty state if no providers configured (link to /providers)
+  - **Acceptance Criteria:**
+    - LLM wizard shows only user's configured providers
+    - Created LLM can make API calls using provider's credentials
+    - Proper connection between LLM agents and provider backends
