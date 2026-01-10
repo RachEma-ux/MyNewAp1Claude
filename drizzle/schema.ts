@@ -2084,3 +2084,308 @@ export const llmAuditEvents = pgTable("llm_audit_events", {
 
 export type LLMAuditEvent = typeof llmAuditEvents.$inferSelect;
 export type InsertLLMAuditEvent = typeof llmAuditEvents.$inferInsert;
+
+// ============================================================================
+// LLM Creation & Training Pipeline
+// ============================================================================
+
+/**
+ * LLM Creation Projects - Tracks complete LLM creation/training projects
+ * Follows the "COMPLETE LLM CREATION GUIDE" methodology
+ */
+export const llmCreationProjects = pgTable("llm_creation_projects", {
+  id: serial("id").primaryKey(),
+
+  // Project identity
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+
+  // Path selection (from guide)
+  path: varchar("path", { length: 10 }).notNull(), // "PATH_A" (fine-tune) or "PATH_B" (pre-train)
+
+  // Target specification (Phase 0 from guide)
+  target: json("target").notNull(), // { useCase, deployment, maxModelSize, contextLength, allowedData }
+
+  // Base model selection (Phase 1 from guide)
+  baseModel: json("baseModel"), // { name, ollamaTag, hfRepo, size, license, context, rationale }
+
+  // Status tracking
+  status: varchar("status", { length: 50 }).notNull().default("draft"), // draft, dataset_prep, training, evaluation, quantization, deployed, failed, archived
+  currentPhase: varchar("currentPhase", { length: 50 }), // phase_0_planning, phase_1_base_model, phase_2_dataset, phase_3_sft, etc.
+  progress: integer("progress").default(0), // 0-100 percentage
+
+  // Results & outputs
+  finalModelPath: varchar("finalModelPath", { length: 512 }),
+  ollamaModelName: varchar("ollamaModelName", { length: 255 }),
+  deploymentStatus: varchar("deploymentStatus", { length: 50 }),
+
+  // Linked LLM (once deployed)
+  llmId: integer("llmId"), // FK to llms table
+
+  // Metadata
+  createdBy: integer("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+}, (table) => ({
+  nameIdx: index("idx_creation_project_name").on(table.name),
+  statusIdx: index("idx_creation_project_status").on(table.status),
+  createdByIdx: index("idx_creation_project_creator").on(table.createdBy),
+}));
+
+export type LLMCreationProject = typeof llmCreationProjects.$inferSelect;
+export type InsertLLMCreationProject = typeof llmCreationProjects.$inferInsert;
+
+/**
+ * LLM Datasets - Stores dataset metadata for training
+ * Covers SFT, DPO, and Eval datasets from guide
+ */
+export const llmDatasets = pgTable("llm_datasets", {
+  id: serial("id").primaryKey(),
+
+  // Project reference
+  projectId: integer("projectId").notNull(), // FK to llm_creation_projects
+
+  // Dataset identity
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // "sft", "dpo", "eval", "pretrain"
+
+  // Source & content
+  source: varchar("source", { length: 50 }), // "upload", "synthetic", "public", "mixed"
+  format: varchar("format", { length: 50 }).notNull(), // "jsonl", "csv", "parquet"
+  filePath: varchar("filePath", { length: 512 }), // Storage path
+  fileSize: bigint("fileSize", { mode: "number" }), // Bytes
+
+  // Statistics
+  recordCount: integer("recordCount"),
+  tokenCount: bigint("tokenCount", { mode: "number" }),
+  stats: json("stats"), // { avgLength, vocabSize, languageDistribution, etc. }
+
+  // Quality metrics
+  qualityScore: numeric("qualityScore", { precision: 5, scale: 2 }),
+  qualityChecks: json("qualityChecks"), // { deduplication, pii_removal, format_validation, etc. }
+
+  // Processing status
+  status: varchar("status", { length: 50 }).default("pending"), // pending, processing, ready, failed
+  processingLogs: text("processingLogs"),
+
+  // Validation
+  validated: boolean("validated").default(false),
+  validationErrors: json("validationErrors"),
+
+  // Metadata
+  createdBy: integer("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => ({
+  projectIdIdx: index("idx_dataset_project").on(table.projectId),
+  typeIdx: index("idx_dataset_type").on(table.type),
+  statusIdx: index("idx_dataset_status").on(table.status),
+}));
+
+export type LLMDataset = typeof llmDatasets.$inferSelect;
+export type InsertLLMDataset = typeof llmDatasets.$inferInsert;
+
+/**
+ * LLM Training Runs - Tracks individual training jobs
+ * Covers SFT, DPO, Tool Tuning, and Pre-training
+ */
+export const llmTrainingRuns = pgTable("llm_training_runs", {
+  id: serial("id").primaryKey(),
+
+  // Project reference
+  projectId: integer("projectId").notNull(), // FK to llm_creation_projects
+
+  // Training type (from guide phases)
+  trainingType: varchar("trainingType", { length: 50 }).notNull(), // "sft", "dpo", "tool_tuning", "pretrain"
+  phase: varchar("phase", { length: 50 }), // "phase_3_sft", "phase_4_dpo", "phase_5_tools"
+
+  // Configuration
+  config: json("config").notNull(), // Complete training config (hyperparameters, model, dataset refs)
+  configHash: varchar("configHash", { length: 64 }),
+
+  // Dataset references
+  datasetIds: json("datasetIds"), // Array of dataset IDs used
+
+  // Training framework
+  framework: varchar("framework", { length: 50 }), // "huggingface", "deepspeed", "megatron", "ollama"
+  accelerator: varchar("accelerator", { length: 50 }), // "cpu", "cuda", "tpu"
+
+  // Status tracking
+  status: varchar("status", { length: 50 }).default("pending"), // pending, running, completed, failed, cancelled
+  progress: integer("progress").default(0), // 0-100
+  currentStep: integer("currentStep"),
+  totalSteps: integer("totalSteps"),
+
+  // Metrics
+  metrics: json("metrics"), // Training loss, validation loss, accuracy, etc.
+  finalLoss: numeric("finalLoss", { precision: 10, scale: 6 }),
+
+  // Resources
+  gpuHours: numeric("gpuHours", { precision: 10, scale: 2 }),
+  estimatedCost: numeric("estimatedCost", { precision: 10, scale: 2 }),
+  actualCost: numeric("actualCost", { precision: 10, scale: 2 }),
+
+  // Outputs
+  checkpointPath: varchar("checkpointPath", { length: 512 }),
+  loraAdapterPath: varchar("loraAdapterPath", { length: 512 }),
+  logs: text("logs"),
+
+  // Timestamps
+  startedAt: timestamp("startedAt"),
+  completedAt: timestamp("completedAt"),
+  failedAt: timestamp("failedAt"),
+  errorMessage: text("errorMessage"),
+
+  // Metadata
+  createdBy: integer("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => ({
+  projectIdIdx: index("idx_training_run_project").on(table.projectId),
+  statusIdx: index("idx_training_run_status").on(table.status),
+  typeIdx: index("idx_training_run_type").on(table.trainingType),
+}));
+
+export type LLMTrainingRun = typeof llmTrainingRuns.$inferSelect;
+export type InsertLLMTrainingRun = typeof llmTrainingRuns.$inferInsert;
+
+/**
+ * LLM Evaluations - Stores evaluation results
+ * Phase 6 from guide - benchmarking and quality checks
+ */
+export const llmEvaluations = pgTable("llm_evaluations", {
+  id: serial("id").primaryKey(),
+
+  // Project & run references
+  projectId: integer("projectId").notNull(), // FK to llm_creation_projects
+  trainingRunId: integer("trainingRunId"), // FK to llm_training_runs (if evaluating a training output)
+
+  // Evaluation target
+  modelPath: varchar("modelPath", { length: 512 }), // Path to model being evaluated
+  modelType: varchar("modelType", { length: 50 }), // "base", "sft", "dpo", "quantized"
+
+  // Evaluation configuration
+  evalDatasetId: integer("evalDatasetId"), // FK to llm_datasets
+  benchmarks: json("benchmarks"), // Array of benchmark names run
+
+  // Results
+  results: json("results").notNull(), // Complete evaluation results
+  overallScore: numeric("overallScore", { precision: 5, scale: 2 }),
+
+  // Metrics (from guide Phase 6)
+  taskAccuracy: numeric("taskAccuracy", { precision: 5, scale: 2 }),
+  formatCorrectness: numeric("formatCorrectness", { precision: 5, scale: 2 }),
+  refusalCorrectness: numeric("refusalCorrectness", { precision: 5, scale: 2 }),
+  latency: integer("latency"), // ms per response
+  throughput: numeric("throughput", { precision: 10, scale: 2 }), // tokens/second
+
+  // Comparison baseline
+  baselineEvalId: integer("baselineEvalId"), // FK to compare against
+  improvement: numeric("improvement", { precision: 5, scale: 2 }), // % improvement over baseline
+
+  // Status
+  status: varchar("status", { length: 50 }).default("pending"),
+
+  // Metadata
+  createdBy: integer("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+}, (table) => ({
+  projectIdIdx: index("idx_evaluation_project").on(table.projectId),
+  trainingRunIdIdx: index("idx_evaluation_run").on(table.trainingRunId),
+  statusIdx: index("idx_evaluation_status").on(table.status),
+}));
+
+export type LLMEvaluation = typeof llmEvaluations.$inferSelect;
+export type InsertLLMEvaluation = typeof llmEvaluations.$inferInsert;
+
+/**
+ * LLM Quantizations - Tracks model quantization/conversion
+ * Phase 7 from guide - GGUF conversion and optimization
+ */
+export const llmQuantizations = pgTable("llm_quantizations", {
+  id: serial("id").primaryKey(),
+
+  // Project reference
+  projectId: integer("projectId").notNull(), // FK to llm_creation_projects
+  sourceTrainingRunId: integer("sourceTrainingRunId"), // FK to llm_training_runs
+
+  // Source model
+  sourceModelPath: varchar("sourceModelPath", { length: 512 }).notNull(),
+
+  // Quantization config
+  quantizationType: varchar("quantizationType", { length: 50 }).notNull(), // "Q4_K_M", "Q5_K_M", "Q8_0", "Q2_K", "f16"
+  method: varchar("method", { length: 50 }), // "llama.cpp", "gptq", "awq"
+
+  // Output
+  outputPath: varchar("outputPath", { length: 512 }),
+  outputFormat: varchar("outputFormat", { length: 50 }), // "gguf", "safetensors"
+  fileSize: bigint("fileSize", { mode: "number" }), // Bytes
+
+  // Quality comparison
+  accuracyDrop: numeric("accuracyDrop", { precision: 5, scale: 2 }), // % drop from full precision
+  compressionRatio: numeric("compressionRatio", { precision: 5, scale: 2 }),
+
+  // Performance
+  inferenceSpeedup: numeric("inferenceSpeedup", { precision: 5, scale: 2 }),
+  memoryReduction: numeric("memoryReduction", { precision: 5, scale: 2 }),
+
+  // Status
+  status: varchar("status", { length: 50 }).default("pending"),
+  logs: text("logs"),
+
+  // Metadata
+  createdBy: integer("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+}, (table) => ({
+  projectIdIdx: index("idx_quantization_project").on(table.projectId),
+  statusIdx: index("idx_quantization_status").on(table.status),
+}));
+
+export type LLMQuantization = typeof llmQuantizations.$inferSelect;
+export type InsertLLMQuantization = typeof llmQuantizations.$inferInsert;
+
+/**
+ * LLM Creation Audit Trail - Detailed audit log for creation pipeline
+ * Extends general audit with creation-specific events
+ */
+export const llmCreationAuditEvents = pgTable("llm_creation_audit_events", {
+  id: serial("id").primaryKey(),
+
+  // Event classification
+  eventType: varchar("eventType", { length: 100 }).notNull(), // "project.created", "dataset.uploaded", "training.started", etc.
+
+  // References
+  projectId: integer("projectId"),
+  datasetId: integer("datasetId"),
+  trainingRunId: integer("trainingRunId"),
+  evaluationId: integer("evaluationId"),
+  quantizationId: integer("quantizationId"),
+
+  // Actor
+  actor: integer("actor"), // User ID
+  actorType: varchar("actorType", { length: 50 }).default("user"), // user, system, automation
+
+  // Event details
+  phase: varchar("phase", { length: 50 }), // Which phase of the guide
+  action: varchar("action", { length: 100 }), // Specific action taken
+  payload: json("payload").notNull(), // Event-specific data
+
+  // Outcome
+  status: varchar("status", { length: 50 }), // "success", "failure", "warning"
+  errorMessage: text("errorMessage"),
+
+  // Timestamps
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  eventTypeIdx: index("idx_creation_audit_type").on(table.eventType),
+  projectIdIdx: index("idx_creation_audit_project").on(table.projectId),
+  timestampIdx: index("idx_creation_audit_timestamp").on(table.timestamp),
+  actorIdx: index("idx_creation_audit_actor").on(table.actor),
+}));
+
+export type LLMCreationAuditEvent = typeof llmCreationAuditEvents.$inferSelect;
+export type InsertLLMCreationAuditEvent = typeof llmCreationAuditEvents.$inferInsert;

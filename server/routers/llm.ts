@@ -826,4 +826,548 @@ export const llmRouter = router({
       const deviceSpecs = await detectDeviceSpecs();
       return checkCompatibility(deviceSpecs, model.systemRequirements);
     }),
+
+  // ============================================================================
+  // LLM Creation & Training Pipeline
+  // Following "COMPLETE LLM CREATION GUIDE" methodology
+  // ============================================================================
+
+  /**
+   * Create a new LLM creation project
+   * Phase 0-1: Target specification and path selection
+   */
+  createCreationProject: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(255),
+        description: z.string().optional(),
+        path: z.enum(["PATH_A", "PATH_B"]),
+        target: z.object({
+          useCase: z.string(),
+          deployment: z.string(),
+          maxModelSize: z.string(),
+          contextLength: z.string(),
+          allowedData: z.string(),
+        }),
+        baseModel: z
+          .object({
+            name: z.string(),
+            ollamaTag: z.string().optional(),
+            hfRepo: z.string().optional(),
+            size: z.string().optional(),
+            license: z.string().optional(),
+            context: z.number().optional(),
+            rationale: z.string().optional(),
+          })
+          .optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { db, insertInto } = await import("../db");
+      const { llmCreationProjects, llmCreationAuditEvents } = await import("../../drizzle/schema");
+
+      const [project] = await insertInto(llmCreationProjects)
+        .values({
+          name: input.name,
+          description: input.description,
+          path: input.path,
+          target: input.target,
+          baseModel: input.baseModel || null,
+          status: "draft",
+          currentPhase: "phase_0_planning",
+          createdBy: ctx.user.id,
+        })
+        .returning();
+
+      // Audit event
+      await insertInto(llmCreationAuditEvents).values({
+        eventType: "project.created",
+        projectId: project.id,
+        actor: ctx.user.id,
+        phase: "phase_0_planning",
+        action: "create_project",
+        payload: { name: input.name, path: input.path, target: input.target },
+        status: "success",
+      });
+
+      return project;
+    }),
+
+  /**
+   * List all creation projects for current user
+   */
+  listCreationProjects: protectedProcedure
+    .input(
+      z
+        .object({
+          status: z.string().optional(),
+          path: z.enum(["PATH_A", "PATH_B"]).optional(),
+        })
+        .optional()
+    )
+    .query(async ({ input, ctx }) => {
+      const { db } = await import("../db");
+      const { llmCreationProjects } = await import("../../drizzle/schema");
+      const { eq, and } = await import("drizzle-orm");
+
+      const conditions = [eq(llmCreationProjects.createdBy, ctx.user.id)];
+
+      if (input?.status) {
+        conditions.push(eq(llmCreationProjects.status, input.status));
+      }
+
+      if (input?.path) {
+        conditions.push(eq(llmCreationProjects.path, input.path));
+      }
+
+      return await db.select().from(llmCreationProjects).where(and(...conditions));
+    }),
+
+  /**
+   * Get a single creation project with all related data
+   */
+  getCreationProject: protectedProcedure
+    .input(z.object({ projectId: z.number() }))
+    .query(async ({ input, ctx }) => {
+      const { db } = await import("../db");
+      const {
+        llmCreationProjects,
+        llmDatasets,
+        llmTrainingRuns,
+        llmEvaluations,
+        llmQuantizations
+      } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const [project] = await db
+        .select()
+        .from(llmCreationProjects)
+        .where(eq(llmCreationProjects.id, input.projectId));
+
+      if (!project) {
+        throw new Error("Project not found");
+      }
+
+      // Fetch related data
+      const datasets = await db
+        .select()
+        .from(llmDatasets)
+        .where(eq(llmDatasets.projectId, input.projectId));
+
+      const trainingRuns = await db
+        .select()
+        .from(llmTrainingRuns)
+        .where(eq(llmTrainingRuns.projectId, input.projectId));
+
+      const evaluations = await db
+        .select()
+        .from(llmEvaluations)
+        .where(eq(llmEvaluations.projectId, input.projectId));
+
+      const quantizations = await db
+        .select()
+        .from(llmQuantizations)
+        .where(eq(llmQuantizations.projectId, input.projectId));
+
+      return {
+        project,
+        datasets,
+        trainingRuns,
+        evaluations,
+        quantizations,
+      };
+    }),
+
+  /**
+   * Update creation project
+   */
+  updateCreationProject: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.number(),
+        status: z.string().optional(),
+        currentPhase: z.string().optional(),
+        progress: z.number().min(0).max(100).optional(),
+        baseModel: z.any().optional(),
+        finalModelPath: z.string().optional(),
+        ollamaModelName: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { db, updateTable, eq } = await import("../db");
+      const { llmCreationProjects, llmCreationAuditEvents } = await import("../../drizzle/schema");
+
+      const { projectId, ...updates } = input;
+
+      const [updated] = await updateTable(llmCreationProjects)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(llmCreationProjects.id, projectId))
+        .returning();
+
+      // Audit event
+      const { insertInto } = await import("../db");
+      await insertInto(llmCreationAuditEvents).values({
+        eventType: "project.updated",
+        projectId: projectId,
+        actor: ctx.user.id,
+        phase: updates.currentPhase || "unknown",
+        action: "update_project",
+        payload: updates,
+        status: "success",
+      });
+
+      return updated;
+    }),
+
+  /**
+   * Upload and create a dataset
+   * Phase 2: Dataset creation
+   */
+  createDataset: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.number(),
+        name: z.string().min(1).max(255),
+        type: z.enum(["sft", "dpo", "eval", "pretrain"]),
+        source: z.enum(["upload", "synthetic", "public", "mixed"]).optional(),
+        format: z.enum(["jsonl", "csv", "parquet"]),
+        filePath: z.string().max(512),
+        fileSize: z.number().optional(),
+        recordCount: z.number().optional(),
+        tokenCount: z.number().optional(),
+        stats: z.any().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { db, insertInto } = await import("../db");
+      const { llmDatasets, llmCreationAuditEvents } = await import("../../drizzle/schema");
+
+      const [dataset] = await insertInto(llmDatasets)
+        .values({
+          ...input,
+          status: "pending",
+          createdBy: ctx.user.id,
+        })
+        .returning();
+
+      // Audit event
+      await insertInto(llmCreationAuditEvents).values({
+        eventType: "dataset.created",
+        projectId: input.projectId,
+        datasetId: dataset.id,
+        actor: ctx.user.id,
+        phase: "phase_2_dataset",
+        action: "create_dataset",
+        payload: { name: input.name, type: input.type, format: input.format },
+        status: "success",
+      });
+
+      return dataset;
+    }),
+
+  /**
+   * Update dataset status and validation
+   */
+  updateDataset: protectedProcedure
+    .input(
+      z.object({
+        datasetId: z.number(),
+        status: z.string().optional(),
+        validated: z.boolean().optional(),
+        validationErrors: z.any().optional(),
+        qualityScore: z.number().optional(),
+        qualityChecks: z.any().optional(),
+        stats: z.any().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { db, updateTable, eq } = await import("../db");
+      const { llmDatasets } = await import("../../drizzle/schema");
+
+      const { datasetId, ...updates } = input;
+
+      const [updated] = await updateTable(llmDatasets)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(llmDatasets.id, datasetId))
+        .returning();
+
+      return updated;
+    }),
+
+  /**
+   * Start a training run
+   * Phase 3-5: SFT, DPO, Tool Tuning
+   */
+  startTraining: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.number(),
+        trainingType: z.enum(["sft", "dpo", "tool_tuning", "pretrain"]),
+        phase: z.string(),
+        config: z.any(),
+        datasetIds: z.array(z.number()),
+        framework: z.enum(["huggingface", "deepspeed", "megatron", "ollama"]).optional(),
+        accelerator: z.enum(["cpu", "cuda", "tpu"]).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { db, insertInto } = await import("../db");
+      const { llmTrainingRuns, llmCreationAuditEvents } = await import("../../drizzle/schema");
+      const crypto = await import("crypto");
+
+      const configHash = crypto
+        .createHash("sha256")
+        .update(JSON.stringify(input.config))
+        .digest("hex");
+
+      const [trainingRun] = await insertInto(llmTrainingRuns)
+        .values({
+          projectId: input.projectId,
+          trainingType: input.trainingType,
+          phase: input.phase,
+          config: input.config,
+          configHash,
+          datasetIds: input.datasetIds,
+          framework: input.framework || "huggingface",
+          accelerator: input.accelerator || "cpu",
+          status: "pending",
+          createdBy: ctx.user.id,
+        })
+        .returning();
+
+      // Audit event
+      await insertInto(llmCreationAuditEvents).values({
+        eventType: "training.started",
+        projectId: input.projectId,
+        trainingRunId: trainingRun.id,
+        actor: ctx.user.id,
+        phase: input.phase,
+        action: "start_training",
+        payload: { trainingType: input.trainingType, framework: input.framework },
+        status: "success",
+      });
+
+      // Here you would trigger the actual training job
+      // For now, just return the training run record
+      return trainingRun;
+    }),
+
+  /**
+   * Update training run progress
+   */
+  updateTrainingRun: protectedProcedure
+    .input(
+      z.object({
+        trainingRunId: z.number(),
+        status: z.string().optional(),
+        progress: z.number().min(0).max(100).optional(),
+        currentStep: z.number().optional(),
+        totalSteps: z.number().optional(),
+        metrics: z.any().optional(),
+        finalLoss: z.number().optional(),
+        checkpointPath: z.string().optional(),
+        loraAdapterPath: z.string().optional(),
+        logs: z.string().optional(),
+        errorMessage: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { db, updateTable, eq } = await import("../db");
+      const { llmTrainingRuns } = await import("../../drizzle/schema");
+
+      const { trainingRunId, ...updates } = input;
+
+      const updateData: any = { ...updates, updatedAt: new Date() };
+
+      if (updates.status === "completed") {
+        updateData.completedAt = new Date();
+      } else if (updates.status === "failed") {
+        updateData.failedAt = new Date();
+      } else if (updates.status === "running" && !updateData.startedAt) {
+        updateData.startedAt = new Date();
+      }
+
+      const [updated] = await updateTable(llmTrainingRuns)
+        .set(updateData)
+        .where(eq(llmTrainingRuns.id, trainingRunId))
+        .returning();
+
+      return updated;
+    }),
+
+  /**
+   * Create evaluation
+   * Phase 6: Evaluation
+   */
+  createEvaluation: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.number(),
+        trainingRunId: z.number().optional(),
+        modelPath: z.string().max(512),
+        modelType: z.enum(["base", "sft", "dpo", "quantized"]),
+        evalDatasetId: z.number().optional(),
+        benchmarks: z.array(z.string()).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { db, insertInto } = await import("../db");
+      const { llmEvaluations, llmCreationAuditEvents } = await import("../../drizzle/schema");
+
+      const [evaluation] = await insertInto(llmEvaluations)
+        .values({
+          ...input,
+          results: {},
+          status: "pending",
+          createdBy: ctx.user.id,
+        })
+        .returning();
+
+      // Audit event
+      await insertInto(llmCreationAuditEvents).values({
+        eventType: "evaluation.created",
+        projectId: input.projectId,
+        evaluationId: evaluation.id,
+        actor: ctx.user.id,
+        phase: "phase_6_evaluation",
+        action: "create_evaluation",
+        payload: { modelType: input.modelType, benchmarks: input.benchmarks },
+        status: "success",
+      });
+
+      return evaluation;
+    }),
+
+  /**
+   * Update evaluation results
+   */
+  updateEvaluation: protectedProcedure
+    .input(
+      z.object({
+        evaluationId: z.number(),
+        status: z.string().optional(),
+        results: z.any().optional(),
+        overallScore: z.number().optional(),
+        taskAccuracy: z.number().optional(),
+        formatCorrectness: z.number().optional(),
+        refusalCorrectness: z.number().optional(),
+        latency: z.number().optional(),
+        throughput: z.number().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { db, updateTable, eq } = await import("../db");
+      const { llmEvaluations } = await import("../../drizzle/schema");
+
+      const { evaluationId, ...updates } = input;
+
+      const updateData: any = { ...updates, updatedAt: new Date() };
+
+      if (updates.status === "completed") {
+        updateData.completedAt = new Date();
+      }
+
+      const [updated] = await updateTable(llmEvaluations)
+        .set(updateData)
+        .where(eq(llmEvaluations.id, evaluationId))
+        .returning();
+
+      return updated;
+    }),
+
+  /**
+   * Start quantization
+   * Phase 7: Quantization and GGUF conversion
+   */
+  startQuantization: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.number(),
+        sourceTrainingRunId: z.number().optional(),
+        sourceModelPath: z.string().max(512),
+        quantizationType: z.enum(["Q4_K_M", "Q5_K_M", "Q8_0", "Q2_K", "f16"]),
+        method: z.enum(["llama.cpp", "gptq", "awq"]).optional(),
+        outputPath: z.string().max(512).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { db, insertInto } = await import("../db");
+      const { llmQuantizations, llmCreationAuditEvents } = await import("../../drizzle/schema");
+
+      const [quantization] = await insertInto(llmQuantizations)
+        .values({
+          ...input,
+          method: input.method || "llama.cpp",
+          outputFormat: "gguf",
+          status: "pending",
+          createdBy: ctx.user.id,
+        })
+        .returning();
+
+      // Audit event
+      await insertInto(llmCreationAuditEvents).values({
+        eventType: "quantization.started",
+        projectId: input.projectId,
+        quantizationId: quantization.id,
+        actor: ctx.user.id,
+        phase: "phase_7_quantization",
+        action: "start_quantization",
+        payload: { quantizationType: input.quantizationType, method: input.method },
+        status: "success",
+      });
+
+      return quantization;
+    }),
+
+  /**
+   * Update quantization status
+   */
+  updateQuantization: protectedProcedure
+    .input(
+      z.object({
+        quantizationId: z.number(),
+        status: z.string().optional(),
+        outputPath: z.string().optional(),
+        fileSize: z.number().optional(),
+        accuracyDrop: z.number().optional(),
+        compressionRatio: z.number().optional(),
+        logs: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { db, updateTable, eq } = await import("../db");
+      const { llmQuantizations } = await import("../../drizzle/schema");
+
+      const { quantizationId, ...updates } = input;
+
+      const updateData: any = { ...updates };
+
+      if (updates.status === "completed") {
+        updateData.completedAt = new Date();
+      }
+
+      const [updated] = await updateTable(llmQuantizations)
+        .set(updateData)
+        .where(eq(llmQuantizations.id, quantizationId))
+        .returning();
+
+      return updated;
+    }),
+
+  /**
+   * Get audit trail for a creation project
+   */
+  getCreationAuditTrail: protectedProcedure
+    .input(z.object({ projectId: z.number() }))
+    .query(async ({ input }) => {
+      const { db } = await import("../db");
+      const { llmCreationAuditEvents } = await import("../../drizzle/schema");
+      const { eq, desc } = await import("drizzle-orm");
+
+      return await db
+        .select()
+        .from(llmCreationAuditEvents)
+        .where(eq(llmCreationAuditEvents.projectId, input.projectId))
+        .orderBy(desc(llmCreationAuditEvents.timestamp));
+    }),
 });
