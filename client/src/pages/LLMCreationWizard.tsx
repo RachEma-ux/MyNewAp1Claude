@@ -1,15 +1,27 @@
 /**
- * LLM Creation Wizard - Complete pipeline for creating custom LLMs
+ * LLM Creation (Full Lifecycle) - Complete pipeline for training custom LLMs
+ *
+ * Purpose: Train/fine-tune actual AI models from scratch or base models
+ * Use when: You need to create a custom model with your own data
  *
  * Follows the "COMPLETE LLM CREATION GUIDE" methodology:
- * - PATH A: Fine-tuning (Recommended) - 8 phases
- * - PATH B: Pre-training from scratch (Advanced) - 6 phases
+ * - PATH A: Fine-tuning (Recommended) - 8 phases, 2-4 weeks
+ * - PATH B: Pre-training from scratch (Advanced) - 6 phases, 2-6 months
  *
  * Features:
  * - Multi-step guided creation process
+ * - Dataset management (SFT, DPO, eval)
+ * - Training configuration & monitoring
+ * - Evaluation & benchmarking
+ * - Quantization & GGUF conversion
  * - Auto-save drafts to localStorage
  * - Complete audit trail
  * - Real-time progress tracking
+ * - Build spec generation
+ * - Promotion workflow integration
+ *
+ * NOTE: This trains actual models. For quick registration of existing models,
+ * use "LLM Quick Setup" wizard at /llm/wizard
  */
 
 import { useState, useEffect } from "react";
@@ -326,9 +338,9 @@ export default function LLMCreationWizard() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold">Create Custom LLM</h1>
+            <h1 className="text-3xl font-bold">LLM Creation (Full Lifecycle)</h1>
             <p className="text-muted-foreground mt-1">
-              Follow the guided process to fine-tune or pre-train your own model
+              Train custom models via PATH A (Fine-tuning) or PATH B (Pre-training from scratch)
             </p>
           </div>
           <Button variant="outline" onClick={() => setLocation("/llm")}>

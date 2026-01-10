@@ -38,8 +38,12 @@ export default function LLMDashboard() {
   // Fetch dashboard statistics
   const { data: stats, isLoading } = trpc.llm.getDashboardStats.useQuery();
 
-  const openWizard = () => {
+  const openQuickSetup = () => {
     setLocation("/llm/wizard");
+  };
+
+  const openFullLifecycle = () => {
+    setLocation("/llm/create");
   };
 
   const openControlPlane = () => {
@@ -77,9 +81,13 @@ export default function LLMDashboard() {
             <Settings className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
             Control Plane
           </Button>
-          <Button size="lg" onClick={openWizard} className="w-full sm:w-auto">
+          <Button variant="outline" size="lg" onClick={openQuickSetup} className="w-full sm:w-auto">
             <Wand2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-            Wizard
+            Quick Setup
+          </Button>
+          <Button size="lg" onClick={openFullLifecycle} className="w-full sm:w-auto">
+            <Cpu className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+            Train Model
           </Button>
         </div>
       </div>
@@ -201,9 +209,14 @@ export default function LLMDashboard() {
               <div className="text-center py-8">
                 <Activity className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-muted-foreground">No recent activity</p>
-                <Button variant="link" onClick={openWizard} className="mt-2">
-                  Create your first LLM
-                </Button>
+                <div className="flex gap-2 justify-center mt-2">
+                  <Button variant="link" onClick={openQuickSetup}>
+                    Quick Setup
+                  </Button>
+                  <Button variant="link" onClick={openFullLifecycle}>
+                    Train Model
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
@@ -216,9 +229,17 @@ export default function LLMDashboard() {
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full" onClick={openWizard}>
+              <Button className="w-full" onClick={openQuickSetup}>
                 <Wand2 className="mr-2 h-4 w-4" />
-                Open Wizard
+                Quick Setup
+              </Button>
+              <Button className="w-full" onClick={openFullLifecycle}>
+                <Cpu className="mr-2 h-4 w-4" />
+                Train Custom Model
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => setLocation("/llm/training")}>
+                <Activity className="mr-2 h-4 w-4" />
+                Training Monitor
               </Button>
               <Button variant="outline" className="w-full" onClick={openControlPlane}>
                 <Settings className="mr-2 h-4 w-4" />
