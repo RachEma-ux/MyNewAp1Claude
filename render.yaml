@@ -23,6 +23,8 @@ services:
         value: https://example.com
       - key: VITE_APP_ID
         value: demo-app
+      - key: OAUTH_SERVER_URL
+        value: https://api.manus.im
       - key: DEV_MODE
         value: true
       - key: ANTHROPIC_API_KEY
@@ -54,3 +56,12 @@ databases:
 # 3. DATABASE_URL is automatically set from app-db database
 # 4. Migration 0017 will run during build via db:push command
 # 5. LLM Control Plane system will be deployed with all features
+#
+# OAuth Bypass Configuration:
+# - DEV_MODE=true bypasses OAuth authentication (auto-login as "Dev User" admin)
+# - Perfect for testing and development without OAuth server
+# - To disable: Remove or set DEV_MODE=false in Render Environment tab
+# - When disabling DEV_MODE, update these OAuth URLs to your actual values:
+#   * VITE_OAUTH_PORTAL_URL (frontend OAuth portal)
+#   * OAUTH_SERVER_URL (backend OAuth API)
+#   * VITE_APP_ID (your registered app ID)
