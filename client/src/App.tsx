@@ -69,6 +69,7 @@ import WikiEditor from "@/pages/WikiEditor";
 import LLMDashboard from "@/pages/LLMDashboard";
 import LLMControlPlane from "@/pages/LLMControlPlane";
 import LLMWizard from "@/pages/LLMWizard";
+import LLMCreationWizard from "@/pages/LLMCreationWizard";
 import LLMProviderConfigWizard from "@/pages/LLMProviderConfigWizard";
 import LLMPromotions from "@/pages/LLMPromotions";
 import LLMDetailPage from "@/pages/LLMDetailPage";
@@ -166,6 +167,7 @@ function Router() {
       <Route path="/llm" component={() => <ProtectedRoute component={LLMDashboard} />} />
       <Route path="/llm/control-plane" component={() => <ProtectedRoute component={LLMControlPlane} />} />
       <Route path="/llm/wizard" component={() => <ProtectedRoute component={LLMWizard} />} />
+      <Route path="/llm/create" component={() => <ProtectedRoute component={LLMCreationWizard} />} />
       <Route path="/llm/promotions" component={() => <ProtectedRoute component={LLMPromotions} />} />
       {/* Provider Configuration Wizard */}
       <Route path="/llm/provider-wizard" component={() => <ProtectedRoute component={LLMProviderConfigWizard} />} />
