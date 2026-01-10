@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "render": {
+      "url": "https://mcp.render.com/mcp",
+      "transport": "http",
+      "headers": {
+        "Authorization": "Bearer ${RENDER_API_KEY}",
+        "Content-Type": "application/json"
+      },
+      "description": "Render.com MCP Server - Manage Render services, deployments, and infrastructure",
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}
