@@ -31,6 +31,7 @@ export interface Job {
     evaluationId?: number;
     quantizationId?: number;
     userId?: number;
+    [key: string]: any; // Allow additional metadata fields
   };
 }
 
@@ -248,7 +249,7 @@ class JobQueue extends EventEmitter {
     const now = Date.now();
     let cleaned = 0;
 
-    for (const [id, job] of this.jobs.entries()) {
+    for (const [id, job] of Array.from(this.jobs.entries())) {
       if (
         (job.status === "completed" || job.status === "failed") &&
         job.completedAt &&
