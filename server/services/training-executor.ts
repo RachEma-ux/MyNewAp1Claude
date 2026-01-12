@@ -198,7 +198,7 @@ class TrainingExecutor {
     await this.updateEvaluationStatus(evaluationId, "running");
 
     // Simulate evaluation
-    const totalBenchmarks = benchmarks?.length || 5;
+    const totalBenchmarks: number = benchmarks?.length || 5;
     const results: any = {};
 
     for (let i = 0; i <= totalBenchmarks; i++) {
@@ -219,7 +219,8 @@ class TrainingExecutor {
     }
 
     // Calculate overall scores
-    const overallScore = Object.values(results).reduce((acc: number, r: any) => acc + r.score, 0) / totalBenchmarks;
+    const resultsArray = Object.values(results) as Array<{ score: number; accuracy: number }>;
+    const overallScore = resultsArray.reduce((acc: number, r) => acc + r.score, 0) / totalBenchmarks;
     const taskAccuracy = overallScore * 100;
 
     await this.updateEvaluationStatus(evaluationId, "completed", {
