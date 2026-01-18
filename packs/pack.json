@@ -1,0 +1,31 @@
+{
+  "pack_version": 1,
+  "id": "hellonewapp",
+  "name": "HelloNewApp",
+  "version": "1.0.0",
+  "type": "wasm",
+  "entry": "companion.wasm",
+  "description": "Hello World companion pack for the MyNewAp1Claude AI platform.",
+  "permissions": {
+    "network": {
+      "connect": [
+        "http://localhost:5000",
+        "http://localhost:3000"
+      ],
+      "listen_localhost": false
+    },
+    "filesystem": {
+      "read": ["data/"],
+      "write": ["cache/"]
+    }
+  },
+  "limits": {
+    "memory_mb": 32,
+    "cpu_ms_per_sec": 500
+  },
+  "build": {
+    "git_sha": "hellonewapp-v1.0.0",
+    "built_at": "2026-01-18T00:00:00Z",
+    "target": "android-arm64"
+  }
+}
