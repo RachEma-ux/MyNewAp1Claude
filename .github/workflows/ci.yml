@@ -1,0 +1,54 @@
+name: Run WASM Pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      pack_id:
+        description: 'Pack ID to run'
+        required: false
+        default: 'hellonewapp'
+
+jobs:
+  run-wasm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Wasmtime
+        run: |
+          curl https://wasmtime.dev/install.sh -sSf | bash
+          echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
+
+      - name: Run WASM Pack
+        id: run_wasm
+        run: |
+          echo "=== Running WASM Pack ===" | tee execution.log
+          echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" | tee -a execution.log
+          echo "Wasmtime version: $(wasmtime --version)" | tee -a execution.log
+          echo "---" | tee -a execution.log
+
+          # Find and run the WASM file
+          WASM_FILE="packs/hellonewapp.wasm"
+          if [ -f "$WASM_FILE" ]; then
+            wasmtime "$WASM_FILE" 2>&1 | tee -a execution.log
+            EXIT_CODE=${PIPESTATUS[0]}
+          else
+            echo "WASM file not found: $WASM_FILE" | tee -a execution.log
+            EXIT_CODE=1
+          fi
+
+          echo "---" | tee -a execution.log
+          echo "Exit code: $EXIT_CODE" | tee -a execution.log
+          echo "=== Execution Complete ===" | tee -a execution.log
+
+          exit $EXIT_CODE
+
+      - name: Upload execution results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wasm-execution-results
+          path: execution.log
+          retention-days: 7
