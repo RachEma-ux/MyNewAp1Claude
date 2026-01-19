@@ -10,7 +10,8 @@ export async function createAgent(data: {
   name: string;
   description?: string;
   systemPrompt: string;
-  modelId?: number;
+  modelId?: string;
+  roleClass?: string;
   temperature?: string;
   hasDocumentAccess?: boolean;
   hasToolAccess?: boolean;
@@ -21,23 +22,26 @@ export async function createAgent(data: {
 }) {
   const db = getDb();
   if (!db) throw new Error('Database not available');
-  
-  const result = await db.insert(agents).values({
+
+  const [result] = await db.insert(agents).values({
     workspaceId: data.workspaceId,
     name: data.name,
     description: data.description,
     systemPrompt: data.systemPrompt,
-    modelId: data.modelId,
+    modelId: data.modelId || 'default',
+    roleClass: data.roleClass || 'general',
     temperature: data.temperature || '0.7',
     hasDocumentAccess: data.hasDocumentAccess ?? true,
     hasToolAccess: data.hasToolAccess ?? false,
-    allowedTools: data.allowedTools ? JSON.stringify(data.allowedTools) : null,
-    maxIterations: data.maxIterations || 10,
-    autoSummarize: data.autoSummarize ?? false,
+    allowedTools: data.allowedTools || null,
+    limits: {
+      maxIterations: data.maxIterations || 10,
+      autoSummarize: data.autoSummarize ?? false,
+    },
     createdBy: data.createdBy,
-  });
+  }).returning();
 
-  return Number(result[0].insertId);
+  return result.id;
 }
 
 /**

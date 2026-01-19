@@ -57,10 +57,15 @@ export interface LLMPolicyInput {
       version?: string;
       contextLength?: number;
     };
-    parameters: {
+    parameters?: {
       temperature?: number;
       maxTokens?: number;
       topP?: number;
+      streaming?: boolean;
+    };
+    capabilities?: {
+      tools?: string[];
+      functions?: string[];
     };
   };
   environment: "sandbox" | "governed" | "production";
@@ -315,6 +320,9 @@ export class LLMPolicyEngine {
   ) {
     const { parameters } = input.configuration;
 
+    // Skip if no parameters defined
+    if (!parameters) return;
+
     // Temperature check
     if (parameters.temperature !== undefined) {
       const { min, max, recommended } = POLICY_RULES.parameters.temperature;
@@ -395,7 +403,7 @@ export class LLMPolicyEngine {
 
     // Temperature check for environment
     if (
-      input.configuration.parameters.temperature &&
+      input.configuration.parameters?.temperature &&
       input.configuration.parameters.temperature > envRules.maxTemperature
     ) {
       violations.push({

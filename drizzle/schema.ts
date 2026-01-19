@@ -1,4 +1,4 @@
-import { integer, serial, varchar, pgTable, text, timestamp, boolean, json, uniqueIndex, index, decimal, pgEnum } from "drizzle-orm/pg-core";
+import { integer, serial, varchar, pgTable, text, timestamp, boolean, json, uniqueIndex, index, decimal, pgEnum, bigint, numeric } from "drizzle-orm/pg-core";
 
 /**
  * MyNewAppV1 Database Schema
@@ -1395,39 +1395,41 @@ export type InsertAgentVersion = typeof agentVersions.$inferInsert;
 export const promotionRequests = pgTable("promotionRequests", {
   id: serial("id").primaryKey(),
   agentId: integer("agentId").notNull(),
-  
+
   // Request metadata
   requestedBy: integer("requestedBy").notNull(),
   status: varchar("status", { length: 50 }).notNull().default("pending"),
-  
+  approvers: json("approvers"), // Array of user IDs who can approve
+  notes: text("notes"),
+
   // Diff information
   diffHash: varchar("diffHash", { length: 64 }),
   diffSnapshot: json("diffSnapshot"), // Structured diff output
   baselineVersion: integer("baselineVersion"),
   proposedVersion: integer("proposedVersion"),
-  
+
   // Policy validation
   validationSnapshot: json("validationSnapshot"), // Policy validation result at request time
   policyDigest: varchar("policyDigest", { length: 64 }),
-  
+
   // Approval workflow
   approvedBy: integer("approvedBy"),
   approvedAt: timestamp("approvedAt"),
   approvalComment: text("approvalComment"),
-  
+
   rejectedBy: integer("rejectedBy"),
   rejectedAt: timestamp("rejectedAt"),
   rejectionReason: text("rejectionReason"),
-  
+
   // Execution
   executedAt: timestamp("executedAt"),
   executionError: text("executionError"),
-  
+
   // SLA & Escalation
   slaDeadline: timestamp("slaDeadline"),
   escalatedAt: timestamp("escalatedAt"),
   escalationCount: integer("escalationCount").default(0),
-  
+
   // Audit
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

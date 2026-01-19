@@ -1,18 +1,18 @@
-import { mysqlTable, varchar, text, int, timestamp, boolean, enum as mysqlEnum, index } from 'drizzle-orm/mysql-core';
+import { pgTable, varchar, text, integer, serial, timestamp, boolean, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { users } from './schema';
 
 // Wiki Categories
-export const wikiCategories = mysqlTable(
+export const wikiCategories = pgTable(
   'wiki_categories',
   {
-    id: int().primaryKey().autoincrement(),
-    name: varchar({ length: 255 }).notNull().unique(),
-    description: text(),
-    icon: varchar({ length: 50 }), // lucide-react icon name
-    displayOrder: int('display_order').default(0),
-    createdAt: timestamp().defaultNow(),
-    updatedAt: timestamp().defaultNow().onUpdateNow(),
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 255 }).notNull().unique(),
+    description: text('description'),
+    icon: varchar('icon', { length: 50 }), // lucide-react icon name
+    displayOrder: integer('display_order').default(0),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
   },
   (table) => ({
     displayOrderIdx: index('wiki_categories_display_order_idx').on(table.displayOrder),
@@ -20,20 +20,20 @@ export const wikiCategories = mysqlTable(
 );
 
 // Wiki Pages
-export const wikiPages = mysqlTable(
+export const wikiPages = pgTable(
   'wiki_pages',
   {
-    id: int().primaryKey().autoincrement(),
-    title: varchar({ length: 255 }).notNull(),
-    slug: varchar({ length: 255 }).notNull().unique(),
-    content: text().notNull(), // markdown content
-    categoryId: int().references(() => wikiCategories.id),
-    authorId: int().references(() => users.id),
-    version: int().default(1),
-    isPublished: boolean().default(false),
-    views: int().default(0),
-    createdAt: timestamp().defaultNow(),
-    updatedAt: timestamp().defaultNow().onUpdateNow(),
+    id: serial('id').primaryKey(),
+    title: varchar('title', { length: 255 }).notNull(),
+    slug: varchar('slug', { length: 255 }).notNull().unique(),
+    content: text('content').notNull(), // markdown content
+    categoryId: integer('category_id').references(() => wikiCategories.id),
+    authorId: integer('author_id').references(() => users.id),
+    version: integer('version').default(1),
+    isPublished: boolean('is_published').default(false),
+    views: integer('views').default(0),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
   },
   (table) => ({
     slugIdx: index('wiki_pages_slug_idx').on(table.slug),
@@ -44,16 +44,16 @@ export const wikiPages = mysqlTable(
 );
 
 // Wiki Revisions (Version History)
-export const wikiRevisions = mysqlTable(
+export const wikiRevisions = pgTable(
   'wiki_revisions',
   {
-    id: int().primaryKey().autoincrement(),
-    pageId: int().notNull().references(() => wikiPages.id, { onDelete: 'cascade' }),
-    content: text().notNull(), // markdown content at this revision
-    authorId: int().references(() => users.id),
-    reason: varchar({ length: 500 }), // why this revision was made
-    revisionNumber: int().notNull(),
-    createdAt: timestamp().defaultNow(),
+    id: serial('id').primaryKey(),
+    pageId: integer('page_id').notNull().references(() => wikiPages.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(), // markdown content at this revision
+    authorId: integer('author_id').references(() => users.id),
+    reason: varchar('reason', { length: 500 }), // why this revision was made
+    revisionNumber: integer('revision_number').notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
   },
   (table) => ({
     pageIdx: index('wiki_revisions_page_idx').on(table.pageId),
@@ -63,17 +63,17 @@ export const wikiRevisions = mysqlTable(
 );
 
 // Wiki Attachments (Images, PDFs, etc.)
-export const wikiAttachments = mysqlTable(
+export const wikiAttachments = pgTable(
   'wiki_attachments',
   {
-    id: int().primaryKey().autoincrement(),
-    pageId: int().notNull().references(() => wikiPages.id, { onDelete: 'cascade' }),
-    filename: varchar({ length: 255 }).notNull(),
-    url: varchar({ length: 500 }).notNull(), // S3 URL or similar
-    type: varchar({ length: 50 }), // image, pdf, document, etc.
-    size: int(), // file size in bytes
-    uploadedBy: int().references(() => users.id),
-    createdAt: timestamp().defaultNow(),
+    id: serial('id').primaryKey(),
+    pageId: integer('page_id').notNull().references(() => wikiPages.id, { onDelete: 'cascade' }),
+    filename: varchar('filename', { length: 255 }).notNull(),
+    url: varchar('url', { length: 500 }).notNull(), // S3 URL or similar
+    type: varchar('type', { length: 50 }), // image, pdf, document, etc.
+    size: integer('size'), // file size in bytes
+    uploadedBy: integer('uploaded_by').references(() => users.id),
+    createdAt: timestamp('created_at').defaultNow(),
   },
   (table) => ({
     pageIdx: index('wiki_attachments_page_idx').on(table.pageId),

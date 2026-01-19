@@ -78,16 +78,15 @@ export const templatesRouter = router({
         definition: workflowDef,
         userId: ctx.user.id,
         isActive: false,
-      } as any);
-      
+      } as any).returning();
+
       // Increment usage count
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       await db
         .update(workflowTemplates)
         .set({ usageCount: (template[0].usageCount || 0) + 1 })
         .where(eq(workflowTemplates.id, input.templateId));
-      
-      return { workflowId: newWorkflow.insertId, name: workflowName };
+
+      return { workflowId: newWorkflow.id, name: workflowName };
     }),
 
   // Create new template (admin only)
@@ -107,9 +106,9 @@ export const templatesRouter = router({
       const [result] = await db.insert(workflowTemplates).values({
         ...input,
         createdBy: ctx.user.id,
-      });
-      
-      return { id: result.insertId };
+      }).returning();
+
+      return { id: result.id };
     }),
 
   // Update template

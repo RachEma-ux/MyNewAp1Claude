@@ -415,7 +415,8 @@ export const appRouter = router({
           name: z.string(),
           description: z.string().optional(),
           systemPrompt: z.string(),
-          modelId: z.number().optional(),
+          modelId: z.string().optional(),
+          roleClass: z.string().optional(),
           temperature: z.string().optional(),
           hasDocumentAccess: z.boolean().optional(),
           hasToolAccess: z.boolean().optional(),
@@ -429,6 +430,8 @@ export const appRouter = router({
         }
         return await db.createAgent({
           ...input,
+          modelId: input.modelId || "default",
+          roleClass: input.roleClass || "general",
           createdBy: ctx.user.id,
         });
       }),
@@ -440,7 +443,7 @@ export const appRouter = router({
           name: z.string().optional(),
           description: z.string().optional(),
           systemPrompt: z.string().optional(),
-          modelId: z.number().optional(),
+          modelId: z.string().optional(),
           temperature: z.string().optional(),
           hasDocumentAccess: z.boolean().optional(),
           hasToolAccess: z.boolean().optional(),

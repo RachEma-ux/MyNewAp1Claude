@@ -1,4 +1,5 @@
 import { eq, and, desc, sql, inArray, ne } from "drizzle-orm";
+export { eq, and, desc, sql, inArray, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "../drizzle/schema";
 import {
@@ -52,7 +53,7 @@ export function getDb() {
       const dbUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':****@');
       console.log("[Database] Initializing Drizzle with URL:", dbUrl);
 
-      _db = drizzle(process.env.DATABASE_URL, { schema, mode: "default" });
+      _db = drizzle(process.env.DATABASE_URL, { schema });
       console.log("[Database] ✅ Drizzle instance created successfully");
     } catch (error) {
       console.error("[Database] ❌ Failed to create Drizzle instance:", error);
@@ -62,6 +63,46 @@ export function getDb() {
     console.error("[Database] ❌ DATABASE_URL environment variable is not set!");
   }
   return _db;
+}
+
+// Export db getter for use with dynamic imports
+export const db = {
+  get instance() {
+    return getDb();
+  },
+  select() {
+    const dbInstance = getDb();
+    if (!dbInstance) throw new Error("Database not available");
+    return dbInstance.select();
+  },
+  insert<T extends Parameters<NonNullable<ReturnType<typeof getDb>>["insert"]>[0]>(table: T) {
+    const dbInstance = getDb();
+    if (!dbInstance) throw new Error("Database not available");
+    return dbInstance.insert(table);
+  },
+  update<T extends Parameters<NonNullable<ReturnType<typeof getDb>>["update"]>[0]>(table: T) {
+    const dbInstance = getDb();
+    if (!dbInstance) throw new Error("Database not available");
+    return dbInstance.update(table);
+  },
+  delete<T extends Parameters<NonNullable<ReturnType<typeof getDb>>["delete"]>[0]>(table: T) {
+    const dbInstance = getDb();
+    if (!dbInstance) throw new Error("Database not available");
+    return dbInstance.delete(table);
+  },
+};
+
+// Helper functions for compatibility with dynamic import patterns
+export function insertInto<T extends Parameters<NonNullable<ReturnType<typeof getDb>>["insert"]>[0]>(table: T) {
+  const dbInstance = getDb();
+  if (!dbInstance) throw new Error("Database not available");
+  return dbInstance.insert(table);
+}
+
+export function updateTable<T extends Parameters<NonNullable<ReturnType<typeof getDb>>["update"]>[0]>(table: T) {
+  const dbInstance = getDb();
+  if (!dbInstance) throw new Error("Database not available");
+  return dbInstance.update(table);
 }
 
 async function getPgPool(): Promise<Pool | null> {
@@ -186,7 +227,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -215,18 +257,16 @@ export async function createWorkspace(workspace: InsertWorkspace): Promise<Works
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(workspaces).values(workspace);
-  const workspaceId = Number(result[0].insertId);
+  const [created] = await db.insert(workspaces).values(workspace).returning();
 
   // Add creator as owner
   await db.insert(workspaceMembers).values({
-    workspaceId,
+    workspaceId: created.id,
     userId: workspace.ownerId,
     role: "owner",
   });
 
-  const created = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
-  return created[0]!;
+  return created;
 }
 
 export async function getUserWorkspaces(userId: number): Promise<Workspace[]> {
@@ -289,11 +329,8 @@ export async function createModel(model: InsertModel): Promise<Model> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(models).values(model);
-  const modelId = Number(result[0].insertId);
-
-  const created = await db.select().from(models).where(eq(models.id, modelId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(models).values(model).returning();
+  return created;
 }
 
 export async function getAllModels(): Promise<Model[]> {
@@ -340,11 +377,8 @@ export async function createDocument(document: InsertDocument): Promise<Document
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(documents).values(document);
-  const documentId = Number(result[0].insertId);
-
-  const created = await db.select().from(documents).where(eq(documents.id, documentId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(documents).values(document).returning();
+  return created;
 }
 
 export async function getWorkspaceDocuments(workspaceId: number): Promise<Document[]> {
@@ -384,11 +418,8 @@ export async function createAgent(agent: InsertAgent): Promise<Agent> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(agents).values(agent);
-  const agentId = Number(result[0].insertId);
-
-  const created = await db.select().from(agents).where(eq(agents.id, agentId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(agents).values(agent).returning();
+  return created;
 }
 
 export async function getWorkspaceAgents(workspaceId: number): Promise<Agent[]> {
@@ -428,11 +459,8 @@ export async function createConversation(conversation: InsertConversation): Prom
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(conversations).values(conversation);
-  const conversationId = Number(result[0].insertId);
-
-  const created = await db.select().from(conversations).where(eq(conversations.id, conversationId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(conversations).values(conversation).returning();
+  return created;
 }
 
 export async function getUserConversations(userId: number, workspaceId?: number): Promise<Conversation[]> {
@@ -481,8 +509,7 @@ export async function createMessage(message: InsertMessage): Promise<Message> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(messages).values(message);
-  const messageId = Number(result[0].insertId);
+  const [created] = await db.insert(messages).values(message).returning();
 
   // Update conversation timestamp
   await db
@@ -490,8 +517,7 @@ export async function createMessage(message: InsertMessage): Promise<Message> {
     .set({ updatedAt: new Date() })
     .where(eq(conversations.id, message.conversationId));
 
-  const created = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-  return created[0]!;
+  return created;
 }
 
 export async function getConversationMessages(conversationId: number): Promise<Message[]> {
@@ -812,20 +838,20 @@ export async function publishWorkflow(
     publishedBy: userId,
     changeNotes: changeNotes || null,
     status: "published",
-  });
+  }).returning();
 
   // Update workflow to reference this version
   await db
     .update(workflows)
     .set({
-      publishedVersionId: newVersion.insertId,
+      publishedVersionId: newVersion.id,
       status: "published",
       draftData: null, // Clear draft data
     })
     .where(eq(workflows.id, workflowId));
 
   return {
-    versionId: newVersion.insertId,
+    versionId: newVersion.id,
     version: nextVersion,
   };
 }
@@ -923,9 +949,9 @@ export async function createWorkflowExecution(
     triggerType: data.triggerType || "manual",
     triggerData: data.triggerData || null,
     executedBy: userId,
-  });
+  }).returning();
 
-  return result.insertId;
+  return result.id;
 }
 
 /**
@@ -1076,9 +1102,9 @@ export async function createExecutionLog(
     startedAt: data.startedAt || new Date(),
     completedAt: data.completedAt || null,
     duration: data.duration || null,
-  });
+  }).returning();
 
-  return result.insertId;
+  return result.id;
 }
 
 /**
@@ -1636,8 +1662,6 @@ export async function getLLMAuditEvents(filter: {
   const db = getDb();
   if (!db) return [];
 
-  let query = db.select().from(llmAuditEvents);
-
   const conditions = [];
   if (filter.llmId) {
     conditions.push(eq(llmAuditEvents.llmId, filter.llmId));
@@ -1649,15 +1673,14 @@ export async function getLLMAuditEvents(filter: {
     conditions.push(eq(llmAuditEvents.eventType, filter.eventType));
   }
 
-  if (conditions.length > 0) {
-    query = query.where(and(...conditions)) as any;
-  }
+  const baseQuery = db.select().from(llmAuditEvents);
+  const filteredQuery = conditions.length > 0
+    ? baseQuery.where(and(...conditions))
+    : baseQuery;
+  const orderedQuery = filteredQuery.orderBy(desc(llmAuditEvents.timestamp));
+  const limitedQuery = filter.limit
+    ? orderedQuery.limit(filter.limit)
+    : orderedQuery;
 
-  query = query.orderBy(desc(llmAuditEvents.timestamp));
-
-  if (filter.limit) {
-    query = query.limit(filter.limit) as any;
-  }
-
-  return await query;
+  return await limitedQuery;
 }

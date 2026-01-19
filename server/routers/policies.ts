@@ -60,7 +60,7 @@ export const policiesRouter = router({
       z.object({
         name: z.string().min(1).max(255),
         description: z.string().optional(),
-        content: z.record(z.any()),
+        content: z.record(z.string(), z.any()),
         isTemplate: z.boolean().optional().default(false),
       })
     )
@@ -112,7 +112,7 @@ export const policiesRouter = router({
         id: z.number(),
         name: z.string().optional(),
         description: z.string().optional(),
-        content: z.record(z.any()).optional(),
+        content: z.record(z.string(), z.any()).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {

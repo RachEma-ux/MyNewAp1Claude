@@ -382,18 +382,18 @@ export const llmRouter = router({
       });
 
       // Update promotion status
-      const db = await import("../db").then((m) => m.getDb());
+      const { getDb } = await import("../db");
+      const { llmPromotions } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = getDb();
       if (db) {
-        await db().update(await import("../../drizzle/schema").then((m) => m.llmPromotions))
+        await db.update(llmPromotions)
           .set({
             status: "executed",
             executedAt: new Date(),
             newVersionId: newVersion.id,
           })
-          .where(await import("drizzle-orm").then((m) => m.eq)(
-            (await import("../../drizzle/schema")).llmPromotions.id,
-            promotion.id
-          ));
+          .where(eq(llmPromotions.id, promotion.id));
       }
 
       return { success: true, newVersion };
@@ -1086,10 +1086,14 @@ export const llmRouter = router({
       const { db, updateTable, eq } = await import("../db");
       const { llmDatasets } = await import("../../drizzle/schema");
 
-      const { datasetId, ...updates } = input;
+      const { datasetId, qualityScore, ...updates } = input;
 
       const [updated] = await updateTable(llmDatasets)
-        .set({ ...updates, updatedAt: new Date() })
+        .set({
+          ...updates,
+          qualityScore: qualityScore?.toString(),
+          updatedAt: new Date()
+        })
         .where(eq(llmDatasets.id, datasetId))
         .returning();
 

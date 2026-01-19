@@ -84,9 +84,9 @@ export const protocolsRouter = router({
         fileSize: input.fileSize,
         tags: input.tags || [],
         createdBy: ctx.user.id,
-      });
+      }).returning();
 
-      return { id: result.insertId };
+      return { id: result.id };
     }),
 
   // Update protocol
@@ -183,8 +183,8 @@ export const protocolsRouter = router({
         fileSize: input.fileSize,
         tags: input.tags || [],
         createdBy: ctx.user.id,
-      });
+      }).returning();
 
-      return { id: result.insertId };
+      return { id: result.id };
     }),
 });

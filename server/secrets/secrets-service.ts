@@ -31,10 +31,10 @@ export async function createSecret(input: {
       key: input.key,
       encryptedValue,
       description: input.description || null,
-    });
+    })
+    .returning();
 
-  const insertId = Number(result.insertId);
-  return (await getSecretById(insertId, input.userId))!;
+  return (await getSecretById(result.id, input.userId))!;
 }
 
 /**

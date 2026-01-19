@@ -316,7 +316,7 @@ export async function getAuditLogs(keyRotationId: number): Promise<KeyRotationAu
   if (!db) return [];
   
   return await db.select().from(keyRotationAuditLogs)
-    .where(eq(keyRotationAuditLogs.keyRotationId, keyRotationId))
+    .where(eq(keyRotationAuditLogs.rotationId, keyRotationId))
     .orderBy(desc(keyRotationAuditLogs.createdAt));
 }
 

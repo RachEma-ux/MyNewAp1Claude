@@ -104,7 +104,8 @@ export async function executeAgent(options: AgentExecutionOptions): Promise<Agen
   // Handle tool calling if agent has tool access
   const toolCalls: Array<{ tool: string; params: Record<string, any>; result: string }> = [];
   let iterations = 0;
-  const maxIterations = agent?.maxIterations || 10;
+  const limits = agent?.limits as { maxIterations?: number } | null;
+  const maxIterations = limits?.maxIterations || 10;
 
   if (agent?.hasToolAccess) {
     // Add tool instructions to system prompt
