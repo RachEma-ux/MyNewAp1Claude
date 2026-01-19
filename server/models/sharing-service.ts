@@ -35,8 +35,8 @@ export async function createModelShare(data: InsertModelShare): Promise<number> 
     }
   }
   
-  const [result] = await db.insert(modelShares).values(data);
-  return result.insertId;
+  const [result] = await db.insert(modelShares).values(data).returning();
+  return result.id;
 }
 
 /**

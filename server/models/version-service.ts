@@ -22,8 +22,8 @@ export async function createModelVersion(data: InsertModelVersion): Promise<numb
       .where(eq(modelVersions.modelId, data.modelId));
   }
 
-  const [result] = await db.insert(modelVersions).values(data);
-  return result.insertId;
+  const [result] = await db.insert(modelVersions).values(data).returning();
+  return result.id;
 }
 
 /**

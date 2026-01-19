@@ -1,0 +1,98 @@
+name: Run App
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'How long to keep app running (minutes)'
+        required: true
+        default: '10'
+        type: choice
+        options:
+          - '5'
+          - '10'
+          - '15'
+          - '30'
+
+permissions:
+  contents: read
+
+jobs:
+  run-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install --legacy-peer-deps
+          npm install @langchain/core --legacy-peer-deps
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+
+      - name: Install cloudflared
+        run: |
+          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+          chmod +x cloudflared
+
+      - name: Start application with tunnel
+        run: |
+          # Start the Node.js server in background on port 3000
+          PORT=3000 NODE_ENV=production node dist/index.js &
+          SERVER_PID=$!
+
+          # Wait for server to start
+          echo "Waiting for server to start..."
+          sleep 10
+
+          # Check if server is responding
+          curl -s http://localhost:3000/api/health || echo "Health check failed (may be expected without DB)"
+
+          # Start cloudflare tunnel and capture URL
+          ./cloudflared tunnel --url http://localhost:3000 2>&1 | tee tunnel.log &
+          TUNNEL_PID=$!
+
+          # Wait for tunnel to establish and get URL
+          sleep 10
+          TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' tunnel.log | head -1)
+
+          echo "============================================"
+          echo "🚀 APP IS LIVE!"
+          echo "============================================"
+          echo ""
+          echo "URL: $TUNNEL_URL"
+          echo ""
+          echo "App will stay running for ${{ github.event.inputs.duration }} minutes"
+          echo "============================================"
+
+          # Save URL to file
+          echo "$TUNNEL_URL" > app_url.txt
+
+          # Keep running for specified duration
+          DURATION_SECONDS=$(( ${{ github.event.inputs.duration }} * 60 ))
+          sleep $DURATION_SECONDS
+
+          # Cleanup
+          kill $SERVER_PID 2>/dev/null || true
+          kill $TUNNEL_PID 2>/dev/null || true
+
+      - name: Upload URL artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-url
+          path: app_url.txt
+          retention-days: 1

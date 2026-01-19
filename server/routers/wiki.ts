@@ -80,8 +80,15 @@ export const wikiRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // Generate slug from title if not provided
+      const slug = input.slug || input.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
       return WikiService.createPage({
         ...input,
+        slug,
         authorId: ctx.user.id,
         isPublished: false,
       });

@@ -39,14 +39,16 @@ export const agentsPromotionsRouter = router({
       const userId = ctx.user.openId;
 
       // Load agent
-      const agent = await (db.query as any).agents.findFirst({
-        where: and(
-
+      const agentResults = await db
+        .select()
+        .from(agents)
+        .where(and(
           eq(agents.id, input.agentId),
+          eq(agents.status, "sandbox")
+        ))
+        .limit(1);
 
-          eq(agents.lifecycleState, "sandbox")
-        ),
-      });
+      const agent = agentResults[0];
 
       if (!agent) {
         throw new TRPCError({
@@ -66,22 +68,18 @@ export const agentsPromotionsRouter = router({
       }
 
       // Create promotion request
-      const requestId = `pr_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      const now = new Date().toISOString();
+      const now = new Date();
 
-      await db.insert(promotionRequests).values({
-        id: requestId,
+      const [inserted] = await db.insert(promotionRequests).values({
         agentId: input.agentId,
-        requestedBy: userId,
-        approvers: JSON.stringify(input.approvers),
+        requestedBy: ctx.user.id,
+        approvers: input.approvers,
         status: "pending",
         notes: input.notes,
-        createdAt: now,
-        updatedAt: now,
-        slaDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h SLA
-      } as any);
+        slaDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h SLA
+      }).returning();
 
-      return { id: requestId, status: "pending" };
+      return { id: inserted.id, status: "pending" };
     }),
 
   /**
@@ -117,8 +115,8 @@ export const agentsPromotionsRouter = router({
 
       if (input.approverId) {
         requests = requests.filter((req) => {
-          const approvers = JSON.parse(req.approvers as string);
-          return approvers.includes(input.approverId);
+          const approversList = req.approvers as string[] | null;
+          return approversList && approversList.includes(input.approverId);
         });
       }
 
@@ -147,9 +145,11 @@ export const agentsPromotionsRouter = router({
       }
 
       // Load agent details
-      const agent = await (db.query as any).agents.findFirst({
-        where: eq(agents.id, request.agentId),
-      });
+      const [agent] = await db
+        .select()
+        .from(agents)
+        .where(eq(agents.id, request.agentId))
+        .limit(1);
 
       return { ...request, agent };
     }),
@@ -191,8 +191,8 @@ export const agentsPromotionsRouter = router({
       }
 
       // Check if user is an approver
-      const approvers = JSON.parse(request.approvers as string);
-      if (!approvers.includes(userId)) {
+      const approversList = request.approvers as string[] | null;
+      if (!approversList || !approversList.includes(userId)) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "User is not an approver for this request",
@@ -200,14 +200,13 @@ export const agentsPromotionsRouter = router({
       }
 
       // Update request
-      const now = new Date().toISOString();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const now = new Date();
 
       await db
         .update(promotionRequests)
         .set({
           status: "approved",
-          approvedBy: userId,
+          approvedBy: ctx.user.id,
           approvedAt: now,
           approvalComment: input.comment,
           updatedAt: now,
@@ -217,11 +216,11 @@ export const agentsPromotionsRouter = router({
       // Record event
       await db.insert(agentHistory).values({
         agentId: request.agentId,
-        event: "promotion_approved",
-        timestamp: now,
-        actor: userId,
-        details: JSON.stringify({ requestId: input.id, comment: input.comment }),
-      } as any);
+        eventType: "promotion_approved",
+        actorId: ctx.user.id,
+        description: input.comment || "Promotion approved",
+        metadata: { requestId: input.id },
+      });
 
       return { success: true };
     }),
@@ -263,8 +262,8 @@ export const agentsPromotionsRouter = router({
       }
 
       // Check if user is an approver
-      const approvers = JSON.parse(request.approvers as string);
-      if (!approvers.includes(userId)) {
+      const approversList = request.approvers as string[] | null;
+      if (!approversList || !approversList.includes(userId)) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "User is not an approver for this request",
@@ -272,14 +271,13 @@ export const agentsPromotionsRouter = router({
       }
 
       // Update request
-      const now = new Date().toISOString();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const now = new Date();
 
       await db
         .update(promotionRequests)
         .set({
           status: "rejected",
-          rejectedBy: userId,
+          rejectedBy: ctx.user.id,
           rejectedAt: now,
           rejectionReason: input.reason,
           updatedAt: now,
@@ -289,11 +287,11 @@ export const agentsPromotionsRouter = router({
       // Record event
       await db.insert(agentHistory).values({
         agentId: request.agentId,
-        event: "promotion_rejected",
-        timestamp: now,
-        actor: userId,
-        details: JSON.stringify({ requestId: input.id, reason: input.reason }),
-      } as any);
+        eventType: "promotion_rejected",
+        actorId: ctx.user.id,
+        description: input.reason,
+        metadata: { requestId: input.id },
+      });
 
       return { success: true };
     }),
@@ -340,9 +338,11 @@ export const agentsPromotionsRouter = router({
       }
 
       // Load agent
-      const agent = await (db.query as any).agents.findFirst({
-        where: eq(agents.id, request.agentId),
-      });
+      const [agent] = await db
+        .select()
+        .from(agents)
+        .where(eq(agents.id, request.agentId))
+        .limit(1);
 
       if (!agent) {
         throw new TRPCError({
@@ -355,8 +355,7 @@ export const agentsPromotionsRouter = router({
       // ... (reuse logic from agents-control-plane.ts promote endpoint)
 
       // Update request
-      const now = new Date().toISOString();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const now = new Date();
 
       await db
         .update(promotionRequests)
@@ -394,10 +393,11 @@ export const agentsPromotionsRouter = router({
       }
 
       // Load history events for this agent
-      const events = await db.query.agentHistory.findMany({
-        where: eq(agentHistory.agentId, request.agentId),
-        orderBy: [desc(agentHistory.createdAt)],
-      });
+      const events = await db
+        .select()
+        .from(agentHistory)
+        .where(eq(agentHistory.agentId, request.agentId))
+        .orderBy(desc(agentHistory.createdAt));
 
       return events;
     }),

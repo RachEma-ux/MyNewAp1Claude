@@ -16,7 +16,8 @@ export class WikiService {
    * Get all wiki categories
    */
   static async getCategories(): Promise<WikiCategory[]> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) return [];
     return db
       .select()
       .from(wikiCategories)
@@ -27,7 +28,8 @@ export class WikiService {
    * Get all published wiki pages
    */
   static async getPages(categoryId?: number): Promise<WikiPage[]> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) return [];
     const conditions = [eq(wikiPages.isPublished, true)];
     if (categoryId) {
       conditions.push(eq(wikiPages.categoryId, categoryId));
@@ -44,7 +46,8 @@ export class WikiService {
    * Get a specific wiki page by slug
    */
   static async getPageBySlug(slug: string): Promise<WikiPage | null> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) return null;
     const result = await db
       .select()
       .from(wikiPages)
@@ -55,7 +58,7 @@ export class WikiService {
     // Increment view count
     await db
       .update(wikiPages)
-      .set({ views: result[0].views + 1 })
+      .set({ views: (result[0].views ?? 0) + 1 })
       .where(eq(wikiPages.id, result[0].id));
 
     return result[0];
@@ -65,7 +68,8 @@ export class WikiService {
    * Search wiki pages by title or content
    */
   static async searchPages(query: string): Promise<WikiPage[]> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) return [];
     const searchPattern = `%${query}%`;
 
     return db
@@ -86,7 +90,8 @@ export class WikiService {
   static async createPage(
     data: InsertWikiPage & { content: string }
   ): Promise<WikiPage> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) throw new Error('Database not available');
 
     // Generate slug from title if not provided
     const slug =
@@ -100,15 +105,9 @@ export class WikiService {
       ...data,
       slug,
       version: 1,
-    });
+    }).returning();
 
-    const pageId = result[0];
-    const page = await db
-      .select()
-      .from(wikiPages)
-      .where(eq(wikiPages.id, pageId));
-
-    return page[0];
+    return result[0];
   }
 
   /**
@@ -118,7 +117,8 @@ export class WikiService {
     pageId: number,
     data: Partial<InsertWikiPage>
   ): Promise<WikiPage> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) throw new Error('Database not available');
 
     // Get current page to create revision
     const currentPage = await db
@@ -138,24 +138,20 @@ export class WikiService {
         pageId,
         content: page.content,
         authorId: page.authorId,
-        revisionNumber: page.version,
+        revisionNumber: page.version ?? 1,
       });
     }
 
     // Update the page
-    await db
+    const updated = await db
       .update(wikiPages)
       .set({
         ...data,
-        version: page.version + 1,
+        version: (page.version ?? 1) + 1,
         updatedAt: new Date(),
       })
-      .where(eq(wikiPages.id, pageId));
-
-    const updated = await db
-      .select()
-      .from(wikiPages)
-      .where(eq(wikiPages.id, pageId));
+      .where(eq(wikiPages.id, pageId))
+      .returning();
 
     return updated[0];
   }
@@ -164,7 +160,8 @@ export class WikiService {
    * Delete a wiki page
    */
   static async deletePage(pageId: number): Promise<void> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) throw new Error('Database not available');
     await db.delete(wikiPages).where(eq(wikiPages.id, pageId));
   }
 
@@ -172,7 +169,8 @@ export class WikiService {
    * Get revision history for a page
    */
   static async getPageRevisions(pageId: number): Promise<WikiRevision[]> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) return [];
     return db
       .select()
       .from(wikiRevisions)
@@ -187,7 +185,8 @@ export class WikiService {
     pageId: number,
     revisionNumber: number
   ): Promise<WikiPage> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) throw new Error('Database not available');
 
     // Get the revision
     const revision = await db
@@ -232,7 +231,8 @@ export class WikiService {
    * Get popular pages (by view count)
    */
   static async getPopularPages(limit: number = 10): Promise<WikiPage[]> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) return [];
     return db
       .select()
       .from(wikiPages)
@@ -245,7 +245,8 @@ export class WikiService {
    * Get recent pages
    */
   static async getRecentPages(limit: number = 10): Promise<WikiPage[]> {
-    const db = await getDb();
+    const db = getDb();
+    if (!db) return [];
     return db
       .select()
       .from(wikiPages)

@@ -26,6 +26,8 @@ import {
 } from "../db";
 import { LLMPolicyEngine } from "../policies/llm-policy-engine";
 import * as providers from "../llm/providers";
+import { jobQueue } from "../services/job-queue";
+import "../services/training-executor"; // Initialize training executor
 
 // ============================================================================
 // Input Validation Schemas
@@ -380,18 +382,18 @@ export const llmRouter = router({
       });
 
       // Update promotion status
-      const db = await import("../db").then((m) => m.getDb());
+      const { getDb } = await import("../db");
+      const { llmPromotions } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = getDb();
       if (db) {
-        await db().update(await import("../../drizzle/schema").then((m) => m.llmPromotions))
+        await db.update(llmPromotions)
           .set({
             status: "executed",
             executedAt: new Date(),
             newVersionId: newVersion.id,
           })
-          .where(await import("drizzle-orm").then((m) => m.eq)(
-            (await import("../../drizzle/schema")).llmPromotions.id,
-            promotion.id
-          ));
+          .where(eq(llmPromotions.id, promotion.id));
       }
 
       return { success: true, newVersion };
@@ -1084,10 +1086,14 @@ export const llmRouter = router({
       const { db, updateTable, eq } = await import("../db");
       const { llmDatasets } = await import("../../drizzle/schema");
 
-      const { datasetId, ...updates } = input;
+      const { datasetId, qualityScore, ...updates } = input;
 
       const [updated] = await updateTable(llmDatasets)
-        .set({ ...updates, updatedAt: new Date() })
+        .set({
+          ...updates,
+          qualityScore: qualityScore?.toString(),
+          updatedAt: new Date()
+        })
         .where(eq(llmDatasets.id, datasetId))
         .returning();
 
@@ -1147,9 +1153,25 @@ export const llmRouter = router({
         status: "success",
       });
 
-      // Here you would trigger the actual training job
-      // For now, just return the training run record
-      return trainingRun;
+      // Enqueue training job for background execution
+      const job = await jobQueue.enqueue(
+        "training",
+        {
+          trainingRunId: trainingRun.id,
+          config: input.config,
+          datasetIds: input.datasetIds,
+          framework: input.framework,
+        },
+        {
+          projectId: input.projectId,
+          trainingRunId: trainingRun.id,
+          userId: ctx.user.id,
+        }
+      );
+
+      console.log(`[LLM Router] Training job ${job.id} enqueued for training run ${trainingRun.id}`);
+
+      return { ...trainingRun, jobId: job.id };
     }),
 
   /**
@@ -1235,7 +1257,25 @@ export const llmRouter = router({
         status: "success",
       });
 
-      return evaluation;
+      // Enqueue evaluation job for background execution
+      const job = await jobQueue.enqueue(
+        "evaluation",
+        {
+          evaluationId: evaluation.id,
+          modelPath: input.modelPath,
+          modelType: input.modelType,
+          benchmarks: input.benchmarks || ["mmlu", "hellaswag", "arc", "truthfulqa", "gsm8k"],
+        },
+        {
+          projectId: input.projectId,
+          evaluationId: evaluation.id,
+          userId: ctx.user.id,
+        }
+      );
+
+      console.log(`[LLM Router] Evaluation job ${job.id} enqueued for evaluation ${evaluation.id}`);
+
+      return { ...evaluation, jobId: job.id };
     }),
 
   /**
@@ -1316,7 +1356,26 @@ export const llmRouter = router({
         status: "success",
       });
 
-      return quantization;
+      // Enqueue quantization job for background execution
+      const job = await jobQueue.enqueue(
+        "quantization",
+        {
+          quantizationId: quantization.id,
+          sourceModelPath: input.sourceModelPath,
+          quantizationType: input.quantizationType,
+          method: input.method || "llama.cpp",
+          outputPath: input.outputPath,
+        },
+        {
+          projectId: input.projectId,
+          quantizationId: quantization.id,
+          userId: ctx.user.id,
+        }
+      );
+
+      console.log(`[LLM Router] Quantization job ${job.id} enqueued for quantization ${quantization.id}`);
+
+      return { ...quantization, jobId: job.id };
     }),
 
   /**
@@ -1369,5 +1428,87 @@ export const llmRouter = router({
         .from(llmCreationAuditEvents)
         .where(eq(llmCreationAuditEvents.projectId, input.projectId))
         .orderBy(desc(llmCreationAuditEvents.timestamp));
+    }),
+
+  // ============================================================================
+  // Job Queue & Training Orchestration
+  // ============================================================================
+
+  /**
+   * Get job status by ID
+   */
+  getJobStatus: protectedProcedure
+    .input(z.object({ jobId: z.string() }))
+    .query(async ({ input }) => {
+      const job = jobQueue.getJob(input.jobId);
+      if (!job) {
+        throw new Error("Job not found");
+      }
+      return job;
+    }),
+
+  /**
+   * Get all jobs (with optional filters)
+   */
+  listJobs: protectedProcedure
+    .input(
+      z
+        .object({
+          type: z.enum(["training", "evaluation", "quantization", "dataset_validation"]).optional(),
+          status: z.enum(["pending", "running", "completed", "failed", "cancelled"]).optional(),
+          projectId: z.number().optional(),
+        })
+        .optional()
+    )
+    .query(async ({ input }) => {
+      let jobs = jobQueue.getJobs({
+        type: input?.type,
+        status: input?.status,
+      });
+
+      // Filter by projectId if provided
+      if (input?.projectId) {
+        jobs = jobs.filter((job) => job.metadata?.projectId === input.projectId);
+      }
+
+      return jobs;
+    }),
+
+  /**
+   * Cancel a running or pending job
+   */
+  cancelJob: protectedProcedure
+    .input(z.object({ jobId: z.string() }))
+    .mutation(async ({ input }) => {
+      const job = await jobQueue.cancelJob(input.jobId);
+      return { success: true, job };
+    }),
+
+  /**
+   * Get job queue statistics
+   */
+  getQueueStats: protectedProcedure.query(async () => {
+    return jobQueue.getStats();
+  }),
+
+  /**
+   * Pause a running training job
+   * Note: This is a placeholder - actual pause/resume requires deeper integration
+   */
+  pauseTraining: protectedProcedure
+    .input(z.object({ trainingRunId: z.number() }))
+    .mutation(async ({ input }) => {
+      // Find job by training run ID
+      const jobs = jobQueue.getJobs({ type: "training", status: "running" });
+      const job = jobs.find((j) => j.metadata?.trainingRunId === input.trainingRunId);
+
+      if (!job) {
+        throw new Error("Training job not found or not running");
+      }
+
+      // For now, just cancel it (pause/resume requires more complex state management)
+      await jobQueue.cancelJob(job.id);
+
+      return { success: true, message: "Training paused (cancelled)" };
     }),
 });

@@ -100,10 +100,16 @@ export default function LLMControlPlane() {
           </div>
         </div>
 
-        <Button onClick={() => setLocation("/llm/wizard")} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Create LLM
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => setLocation("/llm/wizard")} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Quick Setup
+          </Button>
+          <Button onClick={() => setLocation("/llm/create")} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Train Model
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -231,10 +237,16 @@ export default function LLMControlPlane() {
                   : "Create your first LLM to get started"}
               </p>
               {!searchQuery && !roleFilter && (
-                <Button onClick={() => setLocation("/llm/wizard")}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create LLM
-                </Button>
+                <div className="flex gap-2 justify-center">
+                  <Button variant="outline" onClick={() => setLocation("/llm/wizard")}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Quick Setup
+                  </Button>
+                  <Button onClick={() => setLocation("/llm/create")}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Train Model
+                  </Button>
+                </div>
               )}
             </div>
           )}

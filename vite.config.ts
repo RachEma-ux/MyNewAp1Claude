@@ -34,7 +34,7 @@ export default defineConfig({
         manualChunks: undefined,
       },
       // Reduce memory usage during transformation
-      maxParallelFileOps: 2,
+      maxParallelFileOps: 1,  // Reduced from 2 to 1 for Render's memory constraints
     },
   },
   server: {
