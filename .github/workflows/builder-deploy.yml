@@ -33,6 +33,10 @@ on:
         description: 'App ID for OAuth (optional)'
         required: false
         default: ''
+      database_url:
+        description: 'PostgreSQL DATABASE_URL (optional)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -224,11 +228,13 @@ jobs:
 
       - name: Start application with tunnel
         if: ${{ github.event.inputs.run_app == 'yes' }}
+        env:
+          DATABASE_URL: ${{ github.event.inputs.database_url }}
         run: |
           echo "🚀 Starting application..."
 
           # Start the Node.js server
-          PORT=3000 NODE_ENV=production node dist/index.js &
+          PORT=3000 NODE_ENV=production DATABASE_URL="${DATABASE_URL}" node dist/index.js &
           SERVER_PID=$!
 
           # Wait for server startup
