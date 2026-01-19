@@ -148,6 +148,35 @@ jobs:
             client/dist/
           retention-days: 30
 
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: MyNewAp1Claude v${{ steps.version.outputs.version }}
+          body: |
+            ## MyNewAp1Claude v${{ steps.version.outputs.version }}
+
+            ### What's New
+            - Full application pack for Builder
+            - Production-ready build
+
+            ### Artifacts
+            - `pack-mynewap1claude-v${{ steps.version.outputs.version }}.zip` - Complete pack with manifest and checksums
+
+            ### Build Info
+            - Node.js 20
+            - Git SHA: ${{ github.sha }}
+            - Built with Vite + esbuild
+
+            ---
+            Built with GitHub Actions
+          files: |
+            pack-*.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Summary
         run: |
           echo "## Pack Created Successfully" >> $GITHUB_STEP_SUMMARY
@@ -158,3 +187,4 @@ jobs:
           echo "| Version | ${{ steps.version.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Git SHA | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Archive | ${{ env.ARCHIVE_NAME }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Release | https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
