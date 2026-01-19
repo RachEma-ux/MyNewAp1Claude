@@ -122,7 +122,7 @@ jobs:
         run: |
           PACK_NAME="${{ github.event.inputs.pack_name || 'mynewap1claude' }}"
           VERSION="${{ steps.version.outputs.version }}"
-          ARCHIVE_NAME="pack-${PACK_NAME}-v${VERSION}.zip"
+          ARCHIVE_NAME="pack-${PACK_NAME}-android-arm64-v${VERSION}.zip"
 
           cd pack-output
           zip -r "../$ARCHIVE_NAME" .
@@ -181,7 +181,7 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           PACK_NAME="${{ github.event.inputs.pack_name || 'mynewap1claude' }}"
-          ASSET_NAME="pack-${PACK_NAME}-v${VERSION}.zip"
+          ASSET_NAME="pack-${PACK_NAME}-android-arm64-v${VERSION}.zip"
 
           echo "Creating release v${VERSION} with asset ${ASSET_NAME}..."
 
