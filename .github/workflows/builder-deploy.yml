@@ -25,6 +25,14 @@ on:
           - '10'
           - '15'
           - '30'
+      oauth_portal_url:
+        description: 'OAuth Portal URL (optional)'
+        required: false
+        default: ''
+      app_id:
+        description: 'App ID for OAuth (optional)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -63,6 +71,8 @@ jobs:
           npm run build
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
+          VITE_OAUTH_PORTAL_URL: ${{ github.event.inputs.oauth_portal_url }}
+          VITE_APP_ID: ${{ github.event.inputs.app_id }}
 
       # ========== PACK PHASE ==========
       - name: Create pack structure
