@@ -149,17 +149,28 @@ jobs:
           retention-days: 30
 
       - name: Delete existing release if present
+        continue-on-error: true
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          RELEASE_ID=$(gh api repos/${{ github.repository }}/releases/tags/v${VERSION} --jq '.id' 2>/dev/null || echo "")
-          if [ -n "$RELEASE_ID" ]; then
-            echo "Deleting existing release v${VERSION} (ID: $RELEASE_ID)"
-            gh api -X DELETE repos/${{ github.repository }}/releases/${RELEASE_ID}
-            # Also delete the tag
-            gh api -X DELETE repos/${{ github.repository }}/git/refs/tags/v${VERSION} 2>/dev/null || true
+          echo "Checking for existing release v${VERSION}..."
+
+          # Try to get the release ID
+          RELEASE_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/v${VERSION}" \
+            | jq -r '.id // empty')
+
+          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
+            echo "Found existing release v${VERSION} (ID: $RELEASE_ID), deleting..."
+            curl -X DELETE -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}" || true
+
+            # Try to delete the tag
+            curl -X DELETE -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/v${VERSION}" || true
+            echo "Deleted existing release"
+          else
+            echo "No existing release found for v${VERSION}"
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
