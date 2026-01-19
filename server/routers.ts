@@ -33,6 +33,7 @@ import { keyRotationRouter } from "./routers/keyRotation";
 import { wikiRouter } from "./routers/wiki";
 import { llmRouter } from "./routers/llm";
 import { diagnosticRouter } from "./routers/diagnostic";
+import { deployRouter } from "./routers/deploy";
 
 export const appRouter = router({
   system: systemRouter,
@@ -64,6 +65,7 @@ export const appRouter = router({
   keyRotation: keyRotationRouter,
   wiki: wikiRouter,
   llm: llmRouter, // LLM Control Plane
+  deploy: deployRouter, // Deployment management
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
