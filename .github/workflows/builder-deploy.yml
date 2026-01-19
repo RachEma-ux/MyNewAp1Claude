@@ -46,6 +46,30 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Reset Gist status to pending
+        run: |
+          echo "🔄 Resetting Gist tunnel status..."
+          GIST_ID="${{ vars.TUNNEL_GIST_ID }}"
+          GIST_TOKEN="${{ secrets.GIST_TOKEN }}"
+
+          if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
+            TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            GIST_JSON=$(jq -n \
+              --arg rid "${{ github.run_id }}" \
+              --arg repo "${{ github.repository }}" \
+              --arg ts "$TIMESTAMP" \
+              '{tunnel_url: null, version: null, run_id: $rid, repository: $repo, status: "pending", started_at: $ts}')
+
+            PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
+
+            curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
+              -H "Authorization: Bearer $GIST_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -d "$PAYLOAD" > /dev/null && echo "✅ Gist reset to pending" || echo "⚠️ Gist reset failed"
+          else
+            echo "⚠️ GIST_TOKEN or TUNNEL_GIST_ID not configured"
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
