@@ -64,53 +64,58 @@ jobs:
 
           mkdir -p "$PACK_DIR"
 
-          # Copy build artifacts
-          cp -r dist "$PACK_DIR/" 2>/dev/null || true
-          cp -r client/dist "$PACK_DIR/client-dist" 2>/dev/null || true
+          # Copy WASM files (required for Builder)
+          cp packs/hellonewapp.wasm "$PACK_DIR/" 2>/dev/null || true
+          cp packs/hellonewapp.wat "$PACK_DIR/" 2>/dev/null || true
 
-          # Copy existing WASM pack if present
-          cp -r packs/*.wasm "$PACK_DIR/" 2>/dev/null || true
-          cp -r packs/*.wat "$PACK_DIR/" 2>/dev/null || true
-
-          # Create pack manifest
+          # Create pack manifest (WASM format for Builder)
           cat > "$PACK_DIR/pack.json" << EOF
           {
             "pack_version": 1,
             "id": "$PACK_NAME",
             "name": "MyNewAp1Claude",
             "version": "$VERSION",
-            "type": "application",
-            "entry": "dist/index.js",
-            "client_entry": "client-dist/index.html",
-            "description": "Full-stack application pack for MyNewAp1Claude",
+            "type": "wasm",
+            "entry": "hellonewapp.wasm",
+            "description": "Utility Pack with Fibonacci, Prime checker, Factorial, GCD, and Random functions.",
             "permissions": {
               "network": {
-                "connect": ["*"],
-                "listen_localhost": true
+                "connect": ["http://localhost:5000", "http://localhost:3000"],
+                "listen_localhost": false
               },
               "filesystem": {
-                "read": ["./"],
-                "write": ["cache/", "data/", "uploads/"]
+                "read": ["data/"],
+                "write": ["cache/"]
               }
             },
             "limits": {
-              "memory_mb": 512,
-              "cpu_ms_per_sec": 1000
+              "memory_mb": 32,
+              "cpu_ms_per_sec": 500
             },
             "build": {
               "git_sha": "${{ github.sha }}",
               "built_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-              "node_version": "20",
-              "builder": "github-actions"
+              "target": "android-arm64"
             },
-            "scripts": {
-              "start": "node dist/index.js"
-            }
+            "exports": [
+              "fibonacci",
+              "is_prime",
+              "factorial",
+              "gcd",
+              "random",
+              "seed_random",
+              "add",
+              "multiply",
+              "clamp",
+              "get_version"
+            ]
           }
           EOF
 
           echo "Pack structure created:"
           ls -la "$PACK_DIR"
+          echo "Pack manifest:"
+          cat "$PACK_DIR/pack.json"
 
       - name: Generate checksums
         run: |
