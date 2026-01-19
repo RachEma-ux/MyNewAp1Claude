@@ -37,6 +37,10 @@ on:
         description: 'PostgreSQL DATABASE_URL (optional)'
         required: false
         default: ''
+      webhook_url:
+        description: 'Webhook URL to receive tunnel URL (optional)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -267,6 +271,25 @@ jobs:
 
           # Save URL
           echo "$TUNNEL_URL" > app_url.txt
+
+          # Send tunnel URL to webhook if provided
+          WEBHOOK_URL="${{ github.event.inputs.webhook_url }}"
+          if [ -n "$WEBHOOK_URL" ]; then
+            echo "📤 Sending tunnel URL to webhook..."
+            curl -s -X POST "$WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"event\": \"tunnel_ready\",
+                \"tunnel_url\": \"$TUNNEL_URL\",
+                \"version\": \"${{ github.event.inputs.version }}\",
+                \"run_id\": \"${{ github.run_id }}\",
+                \"run_number\": \"${{ github.run_number }}\",
+                \"repository\": \"${{ github.repository }}\",
+                \"sha\": \"${{ github.sha }}\",
+                \"duration_minutes\": \"${{ github.event.inputs.duration }}\",
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }" && echo "✅ Webhook notified" || echo "⚠️ Webhook failed (continuing anyway)"
+          fi
 
           # Keep running
           DURATION_SECONDS=$(( ${{ github.event.inputs.duration }} * 60 ))
