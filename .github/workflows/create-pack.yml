@@ -69,54 +69,41 @@ jobs:
           cp packs/hellonewapp.wat "$PACK_DIR/" 2>/dev/null || true
 
           # Create pack manifest (WASM format for Builder)
-          cat > "$PACK_DIR/pack.json" << 'EOFPACK'
-{
-  "pack_version": 1,
-  "id": "PACK_NAME_PLACEHOLDER",
-  "name": "MyNewAp1Claude",
-  "version": "VERSION_PLACEHOLDER",
-  "type": "wasm",
-  "entry": "hellonewapp.wasm",
-  "description": "Utility Pack with Fibonacci, Prime checker, Factorial, GCD, and Random functions.",
-  "permissions": {
-    "network": {
-      "connect": ["http://localhost:5000", "http://localhost:3000"],
-      "listen_localhost": false
-    },
-    "filesystem": {
-      "read": ["data/"],
-      "write": ["cache/"]
-    }
-  },
-  "limits": {
-    "memory_mb": 32,
-    "cpu_ms_per_sec": 500
-  },
-  "build": {
-    "git_sha": "GIT_SHA_PLACEHOLDER",
-    "built_at": "BUILD_TIME_PLACEHOLDER",
-    "target": "android-arm64"
-  },
-  "exports": [
-    "fibonacci",
-    "is_prime",
-    "factorial",
-    "gcd",
-    "random",
-    "seed_random",
-    "add",
-    "multiply",
-    "clamp",
-    "get_version"
-  ]
-}
-EOFPACK
-
-          # Replace placeholders
-          sed -i "s/PACK_NAME_PLACEHOLDER/$PACK_NAME/g" "$PACK_DIR/pack.json"
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" "$PACK_DIR/pack.json"
-          sed -i "s/GIT_SHA_PLACEHOLDER/${{ github.sha }}/g" "$PACK_DIR/pack.json"
-          sed -i "s/BUILD_TIME_PLACEHOLDER/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" "$PACK_DIR/pack.json"
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          jq -n \
+            --arg id "$PACK_NAME" \
+            --arg version "$VERSION" \
+            --arg sha "${{ github.sha }}" \
+            --arg time "$BUILD_TIME" \
+            '{
+              pack_version: 1,
+              id: $id,
+              name: "MyNewAp1Claude",
+              version: $version,
+              type: "wasm",
+              entry: "hellonewapp.wasm",
+              description: "Utility Pack with Fibonacci, Prime checker, Factorial, GCD, and Random functions.",
+              permissions: {
+                network: {
+                  connect: ["http://localhost:5000", "http://localhost:3000"],
+                  listen_localhost: false
+                },
+                filesystem: {
+                  read: ["data/"],
+                  write: ["cache/"]
+                }
+              },
+              limits: {
+                memory_mb: 32,
+                cpu_ms_per_sec: 500
+              },
+              build: {
+                git_sha: $sha,
+                built_at: $time,
+                target: "android-arm64"
+              },
+              exports: ["fibonacci", "is_prime", "factorial", "gcd", "random", "seed_random", "add", "multiply", "clamp", "get_version"]
+            }' > "$PACK_DIR/pack.json"
 
           echo "Pack structure created:"
           ls -la "$PACK_DIR"
