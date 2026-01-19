@@ -273,26 +273,22 @@ jobs:
           GIST_TOKEN="${{ secrets.GIST_TOKEN }}"
 
           if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
-            GIST_CONTENT=$(cat <<GISTEOF
-{
-  "tunnel_url": "$TUNNEL_URL",
-  "version": "${{ github.event.inputs.version }}",
-  "run_id": "${{ github.run_id }}",
-  "repository": "${{ github.repository }}",
-          "status": "running",
-  "duration_minutes": ${{ github.event.inputs.duration }},
-  "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-}
-GISTEOF
-)
-            # Escape for JSON
-            ESCAPED_CONTENT=$(echo "$GIST_CONTENT" | jq -Rs .)
+            TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            GIST_JSON=$(jq -n \
+              --arg url "$TUNNEL_URL" \
+              --arg ver "${{ github.event.inputs.version }}" \
+              --arg rid "${{ github.run_id }}" \
+              --arg repo "${{ github.repository }}" \
+              --arg dur "${{ github.event.inputs.duration }}" \
+              --arg ts "$TIMESTAMP" \
+              '{tunnel_url: $url, version: $ver, run_id: $rid, repository: $repo, status: "running", duration_minutes: ($dur|tonumber), started_at: $ts}')
+
+            PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
 
             curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
               -H "Authorization: Bearer $GIST_TOKEN" \
               -H "Accept: application/vnd.github+json" \
-              -d "{\"files\":{\"tunnel-status.json\":{\"content\":$ESCAPED_CONTENT}}}" \
-              > /dev/null && echo "✅ Gist updated" || echo "⚠️ Gist update failed"
+              -d "$PAYLOAD" > /dev/null && echo "✅ Gist updated" || echo "⚠️ Gist update failed"
           else
             echo "⚠️ GIST_TOKEN or TUNNEL_GIST_ID not configured, skipping Gist update"
           fi
