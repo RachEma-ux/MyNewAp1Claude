@@ -1,0 +1,160 @@
+name: Create Pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Pack version (e.g., 1.4.0)'
+        required: true
+        default: '1.4.0'
+      pack_name:
+        description: 'Pack name'
+        required: false
+        default: 'mynewap1claude'
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-pack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        env:
+          npm_config_loglevel: verbose
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="${{ github.event.inputs.version || '1.4.0' }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Pack version: $VERSION"
+
+      - name: Create pack structure
+        run: |
+          PACK_NAME="${{ github.event.inputs.pack_name || 'mynewap1claude' }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          PACK_DIR="pack-output"
+
+          mkdir -p "$PACK_DIR"
+
+          # Copy build artifacts
+          cp -r dist "$PACK_DIR/" 2>/dev/null || true
+          cp -r client/dist "$PACK_DIR/client-dist" 2>/dev/null || true
+
+          # Copy existing WASM pack if present
+          cp -r packs/*.wasm "$PACK_DIR/" 2>/dev/null || true
+          cp -r packs/*.wat "$PACK_DIR/" 2>/dev/null || true
+
+          # Create pack manifest
+          cat > "$PACK_DIR/pack.json" << EOF
+          {
+            "pack_version": 1,
+            "id": "$PACK_NAME",
+            "name": "MyNewAp1Claude",
+            "version": "$VERSION",
+            "type": "application",
+            "entry": "dist/index.js",
+            "client_entry": "client-dist/index.html",
+            "description": "Full-stack application pack for MyNewAp1Claude",
+            "permissions": {
+              "network": {
+                "connect": ["*"],
+                "listen_localhost": true
+              },
+              "filesystem": {
+                "read": ["./"],
+                "write": ["cache/", "data/", "uploads/"]
+              }
+            },
+            "limits": {
+              "memory_mb": 512,
+              "cpu_ms_per_sec": 1000
+            },
+            "build": {
+              "git_sha": "${{ github.sha }}",
+              "built_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+              "node_version": "20",
+              "builder": "github-actions"
+            },
+            "scripts": {
+              "start": "node dist/index.js"
+            }
+          }
+          EOF
+
+          echo "Pack structure created:"
+          ls -la "$PACK_DIR"
+
+      - name: Generate checksums
+        run: |
+          cd pack-output
+          find . -type f ! -name "checksums.sha256" -exec sha256sum {} \; > checksums.sha256
+          cat checksums.sha256
+
+      - name: Create pack archive
+        run: |
+          PACK_NAME="${{ github.event.inputs.pack_name || 'mynewap1claude' }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCHIVE_NAME="pack-${PACK_NAME}-v${VERSION}.zip"
+
+          cd pack-output
+          zip -r "../$ARCHIVE_NAME" .
+          cd ..
+
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "Created archive: $ARCHIVE_NAME"
+          ls -lh "$ARCHIVE_NAME"
+
+      - name: Upload pack artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-${{ github.event.inputs.pack_name || 'mynewap1claude' }}-v${{ steps.version.outputs.version }}
+          path: |
+            pack-*.zip
+            pack-output/pack.json
+            pack-output/checksums.sha256
+          retention-days: 30
+
+      - name: Upload build output separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output-v${{ steps.version.outputs.version }}
+          path: |
+            dist/
+            client/dist/
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          echo "## Pack Created Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pack Name | ${{ github.event.inputs.pack_name || 'mynewap1claude' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ steps.version.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Git SHA | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Archive | ${{ env.ARCHIVE_NAME }} |" >> $GITHUB_STEP_SUMMARY
