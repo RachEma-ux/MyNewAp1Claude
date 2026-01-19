@@ -1,0 +1,109 @@
+name: Run Pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Pack version to run (e.g., 1.5.0)'
+        required: true
+        default: '1.5.0'
+
+permissions:
+  contents: read
+
+jobs:
+  run-pack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download pack from release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          ASSET_NAME="pack-mynewap1claude-v${VERSION}.zip"
+
+          echo "Downloading ${ASSET_NAME} from release v${VERSION}..."
+
+          gh release download "v${VERSION}" \
+            --repo "${{ github.repository }}" \
+            --pattern "${ASSET_NAME}"
+
+          echo "Download complete"
+          ls -lh "${ASSET_NAME}"
+
+      - name: Extract pack
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          ASSET_NAME="pack-mynewap1claude-v${VERSION}.zip"
+
+          echo "Extracting ${ASSET_NAME}..."
+          unzip -o "${ASSET_NAME}" -d pack
+
+          echo "Pack contents:"
+          ls -la pack/
+
+          echo "Pack manifest:"
+          cat pack/pack.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run pack
+        id: run_pack
+        run: |
+          echo "=== Running Pack ===" | tee execution.log
+          echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" | tee -a execution.log
+          echo "Node version: $(node --version)" | tee -a execution.log
+          echo "---" | tee -a execution.log
+
+          cd pack
+
+          if [ -f "dist/index.js" ]; then
+            echo "Starting server from dist/index.js..." | tee -a ../execution.log
+
+            # Run for 30 seconds to verify it starts correctly
+            timeout 30s node dist/index.js 2>&1 | tee -a ../execution.log || EXIT_CODE=$?
+
+            # timeout returns 124 if it times out (which is expected)
+            if [ "${EXIT_CODE:-0}" = "124" ]; then
+              echo "Server ran successfully for 30 seconds (timeout as expected)" | tee -a ../execution.log
+              EXIT_CODE=0
+            fi
+          else
+            echo "dist/index.js not found" | tee -a ../execution.log
+            echo "Available files:" | tee -a ../execution.log
+            find . -type f | tee -a ../execution.log
+            EXIT_CODE=1
+          fi
+
+          echo "---" | tee -a ../execution.log
+          echo "Exit code: ${EXIT_CODE:-0}" | tee -a ../execution.log
+          echo "=== Execution Complete ===" | tee -a ../execution.log
+        env:
+          NODE_ENV: production
+
+      - name: Upload execution results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pack-execution-results
+          path: execution.log
+          retention-days: 7
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Pack Execution Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ github.event.inputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Node | $(node --version) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Execution Log" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat execution.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
