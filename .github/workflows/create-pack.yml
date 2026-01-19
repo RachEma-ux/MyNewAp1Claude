@@ -173,6 +173,17 @@ jobs:
             echo "No existing release found for v${VERSION}"
           fi
 
+      - name: Generate release checksum
+        run: |
+          PACK_NAME="${{ github.event.inputs.pack_name || 'mynewap1claude' }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          ASSET_NAME="pack-${PACK_NAME}-android-arm64-v${VERSION}.zip"
+
+          # Generate checksum file for the pack
+          sha256sum "${ASSET_NAME}" > checksums.sha256
+          echo "Generated checksums.sha256:"
+          cat checksums.sha256
+
       - name: Create GitHub Release with Asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -181,15 +192,16 @@ jobs:
           PACK_NAME="${{ github.event.inputs.pack_name || 'mynewap1claude' }}"
           ASSET_NAME="pack-${PACK_NAME}-android-arm64-v${VERSION}.zip"
 
-          echo "Creating release v${VERSION} with asset ${ASSET_NAME}..."
+          echo "Creating release v${VERSION} with asset ${ASSET_NAME} and checksums..."
 
           gh release create "v${VERSION}" \
             --repo "${{ github.repository }}" \
             --title "MyNewAp1Claude v${VERSION}" \
             --notes "MyNewAp1Claude v${VERSION} - Full application pack for Builder. Built with Node.js 20." \
-            "${ASSET_NAME}"
+            "${ASSET_NAME}" \
+            "checksums.sha256"
 
-          echo "Release created successfully with asset attached"
+          echo "Release created successfully with asset and checksum attached"
 
       - name: Summary
         run: |
