@@ -37,11 +37,6 @@ on:
         description: 'PostgreSQL DATABASE_URL (optional)'
         required: false
         default: ''
-      webhook_url:
-        description: 'Webhook URL to receive tunnel URL (optional)'
-        required: false
-        default: ''
-
 permissions:
   contents: write
 
@@ -272,23 +267,34 @@ jobs:
           # Save URL
           echo "$TUNNEL_URL" > app_url.txt
 
-          # Send tunnel URL to webhook if provided
-          WEBHOOK_URL="${{ github.event.inputs.webhook_url }}"
-          if [ -n "$WEBHOOK_URL" ]; then
-            echo "📤 Sending tunnel URL to webhook..."
-            curl -s -X POST "$WEBHOOK_URL" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"event\": \"tunnel_ready\",
-                \"tunnel_url\": \"$TUNNEL_URL\",
-                \"version\": \"${{ github.event.inputs.version }}\",
-                \"run_id\": \"${{ github.run_id }}\",
-                \"run_number\": \"${{ github.run_number }}\",
-                \"repository\": \"${{ github.repository }}\",
-                \"sha\": \"${{ github.sha }}\",
-                \"duration_minutes\": \"${{ github.event.inputs.duration }}\",
-                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-              }" && echo "✅ Webhook notified" || echo "⚠️ Webhook failed (continuing anyway)"
+          # Update Gist with tunnel URL for Builder App
+          echo "📤 Updating Gist with tunnel URL..."
+          GIST_ID="${{ vars.TUNNEL_GIST_ID }}"
+          GIST_TOKEN="${{ secrets.GIST_TOKEN }}"
+
+          if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
+            GIST_CONTENT=$(cat <<GISTEOF
+{
+  "tunnel_url": "$TUNNEL_URL",
+  "version": "${{ github.event.inputs.version }}",
+  "run_id": "${{ github.run_id }}",
+  "repository": "${{ github.repository }}",
+          "status": "running",
+  "duration_minutes": ${{ github.event.inputs.duration }},
+  "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+GISTEOF
+)
+            # Escape for JSON
+            ESCAPED_CONTENT=$(echo "$GIST_CONTENT" | jq -Rs .)
+
+            curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
+              -H "Authorization: Bearer $GIST_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -d "{\"files\":{\"tunnel-status.json\":{\"content\":$ESCAPED_CONTENT}}}" \
+              > /dev/null && echo "✅ Gist updated" || echo "⚠️ Gist update failed"
+          else
+            echo "⚠️ GIST_TOKEN or TUNNEL_GIST_ID not configured, skipping Gist update"
           fi
 
           # Keep running
