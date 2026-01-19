@@ -148,6 +148,19 @@ jobs:
             client/dist/
           retention-days: 30
 
+      - name: Delete existing release if present
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          RELEASE_ID=$(gh api repos/${{ github.repository }}/releases/tags/v${VERSION} --jq '.id' 2>/dev/null || echo "")
+          if [ -n "$RELEASE_ID" ]; then
+            echo "Deleting existing release v${VERSION} (ID: $RELEASE_ID)"
+            gh api -X DELETE repos/${{ github.repository }}/releases/${RELEASE_ID}
+            # Also delete the tag
+            gh api -X DELETE repos/${{ github.repository }}/git/refs/tags/v${VERSION} 2>/dev/null || true
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -174,6 +187,7 @@ jobs:
             pack-*.zip
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
