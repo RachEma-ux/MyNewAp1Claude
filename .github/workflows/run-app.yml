@@ -50,15 +50,19 @@ jobs:
 
       - name: Start application with tunnel
         run: |
-          # Start the Node.js server in background
-          NODE_ENV=production node dist/index.js &
+          # Start the Node.js server in background on port 3000
+          PORT=3000 NODE_ENV=production node dist/index.js &
           SERVER_PID=$!
 
           # Wait for server to start
-          sleep 5
+          echo "Waiting for server to start..."
+          sleep 10
+
+          # Check if server is responding
+          curl -s http://localhost:3000/api/health || echo "Health check failed (may be expected without DB)"
 
           # Start cloudflare tunnel and capture URL
-          ./cloudflared tunnel --url http://localhost:5000 2>&1 | tee tunnel.log &
+          ./cloudflared tunnel --url http://localhost:3000 2>&1 | tee tunnel.log &
           TUNNEL_PID=$!
 
           # Wait for tunnel to establish and get URL
