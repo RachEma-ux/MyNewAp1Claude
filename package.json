@@ -19,6 +19,7 @@
     "@aws-sdk/s3-request-presigner": "^3.693.0",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
+    "@langchain/core": "^1.1.15",
     "@langchain/textsplitters": "^1.0.1",
     "@monaco-editor/react": "^4.7.0",
     "@open-policy-agent/opa-wasm": "^1.10.0",
