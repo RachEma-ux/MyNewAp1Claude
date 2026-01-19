@@ -174,26 +174,44 @@ jobs:
 
       - name: Create GitHub Release
         id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           PACK_NAME="${{ github.event.inputs.pack_name || 'mynewap1claude' }}"
 
+          # Build JSON payload using jq
+          JSON_PAYLOAD=$(jq -n \
+            --arg tag "v${VERSION}" \
+            --arg sha "${{ github.sha }}" \
+            --arg name "MyNewAp1Claude v${VERSION}" \
+            --arg body "## MyNewAp1Claude v${VERSION}
+
+### What's New
+- Full application pack for Builder
+- Production-ready build
+
+### Artifacts
+- pack-${PACK_NAME}-v${VERSION}.zip - Complete pack with manifest and checksums
+
+### Build Info
+- Node.js 20
+- Git SHA: ${{ github.sha }}
+- Built with Vite + esbuild
+
+---
+Built with GitHub Actions" \
+            '{tag_name: $tag, target_commitish: $sha, name: $name, body: $body, draft: false, prerelease: false}')
+
+          echo "Creating release with payload:"
+          echo "$JSON_PAYLOAD"
+
           # Create the release
           RESPONSE=$(curl -s -X POST \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/releases" \
-            -d @- << EOFDATA
-          {
-            "tag_name": "v${VERSION}",
-            "target_commitish": "${{ github.sha }}",
-            "name": "MyNewAp1Claude v${VERSION}",
-            "body": "## MyNewAp1Claude v${VERSION}\n\n### What's New\n- Full application pack for Builder\n- Production-ready build\n\n### Artifacts\n- \`pack-${PACK_NAME}-v${VERSION}.zip\` - Complete pack with manifest and checksums\n\n### Build Info\n- Node.js 20\n- Git SHA: ${{ github.sha }}\n- Built with Vite + esbuild\n\n---\nBuilt with GitHub Actions",
-            "draft": false,
-            "prerelease": false
-          }
-          EOFDATA
-          )
+            -d "$JSON_PAYLOAD")
 
           echo "Release API response:"
           echo "$RESPONSE"
@@ -203,6 +221,7 @@ jobs:
 
           if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
             echo "Failed to create release"
+            echo "Error: $(echo "$RESPONSE" | jq -r '.message // "unknown"')"
             exit 1
           fi
 
