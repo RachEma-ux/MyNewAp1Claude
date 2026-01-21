@@ -33,6 +33,7 @@ import {
   ChevronRight,
   Key,
   BookOpen,
+  Wand2,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -105,6 +106,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       children: [
         { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/llm" },
         { label: "Control Plane", icon: <Settings className="w-4 h-4" />, href: "/llm/control-plane" },
+        { label: "Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/llm/create" },
         { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/settings" },
         { label: "Providers", icon: <Cloud className="w-4 h-4" />, href: "/providers" },
         { label: "Models", icon: <Package className="w-4 h-4" />, href: "/models" },
