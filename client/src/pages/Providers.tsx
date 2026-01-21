@@ -198,23 +198,49 @@ export default function Providers() {
                     setSelectedMultiChatProvider(value);
                     // Handle custom provider
                     if (value === 'custom') {
-                      setFormData({ ...formData, name: 'Custom Provider' });
+                      setFormData({ ...formData, name: 'Custom Provider', baseUrl: '' });
                       setSelectedType('custom');
                       return;
                     }
-                    const provider = multiChatProviders.find(p => p.id === value);
+
+                    // Fallback provider list for when API returns empty
+                    const fallbackProviders = [
+                      { id: 'anthropic', name: 'Anthropic', type: 'cloud' },
+                      { id: 'openai', name: 'OpenAI', type: 'cloud' },
+                      { id: 'google', name: 'Google', type: 'cloud' },
+                      { id: 'meta', name: 'Meta', type: 'cloud' },
+                      { id: 'mistral', name: 'Mistral AI', type: 'cloud' },
+                      { id: 'microsoft', name: 'Microsoft', type: 'cloud' },
+                      { id: 'qwen', name: 'Qwen', type: 'cloud' },
+                      { id: 'xai', name: 'xAI', type: 'cloud' },
+                      { id: 'cohere', name: 'Cohere', type: 'cloud' },
+                      { id: 'butterfly', name: 'Butterfly', type: 'cloud' },
+                      { id: 'moonshot', name: 'Moonshot', type: 'cloud' },
+                      { id: 'palantir', name: 'Palantir', type: 'cloud' },
+                      { id: 'perplexity', name: 'Perplexity', type: 'cloud' },
+                      { id: 'deepseek', name: 'DeepSeek', type: 'cloud' },
+                      { id: 'ollama', name: 'Ollama', type: 'local' },
+                    ];
+
+                    // Search in both API providers and fallback list
+                    const providerList = multiChatProviders.length > 0 ? multiChatProviders : fallbackProviders;
+                    const provider = providerList.find(p => p.id === value);
+
                     if (provider) {
+                      // Update form with provider name
                       setFormData({ ...formData, name: provider.name });
-                      // Auto-select type based on provider
-                      if (provider.type === 'local') {
+
+                      // Auto-select type based on provider ID
+                      if (provider.type === 'local' || value === 'ollama') {
                         setSelectedType('local-ollama');
-                      } else if (provider.id === 'openai') {
+                      } else if (value === 'openai') {
                         setSelectedType('openai');
-                      } else if (provider.id === 'anthropic') {
+                      } else if (value === 'anthropic') {
                         setSelectedType('anthropic');
-                      } else if (provider.id === 'google') {
+                      } else if (value === 'google') {
                         setSelectedType('google');
                       } else {
+                        // All other cloud providers use custom type
                         setSelectedType('custom');
                       }
                     }
@@ -253,6 +279,28 @@ export default function Providers() {
                     Choose from Anthropic, OpenAI, Google, Meta, Mistral, Microsoft, Qwen, xAI, Cohere, Butterfly, Moonshot, Palantir, Perplexity, DeepSeek, Ollama, or Custom
                   </p>
                 </div>
+
+                {/* Selected Provider Indicator */}
+                {selectedMultiChatProvider && (
+                  <div className="p-3 rounded-lg border border-primary/50 bg-primary/5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-sm">
+                          {formData.name || selectedMultiChatProvider} selected
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {selectedType === 'local-ollama' ? 'Local' : 'Cloud'}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedType === 'local-ollama'
+                        ? 'Ollama runs locally - no API key required. Make sure Ollama is installed.'
+                        : 'Enter your API key below to connect to this provider.'}
+                    </p>
+                  </div>
+                )}
 
                 {/* Provider Type Selection */}
                 <div className="space-y-2">
