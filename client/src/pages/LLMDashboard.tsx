@@ -81,6 +81,10 @@ export default function LLMDashboard() {
             <Settings className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
             Control Plane
           </Button>
+          <Button variant="outline" size="lg" onClick={() => setLocation("/llm/create")} className="w-full sm:w-auto">
+            <Wand2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+            Wizard
+          </Button>
           <Button variant="outline" size="lg" onClick={openQuickSetup} className="w-full sm:w-auto">
             <Wand2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
             Quick Setup

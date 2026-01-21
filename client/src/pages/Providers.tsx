@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Settings, Trash2, CheckCircle, XCircle, Loader2, Cloud, Server, Zap, DollarSign, Activity, RefreshCw } from "lucide-react";
+import { Plus, Settings, Trash2, CheckCircle, XCircle, Loader2, Cloud, Server, Zap, DollarSign, Activity, RefreshCw, Route, ClipboardList } from "lucide-react";
+import { TestProviderButton } from "@/components/TestProviderButton";
+import { RoutingAuditViewer } from "@/components/RoutingAuditViewer";
 
 type ProviderType = "openai" | "anthropic" | "google" | "local-llamacpp" | "local-ollama" | "custom";
 
@@ -193,22 +195,54 @@ export default function Providers() {
               <div className="space-y-4 py-4">
                 {/* MultiChat Provider Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="multichat-provider">Select from MultiChat Providers (14 providers)</Label>
+                  <Label htmlFor="multichat-provider">Select from Available Providers ({multiChatProviders.length > 0 ? multiChatProviders.length : 16} providers)</Label>
                   <Select value={selectedMultiChatProvider} onValueChange={(value) => {
                     setSelectedMultiChatProvider(value);
-                    const provider = multiChatProviders.find(p => p.id === value);
+                    // Handle custom provider
+                    if (value === 'custom') {
+                      setFormData({ ...formData, name: 'Custom Provider', baseUrl: '' });
+                      setSelectedType('custom');
+                      return;
+                    }
+
+                    // Fallback provider list for when API returns empty
+                    const fallbackProviders = [
+                      { id: 'anthropic', name: 'Anthropic', type: 'cloud' },
+                      { id: 'openai', name: 'OpenAI', type: 'cloud' },
+                      { id: 'google', name: 'Google', type: 'cloud' },
+                      { id: 'meta', name: 'Meta', type: 'cloud' },
+                      { id: 'mistral', name: 'Mistral AI', type: 'cloud' },
+                      { id: 'microsoft', name: 'Microsoft', type: 'cloud' },
+                      { id: 'qwen', name: 'Qwen', type: 'cloud' },
+                      { id: 'xai', name: 'xAI', type: 'cloud' },
+                      { id: 'cohere', name: 'Cohere', type: 'cloud' },
+                      { id: 'butterfly', name: 'Butterfly', type: 'cloud' },
+                      { id: 'moonshot', name: 'Moonshot', type: 'cloud' },
+                      { id: 'palantir', name: 'Palantir', type: 'cloud' },
+                      { id: 'perplexity', name: 'Perplexity', type: 'cloud' },
+                      { id: 'deepseek', name: 'DeepSeek', type: 'cloud' },
+                      { id: 'ollama', name: 'Ollama', type: 'local' },
+                    ];
+
+                    // Search in both API providers and fallback list
+                    const providerList = multiChatProviders.length > 0 ? multiChatProviders : fallbackProviders;
+                    const provider = providerList.find(p => p.id === value);
+
                     if (provider) {
+                      // Update form with provider name
                       setFormData({ ...formData, name: provider.name });
-                      // Auto-select type based on provider
-                      if (provider.type === 'local') {
+
+                      // Auto-select type based on provider ID
+                      if (provider.type === 'local' || value === 'ollama') {
                         setSelectedType('local-ollama');
-                      } else if (provider.id === 'openai') {
+                      } else if (value === 'openai') {
                         setSelectedType('openai');
-                      } else if (provider.id === 'anthropic') {
+                      } else if (value === 'anthropic') {
                         setSelectedType('anthropic');
-                      } else if (provider.id === 'google') {
+                      } else if (value === 'google') {
                         setSelectedType('google');
                       } else {
+                        // All other cloud providers use custom type
                         setSelectedType('custom');
                       }
                     }
@@ -217,22 +251,58 @@ export default function Providers() {
                       <SelectValue placeholder="Select a provider..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {multiChatProviders.map((provider) => (
+                      {(multiChatProviders.length > 0 ? multiChatProviders : [
+                        { id: 'anthropic', name: 'Anthropic', type: 'cloud' },
+                        { id: 'openai', name: 'OpenAI', type: 'cloud' },
+                        { id: 'google', name: 'Google', type: 'cloud' },
+                        { id: 'meta', name: 'Meta', type: 'cloud' },
+                        { id: 'mistral', name: 'Mistral AI', type: 'cloud' },
+                        { id: 'microsoft', name: 'Microsoft', type: 'cloud' },
+                        { id: 'qwen', name: 'Qwen', type: 'cloud' },
+                        { id: 'xai', name: 'xAI', type: 'cloud' },
+                        { id: 'cohere', name: 'Cohere', type: 'cloud' },
+                        { id: 'butterfly', name: 'Butterfly', type: 'cloud' },
+                        { id: 'moonshot', name: 'Moonshot', type: 'cloud' },
+                        { id: 'palantir', name: 'Palantir', type: 'cloud' },
+                        { id: 'perplexity', name: 'Perplexity', type: 'cloud' },
+                        { id: 'deepseek', name: 'DeepSeek', type: 'cloud' },
+                        { id: 'ollama', name: 'Ollama', type: 'local' },
+                      ]).map((provider) => (
                         <SelectItem key={provider.id} value={provider.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{provider.name}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {provider.type}
-                            </Badge>
-                          </div>
+                          {provider.name} ({provider.type})
                         </SelectItem>
                       ))}
+                      <SelectItem key="custom" value="custom">
+                        Custom (OpenAI-compatible endpoint)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Choose from Anthropic, OpenAI, Google, Meta, Mistral, Microsoft, Qwen, xAI, Cohere, Butterfly, Moonshot, Palantir, Perplexity, DeepSeek, or Ollama
+                    Choose from Anthropic, OpenAI, Google, Meta, Mistral, Microsoft, Qwen, xAI, Cohere, Butterfly, Moonshot, Palantir, Perplexity, DeepSeek, Ollama, or Custom
                   </p>
                 </div>
+
+                {/* Selected Provider Indicator */}
+                {selectedMultiChatProvider && (
+                  <div className="p-3 rounded-lg border border-primary/50 bg-primary/5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-sm">
+                          {formData.name || selectedMultiChatProvider} selected
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {selectedType === 'local-ollama' ? 'Local' : 'Cloud'}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedType === 'local-ollama'
+                        ? 'Ollama runs locally - no API key required. Make sure Ollama is installed.'
+                        : 'Enter your API key below to connect to this provider.'}
+                    </p>
+                  </div>
+                )}
 
                 {/* Provider Type Selection */}
                 <div className="space-y-2">
@@ -399,6 +469,10 @@ export default function Providers() {
           <TabsTrigger value="all">All Providers</TabsTrigger>
           <TabsTrigger value="cloud">Cloud</TabsTrigger>
           <TabsTrigger value="local">Local</TabsTrigger>
+          <TabsTrigger value="routing">
+            <Route className="h-4 w-4 mr-1" />
+            Routing
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -472,6 +546,10 @@ export default function Providers() {
                         >
                           {provider.enabled ? "Disable" : "Enable"}
                         </Button>
+                        <TestProviderButton
+                          providerId={provider.id}
+                          providerName={provider.name}
+                        />
                         <Button
                           variant="outline"
                           size="sm"
@@ -626,6 +704,23 @@ export default function Providers() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="routing" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Routing Audit Log
+              </CardTitle>
+              <CardDescription>
+                Monitor provider routing decisions and fallback events
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RoutingAuditViewer workspaceId={1} />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

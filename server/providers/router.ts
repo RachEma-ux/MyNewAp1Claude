@@ -7,6 +7,10 @@ import * as providerDb from "./db";
 import type { ProviderType } from "./types";
 import { batchService } from "../inference/batch-service";
 import { hybridRouter } from "../inference/hybrid-router";
+import { providerRouter as unifiedRouter } from "../inference/provider-router";
+import { getDb } from "../db";
+import { routingAuditLogs } from "../../drizzle/schema";
+import { desc, eq, and, gte } from "drizzle-orm";
 
 export const providerRouter = router({
   // List all providers
@@ -301,5 +305,269 @@ export const providerRouter = router({
     getStats: protectedProcedure.query(() => {
       return hybridRouter.getStatistics();
     }),
+  }),
+
+  // Unified provider routing with policy support
+  routing: router({
+    // Get routing plan for a request (dry run)
+    getRoutingPlan: protectedProcedure
+      .input(z.object({
+        workspaceId: z.number(),
+        model: z.string().optional(),
+        taskHints: z.object({
+          mustStayLocal: z.boolean().optional(),
+          maxLatencyMs: z.number().optional(),
+          budgetCeiling: z.number().optional(),
+          qualityTier: z.enum(['FAST', 'BALANCED', 'BEST']).optional(),
+          requiredCapabilities: z.array(z.enum(['chat', 'embeddings', 'tools', 'vision', 'json_mode', 'streaming'])).optional(),
+        }).optional(),
+      }))
+      .query(async ({ input }) => {
+        const plan = await unifiedRouter.resolvePlan({
+          messages: [{ role: 'user', content: 'test' }],
+          workspaceId: input.workspaceId,
+          model: input.model,
+          taskHints: input.taskHints,
+        });
+        return plan;
+      }),
+
+    // Get routing audit logs
+    getAuditLogs: protectedProcedure
+      .input(z.object({
+        workspaceId: z.number().optional(),
+        providerId: z.number().optional(),
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+        since: z.date().optional(),
+      }))
+      .query(async ({ input }) => {
+        const db = getDb();
+        if (!db) return [];
+
+        const conditions = [];
+
+        if (input.workspaceId) {
+          conditions.push(eq(routingAuditLogs.workspaceId, input.workspaceId));
+        }
+        if (input.providerId) {
+          conditions.push(eq(routingAuditLogs.actualProviderId, input.providerId));
+        }
+        if (input.since) {
+          conditions.push(gte(routingAuditLogs.createdAt, input.since));
+        }
+
+        const query = db
+          .select()
+          .from(routingAuditLogs)
+          .orderBy(desc(routingAuditLogs.createdAt))
+          .limit(input.limit)
+          .offset(input.offset);
+
+        const logs = conditions.length > 0
+          ? await query.where(and(...conditions))
+          : await query;
+
+        return logs;
+      }),
+
+    // Get routing statistics
+    getStats: protectedProcedure
+      .input(z.object({
+        workspaceId: z.number(),
+        since: z.date().optional(),
+      }))
+      .query(async ({ input }) => {
+        const db = getDb();
+        if (!db) {
+          return {
+            totalRequests: 0,
+            primaryUsed: 0,
+            fallbackUsed: 0,
+            fallbackRate: 0,
+            avgLatencyMs: 0,
+            totalTokens: 0,
+            providerBreakdown: {},
+          };
+        }
+
+        const since = input.since || new Date(Date.now() - 24 * 60 * 60 * 1000); // Default: last 24h
+
+        const logs = await db
+          .select()
+          .from(routingAuditLogs)
+          .where(
+            and(
+              eq(routingAuditLogs.workspaceId, input.workspaceId),
+              gte(routingAuditLogs.createdAt, since)
+            )
+          );
+
+        // Calculate statistics
+        const totalRequests = logs.length;
+        const primaryUsed = logs.filter(l => l.routeTaken === 'PRIMARY').length;
+        const fallbackUsed = totalRequests - primaryUsed;
+        const avgLatency = logs.length > 0
+          ? logs.reduce((sum, l) => sum + (l.latencyMs || 0), 0) / logs.length
+          : 0;
+        const totalTokens = logs.reduce((sum, l) => sum + (l.tokensUsed || 0), 0);
+
+        // Provider breakdown
+        const providerCounts: Record<number, number> = {};
+        logs.forEach(l => {
+          providerCounts[l.actualProviderId] = (providerCounts[l.actualProviderId] || 0) + 1;
+        });
+
+        return {
+          totalRequests,
+          primaryUsed,
+          fallbackUsed,
+          fallbackRate: totalRequests > 0 ? (fallbackUsed / totalRequests) * 100 : 0,
+          avgLatencyMs: Math.round(avgLatency),
+          totalTokens,
+          providerBreakdown: providerCounts,
+        };
+      }),
+  }),
+
+  // Provider capabilities and policy management
+  capabilities: router({
+    // Update provider capabilities
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        capabilities: z.array(z.enum(['chat', 'embeddings', 'tools', 'vision', 'json_mode', 'streaming'])).optional(),
+        policyTags: z.array(z.enum(['no_egress', 'pii_safe', 'gpu_required', 'hipaa_compliant', 'gdpr_compliant'])).optional(),
+        kind: z.enum(['local', 'cloud', 'hybrid']).optional(),
+        limits: z.object({
+          maxContext: z.number().optional(),
+          maxOutput: z.number().optional(),
+          rateLimit: z.number().optional(),
+          costTier: z.enum(['free', 'low', 'medium', 'high']).optional(),
+        }).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await providerDb.updateProvider(id, data as any);
+        return { success: true };
+      }),
+
+    // Get provider with full routing metadata
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const provider = await providerDb.getProviderById(input.id);
+        if (!provider) {
+          throw new Error("Provider not found");
+        }
+        return {
+          ...provider,
+          kind: (provider as any).kind || 'cloud',
+          capabilities: (provider as any).capabilities || [],
+          policyTags: (provider as any).policyTags || [],
+          limits: (provider as any).limits || null,
+        };
+      }),
+  }),
+
+  // Test provider with comprehensive checks
+  test: router({
+    // Full provider test (health + sample completion + streaming + capabilities)
+    runFullTest: protectedProcedure
+      .input(z.object({
+        providerId: z.number(),
+        testOptions: z.object({
+          testHealth: z.boolean().default(true),
+          testCompletion: z.boolean().default(true),
+          testStreaming: z.boolean().default(true),
+          testToolCalling: z.boolean().default(false),
+        }).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const registry = getProviderRegistry();
+        const provider = registry.getProvider(input.providerId);
+
+        if (!provider) {
+          return {
+            success: false,
+            error: "Provider not found in registry",
+            results: {},
+          };
+        }
+
+        const results: Record<string, { success: boolean; latencyMs?: number; error?: string }> = {};
+        const options = input.testOptions || { testHealth: true, testCompletion: true, testStreaming: true, testToolCalling: false };
+
+        // Health check
+        if (options.testHealth) {
+          const startHealth = Date.now();
+          try {
+            const health = await provider.healthCheck();
+            results.health = {
+              success: health.healthy,
+              latencyMs: Date.now() - startHealth,
+              error: health.healthy ? undefined : health.message,
+            };
+          } catch (error: any) {
+            results.health = {
+              success: false,
+              latencyMs: Date.now() - startHealth,
+              error: error.message,
+            };
+          }
+        }
+
+        // Sample completion
+        if (options.testCompletion) {
+          const startCompletion = Date.now();
+          try {
+            const response = await provider.generate({
+              messages: [{ role: 'user', content: 'Say "test successful" and nothing else.' }],
+              maxTokens: 20,
+            });
+            results.completion = {
+              success: true,
+              latencyMs: Date.now() - startCompletion,
+            };
+          } catch (error: any) {
+            results.completion = {
+              success: false,
+              latencyMs: Date.now() - startCompletion,
+              error: error.message,
+            };
+          }
+        }
+
+        // Streaming test
+        if (options.testStreaming) {
+          const startStream = Date.now();
+          try {
+            let tokenCount = 0;
+            for await (const token of provider.generateStream({
+              messages: [{ role: 'user', content: 'Count to 3.' }],
+              maxTokens: 30,
+            })) {
+              tokenCount++;
+              if (token.isComplete) break;
+            }
+            results.streaming = {
+              success: tokenCount > 0,
+              latencyMs: Date.now() - startStream,
+            };
+          } catch (error: any) {
+            results.streaming = {
+              success: false,
+              latencyMs: Date.now() - startStream,
+              error: error.message,
+            };
+          }
+        }
+
+        const allSuccess = Object.values(results).every(r => r.success);
+        return {
+          success: allSuccess,
+          results,
+        };
+      }),
   }),
 });

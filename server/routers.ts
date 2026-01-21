@@ -33,6 +33,7 @@ import { keyRotationRouter } from "./routers/keyRotation";
 import { wikiRouter } from "./routers/wiki";
 import { llmRouter } from "./routers/llm";
 import { diagnosticRouter } from "./routers/diagnostic";
+import { deployRouter } from "./routers/deploy";
 
 export const appRouter = router({
   system: systemRouter,
@@ -64,6 +65,7 @@ export const appRouter = router({
   keyRotation: keyRotationRouter,
   wiki: wikiRouter,
   llm: llmRouter, // LLM Control Plane
+  deploy: deployRouter, // Deployment management
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -130,6 +132,51 @@ export const appRouter = router({
         }
         const { id, ...updates } = input;
         await db.updateWorkspace(id, updates);
+        return { success: true };
+      }),
+
+    // Get workspace routing profile
+    getRoutingProfile: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.id);
+        if (!hasAccess) {
+          throw new Error("Access denied");
+        }
+        const workspace = await db.getWorkspaceById(input.id);
+        return (workspace as any)?.routingProfile || {
+          defaultRoute: 'AUTO',
+          dataSensitivity: 'LOW',
+          qualityTier: 'BALANCED',
+          fallback: { enabled: true, maxHops: 3 },
+        };
+      }),
+
+    // Update workspace routing profile
+    updateRoutingProfile: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          routingProfile: z.object({
+            defaultRoute: z.enum(['AUTO', 'LOCAL_ONLY', 'CLOUD_ALLOWED']),
+            dataSensitivity: z.enum(['LOW', 'MED', 'HIGH']),
+            qualityTier: z.enum(['FAST', 'BALANCED', 'BEST']),
+            fallback: z.object({
+              enabled: z.boolean(),
+              maxHops: z.number().min(0).max(10),
+            }),
+            pinnedProviderId: z.number().optional().nullable(),
+          }),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.id);
+        if (!hasAccess) {
+          throw new Error("Access denied");
+        }
+        await db.updateWorkspace(input.id, {
+          routingProfile: input.routingProfile,
+        } as any);
         return { success: true };
       }),
 

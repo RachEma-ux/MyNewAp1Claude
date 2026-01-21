@@ -5,7 +5,7 @@ import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "./const";
+import { getLoginUrl, isOAuthConfigured } from "./const";
 import MainLayout from "./components/MainLayout";
 import Home from "./pages/Home";
 import Workspaces from "./pages/Workspaces";
@@ -75,10 +75,21 @@ import LLMPromotions from "@/pages/LLMPromotions";
 import LLMDetailPage from "@/pages/LLMDetailPage";
 import LLMTrainingDashboard from "@/pages/LLMTrainingDashboard";
 import DeploymentStatus from "@/pages/DeploymentStatus";
+import DeployPage from "@/pages/DeployPage";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
+
+  // If OAuth is not configured, bypass authentication and render the component
+  // This allows the app to run in "demo mode" without OAuth/database
+  if (!isOAuthConfigured()) {
+    return (
+      <MainLayout>
+        <Component />
+      </MainLayout>
+    );
+  }
 
   if (loading) {
     return (
@@ -89,7 +100,10 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   }
 
   if (!isAuthenticated) {
-    window.location.href = getLoginUrl();
+    const loginUrl = getLoginUrl();
+    if (loginUrl) {
+      window.location.href = loginUrl;
+    }
     return null;
   }
 
@@ -175,6 +189,8 @@ function Router() {
       <Route path="/llm/provider-wizard" component={() => <ProtectedRoute component={LLMProviderConfigWizard} />} />
       {/* Deployment Status Page */}
       <Route path="/deployment-status" component={() => <ProtectedRoute component={DeploymentStatus} />} />
+      {/* Deploy Page */}
+      <Route path="/deploy" component={() => <ProtectedRoute component={DeployPage} />} />
       <Route path="/llm/:id" component={() => <ProtectedRoute component={LLMDetailPage} />} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

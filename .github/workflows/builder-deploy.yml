@@ -25,7 +25,18 @@ on:
           - '10'
           - '15'
           - '30'
-
+      oauth_portal_url:
+        description: 'OAuth Portal URL (optional)'
+        required: false
+        default: ''
+      app_id:
+        description: 'App ID for OAuth (optional)'
+        required: false
+        default: ''
+      database_url:
+        description: 'PostgreSQL DATABASE_URL (optional)'
+        required: false
+        default: ''
 permissions:
   contents: write
 
@@ -35,6 +46,30 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Reset Gist status to pending
+        run: |
+          echo "🔄 Resetting Gist tunnel status..."
+          GIST_ID="${{ vars.TUNNEL_GIST_ID }}"
+          GIST_TOKEN="${{ secrets.GIST_TOKEN }}"
+
+          if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
+            TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            GIST_JSON=$(jq -n \
+              --arg rid "${{ github.run_id }}" \
+              --arg repo "${{ github.repository }}" \
+              --arg ts "$TIMESTAMP" \
+              '{tunnel_url: null, version: null, run_id: $rid, repository: $repo, status: "pending", started_at: $ts}')
+
+            PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
+
+            curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
+              -H "Authorization: Bearer $GIST_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -d "$PAYLOAD" > /dev/null && echo "✅ Gist reset to pending" || echo "⚠️ Gist reset failed"
+          else
+            echo "⚠️ GIST_TOKEN or TUNNEL_GIST_ID not configured"
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -63,6 +98,8 @@ jobs:
           npm run build
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
+          VITE_OAUTH_PORTAL_URL: ${{ github.event.inputs.oauth_portal_url }}
+          VITE_APP_ID: ${{ github.event.inputs.app_id }}
 
       # ========== PACK PHASE ==========
       - name: Create pack structure
@@ -214,11 +251,13 @@ jobs:
 
       - name: Start application with tunnel
         if: ${{ github.event.inputs.run_app == 'yes' }}
+        env:
+          DATABASE_URL: ${{ github.event.inputs.database_url }}
         run: |
           echo "🚀 Starting application..."
 
           # Start the Node.js server
-          PORT=3000 NODE_ENV=production node dist/index.js &
+          PORT=3000 NODE_ENV=production DATABASE_URL="${DATABASE_URL}" node dist/index.js &
           SERVER_PID=$!
 
           # Wait for server startup
@@ -251,6 +290,32 @@ jobs:
 
           # Save URL
           echo "$TUNNEL_URL" > app_url.txt
+
+          # Update Gist with tunnel URL for Builder App
+          echo "📤 Updating Gist with tunnel URL..."
+          GIST_ID="${{ vars.TUNNEL_GIST_ID }}"
+          GIST_TOKEN="${{ secrets.GIST_TOKEN }}"
+
+          if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
+            TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            GIST_JSON=$(jq -n \
+              --arg url "$TUNNEL_URL" \
+              --arg ver "${{ github.event.inputs.version }}" \
+              --arg rid "${{ github.run_id }}" \
+              --arg repo "${{ github.repository }}" \
+              --arg dur "${{ github.event.inputs.duration }}" \
+              --arg ts "$TIMESTAMP" \
+              '{tunnel_url: $url, version: $ver, run_id: $rid, repository: $repo, status: "running", duration_minutes: ($dur|tonumber), started_at: $ts}')
+
+            PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
+
+            curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
+              -H "Authorization: Bearer $GIST_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -d "$PAYLOAD" > /dev/null && echo "✅ Gist updated" || echo "⚠️ Gist update failed"
+          else
+            echo "⚠️ GIST_TOKEN or TUNNEL_GIST_ID not configured, skipping Gist update"
+          fi
 
           # Keep running
           DURATION_SECONDS=$(( ${{ github.event.inputs.duration }} * 60 ))

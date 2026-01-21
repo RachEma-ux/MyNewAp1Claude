@@ -1,0 +1,6 @@
+
+> mynewap1claude@1.0.0 build
+> rm -rf dist client/dist .vite && vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+vite v7.3.1 building client environment for production...
+transforming...

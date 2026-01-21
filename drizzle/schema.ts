@@ -35,22 +35,34 @@ export type InsertUser = typeof users.$inferInsert;
 // Workspace System
 // ============================================================================
 
+// Routing profile type for workspace-level provider routing configuration
+export interface RoutingProfile {
+  defaultRoute: 'AUTO' | 'LOCAL_ONLY' | 'CLOUD_ALLOWED';
+  dataSensitivity: 'LOW' | 'MED' | 'HIGH';
+  qualityTier: 'FAST' | 'BALANCED' | 'BEST';
+  fallback: { enabled: boolean; maxHops: number };
+  pinnedProviderId?: number;
+}
+
 export const workspaces = pgTable("workspaces", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   ownerId: integer("ownerId").notNull(),
-  
+
   // Workspace settings
   embeddingModel: varchar("embeddingModel", { length: 255 }).default("bge-small-en-v1.5"),
   chunkingStrategy: varchar("chunkingStrategy", { length: 50 }).default("semantic"),
   chunkSize: integer("chunkSize").default(512),
   chunkOverlap: integer("chunkOverlap").default(50),
-  
+
   // Vector DB settings
   vectorDb: varchar("vectorDb", { length: 50 }).default("qdrant"),
   collectionName: varchar("collectionName", { length: 255 }),
-  
+
+  // Provider Routing Profile
+  routingProfile: json("routingProfile").$type<RoutingProfile>(),
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -486,21 +498,48 @@ export type InsertWorkflowRun = typeof workflowRuns.$inferInsert;
 // Provider System (Provider Hub Integration)
 // ============================================================================
 
+// Provider capability types
+export type ProviderCapability = 'chat' | 'embeddings' | 'tools' | 'vision' | 'json_mode' | 'streaming';
+export type ProviderPolicyTag = 'no_egress' | 'pii_safe' | 'gpu_required' | 'hipaa_compliant' | 'gdpr_compliant';
+export type ProviderKind = 'local' | 'cloud' | 'hybrid';
+export type CostTier = 'free' | 'low' | 'medium' | 'high';
+
+export interface ProviderLimits {
+  maxContext?: number;
+  maxOutput?: number;
+  rateLimit?: number;  // requests per minute
+  costTier?: CostTier;
+}
+
 export const providers = pgTable("providers", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   type: varchar("type", { length: 50 }).notNull(),
-  
+
   // Provider status
   enabled: boolean("enabled").default(true),
   priority: integer("priority").default(50),
-  
+
   // Configuration (API keys, endpoints, etc.)
   config: json("config").notNull(),
-  
+
   // Cost tracking
   costPer1kTokens: varchar("costPer1kTokens", { length: 20 }),
-  
+
+  // === NEW: Provider Routing Fields ===
+
+  // Provider kind: local, cloud, or hybrid
+  kind: varchar("kind", { length: 20 }).default("cloud").$type<ProviderKind>(),
+
+  // Capabilities as JSON array
+  capabilities: json("capabilities").$type<ProviderCapability[]>(),
+
+  // Policy tags as JSON array
+  policyTags: json("policyTags").$type<ProviderPolicyTag[]>(),
+
+  // Limits as JSON object
+  limits: json("limits").$type<ProviderLimits>(),
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -553,6 +592,32 @@ export const providerHealthChecks = pgTable("provider_health_checks", {
 
 export type ProviderHealthCheck = typeof providerHealthChecks.$inferSelect;
 export type InsertProviderHealthCheck = typeof providerHealthChecks.$inferInsert;
+
+// Routing Audit Log - Track every routing decision for compliance and debugging
+export const routingAuditLogs = pgTable("routing_audit_logs", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspaceId"),
+  requestId: varchar("requestId", { length: 64 }).notNull(),
+
+  // Routing decision
+  primaryProviderId: integer("primaryProviderId").notNull(),
+  actualProviderId: integer("actualProviderId").notNull(),
+  routeTaken: varchar("routeTaken", { length: 50 }).notNull(),  // 'PRIMARY' | 'FALLBACK_1' | 'FALLBACK_2' | etc.
+
+  // Audit info
+  auditReasons: json("auditReasons").$type<string[]>(),
+  policySnapshot: json("policySnapshot"),
+
+  // Metrics
+  latencyMs: integer("latencyMs"),
+  tokensUsed: integer("tokensUsed"),
+  estimatedCost: varchar("estimatedCost", { length: 20 }),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RoutingAuditLog = typeof routingAuditLogs.$inferSelect;
+export type InsertRoutingAuditLog = typeof routingAuditLogs.$inferInsert;
 
 // Provider Performance Metrics
 export const providerMetrics = pgTable("provider_metrics", {
