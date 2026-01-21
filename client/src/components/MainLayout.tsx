@@ -53,6 +53,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   // Start closed on mobile, open on desktop
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [llmMenuOpen, setLlmMenuOpen] = useState(false);
+  const [providersMenuOpen, setProvidersMenuOpen] = useState(false);
   const [automationMenuOpen, setAutomationMenuOpen] = useState(false);
   const [infrastructureMenuOpen, setInfrastructureMenuOpen] = useState(false);
   const [agentsMenuOpen, setAgentsMenuOpen] = useState(false);
@@ -212,6 +213,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     onClick={() => {
                       if (item.label === "LLM") {
                         setLlmMenuOpen(!llmMenuOpen);
+                      } else if (item.label === "Providers") {
+                        setProvidersMenuOpen(!providersMenuOpen);
                       } else if (item.label === "Automation") {
                         setAutomationMenuOpen(!automationMenuOpen);
                       } else if (item.label === "Infrastructure") {
@@ -226,10 +229,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "LLM" && llmMenuOpen) || (item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "Agents" && agentsMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "Agents" && agentsMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
-                  {/* LLM and Automation menus (2-level) */}
-                  {((item.label === "LLM" && llmMenuOpen) || (item.label === "Automation" && automationMenuOpen)) && (
+                  {/* LLM, Providers and Automation menus (2-level) */}
+                  {((item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>
