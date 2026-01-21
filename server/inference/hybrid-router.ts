@@ -1,6 +1,7 @@
 import { BaseProvider } from "../providers/base";
 import { GenerationRequest, GenerationResponse, Token } from "../providers/types";
 import { resourceManager } from "./resource-manager";
+import type { RoutingProfile, ProviderCapability, ProviderPolicyTag } from "../../drizzle/schema";
 
 /**
  * Hybrid Provider Router
@@ -12,12 +13,24 @@ import { resourceManager } from "./resource-manager";
  */
 
 export interface RoutingStrategy {
-  type: "cost" | "latency" | "quality" | "availability" | "custom";
+  type: "cost" | "latency" | "quality" | "availability" | "policy" | "custom";
   preferLocal?: boolean; // Prefer local models when available
   maxLocalLoad?: number; // Max concurrent local requests (0-1)
   maxCostPerRequest?: number; // Max cost in USD
   maxLatencyMs?: number; // Max acceptable latency
   customScore?: (provider: BaseProvider, request: GenerationRequest) => Promise<number>;
+
+  // Policy-aware routing options
+  policyConfig?: {
+    workspaceProfile?: RoutingProfile;
+    requiredCapabilities?: ProviderCapability[];
+    requiredPolicyTags?: ProviderPolicyTag[];
+    providerMetadata?: Map<number, {
+      kind: 'local' | 'cloud' | 'hybrid';
+      capabilities: ProviderCapability[];
+      policyTags: ProviderPolicyTag[];
+    }>;
+  };
 }
 
 export interface RoutingDecision {
@@ -133,6 +146,9 @@ class HybridProviderRouter {
       case "availability":
         score += this.scoreByAvailability(provider, isLocal);
         break;
+      case "policy":
+        score += this.scoreByPolicy(provider, strategy.policyConfig, isLocal);
+        break;
       case "custom":
         if (strategy.customScore) {
           score = await strategy.customScore(provider, request);
@@ -222,9 +238,80 @@ class HybridProviderRouter {
       const loadPercent = allocation.activeRequests / allocation.maxConcurrentRequests;
       return Math.max(0, 40 * (1 - loadPercent));
     }
-    
+
     // Cloud providers assumed to have high availability
     return 35;
+  }
+
+  /**
+   * Score by policy constraints
+   * Evaluates provider against workspace routing profile and required capabilities/tags
+   */
+  private scoreByPolicy(
+    provider: BaseProvider,
+    policyConfig: RoutingStrategy['policyConfig'],
+    isLocal: boolean
+  ): number {
+    if (!policyConfig) {
+      return 30; // Default score when no policy
+    }
+
+    let score = 30;
+    const metadata = policyConfig.providerMetadata?.get(provider.id);
+
+    // 1. Check data sensitivity constraints
+    const profile = policyConfig.workspaceProfile;
+    if (profile?.dataSensitivity === 'HIGH') {
+      if (isLocal || metadata?.policyTags?.includes('no_egress')) {
+        score += 30; // Bonus for being safe for high sensitivity
+      } else {
+        return 0; // Disqualify cloud providers without no_egress
+      }
+    }
+
+    // 2. Check route preference
+    if (profile?.defaultRoute === 'LOCAL_ONLY' && !isLocal) {
+      return 0; // Disqualify cloud providers
+    }
+    if (profile?.defaultRoute === 'LOCAL_ONLY' && isLocal) {
+      score += 20;
+    }
+
+    // 3. Check required capabilities
+    if (policyConfig.requiredCapabilities && metadata) {
+      const hasAllCaps = policyConfig.requiredCapabilities.every(
+        cap => metadata.capabilities?.includes(cap)
+      );
+      if (!hasAllCaps) {
+        return 0; // Disqualify if missing required capabilities
+      }
+      score += 15; // Bonus for having all capabilities
+    }
+
+    // 4. Check required policy tags
+    if (policyConfig.requiredPolicyTags && metadata) {
+      const hasAllTags = policyConfig.requiredPolicyTags.every(
+        tag => metadata.policyTags?.includes(tag)
+      );
+      if (!hasAllTags) {
+        return 0; // Disqualify if missing required tags
+      }
+      score += 15;
+    }
+
+    // 5. Quality tier scoring
+    if (profile?.qualityTier === 'FAST' && isLocal) {
+      score += 10; // Local often faster
+    } else if (profile?.qualityTier === 'BEST' && !isLocal) {
+      score += 10; // Cloud often higher quality
+    }
+
+    // 6. Pinned provider bonus
+    if (profile?.pinnedProviderId === provider.id) {
+      score += 50; // Strong preference for pinned
+    }
+
+    return score;
   }
 
   /**

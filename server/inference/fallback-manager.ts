@@ -1,4 +1,4 @@
-import { BaseProvider } from "../providers/base";
+import { BaseProvider, ILLMProvider } from "../providers/base";
 import { GenerationRequest, GenerationResponse, Token } from "../providers/types";
 
 /**
@@ -14,13 +14,13 @@ export interface FallbackConfig {
 }
 
 export interface FallbackChain {
-  primary: BaseProvider;
-  fallbacks: BaseProvider[];
+  primary: ILLMProvider;
+  fallbacks: ILLMProvider[];
   config?: FallbackConfig;
 }
 
 export interface FallbackAttempt {
-  provider: BaseProvider;
+  provider: ILLMProvider;
   attempt: number;
   success: boolean;
   error?: Error;
@@ -30,7 +30,7 @@ export interface FallbackAttempt {
 export interface FallbackResult<T> {
   result: T;
   attempts: FallbackAttempt[];
-  finalProvider: BaseProvider;
+  finalProvider: ILLMProvider;
   totalLatencyMs: number;
 }
 
@@ -47,7 +47,7 @@ class FallbackProviderManager {
    */
   public async executeWithFallback<T>(
     chain: FallbackChain,
-    executor: (provider: BaseProvider) => Promise<T>
+    executor: (provider: ILLMProvider) => Promise<T>
   ): Promise<FallbackResult<T>> {
     const config = { ...this.defaultConfig, ...chain.config };
     const allProviders = [chain.primary, ...chain.fallbacks];
@@ -199,7 +199,7 @@ class FallbackProviderManager {
    * Create a fallback chain from provider registry
    */
   public createChainFromProviders(
-    providers: BaseProvider[],
+    providers: ILLMProvider[],
     config?: FallbackConfig
   ): FallbackChain | null {
     if (providers.length === 0) {
@@ -217,7 +217,7 @@ class FallbackProviderManager {
    * Create a fallback chain with specific priority order
    */
   public createChainWithPriority(
-    providers: BaseProvider[],
+    providers: ILLMProvider[],
     priorityOrder: string[], // Provider class names in priority order
     config?: FallbackConfig
   ): FallbackChain | null {

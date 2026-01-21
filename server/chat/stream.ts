@@ -3,6 +3,7 @@ import { getProviderRegistry } from '../providers/registry';
 import type { Message } from '../providers/types';
 import { trackProviderUsage } from '../providers/usage';
 import { sdk } from '../_core/sdk';
+import { providerRouter } from '../inference/provider-router';
 
 export async function handleChatStream(req: Request, res: Response) {
   try {
@@ -14,19 +15,48 @@ export async function handleChatStream(req: Request, res: Response) {
     }
 
     // Parse request body
-    const { providerId, messages, temperature, maxTokens, useRAG, workspaceId } = req.body;
+    const { providerId, messages, temperature, maxTokens, useRAG, workspaceId, useUnifiedRouting, taskHints } = req.body;
 
-    if (!providerId || !messages || !Array.isArray(messages)) {
-      res.status(400).json({ error: 'Invalid request body' });
+    // Validate request - providerId is optional when using unified routing
+    if (!messages || !Array.isArray(messages)) {
+      res.status(400).json({ error: 'Invalid request body: messages required' });
       return;
     }
 
-    // Get provider
+    if (!useUnifiedRouting && !providerId) {
+      res.status(400).json({ error: 'Invalid request body: providerId required when not using unified routing' });
+      return;
+    }
+
+    // Get provider - either directly or via unified routing
     const registry = getProviderRegistry();
-    const provider = registry.getProvider(providerId);
+    let provider;
+    let routingPlan = null;
+
+    if (useUnifiedRouting && workspaceId) {
+      // Use unified provider routing
+      try {
+        routingPlan = await providerRouter.resolvePlan({
+          messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
+          workspaceId,
+          temperature,
+          maxTokens,
+          taskHints,
+        });
+        provider = registry.getProvider(routingPlan.primaryProviderId);
+        console.log(`[ChatStream] Unified routing selected provider: ${routingPlan.primaryProviderName}`);
+      } catch (routingError: any) {
+        console.error('[ChatStream] Unified routing failed:', routingError);
+        res.status(500).json({ error: `Routing failed: ${routingError.message}` });
+        return;
+      }
+    } else {
+      // Legacy direct provider selection
+      provider = registry.getProvider(providerId);
+    }
 
     if (!provider) {
-      res.status(404).json({ error: `Provider with ID ${providerId} not found` });
+      res.status(404).json({ error: `Provider not found` });
       return;
     }
 
@@ -149,6 +179,13 @@ export async function handleChatStream(req: Request, res: Response) {
             },
             cost,
             sources: ragSources.length > 0 ? ragSources : undefined,
+            routing: routingPlan ? {
+              requestId: routingPlan.requestId,
+              providerId: routingPlan.primaryProviderId,
+              providerName: routingPlan.primaryProviderName,
+              fallbackChain: routingPlan.fallbackChain,
+              auditReasons: routingPlan.auditReasons,
+            } : undefined,
           })}\n\n`);
           
           res.end();

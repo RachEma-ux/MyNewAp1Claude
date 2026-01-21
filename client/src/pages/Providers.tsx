@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Settings, Trash2, CheckCircle, XCircle, Loader2, Cloud, Server, Zap, DollarSign, Activity, RefreshCw } from "lucide-react";
+import { Plus, Settings, Trash2, CheckCircle, XCircle, Loader2, Cloud, Server, Zap, DollarSign, Activity, RefreshCw, Route, ClipboardList } from "lucide-react";
+import { TestProviderButton } from "@/components/TestProviderButton";
+import { RoutingAuditViewer } from "@/components/RoutingAuditViewer";
 
 type ProviderType = "openai" | "anthropic" | "google" | "local-llamacpp" | "local-ollama" | "custom";
 
@@ -467,6 +469,10 @@ export default function Providers() {
           <TabsTrigger value="all">All Providers</TabsTrigger>
           <TabsTrigger value="cloud">Cloud</TabsTrigger>
           <TabsTrigger value="local">Local</TabsTrigger>
+          <TabsTrigger value="routing">
+            <Route className="h-4 w-4 mr-1" />
+            Routing
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -540,6 +546,10 @@ export default function Providers() {
                         >
                           {provider.enabled ? "Disable" : "Enable"}
                         </Button>
+                        <TestProviderButton
+                          providerId={provider.id}
+                          providerName={provider.name}
+                        />
                         <Button
                           variant="outline"
                           size="sm"
@@ -694,6 +704,23 @@ export default function Providers() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="routing" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Routing Audit Log
+              </CardTitle>
+              <CardDescription>
+                Monitor provider routing decisions and fallback events
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RoutingAuditViewer workspaceId={1} />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
