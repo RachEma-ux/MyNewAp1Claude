@@ -37,6 +37,14 @@ on:
         description: 'PostgreSQL DATABASE_URL (optional)'
         required: false
         default: ''
+      dev_mode:
+        description: 'Enable DEV_MODE (bypass OAuth login)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 permissions:
   contents: write
 
@@ -257,7 +265,7 @@ jobs:
           echo "🚀 Starting application..."
 
           # Start the Node.js server
-          PORT=3000 NODE_ENV=production DATABASE_URL="${DATABASE_URL}" node dist/index.js &
+          PORT=3000 NODE_ENV=production DATABASE_URL="${DATABASE_URL}" DEV_MODE="${{ github.event.inputs.dev_mode }}" node dist/index.js &
           SERVER_PID=$!
 
           # Wait for server startup
