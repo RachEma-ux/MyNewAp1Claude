@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Send, Loader2, MessageSquare, Plus, Bot, User as UserIcon, Sparkles, BookOpen } from "lucide-react";
+import { Send, Loader2, MessageSquare, Plus, Bot, User as UserIcon, Sparkles, BookOpen, Route } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
+import { clientProviderRouter, type WorkspaceRoutingProfile } from "@/lib/provider-router";
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -24,12 +25,44 @@ export default function Chat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [useRAG, setUseRAG] = useState(false);
+  const [useUnifiedRouting, setUseUnifiedRouting] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<number | null>(null);
+  const [routingInfo, setRoutingInfo] = useState<{ provider?: string; reason?: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const { data: providers, isLoading: providersLoading } = trpc.chat.getAvailableProviders.useQuery();
   const { data: workspaces } = trpc.workspaces.list.useQuery();
+  const { data: allProviders } = trpc.providers.list.useQuery();
+
+  // Fetch routing profile when unified routing is enabled and workspace is selected
+  const { data: routingProfile } = trpc.workspaces.getRoutingProfile.useQuery(
+    { id: selectedWorkspace! },
+    { enabled: useUnifiedRouting && !!selectedWorkspace }
+  );
+
+  // Update client-side router with providers and workspace profile
+  useEffect(() => {
+    if (allProviders) {
+      clientProviderRouter.updateLocalProviders(
+        allProviders.map(p => ({
+          id: p.id,
+          name: p.name,
+          type: p.type,
+          kind: (p as any).kind || 'cloud',
+          enabled: p.enabled ?? true,
+          baseUrl: (p.config as any)?.baseURL,
+          capabilities: (p as any).capabilities || [],
+        }))
+      );
+    }
+  }, [allProviders]);
+
+  useEffect(() => {
+    if (selectedWorkspace && routingProfile) {
+      clientProviderRouter.setWorkspaceProfile(selectedWorkspace, routingProfile as WorkspaceRoutingProfile);
+    }
+  }, [selectedWorkspace, routingProfile]);
   
   const sendMessage = trpc.chat.sendMessage.useMutation({
     onSuccess: (response) => {
@@ -72,7 +105,14 @@ export default function Chat() {
       return;
     }
 
-    if (!selectedProvider) {
+    // When unified routing is enabled, we need a workspace selected
+    if (useUnifiedRouting && !selectedWorkspace) {
+      toast.error("Please select a workspace for unified routing");
+      return;
+    }
+
+    // When not using unified routing, we need a provider selected
+    if (!useUnifiedRouting && !selectedProvider) {
       toast.error("Please select a provider");
       return;
     }
@@ -87,26 +127,56 @@ export default function Chat() {
     setInput("");
     setIsStreaming(true);
     setStreamingContent("");
+    setRoutingInfo(null);
 
     // Create abort controller for cancellation
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
     try {
+      // Check client-side routing when unified routing is enabled
+      let localEndpoint: string | null = null;
+      if (useUnifiedRouting && selectedWorkspace && routingProfile) {
+        const canRouteLocally = clientProviderRouter.canRouteLocally({
+          workspaceId: selectedWorkspace,
+        });
+
+        if (canRouteLocally && routingProfile.defaultRoute === 'LOCAL_ONLY') {
+          // Try to get local endpoint for direct routing
+          const localProviders = clientProviderRouter.getLocalProviders();
+          if (localProviders.length > 0) {
+            localEndpoint = clientProviderRouter.getLocalEndpoint(localProviders[0].id);
+            setRoutingInfo({ provider: localProviders[0].name, reason: 'Local-first routing' });
+          }
+        }
+      }
+
+      // Build request body
+      const requestBody: Record<string, any> = {
+        messages: [...messages, userMessage].map(m => ({
+          role: m.role,
+          content: m.content,
+        })),
+        useRAG,
+        workspaceId: selectedWorkspace,
+      };
+
+      // Add routing parameters
+      if (useUnifiedRouting) {
+        requestBody.useUnifiedRouting = true;
+        requestBody.taskHints = {
+          qualityTier: routingProfile?.qualityTier || 'BALANCED',
+        };
+      } else {
+        requestBody.providerId = selectedProvider;
+      }
+
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          providerId: selectedProvider,
-          messages: [...messages, userMessage].map(m => ({
-            role: m.role,
-            content: m.content,
-          })),
-          useRAG,
-          workspaceId: selectedWorkspace,
-        }),
+        body: JSON.stringify(requestBody),
         signal: abortController.signal,
       });
 
@@ -147,6 +217,13 @@ export default function Chat() {
               }]);
               setStreamingContent("");
               setIsStreaming(false);
+              // Capture routing info if unified routing was used
+              if (data.routing) {
+                setRoutingInfo({
+                  provider: data.routing.providerName,
+                  reason: data.routing.auditReasons?.join(', ') || 'Unified routing',
+                });
+              }
             } else if (data.type === 'error') {
               toast.error(`Streaming error: ${data.error}`);
               setIsStreaming(false);
@@ -192,6 +269,19 @@ export default function Chat() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Unified Routing Toggle */}
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
+            <Route className="h-4 w-4 text-muted-foreground" />
+            <Label htmlFor="routing-toggle" className="text-sm cursor-pointer">
+              Smart Routing
+            </Label>
+            <Switch
+              id="routing-toggle"
+              checked={useUnifiedRouting}
+              onCheckedChange={setUseUnifiedRouting}
+            />
+          </div>
+
           {/* RAG Toggle */}
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
             <BookOpen className="h-4 w-4 text-muted-foreground" />
@@ -205,8 +295,8 @@ export default function Chat() {
             />
           </div>
 
-          {/* Workspace Selection (shown when RAG is enabled) */}
-          {useRAG && (
+          {/* Workspace Selection (shown when RAG or unified routing is enabled) */}
+          {(useRAG || useUnifiedRouting) && (
             <Select
               value={selectedWorkspace?.toString()}
               onValueChange={(value) => setSelectedWorkspace(parseInt(value))}
@@ -230,10 +320,11 @@ export default function Chat() {
             </Select>
           )}
 
-          {/* Provider Selection */}
-          <Select
-            value={selectedProvider?.toString()}
-            onValueChange={(value) => setSelectedProvider(parseInt(value))}
+          {/* Provider Selection (hidden when unified routing is enabled) */}
+          {!useUnifiedRouting && (
+            <Select
+              value={selectedProvider?.toString()}
+              onValueChange={(value) => setSelectedProvider(parseInt(value))}
           >
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select provider" />
@@ -259,6 +350,15 @@ export default function Chat() {
               )}
             </SelectContent>
           </Select>
+          )}
+
+          {/* Routing Info Badge */}
+          {routingInfo && (
+            <div className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-primary/10 text-primary">
+              <Route className="h-3 w-3" />
+              <span>{routingInfo.provider}</span>
+            </div>
+          )}
 
           <Button onClick={handleNewChat} variant="outline">
             <Plus className="h-4 w-4 mr-2" />

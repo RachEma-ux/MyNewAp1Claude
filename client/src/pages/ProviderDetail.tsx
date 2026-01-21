@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Trash2, CheckCircle, XCircle, Cloud, Server, Loader2, RefreshCw, Zap } from "lucide-react";
+import { ArrowLeft, Save, Trash2, CheckCircle, XCircle, Cloud, Server, Loader2, RefreshCw, Zap, Shield } from "lucide-react";
+import { ProviderCapabilitiesEditor } from "@/components/ProviderCapabilitiesEditor";
 
 // Model options for each provider type
 const providerModels: Record<string, { value: string; label: string; description: string }[]> = {
@@ -61,8 +62,14 @@ export default function ProviderDetail() {
     temperature: 0.7,
   });
 
-  const { data: providers } = trpc.providers.list.useQuery();
+  const { data: providers, refetch: refetchProviders } = trpc.providers.list.useQuery();
   const provider = providers?.find(p => p.id === providerId);
+
+  // Fetch provider capabilities for the capabilities editor
+  const { data: providerCapabilities, refetch: refetchCapabilities } = trpc.providers.capabilities.get.useQuery(
+    { id: providerId! },
+    { enabled: !!providerId }
+  );
 
   const updateProvider = trpc.providers.update.useMutation({
     onSuccess: () => {
@@ -199,6 +206,10 @@ export default function ProviderDetail() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="models">Models</TabsTrigger>
+          <TabsTrigger value="capabilities">
+            <Shield className="h-4 w-4 mr-1" />
+            Capabilities
+          </TabsTrigger>
           <TabsTrigger value="advanced">Advanced</TabsTrigger>
         </TabsList>
 
@@ -381,6 +392,23 @@ export default function ProviderDetail() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Capabilities & Policy */}
+        <TabsContent value="capabilities" className="space-y-4">
+          {providerId && (
+            <ProviderCapabilitiesEditor
+              providerId={providerId}
+              initialCapabilities={providerCapabilities?.capabilities || []}
+              initialPolicyTags={providerCapabilities?.policyTags || []}
+              initialKind={providerCapabilities?.kind || 'cloud'}
+              initialLimits={providerCapabilities?.limits || {}}
+              onSave={() => {
+                refetchCapabilities();
+                refetchProviders();
+              }}
+            />
+          )}
         </TabsContent>
 
         {/* Advanced Settings */}

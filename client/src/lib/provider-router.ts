@@ -274,6 +274,13 @@ class ClientProviderRouter {
   }
 
   /**
+   * Get all registered local providers
+   */
+  getLocalProviders(): ProviderInfo[] {
+    return Array.from(this.localProviders.values());
+  }
+
+  /**
    * Clear cached data
    */
   clearCache() {

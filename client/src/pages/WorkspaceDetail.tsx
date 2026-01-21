@@ -15,8 +15,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Save, Loader2, File, Bot, Settings as SettingsIcon } from "lucide-react";
+import { ArrowLeft, Save, Loader2, File, Bot, Settings as SettingsIcon, Route } from "lucide-react";
 import { toast } from "sonner";
+import { WorkspaceRoutingProfile } from "@/components/WorkspaceRoutingProfile";
 
 export default function WorkspaceDetail() {
   const params = useParams<{ id: string }>();
@@ -124,6 +125,10 @@ export default function WorkspaceDetail() {
           <TabsTrigger value="settings">
             <SettingsIcon className="mr-2 h-4 w-4" />
             Settings
+          </TabsTrigger>
+          <TabsTrigger value="routing">
+            <Route className="mr-2 h-4 w-4" />
+            Routing
           </TabsTrigger>
           <TabsTrigger value="documents">
             <File className="mr-2 h-4 w-4" />
@@ -236,6 +241,13 @@ export default function WorkspaceDetail() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Routing Tab */}
+        <TabsContent value="routing" className="space-y-4">
+          {workspaceId && (
+            <WorkspaceRoutingProfile workspaceId={workspaceId} />
+          )}
         </TabsContent>
 
         {/* Documents Tab */}
