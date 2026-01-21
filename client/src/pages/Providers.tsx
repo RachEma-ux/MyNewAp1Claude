@@ -193,9 +193,15 @@ export default function Providers() {
               <div className="space-y-4 py-4">
                 {/* MultiChat Provider Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="multichat-provider">Select from MultiChat Providers (14 providers)</Label>
+                  <Label htmlFor="multichat-provider">Select from Available Providers ({multiChatProviders.length > 0 ? multiChatProviders.length : 16} providers)</Label>
                   <Select value={selectedMultiChatProvider} onValueChange={(value) => {
                     setSelectedMultiChatProvider(value);
+                    // Handle custom provider
+                    if (value === 'custom') {
+                      setFormData({ ...formData, name: 'Custom Provider' });
+                      setSelectedType('custom');
+                      return;
+                    }
                     const provider = multiChatProviders.find(p => p.id === value);
                     if (provider) {
                       setFormData({ ...formData, name: provider.name });
@@ -217,20 +223,34 @@ export default function Providers() {
                       <SelectValue placeholder="Select a provider..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {multiChatProviders.map((provider) => (
+                      {(multiChatProviders.length > 0 ? multiChatProviders : [
+                        { id: 'anthropic', name: 'Anthropic', type: 'cloud' },
+                        { id: 'openai', name: 'OpenAI', type: 'cloud' },
+                        { id: 'google', name: 'Google', type: 'cloud' },
+                        { id: 'meta', name: 'Meta', type: 'cloud' },
+                        { id: 'mistral', name: 'Mistral AI', type: 'cloud' },
+                        { id: 'microsoft', name: 'Microsoft', type: 'cloud' },
+                        { id: 'qwen', name: 'Qwen', type: 'cloud' },
+                        { id: 'xai', name: 'xAI', type: 'cloud' },
+                        { id: 'cohere', name: 'Cohere', type: 'cloud' },
+                        { id: 'butterfly', name: 'Butterfly', type: 'cloud' },
+                        { id: 'moonshot', name: 'Moonshot', type: 'cloud' },
+                        { id: 'palantir', name: 'Palantir', type: 'cloud' },
+                        { id: 'perplexity', name: 'Perplexity', type: 'cloud' },
+                        { id: 'deepseek', name: 'DeepSeek', type: 'cloud' },
+                        { id: 'ollama', name: 'Ollama', type: 'local' },
+                      ]).map((provider) => (
                         <SelectItem key={provider.id} value={provider.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{provider.name}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {provider.type}
-                            </Badge>
-                          </div>
+                          {provider.name} ({provider.type})
                         </SelectItem>
                       ))}
+                      <SelectItem key="custom" value="custom">
+                        Custom (OpenAI-compatible endpoint)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Choose from Anthropic, OpenAI, Google, Meta, Mistral, Microsoft, Qwen, xAI, Cohere, Butterfly, Moonshot, Palantir, Perplexity, DeepSeek, or Ollama
+                    Choose from Anthropic, OpenAI, Google, Meta, Mistral, Microsoft, Qwen, xAI, Cohere, Butterfly, Moonshot, Palantir, Perplexity, DeepSeek, Ollama, or Custom
                   </p>
                 </div>
 
