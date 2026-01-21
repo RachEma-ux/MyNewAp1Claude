@@ -107,13 +107,19 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/llm" },
         { label: "Control Plane", icon: <Settings className="w-4 h-4" />, href: "/llm/control-plane" },
         { label: "Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/llm/create" },
-        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/settings" },
-        { label: "Providers", icon: <Cloud className="w-4 h-4" />, href: "/providers" },
-        { label: "Models", icon: <Package className="w-4 h-4" />, href: "/models" },
-        { label: "Analytics", icon: <BarChart3 className="w-4 h-4" />, href: "/analytics" },
       ]
     },
-    { 
+    {
+      label: "Providers",
+      icon: <Cloud className="w-5 h-5" />,
+      children: [
+        { label: "Manage", icon: <Cloud className="w-4 h-4" />, href: "/providers" },
+        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/settings" },
+      ]
+    },
+    { label: "Models", icon: <Package className="w-5 h-5" />, href: "/models" },
+    { label: "Analytics", icon: <BarChart3 className="w-5 h-5" />, href: "/analytics" },
+    {
       label: "Automation", 
       icon: <Zap className="w-5 h-5" />,
       children: [
