@@ -358,9 +358,6 @@ export default function Providers() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Choose from Anthropic, OpenAI, Google, Meta, Mistral, Microsoft, Qwen, xAI, Cohere, Butterfly, Moonshot, Palantir, Perplexity, DeepSeek, Ollama, or Custom
-                  </p>
                 </div>
 
                 {/* Selected Provider Indicator */}
