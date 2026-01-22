@@ -350,7 +350,7 @@ export default function Providers() {
                         { id: 'ollama', name: 'Ollama', type: 'local' },
                       ]).map((provider) => (
                         <SelectItem key={provider.id} value={provider.id}>
-                          {provider.name} ({provider.type})
+                          {provider.name}
                         </SelectItem>
                       ))}
                       <SelectItem key="custom" value="custom">
