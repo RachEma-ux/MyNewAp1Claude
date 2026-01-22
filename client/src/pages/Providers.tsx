@@ -240,26 +240,24 @@ export default function Providers() {
   const localProviders = providers?.filter(p => ["local-llamacpp", "local-ollama"].includes(p.type)) || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Providers</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage LLM providers for inference and embeddings
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Providers</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+            Manage LLM providers
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
+            <RefreshCw className="h-4 w-4" />
           </Button>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Add Provider</span>
-                <span className="sm:hidden">Add</span>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Add
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
