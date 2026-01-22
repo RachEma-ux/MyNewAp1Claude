@@ -78,7 +78,7 @@ jobs:
               --arg rid "${{ github.run_id }}" \
               --arg repo "${{ github.repository }}" \
               --arg ts "$TIMESTAMP" \
-              '{tunnel_url: null, version: null, run_id: $rid, repository: $repo, status: "pending", started_at: $ts}')
+              '{tunnel_url: null, version: null, run_id: $rid, repository: $repo, status: "pending", started_at: $ts, deploy_type: null}')
 
             PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
 
@@ -461,6 +461,11 @@ jobs:
           if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
             TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             AUTH_MODE="${{ github.event.inputs.dev_mode == 'true' && 'dev' || 'oauth' }}"
+            IS_REDEPLOY="${{ steps.version.outputs.REDEPLOY }}"
+            DEPLOY_TYPE="new"
+            if [ "$IS_REDEPLOY" = "true" ]; then
+              DEPLOY_TYPE="redeploy"
+            fi
             GIST_JSON=$(jq -n \
               --arg url "$TUNNEL_URL" \
               --arg ver "${{ steps.version.outputs.VERSION }}" \
@@ -470,7 +475,8 @@ jobs:
               --arg ts "$TIMESTAMP" \
               --arg auth "$AUTH_MODE" \
               --arg appId "${{ github.event.inputs.app_id }}" \
-              '{tunnel_url: $url, version: $ver, run_id: $rid, repository: $repo, status: "running", duration_minutes: ($dur|tonumber), started_at: $ts, auth_mode: $auth, app_id: $appId}')
+              --arg deployType "$DEPLOY_TYPE" \
+              '{tunnel_url: $url, version: $ver, run_id: $rid, repository: $repo, status: "running", duration_minutes: ($dur|tonumber), started_at: $ts, auth_mode: $auth, app_id: $appId, deploy_type: $deployType}')
 
             PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
 
