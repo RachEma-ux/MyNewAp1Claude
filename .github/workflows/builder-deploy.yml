@@ -42,13 +42,13 @@ on:
         required: false
         default: ''
       dev_mode:
-        description: 'Enable DEV_MODE (bypass OAuth - use false for production)'
+        description: 'Enable DEV_MODE (bypass OAuth - use true for Builder testing)'
         required: false
-        default: 'false'
+        default: 'true'
         type: choice
         options:
-          - 'false'
           - 'true'
+          - 'false'
       use_secrets_for_auth:
         description: 'Use repository secrets for JWT_SECRET and auth config'
         required: false
