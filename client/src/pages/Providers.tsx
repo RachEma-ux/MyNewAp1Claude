@@ -10,12 +10,59 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Settings, Trash2, CheckCircle, XCircle, Loader2, Cloud, Server, Zap, DollarSign, Activity, RefreshCw, Route, ClipboardList } from "lucide-react";
+import { Plus, Settings, Trash2, CheckCircle, XCircle, Loader2, Cloud, Server, Zap, DollarSign, Activity, RefreshCw, Route, ClipboardList, ChevronDown } from "lucide-react";
 import { TestProviderButton } from "@/components/TestProviderButton";
 import { RoutingAuditViewer } from "@/components/RoutingAuditViewer";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type ProviderType = "openai" | "anthropic" | "google" | "local-llamacpp" | "local-ollama" | "custom";
+
+// Available models for each provider type
+const providerModels: Record<string, { id: string; name: string; description: string }[]> = {
+  anthropic: [
+    { id: "claude-opus-4-20250514", name: "Claude Opus 4", description: "Most capable model for complex tasks" },
+    { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", description: "Best balance of speed and capability" },
+    { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", description: "Previous generation balanced model" },
+    { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku", description: "Fast and efficient" },
+    { id: "claude-3-opus-20240229", name: "Claude 3 Opus", description: "Powerful for complex analysis" },
+    { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku", description: "Quick responses" },
+  ],
+  openai: [
+    { id: "gpt-4o", name: "GPT-4o", description: "Latest multimodal flagship model" },
+    { id: "gpt-4o-mini", name: "GPT-4o Mini", description: "Fast and affordable" },
+    { id: "gpt-4-turbo", name: "GPT-4 Turbo", description: "Enhanced GPT-4 with vision" },
+    { id: "gpt-4", name: "GPT-4", description: "Original GPT-4 model" },
+    { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", description: "Fast and cost-effective" },
+    { id: "o1-preview", name: "o1 Preview", description: "Reasoning model" },
+    { id: "o1-mini", name: "o1 Mini", description: "Fast reasoning model" },
+  ],
+  google: [
+    { id: "gemini-2.0-flash-exp", name: "Gemini 2.0 Flash", description: "Latest fast model" },
+    { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", description: "Most capable Gemini" },
+    { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", description: "Fast and efficient" },
+    { id: "gemini-1.0-pro", name: "Gemini 1.0 Pro", description: "Stable production model" },
+  ],
+  "local-ollama": [
+    { id: "llama3.2", name: "Llama 3.2", description: "Meta's latest open model" },
+    { id: "llama3.1", name: "Llama 3.1", description: "Versatile open model" },
+    { id: "mistral", name: "Mistral 7B", description: "Efficient French model" },
+    { id: "mixtral", name: "Mixtral 8x7B", description: "MoE architecture" },
+    { id: "codellama", name: "Code Llama", description: "Optimized for code" },
+    { id: "phi3", name: "Phi-3", description: "Microsoft's compact model" },
+    { id: "qwen2.5", name: "Qwen 2.5", description: "Alibaba's latest model" },
+    { id: "deepseek-coder", name: "DeepSeek Coder", description: "Coding specialist" },
+  ],
+  "local-llamacpp": [
+    { id: "llama-3.2-3b", name: "Llama 3.2 3B", description: "Compact Llama model" },
+    { id: "llama-3.1-8b", name: "Llama 3.1 8B", description: "Balanced performance" },
+    { id: "mistral-7b", name: "Mistral 7B", description: "Efficient model" },
+    { id: "phi-3-mini", name: "Phi-3 Mini", description: "Small but capable" },
+  ],
+  custom: [],
+};
 
 interface ProviderFormData {
   name: string;
@@ -25,6 +72,7 @@ interface ProviderFormData {
   apiKey: string;
   baseUrl?: string;
   defaultModel?: string;
+  selectedModels: string[];
 }
 
 const providerTypeInfo: Record<ProviderType, { label: string; icon: React.ReactNode; color: string; description: string }> = {
@@ -79,7 +127,9 @@ export default function Providers() {
     apiKey: "",
     baseUrl: "",
     defaultModel: "",
+    selectedModels: [],
   });
+  const [isModelsOpen, setIsModelsOpen] = useState(false);
 
   const { data: providers, isLoading, refetch } = trpc.providers.list.useQuery();
   const { data: multiChatProviders = [] } = trpc.llm.listProviders.useQuery();
@@ -122,9 +172,11 @@ export default function Providers() {
       apiKey: "",
       baseUrl: "",
       defaultModel: "",
+      selectedModels: [],
     });
     setSelectedType("openai");
     setSelectedMultiChatProvider("");
+    setIsModelsOpen(false);
   };
 
   const handleCreateProvider = () => {
@@ -137,6 +189,13 @@ export default function Providers() {
     if (formData.defaultModel) {
       config.defaultModel = formData.defaultModel;
     }
+    if (formData.selectedModels.length > 0) {
+      config.models = formData.selectedModels;
+      // Set first selected model as default if no default specified
+      if (!formData.defaultModel) {
+        config.defaultModel = formData.selectedModels[0];
+      }
+    }
 
     createProvider.mutate({
       name: formData.name || providerTypeInfo[selectedType].label,
@@ -145,6 +204,23 @@ export default function Providers() {
       priority: formData.priority,
       config,
     });
+  };
+
+  const handleModelToggle = (modelId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedModels: prev.selectedModels.includes(modelId)
+        ? prev.selectedModels.filter(id => id !== modelId)
+        : [...prev.selectedModels, modelId]
+    }));
+  };
+
+  const getAvailableModels = () => {
+    // Get models for the selected provider type or from the multi-chat provider selection
+    if (selectedMultiChatProvider && providerModels[selectedMultiChatProvider]) {
+      return providerModels[selectedMultiChatProvider];
+    }
+    return providerModels[selectedType] || [];
   };
 
   const handleToggleEnabled = (id: number, currentEnabled: boolean | null) => {
@@ -186,11 +262,17 @@ export default function Providers() {
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Add New Provider</DialogTitle>
-                <DialogDescription>
-                  Configure a new LLM provider for inference
-                </DialogDescription>
+              <DialogHeader className="flex flex-row items-start justify-between space-y-0">
+                <div>
+                  <DialogTitle>Add New Provider</DialogTitle>
+                  <DialogDescription>
+                    Configure a new LLM provider for inference
+                  </DialogDescription>
+                </div>
+                <Button onClick={handleCreateProvider} disabled={createProvider.isPending} className="shrink-0">
+                  {createProvider.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Create Provider
+                </Button>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 {/* MultiChat Provider Selection */}
@@ -304,6 +386,71 @@ export default function Providers() {
                   </div>
                 )}
 
+                {/* Available Models Multi-Select */}
+                {getAvailableModels().length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Select Available Models</Label>
+                    <Collapsible open={isModelsOpen} onOpenChange={setIsModelsOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          <span className="text-sm">
+                            {formData.selectedModels.length === 0
+                              ? "Select models..."
+                              : `${formData.selectedModels.length} model(s) selected`}
+                          </span>
+                          <ChevronDown className={`h-4 w-4 transition-transform ${isModelsOpen ? "rotate-180" : ""}`} />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-2">
+                        <div className="border rounded-lg p-2">
+                          <ScrollArea className="h-[200px]">
+                            <div className="space-y-2">
+                              {getAvailableModels().map((model) => (
+                                <div
+                                  key={model.id}
+                                  className="flex items-start space-x-3 p-2 rounded-md hover:bg-accent cursor-pointer"
+                                  onClick={() => handleModelToggle(model.id)}
+                                >
+                                  <Checkbox
+                                    checked={formData.selectedModels.includes(model.id)}
+                                    onCheckedChange={() => handleModelToggle(model.id)}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium">{model.name}</p>
+                                    <p className="text-xs text-muted-foreground">{model.description}</p>
+                                    <code className="text-xs text-muted-foreground">{model.id}</code>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                    {formData.selectedModels.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {formData.selectedModels.map(modelId => {
+                          const model = getAvailableModels().find(m => m.id === modelId);
+                          return (
+                            <Badge key={modelId} variant="secondary" className="text-xs">
+                              {model?.name || modelId}
+                              <button
+                                className="ml-1 hover:text-destructive"
+                                onClick={(e) => { e.stopPropagation(); handleModelToggle(modelId); }}
+                              >
+                                ×
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Selected models will be available in the Models page
+                    </p>
+                  </div>
+                )}
+
                 {/* Provider Type Selection */}
                 <div className="space-y-2">
                   <Label>Provider Type</Label>
@@ -400,10 +547,6 @@ export default function Providers() {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancel
-                </Button>
-                <Button onClick={handleCreateProvider} disabled={createProvider.isPending}>
-                  {createProvider.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Create Provider
                 </Button>
               </DialogFooter>
             </DialogContent>

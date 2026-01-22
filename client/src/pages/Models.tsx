@@ -10,10 +10,47 @@ import { useLocation } from "wouter";
 export default function Models() {
   const [, setLocation] = useLocation();
   const [selectedType, setSelectedType] = useState<"llm" | "embedding" | "reranker" | undefined>(undefined);
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const toast = (msg: any) => console.log(msg.title, msg.description);
   
   const { data: models, isLoading } = trpc.models.list.useQuery({ type: selectedType });
   const { data: downloadHistory } = trpc.modelDownloads.getAll.useQuery();
+  const { data: providers } = trpc.providers.list.useQuery();
+
+  // Official name mapping
+  const getDisplayName = (model: string): string => {
+    const nameMap: Record<string, string> = {
+      "claude-opus-4-20250514": "Claude Opus 4",
+      "claude-sonnet-4-20250514": "Claude Sonnet 4",
+      "claude-3-7-sonnet-20250219": "Claude 3.7 Sonnet",
+      "claude-3-5-sonnet-20241022": "Claude 3.5 Sonnet",
+      "claude-3-5-haiku-20241022": "Claude 3.5 Haiku",
+      "claude-3-opus-20240229": "Claude 3 Opus",
+      "claude-3-haiku-20240307": "Claude 3 Haiku",
+      "gpt-4o": "GPT-4o",
+      "gpt-4o-mini": "GPT-4o Mini",
+      "gpt-4-turbo": "GPT-4 Turbo",
+      "gpt-4": "GPT-4",
+      "gpt-3.5-turbo": "GPT-3.5 Turbo",
+      "gemini-2.0-flash": "Gemini 2.0 Flash",
+      "gemini-1.5-pro": "Gemini 1.5 Pro",
+      "gemini-1.5-flash": "Gemini 1.5 Flash",
+    };
+    return nameMap[model] || model;
+  };
+
+  // Get all models from enabled providers
+  const providerModels: { model: string; displayName: string; provider: string }[] = [];
+  providers?.filter(p => p.enabled).forEach(provider => {
+    const config = provider.config as any;
+    const cloudModels = config?.models || [];
+    cloudModels.forEach((model: string) => {
+      providerModels.push({ model, displayName: getDisplayName(model), provider: provider.name });
+    });
+    if (cloudModels.length === 0 && config?.defaultModel) {
+      providerModels.push({ model: config.defaultModel, displayName: getDisplayName(config.defaultModel), provider: provider.name });
+    }
+  });
   const deleteDownload = trpc.modelDownloads.delete.useMutation({
     onSuccess: () => {
       toast({ title: "Download history entry deleted" });
@@ -80,9 +117,27 @@ export default function Models() {
         </Button>
       </div>
 
+      {/* Dropdown Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="h-9 px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="">Select a model...</option>
+            {providerModels.map((item, idx) => (
+              <option key={idx} value={item.model}>
+                {item.displayName}
+              </option>
+            ))}
+          </select>
+        </CardContent>
+      </Card>
+
       {/* Tabs */}
       <Tabs defaultValue="all" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex flex-wrap h-auto gap-1">
           <TabsTrigger value="all" onClick={() => setSelectedType(undefined)}>
             All Models
           </TabsTrigger>

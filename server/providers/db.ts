@@ -14,14 +14,12 @@ export async function createProvider(data: InsertProvider): Promise<Provider> {
     throw new Error("Database not available");
   }
 
-  const result = await db.insert(providers).values(data);
-  const id = Number(result[0].insertId);
-  
-  const created = await getProviderById(id);
+  const [created] = await db.insert(providers).values(data).returning();
+
   if (!created) {
     throw new Error("Failed to create provider");
   }
-  
+
   return created;
 }
 

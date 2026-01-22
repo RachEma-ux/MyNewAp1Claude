@@ -261,18 +261,26 @@ export default function Chat() {
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Chat</h1>
-          <p className="text-muted-foreground mt-1">
-            Converse with AI using configured providers
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Chat</h1>
+            <p className="text-muted-foreground mt-1">
+              Converse with AI using configured providers
+            </p>
+          </div>
+          <Button onClick={handleNewChat} variant="outline" className="shrink-0">
+            <Plus className="h-4 w-4 mr-2" />
+            New Chat
+          </Button>
         </div>
-        <div className="flex items-center gap-3">
+
+        {/* Controls Row */}
+        <div className="flex flex-wrap items-center gap-3">
           {/* Unified Routing Toggle */}
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
             <Route className="h-4 w-4 text-muted-foreground" />
-            <Label htmlFor="routing-toggle" className="text-sm cursor-pointer">
+            <Label htmlFor="routing-toggle" className="text-sm cursor-pointer whitespace-nowrap">
               Smart Routing
             </Label>
             <Switch
@@ -325,31 +333,31 @@ export default function Chat() {
             <Select
               value={selectedProvider?.toString()}
               onValueChange={(value) => setSelectedProvider(parseInt(value))}
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select provider" />
-            </SelectTrigger>
-            <SelectContent>
-              {providersLoading ? (
-                <div className="flex items-center justify-center p-4">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                </div>
-              ) : providers && providers.length > 0 ? (
-                providers.map((provider) => (
-                  <SelectItem key={provider.id} value={provider.id.toString()}>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      <span>{provider.name}</span>
-                    </div>
-                  </SelectItem>
-                ))
-              ) : (
-                <div className="p-4 text-sm text-muted-foreground">
-                  No providers configured
-                </div>
-              )}
-            </SelectContent>
-          </Select>
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {providersLoading ? (
+                  <div className="flex items-center justify-center p-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : providers && providers.length > 0 ? (
+                  providers.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        <span>{provider.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-4 text-sm text-muted-foreground">
+                    No providers configured
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
           )}
 
           {/* Routing Info Badge */}
@@ -359,11 +367,6 @@ export default function Chat() {
               <span>{routingInfo.provider}</span>
             </div>
           )}
-
-          <Button onClick={handleNewChat} variant="outline">
-            <Plus className="h-4 w-4 mr-2" />
-            New Chat
-          </Button>
         </div>
       </div>
 
