@@ -98,34 +98,28 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          INPUT_VERSION="${{ github.event.inputs.version }}"
+          echo "🔍 Auto-detecting latest version and incrementing..."
 
-          if [ "$INPUT_VERSION" = "auto" ] || [ -z "$INPUT_VERSION" ]; then
-            echo "🔍 Auto-detecting version..."
+          # Get latest release version (sorted by semver)
+          LATEST=$(gh release list --repo "${{ github.repository }}" --limit 100 | awk '{print $1}' | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
 
-            # Get latest release version
-            LATEST=$(gh release list --repo "${{ github.repository }}" --limit 1 | head -1 | awk '{print $1}' | sed 's/^v//')
-
-            if [ -z "$LATEST" ] || [ "$LATEST" = "" ]; then
-              # No releases yet, start at 1.0.0
-              NEW_VERSION="1.0.0"
-            else
-              # Parse and increment patch version
-              MAJOR=$(echo "$LATEST" | cut -d. -f1)
-              MINOR=$(echo "$LATEST" | cut -d. -f2)
-              PATCH=$(echo "$LATEST" | cut -d. -f3)
-
-              # Increment patch
-              NEW_PATCH=$((PATCH + 1))
-              NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
-            fi
-
-            echo "📦 Latest: v${LATEST:-none} → New: v${NEW_VERSION}"
-            echo "VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          if [ -z "$LATEST" ]; then
+            # No releases yet, start at 1.0.0
+            NEW_VERSION="1.0.0"
+            echo "📦 No existing releases → Starting at v${NEW_VERSION}"
           else
-            echo "📦 Using specified version: v${INPUT_VERSION}"
-            echo "VERSION=${INPUT_VERSION}" >> $GITHUB_OUTPUT
+            # Parse and increment patch version
+            MAJOR=$(echo "$LATEST" | cut -d. -f1)
+            MINOR=$(echo "$LATEST" | cut -d. -f2)
+            PATCH=$(echo "$LATEST" | cut -d. -f3)
+
+            # Increment patch
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+            echo "📦 Latest: v${LATEST} → New: v${NEW_VERSION}"
           fi
+
+          echo "VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Validate OAuth configuration
         run: |
