@@ -1,0 +1,193 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 61137382209,
+      "run_id": 21246614454,
+      "workflow_name": "Builder Deploy",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/RachEma-ux/MyNewAp1Claude/actions/runs/21246614454",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOQ00lQs8AAAAOPBJrQQ",
+      "head_sha": "95e052dc01a18494d8b70ad78ab97fc02cc0d24d",
+      "url": "https://api.github.com/repos/RachEma-ux/MyNewAp1Claude/actions/jobs/61137382209",
+      "html_url": "https://github.com/RachEma-ux/MyNewAp1Claude/actions/runs/21246614454/job/61137382209",
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-01-22T11:24:04Z",
+      "started_at": "2026-01-22T11:24:06Z",
+      "completed_at": null,
+      "name": "build-and-deploy",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-01-22T11:24:07Z",
+          "completed_at": "2026-01-22T11:24:08Z"
+        },
+        {
+          "name": "Reset Gist status to pending",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-01-22T11:24:08Z",
+          "completed_at": "2026-01-22T11:24:09Z"
+        },
+        {
+          "name": "Checkout repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-01-22T11:24:09Z",
+          "completed_at": "2026-01-22T11:24:09Z"
+        },
+        {
+          "name": "Validate OAuth configuration",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-01-22T11:24:09Z",
+          "completed_at": "2026-01-22T11:24:09Z"
+        },
+        {
+          "name": "Setup Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-01-22T11:24:09Z",
+          "completed_at": "2026-01-22T11:24:14Z"
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-01-22T11:24:14Z",
+          "completed_at": "2026-01-22T11:24:59Z"
+        },
+        {
+          "name": "Type check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-01-22T11:24:59Z",
+          "completed_at": "2026-01-22T11:25:09Z"
+        },
+        {
+          "name": "Build application",
+          "status": "in_progress",
+          "conclusion": null,
+          "number": 8,
+          "started_at": "2026-01-22T11:25:09Z",
+          "completed_at": null
+        },
+        {
+          "name": "Create pack structure",
+          "status": "pending",
+          "conclusion": null,
+          "number": 9,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Generate checksums",
+          "status": "pending",
+          "conclusion": null,
+          "number": 10,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Create pack archive",
+          "status": "pending",
+          "conclusion": null,
+          "number": 11,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Delete existing release",
+          "status": "pending",
+          "conclusion": null,
+          "number": 12,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Generate release checksum",
+          "status": "pending",
+          "conclusion": null,
+          "number": 13,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Create GitHub Release",
+          "status": "pending",
+          "conclusion": null,
+          "number": 14,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Install cloudflared",
+          "status": "pending",
+          "conclusion": null,
+          "number": 15,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Start application with tunnel",
+          "status": "pending",
+          "conclusion": null,
+          "number": 16,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Upload artifacts",
+          "status": "pending",
+          "conclusion": null,
+          "number": 17,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Deployment Summary",
+          "status": "pending",
+          "conclusion": null,
+          "number": 18,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Setup Node.js",
+          "status": "pending",
+          "conclusion": null,
+          "number": 35,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Checkout repository",
+          "status": "pending",
+          "conclusion": null,
+          "number": 36,
+          "started_at": null,
+          "completed_at": null
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/RachEma-ux/MyNewAp1Claude/check-runs/61137382209",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000001415,
+      "runner_name": "GitHub Actions 1000001415",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

@@ -240,25 +240,24 @@ export default function Providers() {
   const localProviders = providers?.filter(p => ["local-llamacpp", "local-ollama"].includes(p.type)) || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Providers</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage LLM providers for inference and embeddings
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Providers</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+            Manage LLM providers
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+            <RefreshCw className="h-4 w-4" />
           </Button>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Provider
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Add
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
@@ -359,9 +358,6 @@ export default function Providers() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Choose from Anthropic, OpenAI, Google, Meta, Mistral, Microsoft, Qwen, xAI, Cohere, Butterfly, Moonshot, Palantir, Perplexity, DeepSeek, Ollama, or Custom
-                  </p>
                 </div>
 
                 {/* Selected Provider Indicator */}
