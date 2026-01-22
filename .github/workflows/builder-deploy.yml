@@ -100,8 +100,12 @@ jobs:
         run: |
           echo "🔍 Auto-detecting latest version and incrementing..."
 
-          # Get latest release version (sorted by semver)
-          LATEST=$(gh release list --repo "${{ github.repository }}" --limit 100 | awk '{print $1}' | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          # Get all release tags via JSON, filter valid semver, sort, get highest
+          LATEST=$(gh release list --repo "${{ github.repository }}" --limit 100 --json tagName --jq '.[].tagName' | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+
+          echo "DEBUG: All versions found:"
+          gh release list --repo "${{ github.repository }}" --limit 10 --json tagName --jq '.[].tagName'
+          echo "DEBUG: Latest detected: $LATEST"
 
           if [ -z "$LATEST" ]; then
             # No releases yet, start at 1.0.0
