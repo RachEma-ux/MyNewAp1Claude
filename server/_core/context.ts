@@ -1,5 +1,6 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
+import { ENV } from "./env";
 import { sdk } from "./sdk";
 
 export type TrpcContext = {
@@ -14,7 +15,7 @@ export async function createContext(
   let user: User | null = null;
 
   // DEV MODE: Auto-login with test user (bypasses OAuth)
-  if (process.env.DEV_MODE === "true") {
+  if (ENV.isDevMode) {
     user = {
       id: 1,
       openId: "dev-user-001",

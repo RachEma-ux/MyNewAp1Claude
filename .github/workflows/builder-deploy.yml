@@ -26,19 +26,31 @@ on:
           - '15'
           - '30'
       oauth_portal_url:
-        description: 'OAuth Portal URL (optional)'
+        description: 'OAuth Portal URL for client (e.g., https://auth.example.com)'
+        required: false
+        default: ''
+      oauth_server_url:
+        description: 'OAuth Server URL for backend (e.g., https://auth-api.example.com)'
         required: false
         default: ''
       app_id:
-        description: 'App ID for OAuth (optional)'
+        description: 'App ID for OAuth'
         required: false
         default: ''
       database_url:
-        description: 'PostgreSQL DATABASE_URL (optional)'
+        description: 'PostgreSQL DATABASE_URL (required for OAuth)'
         required: false
         default: ''
       dev_mode:
-        description: 'Enable DEV_MODE (bypass OAuth login)'
+        description: 'Enable DEV_MODE (bypass OAuth - use false for production)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      use_secrets_for_auth:
+        description: 'Use repository secrets for JWT_SECRET and auth config'
         required: false
         default: 'true'
         type: choice
@@ -80,6 +92,82 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Validate OAuth configuration
+        run: |
+          echo "🔍 Validating authentication configuration..."
+          DEV_MODE="${{ github.event.inputs.dev_mode }}"
+          OAUTH_PORTAL="${{ github.event.inputs.oauth_portal_url }}"
+          OAUTH_SERVER="${{ github.event.inputs.oauth_server_url }}"
+          APP_ID="${{ github.event.inputs.app_id }}"
+          DATABASE_URL="${{ github.event.inputs.database_url }}"
+          USE_SECRETS="${{ github.event.inputs.use_secrets_for_auth }}"
+
+          # Check if secrets are available when use_secrets_for_auth is true
+          JWT_SECRET_SET="${{ secrets.JWT_SECRET != '' }}"
+          OAUTH_SERVER_SECRET_SET="${{ secrets.OAUTH_SERVER_URL != '' }}"
+
+          echo "Configuration:"
+          echo "  DEV_MODE: $DEV_MODE"
+          echo "  use_secrets_for_auth: $USE_SECRETS"
+          echo "  OAuth Portal URL: ${OAUTH_PORTAL:-(not set)}"
+          echo "  OAuth Server URL: ${OAUTH_SERVER:-(not set)}"
+          echo "  App ID: ${APP_ID:-(not set)}"
+          echo "  Database URL: ${DATABASE_URL:+(set)}"
+          echo "  JWT_SECRET (from secrets): $JWT_SECRET_SET"
+          echo "  OAUTH_SERVER_URL (from secrets): $OAUTH_SERVER_SECRET_SET"
+
+          if [ "$DEV_MODE" = "false" ]; then
+            echo ""
+            echo "⚠️  Production mode (DEV_MODE=false) - validating OAuth requirements..."
+
+            MISSING=""
+
+            # Check OAuth Portal URL (client-side)
+            if [ -z "$OAUTH_PORTAL" ]; then
+              MISSING="$MISSING oauth_portal_url"
+            fi
+
+            # Check OAuth Server URL (can come from input or secrets)
+            if [ -z "$OAUTH_SERVER" ] && [ "$OAUTH_SERVER_SECRET_SET" != "true" ]; then
+              MISSING="$MISSING oauth_server_url"
+            fi
+
+            # Check App ID
+            if [ -z "$APP_ID" ]; then
+              MISSING="$MISSING app_id"
+            fi
+
+            # Check JWT Secret (must come from secrets for security)
+            if [ "$JWT_SECRET_SET" != "true" ]; then
+              MISSING="$MISSING JWT_SECRET(secret)"
+            fi
+
+            # Warn about database (OAuth needs it for user storage)
+            if [ -z "$DATABASE_URL" ]; then
+              echo "⚠️  WARNING: DATABASE_URL not set - OAuth login will fail without database"
+              echo "   Users cannot be stored/retrieved without a database connection"
+            fi
+
+            if [ -n "$MISSING" ]; then
+              echo ""
+              echo "❌ ERROR: Missing required OAuth configuration:$MISSING"
+              echo ""
+              echo "For production deployments (DEV_MODE=false), you must provide:"
+              echo "  - oauth_portal_url: URL for client-side OAuth redirect"
+              echo "  - oauth_server_url: URL for server-side token exchange (or set OAUTH_SERVER_URL secret)"
+              echo "  - app_id: Your OAuth application ID"
+              echo "  - JWT_SECRET: Repository secret for signing session tokens"
+              echo "  - database_url: PostgreSQL connection string (recommended)"
+              echo ""
+              echo "Alternatively, set DEV_MODE=true to bypass OAuth for testing."
+              exit 1
+            fi
+
+            echo "✅ OAuth configuration validated for production mode"
+          else
+            echo "✅ DEV_MODE enabled - OAuth validation skipped (using mock user)"
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -261,11 +349,35 @@ jobs:
         if: ${{ github.event.inputs.run_app == 'yes' }}
         env:
           DATABASE_URL: ${{ github.event.inputs.database_url }}
+          # OAuth Server URL: prefer input, fallback to secret
+          OAUTH_SERVER_URL: ${{ github.event.inputs.oauth_server_url || secrets.OAUTH_SERVER_URL }}
+          # JWT Secret from repository secrets (required for session signing)
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          # Cookie secret (uses JWT_SECRET if not separately defined)
+          COOKIE_SECRET: ${{ secrets.COOKIE_SECRET || secrets.JWT_SECRET }}
+          # App ID for OAuth
+          VITE_APP_ID: ${{ github.event.inputs.app_id }}
         run: |
           echo "🚀 Starting application..."
 
-          # Start the Node.js server
-          PORT=3000 NODE_ENV=production DATABASE_URL="${DATABASE_URL}" DEV_MODE="${{ github.event.inputs.dev_mode }}" node dist/index.js &
+          # Determine effective OAuth server URL
+          EFFECTIVE_OAUTH_SERVER="${OAUTH_SERVER_URL}"
+          echo "Auth configuration:"
+          echo "  DEV_MODE: ${{ github.event.inputs.dev_mode }}"
+          echo "  OAUTH_SERVER_URL: ${EFFECTIVE_OAUTH_SERVER:-(not set)}"
+          echo "  JWT_SECRET: ${JWT_SECRET:+(configured)}"
+          echo "  APP_ID: ${VITE_APP_ID:-(not set)}"
+
+          # Start the Node.js server with all auth environment variables
+          PORT=3000 \
+          NODE_ENV=production \
+          DATABASE_URL="${DATABASE_URL}" \
+          DEV_MODE="${{ github.event.inputs.dev_mode }}" \
+          OAUTH_SERVER_URL="${EFFECTIVE_OAUTH_SERVER}" \
+          JWT_SECRET="${JWT_SECRET}" \
+          COOKIE_SECRET="${COOKIE_SECRET:-$JWT_SECRET}" \
+          VITE_APP_ID="${VITE_APP_ID}" \
+          node dist/index.js &
           SERVER_PID=$!
 
           # Wait for server startup
@@ -306,6 +418,7 @@ jobs:
 
           if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
             TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            AUTH_MODE="${{ github.event.inputs.dev_mode == 'true' && 'dev' || 'oauth' }}"
             GIST_JSON=$(jq -n \
               --arg url "$TUNNEL_URL" \
               --arg ver "${{ github.event.inputs.version }}" \
@@ -313,7 +426,9 @@ jobs:
               --arg repo "${{ github.repository }}" \
               --arg dur "${{ github.event.inputs.duration }}" \
               --arg ts "$TIMESTAMP" \
-              '{tunnel_url: $url, version: $ver, run_id: $rid, repository: $repo, status: "running", duration_minutes: ($dur|tonumber), started_at: $ts}')
+              --arg auth "$AUTH_MODE" \
+              --arg appId "${{ github.event.inputs.app_id }}" \
+              '{tunnel_url: $url, version: $ver, run_id: $rid, repository: $repo, status: "running", duration_minutes: ($dur|tonumber), started_at: $ts, auth_mode: $auth, app_id: $appId}')
 
             PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
 
@@ -348,6 +463,7 @@ jobs:
         if: always()
         run: |
           VERSION="${{ github.event.inputs.version }}"
+          DEV_MODE="${{ github.event.inputs.dev_mode }}"
 
           echo "## 🚀 Builder Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -360,6 +476,20 @@ jobs:
           echo "| Release | [v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/v${VERSION}) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
+          echo "### Authentication Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          if [ "$DEV_MODE" = "true" ]; then
+            echo "| Mode | 🔓 **DEV_MODE** (OAuth bypassed) |" >> $GITHUB_STEP_SUMMARY
+            echo "| Login | Auto-login as Dev User |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Mode | 🔒 **Production** (OAuth enabled) |" >> $GITHUB_STEP_SUMMARY
+            echo "| OAuth Portal | ${{ github.event.inputs.oauth_portal_url || '(not set)' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| App ID | ${{ github.event.inputs.app_id || '(not set)' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Database | ${{ github.event.inputs.database_url && '✅ Configured' || '⚠️ Not set' }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
           if [ "${{ github.event.inputs.run_app }}" = "yes" ]; then
             if [ -f app_url.txt ]; then
               TUNNEL_URL=$(cat app_url.txt)
@@ -367,6 +497,10 @@ jobs:
               echo "🌐 **URL:** ${TUNNEL_URL}" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "App will be available for ${{ github.event.inputs.duration }} minutes." >> $GITHUB_STEP_SUMMARY
+              if [ "$DEV_MODE" = "false" ]; then
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "⚠️ **Note:** OAuth login requires the OAuth portal to be accessible from the tunnel URL." >> $GITHUB_STEP_SUMMARY
+              fi
             fi
           else
             echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
