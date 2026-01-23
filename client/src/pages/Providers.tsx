@@ -80,37 +80,37 @@ const providerTypeInfo: Record<ProviderType, { label: string; icon: React.ReactN
     label: "OpenAI",
     icon: <Cloud className="h-5 w-5" />,
     color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-    description: "GPT-4o, GPT-4, GPT-3.5 Turbo models",
+    description: "cloud",
   },
   anthropic: {
     label: "Anthropic",
     icon: <Cloud className="h-5 w-5" />,
     color: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-    description: "Claude 3.5 Sonnet, Claude 3 Opus, Haiku",
+    description: "cloud",
   },
   google: {
     label: "Google AI",
     icon: <Cloud className="h-5 w-5" />,
     color: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-    description: "Gemini 2.0 Flash, Gemini 1.5 Pro/Flash",
+    description: "cloud",
   },
   "local-llamacpp": {
     label: "llama.cpp",
     icon: <Server className="h-5 w-5" />,
     color: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-    description: "Local inference with GGUF models",
+    description: "local",
   },
   "local-ollama": {
     label: "Ollama",
     icon: <Server className="h-5 w-5" />,
     color: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
-    description: "Local Ollama server integration",
+    description: "local",
   },
   custom: {
     label: "Custom",
     icon: <Settings className="h-5 w-5" />,
     color: "bg-gray-500/10 text-gray-400 border-gray-500/20",
-    description: "Custom OpenAI-compatible endpoint",
+    description: "custom",
   },
 };
 
@@ -246,7 +246,7 @@ export default function Providers() {
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Providers</h1>
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            Manage LLM providers
+            Manage Providers
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -276,7 +276,7 @@ export default function Providers() {
               <div className="space-y-4 py-4">
                 {/* MultiChat Provider Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="multichat-provider">Select from Available Providers ({multiChatProviders.length > 0 ? multiChatProviders.length : 16} providers)</Label>
+                  <Label htmlFor="multichat-provider">Available Providers</Label>
                   <Select value={selectedMultiChatProvider} onValueChange={(value) => {
                     setSelectedMultiChatProvider(value);
                     // Handle custom provider
@@ -441,15 +441,12 @@ export default function Providers() {
                         })}
                       </div>
                     )}
-                    <p className="text-xs text-muted-foreground">
-                      Selected models will be available in the Models page
-                    </p>
                   </div>
                 )}
 
                 {/* Provider Type Selection */}
                 <div className="space-y-2">
-                  <Label>Provider Type</Label>
+                  <Label>Default Providers</Label>
                   <div className="grid grid-cols-3 gap-2">
                     {(Object.keys(providerTypeInfo) as ProviderType[]).map((type) => {
                       const info = providerTypeInfo[type];
