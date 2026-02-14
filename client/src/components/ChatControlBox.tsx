@@ -19,6 +19,9 @@ import {
   Loader2,
   Sparkles,
   Square,
+  Save,
+  Plug,
+  Mic,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -69,6 +72,14 @@ export interface ChatControlBoxProps {
   placeholder?: string;
   /** Optional no-provider warning message */
   noProviderMessage?: string;
+  /** Callback for "Save Chat" action */
+  onSaveChat?: () => void;
+  /** Whether current chat is saved */
+  isSaved?: boolean;
+  /** Number of messages in current chat */
+  messageCount?: number;
+  /** Callback for "Presets" action */
+  onPresetsClick?: () => void;
 }
 
 // =============================================================================
@@ -87,6 +98,10 @@ export function ChatControlBox({
   onStop,
   placeholder = "Type your message...",
   noProviderMessage,
+  onSaveChat,
+  isSaved = false,
+  messageCount = 0,
+  onPresetsClick,
 }: ChatControlBoxProps) {
   const isMobile = useIsMobile();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -260,6 +275,31 @@ export function ChatControlBox({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Save button */}
+          {onSaveChat && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className={isSaved ? "text-green-500" : "text-muted-foreground hover:text-foreground"}
+              onClick={onSaveChat}
+              disabled={isSaved || messageCount === 0}
+              title={isSaved ? "Chat saved" : "Save chat"}
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+          )}
+
+          {/* Presets button */}
+          {onPresetsClick && (
+            <button
+              onClick={onPresetsClick}
+              className="h-7 px-2.5 bg-muted text-muted-foreground text-xs font-semibold rounded-full transition-colors hover:bg-muted/80 hover:text-foreground flex items-center gap-1"
+              title="Presets"
+            >
+              Presets
+            </button>
+          )}
         </div>
 
         {/* Input row */}
@@ -286,6 +326,19 @@ export function ChatControlBox({
             </Button>
           )}
 
+          {/* Plug button (desktop) */}
+          {!isMobile && (
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="shrink-0 rounded-full text-muted-foreground"
+              title="Connect"
+              disabled
+            >
+              <Plug className="h-4 w-4" />
+            </Button>
+          )}
+
           {/* Textarea */}
           <div className="relative flex-1">
             <textarea
@@ -297,7 +350,7 @@ export function ChatControlBox({
               disabled={disabled || isStreaming}
               rows={1}
               className={`w-full resize-none rounded-2xl border bg-muted/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 ${
-                isMobile ? "pr-20 pl-10" : "pr-4"
+                isMobile ? "pr-20 pl-24" : "pr-4"
               }`}
               style={{ lineHeight: "1.5", minHeight: "40px", maxHeight: "200px" }}
             />
@@ -311,6 +364,26 @@ export function ChatControlBox({
               >
                 <Paperclip className="h-4 w-4" />
               </button>
+            )}
+
+            {/* Mobile: Plug & Mic inside input */}
+            {isMobile && (
+              <div className="absolute left-10 bottom-2.5 flex items-center gap-0.5">
+                <button
+                  className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
+                  title="Connect"
+                  disabled
+                >
+                  <Plug className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
+                  title="Voice"
+                  disabled
+                >
+                  <Mic className="h-3.5 w-3.5" />
+                </button>
+              </div>
             )}
 
             {/* Mobile: Send button inside input right */}
@@ -337,6 +410,19 @@ export function ChatControlBox({
               </div>
             )}
           </div>
+
+          {/* Mic button (desktop) */}
+          {!isMobile && (
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="shrink-0 rounded-full text-muted-foreground"
+              title="Voice"
+              disabled
+            >
+              <Mic className="h-4 w-4" />
+            </Button>
+          )}
 
           {/* Desktop: Send/Stop button */}
           {!isMobile && (
