@@ -165,8 +165,10 @@ export class ProviderRegistry {
         const { OllamaProvider } = await import('./ollama');
         return new OllamaProvider(config);
       }
-      case 'local-llamacpp':
-        throw new Error(`Local providers not yet implemented: ${config.type}`);
+      case 'local-llamacpp': {
+        const { LlamaCppProvider } = await import('./llamacpp');
+        return new LlamaCppProvider(config);
+      }
       case 'custom':
         throw new Error('Custom providers not yet implemented');
       default:
