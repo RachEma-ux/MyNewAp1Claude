@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { chunkDocument } from "./chunking-service";
-import { ingestFromBuffer } from "./rag-pipeline";
+import { ingestFromBuffer, retrieveRelevantChunks } from "./rag-pipeline";
+import { qdrantService } from "../vectordb/qdrant-service";
 
 /**
  * Documents Router
@@ -94,35 +95,41 @@ export const documentsRouter = router({
       z.object({
         query: z.string(),
         collectionName: z.string(),
+        workspaceId: z.number().optional(),
         limit: z.number().optional(),
       })
     )
     .query(async ({ input }) => {
-      // Retrieve requires workspaceId and limit parameters
-      // For now, return mock data
-      return [
-        {
-          text: "Sample chunk 1 matching query: " + input.query,
-          score: 0.95,
-          metadata: { source: input.collectionName },
-        },
-        {
-          text: "Sample chunk 2 matching query: " + input.query,
-          score: 0.87,
-          metadata: { source: input.collectionName },
-        },
-      ];
+      try {
+        const results = await retrieveRelevantChunks(
+          input.query,
+          input.collectionName,
+          input.workspaceId ?? 1,
+          input.limit ?? 5,
+        );
+        return results;
+      } catch (error: any) {
+        console.error("[Documents] Retrieve failed:", error);
+        return [];
+      }
     }),
 
   /**
    * List available collections
    */
   listCollections: protectedProcedure.query(async () => {
-    // This would query Qdrant for available collections
-    // For now, return mock data
-    return [
-      { name: "documents", vectorCount: 0, createdAt: new Date().toISOString() },
-      { name: "knowledge-base", vectorCount: 0, createdAt: new Date().toISOString() },
-    ];
+    try {
+      const names = await qdrantService.listCollections();
+      const collections = await Promise.all(
+        names.map(async (name) => {
+          const vectorCount = await qdrantService.count(name).catch(() => 0);
+          return { name, vectorCount, createdAt: new Date().toISOString() };
+        })
+      );
+      return collections;
+    } catch (error: any) {
+      console.error("[Documents] List collections failed:", error);
+      return [];
+    }
   }),
 });
