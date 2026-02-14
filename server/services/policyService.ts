@@ -95,7 +95,8 @@ export async function hotReload(
   workspaceId: string,
   policySet: string,
   bundle: Record<string, any>,
-  actor: string
+  actor: string,
+  actorId?: number
 ): Promise<HotReloadResult> {
   const db = getDb();
   if (!db) {
@@ -120,7 +121,7 @@ export async function hotReload(
     policyHash: newHash,
     bundle: bundle,
     loadedAt: new Date(),
-    loadedBy: 1, // TODO: Get actual actor ID
+    loadedBy: actorId ?? parseInt(actor, 10) || 1,
     isCurrent: true,
   });
 
@@ -274,7 +275,8 @@ export function computeSpecHash(spec: Record<string, any>): string {
 export async function storePolicyVersion(
   policySet: string,
   version: string,
-  bundle: Record<string, any>
+  bundle: Record<string, any>,
+  actorId?: number
 ): Promise<void> {
   const db = getDb();
   if (!db) {
@@ -292,7 +294,7 @@ export async function storePolicyVersion(
     policyHash: hash,
     bundle: bundle,
     loadedAt: new Date(),
-    loadedBy: 1, // TODO: Get actual actor ID
+    loadedBy: actorId ?? 1,
     isCurrent: true,
   });
 }

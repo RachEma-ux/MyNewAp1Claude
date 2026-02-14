@@ -11,6 +11,11 @@ export const documentsApiRouter = router({
       const { getDocumentsWithDetails } = await import("../db");
       const documents = await getDocumentsWithDetails(input.workspaceId);
       
+      // Get workspace name
+      const { getWorkspaceById } = await import("../db");
+      const workspace = await getWorkspaceById(input.workspaceId);
+      const workspaceName = workspace?.name || "Unknown Workspace";
+
       // Transform to match UI expectations
       return documents.map((doc) => ({
         id: doc.id,
@@ -18,7 +23,7 @@ export const documentsApiRouter = router({
         status: doc.status,
         collection: "documents", // Default collection name
         workspaceId: doc.workspaceId,
-        workspaceName: "Main Workspace", // TODO: Join with workspace table
+        workspaceName,
         chunksCreated: doc.chunkCount || 0,
         vectorsStored: doc.vectorsStored || 0,
         fileSize: formatFileSize(doc.fileSize),

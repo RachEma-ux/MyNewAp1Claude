@@ -7,6 +7,7 @@ import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { ChevronLeft, ChevronRight, Save, AlertTriangle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { TRIGGER_DEFAULTS } from "../../../shared/trigger-defaults";
 
 interface TriggerCreationDialogProps {
@@ -15,6 +16,7 @@ interface TriggerCreationDialogProps {
 }
 
 export default function TriggerCreationDialog({ open, onOpenChange }: TriggerCreationDialogProps) {
+  const { user } = useAuth();
   const [currentGate, setCurrentGate] = useState(1);
   const [formData, setFormData] = useState({
     // Gate T1: Trigger Identity
@@ -129,7 +131,7 @@ export default function TriggerCreationDialog({ open, onOpenChange }: TriggerCre
       eventStub: JSON.parse(formData.eventStub),
       uiIntegrationSpec: JSON.parse(formData.uiIntegrationSpec),
       replacementTriggerId: formData.replacementTriggerId || undefined,
-      createdBy: "admin", // TODO: Get from auth context
+      createdBy: user?.id ?? 1,
     });
   };
 

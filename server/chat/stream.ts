@@ -173,11 +173,19 @@ export async function handleChatStream(req: Request, res: Response) {
             (completionTokens / 1000) * costProfile.outputCostPer1kTokens
           );
 
+          // Resolve workspace from request body or user's first workspace
+          let wsId = workspaceId;
+          if (!wsId) {
+            const { getUserWorkspaces } = await import('../db');
+            const userWorkspaces = await getUserWorkspaces(user.id);
+            wsId = userWorkspaces[0]?.id ?? 1;
+          }
+
           // Track usage
           await trackProviderUsage({
-            workspaceId: 1, // TODO: Get from context or input
+            workspaceId: wsId,
             providerId,
-            modelName: "streaming-model", // TODO: Get actual model name
+            modelName: provider.name || "streaming-model",
             tokensUsed: totalTokens,
             cost,
             latencyMs,

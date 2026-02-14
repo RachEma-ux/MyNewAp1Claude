@@ -31,9 +31,15 @@ export default function DocumentsDashboard() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkActionMode, setBulkActionMode] = useState(false);
 
+  // Get user's workspaces and use the first one
+  const { data: workspaces } = trpc.workspaces.list.useQuery();
+  const activeWorkspaceId = workspaces?.[0]?.id;
+
   // Fetch real documents from database
   const { data: documents, isLoading: documentsLoading } = trpc.documentsManagement.listDocuments.useQuery({
-    workspaceId: 1, // TODO: Get from workspace context
+    workspaceId: activeWorkspaceId!,
+  }, {
+    enabled: !!activeWorkspaceId,
   });
 
   const deleteDocumentMutation = trpc.documentsManagement.deleteDocument.useMutation({

@@ -36,6 +36,7 @@ export interface BatchConfig {
   timeout?: number; // Timeout per request in ms
   retryAttempts?: number; // Number of retry attempts for failed requests
   retryDelay?: number; // Delay between retries in ms
+  workspaceId?: number; // Workspace ID for resource quota tracking
 }
 
 class BatchInferenceService {
@@ -144,7 +145,7 @@ class BatchInferenceService {
         // Acquire request slot
         await resourceManager.acquireRequestSlot(
           batchReq.id,
-          1, // TODO: Get actual workspace ID
+          config.workspaceId ?? 1,
           batchReq.priority || 1
         );
 

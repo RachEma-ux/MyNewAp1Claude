@@ -29,29 +29,29 @@ export class PluginRegistry {
   /**
    * Register a plugin
    */
-  async register(plugin: IPlugin): Promise<void> {
+  async register(plugin: IPlugin, installedByUserId?: number): Promise<void> {
     const { id } = plugin.manifest;
-    
+
     if (this.plugins.has(id)) {
       throw new PluginError(id, "Plugin already registered");
     }
-    
+
     // Validate manifest
     this.validateManifest(plugin.manifest);
-    
+
     // Create plugin context
     const context = this.createContext(plugin.manifest);
-    
+
     // Initialize plugin
     await plugin.initialize(context);
-    
+
     // Store plugin and context
     this.plugins.set(id, plugin);
     this.contexts.set(id, context);
-    
+
     // Save to database
-    await this.savePluginToDB(plugin.manifest, "installed");
-    
+    await this.savePluginToDB(plugin.manifest, "installed", installedByUserId);
+
     console.log(`[PluginRegistry] Registered plugin: ${id}`);
   }
   
@@ -366,10 +366,10 @@ export class PluginRegistry {
   /**
    * Save plugin to database
    */
-  private async savePluginToDB(manifest: PluginManifest, status: PluginStatus): Promise<void> {
+  private async savePluginToDB(manifest: PluginManifest, status: PluginStatus, installedByUserId?: number): Promise<void> {
     const db = getDb();
     if (!db) return;
-    
+
     await db.insert(plugins).values({
       name: manifest.id,
       displayName: manifest.name,
@@ -381,7 +381,7 @@ export class PluginRegistry {
       permissions: manifest.permissions || {},
       enabled: status === "enabled",
       verified: false,
-      installedBy: 1, // TODO: Get actual user ID
+      installedBy: installedByUserId ?? 1,
     });
   }
   

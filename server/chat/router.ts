@@ -83,13 +83,21 @@ export const chatRouter = router({
       // Track usage
       if (response.usage) {
         const totalTokens = (response.usage.promptTokens || 0) + (response.usage.completionTokens || 0);
-        
+
         // Calculate cost (simplified - should use provider-specific pricing)
         const costPer1kTokens = 0.002; // Default cost
         const cost = (totalTokens / 1000) * costPer1kTokens;
 
+        // Resolve workspace ID from input or user's first workspace
+        let wsId = input.workspaceId;
+        if (!wsId) {
+          const { getUserWorkspaces } = await import("../db");
+          const userWorkspaces = await getUserWorkspaces(ctx.user.id);
+          wsId = userWorkspaces[0]?.id ?? 1;
+        }
+
         await trackProviderUsage({
-          workspaceId: 1, // TODO: Get from context or input
+          workspaceId: wsId,
           providerId: input.providerId,
           modelName: response.model || "unknown",
           tokensUsed: totalTokens,
@@ -208,11 +216,16 @@ export const chatRouter = router({
           (completionTokens / 1000) * costProfile.outputCostPer1kTokens
         );
 
+        // Resolve workspace ID from user's first workspace
+        const { getUserWorkspaces } = await import("../db");
+        const userWorkspaces = await getUserWorkspaces(ctx.user.id);
+        const wsId = userWorkspaces[0]?.id ?? 1;
+
         // Track usage
         await trackProviderUsage({
-          workspaceId: 1, // TODO: Get from context or input
+          workspaceId: wsId,
           providerId: input.providerId,
-          modelName: "streaming-model", // TODO: Get actual model name
+          modelName: provider.name || "streaming-model",
           tokensUsed: totalTokens,
           cost,
           latencyMs,

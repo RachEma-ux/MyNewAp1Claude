@@ -211,8 +211,8 @@ class ResourceManager {
   /**
    * Load a model into memory
    */
-  public loadModel(modelId: string, modelName: string, sizeGB: number, priority: number = 1): boolean {
-    const check = this.canLoadModel(modelId, sizeGB, 1); // TODO: Get actual workspace ID
+  public loadModel(modelId: string, modelName: string, sizeGB: number, priority: number = 1, workspaceId: number = 1): boolean {
+    const check = this.canLoadModel(modelId, sizeGB, workspaceId);
     if (!check.canLoad) {
       console.warn(`[ResourceManager] Cannot load model ${modelId}: ${check.reason}`);
       return false;
