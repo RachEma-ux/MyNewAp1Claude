@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Send, Loader2, MessageSquare, Plus, Bot, User as UserIcon, Sparkles, BookOpen, Route } from "lucide-react";
+import { Loader2, MessageSquare, Bot, User as UserIcon, Sparkles, BookOpen, Route } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { clientProviderRouter, type WorkspaceRoutingProfile } from "@/lib/provider-router";
+import { ChatControlBox } from "@/components/ChatControlBox";
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -245,13 +245,6 @@ export default function Chat() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   const handleNewChat = () => {
     setMessages([]);
     setInput("");
@@ -262,17 +255,11 @@ export default function Chat() {
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-4">
       {/* Header */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Chat</h1>
-            <p className="text-muted-foreground mt-1">
-              Converse with AI using configured providers
-            </p>
-          </div>
-          <Button onClick={handleNewChat} variant="outline" className="shrink-0">
-            <Plus className="h-4 w-4 mr-2" />
-            New Chat
-          </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Chat</h1>
+          <p className="text-muted-foreground mt-1">
+            Converse with AI using configured providers
+          </p>
         </div>
 
         {/* Controls Row */}
@@ -445,33 +432,26 @@ export default function Chat() {
             )}
           </ScrollArea>
 
-          {/* Input Area */}
+          {/* Input Area — ChatControlBox */}
           <div className="border-t p-4">
-            <div className="flex gap-2">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
-                disabled={isStreaming || !selectedProvider}
-                className="flex-1"
-              />
-              <Button
-                onClick={handleSend}
-                disabled={isStreaming || !input.trim() || !selectedProvider}
-              >
-                {isStreaming ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-            {!selectedProvider && providers && providers.length === 0 && (
-              <p className="text-xs text-muted-foreground mt-2">
-                No providers configured. Please add a provider in the Providers page.
-              </p>
-            )}
+            <ChatControlBox
+              value={input}
+              onChange={setInput}
+              onSend={handleSend}
+              isStreaming={isStreaming}
+              disabled={!useUnifiedRouting && !selectedProvider}
+              providerCount={providers?.length ?? 0}
+              providerName={
+                providers?.find((p) => p.id === selectedProvider)?.name
+              }
+              onNewChat={handleNewChat}
+              onStop={() => abortControllerRef.current?.abort()}
+              noProviderMessage={
+                !selectedProvider && providers && providers.length === 0
+                  ? "No providers configured. Please add a provider in the Providers page."
+                  : undefined
+              }
+            />
           </div>
         </CardContent>
       </Card>
