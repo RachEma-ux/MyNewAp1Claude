@@ -47,6 +47,7 @@ class BatchInferenceService {
     timeout: 60000, // 60 seconds
     retryAttempts: 3,
     retryDelay: 1000, // 1 second
+    workspaceId: 0,
   };
 
   /**
