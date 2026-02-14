@@ -31,7 +31,7 @@ export async function initializeProviders() {
         await registry.registerProvider({
           id: provider.id,
           name: provider.name,
-          type: provider.type as 'openai' | 'anthropic' | 'google',
+          type: provider.type as 'openai' | 'anthropic' | 'google' | 'local-ollama' | 'local-llamacpp' | 'custom',
           enabled: provider.enabled,
           priority: provider.priority ?? 50,
           createdAt: provider.createdAt,

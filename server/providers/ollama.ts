@@ -1,16 +1,13 @@
 import { BaseProvider } from './base';
-import type { 
-  Message, 
-  ProviderConfig, 
-  GenerationRequest, 
-  GenerationResponse, 
+import type {
+  Message,
+  ProviderConfig,
+  GenerationRequest,
+  GenerationResponse,
   Token,
   ProviderCapabilities,
-  CostProfile,
-  LatencyProfile,
   EmbedOptions,
   Embedding,
-  HealthStatus,
 } from './types';
 
 /**
@@ -20,17 +17,18 @@ import type {
 export class OllamaProvider extends BaseProvider {
   private baseUrl: string;
   private defaultModel: string;
+  private installedModels: string[] = [];
 
   constructor(config: ProviderConfig) {
     super(config);
-    
+
     // Get Ollama base URL from config or use default
     this.baseUrl = (config.config.apiEndpoint as string) || 'http://localhost:11434';
     this.defaultModel = (config.config.defaultModel as string) || 'llama3.2';
   }
 
   protected async doInitialize(): Promise<void> {
-    // Test connection to Ollama
+    // Test connection to Ollama and fetch installed models
     try {
       const response = await fetch(`${this.baseUrl}/api/tags`, {
         method: 'GET',
@@ -41,7 +39,8 @@ export class OllamaProvider extends BaseProvider {
       }
 
       const data = await response.json();
-      console.log(`[Ollama] Connected successfully. Available models: ${data.models?.length || 0}`);
+      this.installedModels = data.models?.map((m: { name: string }) => m.name) || [];
+      console.log(`[Ollama] Connected successfully. Available models: ${this.installedModels.length}`);
     } catch (error) {
       throw new Error(
         `Failed to connect to Ollama at ${this.baseUrl}. ` +
@@ -194,14 +193,13 @@ export class OllamaProvider extends BaseProvider {
   }
 
   getMaxContextLength(): number {
-    // Default context length for most Ollama models
-    // This can be overridden in config
-    return 4096;
+    return 128000;
   }
 
   getSupportedModels(): string[] {
-    // Common Ollama models
-    // In a real implementation, we could fetch this from /api/tags
+    if (this.installedModels.length > 0) {
+      return this.installedModels;
+    }
     return [
       'llama4',
       'qwen3',
@@ -259,7 +257,7 @@ export class OllamaProvider extends BaseProvider {
       supportsStreaming: true,
       supportsEmbedding: true,
       supportsFunctionCalling: false,
-      supportsVision: false,
+      supportsVision: true,
       maxContextLength: this.getMaxContextLength(),
       supportedModels: this.getSupportedModels(),
     };
