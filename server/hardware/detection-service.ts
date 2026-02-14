@@ -221,51 +221,58 @@ function generateRecommendations(profile: Partial<HardwareProfile>): { recommend
   // GPU-based recommendations
   if (profile.hasGPU && profile.gpuVRAM) {
     const vram = profile.gpuVRAM;
-    
+
     if (vram >= 24) {
       // High-end GPU (RTX 4090, A100, etc.)
       maxModelSize = 70;
-      recommendations.push("Llama 2 70B", "Mixtral 8x7B", "CodeLlama 34B", "Llama 2 13B", "Mistral 7B");
+      recommendations.push("Llama 4 Scout", "DeepSeek R1 8B", "Qwen 3 8B", "Mistral 7B", "Phi-3 Mini");
     } else if (vram >= 16) {
       // Mid-high GPU (RTX 4080, A6000, etc.)
       maxModelSize = 34;
-      recommendations.push("CodeLlama 34B", "Llama 2 13B", "Mixtral 8x7B (Q4)", "Mistral 7B");
+      recommendations.push("DeepSeek R1 8B", "Qwen 3 8B", "Mistral 7B", "Phi-3 Mini");
     } else if (vram >= 12) {
       // Mid GPU (RTX 4070 Ti, RTX 3090, etc.)
       maxModelSize = 13;
-      recommendations.push("Llama 2 13B", "Mistral 7B", "CodeLlama 13B", "Llama 2 7B");
+      recommendations.push("Mistral 7B", "DeepSeek R1 8B", "Phi-3 Mini", "Phi-2");
     } else if (vram >= 8) {
       // Entry GPU (RTX 4060 Ti, RTX 3070, etc.)
       maxModelSize = 7;
-      recommendations.push("Mistral 7B", "Llama 2 7B", "CodeLlama 7B", "Phi-2");
-    } else if (vram >= 6) {
+      recommendations.push("Mistral 7B", "Phi-3 Mini", "Phi-2", "Gemma 2B");
+    } else if (vram >= 4) {
       // Low-end GPU
       maxModelSize = 3;
-      recommendations.push("Phi-2", "TinyLlama", "Llama 2 7B (Q4)");
-    } else {
+      recommendations.push("Phi-3 Mini", "Phi-2", "Gemma 2B", "DeepSeek R1 1.5B", "SmolLM2 1.7B");
+    } else if (vram >= 2) {
       // Very low VRAM
-      maxModelSize = 1;
-      recommendations.push("TinyLlama", "Phi-2 (Q4)");
+      maxModelSize = 1.5;
+      recommendations.push("DeepSeek R1 1.5B", "PhoneLM 1.5B", "SmolLM2 1.7B", "TinyLlama 1.1B", "Llama 3.2 1B");
+    } else {
+      // Minimal VRAM
+      maxModelSize = 0.5;
+      recommendations.push("SmolLM2 360M Instruct", "PhoneLM 0.5B", "TinyLlama 1.1B");
     }
   } else {
     // CPU-only recommendations based on RAM
     const ram = profile.totalRAM || 0;
-    
+
     if (ram >= 64) {
       maxModelSize = 34;
-      recommendations.push("CodeLlama 34B (Q4)", "Llama 2 13B", "Mistral 7B");
+      recommendations.push("DeepSeek R1 8B", "Qwen 3 8B", "Mistral 7B");
     } else if (ram >= 32) {
       maxModelSize = 13;
-      recommendations.push("Llama 2 13B (Q4)", "Mistral 7B", "CodeLlama 13B (Q4)");
+      recommendations.push("Mistral 7B", "DeepSeek R1 8B", "Phi-3 Mini");
     } else if (ram >= 16) {
       maxModelSize = 7;
-      recommendations.push("Mistral 7B", "Llama 2 7B", "CodeLlama 7B");
+      recommendations.push("Mistral 7B", "Phi-3 Mini", "Phi-2", "Gemma 2B");
     } else if (ram >= 8) {
       maxModelSize = 3;
-      recommendations.push("Phi-2", "TinyLlama", "Llama 2 7B (Q4)");
+      recommendations.push("Phi-3 Mini", "Phi-2", "Gemma 2B", "DeepSeek R1 1.5B", "SmolLM2 1.7B");
+    } else if (ram >= 4) {
+      maxModelSize = 1.5;
+      recommendations.push("DeepSeek R1 1.5B", "PhoneLM 1.5B", "SmolLM2 1.7B", "TinyLlama 1.1B", "Llama 3.2 1B");
     } else {
-      maxModelSize = 1;
-      recommendations.push("TinyLlama");
+      maxModelSize = 0.5;
+      recommendations.push("SmolLM2 360M Instruct", "PhoneLM 0.5B", "TinyLlama 1.1B");
     }
   }
   
