@@ -143,9 +143,10 @@ const blockConfigSchemas: Record<string, Array<{
       label: "AI Model",
       type: "select",
       options: [
-        { value: "gpt-4", label: "GPT-4" },
-        { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
-        { value: "claude-3", label: "Claude 3" },
+        { value: "gpt-4.1", label: "GPT-4.1" },
+        { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+        { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+        { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
       ],
       required: true,
     },

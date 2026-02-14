@@ -20,21 +20,23 @@ export default function Models() {
   // Official name mapping
   const getDisplayName = (model: string): string => {
     const nameMap: Record<string, string> = {
-      "claude-opus-4-20250514": "Claude Opus 4",
+      "claude-opus-4-6": "Claude Opus 4.6",
+      "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
+      "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
+      "claude-opus-4-5-20251101": "Claude Opus 4.5",
       "claude-sonnet-4-20250514": "Claude Sonnet 4",
-      "claude-3-7-sonnet-20250219": "Claude 3.7 Sonnet",
-      "claude-3-5-sonnet-20241022": "Claude 3.5 Sonnet",
-      "claude-3-5-haiku-20241022": "Claude 3.5 Haiku",
-      "claude-3-opus-20240229": "Claude 3 Opus",
-      "claude-3-haiku-20240307": "Claude 3 Haiku",
+      "gpt-4.1": "GPT-4.1",
+      "gpt-4.1-mini": "GPT-4.1 Mini",
+      "gpt-4.1-nano": "GPT-4.1 Nano",
+      "o3": "o3",
+      "o4-mini": "o4 Mini",
       "gpt-4o": "GPT-4o",
       "gpt-4o-mini": "GPT-4o Mini",
-      "gpt-4-turbo": "GPT-4 Turbo",
-      "gpt-4": "GPT-4",
-      "gpt-3.5-turbo": "GPT-3.5 Turbo",
+      "gemini-3-pro": "Gemini 3 Pro",
+      "gemini-3-flash": "Gemini 3 Flash",
+      "gemini-2.5-pro": "Gemini 2.5 Pro",
+      "gemini-2.5-flash": "Gemini 2.5 Flash",
       "gemini-2.0-flash": "Gemini 2.0 Flash",
-      "gemini-1.5-pro": "Gemini 1.5 Pro",
-      "gemini-1.5-flash": "Gemini 1.5 Flash",
     };
     return nameMap[model] || model;
   };

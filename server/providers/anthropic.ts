@@ -40,7 +40,7 @@ export class AnthropicProvider extends BaseProvider {
     try {
       // Simple health check - create a minimal request
       await this.client.messages.create({
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 1,
         messages: [{ role: 'user', content: 'test' }],
       });
@@ -57,7 +57,7 @@ export class AnthropicProvider extends BaseProvider {
     }
 
     const startTime = Date.now();
-    const model = request.model || this.getConfigValue<string>('defaultModel', 'claude-3-5-sonnet-20241022');
+    const model = request.model || this.getConfigValue<string>('defaultModel', 'claude-sonnet-4-5-20250929');
 
     try {
       // Extract system message if present
@@ -114,7 +114,7 @@ export class AnthropicProvider extends BaseProvider {
       throw new Error('Anthropic provider not initialized');
     }
 
-    const model = request.model || this.getConfigValue<string>('defaultModel', 'claude-3-5-sonnet-20241022');
+    const model = request.model || this.getConfigValue<string>('defaultModel', 'claude-sonnet-4-5-20250929');
 
     try {
       // Extract system message if present
@@ -164,45 +164,45 @@ export class AnthropicProvider extends BaseProvider {
       supportsEmbedding: false,
       supportsFunctionCalling: true,
       supportsVision: true,
-      maxContextLength: 200000, // Claude 3.5 Sonnet
+      maxContextLength: 200000,
       supportedModels: [
-        'claude-3-5-sonnet-20241022',
-        'claude-3-5-haiku-20241022',
-        'claude-3-opus-20240229',
-        'claude-3-sonnet-20240229',
-        'claude-3-haiku-20240307',
+        'claude-opus-4-6',
+        'claude-sonnet-4-5-20250929',
+        'claude-haiku-4-5-20251001',
+        'claude-opus-4-5-20251101',
+        'claude-sonnet-4-20250514',
       ],
     };
   }
 
   getCostPerToken(): CostProfile {
-    const model = this.getConfigValue<string>('defaultModel', 'claude-3-5-sonnet-20241022');
-    
-    // Pricing as of Dec 2024 (per 1M tokens, converted to per 1k)
+    const model = this.getConfigValue<string>('defaultModel', 'claude-sonnet-4-5-20250929');
+
+    // Pricing per 1M tokens, converted to per 1k
     const pricing: Record<string, CostProfile> = {
-      'claude-3-5-sonnet-20241022': {
-        inputCostPer1kTokens: 0.003,
-        outputCostPer1kTokens: 0.015,
-      },
-      'claude-3-5-haiku-20241022': {
-        inputCostPer1kTokens: 0.0008,
-        outputCostPer1kTokens: 0.004,
-      },
-      'claude-3-opus-20240229': {
+      'claude-opus-4-6': {
         inputCostPer1kTokens: 0.015,
         outputCostPer1kTokens: 0.075,
       },
-      'claude-3-sonnet-20240229': {
+      'claude-sonnet-4-5-20250929': {
         inputCostPer1kTokens: 0.003,
         outputCostPer1kTokens: 0.015,
       },
-      'claude-3-haiku-20240307': {
-        inputCostPer1kTokens: 0.00025,
-        outputCostPer1kTokens: 0.00125,
+      'claude-haiku-4-5-20251001': {
+        inputCostPer1kTokens: 0.0008,
+        outputCostPer1kTokens: 0.004,
+      },
+      'claude-opus-4-5-20251101': {
+        inputCostPer1kTokens: 0.015,
+        outputCostPer1kTokens: 0.075,
+      },
+      'claude-sonnet-4-20250514': {
+        inputCostPer1kTokens: 0.003,
+        outputCostPer1kTokens: 0.015,
       },
     };
 
-    return pricing[model] || pricing['claude-3-5-sonnet-20241022']!;
+    return pricing[model] || pricing['claude-sonnet-4-5-20250929']!;
   }
 
   private mapStopReason(reason: string | null): 'stop' | 'length' | 'content_filter' | 'error' {

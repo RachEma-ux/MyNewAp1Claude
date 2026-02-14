@@ -36,7 +36,7 @@ export class GoogleProvider extends BaseProvider {
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = this.client.getGenerativeModel({ model: 'gemini-2.5-flash' });
       await model.generateContent('test');
       return true;
     } catch (error) {
@@ -51,7 +51,7 @@ export class GoogleProvider extends BaseProvider {
     }
 
     const startTime = Date.now();
-    const modelName = request.model || this.getConfigValue<string>('defaultModel', 'gemini-2.0-flash-exp');
+    const modelName = request.model || this.getConfigValue<string>('defaultModel', 'gemini-2.5-flash');
 
     try {
       const model = this.client.getGenerativeModel({
@@ -123,7 +123,7 @@ export class GoogleProvider extends BaseProvider {
       throw new Error('Google provider not initialized');
     }
 
-    const modelName = request.model || this.getConfigValue<string>('defaultModel', 'gemini-2.0-flash-exp');
+    const modelName = request.model || this.getConfigValue<string>('defaultModel', 'gemini-2.5-flash');
 
     try {
       const model = this.client.getGenerativeModel({
@@ -211,50 +211,62 @@ export class GoogleProvider extends BaseProvider {
       supportsEmbedding: true,
       supportsFunctionCalling: true,
       supportsVision: true,
-      maxContextLength: 1000000, // Gemini 1.5 Pro
+      maxContextLength: 1000000,
       supportedModels: [
-        'gemini-2.0-flash-exp',
-        'gemini-1.5-pro',
-        'gemini-1.5-flash',
-        'gemini-1.5-flash-8b',
+        'gemini-3-pro',
+        'gemini-3-flash',
+        'gemini-2.5-pro',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.0-flash',
         'text-embedding-004',
       ],
     };
   }
 
   getCostPerToken(): CostProfile {
-    const model = this.getConfigValue<string>('defaultModel', 'gemini-2.0-flash-exp');
+    const model = this.getConfigValue<string>('defaultModel', 'gemini-2.5-flash');
     
-    // Pricing as of Dec 2024 (per 1M tokens, converted to per 1k)
+    // Pricing per 1M tokens, converted to per 1k
     const pricing: Record<string, CostProfile> = {
-      'gemini-2.0-flash-exp': {
-        inputCostPer1kTokens: 0, // Free during preview
-        outputCostPer1kTokens: 0,
+      'gemini-3-pro': {
+        inputCostPer1kTokens: 0.00125,
+        outputCostPer1kTokens: 0.005,
         embeddingCostPer1kTokens: 0,
       },
-      'gemini-1.5-pro': {
-        inputCostPer1kTokens: 0.00125, // $1.25 per 1M
-        outputCostPer1kTokens: 0.005,   // $5 per 1M
+      'gemini-3-flash': {
+        inputCostPer1kTokens: 0.000075,
+        outputCostPer1kTokens: 0.0003,
         embeddingCostPer1kTokens: 0,
       },
-      'gemini-1.5-flash': {
-        inputCostPer1kTokens: 0.000075, // $0.075 per 1M
-        outputCostPer1kTokens: 0.0003,   // $0.30 per 1M
+      'gemini-2.5-pro': {
+        inputCostPer1kTokens: 0.00125,
+        outputCostPer1kTokens: 0.005,
         embeddingCostPer1kTokens: 0,
       },
-      'gemini-1.5-flash-8b': {
-        inputCostPer1kTokens: 0.0000375, // $0.0375 per 1M
-        outputCostPer1kTokens: 0.00015,   // $0.15 per 1M
+      'gemini-2.5-flash': {
+        inputCostPer1kTokens: 0.000075,
+        outputCostPer1kTokens: 0.0003,
+        embeddingCostPer1kTokens: 0,
+      },
+      'gemini-2.5-flash-lite': {
+        inputCostPer1kTokens: 0.0000375,
+        outputCostPer1kTokens: 0.00015,
+        embeddingCostPer1kTokens: 0,
+      },
+      'gemini-2.0-flash': {
+        inputCostPer1kTokens: 0.000075,
+        outputCostPer1kTokens: 0.0003,
         embeddingCostPer1kTokens: 0,
       },
       'text-embedding-004': {
         inputCostPer1kTokens: 0,
         outputCostPer1kTokens: 0,
-        embeddingCostPer1kTokens: 0.00001, // $0.01 per 1M
+        embeddingCostPer1kTokens: 0.00001,
       },
     };
 
-    return pricing[model] || pricing['gemini-2.0-flash-exp']!;
+    return pricing[model] || pricing['gemini-2.5-flash']!;
   }
 
   private mapFinishReason(reason: string | undefined): 'stop' | 'length' | 'content_filter' | 'error' {

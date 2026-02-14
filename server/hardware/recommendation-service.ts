@@ -134,12 +134,12 @@ class ModelRecommendationService {
 
       if (useCase === "all" || useCase === "code") {
         recommendations.push({
-          modelId: "codellama/CodeLlama-13b-hf",
-          modelName: "Code Llama 13B",
-          size: "13B",
+          modelId: "Qwen/Qwen2.5-Coder-32B-Instruct",
+          modelName: "Qwen 2.5 Coder 32B",
+          size: "32B",
           estimatedVRAM: 13,
           estimatedRAM: 8,
-          reason: "Specialized for code generation and completion",
+          reason: "State-of-the-art open coding model",
           performance: "excellent",
           category: "code",
         });
@@ -150,7 +150,7 @@ class ModelRecommendationService {
     if (vram >= 6) {
       if (useCase === "all" || useCase === "chat") {
         recommendations.push({
-          modelId: "mistralai/Mistral-7B-Instruct-v0.2",
+          modelId: "mistralai/Mistral-7B-Instruct-v0.3",
           modelName: "Mistral 7B Instruct",
           size: "7B",
           estimatedVRAM: 7,
@@ -162,9 +162,9 @@ class ModelRecommendationService {
 
         if (includeQuantized) {
           recommendations.push({
-            modelId: "TheBloke/Llama-2-13B-chat-GGUF",
-            modelName: "Llama 2 13B Chat (Q4)",
-            size: "13B",
+            modelId: "bartowski/Llama-3.2-3B-Instruct-GGUF",
+            modelName: "Llama 3.2 3B Instruct (Q4)",
+            size: "3B",
             quantization: "Q4_K_M",
             estimatedVRAM: 8,
             estimatedRAM: 4,
@@ -177,12 +177,12 @@ class ModelRecommendationService {
 
       if (useCase === "all" || useCase === "code") {
         recommendations.push({
-          modelId: "codellama/CodeLlama-7b-hf",
-          modelName: "Code Llama 7B",
+          modelId: "Qwen/Qwen2.5-Coder-7B-Instruct",
+          modelName: "Qwen 2.5 Coder 7B",
           size: "7B",
           estimatedVRAM: 7,
           estimatedRAM: 4,
-          reason: "Fast code generation model",
+          reason: "Strong open-source coding model",
           performance: "excellent",
           category: "code",
         });

@@ -26,7 +26,7 @@ export class OllamaProvider extends BaseProvider {
     
     // Get Ollama base URL from config or use default
     this.baseUrl = (config.config.apiEndpoint as string) || 'http://localhost:11434';
-    this.defaultModel = (config.config.defaultModel as string) || 'llama2';
+    this.defaultModel = (config.config.defaultModel as string) || 'llama3.2';
   }
 
   protected async doInitialize(): Promise<void> {
@@ -203,16 +203,14 @@ export class OllamaProvider extends BaseProvider {
     // Common Ollama models
     // In a real implementation, we could fetch this from /api/tags
     return [
-      'llama2',
-      'llama2:13b',
-      'llama2:70b',
+      'llama4',
+      'qwen3',
+      'deepseek-r1',
+      'gemma3',
       'mistral',
-      'mixtral',
-      'codellama',
-      'phi',
-      'neural-chat',
-      'starling-lm',
-      'orca-mini',
+      'qwen2.5-coder',
+      'llama3.2',
+      'phi4',
     ];
   }
 

@@ -94,13 +94,15 @@ const POLICY_RULES = {
   models: {
     allowlist: {
       cloud: [
+        "claude-opus-4-6",
         "claude-sonnet-4-5-20250929",
         "claude-opus-4-5-20251101",
-        "gpt-4",
-        "gpt-4-turbo",
-        "gemini-pro",
+        "gpt-4.1",
+        "o3",
+        "gemini-3-pro",
+        "gemini-2.5-pro",
       ],
-      local: ["llama-3", "mixtral", "phi-3"],
+      local: ["llama4", "qwen3", "deepseek-r1", "phi4"],
     },
     contextLimits: {
       max: 1000000, // 1M tokens max

@@ -28,16 +28,16 @@ const RECOMMENDED_MODELS: OllamaModel[] = [
     recommended: true,
   },
   {
-    name: "codellama",
-    size: "3.8GB",
-    description: "Specialized for code generation and programming tasks",
-    recommended: false,
+    name: "qwen3",
+    size: "4.9GB",
+    description: "Qwen 3 - strong reasoning and multilingual capabilities",
+    recommended: true,
   },
   {
-    name: "mixtral",
-    size: "26GB",
-    description: "Mixtral 8x7B - very powerful but requires more resources",
-    recommended: false,
+    name: "deepseek-r1",
+    size: "4.7GB",
+    description: "DeepSeek R1 - advanced open reasoning model",
+    recommended: true,
   },
 ];
 

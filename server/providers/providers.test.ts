@@ -35,7 +35,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
     messages: {
       create: vi.fn().mockResolvedValue({
         id: "test-id",
-        model: "claude-3-5-sonnet-20241022",
+        model: "claude-sonnet-4-5-20250929",
         content: [{ type: "text", text: "Test response" }],
         stop_reason: "end_turn",
         usage: { input_tokens: 10, output_tokens: 20 },
@@ -79,7 +79,7 @@ function createTestConfig(type: ProviderType, id: number = 1): ProviderConfig {
     priority: 50,
     config: {
       apiKey: "test-api-key",
-      defaultModel: type === "openai" ? "gpt-4o-mini" : type === "anthropic" ? "claude-3-5-sonnet-20241022" : "gemini-2.0-flash-exp",
+      defaultModel: type === "openai" ? "gpt-4o-mini" : type === "anthropic" ? "claude-sonnet-4-5-20250929" : "gemini-2.5-flash",
     },
     createdAt: new Date(),
     updatedAt: new Date(),

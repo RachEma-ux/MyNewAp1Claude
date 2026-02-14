@@ -216,12 +216,12 @@ class HybridProviderRouter {
     const model = request.model || "";
     
     // Tier 1: Best models
-    if (model.includes("gpt-4") || model.includes("claude-3-opus") || model.includes("gemini-pro")) {
+    if (model.includes("gpt-4.1") || model.includes("o3") || model.includes("claude-opus") || model.includes("gemini-3-pro") || model.includes("gemini-2.5-pro")) {
       return 50;
     }
-    
+
     // Tier 2: Good models
-    if (model.includes("gpt-3.5") || model.includes("claude-3-sonnet") || model.includes("gemini-flash")) {
+    if (model.includes("gpt-4o") || model.includes("o4-mini") || model.includes("claude-sonnet") || model.includes("gemini-flash")) {
       return 30;
     }
     

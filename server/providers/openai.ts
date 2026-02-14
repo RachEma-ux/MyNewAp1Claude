@@ -177,10 +177,13 @@ export class OpenAIProvider extends BaseProvider {
       supportsVision: true,
       maxContextLength: 128000, // gpt-4o
       supportedModels: [
+        'gpt-4.1',
+        'gpt-4.1-mini',
+        'gpt-4.1-nano',
+        'o3',
+        'o4-mini',
         'gpt-4o',
         'gpt-4o-mini',
-        'gpt-4-turbo',
-        'gpt-3.5-turbo',
         'text-embedding-3-small',
         'text-embedding-3-large',
       ],
@@ -190,8 +193,33 @@ export class OpenAIProvider extends BaseProvider {
   getCostPerToken(): CostProfile {
     const model = this.getConfigValue<string>('defaultModel', 'gpt-4o-mini');
     
-    // Pricing as of Dec 2024 (per 1k tokens)
+    // Pricing per 1k tokens
     const pricing: Record<string, CostProfile> = {
+      'gpt-4.1': {
+        inputCostPer1kTokens: 0.002,
+        outputCostPer1kTokens: 0.008,
+        embeddingCostPer1kTokens: 0,
+      },
+      'gpt-4.1-mini': {
+        inputCostPer1kTokens: 0.0004,
+        outputCostPer1kTokens: 0.0016,
+        embeddingCostPer1kTokens: 0,
+      },
+      'gpt-4.1-nano': {
+        inputCostPer1kTokens: 0.0001,
+        outputCostPer1kTokens: 0.0004,
+        embeddingCostPer1kTokens: 0,
+      },
+      'o3': {
+        inputCostPer1kTokens: 0.01,
+        outputCostPer1kTokens: 0.04,
+        embeddingCostPer1kTokens: 0,
+      },
+      'o4-mini': {
+        inputCostPer1kTokens: 0.0011,
+        outputCostPer1kTokens: 0.0044,
+        embeddingCostPer1kTokens: 0,
+      },
       'gpt-4o': {
         inputCostPer1kTokens: 0.0025,
         outputCostPer1kTokens: 0.01,
@@ -200,16 +228,6 @@ export class OpenAIProvider extends BaseProvider {
       'gpt-4o-mini': {
         inputCostPer1kTokens: 0.00015,
         outputCostPer1kTokens: 0.0006,
-        embeddingCostPer1kTokens: 0,
-      },
-      'gpt-4-turbo': {
-        inputCostPer1kTokens: 0.01,
-        outputCostPer1kTokens: 0.03,
-        embeddingCostPer1kTokens: 0,
-      },
-      'gpt-3.5-turbo': {
-        inputCostPer1kTokens: 0.0005,
-        outputCostPer1kTokens: 0.0015,
         embeddingCostPer1kTokens: 0,
       },
       'text-embedding-3-small': {

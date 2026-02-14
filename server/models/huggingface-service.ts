@@ -315,14 +315,14 @@ export const huggingFaceService = new HuggingFaceService();
 export const POPULAR_MODELS = {
   chat: [
     "meta-llama/Llama-2-7b-chat-hf",
-    "meta-llama/Llama-2-13b-chat-hf",
-    "mistralai/Mistral-7B-Instruct-v0.2",
-    "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "meta-llama/Llama-3.2-3B-Instruct",
+    "mistralai/Mistral-7B-Instruct-v0.3",
+    "Qwen/Qwen3-8B",
   ],
   code: [
-    "codellama/CodeLlama-7b-hf",
-    "codellama/CodeLlama-13b-hf",
-    "WizardLM/WizardCoder-15B-V1.0",
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-8B",
+    "Qwen/Qwen2.5-Coder-7B-Instruct",
+    "google/gemma-3-4b-it",
   ],
   embedding: [
     "BAAI/bge-large-en-v1.5",
