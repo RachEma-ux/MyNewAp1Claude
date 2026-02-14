@@ -205,6 +205,7 @@ export class LlamaCppProvider extends BaseProvider {
       return [this.loadedModel];
     }
     return [
+      'smollm2-1.7b',
       'llama-4-scout',
       'qwen3-8b',
       'deepseek-r1-8b',

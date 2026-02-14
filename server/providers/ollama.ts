@@ -24,7 +24,7 @@ export class OllamaProvider extends BaseProvider {
 
     // Get Ollama base URL from config or use default
     this.baseUrl = (config.config.apiEndpoint as string) || 'http://localhost:11434';
-    this.defaultModel = (config.config.defaultModel as string) || 'llama3.2';
+    this.defaultModel = (config.config.defaultModel as string) || 'smollm2';
   }
 
   protected async doInitialize(): Promise<void> {
@@ -201,6 +201,7 @@ export class OllamaProvider extends BaseProvider {
       return this.installedModels;
     }
     return [
+      'smollm2',
       'llama4',
       'qwen3',
       'deepseek-r1',
