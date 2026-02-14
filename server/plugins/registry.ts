@@ -252,36 +252,85 @@ export class PluginRegistry {
    */
   private createAPI(manifest: PluginManifest): PluginAPI {
     const api: PluginAPI = {};
-    
+
     // Only expose APIs if plugin has permissions
     if (manifest.permissions?.llm) {
       api.llm = {
         invoke: async (messages, options) => {
-          // TODO: Implement LLM invocation
-          throw new Error("LLM API not yet implemented");
+          const { getProviderRegistry } = await import("../providers/registry");
+          const registry = getProviderRegistry();
+          const providers = registry.getAllProviders();
+
+          if (providers.length === 0) {
+            throw new Error("No LLM providers available");
+          }
+
+          const provider = providers[0];
+          const response = await provider.generate({
+            messages,
+            model: options?.model,
+            temperature: options?.temperature,
+            maxTokens: options?.maxTokens,
+          });
+
+          return {
+            content: response.content,
+            model: response.model,
+            usage: response.usage,
+          };
         },
         stream: async function* (messages, options) {
-          // TODO: Implement LLM streaming
-          throw new Error("LLM streaming not yet implemented");
+          const { getProviderRegistry } = await import("../providers/registry");
+          const registry = getProviderRegistry();
+          const providers = registry.getAllProviders();
+
+          if (providers.length === 0) {
+            throw new Error("No LLM providers available");
+          }
+
+          const provider = providers[0];
+          const stream = provider.generateStream({
+            messages,
+            model: options?.model,
+            temperature: options?.temperature,
+            maxTokens: options?.maxTokens,
+          });
+
+          for await (const token of stream) {
+            yield token;
+          }
         },
       };
     }
-    
+
     if (manifest.permissions?.workspace) {
       api.workspace = {
         getCurrent: async () => {
-          // TODO: Implement workspace access
-          throw new Error("Workspace API not yet implemented");
+          const db = getDb();
+          if (!db) throw new Error("Database not available");
+
+          const { workspaces } = await import("../../drizzle/schema");
+          const [workspace] = await db.select().from(workspaces).limit(1);
+          return workspace || null;
         },
         getDocuments: async () => {
-          throw new Error("Workspace API not yet implemented");
+          const { getDocumentsByWorkspace } = await import("../documents/db");
+          const db = getDb();
+          if (!db) throw new Error("Database not available");
+
+          const { workspaces } = await import("../../drizzle/schema");
+          const [workspace] = await db.select().from(workspaces).limit(1);
+          if (!workspace) return [];
+
+          return getDocumentsByWorkspace(workspace.id);
         },
         createDocument: async (data) => {
-          throw new Error("Workspace API not yet implemented");
+          const { createDocument } = await import("../documents/db");
+          return createDocument(data);
         },
       };
     }
-    
+
     return api;
   }
   
