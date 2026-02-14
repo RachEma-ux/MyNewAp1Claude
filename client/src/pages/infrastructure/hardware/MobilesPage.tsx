@@ -13,48 +13,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// Mock data - replace with tRPC query in production
-const mockDevices = [
-  {
-    id: 1,
-    name: "iPhone 15 Pro",
-    model: "A3101",
-    os: "iOS 17.2",
-    status: "active",
-    battery: 85,
-    signal: "excellent",
-    lastSeen: "2 minutes ago",
-    assignedTo: "John Doe",
-  },
-  {
-    id: 2,
-    name: "Samsung Galaxy S24",
-    model: "SM-S921B",
-    os: "Android 14",
-    status: "active",
-    battery: 62,
-    signal: "good",
-    lastSeen: "5 minutes ago",
-    assignedTo: "Jane Smith",
-  },
-  {
-    id: 3,
-    name: "Google Pixel 8",
-    model: "GC3VE",
-    os: "Android 14",
-    status: "inactive",
-    battery: 15,
-    signal: "poor",
-    lastSeen: "2 hours ago",
-    assignedTo: "Bob Johnson",
-  },
-];
+// Device type for the inventory list
+interface MobileDevice {
+  id: number;
+  name: string;
+  model: string;
+  os: string;
+  status: string;
+  battery: number;
+  signal: string;
+  lastSeen: string;
+  assignedTo: string;
+}
+
+// TODO: Replace with tRPC query when mobile device backend is implemented
+const devices: MobileDevice[] = [];
 
 export default function MobilesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const filteredDevices = mockDevices.filter((device) => {
+  const filteredDevices = devices.filter((device) => {
     const matchesSearch =
       device.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       device.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -112,7 +91,7 @@ export default function MobilesPage() {
             <CardTitle className="text-sm font-medium">Total Devices</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockDevices.length}</div>
+            <div className="text-2xl font-bold">{devices.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -121,7 +100,7 @@ export default function MobilesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-500">
-              {mockDevices.filter((d) => d.status === "active").length}
+              {devices.filter((d) => d.status === "active").length}
             </div>
           </CardContent>
         </Card>
@@ -131,7 +110,7 @@ export default function MobilesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-500">
-              {mockDevices.filter((d) => d.battery < 20).length}
+              {devices.filter((d) => d.battery < 20).length}
             </div>
           </CardContent>
         </Card>
@@ -141,7 +120,7 @@ export default function MobilesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-500">
-              {mockDevices.filter((d) => d.status === "inactive").length}
+              {devices.filter((d) => d.status === "inactive").length}
             </div>
           </CardContent>
         </Card>

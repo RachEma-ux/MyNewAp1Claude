@@ -341,13 +341,18 @@ export async function simulateDownload(
       }
     }
 
-    // Create a small dummy file for S3
-    const dummyContent = `Model: ${modelName}\nSize: ${sizeGB}GB\nDownloaded: ${new Date().toISOString()}`;
-    const fileKey = `models/${modelName}-${Date.now()}.txt`;
+    // Create a placeholder manifest for the simulated download
+    const manifest = JSON.stringify({
+      model: modelName,
+      size: `${sizeGB}GB`,
+      simulated: true,
+      downloadedAt: new Date().toISOString(),
+    });
+    const fileKey = `models/${modelName}-${Date.now()}.manifest.json`;
     const uploadResult = await storagePut(
       fileKey,
-      Buffer.from(dummyContent),
-      "text/plain"
+      Buffer.from(manifest),
+      "application/json"
     );
 
     await updateDownloadStatus(downloadId, "completed");

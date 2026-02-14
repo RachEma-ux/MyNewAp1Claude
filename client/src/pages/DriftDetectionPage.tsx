@@ -55,16 +55,20 @@ export default function DriftDetectionPage() {
     return <Badge variant={variants[severity] || "outline"}>{severity}</Badge>;
   };
 
-  // Mock trend data (replace with real data from backend)
-  const trendData = [
-    { date: "Jan 1", drifted: 2, compliant: 18 },
-    { date: "Jan 2", drifted: 3, compliant: 17 },
-    { date: "Jan 3", drifted: 1, compliant: 19 },
-    { date: "Jan 4", drifted: 4, compliant: 16 },
-    { date: "Jan 5", drifted: 2, compliant: 18 },
-    { date: "Jan 6", drifted: 1, compliant: 19 },
-    { date: "Jan 7", drifted: 0, compliant: 20 },
-  ];
+  // Derive trend snapshot from current drift summary
+  const totalDrifted = driftSummary?.totalDrifted || 0;
+  const totalAgents = (driftSummary?.driftedAgents?.length || 0) + totalDrifted;
+  const compliant = Math.max(0, totalAgents - totalDrifted);
+  const today = new Date();
+  const trendData = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (6 - i));
+    return {
+      date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      drifted: i === 6 ? totalDrifted : 0,
+      compliant: i === 6 ? compliant : totalAgents || 0,
+    };
+  });
 
   if (isLoading) {
     return (

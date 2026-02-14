@@ -56,70 +56,7 @@ export default function DocumentsDashboard() {
     },
   });
 
-  // Mock data for fallback
-  const mockDocuments = [
-    {
-      id: 1,
-      filename: "Q4_Financial_Report.pdf",
-      status: "completed",
-      collection: "documents",
-      workspaceId: 1,
-      workspaceName: "Main Workspace",
-      chunksCreated: 45,
-      vectorsStored: 45,
-      fileSize: "2.3 MB",
-      uploadedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      processedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      wordCount: 8500,
-      charCount: 52000,
-    },
-    {
-      id: 2,
-      filename: "Product_Roadmap_2024.docx",
-      status: "processing",
-      collection: "documents",
-      workspaceId: 1,
-      workspaceName: "Main Workspace",
-      chunksCreated: 0,
-      vectorsStored: 0,
-      fileSize: "1.1 MB",
-      uploadedAt: new Date(Date.now() - 30 * 60 * 1000),
-      processedAt: null,
-      wordCount: 0,
-      charCount: 0,
-    },
-    {
-      id: 3,
-      filename: "Meeting_Notes_Jan.md",
-      status: "completed",
-      collection: "notes",
-      workspaceId: 1,
-      workspaceName: "Main Workspace",
-      chunksCreated: 12,
-      vectorsStored: 12,
-      fileSize: "45 KB",
-      uploadedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      processedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      wordCount: 2100,
-      charCount: 12500,
-    },
-    {
-      id: 4,
-      filename: "Customer_Feedback.csv",
-      status: "failed",
-      collection: "data",
-      workspaceId: 1,
-      workspaceName: "Main Workspace",
-      chunksCreated: 0,
-      vectorsStored: 0,
-      fileSize: "850 KB",
-      uploadedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      processedAt: null,
-      wordCount: 0,
-      charCount: 0,
-      error: "Failed to extract text from CSV file",
-    },
-  ];
+  const emptyDocuments: any[] = [];
 
   const handleDeleteDocument = async (documentId: number) => {
     if (!confirm("Are you sure you want to delete this document? This will also remove all associated vectors.")) {
@@ -158,8 +95,7 @@ export default function DocumentsDashboard() {
     setShowPreviewModal(true);
   };
 
-  // Use real documents or fallback to mock
-  const displayDocuments = documents || mockDocuments;
+  const displayDocuments = documents || emptyDocuments;
 
   // Filter documents
   const filteredDocuments = displayDocuments.filter((doc: any) => {

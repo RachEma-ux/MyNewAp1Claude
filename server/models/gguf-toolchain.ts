@@ -104,23 +104,42 @@ class GGUFToolchain {
   async validateModel(modelPath: string): Promise<ModelValidationResult> {
     try {
       console.log(`[GGUF] Validating model: ${modelPath}`);
-      
-      // Check if file exists
+
       const stats = await fs.stat(modelPath);
-      
-      // In production, this would parse GGUF headers and validate structure
-      // For now, return basic validation
-      
-      return {
-        valid: true,
-        format: "gguf",
-        size: stats.size,
-        metadata: {
-          architecture: "llama",
-          parameters: 7000000000, // 7B
-          contextLength: 4096,
-        },
-      };
+
+      // Read and parse GGUF magic number and header
+      const fd = await fs.open(modelPath, "r");
+      try {
+        const headerBuf = Buffer.alloc(8);
+        await fd.read(headerBuf, 0, 8, 0);
+
+        // GGUF magic: 0x46475547 ("GGUF" in little-endian)
+        const magic = headerBuf.readUInt32LE(0);
+        if (magic !== 0x46475547) {
+          return {
+            valid: false,
+            format: "unknown",
+            size: stats.size,
+            errors: ["Not a valid GGUF file (invalid magic number)"],
+          };
+        }
+
+        const version = headerBuf.readUInt32LE(4);
+        const metadata = await this.getModelMetadata(modelPath);
+
+        return {
+          valid: true,
+          format: `gguf-v${version}`,
+          size: stats.size,
+          metadata: metadata ? {
+            architecture: metadata.architecture,
+            parameters: metadata.parameters,
+            contextLength: metadata.contextLength,
+          } : undefined,
+        };
+      } finally {
+        await fd.close();
+      }
     } catch (error) {
       console.error("[GGUF] Validation failed:", error);
       return {
@@ -131,25 +150,68 @@ class GGUFToolchain {
       };
     }
   }
-  
+
   /**
    * Get model metadata from GGUF file
+   * Parses the GGUF header to extract architecture, tensor count, and key-value metadata
    */
   async getModelMetadata(modelPath: string): Promise<Record<string, any> | null> {
     try {
-      // In production, this would parse GGUF metadata
-      // For now, return mock metadata
-      
-      return {
-        architecture: "llama",
-        parameters: 7000000000,
-        contextLength: 4096,
-        vocabularySize: 32000,
-        hiddenSize: 4096,
-        attentionHeads: 32,
-        layers: 32,
-        quantization: "Q4_0",
-      };
+      const fd = await fs.open(modelPath, "r");
+      try {
+        // GGUF header: magic(4) + version(4) + tensor_count(8) + metadata_kv_count(8)
+        const headerBuf = Buffer.alloc(24);
+        await fd.read(headerBuf, 0, 24, 0);
+
+        const magic = headerBuf.readUInt32LE(0);
+        if (magic !== 0x46475547) {
+          return null;
+        }
+
+        const version = headerBuf.readUInt32LE(4);
+
+        // v2+ uses 64-bit counts, v1 uses 32-bit
+        let tensorCount: number;
+        let kvCount: number;
+        if (version >= 2) {
+          tensorCount = Number(headerBuf.readBigUInt64LE(8));
+          kvCount = Number(headerBuf.readBigUInt64LE(16));
+        } else {
+          tensorCount = headerBuf.readUInt32LE(8);
+          kvCount = headerBuf.readUInt32LE(12);
+        }
+
+        // Read key-value pairs to find architecture info
+        // We read a larger chunk to scan for common metadata keys
+        const scanSize = Math.min(64 * 1024, (await fs.stat(modelPath)).size);
+        const scanBuf = Buffer.alloc(scanSize);
+        await fd.read(scanBuf, 0, scanSize, 0);
+        const scanStr = scanBuf.toString("utf-8", 0, scanSize);
+
+        // Extract architecture from metadata
+        const archMatch = scanStr.match(/general\.architecture\0[^\0]*\0([a-z0-9_]+)/);
+        const architecture = archMatch ? archMatch[1] : undefined;
+
+        // Extract context length
+        const ctxMatch = scanStr.match(/\.context_length\0/);
+        const contextLength = ctxMatch ? undefined : undefined; // Binary value, needs proper parsing
+
+        // Estimate parameters from file size and tensor count
+        const stats = await fs.stat(modelPath);
+        const estimatedParams = Math.round(stats.size / 2); // Very rough: ~2 bytes per param for Q4
+
+        return {
+          version,
+          architecture: architecture || "unknown",
+          tensorCount,
+          kvCount,
+          parameters: estimatedParams,
+          contextLength: contextLength,
+          fileSize: stats.size,
+        };
+      } finally {
+        await fd.close();
+      }
     } catch (error) {
       console.error("[GGUF] Failed to get metadata:", error);
       return null;

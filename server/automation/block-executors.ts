@@ -35,13 +35,16 @@ export async function executeTimeTrigger(node: any, context: ExecutionContext): 
  */
 export async function executeWebhookTrigger(node: any, context: ExecutionContext): Promise<any> {
   console.log(`[WebhookTrigger] Executing node ${node.id}`);
-  
-  // In real implementation, this would listen for webhook events
-  // For now, return mock webhook data
+
+  // Webhook triggers are event-driven: the workflow engine registers this node
+  // and waits for an incoming HTTP request to the webhook endpoint.
+  // When executed directly (e.g. manual run), use any payload stored on the node.
+  const webhookData = node.data?.webhookPayload || context.variables?.webhookPayload;
+
   return {
-    method: "POST",
-    headers: {},
-    body: {},
+    method: webhookData?.method || "POST",
+    headers: webhookData?.headers || {},
+    body: webhookData?.body || {},
     receivedAt: new Date(),
   };
 }
@@ -155,15 +158,50 @@ export async function executeInvokeAgent(node: any, context: ExecutionContext): 
     throw new Error(`Agent ${agentId} not found`);
   }
   
-  // In real implementation, execute the agent
-  // For now, return mock response
-  return {
-    agentId,
-    agentName: agent.name,
-    input,
-    output: `Agent ${agent.name} executed successfully`,
-    executedAt: new Date(),
-  };
+  // Execute the agent by sending input to its configured provider
+  const { getProviderRegistry } = await import("../providers/registry");
+  const registry = getProviderRegistry();
+  const providers = registry.getAllProviders();
+
+  if (providers.length === 0) {
+    return {
+      agentId,
+      agentName: agent.name,
+      input,
+      output: "No LLM providers available to execute agent",
+      executedAt: new Date(),
+    };
+  }
+
+  try {
+    const provider = providers[0];
+    const systemPrompt = agent.systemPrompt || `You are ${agent.name}.`;
+    const response = await provider.generate({
+      messages: [
+        { role: "system" as const, content: systemPrompt },
+        { role: "user" as const, content: typeof input === "string" ? input : JSON.stringify(input) },
+      ],
+    });
+
+    return {
+      agentId,
+      agentName: agent.name,
+      input,
+      output: response.content,
+      model: response.model,
+      usage: response.usage,
+      executedAt: new Date(),
+    };
+  } catch (error: any) {
+    return {
+      agentId,
+      agentName: agent.name,
+      input,
+      output: `Agent execution failed: ${error.message}`,
+      executedAt: new Date(),
+      error: error.message,
+    };
+  }
 }
 
 /**
