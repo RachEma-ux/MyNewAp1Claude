@@ -787,11 +787,11 @@ export default function Providers() {
                 <Server className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Local Providers</h3>
                 <p className="text-muted-foreground text-center mb-4">
-                  Local inference with llama.cpp and Ollama coming soon
+                  Add a local provider to run models with Ollama or llama.cpp
                 </p>
-                <Button disabled>
+                <Button onClick={() => setIsCreateOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Coming Soon
+                  Add Local Provider
                 </Button>
               </CardContent>
             </Card>
