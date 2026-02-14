@@ -202,14 +202,22 @@ export class OllamaProvider extends BaseProvider {
     }
     return [
       'smollm2',
+      'smollm2:360m',
       'llama4',
       'qwen3',
       'deepseek-r1',
+      'deepseek-r1:1.5b',
       'gemma3',
+      'gemma2:2b',
       'mistral',
       'qwen2.5-coder',
       'llama3.2',
+      'llama3.2:1b',
       'phi4',
+      'phi3:mini',
+      'phi2',
+      'tinyllama',
+      'phonelm',
     ];
   }
 
