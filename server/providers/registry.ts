@@ -169,8 +169,10 @@ export class ProviderRegistry {
         const { LlamaCppProvider } = await import('./llamacpp');
         return new LlamaCppProvider(config);
       }
-      case 'custom':
-        throw new Error('Custom providers not yet implemented');
+      case 'custom': {
+        const { CustomProvider } = await import('./custom');
+        return new CustomProvider(config);
+      }
       default:
         throw new Error(`Unknown provider type: ${config.type}`);
     }
