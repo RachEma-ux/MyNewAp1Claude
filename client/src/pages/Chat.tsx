@@ -460,7 +460,15 @@ function ChatInner() {
   };
 
   const handleModelsToggle = () => {
-    setModelsEnabled(prev => !prev);
+    setModelsEnabled(prev => {
+      const next = !prev;
+      if (next) {
+        toast.success("Models enabled");
+      } else {
+        toast.warning("No models selected");
+      }
+      return next;
+    });
   };
 
   const handleModelsClick = () => {

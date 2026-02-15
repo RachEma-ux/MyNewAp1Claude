@@ -447,16 +447,18 @@ export function ChatControlBox({
             </button>
           )}
 
-          {/* Bot icon */}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="text-muted-foreground"
-            title="AI Assistant"
-            disabled
-          >
-            <Bot className="h-4 w-4" />
-          </Button>
+          {/* Bot icon — only visible when models are active */}
+          {modelsEnabled && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground"
+              title="AI Active"
+              disabled
+            >
+              <Bot className="h-4 w-4" />
+            </Button>
+          )}
 
           {/* Settings dropdown */}
           <DropdownMenu>
