@@ -303,7 +303,7 @@ export function ChatControlBox({
         </div>
 
         {/* Input area */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col">
           {/* Hidden file input */}
           <input
             ref={fileInputRef}
@@ -313,43 +313,7 @@ export function ChatControlBox({
             onChange={handleFileUpload}
           />
 
-          {/* "Select a provider first" hint + action row above textarea */}
-          <div className="flex items-center justify-end gap-1.5 px-1">
-            {disabled && (
-              <span className="text-xs text-muted-foreground mr-auto">
-                Select a provider first
-              </span>
-            )}
-
-            {/* Paperclip */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
-              title="Attach files"
-            >
-              <Paperclip className="h-4 w-4" />
-            </button>
-
-            {/* Plug */}
-            <button
-              className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
-              title="Connect"
-              disabled
-            >
-              <Plug className="h-3.5 w-3.5" />
-            </button>
-
-            {/* Mic */}
-            <button
-              className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
-              title="Voice"
-              disabled
-            >
-              <Mic className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          {/* Textarea spanning full width */}
+          {/* Textarea spanning full width with icons inside */}
           <div className="relative">
             <textarea
               ref={textareaRef}
@@ -359,12 +323,51 @@ export function ChatControlBox({
               placeholder={placeholder}
               disabled={disabled || isStreaming}
               rows={1}
-              className="w-full resize-none rounded-2xl border bg-muted/50 px-4 py-2.5 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ lineHeight: "1.5", minHeight: "40px", maxHeight: "200px" }}
+              className="w-full resize-none rounded-2xl border bg-muted/50 pl-4 pr-12 pt-2.5 pb-10 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ lineHeight: "1.5", minHeight: "56px", maxHeight: "200px" }}
             />
 
-            {/* Send/Stop button inside textarea, bottom-right */}
-            <div className="absolute right-2 bottom-2 flex items-center gap-1">
+            {/* "Select a provider first" inside textarea, above icons */}
+            {disabled && (
+              <div className="absolute left-0 right-0 bottom-9 flex justify-end px-3">
+                <span className="text-xs text-muted-foreground">
+                  Select a provider first
+                </span>
+              </div>
+            )}
+
+            {/* Bottom row inside textarea: icons left, send right */}
+            <div className="absolute left-2 right-2 bottom-2 flex items-center justify-between">
+              <div className="flex items-center gap-0.5">
+                {/* Paperclip */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
+                  title="Attach files"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </button>
+
+                {/* Plug */}
+                <button
+                  className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
+                  title="Connect"
+                  disabled
+                >
+                  <Plug className="h-3.5 w-3.5" />
+                </button>
+
+                {/* Mic */}
+                <button
+                  className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
+                  title="Voice"
+                  disabled
+                >
+                  <Mic className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {/* Send/Stop button */}
               {isStreaming ? (
                 <button
                   onClick={onStop}
