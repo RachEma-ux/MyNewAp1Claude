@@ -26,6 +26,7 @@ import {
   ChevronDown,
   Globe,
   X,
+  LayoutGrid,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -114,6 +115,7 @@ export interface ChatControlBoxProps {
   messageCount?: number;
   onExport?: () => void;
   onPresetsClick?: () => void;
+  onCategoriesClick?: () => void;
   onRenameChat?: () => void;
   onArchiveChat?: () => void;
   onDeleteChat?: () => void;
@@ -192,6 +194,7 @@ export function ChatControlBox({
   messageCount = 0,
   onExport,
   onPresetsClick,
+  onCategoriesClick,
   onRenameChat,
   onArchiveChat,
   onDeleteChat,
@@ -658,20 +661,15 @@ export function ChatControlBox({
             {providerCount} Provider{providerCount !== 1 ? "s" : ""}
           </button>
 
-          {/* Models button — clicking opens Models panel */}
-          {onModelsToggle && (
+          {/* Presets button */}
+          {onPresetsClick && (
             <button
-              onClick={handleModelsPanelToggle}
-              className={`h-7 px-2.5 text-xs font-semibold rounded-full transition-colors flex items-center gap-1 ${
-                showModelsPanel
-                  ? "bg-blue-600 text-white ring-2 ring-blue-400/30"
-                  : modelsEnabled
-                    ? "bg-blue-600 text-white hover:bg-blue-500"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
-              title={modelsEnabled ? "Click to select models" : "Click to select models"}
+              onClick={onPresetsClick}
+              className="h-7 px-2.5 bg-muted text-muted-foreground text-xs font-semibold rounded-full transition-colors hover:bg-muted/80 hover:text-foreground flex items-center gap-1"
+              title="Presets"
             >
-              {modelsEnabled ? modelCount : 0} Model{modelCount !== 1 ? "s" : ""}
+              <Sparkles className="h-3 w-3" />
+              Presets
             </button>
           )}
 
@@ -713,15 +711,22 @@ export function ChatControlBox({
                   </div>
 
                   {/* Presets Setting */}
-                  {onPresetsClick && (
-                    <button
-                      onClick={() => { onPresetsClick(); closeDropdowns(); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      <span>Presets Setting</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => { onPresetsClick?.(); closeDropdowns(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <span>Presets Setting</span>
+                  </button>
+
+                  {/* Categories Setting */}
+                  <button
+                    onClick={() => { onCategoriesClick?.(); closeDropdowns(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                    <span>Categories Setting</span>
+                  </button>
 
                   {/* Theme with submenu */}
                   <div className="relative">
@@ -806,17 +811,6 @@ export function ChatControlBox({
             >
               <Save className="h-4 w-4" />
             </Button>
-          )}
-
-          {/* Presets button */}
-          {onPresetsClick && (
-            <button
-              onClick={onPresetsClick}
-              className="h-7 px-2.5 bg-muted text-muted-foreground text-xs font-semibold rounded-full transition-colors hover:bg-muted/80 hover:text-foreground flex items-center gap-1"
-              title="Presets"
-            >
-              Presets
-            </button>
           )}
         </div>
 

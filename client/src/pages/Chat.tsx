@@ -779,6 +779,8 @@ function ChatInner() {
               isSaved={currentChat?.isSaved ?? false}
               messageCount={messages.length}
               onExport={handleExport}
+              onPresetsClick={() => toast.info("Presets management coming soon")}
+              onCategoriesClick={() => toast.info("Categories settings coming soon")}
               onRenameChat={handleRenameChat}
               onArchiveChat={handleArchiveChat}
               onDeleteChat={handleDeleteChat}
