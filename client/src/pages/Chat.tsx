@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { trpc } from "@/lib/trpc";
-import { Loader2, MessageSquare, Bot, User as UserIcon, Sparkles, BookOpen, Route, History, Archive, ArchiveRestore, Trash2, PenLine, FileText, BarChart3, Upload, Download, Zap } from "lucide-react";
+import { Loader2, MessageSquare, Bot, User as UserIcon, Sparkles, BookOpen, Route, History, Archive, Trash2, PenLine, BarChart3, Upload, Download, Zap } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -176,11 +176,9 @@ function ChatInner() {
     addMessage,
     saveChat,
     exportChatData,
-    importChatData,
     getAnalytics,
     getRecentChats,
     settings,
-    updateSettings,
   } = useChatContext();
 
   const [input, setInput] = useState("");
@@ -196,7 +194,6 @@ function ChatInner() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const modelSelectRef = useRef<HTMLButtonElement>(null);
 
   const messages = currentChat?.messages ?? [];
 
@@ -454,39 +451,6 @@ function ChatInner() {
     );
   };
 
-  const handleImportData = (file: File) => {
-    importChatData(file);
-    toast.success("Chat data imported");
-  };
-
-  const handleModelsToggle = () => {
-    setModelsEnabled(prev => {
-      const next = !prev;
-      if (next) {
-        toast.success("Models enabled");
-      } else {
-        toast.warning("No models selected");
-      }
-      return next;
-    });
-  };
-
-  const handleModelsClick = () => {
-    if (modelSelectRef.current) {
-      modelSelectRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-      modelSelectRef.current.click();
-    } else {
-      toast.info("Select a provider first to see available models");
-    }
-  };
-
-  const handleClearAllData = () => {
-    if (confirm("This will delete ALL chat data. Are you sure?")) {
-      localStorage.clear();
-      window.location.reload();
-    }
-  };
-
   const recentChats = getRecentChats(3).map((c) => ({
     id: c.id,
     title: c.title,
@@ -623,7 +587,7 @@ function ChatInner() {
               value={selectedModel ?? ""}
               onValueChange={(value) => setSelectedModel(value || null)}
             >
-              <SelectTrigger ref={modelSelectRef} className="w-[240px]">
+              <SelectTrigger className="w-[240px]">
                 <SelectValue placeholder="Default model" />
               </SelectTrigger>
               <SelectContent>
@@ -757,41 +721,19 @@ function ChatInner() {
               onSend={handleSend}
               isStreaming={isStreaming}
               disabled={!useUnifiedRouting && !selectedProvider}
-              providerCount={providers?.length ?? 0}
-              providerName={
-                providers?.find((p) => p.id === selectedProvider)?.name
-              }
-              modelCount={providerModels?.length ?? 0}
-              modelName={
-                providerModels?.find((m) => m.id === selectedModel)?.name
-              }
               modelsEnabled={modelsEnabled}
-              onModelsToggle={handleModelsToggle}
-              onModelsClick={handleModelsClick}
               onNewChat={handleNewChat}
               onStop={() => abortControllerRef.current?.abort()}
-              noProviderMessage={
-                !selectedProvider && providers && providers.length === 0
-                  ? "No providers configured. Please add a provider in the Providers page."
-                  : undefined
-              }
               onSaveChat={handleSaveChat}
               isSaved={currentChat?.isSaved ?? false}
               messageCount={messages.length}
               onExport={handleExport}
-              onPresetsClick={() => toast.info("Presets management coming soon")}
-              onCategoriesClick={() => toast.info("Categories settings coming soon")}
               onRenameChat={handleRenameChat}
               onArchiveChat={handleArchiveChat}
               onDeleteChat={handleDeleteChat}
               onAnalytics={handleAnalytics}
               onSwitchChat={(id) => switchChat(id)}
               recentChats={recentChats}
-              onExportAll={handleExport}
-              onImportData={handleImportData}
-              onClearAllData={handleClearAllData}
-              autoSave={settings.autoSave}
-              onAutoSaveChange={(v) => updateSettings({ autoSave: v })}
               providers={providers?.map((p) => ({ id: p.id, name: p.name, type: p.type })) ?? []}
               providerModels={providerModels?.map((m) => ({ id: m.id, name: m.name })) ?? []}
               selectedProviderId={selectedProvider}
@@ -803,6 +745,8 @@ function ChatInner() {
               onModelSelect={setSelectedModel}
               providersLoading={providersLoading}
               modelsLoading={modelsLoading}
+              providerCount={providers?.length ?? 0}
+              modelCount={providerModels?.length ?? 0}
             />
           </div>
         </CardContent>
