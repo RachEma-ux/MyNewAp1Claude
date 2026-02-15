@@ -5,6 +5,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -22,7 +26,18 @@ import {
   Save,
   Plug,
   Mic,
+  PenLine,
+  Archive,
+  BarChart3,
+  MessageSquare,
+  Upload,
+  Sun,
+  Moon,
+  Monitor,
+  Palette,
+  Clock,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
 // =============================================================================
@@ -78,8 +93,47 @@ export interface ChatControlBoxProps {
   isSaved?: boolean;
   /** Number of messages in current chat */
   messageCount?: number;
+  /** Callback for "Export Chat" action */
+  onExport?: () => void;
   /** Callback for "Presets" action */
   onPresetsClick?: () => void;
+  /** Menu dropdown: rename chat */
+  onRenameChat?: () => void;
+  /** Menu dropdown: archive chat */
+  onArchiveChat?: () => void;
+  /** Menu dropdown: delete chat */
+  onDeleteChat?: () => void;
+  /** Menu dropdown: show analytics */
+  onAnalytics?: () => void;
+  /** Menu dropdown: switch to a recent chat */
+  onSwitchChat?: (id: string) => void;
+  /** Menu dropdown: recent conversations */
+  recentChats?: Array<{ id: string; title: string; messageCount: number; updatedAt: string }>;
+  /** Settings dropdown: export all data */
+  onExportAll?: () => void;
+  /** Settings dropdown: import data via file picker */
+  onImportData?: (file: File) => void;
+  /** Settings dropdown: clear all data */
+  onClearAllData?: () => void;
+  /** Settings dropdown: auto-save toggle state */
+  autoSave?: boolean;
+  /** Settings dropdown: auto-save toggle callback */
+  onAutoSaveChange?: (v: boolean) => void;
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+function timeAgo(dateStr: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 // =============================================================================
@@ -101,11 +155,25 @@ export function ChatControlBox({
   onSaveChat,
   isSaved = false,
   messageCount = 0,
+  onExport,
   onPresetsClick,
+  onRenameChat,
+  onArchiveChat,
+  onDeleteChat,
+  onAnalytics,
+  onSwitchChat,
+  recentChats,
+  onExportAll,
+  onImportData,
+  onClearAllData,
+  autoSave = false,
+  onAutoSaveChange,
 }: ChatControlBoxProps) {
   const isMobile = useIsMobile();
+  const { setTheme } = useTheme();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
 
   // =========================================================================
@@ -152,7 +220,11 @@ export function ChatControlBox({
   };
 
   const handleExport = () => {
-    toast.info("Export: copy messages from the chat above");
+    if (onExport) {
+      onExport();
+    } else {
+      toast.info("Export: copy messages from the chat above");
+    }
   };
 
   const handleClear = () => {
@@ -206,20 +278,77 @@ export function ChatControlBox({
                 <Menu className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top" className="w-56">
+            <DropdownMenuContent align="start" side="top" className="w-60">
               <DropdownMenuItem onClick={onNewChat}>
                 <Plus className="h-4 w-4" />
                 New Chat
               </DropdownMenuItem>
+              {onRenameChat && (
+                <DropdownMenuItem onClick={onRenameChat}>
+                  <PenLine className="h-4 w-4" />
+                  Rename Chat
+                </DropdownMenuItem>
+              )}
+              {onSaveChat && (
+                <DropdownMenuItem onClick={onSaveChat} disabled={isSaved || messageCount === 0}>
+                  <Save className="h-4 w-4" />
+                  Save Chat
+                  {isSaved && (
+                    <span className="ml-auto text-[10px] text-green-500 font-medium">Saved</span>
+                  )}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={handleClear}>
                 <Trash2 className="h-4 w-4" />
                 Clear Chat
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {onAnalytics && (
+                <DropdownMenuItem onClick={onAnalytics}>
+                  <BarChart3 className="h-4 w-4" />
+                  Analytics
+                </DropdownMenuItem>
+              )}
+              {onArchiveChat && (
+                <DropdownMenuItem onClick={onArchiveChat} disabled={messageCount === 0}>
+                  <Archive className="h-4 w-4" />
+                  Archive Chat
+                </DropdownMenuItem>
+              )}
+              {onDeleteChat && (
+                <DropdownMenuItem onClick={onDeleteChat} className="text-destructive focus:text-destructive">
+                  <Trash2 className="h-4 w-4" />
+                  Delete Chat
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleExport}>
                 <Download className="h-4 w-4" />
                 Export Chat
               </DropdownMenuItem>
+
+              {/* Recent conversations */}
+              {recentChats && recentChats.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    Recent Conversations
+                  </DropdownMenuLabel>
+                  {recentChats.map((chat) => (
+                    <DropdownMenuItem
+                      key={chat.id}
+                      onClick={() => onSwitchChat?.(chat.id)}
+                      className="flex items-center gap-2"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate flex-1">{chat.title}</span>
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {timeAgo(chat.updatedAt)}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -265,11 +394,62 @@ export function ChatControlBox({
                 <Settings className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="w-48">
+            <DropdownMenuContent align="end" side="top" className="w-52">
+              {onAutoSaveChange && (
+                <DropdownMenuItem onClick={() => onAutoSaveChange(!autoSave)}>
+                  <Save className="h-4 w-4" />
+                  Auto-Save
+                  <span className={`ml-auto text-[10px] font-medium ${autoSave ? "text-green-500" : "text-muted-foreground"}`}>
+                    {autoSave ? "ON" : "OFF"}
+                  </span>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Palette className="h-4 w-4" />
+                  Theme
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem onClick={() => setTheme("light")}>
+                    <Sun className="h-4 w-4" />
+                    Light
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTheme("dark")}>
+                    <Moon className="h-4 w-4" />
+                    Dark
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTheme("system")}>
+                    <Monitor className="h-4 w-4" />
+                    System
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleExport}>
                 <Download className="h-4 w-4" />
-                Export Data
+                Export Current Chat
               </DropdownMenuItem>
+              {onExportAll && (
+                <DropdownMenuItem onClick={onExportAll}>
+                  <Download className="h-4 w-4" />
+                  Export All Data
+                </DropdownMenuItem>
+              )}
+              {onImportData && (
+                <DropdownMenuItem onClick={() => importInputRef.current?.click()}>
+                  <Upload className="h-4 w-4" />
+                  Import Data
+                </DropdownMenuItem>
+              )}
+              {onClearAllData && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onClearAllData} className="text-destructive focus:text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                    Clear All Data
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -301,7 +481,7 @@ export function ChatControlBox({
 
         {/* Input area */}
         <div className="flex flex-col">
-          {/* Hidden file input */}
+          {/* Hidden file inputs */}
           <input
             ref={fileInputRef}
             type="file"
@@ -309,6 +489,19 @@ export function ChatControlBox({
             className="hidden"
             onChange={handleFileUpload}
           />
+          {onImportData && (
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onImportData(file);
+                e.target.value = "";
+              }}
+            />
+          )}
 
           {/* Textarea spanning full width with icons inside */}
           <div className="relative">

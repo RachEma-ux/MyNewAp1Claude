@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { trpc } from "@/lib/trpc";
-import { Loader2, MessageSquare, Bot, User as UserIcon, Sparkles, BookOpen, Route } from "lucide-react";
+import { Loader2, MessageSquare, Bot, User as UserIcon, Sparkles, BookOpen, Route, History, Archive, ArchiveRestore, Trash2, PenLine, FileText, BarChart3, Upload, Download, Zap } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -12,15 +13,176 @@ import { Streamdown } from "streamdown";
 import { clientProviderRouter, type WorkspaceRoutingProfile } from "@/lib/provider-router";
 import { ChatControlBox } from "@/components/ChatControlBox";
 import { useHeaderActions } from "@/components/MainLayout";
+import { ChatProvider, useChatContext, type ChatSession } from "@/contexts/ChatContext";
 
-interface ChatMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp?: Date;
+// =============================================================================
+// CHAT HISTORY SIDEBAR
+// =============================================================================
+
+function ChatHistoryItem({
+  chat,
+  isActive,
+  onSwitch,
+  onArchive,
+  onDelete,
+  onRename,
+}: {
+  chat: ChatSession;
+  isActive: boolean;
+  onSwitch: () => void;
+  onArchive?: () => void;
+  onDelete: () => void;
+  onRename: () => void;
+}) {
+  const msgCount = chat.messages.length;
+  const lastMsg = chat.messages[chat.messages.length - 1];
+  const preview = lastMsg ? lastMsg.content.slice(0, 60) : "No messages";
+
+  return (
+    <div
+      className={`group flex flex-col gap-1 rounded-lg px-3 py-2 cursor-pointer transition-colors ${
+        isActive ? "bg-primary/10 border border-primary/20" : "hover:bg-muted"
+      }`}
+      onClick={onSwitch}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium truncate flex-1">{chat.title}</span>
+        {chat.isSaved && (
+          <span className="text-[10px] text-green-500 font-medium shrink-0">Saved</span>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground truncate">{preview}</p>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-muted-foreground">
+          {msgCount} msg{msgCount !== 1 ? "s" : ""} · {new Date(chat.updatedAt).toLocaleDateString()}
+        </span>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground"
+            onClick={(e) => { e.stopPropagation(); onRename(); }}
+            title="Rename"
+          >
+            <PenLine className="h-3 w-3" />
+          </button>
+          {onArchive && (
+            <button
+              className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); onArchive(); }}
+              title="Archive"
+            >
+              <Archive className="h-3 w-3" />
+            </button>
+          )}
+          <button
+            className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            title="Delete"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-export default function Chat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+function ChatHistoryPanel({ onClose }: { onClose: () => void }) {
+  const { chats, archivedChats, currentChatId, switchChat, archiveChat, unarchiveChat, deleteChat, renameChat } = useChatContext();
+  const [showArchived, setShowArchived] = useState(false);
+
+  const handleRename = (id: string, currentTitle: string) => {
+    const newTitle = prompt("Rename chat:", currentTitle);
+    if (newTitle && newTitle.trim()) {
+      renameChat(id, newTitle.trim());
+    }
+  };
+
+  const handleSwitch = (id: string) => {
+    switchChat(id);
+    onClose();
+  };
+
+  const displayChats = showArchived ? archivedChats : chats;
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 mb-4">
+        <Button
+          variant={showArchived ? "outline" : "default"}
+          size="sm"
+          onClick={() => setShowArchived(false)}
+        >
+          Active ({chats.length})
+        </Button>
+        <Button
+          variant={showArchived ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowArchived(true)}
+        >
+          Archived ({archivedChats.length})
+        </Button>
+      </div>
+
+      <ScrollArea className="flex-1 -mx-2 px-2">
+        {displayChats.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            {showArchived ? "No archived chats" : "No chats yet"}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {displayChats.map((chat) => (
+              <ChatHistoryItem
+                key={chat.id}
+                chat={chat}
+                isActive={chat.id === currentChatId}
+                onSwitch={() => handleSwitch(chat.id)}
+                onArchive={
+                  showArchived
+                    ? undefined
+                    : () => archiveChat(chat.id)
+                }
+                onDelete={() => {
+                  if (confirm("Delete this chat?")) deleteChat(chat.id);
+                }}
+                onRename={() => handleRename(chat.id, chat.title)}
+              />
+            ))}
+          </div>
+        )}
+      </ScrollArea>
+
+      {showArchived && archivedChats.length > 0 && (
+        <div className="pt-2 border-t mt-2 text-xs text-muted-foreground text-center">
+          Click a chat to restore it, or use the actions menu
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// INNER CHAT (uses ChatContext)
+// =============================================================================
+
+function ChatInner() {
+  const {
+    currentChat,
+    currentChatId,
+    createChat,
+    switchChat,
+    renameChat,
+    deleteChat,
+    archiveChat,
+    addMessage,
+    saveChat,
+    exportChatData,
+    importChatData,
+    getAnalytics,
+    getRecentChats,
+    settings,
+    updateSettings,
+  } = useChatContext();
+
   const [input, setInput] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
@@ -30,8 +192,11 @@ export default function Chat() {
   const [useUnifiedRouting, setUseUnifiedRouting] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<number | null>(null);
   const [routingInfo, setRoutingInfo] = useState<{ provider?: string; reason?: string } | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const messages = currentChat?.messages ?? [];
 
   const { data: providers, isLoading: providersLoading } = trpc.chat.getAvailableProviders.useQuery();
   const { data: workspaces } = trpc.workspaces.list.useQuery();
@@ -71,20 +236,6 @@ export default function Chat() {
       clientProviderRouter.setWorkspaceProfile(selectedWorkspace, routingProfile as WorkspaceRoutingProfile);
     }
   }, [selectedWorkspace, routingProfile]);
-  
-  const sendMessage = trpc.chat.sendMessage.useMutation({
-    onSuccess: (response) => {
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: response.content,
-        timestamp: new Date(),
-      }]);
-      setInput("");
-    },
-    onError: (error) => {
-      toast.error(`Failed to send message: ${error.message}`);
-    },
-  });
 
   // Auto-select first provider
   useEffect(() => {
@@ -107,42 +258,50 @@ export default function Chat() {
     }
   }, [messages, streamingContent]);
 
+  // Ensure there's always a current chat
+  useEffect(() => {
+    if (!currentChatId) {
+      createChat();
+    }
+  }, [currentChatId, createChat]);
+
+  // Auto-save after messages change
+  useEffect(() => {
+    if (settings.autoSave && currentChatId && messages.length > 0) {
+      saveChat(currentChatId);
+    }
+  }, [settings.autoSave, messages.length, currentChatId, saveChat]);
+
   const handleSend = async () => {
     if (!input.trim()) {
       toast.error("Please enter a message");
       return;
     }
 
-    // When unified routing is enabled, we need a workspace selected
     if (useUnifiedRouting && !selectedWorkspace) {
       toast.error("Please select a workspace for unified routing");
       return;
     }
 
-    // When not using unified routing, we need a provider selected
     if (!useUnifiedRouting && !selectedProvider) {
       toast.error("Please select a provider");
       return;
     }
 
-    const userMessage: ChatMessage = {
-      role: "user",
-      content: input.trim(),
-      timestamp: new Date(),
-    };
+    const userContent = input.trim();
 
-    setMessages(prev => [...prev, userMessage]);
+    // Add user message to context
+    addMessage({ role: "user", content: userContent });
+
     setInput("");
     setIsStreaming(true);
     setStreamingContent("");
     setRoutingInfo(null);
 
-    // Create abort controller for cancellation
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
     try {
-      // Check client-side routing when unified routing is enabled
       let localEndpoint: string | null = null;
       if (useUnifiedRouting && selectedWorkspace && routingProfile) {
         const canRouteLocally = clientProviderRouter.canRouteLocally({
@@ -150,7 +309,6 @@ export default function Chat() {
         });
 
         if (canRouteLocally && routingProfile.defaultRoute === 'LOCAL_ONLY') {
-          // Try to get local endpoint for direct routing
           const localProviders = clientProviderRouter.getLocalProviders();
           if (localProviders.length > 0) {
             localEndpoint = clientProviderRouter.getLocalEndpoint(localProviders[0].id);
@@ -159,17 +317,18 @@ export default function Chat() {
         }
       }
 
-      // Build request body
+      // Build message history from context messages + the new user message
+      const allMessages = [
+        ...messages.map(m => ({ role: m.role, content: m.content })),
+        { role: "user" as const, content: userContent },
+      ];
+
       const requestBody: Record<string, any> = {
-        messages: [...messages, userMessage].map(m => ({
-          role: m.role,
-          content: m.content,
-        })),
+        messages: allMessages,
         useRAG,
         workspaceId: selectedWorkspace,
       };
 
-      // Add routing parameters
       if (useUnifiedRouting) {
         requestBody.useUnifiedRouting = true;
         requestBody.taskHints = {
@@ -184,9 +343,7 @@ export default function Chat() {
 
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
         signal: abortController.signal,
       });
@@ -205,10 +362,7 @@ export default function Chat() {
 
       while (true) {
         const { done, value } = await reader.read();
-        
-        if (done) {
-          break;
-        }
+        if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
         const lines = chunk.split('\n');
@@ -216,19 +370,15 @@ export default function Chat() {
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const data = JSON.parse(line.slice(6));
-            
+
             if (data.type === 'token') {
               accumulatedContent += data.content;
               setStreamingContent(accumulatedContent);
             } else if (data.type === 'complete') {
-              setMessages(prev => [...prev, {
-                role: "assistant",
-                content: data.content,
-                timestamp: new Date(),
-              }]);
+              // Add assistant message to context
+              addMessage({ role: "assistant", content: data.content });
               setStreamingContent("");
               setIsStreaming(false);
-              // Capture routing info if unified routing was used
               if (data.routing) {
                 setRoutingInfo({
                   provider: data.routing.providerName,
@@ -257,10 +407,69 @@ export default function Chat() {
   };
 
   const handleNewChat = () => {
-    setMessages([]);
+    createChat();
     setInput("");
     toast.success("New chat started");
   };
+
+  const handleSaveChat = () => {
+    saveChat();
+    toast.success("Chat saved");
+  };
+
+  const handleExport = () => {
+    exportChatData();
+    toast.success("Chat data exported");
+  };
+
+  const handleRenameChat = () => {
+    if (!currentChatId || !currentChat) return;
+    const newTitle = prompt("Rename chat:", currentChat.title);
+    if (newTitle && newTitle.trim()) {
+      renameChat(currentChatId, newTitle.trim());
+      toast.success("Chat renamed");
+    }
+  };
+
+  const handleArchiveChat = () => {
+    if (!currentChatId) return;
+    archiveChat(currentChatId);
+    toast.success("Chat archived");
+  };
+
+  const handleDeleteChat = () => {
+    if (!currentChatId) return;
+    if (confirm("Are you sure you want to delete this chat?")) {
+      deleteChat(currentChatId);
+      toast.success("Chat deleted");
+    }
+  };
+
+  const handleAnalytics = () => {
+    const stats = getAnalytics();
+    toast.info(
+      `Chats: ${stats.totalChats} | Messages: ${stats.totalMessages} | Saved: ${stats.savedChats} | Archived: ${stats.archivedChats} | Avg msgs/chat: ${stats.avgMessagesPerChat}`
+    );
+  };
+
+  const handleImportData = (file: File) => {
+    importChatData(file);
+    toast.success("Chat data imported");
+  };
+
+  const handleClearAllData = () => {
+    if (confirm("This will delete ALL chat data. Are you sure?")) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  };
+
+  const recentChats = getRecentChats(3).map((c) => ({
+    id: c.id,
+    title: c.title,
+    messageCount: c.messages.length,
+    updatedAt: c.updatedAt,
+  }));
 
   useHeaderActions(
     useMemo(() => (
@@ -295,13 +504,36 @@ export default function Chat() {
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-4">
       {/* Header */}
       <div className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Chat</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">Chat</h1>
+            {currentChat && currentChat.title !== "New Chat" && (
+              <span className="text-sm text-muted-foreground truncate max-w-[300px]">
+                — {currentChat.title}
+              </span>
+            )}
+          </div>
+
+          <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <History className="h-4 w-4" />
+                History
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[340px] sm:w-[400px]">
+              <SheetHeader>
+                <SheetTitle>Chat History</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 h-[calc(100%-3rem)]">
+                <ChatHistoryPanel onClose={() => setHistoryOpen(false)} />
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
 
         {/* Controls Row */}
         <div className="flex flex-wrap items-center gap-3">
-
           {/* Workspace Selection (shown when RAG or unified routing is enabled) */}
           {(useRAG || useUnifiedRouting) && (
             <Select
@@ -410,15 +642,33 @@ export default function Chat() {
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <MessageSquare className="h-16 w-16 text-muted-foreground mb-4" />
                 <h3 className="text-xl font-semibold mb-2">Start a Conversation</h3>
-                <p className="text-muted-foreground max-w-md">
+                <p className="text-muted-foreground max-w-md mb-6">
                   Select a provider and send a message to start chatting with AI
                 </p>
+                <div className="rounded-xl border bg-muted/40 p-5 max-w-lg w-full text-left">
+                  <h4 className="text-sm font-semibold mb-3">Features</h4>
+                  <div className="grid grid-cols-2 gap-2.5 text-xs text-muted-foreground">
+                    {[
+                      { icon: Zap, label: "Smart Naming" },
+                      { icon: History, label: "Chat Management" },
+                      { icon: MessageSquare, label: "Recent Conversations" },
+                      { icon: BarChart3, label: "Analytics" },
+                      { icon: Download, label: "Export / Import" },
+                      { icon: Upload, label: "File Upload" },
+                    ].map(({ icon: Icon, label }) => (
+                      <div key={label} className="flex items-center gap-2">
+                        <Icon className="h-3.5 w-3.5 text-primary/70" />
+                        <span>{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-6">
-                {messages.map((msg, idx) => (
+                {messages.map((msg) => (
                   <div
-                    key={idx}
+                    key={msg.id}
                     className={`flex gap-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     {msg.role === "assistant" && (
@@ -440,7 +690,7 @@ export default function Chat() {
                       )}
                       {msg.timestamp && (
                         <p className={`text-xs mt-2 ${msg.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                          {msg.timestamp.toLocaleTimeString()}
+                          {new Date(msg.timestamp).toLocaleTimeString()}
                         </p>
                       )}
                     </div>
@@ -495,10 +745,37 @@ export default function Chat() {
                   ? "No providers configured. Please add a provider in the Providers page."
                   : undefined
               }
+              onSaveChat={handleSaveChat}
+              isSaved={currentChat?.isSaved ?? false}
+              messageCount={messages.length}
+              onExport={handleExport}
+              onRenameChat={handleRenameChat}
+              onArchiveChat={handleArchiveChat}
+              onDeleteChat={handleDeleteChat}
+              onAnalytics={handleAnalytics}
+              onSwitchChat={(id) => switchChat(id)}
+              recentChats={recentChats}
+              onExportAll={handleExport}
+              onImportData={handleImportData}
+              onClearAllData={handleClearAllData}
+              autoSave={settings.autoSave}
+              onAutoSaveChange={(v) => updateSettings({ autoSave: v })}
             />
           </div>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// =============================================================================
+// EXPORTED PAGE COMPONENT (wraps with ChatProvider)
+// =============================================================================
+
+export default function Chat() {
+  return (
+    <ChatProvider>
+      <ChatInner />
+    </ChatProvider>
   );
 }
