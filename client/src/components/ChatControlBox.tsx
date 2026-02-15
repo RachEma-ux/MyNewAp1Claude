@@ -302,8 +302,8 @@ export function ChatControlBox({
           )}
         </div>
 
-        {/* Input row */}
-        <div className="flex items-end gap-1.5">
+        {/* Input area */}
+        <div className="flex flex-col gap-1">
           {/* Hidden file input */}
           <input
             ref={fileInputRef}
@@ -313,136 +313,71 @@ export function ChatControlBox({
             onChange={handleFileUpload}
           />
 
-          {/* Paperclip button (desktop) */}
-          {!isMobile && (
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+          {/* "Select a provider first" hint + action row above textarea */}
+          <div className="flex items-center justify-end gap-1.5 px-1">
+            {disabled && (
+              <span className="text-xs text-muted-foreground mr-auto">
+                Select a provider first
+              </span>
+            )}
+
+            {/* Paperclip */}
+            <button
               onClick={() => fileInputRef.current?.click()}
+              className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
               title="Attach files"
             >
               <Paperclip className="h-4 w-4" />
-            </Button>
-          )}
+            </button>
 
-          {/* Plug button (desktop) */}
-          {!isMobile && (
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="shrink-0 rounded-full text-muted-foreground"
+            {/* Plug */}
+            <button
+              className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
               title="Connect"
               disabled
             >
-              <Plug className="h-4 w-4" />
-            </Button>
-          )}
+              <Plug className="h-3.5 w-3.5" />
+            </button>
 
-          {/* Textarea */}
-          <div className="relative flex-1">
+            {/* Mic */}
+            <button
+              className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
+              title="Voice"
+              disabled
+            >
+              <Mic className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Textarea spanning full width */}
+          <div className="relative">
             <textarea
               ref={textareaRef}
               value={value}
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={disabled ? "Select a provider first..." : placeholder}
+              placeholder={placeholder}
               disabled={disabled || isStreaming}
               rows={1}
-              className={`w-full resize-none rounded-2xl border bg-muted/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 ${
-                isMobile ? "pr-20 pl-24" : "pr-4"
-              }`}
+              className="w-full resize-none rounded-2xl border bg-muted/50 px-4 py-2.5 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
               style={{ lineHeight: "1.5", minHeight: "40px", maxHeight: "200px" }}
             />
 
-            {/* Mobile: Paperclip inside input left */}
-            {isMobile && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute left-2.5 bottom-2.5 h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
-                title="Attach files"
-              >
-                <Paperclip className="h-4 w-4" />
-              </button>
-            )}
-
-            {/* Mobile: Plug & Mic inside input */}
-            {isMobile && (
-              <div className="absolute left-10 bottom-2.5 flex items-center gap-0.5">
-                <button
-                  className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
-                  title="Connect"
-                  disabled
-                >
-                  <Plug className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
-                  title="Voice"
-                  disabled
-                >
-                  <Mic className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-
-            {/* Mobile: Send button inside input right */}
-            {isMobile && (
-              <div className="absolute right-2 bottom-2 flex items-center gap-1">
-                {isStreaming ? (
-                  <button
-                    onClick={onStop}
-                    className="h-7 w-7 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground transition-colors"
-                    title="Stop generating"
-                  >
-                    <Square className="h-3 w-3" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={onSend}
-                    disabled={!canSend}
-                    className="h-7 w-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Send message"
-                  >
-                    <ArrowUp className="h-4 w-4" strokeWidth={2.125} />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Mic button (desktop) */}
-          {!isMobile && (
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="shrink-0 rounded-full text-muted-foreground"
-              title="Voice"
-              disabled
-            >
-              <Mic className="h-4 w-4" />
-            </Button>
-          )}
-
-          {/* Desktop: Send/Stop button */}
-          {!isMobile && (
-            <>
+            {/* Send/Stop button inside textarea, bottom-right */}
+            <div className="absolute right-2 bottom-2 flex items-center gap-1">
               {isStreaming ? (
-                <Button
-                  variant="destructive"
-                  size="icon-sm"
-                  className="shrink-0 rounded-full"
+                <button
                   onClick={onStop}
+                  className="h-7 w-7 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground transition-colors"
                   title="Stop generating"
                 >
-                  <Square className="h-3.5 w-3.5" />
-                </Button>
+                  <Square className="h-3 w-3" />
+                </button>
               ) : (
-                <Button
-                  size="icon-sm"
-                  className="shrink-0 rounded-full"
+                <button
                   onClick={onSend}
                   disabled={!canSend}
+                  className="h-7 w-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Send message"
                 >
                   {disabled ? (
@@ -450,18 +385,12 @@ export function ChatControlBox({
                   ) : (
                     <ArrowUp className="h-4 w-4" strokeWidth={2.125} />
                   )}
-                </Button>
+                </button>
               )}
-            </>
-          )}
+            </div>
+          </div>
         </div>
 
-        {/* No-provider warning */}
-        {noProviderMessage && (
-          <p className="text-xs text-muted-foreground mt-2 px-1">
-            {noProviderMessage}
-          </p>
-        )}
       </div>
     </div>
   );
