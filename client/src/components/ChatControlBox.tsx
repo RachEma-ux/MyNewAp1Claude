@@ -1,17 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Menu,
   Plus,
   Settings,
@@ -34,7 +23,6 @@ import {
   Moon,
   Monitor,
   Palette,
-  Clock,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -102,69 +90,37 @@ function useIsMobile(breakpoint = 768) {
 // =============================================================================
 
 export interface ChatControlBoxProps {
-  /** Current input value */
   value: string;
-  /** Input change callback */
   onChange: (value: string) => void;
-  /** Send message callback */
   onSend: () => void;
-  /** Whether AI is currently streaming a response */
   isStreaming?: boolean;
-  /** Whether the input is disabled (no provider, etc.) */
   disabled?: boolean;
-  /** Number of configured providers */
   providerCount?: number;
-  /** Name of the currently selected provider */
   providerName?: string;
-  /** Number of available models for the selected provider */
   modelCount?: number;
-  /** Name of the currently selected model */
   modelName?: string;
-  /** Whether models are toggled on (active) */
   modelsEnabled?: boolean;
-  /** Callback to toggle models on/off */
   onModelsToggle?: () => void;
-  /** Callback for "Models" button click */
   onModelsClick?: () => void;
-  /** Callback for "New Chat" action */
   onNewChat?: () => void;
-  /** Callback for "Stop" action during streaming */
   onStop?: () => void;
-  /** Custom placeholder text */
   placeholder?: string;
-  /** Optional no-provider warning message */
   noProviderMessage?: string;
-  /** Callback for "Save Chat" action */
   onSaveChat?: () => void;
-  /** Whether current chat is saved */
   isSaved?: boolean;
-  /** Number of messages in current chat */
   messageCount?: number;
-  /** Callback for "Export Chat" action */
   onExport?: () => void;
-  /** Callback for "Presets" action */
   onPresetsClick?: () => void;
-  /** Menu dropdown: rename chat */
   onRenameChat?: () => void;
-  /** Menu dropdown: archive chat */
   onArchiveChat?: () => void;
-  /** Menu dropdown: delete chat */
   onDeleteChat?: () => void;
-  /** Menu dropdown: show analytics */
   onAnalytics?: () => void;
-  /** Menu dropdown: switch to a recent chat */
   onSwitchChat?: (id: string) => void;
-  /** Menu dropdown: recent conversations */
   recentChats?: Array<{ id: string; title: string; messageCount: number; updatedAt: string }>;
-  /** Settings dropdown: export all data */
   onExportAll?: () => void;
-  /** Settings dropdown: import data via file picker */
   onImportData?: (file: File) => void;
-  /** Settings dropdown: clear all data */
   onClearAllData?: () => void;
-  /** Settings dropdown: auto-save toggle state */
   autoSave?: boolean;
-  /** Settings dropdown: auto-save toggle callback */
   onAutoSaveChange?: (v: boolean) => void;
 }
 
@@ -222,11 +178,16 @@ export function ChatControlBox({
   onAutoSaveChange,
 }: ChatControlBoxProps) {
   const isMobile = useIsMobile();
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
+
+  // Manual dropdown state (matches Manud behavior)
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+  const [showThemeSubmenu, setShowThemeSubmenu] = useState(false);
 
   // =========================================================================
   // TEXTAREA AUTO-GROW
@@ -249,14 +210,28 @@ export function ChatControlBox({
   // HANDLERS
   // =========================================================================
 
+  const handleMenuClick = () => {
+    setShowMenuDropdown(!showMenuDropdown);
+    setShowSettingsDropdown(false);
+    setShowThemeSubmenu(false);
+  };
+
+  const handleSettingsClick = () => {
+    setShowSettingsDropdown(!showSettingsDropdown);
+    setShowMenuDropdown(false);
+    setShowThemeSubmenu(false);
+  };
+
+  const closeDropdowns = () => {
+    setShowMenuDropdown(false);
+    setShowSettingsDropdown(false);
+    setShowThemeSubmenu(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter") {
-      if (e.shiftKey) {
-        // Shift+Enter → newline (default behavior, no preventDefault)
-        return;
-      }
+      if (e.shiftKey) return;
       if (!isMobile) {
-        // Enter on desktop → send
         e.preventDefault();
         if (!inputDisabled && value.trim() && !isStreaming) {
           onSend();
@@ -284,10 +259,6 @@ export function ChatControlBox({
     } else {
       toast.info("Export: copy messages from the chat above");
     }
-  };
-
-  const handleClear = () => {
-    if (onNewChat) onNewChat();
   };
 
   const inputDisabled = disabled || !modelsEnabled;
@@ -327,90 +298,131 @@ export function ChatControlBox({
             isMobile ? "flex-wrap justify-between gap-1 mb-2" : "gap-1 mb-2"
           }`}
         >
-          {/* Menu dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <Menu className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top" className="w-60">
-              <DropdownMenuItem onClick={onNewChat}>
-                <Plus className="h-4 w-4" />
-                New Chat
-              </DropdownMenuItem>
-              {onRenameChat && (
-                <DropdownMenuItem onClick={onRenameChat}>
-                  <PenLine className="h-4 w-4" />
-                  Rename Chat
-                </DropdownMenuItem>
-              )}
-              {onSaveChat && (
-                <DropdownMenuItem onClick={onSaveChat} disabled={isSaved || messageCount === 0}>
-                  <Save className="h-4 w-4" />
-                  Save Chat
-                  {isSaved && (
-                    <span className="ml-auto text-[10px] text-green-500 font-medium">Saved</span>
-                  )}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={handleClear}>
-                <Trash2 className="h-4 w-4" />
-                Clear Chat
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {onAnalytics && (
-                <DropdownMenuItem onClick={onAnalytics}>
-                  <BarChart3 className="h-4 w-4" />
-                  Analytics
-                </DropdownMenuItem>
-              )}
-              {onArchiveChat && (
-                <DropdownMenuItem onClick={onArchiveChat} disabled={messageCount === 0}>
-                  <Archive className="h-4 w-4" />
-                  Archive Chat
-                </DropdownMenuItem>
-              )}
-              {onDeleteChat && (
-                <DropdownMenuItem onClick={onDeleteChat} className="text-destructive focus:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                  Delete Chat
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleExport}>
-                <Download className="h-4 w-4" />
-                Export Chat
-              </DropdownMenuItem>
+          {/* Menu Button with Dropdown (Manud pattern) */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={handleMenuClick}
+              title="Menu"
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
 
-              {/* Recent conversations */}
-              {recentChats && recentChats.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">
-                    Recent Conversations
-                  </DropdownMenuLabel>
-                  {recentChats.map((chat) => (
-                    <DropdownMenuItem
-                      key={chat.id}
-                      onClick={() => onSwitchChat?.(chat.id)}
-                      className="flex items-center gap-2"
+            {showMenuDropdown && (
+              <>
+                {/* Backdrop */}
+                <div className="fixed inset-0 z-[9998]" onClick={closeDropdowns} />
+
+                {/* Menu Dropdown */}
+                <div className="absolute bottom-full left-0 mb-2 w-[280px] bg-popover border border-border rounded-xl shadow-2xl z-[9999] overflow-hidden">
+                  {/* Main actions */}
+                  <button
+                    onClick={() => { onNewChat?.(); closeDropdowns(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>New Chat</span>
+                  </button>
+
+                  {onRenameChat && (
+                    <button
+                      onClick={() => { onRenameChat(); closeDropdowns(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
                     >
-                      <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate flex-1">{chat.title}</span>
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {timeAgo(chat.updatedAt)}
-                      </span>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                      <PenLine className="h-4 w-4" />
+                      <span>Rename Chat</span>
+                    </button>
+                  )}
+
+                  {onSaveChat && (
+                    <button
+                      onClick={() => { onSaveChat(); closeDropdowns(); }}
+                      disabled={isSaved || messageCount === 0}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Save className="h-4 w-4" />
+                      <span>{isSaved ? "Saved \u2713" : "Save Chat"}</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => { onNewChat?.(); closeDropdowns(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Clear Chat</span>
+                  </button>
+
+                  {onAnalytics && (
+                    <button
+                      onClick={() => { onAnalytics(); closeDropdowns(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                      <span>Analytics</span>
+                    </button>
+                  )}
+
+                  {/* Divider */}
+                  <div className="border-t border-border my-1" />
+
+                  {onArchiveChat && (
+                    <button
+                      onClick={() => { onArchiveChat(); closeDropdowns(); }}
+                      disabled={messageCount === 0}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Archive className="h-4 w-4" />
+                      <span>Archive Chat</span>
+                    </button>
+                  )}
+
+                  {onDeleteChat && (
+                    <button
+                      onClick={() => { onDeleteChat(); closeDropdowns(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-destructive hover:bg-muted"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>Delete Chat</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => { handleExport(); closeDropdowns(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Export Chat</span>
+                  </button>
+
+                  {/* Recent Conversations */}
+                  {recentChats && recentChats.length > 0 && (
+                    <>
+                      <div className="border-t border-border mt-1" />
+                      <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                        Recent Conversations
+                      </div>
+                      {recentChats.map((chat) => (
+                        <button
+                          key={chat.id}
+                          onClick={() => { onSwitchChat?.(chat.id); closeDropdowns(); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                        >
+                          <MessageSquare className="h-4 w-4 shrink-0" />
+                          <span className="truncate flex-1">{chat.title}</span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">
+                            {timeAgo(chat.updatedAt)}
+                          </span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           {/* New Chat button */}
           <Button
@@ -432,7 +444,7 @@ export function ChatControlBox({
             {providerCount} Provider{providerCount !== 1 ? "s" : ""}
           </button>
 
-          {/* Models toggle button (matches Claude repo behavior) */}
+          {/* Models toggle button */}
           {onModelsToggle && (
             <button
               onClick={onModelsToggle}
@@ -460,75 +472,143 @@ export function ChatControlBox({
             </Button>
           )}
 
-          {/* Settings dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="w-52">
-              {onAutoSaveChange && (
-                <DropdownMenuItem onClick={() => onAutoSaveChange(!autoSave)}>
-                  <Save className="h-4 w-4" />
-                  Auto-Save
-                  <span className={`ml-auto text-[10px] font-medium ${autoSave ? "text-green-500" : "text-muted-foreground"}`}>
-                    {autoSave ? "ON" : "OFF"}
-                  </span>
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <Palette className="h-4 w-4" />
-                  Theme
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem onClick={() => setTheme("light")}>
-                    <Sun className="h-4 w-4" />
-                    Light
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setTheme("dark")}>
-                    <Moon className="h-4 w-4" />
-                    Dark
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setTheme("system")}>
-                    <Monitor className="h-4 w-4" />
-                    System
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleExport}>
-                <Download className="h-4 w-4" />
-                Export Current Chat
-              </DropdownMenuItem>
-              {onExportAll && (
-                <DropdownMenuItem onClick={onExportAll}>
-                  <Download className="h-4 w-4" />
-                  Export All Data
-                </DropdownMenuItem>
-              )}
-              {onImportData && (
-                <DropdownMenuItem onClick={() => importInputRef.current?.click()}>
-                  <Upload className="h-4 w-4" />
-                  Import Data
-                </DropdownMenuItem>
-              )}
-              {onClearAllData && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={onClearAllData} className="text-destructive focus:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                    Clear All Data
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Settings Button with Dropdown (Manud pattern) */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={handleSettingsClick}
+              title="Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+
+            {showSettingsDropdown && (
+              <>
+                {/* Backdrop */}
+                <div className="fixed inset-0 z-[9998]" onClick={closeDropdowns} />
+
+                {/* Settings Dropdown */}
+                <div className="absolute bottom-full right-0 mb-2 w-[220px] bg-popover border border-border rounded-xl shadow-2xl z-[9999] overflow-visible">
+                  {/* Header */}
+                  <div className="px-4 py-3 border-b border-border">
+                    <h3 className="text-sm font-semibold text-popover-foreground m-0">Settings</h3>
+                  </div>
+
+                  {/* Auto-Save Toggle */}
+                  {onAutoSaveChange && (
+                    <button
+                      onClick={() => { onAutoSaveChange(!autoSave); closeDropdowns(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                    >
+                      <Save className="h-4 w-4" />
+                      <span className="flex-1">Auto-Save</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${
+                        autoSave ? "bg-green-500/20 text-green-500" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {autoSave ? "ON" : "OFF"}
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Theme with submenu */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowThemeSubmenu(!showThemeSubmenu)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                    >
+                      <Palette className="h-4 w-4" />
+                      <span className="flex-1">Theme</span>
+                      <span className="text-xs text-muted-foreground">
+                        {theme === "light" ? "☀️" : theme === "dark" ? "🌙" : "🔄"}
+                      </span>
+                    </button>
+
+                    {showThemeSubmenu && (
+                      <div className="absolute left-full top-0 ml-1 w-32 bg-popover border border-border rounded-lg shadow-lg z-[10000]">
+                        <button
+                          onClick={() => { setTheme("light"); closeDropdowns(); }}
+                          className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-muted ${
+                            theme === "light" ? "bg-primary/10 text-primary" : "text-popover-foreground"
+                          }`}
+                        >
+                          <Sun className="h-3.5 w-3.5 inline mr-2" />
+                          Light
+                        </button>
+                        <button
+                          onClick={() => { setTheme("dark"); closeDropdowns(); }}
+                          className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-muted ${
+                            theme === "dark" ? "bg-primary/10 text-primary" : "text-popover-foreground"
+                          }`}
+                        >
+                          <Moon className="h-3.5 w-3.5 inline mr-2" />
+                          Dark
+                        </button>
+                        <button
+                          onClick={() => { setTheme("system"); closeDropdowns(); }}
+                          className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-muted ${
+                            theme === "system" ? "bg-primary/10 text-primary" : "text-popover-foreground"
+                          }`}
+                        >
+                          <Monitor className="h-3.5 w-3.5 inline mr-2" />
+                          System
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="border-t border-border my-1" />
+
+                  {/* Export Current Chat */}
+                  <button
+                    onClick={() => { handleExport(); closeDropdowns(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Export Current Chat</span>
+                  </button>
+
+                  {/* Export All */}
+                  {onExportAll && (
+                    <button
+                      onClick={() => { onExportAll(); closeDropdowns(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>Export All Data</span>
+                    </button>
+                  )}
+
+                  {/* Import */}
+                  {onImportData && (
+                    <button
+                      onClick={() => { importInputRef.current?.click(); closeDropdowns(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
+                    >
+                      <Upload className="h-4 w-4" />
+                      <span>Import Data</span>
+                    </button>
+                  )}
+
+                  {/* Clear All Data */}
+                  {onClearAllData && (
+                    <>
+                      <div className="border-t border-border my-1" />
+                      <button
+                        onClick={() => { onClearAllData(); closeDropdowns(); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-destructive hover:bg-muted"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>Clear All Data</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Save button */}
           {onSaveChat && (
@@ -597,7 +677,6 @@ export function ChatControlBox({
             {/* Bottom row inside textarea: icons left, send right */}
             <div className="absolute left-2 right-2 bottom-2 flex items-center justify-between">
               <div className="flex items-center gap-0.5">
-                {/* Paperclip */}
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
@@ -605,8 +684,6 @@ export function ChatControlBox({
                 >
                   <Paperclip className="h-4 w-4" />
                 </button>
-
-                {/* Plug */}
                 <button
                   className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
                   title="Connect"
@@ -614,8 +691,6 @@ export function ChatControlBox({
                 >
                   <Plug className="h-3.5 w-3.5" />
                 </button>
-
-                {/* Mic */}
                 <button
                   className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground"
                   title="Voice"
