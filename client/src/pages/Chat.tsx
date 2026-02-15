@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { clientProviderRouter, type WorkspaceRoutingProfile } from "@/lib/provider-router";
 import { ChatControlBox } from "@/components/ChatControlBox";
+import { useHeaderActions } from "@/components/DashboardLayout";
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -261,39 +262,41 @@ export default function Chat() {
     toast.success("New chat started");
   };
 
+  useHeaderActions(
+    useMemo(() => (
+      <>
+        <div className="flex items-center gap-2 px-2 py-1 rounded-lg border bg-card">
+          <Route className="h-3.5 w-3.5 text-muted-foreground" />
+          <Label htmlFor="routing-toggle" className="text-xs cursor-pointer whitespace-nowrap">
+            Smart Routing
+          </Label>
+          <Switch
+            id="routing-toggle"
+            checked={useUnifiedRouting}
+            onCheckedChange={setUseUnifiedRouting}
+          />
+        </div>
+        <div className="flex items-center gap-2 px-2 py-1 rounded-lg border bg-card">
+          <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
+          <Label htmlFor="rag-toggle" className="text-xs cursor-pointer">
+            RAG
+          </Label>
+          <Switch
+            id="rag-toggle"
+            checked={useRAG}
+            onCheckedChange={setUseRAG}
+          />
+        </div>
+      </>
+    ), [useUnifiedRouting, useRAG])
+  );
+
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-4">
       {/* Header */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+        <div>
           <h1 className="text-3xl font-bold tracking-tight">Chat</h1>
-          <div className="flex items-center gap-3">
-            {/* Unified Routing Toggle */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
-              <Route className="h-4 w-4 text-muted-foreground" />
-              <Label htmlFor="routing-toggle" className="text-sm cursor-pointer whitespace-nowrap">
-                Smart Routing
-              </Label>
-              <Switch
-                id="routing-toggle"
-                checked={useUnifiedRouting}
-                onCheckedChange={setUseUnifiedRouting}
-              />
-            </div>
-
-            {/* RAG Toggle */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-              <Label htmlFor="rag-toggle" className="text-sm cursor-pointer">
-                RAG
-              </Label>
-              <Switch
-                id="rag-toggle"
-                checked={useRAG}
-                onCheckedChange={setUseRAG}
-              />
-            </div>
-          </div>
         </div>
 
         {/* Controls Row */}

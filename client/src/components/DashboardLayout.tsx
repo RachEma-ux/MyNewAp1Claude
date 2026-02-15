@@ -22,8 +22,23 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
-import { CSSProperties, useEffect, useRef, useState } from "react";
+import { CSSProperties, createContext, useContext, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
+
+// Context for pages to inject actions into the page header
+const HeaderActionsContext = createContext<{
+  actions: React.ReactNode;
+  setActions: (node: React.ReactNode) => void;
+}>({ actions: null, setActions: () => {} });
+
+export function useHeaderActions(node: React.ReactNode) {
+  const { setActions } = useContext(HeaderActionsContext);
+  useEffect(() => {
+    setActions(node);
+    return () => setActions(null);
+  }, [node]);
+}
+
 
 import { Button } from "./ui/button";
 
@@ -80,29 +95,35 @@ export default function DashboardLayout({
     );
   }
 
+  const [headerActions, setHeaderActions] = useState<React.ReactNode>(null);
+
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": `${sidebarWidth}px`,
-        } as CSSProperties
-      }
-    >
-      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
-        {children}
-      </DashboardLayoutContent>
-    </SidebarProvider>
+    <HeaderActionsContext.Provider value={{ actions: headerActions, setActions: setHeaderActions }}>
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": `${sidebarWidth}px`,
+          } as CSSProperties
+        }
+      >
+        <DashboardLayoutContent setSidebarWidth={setSidebarWidth} headerActions={headerActions}>
+          {children}
+        </DashboardLayoutContent>
+      </SidebarProvider>
+    </HeaderActionsContext.Provider>
   );
 }
 
 type DashboardLayoutContentProps = {
   children: React.ReactNode;
   setSidebarWidth: (width: number) => void;
+  headerActions?: React.ReactNode;
 };
 
 function DashboardLayoutContent({
   children,
   setSidebarWidth,
+  headerActions,
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
@@ -241,20 +262,21 @@ function DashboardLayoutContent({
       </div>
 
       <SidebarInset>
-        {isMobile && (
-          <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
-            <div className="flex items-center gap-2">
+        <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
+          <div className="flex items-center gap-2">
+            {isMobile && (
               <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "Menu"}
-                  </span>
-                </div>
-              </div>
-            </div>
+            )}
+            <span className="tracking-tight text-foreground">
+              {activeMenuItem?.label ?? "Menu"}
+            </span>
           </div>
-        )}
+          {headerActions && (
+            <div className="flex items-center gap-2">
+              {headerActions}
+            </div>
+          )}
+        </div>
         <main className="flex-1 p-4">{children}</main>
       </SidebarInset>
     </>
