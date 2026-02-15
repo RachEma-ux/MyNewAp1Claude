@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Menu,
   Plus,
   Settings,
@@ -30,6 +36,68 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
+
+// =============================================================================
+// PRESETS & CATEGORIES — localStorage backed (matches Manus)
+// =============================================================================
+
+interface Preset {
+  id: string;
+  name: string;
+  prompt: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  color: string;
+}
+
+const PRESETS_KEY = "mynewapp_presets";
+const CATEGORIES_KEY = "mynewapp_categories";
+
+const DEFAULT_PRESETS: Preset[] = [
+  { id: "1", name: "Code Review", prompt: "Review this code and suggest improvements:" },
+  { id: "2", name: "Explain", prompt: "Explain this concept in simple terms:" },
+  { id: "3", name: "Summarize", prompt: "Summarize the following:" },
+  { id: "4", name: "Debug", prompt: "Help me debug this issue:" },
+];
+
+const DEFAULT_CATEGORIES: Category[] = [
+  { id: "1", name: "General", color: "bg-blue-500" },
+  { id: "2", name: "Coding", color: "bg-green-500" },
+  { id: "3", name: "Writing", color: "bg-purple-500" },
+  { id: "4", name: "Research", color: "bg-orange-500" },
+];
+
+const CATEGORY_COLORS = [
+  "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500",
+  "bg-red-500", "bg-yellow-500", "bg-pink-500", "bg-teal-500",
+];
+
+function loadPresets(): Preset[] {
+  try {
+    const raw = localStorage.getItem(PRESETS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return DEFAULT_PRESETS;
+}
+
+function savePresets(presets: Preset[]) {
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+}
+
+function loadCategories(): Category[] {
+  try {
+    const raw = localStorage.getItem(CATEGORIES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return DEFAULT_CATEGORIES;
+}
+
+function saveCategories(categories: Category[]) {
+  localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
+}
 
 // =============================================================================
 // CUSTOM SEND ICON (ported from Claude repo)
@@ -233,6 +301,17 @@ export function ChatControlBox({
   const [showProviderDropdown, setShowProviderDropdown] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
 
+  // Presets & Categories modals
+  const [showPresetsModal, setShowPresetsModal] = useState(false);
+  const [showCategoriesModal, setShowCategoriesModal] = useState(false);
+  const [presets, setPresets] = useState<Preset[]>(loadPresets);
+  const [categories, setCategories] = useState<Category[]>(loadCategories);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [newPresetName, setNewPresetName] = useState("");
+  const [newPresetPrompt, setNewPresetPrompt] = useState("");
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatColor, setNewCatColor] = useState(CATEGORY_COLORS[0]);
+
   // =========================================================================
   // TEXTAREA AUTO-GROW
   // =========================================================================
@@ -323,6 +402,57 @@ export function ChatControlBox({
 
   const removeAttachment = (idx: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Presets CRUD
+  const handleAddPreset = () => {
+    if (!newPresetName.trim()) return;
+    const p: Preset = { id: Date.now().toString(36), name: newPresetName.trim(), prompt: newPresetPrompt.trim() };
+    const updated = [...presets, p];
+    setPresets(updated);
+    savePresets(updated);
+    setNewPresetName("");
+    setNewPresetPrompt("");
+    toast.success("Preset added");
+  };
+
+  const handleDeletePreset = (id: string) => {
+    const updated = presets.filter((p) => p.id !== id);
+    setPresets(updated);
+    savePresets(updated);
+    toast.success("Preset deleted");
+  };
+
+  const handleUpdatePreset = (id: string, name: string, prompt: string) => {
+    const updated = presets.map((p) => (p.id === id ? { ...p, name, prompt } : p));
+    setPresets(updated);
+    savePresets(updated);
+    setEditingPresetId(null);
+    toast.success("Preset updated");
+  };
+
+  const handleUsePreset = (preset: Preset) => {
+    onChange(preset.prompt + " ");
+    setShowPresetsModal(false);
+    toast.success(`Applied preset: ${preset.name}`);
+  };
+
+  // Categories CRUD
+  const handleAddCategory = () => {
+    if (!newCatName.trim()) return;
+    const c: Category = { id: Date.now().toString(36), name: newCatName.trim(), color: newCatColor };
+    const updated = [...categories, c];
+    setCategories(updated);
+    saveCategories(updated);
+    setNewCatName("");
+    toast.success("Category added");
+  };
+
+  const handleDeleteCategory = (id: string) => {
+    const updated = categories.filter((c) => c.id !== id);
+    setCategories(updated);
+    saveCategories(updated);
+    toast.success("Category deleted");
   };
 
   const handleExport = () => {
@@ -662,9 +792,9 @@ export function ChatControlBox({
           </button>
 
           {/* Presets button */}
-          {onPresetsClick && (
+          {(onPresetsClick || true) && (
             <button
-              onClick={onPresetsClick}
+              onClick={() => setShowPresetsModal(true)}
               className="h-7 px-2.5 bg-muted text-muted-foreground text-xs font-semibold rounded-full transition-colors hover:bg-muted/80 hover:text-foreground flex items-center gap-1"
               title="Presets"
             >
@@ -712,7 +842,7 @@ export function ChatControlBox({
 
                   {/* Presets Setting */}
                   <button
-                    onClick={() => { onPresetsClick?.(); closeDropdowns(); }}
+                    onClick={() => { setShowPresetsModal(true); closeDropdowns(); }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
                   >
                     <Sparkles className="h-4 w-4" />
@@ -721,7 +851,7 @@ export function ChatControlBox({
 
                   {/* Categories Setting */}
                   <button
-                    onClick={() => { onCategoriesClick?.(); closeDropdowns(); }}
+                    onClick={() => { setShowCategoriesModal(true); closeDropdowns(); }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors text-popover-foreground hover:bg-muted"
                   >
                     <LayoutGrid className="h-4 w-4" />
@@ -906,6 +1036,167 @@ export function ChatControlBox({
         </div>
 
       </div>
+
+      {/* ================================================================= */}
+      {/* PRESETS MANAGEMENT MODAL */}
+      {/* ================================================================= */}
+      <Dialog open={showPresetsModal} onOpenChange={setShowPresetsModal}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Presets Setting</DialogTitle>
+          </DialogHeader>
+
+          {/* Existing presets */}
+          <div className="space-y-2 mt-2">
+            {presets.map((preset) => (
+              <div key={preset.id} className="flex items-start gap-2 p-3 rounded-lg border bg-muted/30">
+                {editingPresetId === preset.id ? (
+                  <div className="flex-1 space-y-2">
+                    <input
+                      className="w-full px-2 py-1 text-sm bg-background border border-border rounded"
+                      value={preset.name}
+                      onChange={(e) => {
+                        const updated = presets.map((p) => p.id === preset.id ? { ...p, name: e.target.value } : p);
+                        setPresets(updated);
+                      }}
+                    />
+                    <textarea
+                      className="w-full px-2 py-1 text-sm bg-background border border-border rounded resize-none"
+                      rows={2}
+                      value={preset.prompt}
+                      onChange={(e) => {
+                        const updated = presets.map((p) => p.id === preset.id ? { ...p, prompt: e.target.value } : p);
+                        setPresets(updated);
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleUpdatePreset(preset.id, preset.name, preset.prompt)}
+                        className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/80"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingPresetId(null)}
+                        className="px-3 py-1 text-xs bg-muted text-muted-foreground rounded hover:bg-muted/80"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">{preset.name}</div>
+                      <div className="text-xs text-muted-foreground truncate">{preset.prompt}</div>
+                    </div>
+                    <button
+                      onClick={() => handleUsePreset(preset)}
+                      className="px-2 py-1 text-xs bg-primary/10 text-primary rounded hover:bg-primary/20 shrink-0"
+                    >
+                      Use
+                    </button>
+                    <button
+                      onClick={() => setEditingPresetId(preset.id)}
+                      className="p-1 text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      <PenLine className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeletePreset(preset.id)}
+                      className="p-1 text-muted-foreground hover:text-destructive shrink-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add new preset */}
+          <div className="border-t pt-3 mt-3 space-y-2">
+            <div className="text-sm font-medium">Add New Preset</div>
+            <input
+              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg"
+              placeholder="Preset name"
+              value={newPresetName}
+              onChange={(e) => setNewPresetName(e.target.value)}
+            />
+            <textarea
+              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg resize-none"
+              placeholder="Prompt template..."
+              rows={2}
+              value={newPresetPrompt}
+              onChange={(e) => setNewPresetPrompt(e.target.value)}
+            />
+            <button
+              onClick={handleAddPreset}
+              disabled={!newPresetName.trim()}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 disabled:opacity-50"
+            >
+              Add Preset
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ================================================================= */}
+      {/* CATEGORIES SETTING MODAL */}
+      {/* ================================================================= */}
+      <Dialog open={showCategoriesModal} onOpenChange={setShowCategoriesModal}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Categories Setting</DialogTitle>
+          </DialogHeader>
+
+          {/* Existing categories */}
+          <div className="space-y-2 mt-2">
+            {categories.map((cat) => (
+              <div key={cat.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                <div className={`w-4 h-4 rounded-full ${cat.color} shrink-0`} />
+                <span className="text-sm font-medium flex-1">{cat.name}</span>
+                <button
+                  onClick={() => handleDeleteCategory(cat.id)}
+                  className="p-1 text-muted-foreground hover:text-destructive shrink-0"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Add new category */}
+          <div className="border-t pt-3 mt-3 space-y-2">
+            <div className="text-sm font-medium">Add New Category</div>
+            <input
+              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg"
+              placeholder="Category name"
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Color:</span>
+              {CATEGORY_COLORS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setNewCatColor(c)}
+                  className={`w-6 h-6 rounded-full ${c} transition-transform ${
+                    newCatColor === c ? "ring-2 ring-primary ring-offset-2 ring-offset-background scale-110" : ""
+                  }`}
+                />
+              ))}
+            </div>
+            <button
+              onClick={handleAddCategory}
+              disabled={!newCatName.trim()}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 disabled:opacity-50"
+            >
+              Add Category
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
