@@ -1,5 +1,19 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
+
+// Context for pages to inject actions into the top header bar
+const HeaderActionsContext = createContext<{
+  actions: ReactNode;
+  setActions: (node: ReactNode) => void;
+}>({ actions: null, setActions: () => {} });
+
+export function useHeaderActions(node: ReactNode) {
+  const { setActions } = useContext(HeaderActionsContext);
+  useEffect(() => {
+    setActions(node);
+    return () => setActions(null);
+  }, [node]);
+}
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +66,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const { user } = useAuth();
   // Start closed on mobile, open on desktop
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [headerActions, setHeaderActions] = useState<ReactNode>(null);
   const [llmMenuOpen, setLlmMenuOpen] = useState(false);
   const [providersMenuOpen, setProvidersMenuOpen] = useState(false);
   const [automationMenuOpen, setAutomationMenuOpen] = useState(false);
@@ -176,6 +191,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
+    <HeaderActionsContext.Provider value={{ actions: headerActions, setActions: setHeaderActions }}>
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
       <aside
@@ -420,6 +436,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex-1" />
+          {headerActions && (
+            <div className="flex items-center gap-2">
+              {headerActions}
+            </div>
+          )}
         </header>
 
         {/* Page Content */}
@@ -434,5 +455,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
         />
       )}
     </div>
+    </HeaderActionsContext.Provider>
   );
 }

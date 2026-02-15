@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { clientProviderRouter, type WorkspaceRoutingProfile } from "@/lib/provider-router";
 import { ChatControlBox } from "@/components/ChatControlBox";
-import { useHeaderActions } from "@/components/DashboardLayout";
+import { useHeaderActions } from "@/components/MainLayout";
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
