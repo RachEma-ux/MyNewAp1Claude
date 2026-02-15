@@ -168,6 +168,17 @@ export const providerRouter = router({
       return Object.fromEntries(results);
     }),
 
+  // Get models available for a provider
+  getModels: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const registry = getProviderRegistry();
+      const provider = registry.getProvider(input.id);
+      if (!provider) throw new Error("Provider not found");
+      const caps = provider.getCapabilities();
+      return (caps.supportedModels || []).map(m => ({ id: m, name: m }));
+    }),
+
   // Get provider capabilities
   getCapabilities: protectedProcedure
     .input(z.object({

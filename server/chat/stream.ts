@@ -30,7 +30,7 @@ export async function handleChatStream(req: Request, res: Response) {
     }
 
     // Parse request body
-    const { providerId, messages, temperature, maxTokens, useRAG, workspaceId, useUnifiedRouting, taskHints } = req.body;
+    const { providerId, messages, temperature, maxTokens, useRAG, workspaceId, useUnifiedRouting, taskHints, model } = req.body;
 
     // Validate request - providerId is optional when using unified routing
     if (!messages || !Array.isArray(messages)) {
@@ -154,6 +154,7 @@ export async function handleChatStream(req: Request, res: Response) {
       // Stream tokens from provider
       for await (const token of provider.generateStream({
         messages: providerMessages,
+        model,
         temperature,
         maxTokens,
       })) {

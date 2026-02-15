@@ -22,6 +22,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [useRAG, setUseRAG] = useState(false);
@@ -34,6 +35,12 @@ export default function Chat() {
   const { data: providers, isLoading: providersLoading } = trpc.chat.getAvailableProviders.useQuery();
   const { data: workspaces } = trpc.workspaces.list.useQuery();
   const { data: allProviders } = trpc.providers.list.useQuery();
+
+  // Fetch models for the selected provider
+  const { data: providerModels, isLoading: modelsLoading } = trpc.providers.getModels.useQuery(
+    { id: selectedProvider! },
+    { enabled: !useUnifiedRouting && !!selectedProvider }
+  );
 
   // Fetch routing profile when unified routing is enabled and workspace is selected
   const { data: routingProfile } = trpc.workspaces.getRoutingProfile.useQuery(
@@ -169,6 +176,9 @@ export default function Chat() {
         };
       } else {
         requestBody.providerId = selectedProvider;
+        if (selectedModel) {
+          requestBody.model = selectedModel;
+        }
       }
 
       const response = await fetch('/api/chat/stream', {
@@ -319,7 +329,10 @@ export default function Chat() {
           {!useUnifiedRouting && (
             <Select
               value={selectedProvider?.toString()}
-              onValueChange={(value) => setSelectedProvider(parseInt(value))}
+              onValueChange={(value) => {
+                setSelectedProvider(parseInt(value));
+                setSelectedModel(null);
+              }}
             >
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Select provider" />
@@ -341,6 +354,35 @@ export default function Chat() {
                 ) : (
                   <div className="p-4 text-sm text-muted-foreground">
                     No providers configured
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Model Selection (shown when a provider is selected and not using unified routing) */}
+          {!useUnifiedRouting && selectedProvider && (
+            <Select
+              value={selectedModel ?? ""}
+              onValueChange={(value) => setSelectedModel(value || null)}
+            >
+              <SelectTrigger className="w-[240px]">
+                <SelectValue placeholder="Default model" />
+              </SelectTrigger>
+              <SelectContent>
+                {modelsLoading ? (
+                  <div className="flex items-center justify-center p-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : providerModels && providerModels.length > 0 ? (
+                  providerModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-4 text-sm text-muted-foreground">
+                    No models available
                   </div>
                 )}
               </SelectContent>
