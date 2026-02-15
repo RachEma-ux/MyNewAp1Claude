@@ -16,7 +16,6 @@ import {
   Plus,
   Settings,
   Paperclip,
-  ArrowUp,
   Bot,
   Trash2,
   Download,
@@ -41,7 +40,45 @@ import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
 // =============================================================================
-// RESPONSIVE HOOK (simplified inline version)
+// CUSTOM SEND ICON (ported from Claude repo)
+// =============================================================================
+
+function SendIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      vectorEffect="non-scaling-stroke"
+      aria-hidden="true"
+      className={className}
+      style={style}
+    >
+      <path
+        d="
+          M12 2
+          L18 10
+          L13.5 9.5
+          L13.5 18
+          Q13.5 21 12 21
+          Q10.5 21 10.5 18
+          L10.5 9.5
+          L6 10
+          Z
+        "
+      />
+    </svg>
+  );
+}
+
+// =============================================================================
+// RESPONSIVE HOOK
 // =============================================================================
 
 function useIsMobile(breakpoint = 768) {
@@ -198,10 +235,17 @@ export function ChatControlBox({
   // =========================================================================
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.shiftKey || e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      if (!disabled && value.trim() && !isStreaming) {
-        onSend();
+    if (e.key === "Enter") {
+      if (e.shiftKey) {
+        // Shift+Enter → newline (default behavior, no preventDefault)
+        return;
+      }
+      if (!isMobile) {
+        // Enter on desktop → send
+        e.preventDefault();
+        if (!disabled && value.trim() && !isStreaming) {
+          onSend();
+        }
       }
     }
   };
@@ -562,12 +606,12 @@ export function ChatControlBox({
                   onClick={onSend}
                   disabled={!canSend}
                   className="h-7 w-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Send message"
+                  title="Send message (Enter)"
                 >
                   {disabled ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <ArrowUp className="h-4 w-4" strokeWidth={2.125} />
+                    <SendIcon className="h-4 w-4" />
                   )}
                 </button>
               )}
