@@ -267,9 +267,6 @@ export default function Chat() {
       <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Chat</h1>
-          <p className="text-muted-foreground mt-1">
-            Converse with AI using configured providers
-          </p>
         </div>
 
         {/* Controls Row */}

@@ -115,13 +115,10 @@ export function ChatControlBox({
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "40px";
-    requestAnimationFrame(() => {
-      if (!textareaRef.current) return;
-      const h = textareaRef.current.scrollHeight;
-      textareaRef.current.style.height = `${Math.min(h, 200)}px`;
-      textareaRef.current.style.overflowY = h > 200 ? "auto" : "hidden";
-    });
+    el.style.height = "auto";
+    const h = el.scrollHeight;
+    el.style.height = `${Math.min(h, 200)}px`;
+    el.style.overflowY = h > 200 ? "auto" : "hidden";
   }, []);
 
   useEffect(() => {
@@ -133,7 +130,7 @@ export function ChatControlBox({
   // =========================================================================
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (e.shiftKey || e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       if (!disabled && value.trim() && !isStreaming) {
         onSend();
