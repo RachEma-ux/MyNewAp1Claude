@@ -790,6 +790,17 @@ function ChatInner() {
               onClearAllData={handleClearAllData}
               autoSave={settings.autoSave}
               onAutoSaveChange={(v) => updateSettings({ autoSave: v })}
+              providers={providers?.map((p) => ({ id: p.id, name: p.name, type: p.type })) ?? []}
+              providerModels={providerModels?.map((m) => ({ id: m.id, name: m.name })) ?? []}
+              selectedProviderId={selectedProvider}
+              selectedModelId={selectedModel}
+              onProviderSelect={(id) => {
+                setSelectedProvider(id);
+                setSelectedModel(null);
+              }}
+              onModelSelect={setSelectedModel}
+              providersLoading={providersLoading}
+              modelsLoading={modelsLoading}
             />
           </div>
         </CardContent>
