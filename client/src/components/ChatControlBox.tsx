@@ -120,6 +120,10 @@ export interface ChatControlBoxProps {
   modelCount?: number;
   /** Name of the currently selected model */
   modelName?: string;
+  /** Whether models are toggled on (active) */
+  modelsEnabled?: boolean;
+  /** Callback to toggle models on/off */
+  onModelsToggle?: () => void;
   /** Callback for "Models" button click */
   onModelsClick?: () => void;
   /** Callback for "New Chat" action */
@@ -193,6 +197,8 @@ export function ChatControlBox({
   providerName,
   modelCount = 0,
   modelName,
+  modelsEnabled = true,
+  onModelsToggle,
   onModelsClick,
   onNewChat,
   onStop,
@@ -252,7 +258,7 @@ export function ChatControlBox({
       if (!isMobile) {
         // Enter on desktop → send
         e.preventDefault();
-        if (!disabled && value.trim() && !isStreaming) {
+        if (!inputDisabled && value.trim() && !isStreaming) {
           onSend();
         }
       }
@@ -284,7 +290,8 @@ export function ChatControlBox({
     if (onNewChat) onNewChat();
   };
 
-  const canSend = !disabled && value.trim().length > 0;
+  const inputDisabled = disabled || !modelsEnabled;
+  const canSend = !inputDisabled && value.trim().length > 0;
 
   // =========================================================================
   // RENDER
@@ -425,18 +432,18 @@ export function ChatControlBox({
             {providerCount} Provider{providerCount !== 1 ? "s" : ""}
           </button>
 
-          {/* Models button */}
-          {onModelsClick && (
+          {/* Models toggle button (matches Claude repo behavior) */}
+          {onModelsToggle && (
             <button
-              onClick={onModelsClick}
+              onClick={onModelsToggle}
               className={`h-7 px-2.5 text-xs font-semibold rounded-full transition-colors flex items-center gap-1 ${
-                modelCount > 0
-                  ? "bg-primary text-primary-foreground hover:bg-primary/80"
+                modelsEnabled
+                  ? "bg-blue-600 text-white hover:bg-blue-500"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
-              title={modelName || "Models"}
+              title={modelsEnabled ? "Models active — click to deactivate" : "Click to activate models"}
             >
-              {modelCount} Model{modelCount !== 1 ? "s" : ""}
+              {modelsEnabled ? modelCount : 0} Model{modelCount !== 1 ? "s" : ""}
             </button>
           )}
 
@@ -578,8 +585,8 @@ export function ChatControlBox({
               value={value}
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={disabled ? "Select a provider first..." : placeholder}
-              disabled={disabled || isStreaming}
+              placeholder={!modelsEnabled ? "Select models first..." : disabled ? "Select a provider first..." : placeholder}
+              disabled={inputDisabled || isStreaming}
               rows={1}
               className="w-full resize-none rounded-2xl border bg-muted/50 pl-4 pr-12 pt-2.5 pb-10 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
               style={{ lineHeight: "1.5", minHeight: "56px", maxHeight: "200px" }}
@@ -632,7 +639,7 @@ export function ChatControlBox({
                   className="h-7 w-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Send message (Enter)"
                 >
-                  {disabled ? (
+                  {inputDisabled ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <SendIcon className="h-4 w-4" />

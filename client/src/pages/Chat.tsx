@@ -192,6 +192,7 @@ function ChatInner() {
   const [useUnifiedRouting, setUseUnifiedRouting] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<number | null>(null);
   const [routingInfo, setRoutingInfo] = useState<{ provider?: string; reason?: string } | null>(null);
+  const [modelsEnabled, setModelsEnabled] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -456,6 +457,10 @@ function ChatInner() {
   const handleImportData = (file: File) => {
     importChatData(file);
     toast.success("Chat data imported");
+  };
+
+  const handleModelsToggle = () => {
+    setModelsEnabled(prev => !prev);
   };
 
   const handleModelsClick = () => {
@@ -752,6 +757,8 @@ function ChatInner() {
               modelName={
                 providerModels?.find((m) => m.id === selectedModel)?.name
               }
+              modelsEnabled={modelsEnabled}
+              onModelsToggle={handleModelsToggle}
               onModelsClick={handleModelsClick}
               onNewChat={handleNewChat}
               onStop={() => abortControllerRef.current?.abort()}
