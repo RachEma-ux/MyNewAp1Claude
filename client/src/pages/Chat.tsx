@@ -265,37 +265,39 @@ export default function Chat() {
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-4">
       {/* Header */}
       <div className="flex flex-col gap-4">
-        <div>
+        <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Chat</h1>
+          <div className="flex items-center gap-3">
+            {/* Unified Routing Toggle */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
+              <Route className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="routing-toggle" className="text-sm cursor-pointer whitespace-nowrap">
+                Smart Routing
+              </Label>
+              <Switch
+                id="routing-toggle"
+                checked={useUnifiedRouting}
+                onCheckedChange={setUseUnifiedRouting}
+              />
+            </div>
+
+            {/* RAG Toggle */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="rag-toggle" className="text-sm cursor-pointer">
+                RAG
+              </Label>
+              <Switch
+                id="rag-toggle"
+                checked={useRAG}
+                onCheckedChange={setUseRAG}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Controls Row */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Unified Routing Toggle */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
-            <Route className="h-4 w-4 text-muted-foreground" />
-            <Label htmlFor="routing-toggle" className="text-sm cursor-pointer whitespace-nowrap">
-              Smart Routing
-            </Label>
-            <Switch
-              id="routing-toggle"
-              checked={useUnifiedRouting}
-              onCheckedChange={setUseUnifiedRouting}
-            />
-          </div>
-
-          {/* RAG Toggle */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-            <Label htmlFor="rag-toggle" className="text-sm cursor-pointer">
-              RAG
-            </Label>
-            <Switch
-              id="rag-toggle"
-              checked={useRAG}
-              onCheckedChange={setUseRAG}
-            />
-          </div>
 
           {/* Workspace Selection (shown when RAG or unified routing is enabled) */}
           {(useRAG || useUnifiedRouting) && (
