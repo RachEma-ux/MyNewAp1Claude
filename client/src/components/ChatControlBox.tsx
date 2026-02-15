@@ -320,21 +320,12 @@ export function ChatControlBox({
               value={value}
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={placeholder}
+              placeholder={disabled ? "Select a provider first..." : placeholder}
               disabled={disabled || isStreaming}
               rows={1}
               className="w-full resize-none rounded-2xl border bg-muted/50 pl-4 pr-12 pt-2.5 pb-10 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
               style={{ lineHeight: "1.5", minHeight: "56px", maxHeight: "200px" }}
             />
-
-            {/* "Select a provider first" inside textarea, above icons */}
-            {disabled && (
-              <div className="absolute left-0 right-0 bottom-9 flex justify-end px-3">
-                <span className="text-xs text-muted-foreground">
-                  Select a provider first
-                </span>
-              </div>
-            )}
 
             {/* Bottom row inside textarea: icons left, send right */}
             <div className="absolute left-2 right-2 bottom-2 flex items-center justify-between">
