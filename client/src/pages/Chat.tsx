@@ -195,6 +195,7 @@ function ChatInner() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const modelSelectRef = useRef<HTMLButtonElement>(null);
 
   const messages = currentChat?.messages ?? [];
 
@@ -457,6 +458,15 @@ function ChatInner() {
     toast.success("Chat data imported");
   };
 
+  const handleModelsClick = () => {
+    if (modelSelectRef.current) {
+      modelSelectRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      modelSelectRef.current.click();
+    } else {
+      toast.info("Select a provider first to see available models");
+    }
+  };
+
   const handleClearAllData = () => {
     if (confirm("This will delete ALL chat data. Are you sure?")) {
       localStorage.clear();
@@ -600,7 +610,7 @@ function ChatInner() {
               value={selectedModel ?? ""}
               onValueChange={(value) => setSelectedModel(value || null)}
             >
-              <SelectTrigger className="w-[240px]">
+              <SelectTrigger ref={modelSelectRef} className="w-[240px]">
                 <SelectValue placeholder="Default model" />
               </SelectTrigger>
               <SelectContent>
@@ -738,6 +748,11 @@ function ChatInner() {
               providerName={
                 providers?.find((p) => p.id === selectedProvider)?.name
               }
+              modelCount={providerModels?.length ?? 0}
+              modelName={
+                providerModels?.find((m) => m.id === selectedModel)?.name
+              }
+              onModelsClick={handleModelsClick}
               onNewChat={handleNewChat}
               onStop={() => abortControllerRef.current?.abort()}
               noProviderMessage={

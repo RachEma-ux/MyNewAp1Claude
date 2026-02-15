@@ -116,6 +116,12 @@ export interface ChatControlBoxProps {
   providerCount?: number;
   /** Name of the currently selected provider */
   providerName?: string;
+  /** Number of available models for the selected provider */
+  modelCount?: number;
+  /** Name of the currently selected model */
+  modelName?: string;
+  /** Callback for "Models" button click */
+  onModelsClick?: () => void;
   /** Callback for "New Chat" action */
   onNewChat?: () => void;
   /** Callback for "Stop" action during streaming */
@@ -185,6 +191,9 @@ export function ChatControlBox({
   disabled = false,
   providerCount = 0,
   providerName,
+  modelCount = 0,
+  modelName,
+  onModelsClick,
   onNewChat,
   onStop,
   placeholder = "Type your message...",
@@ -407,7 +416,7 @@ export function ChatControlBox({
             <Plus className="h-4 w-4" />
           </Button>
 
-          {/* Models pill */}
+          {/* Providers pill */}
           <button
             className="h-7 px-2.5 bg-primary text-primary-foreground text-xs font-semibold rounded-full transition-colors hover:bg-primary/80 flex items-center gap-1"
             title={providerName || "Providers"}
@@ -415,6 +424,21 @@ export function ChatControlBox({
             <Sparkles className="h-3 w-3" />
             {providerCount} Provider{providerCount !== 1 ? "s" : ""}
           </button>
+
+          {/* Models button */}
+          {onModelsClick && (
+            <button
+              onClick={onModelsClick}
+              className={`h-7 px-2.5 text-xs font-semibold rounded-full transition-colors flex items-center gap-1 ${
+                modelCount > 0
+                  ? "bg-primary text-primary-foreground hover:bg-primary/80"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+              title={modelName || "Models"}
+            >
+              {modelCount} Model{modelCount !== 1 ? "s" : ""}
+            </button>
+          )}
 
           {/* Bot icon */}
           <Button
