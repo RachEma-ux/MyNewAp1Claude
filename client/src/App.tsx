@@ -10,6 +10,7 @@ import MainLayout from "./components/MainLayout";
 import Home from "./pages/Home";
 import Workspaces from "./pages/Workspaces";
 import WorkspaceDetail from "./pages/WorkspaceDetail";
+import WorkspaceHome from "./pages/WorkspaceHome";
 import Models from "./pages/Models";
 import Documents from "./pages/Documents";
 import Agents from "./pages/Agents";
@@ -119,6 +120,7 @@ function Router() {
     <Switch>
       <Route path="/" component={() => <ProtectedRoute component={Home} />} />
       <Route path="/workspaces" component={() => <ProtectedRoute component={Workspaces} />} />
+      <Route path="/workspaces/:id/home" component={() => <ProtectedRoute component={WorkspaceHome} />} />
       <Route path="/workspaces/:id" component={() => <ProtectedRoute component={WorkspaceDetail} />} />
       <Route path="/models" component={() => <ProtectedRoute component={Models} />} />
       <Route path="/hardware" component={() => <ProtectedRoute component={HardwareProfile} />} />

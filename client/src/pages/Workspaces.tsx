@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Plus, FolderOpen, Settings, Trash2, Loader2 } from "lucide-react";
+import { Plus, FolderOpen, Settings, Trash2, Loader2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -214,14 +214,20 @@ export default function Workspaces() {
                     <span className="font-medium capitalize">{workspace.chunkingStrategy}</span>
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       className="flex-1"
+                      onClick={() => setLocation(`/workspaces/${workspace.id}/home`)}
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => setLocation(`/workspaces/${workspace.id}`)}
                     >
-                      <Settings className="mr-2 h-4 w-4" />
-                      Configure
+                      <Settings className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
