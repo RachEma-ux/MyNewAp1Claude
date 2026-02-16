@@ -129,6 +129,12 @@ const FAMILY_LABELS: Record<string, string> = {
 
 // ── Helpers ──
 
+const DEFAULT_BASE_URLS: Record<string, string> = {
+  ollama_compat: "http://localhost:11434",
+  openai_compat: "https://api.openai.com/v1",
+  anthropic_compat: "https://api.anthropic.com/v1",
+};
+
 function toSlug(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
 }
@@ -274,7 +280,20 @@ export default function NewProviderPage() {
 
             <div className="space-y-2">
               <Label>API Family *</Label>
-              <Select value={data.family} onValueChange={(v) => update({ family: v as ProviderFamily })}>
+              <Select value={data.family} onValueChange={(v) => {
+                const family = v as ProviderFamily;
+                const patch: Partial<WizardData> = { family };
+                // Auto-fill base URL if empty or still a default
+                const currentIsDefault = !data.baseUrl || Object.values(DEFAULT_BASE_URLS).includes(data.baseUrl);
+                if (currentIsDefault && DEFAULT_BASE_URLS[family]) {
+                  patch.baseUrl = DEFAULT_BASE_URLS[family];
+                }
+                // Auto-set auth to "none" for Ollama (no API key needed)
+                if (family === "ollama_compat") {
+                  patch.authKind = "none";
+                }
+                update(patch);
+              }}>
                 <SelectTrigger><SelectValue placeholder="Select API family..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="openai_compat">OpenAI-compatible</SelectItem>
