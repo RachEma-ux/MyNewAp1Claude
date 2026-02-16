@@ -750,116 +750,20 @@ function BaseModelSelectionStep({
   project: CreationProject;
   updateProject: (updates: Partial<CreationProject>) => void;
 }) {
-  const recommendedModels = [
-    {
-      name: "Qwen2.5 7B",
-      ollamaTag: "qwen2.5:7b",
-      hfRepo: "Qwen/Qwen2.5-7B-Instruct",
-      size: "7B",
-      license: "Apache 2.0",
-      context: 32768,
-      bestFor: "General purpose, great quality/cost balance",
-    },
-    {
-      name: "Llama 3.2 3B",
-      ollamaTag: "llama3.2:3b",
-      hfRepo: "meta-llama/Llama-3.2-3B-Instruct",
-      size: "3B",
-      license: "Llama 3.2 License",
-      context: 128000,
-      bestFor: "Compact, efficient open model",
-    },
-    {
-      name: "DeepSeek R1 8B",
-      ollamaTag: "deepseek-r1:8b",
-      hfRepo: "deepseek-ai/DeepSeek-R1-Distill-Qwen-8B",
-      size: "8B",
-      license: "MIT",
-      context: 128000,
-      bestFor: "Reasoning, math, technical tasks",
-    },
-    {
-      name: "Gemma 3 4B",
-      ollamaTag: "gemma3:4b",
-      hfRepo: "google/gemma-3-4b-it",
-      size: "4B",
-      license: "Gemma License",
-      context: 128000,
-      bestFor: "Efficient multimodal model",
-    },
-    {
-      name: "Phi-3 Mini",
-      ollamaTag: "phi3:mini",
-      hfRepo: "microsoft/Phi-3-mini-4k-instruct",
-      size: "3.8B",
-      license: "MIT",
-      context: 4096,
-      bestFor: "Strong reasoning for its size, good for edge fine-tuning",
-    },
-    {
-      name: "Phi-2",
-      ollamaTag: "phi2",
-      hfRepo: "microsoft/phi-2",
-      size: "2.7B",
-      license: "MIT",
-      context: 2048,
-      bestFor: "Efficient small base with strong benchmarks",
-    },
-    {
-      name: "Gemma 2B",
-      ollamaTag: "gemma2:2b",
-      hfRepo: "google/gemma-2b-it",
-      size: "2B",
-      license: "Gemma License",
-      context: 8192,
-      bestFor: "Lightweight Google base for resource-constrained fine-tuning",
-    },
-    {
-      name: "SmolLM2 1.7B",
-      ollamaTag: "smollm2",
-      hfRepo: "HuggingFaceTB/SmolLM2-1.7B-Instruct",
-      size: "1.7B",
-      license: "Apache 2.0",
-      context: 8192,
-      bestFor: "Ultra-compact base ideal for on-device fine-tuning",
-    },
-    {
-      name: "DeepSeek R1 1.5B",
-      ollamaTag: "deepseek-r1:1.5b",
-      hfRepo: "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
-      size: "1.5B",
-      license: "MIT",
-      context: 128000,
-      bestFor: "Compact reasoning base for math and code tasks",
-    },
-    {
-      name: "PhoneLM 1.5B",
-      ollamaTag: "phonelm",
-      hfRepo: "mllmTeam/PhoneLM-1.5B-Instruct",
-      size: "1.5B",
-      license: "Apache 2.0",
-      context: 4096,
-      bestFor: "Purpose-built for mobile/phone deployment fine-tuning",
-    },
-    {
-      name: "TinyLlama 1.1B",
-      ollamaTag: "tinyllama",
-      hfRepo: "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-      size: "1.1B",
-      license: "Apache 2.0",
-      context: 2048,
-      bestFor: "Ultra-light Llama architecture for minimal hardware",
-    },
-    {
-      name: "Llama 3.2 1B",
-      ollamaTag: "llama3.2:1b",
-      hfRepo: "meta-llama/Llama-3.2-1B-Instruct",
-      size: "1B",
-      license: "Llama 3.2 License",
-      context: 128000,
-      bestFor: "Smallest Llama, optimized for edge and mobile fine-tuning",
-    },
-  ];
+  const catalogQuery = trpc.modelDownloads.getUnifiedCatalog.useQuery({ source: "hub" });
+
+  // Map catalog hub models to training-compatible format, filtering out embedding models
+  const recommendedModels = (catalogQuery.data || [])
+    .filter((m) => m.category !== "embedding" && !m.isProviderModel)
+    .map((m) => ({
+      name: m.displayName,
+      ollamaTag: m.ollamaTag || "",
+      hfRepo: m.downloadUrl.replace("https://huggingface.co/", ""),
+      size: m.parameters,
+      license: m.license || "",
+      context: 0, // Not tracked in catalog; user picks context in target step
+      bestFor: m.bestFor || m.description,
+    }));
 
   return (
     <div className="space-y-6">
@@ -872,57 +776,70 @@ function BaseModelSelectionStep({
 
       <div className="space-y-4">
         <Label>Recommended Base Models</Label>
-        <div className="grid gap-4">
-          {recommendedModels.map((model) => (
-            <Card
-              key={model.name}
-              className={`cursor-pointer transition-all ${
-                project.baseModel?.name === model.name
-                  ? "border-primary ring-2 ring-primary"
-                  : "hover:border-primary/50"
-              }`}
-              onClick={() =>
-                updateProject({
-                  baseModel: {
-                    name: model.name,
-                    ollamaTag: model.ollamaTag,
-                    hfRepo: model.hfRepo,
-                    size: model.size,
-                    license: model.license,
-                    context: model.context,
-                    rationale: model.bestFor,
-                  },
-                })
-              }
-            >
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{model.name}</CardTitle>
-                  <Badge variant="secondary">{model.size}</Badge>
-                </div>
-                <CardDescription>{model.bestFor}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Ollama:</span>
-                  <code className="text-xs bg-muted px-2 py-1 rounded">{model.ollamaTag}</code>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">HuggingFace:</span>
-                  <code className="text-xs bg-muted px-2 py-1 rounded">{model.hfRepo}</code>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Context:</span>
-                  <span>{model.context.toLocaleString()} tokens</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">License:</span>
-                  <span>{model.license}</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {catalogQuery.isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading models from catalog...
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {recommendedModels.map((model) => (
+              <Card
+                key={model.name}
+                className={`cursor-pointer transition-all ${
+                  project.baseModel?.name === model.name
+                    ? "border-primary ring-2 ring-primary"
+                    : "hover:border-primary/50"
+                }`}
+                onClick={() =>
+                  updateProject({
+                    baseModel: {
+                      name: model.name,
+                      ollamaTag: model.ollamaTag,
+                      hfRepo: model.hfRepo,
+                      size: model.size,
+                      license: model.license,
+                      context: model.context,
+                      rationale: model.bestFor,
+                    },
+                  })
+                }
+              >
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{model.name}</CardTitle>
+                    <Badge variant="secondary">{model.size}</Badge>
+                  </div>
+                  <CardDescription>{model.bestFor}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {model.ollamaTag && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Ollama:</span>
+                      <code className="text-xs bg-muted px-2 py-1 rounded">{model.ollamaTag}</code>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">HuggingFace:</span>
+                    <code className="text-xs bg-muted px-2 py-1 rounded">{model.hfRepo}</code>
+                  </div>
+                  {model.context > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Context:</span>
+                      <span>{model.context.toLocaleString()} tokens</span>
+                    </div>
+                  )}
+                  {model.license && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">License:</span>
+                      <span>{model.license}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       {project.baseModel && (

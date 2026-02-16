@@ -44,7 +44,6 @@ import {
   Loader2,
   Shield,
   XCircle,
-  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -496,6 +495,8 @@ function ConfigurationStep({
   onUpdate: (updates: Partial<LLMConfiguration>) => void;
 }) {
   const [, navigate] = useLocation();
+  const [useCustomModel, setUseCustomModel] = useState(false);
+  const catalogQuery = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
 
   const updateRuntime = (updates: Partial<typeof configuration.runtime>) => {
     onUpdate({ runtime: { ...configuration.runtime, ...updates } });
@@ -509,20 +510,29 @@ function ConfigurationStep({
     onUpdate({ parameters: { ...configuration.parameters, ...updates } });
   };
 
+  const handleCatalogModelSelect = (value: string) => {
+    if (value === "__custom__") {
+      setUseCustomModel(true);
+      return;
+    }
+    setUseCustomModel(false);
+    const model = catalogQuery.data?.find((m) => m.name === value);
+    if (model) {
+      updateModel({ name: model.name, contextLength: undefined });
+      // Auto-fill provider from catalog
+      if (model.isProviderModel && model.providerName) {
+        const localProviders = ["ollama", "llama.cpp", "local-ollama"];
+        const providerType = model.providerName.toLowerCase();
+        updateRuntime({
+          type: localProviders.some((p) => providerType.includes(p)) ? "local" : "cloud",
+          provider: providerType,
+        });
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Browse Model Browser link */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription className="flex items-center justify-between">
-          <span>Need to pick a model? Browse all available models from the catalog.</span>
-          <Button variant="outline" size="sm" onClick={() => navigate("/models/browser")}>
-            <ExternalLink className="h-3 w-3 mr-1" />
-            Model Browser
-          </Button>
-        </AlertDescription>
-      </Alert>
-
       {/* Runtime Configuration */}
       <Card>
         <CardHeader>
@@ -583,18 +593,60 @@ function ConfigurationStep({
       <Card>
         <CardHeader>
           <CardTitle>Model Configuration</CardTitle>
-          <CardDescription>Model details and capabilities</CardDescription>
+          <CardDescription>Pick from the catalog or enter a custom model</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>
               Model Name <span className="text-destructive">*</span>
             </Label>
-            <Input
-              placeholder="e.g., claude-sonnet-4-5-20250929"
-              value={configuration.model.name}
-              onChange={(e) => updateModel({ name: e.target.value })}
-            />
+            {catalogQuery.isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading catalog...
+              </div>
+            ) : (
+              <Select
+                value={useCustomModel ? "__custom__" : (configuration.model.name || undefined)}
+                onValueChange={handleCatalogModelSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a model from catalog..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalogQuery.data && catalogQuery.data.filter((m) => !m.isProviderModel).length > 0 && (
+                    <>
+                      <SelectItem value="__hub_label__" disabled>Hub Models</SelectItem>
+                      {catalogQuery.data.filter((m) => !m.isProviderModel).map((model) => (
+                        <SelectItem key={`hub-${model.id}`} value={model.name}>
+                          {model.displayName} ({model.parameters})
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {catalogQuery.data && catalogQuery.data.filter((m) => m.isProviderModel).length > 0 && (
+                    <>
+                      <SelectItem value="__provider_label__" disabled>Provider Models</SelectItem>
+                      {catalogQuery.data.filter((m) => m.isProviderModel).map((model) => (
+                        <SelectItem key={`prov-${model.id}`} value={model.name}>
+                          {model.displayName} ({model.providerName})
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  <SelectItem value="__custom__">Other (custom model name)</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+
+            {useCustomModel && (
+              <Input
+                className="mt-2"
+                placeholder="e.g., claude-sonnet-4-5-20250929"
+                value={configuration.model.name}
+                onChange={(e) => updateModel({ name: e.target.value })}
+              />
+            )}
           </div>
 
           <div className="space-y-2">

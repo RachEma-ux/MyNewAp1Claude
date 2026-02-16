@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import * as downloadDb from "./download-db";
 import { startModelDownload, pauseDownload, resumeDownload, cancelDownload, simulateDownload } from "./download-service";
-import { getEnabledProviders } from "../providers/db";
+import { getEnabledProviders, getProviderById, updateProvider } from "../providers/db";
 
 /**
  * Model Download tRPC Router
@@ -18,6 +18,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/meta-llama/Llama-2-7b-chat-hf",
     currentVersion: "2.0", availableVersions: ["2.0", "1.1", "1.0"],
     requirements: { minVRAM: 8, minRAM: 16, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "llama2:7b-chat", license: "Llama 2 License", bestFor: "General dialogue and chat tasks",
   },
   {
     id: 2, name: "mistral-7b-instruct", displayName: "Mistral 7B Instruct",
@@ -26,6 +27,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2",
     currentVersion: "0.2", availableVersions: ["0.2", "0.1"],
     requirements: { minVRAM: 8, minRAM: 16, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "mistral:7b-instruct", license: "Apache 2.0", bestFor: "Instruction-following with strong reasoning",
   },
   {
     id: 3, name: "deepseek-r1-8b", displayName: "DeepSeek R1 8B",
@@ -34,6 +36,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-8B",
     currentVersion: "1.0", availableVersions: ["1.0"],
     requirements: { minVRAM: 8, minRAM: 16, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "deepseek-r1:8b", license: "MIT", bestFor: "Reasoning, math, technical tasks",
   },
   {
     id: 4, name: "bge-large-en-v1.5", displayName: "BGE Large EN v1.5",
@@ -42,6 +45,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/BAAI/bge-large-en-v1.5",
     currentVersion: "1.5", availableVersions: ["1.5", "1.0"],
     requirements: { minVRAM: 2, minRAM: 4, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "", license: "MIT", bestFor: "Text embedding and semantic search",
   },
   {
     id: 5, name: "qwen3-8b", displayName: "Qwen 3 8B",
@@ -50,6 +54,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/Qwen/Qwen3-8B",
     currentVersion: "0.1", availableVersions: ["0.1"],
     requirements: { minVRAM: 24, minRAM: 64, gpuRequired: true, cpuCompatible: false },
+    ollamaTag: "qwen2.5:7b", license: "Apache 2.0", bestFor: "General purpose, great quality/cost balance",
   },
   {
     id: 6, name: "smollm2-360m-instruct", displayName: "SmolLM2 360M Instruct",
@@ -58,6 +63,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct",
     currentVersion: "1.0", availableVersions: ["1.0"],
     requirements: { minVRAM: 1, minRAM: 2, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "smollm2", license: "Apache 2.0", bestFor: "Ultra-compact base ideal for on-device fine-tuning",
   },
   {
     id: 7, name: "tinyllama-1.1b", displayName: "TinyLlama 1.1B",
@@ -66,6 +72,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0",
     currentVersion: "1.0", availableVersions: ["1.0"],
     requirements: { minVRAM: 1, minRAM: 2, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "tinyllama", license: "Apache 2.0", bestFor: "Ultra-light Llama architecture for minimal hardware",
   },
   {
     id: 8, name: "phi-3-mini", displayName: "Phi-3 Mini",
@@ -74,6 +81,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct",
     currentVersion: "1.0", availableVersions: ["1.0"],
     requirements: { minVRAM: 4, minRAM: 8, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "phi3:mini", license: "MIT", bestFor: "Strong reasoning for its size, good for edge fine-tuning",
   },
   {
     id: 9, name: "phi-2", displayName: "Phi-2 Small",
@@ -82,6 +90,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/microsoft/phi-2",
     currentVersion: "1.0", availableVersions: ["1.0"],
     requirements: { minVRAM: 2, minRAM: 4, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "phi2", license: "MIT", bestFor: "Efficient small base with strong benchmarks",
   },
   {
     id: 10, name: "gemma-2b", displayName: "Gemma 2B",
@@ -90,6 +99,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/google/gemma-2b-it",
     currentVersion: "1.0", availableVersions: ["1.0"],
     requirements: { minVRAM: 2, minRAM: 4, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "gemma2:2b", license: "Gemma License", bestFor: "Lightweight Google base for resource-constrained fine-tuning",
   },
   {
     id: 11, name: "deepseek-r1-1.5b", displayName: "DeepSeek R1 1.5B",
@@ -98,6 +108,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
     currentVersion: "1.0", availableVersions: ["1.0"],
     requirements: { minVRAM: 2, minRAM: 4, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "deepseek-r1:1.5b", license: "MIT", bestFor: "Compact reasoning base for math and code tasks",
   },
   {
     id: 12, name: "llama-3.2-1b", displayName: "Llama 3.2 1B",
@@ -106,6 +117,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct",
     currentVersion: "1.0", availableVersions: ["1.0"],
     requirements: { minVRAM: 1, minRAM: 2, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "llama3.2:1b", license: "Llama 3.2 License", bestFor: "Smallest Llama, optimized for edge and mobile fine-tuning",
   },
   {
     id: 13, name: "phonelm-1.5b", displayName: "PhoneLM 1.5B",
@@ -114,6 +126,7 @@ const HUB_MODELS = [
     downloadUrl: "https://huggingface.co/mllmTeam/PhoneLM-1.5B-Instruct",
     currentVersion: "1.0", availableVersions: ["1.0"],
     requirements: { minVRAM: 1, minRAM: 2, gpuRequired: false, cpuCompatible: true },
+    ollamaTag: "phonelm", license: "Apache 2.0", bestFor: "Purpose-built for mobile/phone deployment fine-tuning",
   },
 ];
 
@@ -325,6 +338,9 @@ export const modelDownloadRouter = router({
               currentVersion: "",
               availableVersions: [],
               requirements: null as any,
+              ollamaTag: "",
+              license: "",
+              bestFor: "",
               isProviderModel: true,
               providerName: provider.name,
               providerId: provider.id,
@@ -364,5 +380,34 @@ export const modelDownloadRouter = router({
       }
 
       return filtered;
+    }),
+
+  // Push a model to a provider's config.models (bidirectional catalog write)
+  addToCatalog: protectedProcedure
+    .input(
+      z.object({
+        providerId: z.number(),
+        modelName: z.string().min(1),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const provider = await getProviderById(input.providerId);
+      if (!provider) {
+        throw new Error(`Provider ${input.providerId} not found`);
+      }
+
+      const config = (provider.config as any) || {};
+      const models: string[] = config.models || [];
+
+      if (models.includes(input.modelName)) {
+        return { added: false, message: "Model already exists in provider" };
+      }
+
+      models.push(input.modelName);
+      await updateProvider(provider.id, {
+        config: { ...config, models },
+      } as any);
+
+      return { added: true, message: `Added ${input.modelName} to ${provider.name}` };
     }),
 });

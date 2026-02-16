@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -149,6 +149,8 @@ export default function NewProviderPage() {
   const [tagInput, setTagInput] = useState("");
   const [isTesting, setIsTesting] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showCatalogPicker, setShowCatalogPicker] = useState(false);
+  const catalogQuery = trpc.modelDownloads.getUnifiedCatalog.useQuery({ source: "hub" });
 
   const createProvider = trpc.providers.create.useMutation({
     onSuccess: () => {
@@ -526,12 +528,58 @@ export default function NewProviderPage() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <p className="text-sm text-muted-foreground">{data.models.length} model(s) configured</p>
-              <Button size="sm" variant="outline" onClick={addModel}>
-                <Plus className="h-4 w-4 mr-1" />Add Model
-              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setShowCatalogPicker(!showCatalogPicker)}>
+                  <Search className="h-4 w-4 mr-1" />Pick from Catalog
+                </Button>
+                <Button size="sm" variant="outline" onClick={addModel}>
+                  <Plus className="h-4 w-4 mr-1" />Add Model
+                </Button>
+              </div>
             </div>
 
-            {data.models.length === 0 && (
+            {showCatalogPicker && (
+              <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                <p className="text-sm font-medium">Select from Hub Catalog</p>
+                {catalogQuery.isLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />Loading catalog...
+                  </div>
+                ) : (
+                  <div className="grid gap-1 max-h-48 overflow-y-auto">
+                    {catalogQuery.data?.map((model) => (
+                      <button
+                        key={model.id}
+                        className="text-left px-3 py-2 rounded hover:bg-primary/10 text-sm flex justify-between items-center"
+                        onClick={() => {
+                          const alreadyAdded = data.models.some((m) => m.providerModelId === model.name);
+                          if (alreadyAdded) {
+                            toast.info(`${model.displayName} already added`);
+                            return;
+                          }
+                          update({
+                            models: [...data.models, {
+                              alias: model.displayName,
+                              providerModelId: model.name,
+                              isEnabled: true,
+                              isDefault: data.models.length === 0,
+                              pricingLabel: (data.cost as CostMode) || "paid",
+                            }],
+                          });
+                          setShowCatalogPicker(false);
+                          toast.success(`Added ${model.displayName}`);
+                        }}
+                      >
+                        <span>{model.displayName}</span>
+                        <span className="text-xs text-muted-foreground">{model.parameters}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {data.models.length === 0 && !showCatalogPicker && (
               <div className="text-center py-8 text-muted-foreground">
                 <p>No models yet. Add at least one model to proceed.</p>
               </div>
