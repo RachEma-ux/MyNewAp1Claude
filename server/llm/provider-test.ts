@@ -46,6 +46,9 @@ export async function testProviderConnection(
       case 'google':
         return await testGoogle(credentials.apiKey!);
 
+      case 'ollama':
+        return await testOllama(credentials.endpoint);
+
       case 'meta':
       case 'mistral':
       case 'microsoft':
@@ -183,6 +186,51 @@ async function testAnthropic(apiKey: string): Promise<TestConnectionResult> {
     return {
       success: false,
       message: `Failed to connect to Anthropic: ${error.message}`,
+      details: {
+        error: error.message,
+        latency: Date.now() - startTime,
+      },
+    };
+  }
+}
+
+/**
+ * Test Ollama connection
+ */
+async function testOllama(endpoint?: string): Promise<TestConnectionResult> {
+  const startTime = Date.now();
+  const baseURL = endpoint || 'http://localhost:11434';
+
+  try {
+    const response = await fetch(`${baseURL}/api/tags`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        message: `Ollama API error: ${response.status} ${response.statusText}`,
+        details: {
+          latency: Date.now() - startTime,
+        },
+      };
+    }
+
+    const data = await response.json();
+    const models = data.models?.map((m: any) => m.name) || [];
+
+    return {
+      success: true,
+      message: `Connected to Ollama (${models.length} model${models.length !== 1 ? 's' : ''} installed)`,
+      details: {
+        latency: Date.now() - startTime,
+        models: models.slice(0, 10),
+      },
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: `Cannot reach Ollama at ${baseURL}: ${error.message}`,
       details: {
         error: error.message,
         latency: Date.now() - startTime,

@@ -116,31 +116,38 @@ function SystemRequirements({ model }: { model: any }) {
   );
 }
 
-// Cloud provider model lists for the configure step
-const cloudProviderModels: Record<string, { id: string; name: string }[]> = {
-  anthropic: [
-    { id: "claude-opus-4-6", name: "Claude Opus 4.6" },
-    { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5" },
-    { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5" },
-    { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5" },
-    { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4" },
-  ],
-  openai: [
-    { id: "gpt-4.1", name: "GPT-4.1" },
-    { id: "gpt-4.1-mini", name: "GPT-4.1 Mini" },
-    { id: "gpt-4.1-nano", name: "GPT-4.1 Nano" },
-    { id: "o3", name: "o3" },
-    { id: "o4-mini", name: "o4 Mini" },
-    { id: "gpt-4o", name: "GPT-4o" },
-    { id: "gpt-4o-mini", name: "GPT-4o Mini" },
-  ],
-  google: [
-    { id: "gemini-3-pro", name: "Gemini 3 Pro" },
-    { id: "gemini-3-flash", name: "Gemini 3 Flash" },
-    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
-    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
-    { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
-  ],
+// Map static provider IDs to DB provider types for creation
+// DB accepts: "local-llamacpp" | "local-ollama" | "openai" | "anthropic" | "google" | "custom"
+const providerTypeMap: Record<string, "local-llamacpp" | "local-ollama" | "openai" | "anthropic" | "google" | "custom"> = {
+  anthropic: "anthropic",
+  openai: "openai",
+  google: "google",
+  ollama: "local-ollama",
+  meta: "custom",
+  mistral: "custom",
+  microsoft: "custom",
+  qwen: "custom",
+  xai: "custom",
+  cohere: "custom",
+  butterfly: "custom",
+  moonshot: "custom",
+  palantir: "custom",
+  perplexity: "custom",
+  deepseek: "custom",
+};
+
+// Default API base URLs for known providers
+const defaultBaseUrls: Record<string, string> = {
+  ollama: "http://localhost:11434",
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1",
+  mistral: "https://api.mistral.ai/v1",
+  deepseek: "https://api.deepseek.com/v1",
+  cohere: "https://api.cohere.ai/v1",
+  perplexity: "https://api.perplexity.ai",
+  xai: "https://api.x.ai/v1",
+  moonshot: "https://api.moonshot.cn/v1",
 };
 
 type WizardStep = "select" | "install" | "models" | "configure" | "test" | "review";
@@ -185,7 +192,13 @@ export default function LLMProviderConfigWizard() {
 
   // Queries
   const { data: providers = [] } = trpc.llm.listProviders.useQuery();
+  const { data: dbProviders = [] } = trpc.providers.list.useQuery({});
   const testConnectionMutation = trpc.llm.testProviderConnection.useMutation();
+  const createProviderMutation = trpc.providers.create.useMutation();
+  const configureProviderMutation = trpc.llm.configureProvider.useMutation();
+
+  // Unified catalog: fetches hub + registered provider models
+  const catalogQuery = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
 
   // Debug: Log providers when loaded
   useEffect(() => {
@@ -280,6 +293,10 @@ export default function LLMProviderConfigWizard() {
       providerName,
       providerType,
       step: nextStep,
+      credentials: {
+        ...state.credentials,
+        endpoint: defaultBaseUrls[providerId] || "",
+      },
     });
   };
 
@@ -327,10 +344,59 @@ export default function LLMProviderConfigWizard() {
   };
 
   const handleSave = async () => {
-    // For now, just show success message since we need DB provider ID
-    // In real implementation, this would create a provider entry first
-    toast.success("Provider configuration saved successfully");
-    navigate("/llm");
+    setIsSaving(true);
+    try {
+      const dbType = providerTypeMap[state.providerId] || "custom";
+      const config: Record<string, unknown> = {};
+
+      if (state.credentials.endpoint) {
+        config.baseUrl = state.credentials.endpoint;
+        config.apiEndpoint = state.credentials.endpoint;
+      } else if (defaultBaseUrls[state.providerId]) {
+        config.baseUrl = defaultBaseUrls[state.providerId];
+        config.apiEndpoint = defaultBaseUrls[state.providerId];
+      }
+
+      if (state.credentials.apiKey) {
+        config.apiKey = state.credentials.apiKey;
+      }
+      if (state.selectedModels.length > 0) {
+        config.models = state.selectedModels;
+        config.defaultModel = state.selectedModels[0];
+      }
+
+      // 1. Create provider in DB + registry
+      const provider = await createProviderMutation.mutateAsync({
+        name: state.providerName,
+        type: dbType,
+        enabled: true,
+        priority: 50,
+        config,
+      });
+
+      // 2. Store encrypted credentials
+      if (state.credentials.apiKey) {
+        await configureProviderMutation.mutateAsync({
+          dbProviderId: provider.id,
+          providerId: state.providerId,
+          credentials: {
+            apiKey: state.credentials.apiKey,
+            apiSecret: state.credentials.apiSecret,
+            endpoint: state.credentials.endpoint,
+            organizationId: state.credentials.organizationId,
+            projectId: state.credentials.projectId,
+          },
+          setAsDefault: state.setAsDefault,
+        });
+      }
+
+      toast.success(`Provider "${state.providerName}" created and configured`);
+      navigate("/llm");
+    } catch (error: any) {
+      toast.error(`Failed to save: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const canProceed = () => {
@@ -400,7 +466,7 @@ export default function LLMProviderConfigWizard() {
           Set up your LLM provider with secure credential storage
         </p>
         {/* Deployment verification marker */}
-        <p className="text-xs text-gray-400 mt-1">Build: 2026-01-09-v3-with-device-detection</p>
+        <p className="text-xs text-gray-400 mt-1">Build: 2026-02-16-v4-unified-catalog</p>
       </div>
 
       {/* Progress Indicator */}
@@ -466,7 +532,60 @@ export default function LLMProviderConfigWizard() {
 
           {/* Step 1: Select Provider */}
           {state.step === "select" && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="space-y-6">
+              {/* Registered (DB) Providers */}
+              {dbProviders.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Configured Providers ({dbProviders.length})
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {dbProviders.map((dbProv) => {
+                      const isLocal = dbProv.type.startsWith("local");
+                      const provType = isLocal ? "local" as const : "cloud" as const;
+                      const models = (dbProv.config as any)?.models || [];
+                      return (
+                        <div
+                          key={`db-${dbProv.id}`}
+                          className="p-4 rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30 text-left relative"
+                        >
+                          <div className="w-12 h-12 rounded-lg bg-blue-600 mb-3 flex items-center justify-center text-white font-bold">
+                            {dbProv.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <h3 className="font-semibold">{dbProv.name}</h3>
+                          <p className="text-xs text-muted-foreground mt-1">{dbProv.type}</p>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            <Badge variant="outline" className={`text-xs ${dbProv.enabled ? "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-700" : "bg-gray-100 text-gray-500 border-gray-300"}`}>
+                              {dbProv.enabled ? "Pending Validation" : "Disabled"}
+                            </Badge>
+                            {isLocal && (
+                              <Badge variant="outline" className="text-xs">
+                                <Package className="h-3 w-3 mr-1" />
+                                Local
+                              </Badge>
+                            )}
+                          </div>
+                          {models.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {models.length} model{models.length !== 1 ? "s" : ""}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Available Providers (static) */}
+              <div>
+                {dbProviders.length > 0 && (
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+                    Available Providers
+                  </h3>
+                )}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {providers.map((provider) => (
                 <button
                   key={provider.id}
@@ -505,6 +624,8 @@ export default function LLMProviderConfigWizard() {
                   )}
                 </button>
               ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -796,38 +917,74 @@ export default function LLMProviderConfigWizard() {
                 </div>
               )}
 
-              {/* Model Selection for cloud providers */}
-              {cloudProviderModels[state.providerId] && (
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1 space-y-2">
-                    <Label>Model</Label>
-                    <Select
-                      value={state.selectedModels[0] || ""}
-                      onValueChange={(value) => updateState({ selectedModels: [value] })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a model..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cloudProviderModels[state.providerId].map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            {model.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              {/* Model Selection from Unified Catalog */}
+              {state.providerType === "cloud" && (
+                <div className="space-y-3">
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1 space-y-2">
+                      <Label>Model (from Catalog)</Label>
+                      {catalogQuery.isLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground p-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading catalog...
+                        </div>
+                      ) : (
+                        <Select
+                          value={state.selectedModels[0] || ""}
+                          onValueChange={(value) => updateState({ selectedModels: [value] })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Pick a model from catalog..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* Provider models first */}
+                            {(catalogQuery.data || []).filter((m) => m.isProviderModel).length > 0 && (
+                              <>
+                                <SelectItem value="__header_provider__" disabled>
+                                  -- Registered Provider Models --
+                                </SelectItem>
+                                {(catalogQuery.data || [])
+                                  .filter((m) => m.isProviderModel)
+                                  .map((model) => (
+                                    <SelectItem key={`prov-${model.name}`} value={model.name}>
+                                      {model.displayName || model.name}
+                                      {model.providerName ? ` (${model.providerName})` : ""}
+                                    </SelectItem>
+                                  ))}
+                              </>
+                            )}
+                            {/* Hub models */}
+                            <SelectItem value="__header_hub__" disabled>
+                              -- Model Hub --
+                            </SelectItem>
+                            {(catalogQuery.data || [])
+                              .filter((m) => !m.isProviderModel)
+                              .map((model) => (
+                                <SelectItem key={`hub-${model.name}`} value={model.name}>
+                                  {model.displayName || model.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 pb-2">
+                      <Checkbox
+                        id="setDefaultModel"
+                        checked={state.setAsDefault}
+                        onCheckedChange={(checked) => updateState({ setAsDefault: !!checked })}
+                        disabled={!state.selectedModels[0]}
+                      />
+                      <Label htmlFor="setDefaultModel" className="text-sm whitespace-nowrap cursor-pointer">
+                        Set as Default
+                      </Label>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 pb-2">
-                    <Checkbox
-                      id="setDefaultModel"
-                      checked={state.setAsDefault}
-                      onCheckedChange={(checked) => updateState({ setAsDefault: !!checked })}
-                      disabled={!state.selectedModels[0]}
-                    />
-                    <Label htmlFor="setDefaultModel" className="text-sm whitespace-nowrap cursor-pointer">
-                      Set as Default
-                    </Label>
-                  </div>
+                  {state.selectedModels[0] && (
+                    <Badge variant="outline" className="text-xs">
+                      Selected: {state.selectedModels[0]}
+                    </Badge>
+                  )}
                 </div>
               )}
 
@@ -948,6 +1105,12 @@ export default function LLMProviderConfigWizard() {
                   <p className="text-sm text-muted-foreground">Endpoint</p>
                   <p className="font-semibold">{state.credentials.endpoint || "Default"}</p>
                 </div>
+                {state.selectedModels.length > 0 && (
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground">Selected Model</p>
+                    <p className="font-semibold">{state.selectedModels.join(", ")}</p>
+                  </div>
+                )}
                 {state.testResult && (
                   <div className="col-span-2">
                     <p className="text-sm text-muted-foreground">Connection Test</p>
