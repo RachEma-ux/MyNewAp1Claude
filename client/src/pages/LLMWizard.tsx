@@ -14,8 +14,8 @@
  * use "LLM Creation (Full Lifecycle)" wizard at /llm/create
  */
 
-import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,7 @@ import {
   Loader2,
   Shield,
   XCircle,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -120,14 +121,26 @@ const defaultConfiguration: LLMConfiguration = {
 
 export default function LLMWizard() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const [currentStep, setCurrentStep] = useState<WizardStep>("identity");
   const [state, setState] = useState<WizardState>({
     identity: defaultIdentity,
     configuration: defaultConfiguration,
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const prefillApplied = useRef(false);
 
-  // Load draft from localStorage on mount
+  // Provider name → runtime provider mapping
+  const providerMapping: Record<string, string> = {
+    anthropic: "anthropic",
+    openai: "openai",
+    google: "google",
+    "google ai": "google",
+    ollama: "ollama",
+    "llama.cpp": "llama.cpp",
+  };
+
+  // Load draft from localStorage on mount, then apply URL param pre-fill
   useEffect(() => {
     const draft = localStorage.getItem(DRAFT_KEY);
     if (draft) {
@@ -137,6 +150,45 @@ export default function LLMWizard() {
         toast.info("Draft loaded from previous session");
       } catch (e) {
         console.error("Failed to parse draft:", e);
+      }
+    }
+
+    // Pre-fill from URL params (e.g., from Model Browser "Register in Governance")
+    if (!prefillApplied.current && searchString) {
+      const params = new URLSearchParams(searchString);
+      const modelParam = params.get("model");
+      const providerParam = params.get("provider");
+
+      if (modelParam || providerParam) {
+        prefillApplied.current = true;
+        setState((prev) => {
+          const mappedProvider = providerParam
+            ? providerMapping[providerParam.toLowerCase()] || providerParam.toLowerCase()
+            : prev.configuration.runtime.provider;
+
+          // Determine runtime type from provider
+          const localProviders = ["ollama", "llama.cpp"];
+          const runtimeType = mappedProvider && localProviders.includes(mappedProvider)
+            ? "local" as const
+            : "cloud" as const;
+
+          return {
+            ...prev,
+            configuration: {
+              ...prev.configuration,
+              runtime: {
+                ...prev.configuration.runtime,
+                type: runtimeType,
+                provider: mappedProvider,
+              },
+              model: {
+                ...prev.configuration.model,
+                name: modelParam || prev.configuration.model.name,
+              },
+            },
+          };
+        });
+        toast.info(`Pre-filled from Model Browser: ${modelParam || ""} ${providerParam ? `(${providerParam})` : ""}`);
       }
     }
   }, []);
@@ -443,6 +495,8 @@ function ConfigurationStep({
   configuration: LLMConfiguration;
   onUpdate: (updates: Partial<LLMConfiguration>) => void;
 }) {
+  const [, navigate] = useLocation();
+
   const updateRuntime = (updates: Partial<typeof configuration.runtime>) => {
     onUpdate({ runtime: { ...configuration.runtime, ...updates } });
   };
@@ -457,6 +511,18 @@ function ConfigurationStep({
 
   return (
     <div className="space-y-6">
+      {/* Browse Model Browser link */}
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription className="flex items-center justify-between">
+          <span>Need to pick a model? Browse all available models from the catalog.</span>
+          <Button variant="outline" size="sm" onClick={() => navigate("/models/browser")}>
+            <ExternalLink className="h-3 w-3 mr-1" />
+            Model Browser
+          </Button>
+        </AlertDescription>
+      </Alert>
+
       {/* Runtime Configuration */}
       <Card>
         <CardHeader>

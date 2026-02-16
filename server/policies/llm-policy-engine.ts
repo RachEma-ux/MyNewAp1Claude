@@ -13,6 +13,7 @@
  */
 
 import { createHash } from "crypto";
+import { getEnabledProviders } from "../providers/db";
 
 // ============================================================================
 // Types
@@ -140,14 +141,14 @@ export class LLMPolicyEngine {
   /**
    * Evaluate an LLM configuration against policy rules
    */
-  static evaluate(input: LLMPolicyInput): PolicyEvaluationResult {
+  static async evaluate(input: LLMPolicyInput): Promise<PolicyEvaluationResult> {
     const violations: PolicyViolation[] = [];
     const warnings: PolicyViolation[] = [];
 
     // Run all policy checks
     this.checkNaming(input, violations, warnings);
     this.checkRole(input, violations, warnings);
-    this.checkModel(input, violations, warnings);
+    await this.checkModel(input, violations, warnings);
     this.checkParameters(input, violations, warnings);
     this.checkEnvironment(input, violations, warnings);
 
@@ -263,7 +264,7 @@ export class LLMPolicyEngine {
   /**
    * Check model configuration
    */
-  private static checkModel(
+  private static async checkModel(
     input: LLMPolicyInput,
     violations: PolicyViolation[],
     warnings: PolicyViolation[]
@@ -271,13 +272,33 @@ export class LLMPolicyEngine {
     const { model } = input.configuration;
     const { runtime } = input.configuration;
 
-    // Model allowlist check
+    // Model allowlist check - static list first
     const runtimeType = runtime.type === "cloud" ? "cloud" : "local";
     const allowedModels = POLICY_RULES.models.allowlist[runtimeType];
 
-    const isModelAllowed = allowedModels.some((allowed) =>
+    let isModelAllowed = allowedModels.some((allowed) =>
       model.name.toLowerCase().includes(allowed.toLowerCase())
     );
+
+    // Dynamic check: also allow models from enabled registered providers
+    if (!isModelAllowed) {
+      try {
+        const enabledProviders = await getEnabledProviders();
+        for (const provider of enabledProviders) {
+          const config = provider.config as any;
+          const providerModels: string[] = config?.models || [];
+          if (config?.defaultModel && !providerModels.includes(config.defaultModel)) {
+            providerModels.push(config.defaultModel);
+          }
+          if (providerModels.some((pm) => model.name.toLowerCase().includes(pm.toLowerCase()))) {
+            isModelAllowed = true;
+            break;
+          }
+        }
+      } catch {
+        // If provider DB is unavailable, fall through to static allowlist only
+      }
+    }
 
     if (!isModelAllowed && input.environment !== "sandbox") {
       violations.push({
@@ -285,7 +306,7 @@ export class LLMPolicyEngine {
         rule: "model.notAllowed",
         field: "model.name",
         message: `Model "${model.name}" is not in the ${runtimeType} allowlist for ${input.environment}`,
-        suggestion: `Approved models: ${allowedModels.join(", ")}`,
+        suggestion: `Approved models: ${allowedModels.join(", ")}. Models from registered providers are also accepted.`,
       });
     }
 

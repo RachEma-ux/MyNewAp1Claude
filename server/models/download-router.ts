@@ -2,11 +2,120 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import * as downloadDb from "./download-db";
 import { startModelDownload, pauseDownload, resumeDownload, cancelDownload, simulateDownload } from "./download-service";
+import { getEnabledProviders } from "../providers/db";
 
 /**
  * Model Download tRPC Router
  * Handles model download management and tracking
  */
+
+// Shared hub model catalog (used by both getCatalog and getUnifiedCatalog)
+const HUB_MODELS = [
+  {
+    id: 1, name: "llama-2-7b-chat", displayName: "Llama 2 7B Chat",
+    description: "Meta's Llama 2 optimized for dialogue", category: "text" as const,
+    size: "3.8 GB", parameters: "7B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/meta-llama/Llama-2-7b-chat-hf",
+    currentVersion: "2.0", availableVersions: ["2.0", "1.1", "1.0"],
+    requirements: { minVRAM: 8, minRAM: 16, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 2, name: "mistral-7b-instruct", displayName: "Mistral 7B Instruct",
+    description: "Mistral AI's instruction-tuned model", category: "text" as const,
+    size: "4.1 GB", parameters: "7B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2",
+    currentVersion: "0.2", availableVersions: ["0.2", "0.1"],
+    requirements: { minVRAM: 8, minRAM: 16, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 3, name: "deepseek-r1-8b", displayName: "DeepSeek R1 8B",
+    description: "Advanced open reasoning model", category: "code" as const,
+    size: "4.7 GB", parameters: "8B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-8B",
+    currentVersion: "1.0", availableVersions: ["1.0"],
+    requirements: { minVRAM: 8, minRAM: 16, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 4, name: "bge-large-en-v1.5", displayName: "BGE Large EN v1.5",
+    description: "BAAI's general embedding model", category: "embedding" as const,
+    size: "1.34 GB", parameters: "335M", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/BAAI/bge-large-en-v1.5",
+    currentVersion: "1.5", availableVersions: ["1.5", "1.0"],
+    requirements: { minVRAM: 2, minRAM: 4, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 5, name: "qwen3-8b", displayName: "Qwen 3 8B",
+    description: "Alibaba's latest reasoning model", category: "text" as const,
+    size: "4.9 GB", parameters: "8B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/Qwen/Qwen3-8B",
+    currentVersion: "0.1", availableVersions: ["0.1"],
+    requirements: { minVRAM: 24, minRAM: 64, gpuRequired: true, cpuCompatible: false },
+  },
+  {
+    id: 6, name: "smollm2-360m-instruct", displayName: "SmolLM2 360M Instruct",
+    description: "HuggingFace's ultra-compact instruction-tuned model, ideal for on-device inference",
+    category: "text" as const, size: "0.7 GB", parameters: "360M", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct",
+    currentVersion: "1.0", availableVersions: ["1.0"],
+    requirements: { minVRAM: 1, minRAM: 2, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 7, name: "tinyllama-1.1b", displayName: "TinyLlama 1.1B",
+    description: "Compact Llama architecture model trained on 3T tokens, great for resource-constrained devices",
+    category: "text" as const, size: "0.6 GB", parameters: "1.1B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    currentVersion: "1.0", availableVersions: ["1.0"],
+    requirements: { minVRAM: 1, minRAM: 2, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 8, name: "phi-3-mini", displayName: "Phi-3 Mini",
+    description: "Microsoft's compact yet capable model with strong reasoning for its size",
+    category: "text" as const, size: "2.2 GB", parameters: "3.8B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct",
+    currentVersion: "1.0", availableVersions: ["1.0"],
+    requirements: { minVRAM: 4, minRAM: 8, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 9, name: "phi-2", displayName: "Phi-2 Small",
+    description: "Microsoft's efficient small language model with strong benchmark performance",
+    category: "text" as const, size: "1.5 GB", parameters: "2.7B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/microsoft/phi-2",
+    currentVersion: "1.0", availableVersions: ["1.0"],
+    requirements: { minVRAM: 2, minRAM: 4, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 10, name: "gemma-2b", displayName: "Gemma 2B",
+    description: "Google's lightweight open model built from Gemini research",
+    category: "text" as const, size: "1.4 GB", parameters: "2B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/google/gemma-2b-it",
+    currentVersion: "1.0", availableVersions: ["1.0"],
+    requirements: { minVRAM: 2, minRAM: 4, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 11, name: "deepseek-r1-1.5b", displayName: "DeepSeek R1 1.5B",
+    description: "Compact reasoning model distilled from DeepSeek R1",
+    category: "code" as const, size: "0.9 GB", parameters: "1.5B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+    currentVersion: "1.0", availableVersions: ["1.0"],
+    requirements: { minVRAM: 2, minRAM: 4, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 12, name: "llama-3.2-1b", displayName: "Llama 3.2 1B",
+    description: "Meta's smallest Llama model, optimized for edge and mobile deployment",
+    category: "text" as const, size: "0.7 GB", parameters: "1B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct",
+    currentVersion: "1.0", availableVersions: ["1.0"],
+    requirements: { minVRAM: 1, minRAM: 2, gpuRequired: false, cpuCompatible: true },
+  },
+  {
+    id: 13, name: "phonelm-1.5b", displayName: "PhoneLM 1.5B",
+    description: "Purpose-built for on-device phone inference with minimal memory footprint",
+    category: "text" as const, size: "0.9 GB", parameters: "1.5B", source: "huggingface" as const,
+    downloadUrl: "https://huggingface.co/mllmTeam/PhoneLM-1.5B-Instruct",
+    currentVersion: "1.0", availableVersions: ["1.0"],
+    requirements: { minVRAM: 1, minRAM: 2, gpuRequired: false, cpuCompatible: true },
+  },
+];
 
 export const modelDownloadRouter = router({
   // Create a new download with scheduling options
@@ -154,258 +263,7 @@ export const modelDownloadRouter = router({
       })
     )
     .query(async ({ input }) => {
-      // Mock catalog - in production, this would call HuggingFace API
-      const allModels = [
-        {
-          id: 1,
-          name: "llama-2-7b-chat",
-          displayName: "Llama 2 7B Chat",
-          description: "Meta's Llama 2 optimized for dialogue",
-          category: "text",
-          size: "3.8 GB",
-          parameters: "7B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/meta-llama/Llama-2-7b-chat-hf",
-          currentVersion: "2.0",
-          availableVersions: ["2.0", "1.1", "1.0"],
-          requirements: {
-            minVRAM: 8,
-            minRAM: 16,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 2,
-          name: "mistral-7b-instruct",
-          displayName: "Mistral 7B Instruct",
-          description: "Mistral AI's instruction-tuned model",
-          category: "text",
-          size: "4.1 GB",
-          parameters: "7B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2",
-          currentVersion: "0.2",
-          availableVersions: ["0.2", "0.1"],
-          requirements: {
-            minVRAM: 8,
-            minRAM: 16,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 3,
-          name: "deepseek-r1-8b",
-          displayName: "DeepSeek R1 8B",
-          description: "Advanced open reasoning model",
-          category: "code",
-          size: "4.7 GB",
-          parameters: "8B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-8B",
-          currentVersion: "1.0",
-          availableVersions: ["1.0"],
-          requirements: {
-            minVRAM: 8,
-            minRAM: 16,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 4,
-          name: "bge-large-en-v1.5",
-          displayName: "BGE Large EN v1.5",
-          description: "BAAI's general embedding model",
-          category: "embedding",
-          size: "1.34 GB",
-          parameters: "335M",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/BAAI/bge-large-en-v1.5",
-          currentVersion: "1.5",
-          availableVersions: ["1.5", "1.0"],
-          requirements: {
-            minVRAM: 2,
-            minRAM: 4,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 5,
-          name: "qwen3-8b",
-          displayName: "Qwen 3 8B",
-          description: "Alibaba's latest reasoning model",
-          category: "text",
-          size: "4.9 GB",
-          parameters: "8B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/Qwen/Qwen3-8B",
-          currentVersion: "0.1",
-          availableVersions: ["0.1"],
-          requirements: {
-            minVRAM: 24,
-            minRAM: 64,
-            gpuRequired: true,
-            cpuCompatible: false,
-          },
-        },
-        {
-          id: 6,
-          name: "smollm2-360m-instruct",
-          displayName: "SmolLM2 360M Instruct",
-          description: "HuggingFace's ultra-compact instruction-tuned model, ideal for on-device inference",
-          category: "text",
-          size: "0.7 GB",
-          parameters: "360M",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct",
-          currentVersion: "1.0",
-          availableVersions: ["1.0"],
-          requirements: {
-            minVRAM: 1,
-            minRAM: 2,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 7,
-          name: "tinyllama-1.1b",
-          displayName: "TinyLlama 1.1B",
-          description: "Compact Llama architecture model trained on 3T tokens, great for resource-constrained devices",
-          category: "text",
-          size: "0.6 GB",
-          parameters: "1.1B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-          currentVersion: "1.0",
-          availableVersions: ["1.0"],
-          requirements: {
-            minVRAM: 1,
-            minRAM: 2,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 8,
-          name: "phi-3-mini",
-          displayName: "Phi-3 Mini",
-          description: "Microsoft's compact yet capable model with strong reasoning for its size",
-          category: "text",
-          size: "2.2 GB",
-          parameters: "3.8B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct",
-          currentVersion: "1.0",
-          availableVersions: ["1.0"],
-          requirements: {
-            minVRAM: 4,
-            minRAM: 8,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 9,
-          name: "phi-2",
-          displayName: "Phi-2 Small",
-          description: "Microsoft's efficient small language model with strong benchmark performance",
-          category: "text",
-          size: "1.5 GB",
-          parameters: "2.7B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/microsoft/phi-2",
-          currentVersion: "1.0",
-          availableVersions: ["1.0"],
-          requirements: {
-            minVRAM: 2,
-            minRAM: 4,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 10,
-          name: "gemma-2b",
-          displayName: "Gemma 2B",
-          description: "Google's lightweight open model built from Gemini research",
-          category: "text",
-          size: "1.4 GB",
-          parameters: "2B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/google/gemma-2b-it",
-          currentVersion: "1.0",
-          availableVersions: ["1.0"],
-          requirements: {
-            minVRAM: 2,
-            minRAM: 4,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 11,
-          name: "deepseek-r1-1.5b",
-          displayName: "DeepSeek R1 1.5B",
-          description: "Compact reasoning model distilled from DeepSeek R1",
-          category: "code",
-          size: "0.9 GB",
-          parameters: "1.5B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
-          currentVersion: "1.0",
-          availableVersions: ["1.0"],
-          requirements: {
-            minVRAM: 2,
-            minRAM: 4,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 12,
-          name: "llama-3.2-1b",
-          displayName: "Llama 3.2 1B",
-          description: "Meta's smallest Llama model, optimized for edge and mobile deployment",
-          category: "text",
-          size: "0.7 GB",
-          parameters: "1B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct",
-          currentVersion: "1.0",
-          availableVersions: ["1.0"],
-          requirements: {
-            minVRAM: 1,
-            minRAM: 2,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-        {
-          id: 13,
-          name: "phonelm-1.5b",
-          displayName: "PhoneLM 1.5B",
-          description: "Purpose-built for on-device phone inference with minimal memory footprint",
-          category: "text",
-          size: "0.9 GB",
-          parameters: "1.5B",
-          source: "huggingface",
-          downloadUrl: "https://huggingface.co/mllmTeam/PhoneLM-1.5B-Instruct",
-          currentVersion: "1.0",
-          availableVersions: ["1.0"],
-          requirements: {
-            minVRAM: 1,
-            minRAM: 2,
-            gpuRequired: false,
-            cpuCompatible: true,
-          },
-        },
-      ];
-
-      let filtered = allModels;
+      let filtered = [...HUB_MODELS];
 
       if (input.category && input.category !== "all") {
         filtered = filtered.filter((m) => m.category === input.category);
@@ -418,6 +276,90 @@ export const modelDownloadRouter = router({
             m.name.toLowerCase().includes(search) ||
             m.displayName.toLowerCase().includes(search) ||
             m.description.toLowerCase().includes(search)
+        );
+      }
+
+      return filtered;
+    }),
+
+  // Unified catalog: merges hub models + registered provider models
+  getUnifiedCatalog: protectedProcedure
+    .input(
+      z.object({
+        search: z.string().optional(),
+        category: z.enum(["text", "code", "embedding", "all"]).optional(),
+        source: z.enum(["all", "hub", "providers"]).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      // Hub models with unified catalog fields
+      const hubModels = HUB_MODELS.map((m) => ({
+        ...m,
+        isProviderModel: false,
+        providerName: null as string | null,
+        providerId: null as number | null,
+      }));
+
+      // Build provider model entries from enabled providers
+      const providerModelEntries: typeof hubModels = [];
+      try {
+        const enabledProviders = await getEnabledProviders();
+        for (const provider of enabledProviders) {
+          const config = provider.config as any;
+          const models: string[] = config?.models || [];
+          // Include defaultModel if not already in models list
+          if (config?.defaultModel && !models.includes(config.defaultModel)) {
+            models.push(config.defaultModel);
+          }
+          models.forEach((modelName: string, idx: number) => {
+            providerModelEntries.push({
+              id: 1000 + provider.id * 100 + idx,
+              name: modelName,
+              displayName: modelName,
+              description: `Available via ${provider.name} (${provider.type})`,
+              category: "text",
+              size: "",
+              parameters: "",
+              source: "provider" as any,
+              downloadUrl: "",
+              currentVersion: "",
+              availableVersions: [],
+              requirements: null as any,
+              isProviderModel: true,
+              providerName: provider.name,
+              providerId: provider.id,
+            });
+          });
+        }
+      } catch (err) {
+        console.warn("[UnifiedCatalog] Failed to fetch provider models:", err);
+      }
+
+      // Merge based on source filter
+      const sourceFilter = input.source || "all";
+      let allModels: typeof hubModels = [];
+      if (sourceFilter === "all" || sourceFilter === "hub") {
+        allModels.push(...hubModels);
+      }
+      if (sourceFilter === "all" || sourceFilter === "providers") {
+        allModels.push(...providerModelEntries);
+      }
+
+      // Apply category filter
+      let filtered = allModels;
+      if (input.category && input.category !== "all") {
+        filtered = filtered.filter((m) => m.category === input.category);
+      }
+
+      // Apply search filter
+      if (input.search) {
+        const search = input.search.toLowerCase();
+        filtered = filtered.filter(
+          (m) =>
+            m.name.toLowerCase().includes(search) ||
+            m.displayName.toLowerCase().includes(search) ||
+            m.description.toLowerCase().includes(search) ||
+            (m.providerName && m.providerName.toLowerCase().includes(search))
         );
       }
 

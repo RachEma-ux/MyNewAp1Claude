@@ -4,7 +4,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { Download, Search, Filter, Loader2, CheckCircle2, XCircle, Pause, Settings } from "lucide-react";
+import { Download, Search, Filter, Loader2, CheckCircle2, XCircle, Pause, Settings, ExternalLink } from "lucide-react";
 import { DownloadSchedulingDialog } from "../components/DownloadSchedulingDialog";
 import {
   Select,
@@ -13,22 +13,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { useLocation } from "wouter";
 
 /**
  * Model Browser Page
- * Browse and download AI models from HuggingFace and Ollama
+ * Browse AI models from the hub catalog and registered providers
  */
 
 export default function ModelBrowser() {
   const [searchQuery, setSearchQuery] = useState("");
   const [category, setCategory] = useState<"text" | "code" | "embedding" | "all">("all");
+  const [source, setSource] = useState<"all" | "hub" | "providers">("all");
   const [schedulingDialogOpen, setSchedulingDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<any>(null);
+  const [, setLocation] = useLocation();
 
-  // Fetch model catalog
-  const { data: models, isLoading: catalogLoading } = trpc.modelDownloads.getCatalog.useQuery({
+  // Fetch unified model catalog
+  const { data: models, isLoading: catalogLoading } = trpc.modelDownloads.getUnifiedCatalog.useQuery({
     search: searchQuery || undefined,
     category,
+    source,
   });
 
   // Fetch active downloads
@@ -113,12 +117,19 @@ export default function ModelBrowser() {
     }
   };
 
+  const handleRegister = (model: any) => {
+    const params = new URLSearchParams();
+    if (model.name) params.set("model", model.name);
+    if (model.providerName) params.set("provider", model.providerName);
+    setLocation(`/llm/wizard?${params.toString()}`);
+  };
+
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Model Browser</h1>
         <p className="text-muted-foreground">
-          Browse and download AI models from HuggingFace and Ollama
+          Browse AI models from the hub catalog and registered providers
         </p>
       </div>
 
@@ -162,8 +173,8 @@ export default function ModelBrowser() {
       )}
 
       {/* Search and Filter */}
-      <div className="flex gap-4 mb-6">
-        <div className="relative flex-1">
+      <div className="flex gap-4 mb-6 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Search models..."
@@ -184,6 +195,16 @@ export default function ModelBrowser() {
             <SelectItem value="embedding">Embeddings</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={source} onValueChange={(v: any) => setSource(v)}>
+          <SelectTrigger className="w-[220px]">
+            <SelectValue placeholder="Source" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Sources</SelectItem>
+            <SelectItem value="hub">Model Hub</SelectItem>
+            <SelectItem value="providers">Registered Providers</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Model Catalog */}
@@ -194,18 +215,19 @@ export default function ModelBrowser() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {models?.map((model) => {
-            const download = getDownloadForModel(model.id);
+            const isProviderModel = model.isProviderModel;
+            const download = !isProviderModel ? getDownloadForModel(model.id) : undefined;
             const isDownloaded = download?.status === "completed";
             const isDownloading = download?.status === "downloading";
 
             return (
-              <Card key={model.id}>
+              <Card key={`${model.source}-${model.id}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-lg">{model.displayName}</CardTitle>
-                        {model.currentVersion && (
+                        {!isProviderModel && model.currentVersion && (
                           <Badge variant="outline" className="text-xs">v{model.currentVersion}</Badge>
                         )}
                       </div>
@@ -218,18 +240,25 @@ export default function ModelBrowser() {
                   <div className="space-y-4">
                     <div className="flex gap-2 flex-wrap">
                       <Badge variant="secondary">{model.category}</Badge>
-                      <Badge variant="outline">{model.parameters}</Badge>
-                      <Badge variant="outline">{model.size}</Badge>
-                      
-                      {/* Hardware Compatibility Badges */}
-                      {model.requirements && (
+                      {model.parameters && <Badge variant="outline">{model.parameters}</Badge>}
+                      {model.size && <Badge variant="outline">{model.size}</Badge>}
+
+                      {/* Provider badge for provider models */}
+                      {isProviderModel && model.providerName && (
+                        <Badge className="bg-blue-600 hover:bg-blue-700 text-white">
+                          {model.providerName}
+                        </Badge>
+                      )}
+
+                      {/* Hardware Compatibility Badges (hub models only) */}
+                      {!isProviderModel && model.requirements && (
                         <>
                           {model.requirements.gpuRequired ? (
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className={`${
-                                hardwareProfile?.hasGPU 
-                                  ? "border-green-500 text-green-500" 
+                                hardwareProfile?.hasGPU
+                                  ? "border-green-500 text-green-500"
                                   : "border-red-500 text-red-500"
                               }`}
                             >
@@ -240,9 +269,9 @@ export default function ModelBrowser() {
                               CPU-OK
                             </Badge>
                           )}
-                          
+
                           {hardwareProfile?.hasGPU && hardwareProfile.gpuVRAM && (
-                            <Badge 
+                            <Badge
                               variant="outline"
                               className={`${
                                 hardwareProfile.gpuVRAM >= model.requirements.minVRAM
@@ -253,9 +282,9 @@ export default function ModelBrowser() {
                               VRAM: {model.requirements.minVRAM}GB+
                             </Badge>
                           )}
-                          
+
                           {!hardwareProfile?.hasGPU && (
-                            <Badge 
+                            <Badge
                               variant="outline"
                               className={`${
                                 hardwareProfile && hardwareProfile.totalRAM >= model.requirements.minRAM
@@ -271,8 +300,8 @@ export default function ModelBrowser() {
                     </div>
 
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Source: {model.source || 'Unknown'}</span>
-                      {model.availableVersions && model.availableVersions.length > 1 && (
+                      <span>Source: {isProviderModel ? `Provider (${model.providerName})` : model.source || 'Unknown'}</span>
+                      {!isProviderModel && model.availableVersions && model.availableVersions.length > 1 && (
                         <div className="flex items-center gap-2">
                           <span className="text-xs">Version:</span>
                           <Select defaultValue={model.currentVersion}>
@@ -292,46 +321,59 @@ export default function ModelBrowser() {
                       )}
                     </div>
 
-                    {isDownloaded || isDownloading || createDownload.isPending ? (
+                    {/* Provider models: Register button */}
+                    {isProviderModel ? (
                       <Button
                         className="w-full"
-                        disabled
+                        variant="outline"
+                        onClick={() => handleRegister(model)}
                       >
-                        {createDownload.isPending ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Starting...
-                          </>
-                        ) : isDownloaded ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 mr-2" />
-                            Downloaded
-                          </>
-                        ) : (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Downloading...
-                          </>
-                        )}
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Register in Governance
                       </Button>
                     ) : (
-                      <div className="flex gap-2">
+                      /* Hub models: Download button */
+                      isDownloaded || isDownloading || createDownload.isPending ? (
                         <Button
-                          className="flex-1"
-                          onClick={() => handleDownload(model)}
+                          className="w-full"
+                          disabled
                         >
-                          <Download className="w-4 h-4 mr-2" />
-                          Download
+                          {createDownload.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Starting...
+                            </>
+                          ) : isDownloaded ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 mr-2" />
+                              Downloaded
+                            </>
+                          ) : (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Downloading...
+                            </>
+                          )}
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => openSchedulingDialog(model)}
-                          title="Schedule download"
-                        >
-                          <Settings className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            className="flex-1"
+                            onClick={() => handleDownload(model)}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Download
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => openSchedulingDialog(model)}
+                            title="Schedule download"
+                          >
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )
                     )}
                   </div>
                 </CardContent>

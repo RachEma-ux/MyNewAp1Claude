@@ -492,7 +492,7 @@ export const llmRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const result = LLMPolicyEngine.evaluate({
+      const result = await LLMPolicyEngine.evaluate({
         identity: {
           name: input.identity.name,
           role: input.identity.role,

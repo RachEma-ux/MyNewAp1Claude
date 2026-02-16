@@ -115,7 +115,7 @@ export default function Models() {
         </div>
         <Button onClick={() => setLocation("/models/browser")}>
           <Download className="mr-2 h-4 w-4" />
-          Browse Model Hub
+          Browse All Models
         </Button>
       </div>
 
