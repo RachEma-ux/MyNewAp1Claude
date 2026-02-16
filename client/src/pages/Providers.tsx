@@ -283,7 +283,7 @@ export default function Providers() {
                 Add
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
               <DialogHeader className="flex flex-row items-start justify-between space-y-0">
                 <div>
                   <DialogTitle>Add New Provider</DialogTitle>
