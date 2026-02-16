@@ -40,6 +40,7 @@ import {
   Plus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { StepProgress } from "@/components/ui/step-progress";
 
 // Helper component to show model compatibility
 function ModelCompatibilityBadge({ model, deviceSpecs }: { model: any; deviceSpecs: any }) {
@@ -404,58 +405,25 @@ export default function LLMProviderConfigWizard() {
 
       {/* Progress Indicator */}
       <div className="mb-8">
-        <div className="flex items-center justify-center gap-2 overflow-x-auto">
-          {(state.providerType === "local"
-            ? ([
+        <StepProgress
+          steps={state.providerType === "local"
+            ? [
                 { step: "select", label: "Select" },
                 { step: "install", label: "Install" },
                 { step: "models", label: "Models" },
                 { step: "configure", label: "Configure" },
                 { step: "test", label: "Test" },
                 { step: "review", label: "Review" },
-              ] as const)
-            : ([
+              ]
+            : [
                 { step: "select", label: "Select" },
                 { step: "configure", label: "Configure" },
                 { step: "test", label: "Test" },
                 { step: "review", label: "Review" },
-              ] as const)
-          ).map((item, index, array) => {
-            const allSteps = array.map((s) => s.step);
-            const currentIndex = allSteps.indexOf(state.step as any);
-            const isCompleted = currentIndex > index;
-            const isCurrent = state.step === item.step;
-
-            return (
-              <div key={item.step} className="flex items-center">
-                <div className="flex flex-col items-center min-w-max">
-                  <div
-                    className={`
-                      w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all
-                      ${isCurrent ? "bg-primary text-primary-foreground ring-4 ring-primary/20" : ""}
-                      ${isCompleted ? "bg-primary text-primary-foreground" : ""}
-                      ${!isCurrent && !isCompleted ? "bg-muted text-muted-foreground" : ""}
-                    `}
-                  >
-                    {isCompleted ? (
-                      <Check className="h-5 w-5" />
-                    ) : (
-                      index + 1
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground mt-2">{item.label}</span>
-                </div>
-                {index < array.length - 1 && (
-                  <div
-                    className={`h-1 w-12 mx-2 mb-6 transition-all ${
-                      isCompleted ? "bg-primary" : "bg-muted"
-                    }`}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
+              ]
+          }
+          currentStep={state.step}
+        />
       </div>
 
       <Card>
