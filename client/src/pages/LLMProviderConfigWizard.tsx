@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -111,6 +112,33 @@ function SystemRequirements({ model }: { model: any }) {
     </div>
   );
 }
+
+// Cloud provider model lists for the configure step
+const cloudProviderModels: Record<string, { id: string; name: string }[]> = {
+  anthropic: [
+    { id: "claude-opus-4-6", name: "Claude Opus 4.6" },
+    { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5" },
+    { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5" },
+    { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5" },
+    { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4" },
+  ],
+  openai: [
+    { id: "gpt-4.1", name: "GPT-4.1" },
+    { id: "gpt-4.1-mini", name: "GPT-4.1 Mini" },
+    { id: "gpt-4.1-nano", name: "GPT-4.1 Nano" },
+    { id: "o3", name: "o3" },
+    { id: "o4-mini", name: "o4 Mini" },
+    { id: "gpt-4o", name: "GPT-4o" },
+    { id: "gpt-4o-mini", name: "GPT-4o Mini" },
+  ],
+  google: [
+    { id: "gemini-3-pro", name: "Gemini 3 Pro" },
+    { id: "gemini-3-flash", name: "Gemini 3 Flash" },
+    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
+    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+    { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+  ],
+};
 
 type WizardStep = "select" | "install" | "models" | "configure" | "test" | "review";
 
@@ -787,6 +815,28 @@ export default function LLMProviderConfigWizard() {
                   <p className="text-xs text-muted-foreground">
                     Get your API key from {selectedProvider.company} dashboard
                   </p>
+                </div>
+              )}
+
+              {/* Model Selection for cloud providers */}
+              {cloudProviderModels[state.providerId] && (
+                <div className="space-y-2">
+                  <Label>Model</Label>
+                  <Select
+                    value={state.selectedModels[0] || ""}
+                    onValueChange={(value) => updateState({ selectedModels: [value] })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a model..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cloudProviderModels[state.providerId].map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          {model.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 
