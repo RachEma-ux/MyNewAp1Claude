@@ -750,20 +750,25 @@ function BaseModelSelectionStep({
   project: CreationProject;
   updateProject: (updates: Partial<CreationProject>) => void;
 }) {
-  const catalogQuery = trpc.modelDownloads.getUnifiedCatalog.useQuery({ source: "hub" });
+  const catalogQuery = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
 
-  // Map catalog hub models to training-compatible format, filtering out embedding models
-  const recommendedModels = (catalogQuery.data || [])
-    .filter((m) => m.category !== "embedding" && !m.isProviderModel)
+  // Map all catalog models to training-compatible format, filtering out embedding models
+  const allModels = (catalogQuery.data || [])
+    .filter((m) => m.category !== "embedding" && (m.displayName || m.name || "").trim() !== "")
     .map((m) => ({
-      name: m.displayName,
+      name: m.displayName || m.name,
       ollamaTag: m.ollamaTag || "",
-      hfRepo: m.downloadUrl.replace("https://huggingface.co/", ""),
-      size: m.parameters,
+      hfRepo: m.downloadUrl ? m.downloadUrl.replace("https://huggingface.co/", "") : "",
+      size: m.parameters || m.size || "",
       license: m.license || "",
-      context: 0, // Not tracked in catalog; user picks context in target step
+      context: 0,
       bestFor: m.bestFor || m.description,
+      isProviderModel: m.isProviderModel,
+      providerName: m.providerName,
     }));
+
+  const hubModels = allModels.filter((m) => !m.isProviderModel);
+  const providerModels = allModels.filter((m) => m.isProviderModel);
 
   return (
     <div className="space-y-6">
@@ -774,73 +779,117 @@ function BaseModelSelectionStep({
         </AlertDescription>
       </Alert>
 
-      <div className="space-y-4">
-        <Label>Recommended Base Models</Label>
-        {catalogQuery.isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading models from catalog...
+      {catalogQuery.isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading models from catalog...
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Provider Models */}
+          {providerModels.length > 0 && (
+            <div className="space-y-4">
+              <Label>Configured Provider Models ({providerModels.length})</Label>
+              <div className="grid gap-4">
+                {providerModels.map((model) => (
+                  <Card
+                    key={`prov-${model.name}`}
+                    className={`cursor-pointer transition-all ${
+                      project.baseModel?.name === model.name
+                        ? "border-primary ring-2 ring-primary"
+                        : "hover:border-primary/50"
+                    }`}
+                    onClick={() =>
+                      updateProject({
+                        baseModel: {
+                          name: model.name,
+                          ollamaTag: model.ollamaTag,
+                          hfRepo: model.hfRepo,
+                          size: model.size,
+                          license: model.license,
+                          context: model.context,
+                          rationale: model.bestFor,
+                        },
+                      })
+                    }
+                  >
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{model.name}</CardTitle>
+                        <div className="flex gap-2">
+                          {model.providerName && (
+                            <Badge variant="outline">{model.providerName}</Badge>
+                          )}
+                          {model.size && <Badge variant="secondary">{model.size}</Badge>}
+                        </div>
+                      </div>
+                      <CardDescription>{model.bestFor}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Hub Models */}
+          <div className="space-y-4">
+            <Label>Model Hub ({hubModels.length})</Label>
+            <div className="grid gap-4">
+              {hubModels.map((model) => (
+                <Card
+                  key={`hub-${model.name}`}
+                  className={`cursor-pointer transition-all ${
+                    project.baseModel?.name === model.name
+                      ? "border-primary ring-2 ring-primary"
+                      : "hover:border-primary/50"
+                  }`}
+                  onClick={() =>
+                    updateProject({
+                      baseModel: {
+                        name: model.name,
+                        ollamaTag: model.ollamaTag,
+                        hfRepo: model.hfRepo,
+                        size: model.size,
+                        license: model.license,
+                        context: model.context,
+                        rationale: model.bestFor,
+                      },
+                    })
+                  }
+                >
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{model.name}</CardTitle>
+                      <Badge variant="secondary">{model.size}</Badge>
+                    </div>
+                    <CardDescription>{model.bestFor}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    {model.ollamaTag && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Ollama:</span>
+                        <code className="text-xs bg-muted px-2 py-1 rounded">{model.ollamaTag}</code>
+                      </div>
+                    )}
+                    {model.hfRepo && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">HuggingFace:</span>
+                        <code className="text-xs bg-muted px-2 py-1 rounded">{model.hfRepo}</code>
+                      </div>
+                    )}
+                    {model.license && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">License:</span>
+                        <span>{model.license}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-        ) : (
-          <div className="grid gap-4">
-            {recommendedModels.map((model) => (
-              <Card
-                key={model.name}
-                className={`cursor-pointer transition-all ${
-                  project.baseModel?.name === model.name
-                    ? "border-primary ring-2 ring-primary"
-                    : "hover:border-primary/50"
-                }`}
-                onClick={() =>
-                  updateProject({
-                    baseModel: {
-                      name: model.name,
-                      ollamaTag: model.ollamaTag,
-                      hfRepo: model.hfRepo,
-                      size: model.size,
-                      license: model.license,
-                      context: model.context,
-                      rationale: model.bestFor,
-                    },
-                  })
-                }
-              >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{model.name}</CardTitle>
-                    <Badge variant="secondary">{model.size}</Badge>
-                  </div>
-                  <CardDescription>{model.bestFor}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  {model.ollamaTag && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Ollama:</span>
-                      <code className="text-xs bg-muted px-2 py-1 rounded">{model.ollamaTag}</code>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">HuggingFace:</span>
-                    <code className="text-xs bg-muted px-2 py-1 rounded">{model.hfRepo}</code>
-                  </div>
-                  {model.context > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Context:</span>
-                      <span>{model.context.toLocaleString()} tokens</span>
-                    </div>
-                  )}
-                  {model.license && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">License:</span>
-                      <span>{model.license}</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {project.baseModel && (
         <Alert className="bg-green-50 border-green-200">

@@ -3,7 +3,7 @@
  * Step-by-step wizard for configuring LLM providers with encryption & testing
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -190,15 +190,35 @@ export default function LLMProviderConfigWizard() {
   const [isSaving, setIsSaving] = useState(false);
   const [isCheckingInstallation, setIsCheckingInstallation] = useState(false);
 
-  // Queries
+  // Queries — single catalog is the source of truth for models
   const { data: providers = [] } = trpc.llm.listProviders.useQuery();
-  const { data: dbProviders = [] } = trpc.providers.list.useQuery({});
   const testConnectionMutation = trpc.llm.testProviderConnection.useMutation();
   const createProviderMutation = trpc.providers.create.useMutation();
   const configureProviderMutation = trpc.llm.configureProvider.useMutation();
 
-  // Unified catalog: fetches hub + registered provider models
+  // Unified catalog: single source of truth for all models (hub + provider)
   const catalogQuery = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
+
+  // Derive configured providers from the unified catalog (no separate DB query)
+  const configuredProviders = useMemo(() => {
+    if (!catalogQuery.data) return [];
+    const provMap = new Map<number, { id: number; name: string; models: string[] }>();
+    for (const m of catalogQuery.data) {
+      if (m.isProviderModel && m.providerId != null && (m.name || "").trim()) {
+        const existing = provMap.get(m.providerId);
+        if (existing) {
+          existing.models.push(m.name);
+        } else {
+          provMap.set(m.providerId, {
+            id: m.providerId,
+            name: m.providerName || `Provider ${m.providerId}`,
+            models: [m.name],
+          });
+        }
+      }
+    }
+    return Array.from(provMap.values());
+  }, [catalogQuery.data]);
 
   // Debug: Log providers when loaded
   useEffect(() => {
@@ -533,54 +553,40 @@ export default function LLMProviderConfigWizard() {
           {/* Step 1: Select Provider */}
           {state.step === "select" && (
             <div className="space-y-6">
-              {/* Registered (DB) Providers */}
-              {dbProviders.length > 0 && (
+              {/* Configured Providers — derived from unified catalog */}
+              {configuredProviders.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                     <Package className="h-4 w-4" />
-                    Configured Providers ({dbProviders.length})
+                    Configured Providers ({configuredProviders.length})
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {dbProviders.map((dbProv) => {
-                      const isLocal = dbProv.type.startsWith("local");
-                      const provType = isLocal ? "local" as const : "cloud" as const;
-                      const models = (dbProv.config as any)?.models || [];
-                      return (
-                        <div
-                          key={`db-${dbProv.id}`}
-                          className="p-4 rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30 text-left relative"
-                        >
-                          <div className="w-12 h-12 rounded-lg bg-blue-600 mb-3 flex items-center justify-center text-white font-bold">
-                            {dbProv.name.substring(0, 2).toUpperCase()}
-                          </div>
-                          <h3 className="font-semibold">{dbProv.name}</h3>
-                          <p className="text-xs text-muted-foreground mt-1">{dbProv.type}</p>
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            <Badge variant="outline" className={`text-xs ${dbProv.enabled ? "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-700" : "bg-gray-100 text-gray-500 border-gray-300"}`}>
-                              {dbProv.enabled ? "Pending Validation" : "Disabled"}
-                            </Badge>
-                            {isLocal && (
-                              <Badge variant="outline" className="text-xs">
-                                <Package className="h-3 w-3 mr-1" />
-                                Local
-                              </Badge>
-                            )}
-                          </div>
-                          {models.length > 0 && (
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {models.length} model{models.length !== 1 ? "s" : ""}
-                            </p>
-                          )}
+                    {configuredProviders.map((cp) => (
+                      <div
+                        key={`cp-${cp.id}`}
+                        className="p-4 rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30 text-left relative"
+                      >
+                        <div className="w-12 h-12 rounded-lg bg-blue-600 mb-3 flex items-center justify-center text-white font-bold">
+                          {cp.name.substring(0, 2).toUpperCase()}
                         </div>
-                      );
-                    })}
+                        <h3 className="font-semibold">{cp.name}</h3>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-700">
+                            Pending Validation
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {cp.models.length} model{cp.models.length !== 1 ? "s" : ""}: {cp.models.slice(0, 2).join(", ")}{cp.models.length > 2 ? "..." : ""}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Available Providers (static) */}
+              {/* Available Providers (templates for new configuration) */}
               <div>
-                {dbProviders.length > 0 && (
+                {configuredProviders.length > 0 && (
                   <h3 className="text-sm font-semibold text-muted-foreground mb-3">
                     Available Providers
                   </h3>
