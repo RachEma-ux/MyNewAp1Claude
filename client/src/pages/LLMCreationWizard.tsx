@@ -784,6 +784,13 @@ function BaseModelSelectionStep({
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading models from catalog...
         </div>
+      ) : catalogQuery.error ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load catalog: {catalogQuery.error.message}
+          </AlertDescription>
+        </Alert>
       ) : (
         <div className="space-y-6">
           {/* Provider Models */}
