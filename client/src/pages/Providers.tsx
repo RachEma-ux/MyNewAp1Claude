@@ -386,10 +386,10 @@ export default function Providers() {
 
                 {/* Default Provider Type */}
                 <div className="flex-1 space-y-2">
-                  <Label>Type</Label>
+                  <Label>Default Providers</Label>
                   <Select value={selectedType} onValueChange={(value) => setSelectedType(value as ProviderType)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select type..." />
+                      <SelectValue placeholder="Select default..." />
                     </SelectTrigger>
                     <SelectContent>
                       {(Object.keys(providerTypeInfo) as ProviderType[]).map((type) => {
