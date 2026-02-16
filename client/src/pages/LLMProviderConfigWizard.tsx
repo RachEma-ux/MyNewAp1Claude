@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -820,23 +821,36 @@ export default function LLMProviderConfigWizard() {
 
               {/* Model Selection for cloud providers */}
               {cloudProviderModels[state.providerId] && (
-                <div className="space-y-2">
-                  <Label>Model</Label>
-                  <Select
-                    value={state.selectedModels[0] || ""}
-                    onValueChange={(value) => updateState({ selectedModels: [value] })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a model..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cloudProviderModels[state.providerId].map((model) => (
-                        <SelectItem key={model.id} value={model.id}>
-                          {model.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1 space-y-2">
+                    <Label>Model</Label>
+                    <Select
+                      value={state.selectedModels[0] || ""}
+                      onValueChange={(value) => updateState({ selectedModels: [value] })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a model..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cloudProviderModels[state.providerId].map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2 pb-2">
+                    <Checkbox
+                      id="setDefaultModel"
+                      checked={state.setAsDefault}
+                      onCheckedChange={(checked) => updateState({ setAsDefault: !!checked })}
+                      disabled={!state.selectedModels[0]}
+                    />
+                    <Label htmlFor="setDefaultModel" className="text-sm whitespace-nowrap cursor-pointer">
+                      Set as Default
+                    </Label>
+                  </div>
                 </div>
               )}
 
