@@ -37,6 +37,7 @@ import {
   HardDrive,
   Monitor,
   Zap,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -459,8 +460,16 @@ export default function LLMProviderConfigWizard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            {state.step === "select" && "Select Provider"}
+          <CardTitle className="flex items-center justify-between">
+            {state.step === "select" && (
+              <>
+                <span>Providers Setting</span>
+                <Button size="sm" variant="outline" onClick={() => navigate("/llm/new-provider")}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  New
+                </Button>
+              </>
+            )}
             {state.step === "install" && `Install ${state.providerName}`}
             {state.step === "models" && "Download Models"}
             {state.step === "configure" && "Configure Credentials"}
