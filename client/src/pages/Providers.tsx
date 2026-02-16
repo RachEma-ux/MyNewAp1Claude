@@ -297,9 +297,10 @@ export default function Providers() {
                 </Button>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                {/* MultiChat Provider Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="multichat-provider">Available Providers</Label>
+                {/* Provider Selection Row */}
+                <div className="flex gap-2">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="multichat-provider">Select Provider</Label>
                   <Select value={selectedMultiChatProvider} onValueChange={(value) => {
                     setSelectedMultiChatProvider(value);
                     // Handle custom provider
@@ -381,6 +382,27 @@ export default function Providers() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Default Provider Type */}
+                <div className="flex-1 space-y-2">
+                  <Label>Type</Label>
+                  <Select value={selectedType} onValueChange={(value) => setSelectedType(value as ProviderType)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(providerTypeInfo) as ProviderType[]).map((type) => {
+                        const info = providerTypeInfo[type];
+                        return (
+                          <SelectItem key={type} value={type}>
+                            {info.label}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
                 </div>
 
                 {/* Selected Provider Indicator */}
@@ -466,35 +488,6 @@ export default function Providers() {
                     )}
                   </div>
                 )}
-
-                {/* Provider Type Selection */}
-                <div className="space-y-2">
-                  <Label>Default Providers</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(Object.keys(providerTypeInfo) as ProviderType[]).map((type) => {
-                      const info = providerTypeInfo[type];
-                      return (
-                        <button
-                          key={type}
-                          onClick={() => setSelectedType(type)}
-                          className={`p-3 rounded-lg border text-left transition-all ${
-                            selectedType === type
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-primary/50"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            {info.icon}
-                            <span className="font-medium text-sm">{info.label}</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {info.description}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
 
                 {/* Name */}
                 <div className="space-y-2">
