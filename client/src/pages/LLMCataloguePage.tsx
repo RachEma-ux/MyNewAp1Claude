@@ -223,40 +223,103 @@ export default function LLMCataloguePage() {
 
       {(llmIdentities.length > 0 || creationProjects.length > 0) && <Separator className="mb-6" />}
 
-      {/* Catalog Grid */}
+      {/* Providers Section */}
+      {providers && providers.length > 0 && (source === "all" || source === "providers") && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Server className="h-4 w-4 text-blue-500" />
+            <h2 className="text-lg font-semibold">Providers</h2>
+            <Badge variant="secondary" className="text-xs">{providers.filter((p: any) => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase())).length}</Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {providers
+              .filter((p: any) => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+              .map((provider: any) => {
+                const config = provider.config || {};
+                const modelCount = (config.models || []).length;
+                const isLocal = provider.type?.startsWith("local-") || provider.kind === "local";
+                const endpoint = config.apiEndpoint || config.baseUrl || config.baseURL || "";
+                return (
+                  <Card key={`provider-${provider.id}`} className="hover:bg-accent/50 transition-colors cursor-pointer" onClick={() => navigate(`/providers/${provider.id}`)}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-base">{provider.name}</CardTitle>
+                        <Badge className="bg-blue-600 text-white text-xs">Provider</Badge>
+                      </div>
+                      <CardDescription className="text-xs">
+                        {provider.type} {endpoint ? `\u2022 ${endpoint}` : ""}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {isLocal ? (
+                          <Badge variant="secondary" className="text-xs"><Server className="h-3 w-3 mr-1" />Local</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs"><Cloud className="h-3 w-3 mr-1" />Cloud</Badge>
+                        )}
+                        <Badge variant="outline" className="text-xs">{modelCount} model{modelCount !== 1 ? "s" : ""}</Badge>
+                        {provider.enabled ? (
+                          <Badge className="bg-green-600/20 text-green-400 border-green-600/30 text-xs">Active</Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-xs">Disabled</Badge>
+                        )}
+                        {provider.priority != null && (
+                          <Badge variant="outline" className="text-xs">Priority {provider.priority}</Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {providers && providers.length > 0 && <Separator className="mb-6" />}
+
+      {/* Models Section */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
-      ) : catalogModels && catalogModels.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {catalogModels
-            .filter((m) => (m.name || "").trim() !== "")
-            .map((model) => (
-              <Card key={`${model.source}-${model.id}`} className="hover:bg-accent/50 transition-colors">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-base">{model.displayName}</CardTitle>
-                    {model.isProviderModel ? (
-                      <Badge className="bg-blue-600 text-white text-xs">Provider</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-xs">Hub</Badge>
-                    )}
-                  </div>
-                  <CardDescription className="text-xs">{model.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex gap-1.5 flex-wrap">
-                    <Badge variant="secondary" className="text-xs">{model.category}</Badge>
-                    {model.parameters && <Badge variant="outline" className="text-xs">{model.parameters}</Badge>}
-                    {model.size && <Badge variant="outline" className="text-xs">{model.size}</Badge>}
-                    {model.isProviderModel && model.providerName && (
-                      <Badge variant="outline" className="text-xs">{model.providerName}</Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      ) : catalogModels && catalogModels.filter((m) => (m.name || "").trim() !== "").length > 0 ? (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Package className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-lg font-semibold">Models</h2>
+            <Badge variant="secondary" className="text-xs">{catalogModels.filter((m) => (m.name || "").trim() !== "").length}</Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {catalogModels
+              .filter((m) => (m.name || "").trim() !== "")
+              .map((model) => (
+                <Card key={`${model.source}-${model.id}`} className="hover:bg-accent/50 transition-colors">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-base">{model.displayName}</CardTitle>
+                      <Badge variant="outline" className="text-xs">Model</Badge>
+                    </div>
+                    <CardDescription className="text-xs">
+                      {model.isProviderModel
+                        ? `Available via ${model.providerName}`
+                        : model.description}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <Badge variant="secondary" className="text-xs">{model.category}</Badge>
+                      {model.parameters && <Badge variant="outline" className="text-xs">{model.parameters}</Badge>}
+                      {model.size && <Badge variant="outline" className="text-xs">{model.size}</Badge>}
+                      {model.isProviderModel ? (
+                        <Badge className="bg-blue-600/20 text-blue-400 border-blue-600/30 text-xs">{model.providerName}</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">Hub</Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
         </div>
       ) : (
         <Card className="border-dashed">
