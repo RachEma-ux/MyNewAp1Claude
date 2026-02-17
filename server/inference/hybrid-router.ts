@@ -3,6 +3,13 @@ import { GenerationRequest, GenerationResponse, Token } from "../providers/types
 import { resourceManager } from "./resource-manager";
 import type { RoutingProfile, ProviderCapability, ProviderPolicyTag } from "../../drizzle/schema";
 
+// Model quality tiers for routing score (higher = better quality)
+const MODEL_QUALITY_TIERS: { patterns: string[]; score: number }[] = [
+  { patterns: ["gpt-4.1", "o3", "claude-opus", "gemini-3-pro", "gemini-2.5-pro"], score: 50 },
+  { patterns: ["gpt-4o", "o4-mini", "claude-sonnet", "gemini-flash"], score: 30 },
+];
+const DEFAULT_QUALITY_SCORE = 10;
+
 /**
  * Hybrid Provider Router
  * Intelligently routes requests between local and cloud providers based on:
@@ -214,19 +221,12 @@ class HybridProviderRouter {
    */
   private scoreByQuality(provider: BaseProvider, request: GenerationRequest): number {
     const model = request.model || "";
-    
-    // Tier 1: Best models
-    if (model.includes("gpt-4.1") || model.includes("o3") || model.includes("claude-opus") || model.includes("gemini-3-pro") || model.includes("gemini-2.5-pro")) {
-      return 50;
+    for (const tier of MODEL_QUALITY_TIERS) {
+      if (tier.patterns.some((p) => model.includes(p))) {
+        return tier.score;
+      }
     }
-
-    // Tier 2: Good models
-    if (model.includes("gpt-4o") || model.includes("o4-mini") || model.includes("claude-sonnet") || model.includes("gemini-flash")) {
-      return 30;
-    }
-    
-    // Tier 3: Basic models
-    return 10;
+    return DEFAULT_QUALITY_SCORE;
   }
 
   /**

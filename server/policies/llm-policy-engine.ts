@@ -93,18 +93,7 @@ const POLICY_RULES = {
   },
 
   models: {
-    allowlist: {
-      cloud: [
-        "claude-opus-4-6",
-        "claude-sonnet-4-5-20250929",
-        "claude-opus-4-5-20251101",
-        "gpt-4.1",
-        "o3",
-        "gemini-3-pro",
-        "gemini-2.5-pro",
-      ],
-      local: ["llama4", "qwen3", "deepseek-r1", "phi4"],
-    },
+    // Allowlist is derived dynamically from registered providers (no static list)
     contextLimits: {
       max: 1000000, // 1M tokens max
       recommended: 200000,
@@ -272,32 +261,26 @@ export class LLMPolicyEngine {
     const { model } = input.configuration;
     const { runtime } = input.configuration;
 
-    // Model allowlist check - static list first
+    // Model allowlist: derived dynamically from registered providers
     const runtimeType = runtime.type === "cloud" ? "cloud" : "local";
-    const allowedModels = POLICY_RULES.models.allowlist[runtimeType];
+    let isModelAllowed = false;
 
-    let isModelAllowed = allowedModels.some((allowed) =>
-      model.name.toLowerCase().includes(allowed.toLowerCase())
-    );
-
-    // Dynamic check: also allow models from enabled registered providers
-    if (!isModelAllowed) {
-      try {
-        const enabledProviders = await getEnabledProviders();
-        for (const provider of enabledProviders) {
-          const config = provider.config as any;
-          const providerModels: string[] = config?.models || [];
-          if (config?.defaultModel && !providerModels.includes(config.defaultModel)) {
-            providerModels.push(config.defaultModel);
-          }
-          if (providerModels.some((pm) => model.name.toLowerCase().includes(pm.toLowerCase()))) {
-            isModelAllowed = true;
-            break;
-          }
+    try {
+      const enabledProviders = await getEnabledProviders();
+      for (const provider of enabledProviders) {
+        const config = provider.config as any;
+        const providerModels: string[] = config?.models || [];
+        if (config?.defaultModel && !providerModels.includes(config.defaultModel)) {
+          providerModels.push(config.defaultModel);
         }
-      } catch {
-        // If provider DB is unavailable, fall through to static allowlist only
+        if (providerModels.some((pm) => model.name.toLowerCase().includes(pm.toLowerCase()))) {
+          isModelAllowed = true;
+          break;
+        }
       }
+    } catch {
+      // If provider DB is unavailable, allow all models as fallback
+      isModelAllowed = true;
     }
 
     if (!isModelAllowed && input.environment !== "sandbox") {
@@ -306,7 +289,7 @@ export class LLMPolicyEngine {
         rule: "model.notAllowed",
         field: "model.name",
         message: `Model "${model.name}" is not in the ${runtimeType} allowlist for ${input.environment}`,
-        suggestion: `Approved models: ${allowedModels.join(", ")}. Models from registered providers are also accepted.`,
+        suggestion: "Register the model's provider to add it to the allowlist.",
       });
     }
 
