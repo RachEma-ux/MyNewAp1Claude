@@ -1,0 +1,49 @@
+Session Summary — 2026-02-17 04:25 UTC
+
+## Issues Fixed
+
+### 1. Crashes due to zombie dev server processes
+- Found 6 duplicate `npm run dev` / tsx server instances consuming ~1.4 GB RAM
+- Killed all, freeing memory from 438 MB → 1.9 GB free
+- Root cause: processes not cleanly stopped between sessions
+
+### 2. 404 on NewProviderPage after saving provider
+- `NewProviderPage.tsx` navigated to `/llm/provider-wizard` which had no route
+- Fixed: changed to `navigate("/llm")` (both success redirect and Back button)
+
+### 3. 404 on LLMCreationWizard after creating project
+- `LLMCreationWizard.tsx` navigated to `/llm/creation/${id}` — route doesn't exist
+- User saw: "404 Page Not Found — Path: /llm/creation/6"
+- Fixed: changed to `navigate("/llm")`
+- Added debug path display to NotFound.tsx to help diagnose future 404s
+
+### 4. Created LLMs not showing in Catalogue page
+- `/llm/catalogue` only showed hub models + provider models from unified catalog
+- Added `trpc.llm.list` and `trpc.llm.listCreationProjects` queries
+- Added "Registered LLMs" section with purple LLM badges (clickable → /llm/:id)
+- Added "Creation Projects" section with status, base model, phase info
+- Updated stats row: replaced "Coming soon" with actual LLM and Project counts
+- Search filter works across all sections
+
+## Other Actions
+- Started dev server on localhost:3000, ollama serve on :11434
+- Created provider "protst" (ID: 8, type: local-ollama) via tRPC API
+- Deployed twice via Builder Deploy workflow:
+  - v3.0.57: https://snap-investigate-prescription-ice.trycloudflare.com
+  - v3.0.59: https://submitted-concentrate-firms-andrew.trycloudflare.com (with all fixes)
+
+## Architecture Understanding: Model Entry Points
+- Hub Models: hardcoded `HUB_MODELS` array in `server/models/download-router.ts`
+- Provider Models: dynamic from `getEnabledProviders()` → each provider's `config.models`
+- Unified Catalog (`getUnifiedCatalog`): merges Hub + Provider models at query time
+- LLM Identities (`/llm/wizard`): governance layer on top, not part of catalog (now shown in catalogue page)
+- Creation Projects (`/llm/create`): LLM training project tracker
+
+## Files Modified
+- client/src/pages/NewProviderPage.tsx — fix navigation
+- client/src/pages/LLMCreationWizard.tsx — fix navigation
+- client/src/pages/NotFound.tsx — add debug path display
+- client/src/pages/LLMCataloguePage.tsx — add LLMs + projects sections
+
+## Commit
+- 4816d7d fix: Fix 404 redirects and show LLMs in catalogue page
