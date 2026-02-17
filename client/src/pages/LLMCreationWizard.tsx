@@ -300,6 +300,12 @@ export default function LLMCreationWizard() {
   const progress = ((currentStepIndex + 1) / stepOrder.length) * 100;
 
   const goToNextStep = () => {
+    // Validate required fields before leaving the current step
+    if (currentStep === "path" && (!project.name || project.name.trim().length === 0)) {
+      toast.error("Please enter a project name before continuing.");
+      return;
+    }
+
     const nextIndex = currentStepIndex + 1;
     if (nextIndex < stepOrder.length) {
       setCurrentStep(stepOrder[nextIndex]);
@@ -314,10 +320,16 @@ export default function LLMCreationWizard() {
   };
 
   const handleSubmit = async () => {
+    // Client-side validation
+    if (!project.name || project.name.trim().length === 0) {
+      toast.error("Project name is required. Go back to Step 1 to fill it in.");
+      return;
+    }
+
     try {
       // Create the project
       const createdProject = await createProjectMutation.mutateAsync({
-        name: project.name,
+        name: project.name.trim(),
         description: project.description,
         path: project.path,
         target: project.target,
@@ -328,6 +340,15 @@ export default function LLMCreationWizard() {
       localStorage.removeItem(DRAFT_KEY);
       setLocation(`/llm/creation/${createdProject.id}`);
     } catch (error: any) {
+      // Parse Zod validation errors into readable messages
+      try {
+        const parsed = JSON.parse(error.message);
+        if (Array.isArray(parsed)) {
+          const msgs = parsed.map((v: any) => `${v.path?.join(".")}: ${v.message}`).join("; ");
+          toast.error(msgs);
+          return;
+        }
+      } catch {}
       toast.error(error.message || "Failed to create project");
     }
   };
