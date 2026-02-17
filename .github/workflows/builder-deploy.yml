@@ -65,6 +65,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: mynewapp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://app:app@localhost:5432/mynewapp
+
     steps:
       - name: Reset Gist status to pending
         run: |
@@ -390,7 +408,7 @@ jobs:
       - name: Start application with tunnel
         if: ${{ github.event.inputs.run_app == 'yes' }}
         env:
-          DATABASE_URL: ${{ github.event.inputs.database_url }}
+          DATABASE_URL_INPUT: ${{ github.event.inputs.database_url }}
           # OAuth Server URL: prefer input, fallback to secret
           OAUTH_SERVER_URL: ${{ github.event.inputs.oauth_server_url || secrets.OAUTH_SERVER_URL }}
           # JWT Secret from repository secrets (required for session signing)
@@ -402,10 +420,20 @@ jobs:
         run: |
           echo "🚀 Starting application..."
 
+          # Use input DATABASE_URL if provided, otherwise use the service container
+          if [ -n "$DATABASE_URL_INPUT" ]; then
+            EFFECTIVE_DB_URL="$DATABASE_URL_INPUT"
+            echo "  Database: external (from input)"
+          else
+            EFFECTIVE_DB_URL="postgresql://app:app@localhost:5432/mynewapp"
+            echo "  Database: local PostgreSQL service container"
+          fi
+
           # Determine effective OAuth server URL
           EFFECTIVE_OAUTH_SERVER="${OAUTH_SERVER_URL}"
           echo "Auth configuration:"
           echo "  DEV_MODE: ${{ github.event.inputs.dev_mode }}"
+          echo "  DATABASE_URL: ${EFFECTIVE_DB_URL:+(configured)}"
           echo "  OAUTH_SERVER_URL: ${EFFECTIVE_OAUTH_SERVER:-(not set)}"
           echo "  JWT_SECRET: ${JWT_SECRET:+(configured)}"
           echo "  APP_ID: ${VITE_APP_ID:-(not set)}"
@@ -413,7 +441,7 @@ jobs:
           # Start the Node.js server with all auth environment variables
           PORT=3000 \
           NODE_ENV=production \
-          DATABASE_URL="${DATABASE_URL}" \
+          DATABASE_URL="${EFFECTIVE_DB_URL}" \
           DEV_MODE="${{ github.event.inputs.dev_mode }}" \
           OAUTH_SERVER_URL="${EFFECTIVE_OAUTH_SERVER}" \
           JWT_SECRET="${JWT_SECRET}" \
