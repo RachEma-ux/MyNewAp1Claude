@@ -15,44 +15,7 @@ export default function Models() {
   
   const { data: models, isLoading } = trpc.models.list.useQuery({ type: selectedType });
   const { data: downloadHistory } = trpc.modelDownloads.getAll.useQuery();
-  const { data: providers } = trpc.providers.list.useQuery();
-
-  // Official name mapping
-  const getDisplayName = (model: string): string => {
-    const nameMap: Record<string, string> = {
-      "claude-opus-4-6": "Claude Opus 4.6",
-      "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
-      "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
-      "claude-opus-4-5-20251101": "Claude Opus 4.5",
-      "claude-sonnet-4-20250514": "Claude Sonnet 4",
-      "gpt-4.1": "GPT-4.1",
-      "gpt-4.1-mini": "GPT-4.1 Mini",
-      "gpt-4.1-nano": "GPT-4.1 Nano",
-      "o3": "o3",
-      "o4-mini": "o4 Mini",
-      "gpt-4o": "GPT-4o",
-      "gpt-4o-mini": "GPT-4o Mini",
-      "gemini-3-pro": "Gemini 3 Pro",
-      "gemini-3-flash": "Gemini 3 Flash",
-      "gemini-2.5-pro": "Gemini 2.5 Pro",
-      "gemini-2.5-flash": "Gemini 2.5 Flash",
-      "gemini-2.0-flash": "Gemini 2.0 Flash",
-    };
-    return nameMap[model] || model;
-  };
-
-  // Get all models from enabled providers
-  const providerModels: { model: string; displayName: string; provider: string }[] = [];
-  providers?.filter(p => p.enabled).forEach(provider => {
-    const config = provider.config as any;
-    const cloudModels = config?.models || [];
-    cloudModels.forEach((model: string) => {
-      providerModels.push({ model, displayName: getDisplayName(model), provider: provider.name });
-    });
-    if (cloudModels.length === 0 && config?.defaultModel) {
-      providerModels.push({ model: config.defaultModel, displayName: getDisplayName(config.defaultModel), provider: provider.name });
-    }
-  });
+  const { data: catalogModels } = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
   const deleteDownload = trpc.modelDownloads.delete.useMutation({
     onSuccess: () => {
       toast({ title: "Download history entry deleted" });
@@ -128,11 +91,13 @@ export default function Models() {
             className="h-9 px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="">Select a model...</option>
-            {providerModels.map((item, idx) => (
-              <option key={idx} value={item.model}>
-                {item.displayName}
-              </option>
-            ))}
+            {catalogModels
+              ?.filter((m) => (m.name || "").trim() !== "")
+              .map((m) => (
+                <option key={`${m.source}-${m.id}`} value={m.name}>
+                  {m.displayName}{m.isProviderModel && m.providerName ? ` (${m.providerName})` : ""}
+                </option>
+              ))}
           </select>
         </CardContent>
       </Card>
