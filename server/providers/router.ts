@@ -8,7 +8,7 @@ import type { ProviderType } from "./types";
 import { batchService } from "../inference/batch-service";
 import { hybridRouter } from "../inference/hybrid-router";
 import { providerRouter as unifiedRouter } from "../inference/provider-router";
-import { getDb } from "../db";
+import { getDb, createModel } from "../db";
 import { routingAuditLogs } from "../../drizzle/schema";
 import { desc, eq, and, gte } from "drizzle-orm";
 
@@ -54,7 +54,7 @@ export const providerRouter = router({
 
       // Register provider in registry
       const registry = getProviderRegistry();
-      await registry.registerProvider({
+      const runtimeProvider = await registry.registerProvider({
         id: provider.id,
         name: provider.name,
         type: provider.type as ProviderType,
@@ -65,6 +65,41 @@ export const providerRouter = router({
         createdAt: provider.createdAt,
         updatedAt: provider.updatedAt,
       });
+
+      // Auto-discover models and register them
+      try {
+        let discoveredModels: string[] = [];
+        if ('getSupportedModels' in runtimeProvider && typeof (runtimeProvider as any).getSupportedModels === 'function') {
+          discoveredModels = (runtimeProvider as any).getSupportedModels();
+        }
+
+        if (discoveredModels.length > 0) {
+          // Update provider config with discovered models for catalogue visibility
+          await providerDb.updateProvider(provider.id, {
+            config: { ...(provider.config as Record<string, unknown>), models: discoveredModels, defaultModel: discoveredModels[0] },
+          });
+
+          // Insert each model into the models DB table for Models Hub visibility
+          for (const modelName of discoveredModels) {
+            try {
+              const modelType = /embed/i.test(modelName) ? "embedding" : "llm";
+              await createModel({
+                name: modelName,
+                displayName: modelName,
+                modelType,
+                status: "ready",
+              });
+            } catch (e: any) {
+              // Skip duplicates or other insertion errors
+              console.log(`[Provider] Skipping model registration for ${modelName}: ${e.message}`);
+            }
+          }
+          console.log(`[Provider] Auto-discovered ${discoveredModels.length} models for ${provider.name}`);
+        }
+      } catch (err: any) {
+        // Don't fail provider creation if model discovery fails
+        console.warn(`[Provider] Model auto-discovery failed for ${provider.name}: ${err.message}`);
+      }
 
       return provider;
     }),
