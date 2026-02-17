@@ -50,7 +50,7 @@ import * as providerDb from "../providers/db";
 // Input Schemas
 // ============================================================================
 
-const entryTypeSchema = z.enum(["provider", "model"]);
+const entryTypeSchema = z.enum(["provider", "llm", "model", "agent", "bot"]);
 const statusSchema = z.enum(["draft", "active", "deprecated", "disabled"]);
 const originSchema = z.enum(["admin", "discovery", "api"]);
 const scopeSchema = z.enum(["app", "workspace", "org", "global"]);
