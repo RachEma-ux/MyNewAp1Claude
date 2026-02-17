@@ -562,9 +562,10 @@ export default function LLMProviderConfigWizard() {
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {configuredProviders.map((cp) => (
-                      <div
+                      <button
                         key={`cp-${cp.id}`}
-                        className="p-4 rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30 text-left relative"
+                        onClick={() => handleSelectProvider(`configured-${cp.id}`, cp.name, "cloud")}
+                        className="p-4 rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30 text-left relative hover:border-primary/50 transition-all"
                       >
                         <div className="w-12 h-12 rounded-lg bg-blue-600 mb-3 flex items-center justify-center text-white font-bold">
                           {cp.name.substring(0, 2).toUpperCase()}
@@ -578,7 +579,7 @@ export default function LLMProviderConfigWizard() {
                         <p className="text-xs text-muted-foreground mt-2">
                           {cp.models.length} model{cp.models.length !== 1 ? "s" : ""}: {cp.models.slice(0, 2).join(", ")}{cp.models.length > 2 ? "..." : ""}
                         </p>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -950,7 +951,7 @@ export default function LLMProviderConfigWizard() {
                                   -- Registered Provider Models --
                                 </SelectItem>
                                 {(catalogQuery.data || [])
-                                  .filter((m) => m.isProviderModel)
+                                  .filter((m) => m.isProviderModel && (m.name || "").trim() !== "")
                                   .map((model) => (
                                     <SelectItem key={`prov-${model.name}`} value={model.name}>
                                       {model.displayName || model.name}
@@ -964,7 +965,7 @@ export default function LLMProviderConfigWizard() {
                               -- Model Hub --
                             </SelectItem>
                             {(catalogQuery.data || [])
-                              .filter((m) => !m.isProviderModel)
+                              .filter((m) => !m.isProviderModel && (m.name || "").trim() !== "")
                               .map((model) => (
                                 <SelectItem key={`hub-${model.name}`} value={model.name}>
                                   {model.displayName || model.name}
