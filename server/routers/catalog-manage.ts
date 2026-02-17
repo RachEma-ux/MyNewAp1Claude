@@ -3,10 +3,15 @@
  *
  * tRPC endpoints for managing catalog entries (providers & models)
  * in the authoring space before publishing to the registry.
+ *
+ * Auth model:
+ * - Read ops (list, getById, listVersions, listBundles): protectedProcedure
+ * - Authoring ops (create, update, delete, validate): protectedProcedure
+ * - Authority ops (publish, recall, activate, approve, reject): adminProcedure
  */
 
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import {
   getCatalogEntries,
   getCatalogEntryById,
@@ -18,6 +23,7 @@ import {
   createPublishBundle,
   recallPublishBundle,
   createCatalogAuditEvent,
+  approveCatalogEntry,
 } from "../db";
 import { createHash } from "crypto";
 
@@ -40,7 +46,8 @@ import * as providerDb from "../providers/db";
 // ============================================================================
 
 const entryTypeSchema = z.enum(["provider", "model"]);
-const statusSchema = z.enum(["draft", "validating", "validated", "publishing", "published", "deprecated"]);
+const statusSchema = z.enum(["draft", "active", "deprecated", "disabled"]);
+const originSchema = z.enum(["admin", "discovery", "api"]);
 const scopeSchema = z.enum(["app", "workspace", "org", "global"]);
 
 const createEntrySchema = z.object({
@@ -52,6 +59,7 @@ const createEntrySchema = z.object({
   providerId: z.number().int().positive().optional(),
   config: z.any().optional(),
   tags: z.array(z.string()).optional(),
+  origin: originSchema.optional(),
 });
 
 const updateEntrySchema = z.object({
@@ -59,7 +67,6 @@ const updateEntrySchema = z.object({
   name: z.string().min(1).max(255).optional(),
   displayName: z.string().max(255).optional(),
   description: z.string().optional(),
-  status: statusSchema.optional(),
   providerId: z.number().int().positive().optional(),
   config: z.any().optional(),
   tags: z.array(z.string()).optional(),
@@ -73,12 +80,14 @@ export const catalogManageRouter = router({
   /**
    * List catalog entries with optional filters
    */
-  list: publicProcedure
+  list: protectedProcedure
     .input(
       z.object({
         entryType: entryTypeSchema.optional(),
         status: statusSchema.optional(),
         scope: scopeSchema.optional(),
+        origin: originSchema.optional(),
+        reviewState: z.enum(["needs_review", "approved", "rejected"]).optional(),
       }).optional()
     )
     .query(async ({ input }) => {
@@ -88,7 +97,7 @@ export const catalogManageRouter = router({
   /**
    * Get a single catalog entry by ID
    */
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input }) => {
       const entry = await getCatalogEntryById(input.id);
@@ -98,10 +107,14 @@ export const catalogManageRouter = router({
 
   /**
    * Create a new catalog entry
+   * Non-admin origins get reviewState = "needs_review"
    */
-  create: publicProcedure
+  create: protectedProcedure
     .input(createEntrySchema)
     .mutation(async ({ input }) => {
+      const origin = input.origin ?? "admin";
+      const reviewState = origin !== "admin" ? "needs_review" : "approved";
+
       const entry = await createCatalogEntry({
         name: input.name,
         displayName: input.displayName ?? input.name,
@@ -109,19 +122,21 @@ export const catalogManageRouter = router({
         entryType: input.entryType,
         scope: input.scope ?? "app",
         status: "draft",
+        origin,
+        reviewState,
         providerId: input.providerId ?? null,
         config: input.config ?? {},
         tags: input.tags ?? [],
         createdBy: 1,
       });
-      audit("catalog.entry.created", entry.id, { name: entry.name, entryType: entry.entryType });
+      audit("catalog.entry.created", entry.id, { name: entry.name, entryType: entry.entryType, origin, reviewState });
       return entry;
     }),
 
   /**
-   * Update an existing catalog entry
+   * Update an existing catalog entry (authoring fields only — not status/authority)
    */
-  update: publicProcedure
+  update: protectedProcedure
     .input(updateEntrySchema)
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
@@ -133,7 +148,7 @@ export const catalogManageRouter = router({
   /**
    * Delete a catalog entry and all its versions
    */
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       const entry = await getCatalogEntryById(input.id);
@@ -145,7 +160,7 @@ export const catalogManageRouter = router({
   /**
    * List version history for a catalog entry
    */
-  listVersions: publicProcedure
+  listVersions: protectedProcedure
     .input(z.object({ catalogEntryId: z.number().int().positive() }))
     .query(async ({ input }) => {
       return await getCatalogEntryVersions(input.catalogEntryId);
@@ -153,9 +168,9 @@ export const catalogManageRouter = router({
 
   /**
    * Validate a catalog entry via orchestrator handshake
-   * Runs health, capabilities, models, and optional testPrompt checks
+   * Allowed on draft and active entries. Restores previous status on completion.
    */
-  validate: publicProcedure
+  validate: protectedProcedure
     .input(z.object({
       id: z.number().int().positive(),
       runTestPrompt: z.boolean().optional(),
@@ -164,7 +179,10 @@ export const catalogManageRouter = router({
       const entry = await getCatalogEntryById(input.id);
       if (!entry) throw new Error(`Catalog entry ${input.id} not found`);
 
-      // Mark as validating
+      // Remember previous status to restore after validation
+      const previousStatus = entry.status;
+
+      // Mark as validating (transient)
       await updateCatalogEntry(input.id, { status: "validating" }, 1);
 
       const results: {
@@ -200,10 +218,7 @@ export const catalogManageRouter = router({
 
         if (!providerId) {
           errors.push("No linked provider found. Set providerId on the catalog entry.");
-          await updateCatalogEntry(input.id, {
-            status: "draft",
-          }, 1);
-          // Update validation fields via direct DB
+          await updateCatalogEntry(input.id, { status: previousStatus }, 1);
           const { getDb } = await import("../db");
           const db = getDb();
           if (db) {
@@ -223,7 +238,7 @@ export const catalogManageRouter = router({
 
         if (!provider) {
           errors.push(`Provider ID ${providerId} not found in runtime registry (may not be initialized).`);
-          await updateCatalogEntry(input.id, { status: "draft" }, 1);
+          await updateCatalogEntry(input.id, { status: previousStatus }, 1);
           const { getDb } = await import("../db");
           const db = getDb();
           if (db) {
@@ -330,9 +345,9 @@ export const catalogManageRouter = router({
           && (results.testPrompt === null || results.testPrompt.passed);
 
         const validationStatus = allPassed ? "passed" : "failed";
-        const newStatus = allPassed ? "validated" : "draft";
 
-        await updateCatalogEntry(input.id, { status: newStatus }, 1);
+        // Restore previous status — validation doesn't change catalog status
+        await updateCatalogEntry(input.id, { status: previousStatus }, 1);
         // Update validation-specific fields
         const { getDb } = await import("../db");
         const db = getDb();
@@ -350,7 +365,7 @@ export const catalogManageRouter = router({
         return { success: allPassed, results, errors };
       } catch (e: any) {
         errors.push(`Unexpected error: ${e.message}`);
-        await updateCatalogEntry(input.id, { status: "draft" }, 1);
+        await updateCatalogEntry(input.id, { status: previousStatus }, 1);
         const { getDb } = await import("../db");
         const db = getDb();
         if (db) {
@@ -367,13 +382,88 @@ export const catalogManageRouter = router({
     }),
 
   // ============================================================================
-  // Publishing Endpoints
+  // Authority Endpoints (admin only)
+  // ============================================================================
+
+  /**
+   * Approve a catalog entry — sets reviewState to "approved"
+   * Optionally activates the entry in the same call
+   */
+  approve: adminProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      activateNow: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const entry = await getCatalogEntryById(input.id);
+      if (!entry) throw new Error(`Catalog entry ${input.id} not found`);
+
+      const approved = await approveCatalogEntry(input.id, 1);
+
+      if (input.activateNow) {
+        await updateCatalogEntry(input.id, { status: "active" }, 1);
+      }
+
+      audit("catalog.entry.approved", input.id, {
+        name: entry.name,
+        activateNow: input.activateNow ?? false,
+      });
+
+      const updated = await getCatalogEntryById(input.id);
+      return updated!;
+    }),
+
+  /**
+   * Reject a catalog entry — sets reviewState to "rejected"
+   */
+  reject: adminProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+    }))
+    .mutation(async ({ input }) => {
+      const entry = await getCatalogEntryById(input.id);
+      if (!entry) throw new Error(`Catalog entry ${input.id} not found`);
+
+      await updateCatalogEntry(input.id, { reviewState: "rejected" }, 1);
+
+      audit("catalog.entry.rejected", input.id, { name: entry.name });
+
+      const updated = await getCatalogEntryById(input.id);
+      return updated!;
+    }),
+
+  /**
+   * Activate a catalog entry — sets status to "active"
+   * Entry must have reviewState = "approved"
+   */
+  activate: adminProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+    }))
+    .mutation(async ({ input }) => {
+      const entry = await getCatalogEntryById(input.id);
+      if (!entry) throw new Error(`Catalog entry ${input.id} not found`);
+
+      if (entry.reviewState !== "approved") {
+        throw new Error(`Entry must be approved before activation (current reviewState: ${entry.reviewState})`);
+      }
+
+      await updateCatalogEntry(input.id, { status: "active" }, 1);
+
+      audit("catalog.entry.activated", input.id, { name: entry.name });
+
+      const updated = await getCatalogEntryById(input.id);
+      return updated!;
+    }),
+
+  // ============================================================================
+  // Publishing Endpoints (admin only)
   // ============================================================================
 
   /**
    * List published bundles
    */
-  listBundles: publicProcedure
+  listBundles: protectedProcedure
     .input(
       z.object({
         catalogEntryId: z.number().int().positive().optional(),
@@ -386,9 +476,9 @@ export const catalogManageRouter = router({
 
   /**
    * Publish a catalog entry — creates an immutable snapshot bundle
-   * Entry must be in "validated" status
+   * Entry must be status = "active" AND reviewState = "approved"
    */
-  publish: publicProcedure
+  publish: adminProcedure
     .input(z.object({
       catalogEntryId: z.number().int().positive(),
       versionLabel: z.string().min(1).max(50),
@@ -398,11 +488,15 @@ export const catalogManageRouter = router({
       const entry = await getCatalogEntryById(input.catalogEntryId);
       if (!entry) throw new Error(`Catalog entry ${input.catalogEntryId} not found`);
 
-      if (entry.status !== "validated" && entry.status !== "published") {
-        throw new Error(`Entry must be validated before publishing (current status: ${entry.status})`);
+      if (entry.status !== "active") {
+        throw new Error(`Entry must be active before publishing (current status: ${entry.status})`);
       }
 
-      // Mark entry as publishing
+      if (entry.reviewState !== "approved") {
+        throw new Error(`Entry must be approved before publishing (current reviewState: ${entry.reviewState})`);
+      }
+
+      // Mark entry as publishing (transient)
       await updateCatalogEntry(input.catalogEntryId, { status: "publishing" }, 1);
 
       try {
@@ -434,11 +528,11 @@ export const catalogManageRouter = router({
           snapshot,
           snapshotHash,
           publishedBy: 1,
-          policyDecision: "pass", // Placeholder — Phase 4 will add real policy gate
+          policyDecision: "pass",
         });
 
-        // Mark entry as published
-        await updateCatalogEntry(input.catalogEntryId, { status: "published" }, 1);
+        // Restore to active after publishing
+        await updateCatalogEntry(input.catalogEntryId, { status: "active" }, 1);
 
         audit("catalog.bundle.published", input.catalogEntryId, {
           bundleId: bundle.id, versionLabel: input.versionLabel, snapshotHash: snapshotHash,
@@ -446,16 +540,16 @@ export const catalogManageRouter = router({
 
         return bundle;
       } catch (e: any) {
-        // Revert to validated on failure
-        await updateCatalogEntry(input.catalogEntryId, { status: "validated" }, 1);
+        // Revert to active on failure
+        await updateCatalogEntry(input.catalogEntryId, { status: "active" }, 1);
         throw new Error(`Publishing failed: ${e.message}`);
       }
     }),
 
   /**
-   * Recall a published bundle — marks it as recalled
+   * Recall a published bundle — marks it as recalled (admin only)
    */
-  recall: publicProcedure
+  recall: adminProcedure
     .input(z.object({
       bundleId: z.number().int().positive(),
     }))

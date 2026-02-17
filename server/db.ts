@@ -1705,6 +1705,8 @@ export async function getCatalogEntries(filter?: {
   entryType?: string;
   status?: string;
   scope?: string;
+  origin?: string;
+  reviewState?: string;
 }): Promise<CatalogEntry[]> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
@@ -1713,6 +1715,8 @@ export async function getCatalogEntries(filter?: {
   if (filter?.entryType) conditions.push(eq(catalogEntries.entryType, filter.entryType));
   if (filter?.status) conditions.push(eq(catalogEntries.status, filter.status));
   if (filter?.scope) conditions.push(eq(catalogEntries.scope, filter.scope));
+  if (filter?.origin) conditions.push(eq(catalogEntries.origin, filter.origin));
+  if (filter?.reviewState) conditions.push(eq(catalogEntries.reviewState, filter.reviewState));
 
   const query = db.select().from(catalogEntries);
   const filtered = conditions.length > 0 ? query.where(and(...conditions)) : query;
@@ -1753,7 +1757,7 @@ export async function createCatalogEntry(data: InsertCatalogEntry): Promise<Cata
 
 export async function updateCatalogEntry(
   id: number,
-  data: Partial<Pick<InsertCatalogEntry, "name" | "displayName" | "description" | "config" | "tags" | "status" | "providerId">>,
+  data: Partial<Pick<InsertCatalogEntry, "name" | "displayName" | "description" | "config" | "tags" | "status" | "providerId" | "origin" | "reviewState" | "approvedBy" | "approvedAt">>,
   updatedBy: number
 ): Promise<CatalogEntry> {
   const db = getDb();
@@ -1784,6 +1788,21 @@ export async function updateCatalogEntry(
       changedBy: updatedBy,
     });
   }
+
+  const [updated] = await db.select().from(catalogEntries).where(eq(catalogEntries.id, id));
+  return updated;
+}
+
+export async function approveCatalogEntry(id: number, approvedByUserId: number): Promise<CatalogEntry> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(catalogEntries).set({
+    reviewState: "approved",
+    approvedBy: approvedByUserId,
+    approvedAt: new Date(),
+    updatedAt: new Date(),
+  }).where(eq(catalogEntries.id, id));
 
   const [updated] = await db.select().from(catalogEntries).where(eq(catalogEntries.id, id));
   return updated;
