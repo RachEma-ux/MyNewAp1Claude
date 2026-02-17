@@ -5,7 +5,10 @@ import {
   getCategoriesForType,
   getSubCategories,
   getCapabilitiesForType,
+  ENTRY_TYPES,
+  ENTRY_TYPE_DEFS,
 } from "@shared/catalog-taxonomy";
+import type { EntryType } from "@shared/catalog-taxonomy";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -60,9 +63,20 @@ import {
   ShieldCheck,
   ShieldX,
   Zap,
+  Brain,
+  Bot,
+  Workflow,
 } from "lucide-react";
 
-type EntryType = "provider" | "model";
+const TYPE_ICONS: Record<string, any> = {
+  provider: Server,
+  llm: Brain,
+  model: Package,
+  agent: Workflow,
+  bot: Bot,
+};
+
+// EntryType imported from @shared/catalog-taxonomy
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-600/20 text-gray-400 border-gray-600/30",
@@ -326,8 +340,9 @@ export default function CatalogManagePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="provider">Providers</SelectItem>
-                <SelectItem value="model">Models</SelectItem>
+                {ENTRY_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>{ENTRY_TYPE_DEFS[t].label}s</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v)}>
@@ -336,13 +351,22 @@ export default function CatalogManagePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {typeFilter !== "model" && Object.entries(getCategoriesForType("provider")).map(([key, cat]) => (
-                  <SelectItem key={`p-${key}`} value={key}>{cat.label}</SelectItem>
-                ))}
-                {typeFilter === "all" && <SelectItem value="_sep" disabled>───</SelectItem>}
-                {typeFilter !== "provider" && Object.entries(getCategoriesForType("model")).map(([key, cat]) => (
-                  <SelectItem key={`m-${key}`} value={key}>{cat.label}</SelectItem>
-                ))}
+                {typeFilter !== "all" ? (
+                  Object.entries(getCategoriesForType(typeFilter as EntryType)).map(([key, cat]) => (
+                    <SelectItem key={key} value={key}>{cat.label}</SelectItem>
+                  ))
+                ) : (
+                  ENTRY_TYPES.map((t) => {
+                    const cats = Object.entries(getCategoriesForType(t));
+                    if (cats.length === 0) return null;
+                    return [
+                      <SelectItem key={`_hdr_${t}`} value={`_hdr_${t}`} disabled>{ENTRY_TYPE_DEFS[t].label}</SelectItem>,
+                      ...cats.map(([key, cat]) => (
+                        <SelectItem key={`${t}-${key}`} value={key}>{cat.label}</SelectItem>
+                      ))
+                    ];
+                  })
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -391,14 +415,12 @@ export default function CatalogManagePage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {entry.entryType === "provider" ? (
-                            <Server className="h-3 w-3 mr-1" />
-                          ) : (
-                            <Package className="h-3 w-3 mr-1" />
-                          )}
-                          {entry.entryType}
-                        </Badge>
+                        {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
+                          <Badge variant="outline" className="text-xs">
+                            <Icon className="h-3 w-3 mr-1" />
+                            {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
+                          </Badge>
+                        ); })()}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-0.5">
@@ -543,10 +565,12 @@ export default function CatalogManagePage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <CardTitle className="text-base">{entry.displayName || entry.name}</CardTitle>
-                          <Badge variant="outline" className="text-xs">
-                            {entry.entryType === "provider" ? <Server className="h-3 w-3 mr-1" /> : <Package className="h-3 w-3 mr-1" />}
-                            {entry.entryType}
-                          </Badge>
+                          {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
+                            <Badge variant="outline" className="text-xs">
+                              <Icon className="h-3 w-3 mr-1" />
+                              {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
+                            </Badge>
+                          ); })()}
                           <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
                           {entry.validationStatus && (
                             <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
@@ -679,10 +703,12 @@ export default function CatalogManagePage() {
                   {publishable.map((entry: any) => (
                     <div key={entry.id} className="flex items-center justify-between p-3 border rounded-md">
                       <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="text-xs">
-                          {entry.entryType === "provider" ? <Server className="h-3 w-3 mr-1" /> : <Package className="h-3 w-3 mr-1" />}
-                          {entry.entryType}
-                        </Badge>
+                        {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
+                          <Badge variant="outline" className="text-xs">
+                            <Icon className="h-3 w-3 mr-1" />
+                            {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
+                          </Badge>
+                        ); })()}
                         <span className="font-medium text-sm">{entry.displayName || entry.name}</span>
                         <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
                       </div>
@@ -854,8 +880,11 @@ export default function CatalogManagePage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="provider">Provider</SelectItem>
-                    <SelectItem value="model">Model</SelectItem>
+                    {ENTRY_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {ENTRY_TYPE_DEFS[t].label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
