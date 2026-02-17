@@ -73,6 +73,7 @@ import LLMWizard from "@/pages/LLMWizard";
 import LLMCreationWizard from "@/pages/LLMCreationWizard";
 import LLMProviderConfigWizard from "@/pages/LLMProviderConfigWizard";
 import NewProviderPage from "@/pages/NewProviderPage";
+import LLMCataloguePage from "@/pages/LLMCataloguePage";
 import LLMPromotions from "@/pages/LLMPromotions";
 import LLMDetailPage from "@/pages/LLMDetailPage";
 import LLMTrainingDashboard from "@/pages/LLMTrainingDashboard";
@@ -191,6 +192,7 @@ function Router() {
       {/* Provider Configuration Wizard */}
       <Route path="/llm/provider-wizard" component={() => <ProtectedRoute component={LLMProviderConfigWizard} />} />
       <Route path="/llm/new-provider" component={() => <ProtectedRoute component={NewProviderPage} />} />
+      <Route path="/llm/catalogue" component={() => <ProtectedRoute component={LLMCataloguePage} />} />
       {/* Deployment Status Page */}
       <Route path="/deployment-status" component={() => <ProtectedRoute component={DeploymentStatus} />} />
       {/* Deploy Page */}
