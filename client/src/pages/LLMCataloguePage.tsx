@@ -49,51 +49,66 @@ export default function LLMCataloguePage() {
         </p>
       </div>
 
-      {/* Stats — 2 rows x 4 columns */}
-      <div className="grid gap-4 grid-cols-4 mb-6">
+      {/* Row 1: Providers */}
+      <div className="grid gap-3 grid-cols-4 mb-3">
         <Card>
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Server className="h-5 w-5 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="text-2xl font-bold">{availableProviderCount}</p>
-              <p className="text-xs text-muted-foreground truncate">Available Providers</p>
-            </div>
+          <CardContent className="py-3 px-4 text-center">
+            <Server className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
+            <p className="text-2xl font-bold">{availableProviderCount || <span className="text-sm text-muted-foreground">Coming soon</span>}</p>
+            <p className="text-[11px] text-muted-foreground">Available</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Cloud className="h-5 w-5 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="text-2xl font-bold">{configuredProviderCount}</p>
-              <p className="text-xs text-muted-foreground truncate">Configured Providers</p>
-            </div>
+          <CardContent className="py-3 px-4 text-center">
+            <Cloud className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
+            <p className="text-2xl font-bold">{configuredProviderCount || <span className="text-sm text-muted-foreground">Coming soon</span>}</p>
+            <p className="text-[11px] text-muted-foreground">Configured</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Download className="h-5 w-5 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="text-2xl font-bold">{downloadableCount}</p>
-              <p className="text-xs text-muted-foreground truncate">Downloadable Models</p>
-            </div>
+          <CardContent className="py-3 px-4 text-center">
+            <Zap className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
+            <p className="text-2xl font-bold text-muted-foreground text-sm">Coming soon</p>
+            <p className="text-[11px] text-muted-foreground">Active</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <HardDrive className="h-5 w-5 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="text-2xl font-bold">{availableModelCount}</p>
-              <p className="text-xs text-muted-foreground truncate">Available Models</p>
-            </div>
+          <CardContent className="py-3 px-4 text-center">
+            <Server className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
+            <p className="text-2xl font-bold text-muted-foreground text-sm">Coming soon</p>
+            <p className="text-[11px] text-muted-foreground">Offline</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 2: Models */}
+      <div className="grid gap-3 grid-cols-4 mb-6">
+        <Card>
+          <CardContent className="py-3 px-4 text-center">
+            <Download className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
+            <p className="text-2xl font-bold">{downloadableCount || <span className="text-sm text-muted-foreground">Coming soon</span>}</p>
+            <p className="text-[11px] text-muted-foreground">Downloadable</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Zap className="h-5 w-5 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="text-2xl font-bold">{activeModelCount}</p>
-              <p className="text-xs text-muted-foreground truncate">Active Models</p>
-            </div>
+          <CardContent className="py-3 px-4 text-center">
+            <HardDrive className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
+            <p className="text-2xl font-bold">{availableModelCount || <span className="text-sm text-muted-foreground">Coming soon</span>}</p>
+            <p className="text-[11px] text-muted-foreground">Available</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-3 px-4 text-center">
+            <Zap className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
+            <p className="text-2xl font-bold">{activeModelCount || <span className="text-sm text-muted-foreground">Coming soon</span>}</p>
+            <p className="text-[11px] text-muted-foreground">Active</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-3 px-4 text-center">
+            <Package className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
+            <p className="text-2xl font-bold text-muted-foreground text-sm">Coming soon</p>
+            <p className="text-[11px] text-muted-foreground">Deprecated</p>
           </CardContent>
         </Card>
       </div>
