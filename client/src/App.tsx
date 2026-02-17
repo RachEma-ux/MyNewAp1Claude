@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, Redirect } from "wouter";
+import { Route, Switch, Redirect, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -192,6 +192,18 @@ function Router() {
       {/* Provider Configuration Wizard */}
       <Route path="/llm/provider-wizard" component={() => <ProtectedRoute component={LLMProviderConfigWizard} />} />
       <Route path="/llm/new-provider" component={() => <ProtectedRoute component={NewProviderPage} />} />
+      <Route path="/llm/catalogue/manage" component={() => <ProtectedRoute component={() => {
+        const [, nav] = useLocation();
+        return (
+          <div className="container mx-auto py-8 max-w-6xl px-4">
+            <button className="mb-4 text-sm text-muted-foreground hover:text-foreground" onClick={() => nav("/llm/catalogue")}>&larr; Back to Catalogue</button>
+            <div className="flex flex-col items-center justify-center py-24">
+              <h1 className="text-3xl font-bold mb-2">Manage Catalogue</h1>
+              <p className="text-muted-foreground text-lg">Coming soon</p>
+            </div>
+          </div>
+        );
+      }} />} />
       <Route path="/llm/catalogue" component={() => <ProtectedRoute component={LLMCataloguePage} />} />
       {/* Deployment Status Page */}
       <Route path="/deployment-status" component={() => <ProtectedRoute component={DeploymentStatus} />} />
