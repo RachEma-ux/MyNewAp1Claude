@@ -12,7 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, Search, Filter, Loader2, Cloud, Server, Package, Download, HardDrive, Zap } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { ChevronLeft, Search, Filter, Loader2, Cloud, Server, Package, Download, HardDrive, Zap, Brain, FlaskConical } from "lucide-react";
 
 export default function LLMCataloguePage() {
   const [, navigate] = useLocation();
@@ -29,6 +30,8 @@ export default function LLMCataloguePage() {
   const { data: availableProviders = [] } = trpc.llm.listProviders.useQuery();
   const { data: downloads = [] } = trpc.modelDownloads.getAll.useQuery();
   const { data: installedModels = [] } = trpc.models.list.useQuery({});
+  const { data: llmIdentities = [] } = trpc.llm.list.useQuery({});
+  const { data: creationProjects = [] } = trpc.llm.listCreationProjects.useQuery({});
 
   const availableProviderCount = availableProviders.length;
   const configuredProviderCount = providers?.length ?? 0;
@@ -68,16 +71,16 @@ export default function LLMCataloguePage() {
         </Card>
         <Card>
           <CardContent className="py-2 px-3 text-center">
-            <Zap className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
-            <p className="text-lg font-bold leading-tight text-muted-foreground text-[10px]">Coming soon</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Active</p>
+            <Brain className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+            <p className="text-lg font-bold leading-tight">{llmIdentities.length || <span className="text-[10px] text-muted-foreground">0</span>}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Registered LLMs</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-2 px-3 text-center">
-            <Server className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
-            <p className="text-lg font-bold leading-tight text-muted-foreground text-[10px]">Coming soon</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Offline</p>
+            <FlaskConical className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+            <p className="text-lg font-bold leading-tight">{creationProjects.length || <span className="text-[10px] text-muted-foreground">0</span>}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Projects</p>
           </CardContent>
         </Card>
       </div>
@@ -149,6 +152,76 @@ export default function LLMCataloguePage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Registered LLMs */}
+      {llmIdentities.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Brain className="h-4 w-4 text-primary" />
+            <h2 className="text-lg font-semibold">Registered LLMs</h2>
+            <Badge variant="secondary" className="text-xs">{llmIdentities.length}</Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {llmIdentities
+              .filter((llm: any) => !searchQuery || llm.name.toLowerCase().includes(searchQuery.toLowerCase()))
+              .map((llm: any) => (
+                <Card key={`llm-${llm.id}`} className="hover:bg-accent/50 transition-colors cursor-pointer" onClick={() => navigate(`/llm/${llm.id}`)}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-base">{llm.name}</CardTitle>
+                      <Badge className="bg-purple-600 text-white text-xs">LLM</Badge>
+                    </div>
+                    <CardDescription className="text-xs">{llm.description || "No description"}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <Badge variant="secondary" className="text-xs capitalize">{llm.role}</Badge>
+                      {llm.ownerTeam && <Badge variant="outline" className="text-xs">{llm.ownerTeam}</Badge>}
+                      {llm.archived && <Badge variant="destructive" className="text-xs">Archived</Badge>}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Creation Projects */}
+      {creationProjects.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <FlaskConical className="h-4 w-4 text-orange-500" />
+            <h2 className="text-lg font-semibold">Creation Projects</h2>
+            <Badge variant="secondary" className="text-xs">{creationProjects.length}</Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {creationProjects
+              .filter((p: any) => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+              .map((project: any) => (
+                <Card key={`proj-${project.id}`} className="hover:bg-accent/50 transition-colors">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-base">{project.name}</CardTitle>
+                      <Badge variant="outline" className="text-xs capitalize">{project.status}</Badge>
+                    </div>
+                    <CardDescription className="text-xs">
+                      {project.baseModel?.name || "Custom model"} &middot; {project.target?.useCase?.replace(/_/g, " ") || "General"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <Badge variant="secondary" className="text-xs">{project.baseModel?.size || "—"}</Badge>
+                      <Badge variant="outline" className="text-xs capitalize">{project.currentPhase?.replace(/_/g, " ").replace("phase ", "P") || "Planning"}</Badge>
+                      {project.progress > 0 && <Badge variant="outline" className="text-xs">{project.progress}%</Badge>}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {(llmIdentities.length > 0 || creationProjects.length > 0) && <Separator className="mb-6" />}
 
       {/* Catalog Grid */}
       {isLoading ? (

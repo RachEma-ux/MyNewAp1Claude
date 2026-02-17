@@ -338,7 +338,7 @@ export default function LLMCreationWizard() {
 
       toast.success("LLM creation project started!");
       localStorage.removeItem(DRAFT_KEY);
-      setLocation(`/llm/creation/${createdProject.id}`);
+      setLocation("/llm");
     } catch (error: any) {
       // Parse Zod validation errors into readable messages
       try {

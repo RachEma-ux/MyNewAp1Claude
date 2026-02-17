@@ -4,7 +4,8 @@ import { AlertCircle, Home } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function NotFound() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  console.error("[404 NotFound] Current path:", location, "Full URL:", window.location.href);
 
   const handleGoHome = () => {
     setLocation("/");
@@ -31,6 +32,8 @@ export default function NotFound() {
             Sorry, the page you are looking for doesn't exist.
             <br />
             It may have been moved or deleted.
+            <br />
+            <code className="text-xs text-red-400 mt-2 block">Path: {location}</code>
           </p>
 
           <div
