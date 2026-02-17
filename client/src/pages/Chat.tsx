@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CatalogSelect } from "@/components/CatalogSelect";
+import { useCatalogEntries } from "@/hooks/useCatalogEntries";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { trpc } from "@/lib/trpc";
 import { Loader2, MessageSquare, Bot, User as UserIcon, Sparkles, BookOpen, Route, History, Archive, Trash2, PenLine, BarChart3, Upload, Download, Zap } from "lucide-react";
@@ -184,6 +186,13 @@ function ChatInner() {
   const [input, setInput] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [catalogProvider, setCatalogProvider] = useState<string>("");
+  const [catalogModel, setCatalogModel] = useState<string>("");
+  const { entries: catalogProviders } = useCatalogEntries({ entryType: "provider" });
+  const selectedCatalogProvider = catalogProvider
+    ? catalogProviders.find((e) => String(e.id) === catalogProvider)
+    : null;
+  const selectedCatalogProviderName = selectedCatalogProvider?.name ?? "";
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [useRAG, setUseRAG] = useState(false);
@@ -197,15 +206,8 @@ function ChatInner() {
 
   const messages = currentChat?.messages ?? [];
 
-  const { data: providers, isLoading: providersLoading } = trpc.chat.getAvailableProviders.useQuery();
   const { data: workspaces } = trpc.workspaces.list.useQuery();
   const { data: allProviders } = trpc.providers.list.useQuery();
-
-  // Fetch models for the selected provider
-  const { data: providerModels, isLoading: modelsLoading } = trpc.providers.getModels.useQuery(
-    { id: selectedProvider! },
-    { enabled: !useUnifiedRouting && !!selectedProvider }
-  );
 
   // Fetch routing profile when unified routing is enabled and workspace is selected
   const { data: routingProfile } = trpc.workspaces.getRoutingProfile.useQuery(
@@ -236,12 +238,27 @@ function ChatInner() {
     }
   }, [selectedWorkspace, routingProfile]);
 
-  // Auto-select first provider
+  // Map catalog provider selection to DB provider ID
   useEffect(() => {
-    if (providers && providers.length > 0 && !selectedProvider) {
-      setSelectedProvider(providers[0]!.id);
+    if (selectedCatalogProvider && allProviders) {
+      const match = allProviders.find(
+        (p) => p.name.toLowerCase() === selectedCatalogProvider.name.toLowerCase()
+          || p.name.toLowerCase() === (selectedCatalogProvider.displayName ?? "").toLowerCase()
+      );
+      setSelectedProvider(match?.id ?? null);
+    } else if (!catalogProvider) {
+      setSelectedProvider(null);
     }
-  }, [providers, selectedProvider]);
+  }, [catalogProvider, selectedCatalogProvider, allProviders]);
+
+  // Map catalog model selection to selectedModel
+  useEffect(() => {
+    if (catalogModel) {
+      setSelectedModel(catalogModel);
+    } else {
+      setSelectedModel(null);
+    }
+  }, [catalogModel]);
 
   // Auto-select first workspace
   useEffect(() => {
@@ -548,66 +565,32 @@ function ChatInner() {
 
           {/* Provider Selection (hidden when unified routing is enabled) */}
           {!useUnifiedRouting && (
-            <Select
-              value={selectedProvider?.toString()}
-              onValueChange={(value) => {
-                setSelectedProvider(parseInt(value));
+            <CatalogSelect
+              entryType="provider"
+              value={catalogProvider}
+              onValueChange={(id) => {
+                setCatalogProvider(id);
+                setCatalogModel("");
                 setSelectedModel(null);
               }}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select provider" />
-              </SelectTrigger>
-              <SelectContent>
-                {providersLoading ? (
-                  <div className="flex items-center justify-center p-4">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  </div>
-                ) : providers && providers.length > 0 ? (
-                  providers.map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id.toString()}>
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        <span>{provider.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="p-4 text-sm text-muted-foreground">
-                    No providers configured
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
+              placeholder="Select provider"
+              className="w-[200px]"
+            />
           )}
 
           {/* Model Selection (shown when a provider is selected and not using unified routing) */}
-          {!useUnifiedRouting && selectedProvider && (
-            <Select
-              value={selectedModel ?? ""}
-              onValueChange={(value) => setSelectedModel(value || null)}
-            >
-              <SelectTrigger className="w-[240px]">
-                <SelectValue placeholder="Default model" />
-              </SelectTrigger>
-              <SelectContent>
-                {modelsLoading ? (
-                  <div className="flex items-center justify-center p-4">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  </div>
-                ) : providerModels && providerModels.length > 0 ? (
-                  providerModels.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="p-4 text-sm text-muted-foreground">
-                    No models available
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
+          {!useUnifiedRouting && catalogProvider && (
+            <CatalogSelect
+              entryType="model"
+              value={catalogModel}
+              onValueChange={(id) => {
+                setCatalogModel(id);
+              }}
+              placeholder="Select model"
+              className="w-[240px]"
+              linkedProvider={selectedCatalogProviderName}
+              valueField="name"
+            />
           )}
 
           {/* Routing Info Badge */}
@@ -734,19 +717,10 @@ function ChatInner() {
               onAnalytics={handleAnalytics}
               onSwitchChat={(id) => switchChat(id)}
               recentChats={recentChats}
-              providers={providers?.map((p) => ({ id: p.id, name: p.name, type: p.type })) ?? []}
-              providerModels={providerModels?.map((m) => ({ id: m.id, name: m.name })) ?? []}
+              providers={allProviders?.map((p) => ({ id: p.id, name: p.name, type: p.type })) ?? []}
               selectedProviderId={selectedProvider}
               selectedModelId={selectedModel}
-              onProviderSelect={(id) => {
-                setSelectedProvider(id);
-                setSelectedModel(null);
-              }}
-              onModelSelect={setSelectedModel}
-              providersLoading={providersLoading}
-              modelsLoading={modelsLoading}
-              providerCount={providers?.length ?? 0}
-              modelCount={providerModels?.length ?? 0}
+              providerCount={allProviders?.length ?? 0}
             />
           </div>
         </CardContent>

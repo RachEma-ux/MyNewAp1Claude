@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { StepProgress } from "@/components/ui/step-progress";
+import { CatalogSelect } from "@/components/CatalogSelect";
 
 // Helper component to show model compatibility
 function ModelCompatibilityBadge({ model, deviceSpecs }: { model: any; deviceSpecs: any }) {
@@ -930,50 +931,13 @@ export default function LLMProviderConfigWizard() {
                   <div className="flex gap-2 items-end">
                     <div className="flex-1 space-y-2">
                       <Label>Model (from Catalog)</Label>
-                      {catalogQuery.isLoading ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground p-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Loading catalog...
-                        </div>
-                      ) : (
-                        <Select
-                          value={state.selectedModels[0] || ""}
-                          onValueChange={(value) => updateState({ selectedModels: [value] })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pick a model from catalog..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {/* Provider models first */}
-                            {(catalogQuery.data || []).filter((m) => m.isProviderModel).length > 0 && (
-                              <>
-                                <SelectItem value="__header_provider__" disabled>
-                                  -- Registered Provider Models --
-                                </SelectItem>
-                                {(catalogQuery.data || [])
-                                  .filter((m) => m.isProviderModel && (m.name || "").trim() !== "")
-                                  .map((model) => (
-                                    <SelectItem key={`prov-${model.name}`} value={model.name}>
-                                      {model.displayName || model.name}
-                                      {model.providerName ? ` (${model.providerName})` : ""}
-                                    </SelectItem>
-                                  ))}
-                              </>
-                            )}
-                            {/* Hub models */}
-                            <SelectItem value="__header_hub__" disabled>
-                              -- Model Hub --
-                            </SelectItem>
-                            {(catalogQuery.data || [])
-                              .filter((m) => !m.isProviderModel && (m.name || "").trim() !== "")
-                              .map((model) => (
-                                <SelectItem key={`hub-${model.name}`} value={model.name}>
-                                  {model.displayName || model.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      )}
+                      <CatalogSelect
+                        entryType="model"
+                        value={state.selectedModels[0] || ""}
+                        onValueChange={(value) => updateState({ selectedModels: [value] })}
+                        placeholder="Pick a model from catalog..."
+                        valueField="name"
+                      />
                     </div>
                     <div className="flex items-center gap-2 pb-2">
                       <Checkbox

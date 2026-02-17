@@ -23,6 +23,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLocation } from 'wouter';
 import { ArrowLeft, Save } from 'lucide-react';
+import { CatalogSelect } from '@/components/CatalogSelect';
 
 const ROLE_CLASSES = [
   { value: 'assistant', label: 'Assistant' },
@@ -71,11 +72,7 @@ export function AgentEditor({ agentId }: { agentId?: string }) {
     allowedTools: [],
   });
 
-  // Unified catalog as single source of truth for model list
-  const { data: catalogModels = [] } = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
-  const MODELS = catalogModels
-    .filter((m) => (m.name || "").trim() !== "")
-    .map((m) => ({ value: m.name, label: m.displayName }));
+  // Model list is now handled by CatalogSelect component
 
   // Fetch agent if editing
   const { data: agent, isLoading: isLoadingAgent } = trpc.agents.get.useQuery(
@@ -259,18 +256,13 @@ export function AgentEditor({ agentId }: { agentId?: string }) {
             </div>
             <div>
               <Label htmlFor="modelId">Model *</Label>
-              <Select value={formData.modelId} onValueChange={(v) => handleSelectChange('modelId', v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODELS.map(model => (
-                    <SelectItem key={model.value} value={model.value}>
-                      {model.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CatalogSelect
+                entryType="model"
+                value={formData.modelId}
+                onValueChange={(v) => handleSelectChange('modelId', v)}
+                placeholder="Select a model"
+                valueField="name"
+              />
             </div>
             <div>
               <Label htmlFor="temperature">

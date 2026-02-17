@@ -67,6 +67,7 @@ import {
   Bot,
   Workflow,
 } from "lucide-react";
+import { CatalogSelect } from "@/components/CatalogSelect";
 
 const TYPE_ICONS: Record<string, any> = {
   provider: Server,
@@ -141,7 +142,6 @@ export default function CatalogManagePage() {
   const [publishNotes, setPublishNotes] = useState("");
 
   // Data queries
-  const { data: providers = [] } = trpc.providers.list.useQuery({});
   const { data: entries = [], isLoading, refetch } = trpc.catalogManage.list.useQuery({
     ...(typeFilter !== "all" ? { entryType: typeFilter } : {}),
     ...(categoryFilter !== "all" ? { category: categoryFilter } : {}),
@@ -980,19 +980,12 @@ export default function CatalogManagePage() {
             {formEntryType !== "provider" && (
               <div className="grid gap-2">
                 <Label>Linked Provider</Label>
-                <Select value={formProviderId} onValueChange={setFormProviderId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select provider (for validation)..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {providers.map((p: any) => (
-                      <SelectItem key={p.id} value={String(p.id)}>
-                        {p.name} ({p.type})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CatalogSelect
+                  entryType="provider"
+                  value={formProviderId === "none" ? "" : formProviderId}
+                  onValueChange={(v) => setFormProviderId(v || "none")}
+                  placeholder="Select provider (for validation)..."
+                />
                 <p className="text-xs text-muted-foreground">Required for validation — links this entry to a provider runtime</p>
               </div>
             )}
