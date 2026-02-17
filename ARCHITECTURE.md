@@ -56,7 +56,7 @@ Both implementations support collection management, filtered search, and hybrid 
 
 The storage layer manages three distinct data types with appropriate persistence strategies.
 
-**Structured Data (MySQL/TiDB)**: User accounts, workspace configurations, document metadata, agent definitions, and system settings persist in a relational database. The schema uses Drizzle ORM for type-safe queries and migrations.
+**Structured Data (PostgreSQL)**: User accounts, workspace configurations, document metadata, agent definitions, provider registrations, and system settings persist in PostgreSQL. The schema (`drizzle/schema.ts`, 2458 lines) uses Drizzle ORM for type-safe queries and migrations.
 
 **Vector Data (Qdrant/Milvus)**: Document embeddings and semantic indices store in the vector database for efficient similarity search.
 
@@ -90,15 +90,89 @@ When a user submits a query, the system retrieves relevant context and generates
 
 **Stage 5: Generation**: The assembled context and user query pass to the inference engine, which streams the response back to the frontend in real-time.
 
-## Model Management System
+## Providers and Models Catalog
 
-The model management subsystem handles the complete lifecycle of AI models from discovery to deployment.
+The platform uses a **Unified Catalog** as the single source of truth for all model and provider information. Every UI component that needs a list of models queries the same `getUnifiedCatalog` tRPC endpoint, eliminating scattered hardcoded lists.
+
+### Unified Catalog (`getUnifiedCatalog`)
+
+The catalog merges two sources into a single queryable collection:
+
+**Hub Models** — A curated static array of 13 downloadable open-weight models (`HUB_MODELS` in `server/models/download-router.ts`). Each entry carries metadata: name, display name, description, category (text/code/embedding), size, parameter count, Ollama tag, hardware requirements, license, and HuggingFace download URL. These represent models users can download and run locally.
+
+**Provider Models** — Dynamically extracted from the `config.models` and `config.defaultModel` fields of all enabled providers in the database (`providers` table). When a user registers an OpenAI, Anthropic, Google, or Ollama provider, the models they configure automatically appear in the catalog with `isProviderModel: true` and the provider name attached.
+
+The endpoint supports three filters: `search` (free-text across name, description, provider), `category` (text, code, embedding, all), and `source` (hub, providers, all).
+
+### Provider Lifecycle
+
+Providers follow a four-stage lifecycle tracked in the Catalogue dashboard:
+
+| Stage | Definition | Data Source |
+|---|---|---|
+| **Available** | Known provider integrations the platform supports | `trpc.llm.listProviders` (static registry of supported types: Ollama, OpenAI, Anthropic, Google, llama.cpp, custom) |
+| **Configured** | Providers the user has registered with credentials/endpoints | `trpc.providers.list` (rows in the `providers` DB table) |
+| **Active** | Configured providers currently healthy and serving requests | Coming soon (health check integration) |
+| **Offline** | Configured providers that failed their last health check | Coming soon |
+
+### Model Lifecycle
+
+Models follow a five-stage lifecycle:
+
+| Stage | Definition | Data Source |
+|---|---|---|
+| **Downloadable** | Models in the hub catalog available for download | `getUnifiedCatalog` filtered to `!isProviderModel` (the 13 HUB_MODELS entries) |
+| **Available** | Models that have been downloaded and are ready for installation | `trpc.modelDownloads.getAll` filtered to `status === "completed"` |
+| **Active** | Models currently installed and loaded for inference | `trpc.models.list` (rows in the `models` DB table with status "ready") |
+| **Deprecated** | Models marked for removal (end-of-life) | Coming soon |
+
+### Catalogue Page (`LLMCataloguePage.tsx`)
+
+The `/llm/catalogue` page renders the full unified catalog with:
+
+- **Stats Dashboard** — Two rows of 4 cards each. Row 1 (Providers): Available, Configured, Active, Offline. Row 2 (Models): Downloadable, Available, Active, Deprecated. Cards with no data show "Coming soon".
+- **Search and Filter** — Free-text search, category dropdown (All/Text/Code/Embedding), source dropdown (All/Hub/Provider).
+- **Model Grid** — Cards showing model name, description, category badge, parameter count, size, and source badge (Hub vs Provider with provider name).
+
+### Consumer Pages
+
+All client pages that need model lists consume the unified catalog:
+
+| Page | Usage |
+|---|---|
+| `LLMCataloguePage.tsx` | Full catalog browse with search, filters, and stats |
+| `Providers.tsx` | Model dropdown in provider configuration |
+| `ProviderDetail.tsx` | Available models list for a specific provider |
+| `AgentEditor.tsx` | Model selection in agent configuration |
+| `BlockConfigModal.tsx` | Model selection in automation workflow blocks |
+
+### Policy Engine Integration
+
+The LLM Policy Engine (`server/policies/llm-policy-engine.ts`) validates model access dynamically rather than using a static allowlist. When a model is referenced in an LLM configuration, the engine checks whether it belongs to an enabled provider in the database via `getEnabledProviders()`. In sandbox mode, all models are allowed. This means registering a new provider automatically expands the set of allowed models with no code changes.
+
+### Provider Routing
+
+The Hybrid Provider Router (`server/inference/hybrid-router.ts`) scores and selects the best provider for each inference request using configurable strategies: cost, latency, quality, availability, policy, or custom. Quality scoring uses a `MODEL_QUALITY_TIERS` data structure that maps model name patterns to tier scores. The router supports local-preference bias, resource-aware load balancing, cost budgets, and automatic fallback when a provider fails.
+
+### Key Files
+
+| File | Role |
+|---|---|
+| `server/models/download-router.ts` | `HUB_MODELS` array + `getUnifiedCatalog` / `getCatalog` / `addToCatalog` endpoints |
+| `server/providers/router.ts` | Provider CRUD (create, update, delete, list, health check) |
+| `server/providers/db.ts` | Provider database operations (`getEnabledProviders`, `getAllProviders`, etc.) |
+| `server/policies/llm-policy-engine.ts` | Dynamic model allowlist via provider DB check |
+| `server/inference/hybrid-router.ts` | Multi-provider routing with `MODEL_QUALITY_TIERS` |
+| `server/_core/llm.ts` | Core `invokeLLM()` with configurable model (`params.model` / `DEFAULT_LLM_MODEL` env / fallback) |
+| `client/src/pages/LLMCataloguePage.tsx` | Catalogue UI with stats dashboard |
+
+## Model Download and Serving
 
 ### Model Discovery and Download
 
-The model browser connects to Hugging Face and other model repositories, presenting a searchable catalog with filtering by size, quantization, and task type. Users can preview model cards, view performance benchmarks, and check hardware compatibility before downloading.
+The model browser connects to HuggingFace and other model repositories via the hub catalog, presenting a searchable list with filtering by size, quantization, and task type. Users can preview model cards, view performance benchmarks, and check hardware compatibility before downloading.
 
-The download manager implements resumable downloads with progress tracking and bandwidth throttling. Downloads verify integrity using checksums and automatically extract compressed archives.
+The download manager (`server/models/download-service.ts`) implements resumable downloads with progress tracking, priority scheduling, bandwidth throttling, and pause/resume/cancel controls. Download status is tracked in the database via `server/models/download-db.ts`.
 
 ### Model Conversion and Quantization
 
@@ -236,7 +310,7 @@ Advanced users can install components separately, allowing custom configurations
 
 **Backend**: Node.js 22, Express 4, tRPC 11, Drizzle ORM, SuperJSON
 
-**Database**: MySQL/TiDB (structured data), Qdrant/Milvus (vectors), S3-compatible (files)
+**Database**: PostgreSQL (structured data), Qdrant/Milvus (vectors), S3-compatible (files)
 
 **Inference**: llama.cpp, vLLM, ONNX Runtime
 
