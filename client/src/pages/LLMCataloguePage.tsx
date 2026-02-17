@@ -49,50 +49,50 @@ export default function LLMCataloguePage() {
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 grid-cols-5 mb-6">
+      {/* Stats — 2 rows x 4 columns */}
+      <div className="grid gap-4 grid-cols-4 mb-6">
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Server className="h-5 w-5 text-muted-foreground" />
-            <div>
+            <Server className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
               <p className="text-2xl font-bold">{availableProviderCount}</p>
-              <p className="text-xs text-muted-foreground">Available Providers</p>
+              <p className="text-xs text-muted-foreground truncate">Available Providers</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Cloud className="h-5 w-5 text-muted-foreground" />
-            <div>
+            <Cloud className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
               <p className="text-2xl font-bold">{configuredProviderCount}</p>
-              <p className="text-xs text-muted-foreground">Configured Providers</p>
+              <p className="text-xs text-muted-foreground truncate">Configured Providers</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Download className="h-5 w-5 text-muted-foreground" />
-            <div>
+            <Download className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
               <p className="text-2xl font-bold">{downloadableCount}</p>
-              <p className="text-xs text-muted-foreground">Downloadable Models</p>
+              <p className="text-xs text-muted-foreground truncate">Downloadable Models</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <HardDrive className="h-5 w-5 text-muted-foreground" />
-            <div>
+            <HardDrive className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
               <p className="text-2xl font-bold">{availableModelCount}</p>
-              <p className="text-xs text-muted-foreground">Available Models</p>
+              <p className="text-xs text-muted-foreground truncate">Available Models</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Zap className="h-5 w-5 text-muted-foreground" />
-            <div>
+            <Zap className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
               <p className="text-2xl font-bold">{activeModelCount}</p>
-              <p className="text-xs text-muted-foreground">Active Models</p>
+              <p className="text-xs text-muted-foreground truncate">Active Models</p>
             </div>
           </CardContent>
         </Card>
