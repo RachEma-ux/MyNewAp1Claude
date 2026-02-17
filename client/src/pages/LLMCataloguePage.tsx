@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, Search, Filter, Loader2, Cloud, Server, Package } from "lucide-react";
+import { ChevronLeft, Search, Filter, Loader2, Cloud, Server, Package, Download, HardDrive, Zap } from "lucide-react";
 
 export default function LLMCataloguePage() {
   const [, navigate] = useLocation();
@@ -27,10 +27,14 @@ export default function LLMCataloguePage() {
   });
   const { data: providers } = trpc.providers.list.useQuery();
   const { data: availableProviders = [] } = trpc.llm.listProviders.useQuery();
+  const { data: downloads = [] } = trpc.modelDownloads.getAll.useQuery();
+  const { data: installedModels = [] } = trpc.models.list.useQuery({});
 
-  const configuredCount = providers?.length ?? 0;
-  const availableCount = availableProviders.length;
-  const modelCount = catalogModels?.length ?? 0;
+  const availableProviderCount = availableProviders.length;
+  const configuredProviderCount = providers?.length ?? 0;
+  const downloadableCount = catalogModels?.filter((m) => !m.isProviderModel).length ?? 0;
+  const availableModelCount = downloads.filter((d: any) => d.status === "completed").length;
+  const activeModelCount = installedModels.length;
 
   return (
     <div className="container mx-auto py-8 max-w-6xl px-4">
@@ -46,12 +50,12 @@ export default function LLMCataloguePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 grid-cols-3 mb-6">
+      <div className="grid gap-4 grid-cols-5 mb-6">
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
             <Server className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-2xl font-bold">{availableCount}</p>
+              <p className="text-2xl font-bold">{availableProviderCount}</p>
               <p className="text-xs text-muted-foreground">Available Providers</p>
             </div>
           </CardContent>
@@ -60,17 +64,35 @@ export default function LLMCataloguePage() {
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
             <Cloud className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-2xl font-bold">{configuredCount}</p>
+              <p className="text-2xl font-bold">{configuredProviderCount}</p>
               <p className="text-xs text-muted-foreground">Configured Providers</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Package className="h-5 w-5 text-muted-foreground" />
+            <Download className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-2xl font-bold">{modelCount}</p>
+              <p className="text-2xl font-bold">{downloadableCount}</p>
+              <p className="text-xs text-muted-foreground">Downloadable Models</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4 flex items-center gap-3">
+            <HardDrive className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-2xl font-bold">{availableModelCount}</p>
               <p className="text-xs text-muted-foreground">Available Models</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4 flex items-center gap-3">
+            <Zap className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-2xl font-bold">{activeModelCount}</p>
+              <p className="text-xs text-muted-foreground">Active Models</p>
             </div>
           </CardContent>
         </Card>
