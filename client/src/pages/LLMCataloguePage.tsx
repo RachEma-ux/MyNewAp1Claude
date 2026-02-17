@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, Search, Filter, Loader2, Cloud, Package } from "lucide-react";
+import { ChevronLeft, Search, Filter, Loader2, Cloud, Server, Package } from "lucide-react";
 
 export default function LLMCataloguePage() {
   const [, navigate] = useLocation();
@@ -26,8 +26,10 @@ export default function LLMCataloguePage() {
     source,
   });
   const { data: providers } = trpc.providers.list.useQuery();
+  const { data: availableProviders = [] } = trpc.llm.listProviders.useQuery();
 
-  const providerCount = providers?.length ?? 0;
+  const configuredCount = providers?.length ?? 0;
+  const availableCount = availableProviders.length;
   const modelCount = catalogModels?.length ?? 0;
 
   return (
@@ -44,12 +46,21 @@ export default function LLMCataloguePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 grid-cols-2 mb-6">
+      <div className="grid gap-4 grid-cols-3 mb-6">
+        <Card>
+          <CardContent className="pt-4 pb-4 flex items-center gap-3">
+            <Server className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-2xl font-bold">{availableCount}</p>
+              <p className="text-xs text-muted-foreground">Available Providers</p>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
             <Cloud className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-2xl font-bold">{providerCount}</p>
+              <p className="text-2xl font-bold">{configuredCount}</p>
               <p className="text-xs text-muted-foreground">Configured Providers</p>
             </div>
           </CardContent>
