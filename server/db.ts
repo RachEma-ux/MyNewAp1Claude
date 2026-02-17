@@ -1684,3 +1684,258 @@ export async function getLLMAuditEvents(filter: {
 
   return await limitedQuery;
 }
+
+// ============================================================================
+// Catalog Management Operations
+// ============================================================================
+
+import {
+  catalogEntries,
+  catalogEntryVersions,
+  publishBundles,
+  type CatalogEntry,
+  type InsertCatalogEntry,
+  type CatalogEntryVersion,
+  type InsertCatalogEntryVersion,
+  type PublishBundle,
+  type InsertPublishBundle,
+} from "../drizzle/schema";
+
+export async function getCatalogEntries(filter?: {
+  entryType?: string;
+  status?: string;
+  scope?: string;
+}): Promise<CatalogEntry[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const conditions: any[] = [];
+  if (filter?.entryType) conditions.push(eq(catalogEntries.entryType, filter.entryType));
+  if (filter?.status) conditions.push(eq(catalogEntries.status, filter.status));
+  if (filter?.scope) conditions.push(eq(catalogEntries.scope, filter.scope));
+
+  const query = db.select().from(catalogEntries);
+  const filtered = conditions.length > 0 ? query.where(and(...conditions)) : query;
+  return await filtered.orderBy(desc(catalogEntries.updatedAt));
+}
+
+export async function getCatalogEntryById(id: number): Promise<CatalogEntry | null> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const results = await db.select().from(catalogEntries).where(eq(catalogEntries.id, id));
+  return results[0] ?? null;
+}
+
+export async function createCatalogEntry(data: InsertCatalogEntry): Promise<CatalogEntry> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [entry] = await db.insert(catalogEntries).values({
+    ...data,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }).returning();
+
+  // Create initial version snapshot
+  const configHash = createHash("sha256").update(JSON.stringify(data.config ?? {})).digest("hex");
+  await db.insert(catalogEntryVersions).values({
+    catalogEntryId: entry.id,
+    version: 1,
+    config: data.config ?? {},
+    configHash,
+    changeNotes: "Initial creation",
+    changedBy: data.createdBy,
+  });
+
+  return entry;
+}
+
+export async function updateCatalogEntry(
+  id: number,
+  data: Partial<Pick<InsertCatalogEntry, "name" | "displayName" | "description" | "config" | "tags" | "status" | "providerId">>,
+  updatedBy: number
+): Promise<CatalogEntry> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(catalogEntries).set({
+    ...data,
+    updatedAt: new Date(),
+  }).where(eq(catalogEntries.id, id));
+
+  // Create version snapshot if config changed
+  if (data.config) {
+    const existingVersions = await db.select()
+      .from(catalogEntryVersions)
+      .where(eq(catalogEntryVersions.catalogEntryId, id))
+      .orderBy(desc(catalogEntryVersions.version))
+      .limit(1);
+
+    const nextVersion = (existingVersions[0]?.version ?? 0) + 1;
+    const configHash = createHash("sha256").update(JSON.stringify(data.config)).digest("hex");
+
+    await db.insert(catalogEntryVersions).values({
+      catalogEntryId: id,
+      version: nextVersion,
+      config: data.config,
+      configHash,
+      changeNotes: "Configuration updated",
+      changedBy: updatedBy,
+    });
+  }
+
+  const [updated] = await db.select().from(catalogEntries).where(eq(catalogEntries.id, id));
+  return updated;
+}
+
+export async function deleteCatalogEntry(id: number): Promise<void> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Delete versions first
+  await db.delete(catalogEntryVersions).where(eq(catalogEntryVersions.catalogEntryId, id));
+  // Delete any publish bundles
+  await db.delete(publishBundles).where(eq(publishBundles.catalogEntryId, id));
+  // Delete the entry
+  await db.delete(catalogEntries).where(eq(catalogEntries.id, id));
+}
+
+export async function getCatalogEntryVersions(catalogEntryId: number): Promise<CatalogEntryVersion[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.select()
+    .from(catalogEntryVersions)
+    .where(eq(catalogEntryVersions.catalogEntryId, catalogEntryId))
+    .orderBy(desc(catalogEntryVersions.version));
+}
+
+export async function getPublishBundles(filter?: {
+  catalogEntryId?: number;
+  status?: string;
+}): Promise<PublishBundle[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const conditions: any[] = [];
+  if (filter?.catalogEntryId) conditions.push(eq(publishBundles.catalogEntryId, filter.catalogEntryId));
+  if (filter?.status) conditions.push(eq(publishBundles.status, filter.status));
+
+  const query = db.select().from(publishBundles);
+  const filtered = conditions.length > 0 ? query.where(and(...conditions)) : query;
+  return await filtered.orderBy(desc(publishBundles.publishedAt));
+}
+
+export async function createPublishBundle(data: {
+  catalogEntryId: number;
+  versionLabel: string;
+  snapshot: any;
+  snapshotHash: string;
+  publishedBy: number;
+  policyDecision?: string;
+  policyViolations?: any;
+}): Promise<PublishBundle> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Supersede any existing active bundles for this entry
+  await db.update(publishBundles).set({ status: "superseded" })
+    .where(and(
+      eq(publishBundles.catalogEntryId, data.catalogEntryId),
+      eq(publishBundles.status, "active"),
+    ));
+
+  const [bundle] = await db.insert(publishBundles).values({
+    catalogEntryId: data.catalogEntryId,
+    versionLabel: data.versionLabel,
+    snapshot: data.snapshot,
+    snapshotHash: data.snapshotHash,
+    status: "active",
+    publishedBy: data.publishedBy,
+    policyDecision: data.policyDecision ?? null,
+    policyViolations: data.policyViolations ?? null,
+  }).returning();
+
+  return bundle;
+}
+
+export async function recallPublishBundle(bundleId: number): Promise<void> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(publishBundles).set({ status: "recalled" })
+    .where(eq(publishBundles.id, bundleId));
+}
+
+export async function getActiveBundles(): Promise<PublishBundle[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.select().from(publishBundles)
+    .where(eq(publishBundles.status, "active"))
+    .orderBy(desc(publishBundles.publishedAt));
+}
+
+export async function getBundleByHash(hash: string): Promise<PublishBundle | null> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [bundle] = await db.select().from(publishBundles)
+    .where(eq(publishBundles.snapshotHash, hash))
+    .limit(1);
+  return bundle ?? null;
+}
+
+export async function getActiveBundleForEntry(catalogEntryId: number): Promise<PublishBundle | null> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [bundle] = await db.select().from(publishBundles)
+    .where(and(
+      eq(publishBundles.catalogEntryId, catalogEntryId),
+      eq(publishBundles.status, "active"),
+    ))
+    .orderBy(desc(publishBundles.publishedAt))
+    .limit(1);
+  return bundle ?? null;
+}
+
+// ============================================================================
+// Catalog Audit Events
+// ============================================================================
+
+import {
+  catalogAuditEvents,
+  type CatalogAuditEvent,
+  type InsertCatalogAuditEvent,
+} from "../drizzle/schema";
+
+export async function createCatalogAuditEvent(data: InsertCatalogAuditEvent): Promise<CatalogAuditEvent> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [event] = await db.insert(catalogAuditEvents).values({
+    ...data,
+    timestamp: new Date(),
+  }).returning();
+  return event;
+}
+
+export async function getCatalogAuditEvents(filter?: {
+  catalogEntryId?: number;
+  eventType?: string;
+  limit?: number;
+}): Promise<CatalogAuditEvent[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const conditions: any[] = [];
+  if (filter?.catalogEntryId) conditions.push(eq(catalogAuditEvents.catalogEntryId, filter.catalogEntryId));
+  if (filter?.eventType) conditions.push(eq(catalogAuditEvents.eventType, filter.eventType));
+
+  const query = db.select().from(catalogAuditEvents);
+  const filtered = conditions.length > 0 ? query.where(and(...conditions)) : query;
+  const ordered = filtered.orderBy(desc(catalogAuditEvents.timestamp));
+  return filter?.limit ? await ordered.limit(filter.limit) : await ordered;
+}

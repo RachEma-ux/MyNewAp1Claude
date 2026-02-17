@@ -19,7 +19,7 @@ export default function LLMCataloguePage() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [category, setCategory] = useState<"text" | "code" | "embedding" | "all">("all");
-  const [source, setSource] = useState<"all" | "hub" | "providers">("all");
+  const [source, setSource] = useState<"all" | "hub" | "providers" | "registry">("all");
 
   const { data: catalogModels, isLoading } = trpc.modelDownloads.getUnifiedCatalog.useQuery({
     search: searchQuery || undefined,
@@ -32,6 +32,7 @@ export default function LLMCataloguePage() {
   const { data: installedModels = [] } = trpc.models.list.useQuery({});
   const { data: llmIdentities = [] } = trpc.llm.list.useQuery({});
   const { data: creationProjects = [] } = trpc.llm.listCreationProjects.useQuery({});
+  const { data: registryEntries = [] } = trpc.catalogRegistry.listForDropdown.useQuery({});
 
   const availableProviderCount = availableProviders.length;
   const configuredProviderCount = providers?.length ?? 0;
@@ -152,6 +153,7 @@ export default function LLMCataloguePage() {
             <SelectItem value="all">All Sources</SelectItem>
             <SelectItem value="hub">Hub Models</SelectItem>
             <SelectItem value="providers">Provider Models</SelectItem>
+            <SelectItem value="registry">Published Registry</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -344,6 +346,45 @@ export default function LLMCataloguePage() {
             <p className="text-muted-foreground">No models found matching your filters.</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Published Registry Section */}
+      {(source === "all" || source === "registry") && registryEntries.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck className="h-4 w-4 text-green-500" />
+            <h2 className="text-lg font-semibold">Published Registry</h2>
+            <Badge variant="secondary" className="text-xs">{registryEntries.length}</Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {registryEntries.map((entry: any) => (
+              <Card key={entry.id} className="hover:bg-accent/50 transition-colors border-green-900/30">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <CardTitle className="text-base">{entry.displayName || entry.name}</CardTitle>
+                    <Badge className="bg-green-600/20 text-green-400 border-green-600/30 text-xs">
+                      Published
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-xs">
+                    {entry.entryType === "provider" ? "Provider" : "Model"} &middot; v{entry.versionLabel}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-1.5 flex-wrap">
+                    <Badge variant="outline" className="text-xs">{entry.entryType}</Badge>
+                    {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
+                      <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+                    ))}
+                    <Badge variant="outline" className="text-xs font-mono">
+                      {entry.snapshotHash?.substring(0, 8)}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
