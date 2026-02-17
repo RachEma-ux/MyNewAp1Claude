@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import {
+  getCategoriesForType,
+  getSubCategories,
+  getCapabilitiesForType,
+} from "@shared/catalog-taxonomy";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -85,6 +90,7 @@ export default function CatalogManagePage() {
   const [activeTab, setActiveTab] = useState<"catalog" | "validation" | "publishing" | "audit">("catalog");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | EntryType>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   // Create/Edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -95,6 +101,9 @@ export default function CatalogManagePage() {
   const [formEntryType, setFormEntryType] = useState<EntryType>("provider");
   const [formTags, setFormTags] = useState("");
   const [formConfig, setFormConfig] = useState("{}");
+  const [formCategory, setFormCategory] = useState("");
+  const [formSubCategory, setFormSubCategory] = useState("");
+  const [formCapabilities, setFormCapabilities] = useState<string[]>([]);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -117,9 +126,10 @@ export default function CatalogManagePage() {
   const [publishNotes, setPublishNotes] = useState("");
 
   // Data queries
-  const { data: entries = [], isLoading, refetch } = trpc.catalogManage.list.useQuery(
-    typeFilter !== "all" ? { entryType: typeFilter } : {}
-  );
+  const { data: entries = [], isLoading, refetch } = trpc.catalogManage.list.useQuery({
+    ...(typeFilter !== "all" ? { entryType: typeFilter } : {}),
+    ...(categoryFilter !== "all" ? { category: categoryFilter } : {}),
+  });
   const { data: versions = [] } = trpc.catalogManage.listVersions.useQuery(
     { catalogEntryId: versionsEntryId! },
     { enabled: !!versionsEntryId }
@@ -181,6 +191,9 @@ export default function CatalogManagePage() {
     setFormEntryType("provider");
     setFormTags("");
     setFormConfig("{}");
+    setFormCategory("");
+    setFormSubCategory("");
+    setFormCapabilities([]);
     setDialogOpen(true);
   }
 
@@ -192,6 +205,9 @@ export default function CatalogManagePage() {
     setFormEntryType(entry.entryType);
     setFormTags((entry.tags || []).join(", "));
     setFormConfig(JSON.stringify(entry.config || {}, null, 2));
+    setFormCategory(entry.category || "");
+    setFormSubCategory(entry.subCategory || "");
+    setFormCapabilities(entry.capabilities || []);
     setDialogOpen(true);
   }
 
@@ -218,6 +234,9 @@ export default function CatalogManagePage() {
         description: formDescription || undefined,
         config: parsedConfig,
         tags,
+        category: formCategory || undefined,
+        subCategory: formSubCategory || undefined,
+        capabilities: formCapabilities.length > 0 ? formCapabilities : undefined,
       });
     } else {
       createMutation.mutate({
@@ -227,6 +246,9 @@ export default function CatalogManagePage() {
         entryType: formEntryType,
         config: parsedConfig,
         tags,
+        category: formCategory || undefined,
+        subCategory: formSubCategory || undefined,
+        capabilities: formCapabilities.length > 0 ? formCapabilities : undefined,
       });
     }
   }
@@ -298,7 +320,7 @@ export default function CatalogManagePage() {
                 className="pl-9"
               />
             </div>
-            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+            <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v as any); setCategoryFilter("all"); }}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -306,6 +328,21 @@ export default function CatalogManagePage() {
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="provider">Providers</SelectItem>
                 <SelectItem value="model">Models</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {typeFilter !== "model" && Object.entries(getCategoriesForType("provider")).map(([key, cat]) => (
+                  <SelectItem key={`p-${key}`} value={key}>{cat.label}</SelectItem>
+                ))}
+                {typeFilter === "all" && <SelectItem value="_sep" disabled>───</SelectItem>}
+                {typeFilter !== "provider" && Object.entries(getCategoriesForType("model")).map(([key, cat]) => (
+                  <SelectItem key={`m-${key}`} value={key}>{cat.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -331,6 +368,7 @@ export default function CatalogManagePage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Category</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Review</TableHead>
                     <TableHead>Origin</TableHead>
@@ -361,6 +399,34 @@ export default function CatalogManagePage() {
                           )}
                           {entry.entryType}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          {entry.category ? (
+                            <Badge variant="secondary" className="text-xs w-fit">
+                              {getCategoriesForType(entry.entryType)[entry.category]?.label || entry.category}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                          {entry.subCategory && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {getSubCategories(entry.category)?.[entry.subCategory] || entry.subCategory}
+                            </span>
+                          )}
+                          {entry.capabilities && entry.capabilities.length > 0 && (
+                            <div className="flex gap-0.5 flex-wrap mt-0.5">
+                              {entry.capabilities.slice(0, 2).map((c: string) => (
+                                <Badge key={c} variant="outline" className="text-[10px] px-1 py-0">
+                                  {c.replace(/_/g, " ")}
+                                </Badge>
+                              ))}
+                              {entry.capabilities.length > 2 && (
+                                <span className="text-[10px] text-muted-foreground">+{entry.capabilities.length - 2}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>
@@ -778,7 +844,12 @@ export default function CatalogManagePage() {
             {!editingEntry && (
               <div className="grid gap-2">
                 <Label>Type</Label>
-                <Select value={formEntryType} onValueChange={(v) => setFormEntryType(v as EntryType)}>
+                <Select value={formEntryType} onValueChange={(v) => {
+                  setFormEntryType(v as EntryType);
+                  setFormCategory("");
+                  setFormSubCategory("");
+                  setFormCapabilities([]);
+                }}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -789,6 +860,74 @@ export default function CatalogManagePage() {
                 </Select>
               </div>
             )}
+
+            {/* Category */}
+            <div className="grid gap-2">
+              <Label>Category</Label>
+              <Select value={formCategory} onValueChange={(v) => {
+                setFormCategory(v);
+                setFormSubCategory("");
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(getCategoriesForType(formEntryType)).map(([key, cat]) => (
+                    <SelectItem key={key} value={key}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formCategory && getCategoriesForType(formEntryType)[formCategory] && (
+                <p className="text-xs text-muted-foreground">{getCategoriesForType(formEntryType)[formCategory].description}</p>
+              )}
+            </div>
+
+            {/* Sub-Category (conditional) */}
+            {formCategory && getSubCategories(formCategory) && Object.keys(getSubCategories(formCategory)!).length > 0 && (
+              <div className="grid gap-2">
+                <Label>Sub-Category</Label>
+                <Select value={formSubCategory} onValueChange={setFormSubCategory}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select sub-category..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(getSubCategories(formCategory)!).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Capabilities (multi-select chips) */}
+            <div className="grid gap-2">
+              <Label>Capabilities</Label>
+              <div className="flex flex-wrap gap-1.5 p-2 border rounded-md min-h-[38px]">
+                {Object.entries(getCapabilitiesForType(formEntryType)).map(([key, cap]) => {
+                  const selected = formCapabilities.includes(key);
+                  return (
+                    <Badge
+                      key={key}
+                      variant={selected ? "default" : "outline"}
+                      className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
+                      onClick={() => {
+                        setFormCapabilities((prev) =>
+                          selected ? prev.filter((c) => c !== key) : [...prev, key]
+                        );
+                      }}
+                    >
+                      {cap.label}
+                    </Badge>
+                  );
+                })}
+              </div>
+              {formCapabilities.length > 0 && (
+                <p className="text-xs text-muted-foreground">{formCapabilities.length} selected</p>
+              )}
+            </div>
+
             <div className="grid gap-2">
               <Label>Name</Label>
               <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g., my-ollama-provider" />

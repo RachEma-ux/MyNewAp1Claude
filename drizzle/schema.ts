@@ -2476,6 +2476,11 @@ export const catalogEntries = pgTable("catalog_entries", {
   // Type: provider or model
   entryType: varchar("entryType", { length: 50 }).notNull(), // "provider", "model"
 
+  // Taxonomy classification
+  category: varchar("category", { length: 100 }),       // e.g., "cloud_api", "base_llm"
+  subCategory: varchar("subCategory", { length: 100 }), // e.g., "official_saas", "quantized"
+  capabilities: json("capabilities").$type<string[]>(), // e.g., ["streaming","tool_calling"]
+
   // Scope (for future multi-scope resolution)
   scope: varchar("scope", { length: 50 }).default("app").notNull(),
 
