@@ -48,6 +48,7 @@ import {
   Key,
   BookOpen,
   Wand2,
+  List,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -123,6 +124,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/llm" },
         { label: "Control Plane", icon: <Settings className="w-4 h-4" />, href: "/llm/control-plane" },
         { label: "Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/llm/create" },
+        { label: "Catalogue", icon: <List className="w-4 h-4" />, href: "/llm/catalogue" },
       ]
     },
     {
