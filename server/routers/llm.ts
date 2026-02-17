@@ -1351,7 +1351,21 @@ export const llmRouter = router({
 
       const { evaluationId, ...updates } = input;
 
-      const updateData: any = { ...updates, updatedAt: new Date() };
+      const updateData: any = { updatedAt: new Date() };
+
+      // Copy non-numeric fields directly
+      if (updates.status !== undefined) updateData.status = updates.status;
+      if (updates.results !== undefined) updateData.results = updates.results;
+
+      // Convert numeric fields to strings for Drizzle numeric columns
+      if (updates.overallScore !== undefined) updateData.overallScore = String(updates.overallScore);
+      if (updates.taskAccuracy !== undefined) updateData.taskAccuracy = String(updates.taskAccuracy);
+      if (updates.formatCorrectness !== undefined) updateData.formatCorrectness = String(updates.formatCorrectness);
+      if (updates.refusalCorrectness !== undefined) updateData.refusalCorrectness = String(updates.refusalCorrectness);
+      if (updates.throughput !== undefined) updateData.throughput = String(updates.throughput);
+
+      // latency is integer column — truncate to int
+      if (updates.latency !== undefined) updateData.latency = Math.round(updates.latency);
 
       if (updates.status === "completed") {
         updateData.completedAt = new Date();
