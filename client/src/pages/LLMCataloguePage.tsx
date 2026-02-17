@@ -28,6 +28,7 @@ import {
   getCategoriesForType,
   CAPABILITIES,
 } from "@shared/catalog-taxonomy";
+import { CatalogSelect } from "@/components/CatalogSelect";
 
 // ============================================================================
 // Constants
@@ -65,6 +66,11 @@ export default function LLMCataloguePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeType, setActiveType] = useState<EntryType | "all">("all");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  // CatalogSelect demo state
+  const [selectedProvider, setSelectedProvider] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedAny, setSelectedAny] = useState<string>("");
 
   // Primary data source: catalog entries
   const { data: entries = [], isLoading, refetch } = trpc.catalogManage.list.useQuery(
@@ -171,6 +177,61 @@ export default function LLMCataloguePage() {
           </Button>
         </div>
       </div>
+
+      {/* Quick Select — CatalogSelect Demo */}
+      <Card className="mb-6">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Quick Select</CardTitle>
+          <CardDescription className="text-xs">
+            Reusable CatalogSelect dropdowns — pick a provider, model, or any entry
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Provider</label>
+              <CatalogSelect
+                entryType="provider"
+                value={selectedProvider}
+                onValueChange={setSelectedProvider}
+                placeholder="Select provider..."
+                showCategory
+                className="w-full"
+              />
+              {selectedProvider && (
+                <p className="text-xs text-muted-foreground">ID: {selectedProvider}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Model</label>
+              <CatalogSelect
+                entryType="model"
+                value={selectedModel}
+                onValueChange={setSelectedModel}
+                placeholder="Select model..."
+                showCategory
+                className="w-full"
+              />
+              {selectedModel && (
+                <p className="text-xs text-muted-foreground">ID: {selectedModel}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">All (Grouped)</label>
+              <CatalogSelect
+                value={selectedAny}
+                onValueChange={setSelectedAny}
+                placeholder="Any entry..."
+                showCategory
+                className="w-full"
+              />
+              {selectedAny && (
+                <p className="text-xs text-muted-foreground">ID: {selectedAny}</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Architectural Stack Banner */}
       <Card className="mb-6 border-dashed">
