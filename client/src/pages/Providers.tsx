@@ -20,73 +20,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 type ProviderType = "openai" | "anthropic" | "google" | "local-llamacpp" | "local-ollama" | "custom";
 
-// Available models for each provider type
-const providerModels: Record<string, { id: string; name: string; description: string }[]> = {
-  anthropic: [
-    { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Most capable, advanced reasoning" },
-    { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", description: "Fast and intelligent" },
-    { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", description: "Fast and cost-efficient" },
-    { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5", description: "Complex coding and analysis" },
-    { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", description: "Balanced speed and capability" },
-    { id: "claude-3-7-sonnet-20250219", name: "Claude 3.7 Sonnet", description: "Legacy balanced model" },
-  ],
-  openai: [
-    { id: "gpt-4.1", name: "GPT-4.1", description: "Smartest non-reasoning model" },
-    { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", description: "Fast and capable" },
-    { id: "gpt-4.1-nano", name: "GPT-4.1 Nano", description: "Fastest, most cost-efficient" },
-    { id: "o3", name: "o3", description: "Advanced reasoning model" },
-    { id: "o4-mini", name: "o4 Mini", description: "Fast reasoning model" },
-    { id: "gpt-4o", name: "GPT-4o", description: "Multimodal flagship model" },
-    { id: "gpt-4o-mini", name: "GPT-4o Mini", description: "Fast and affordable" },
-  ],
-  google: [
-    { id: "gemini-3-pro", name: "Gemini 3 Pro", description: "Most powerful reasoning model" },
-    { id: "gemini-3-flash", name: "Gemini 3 Flash", description: "Fast multimodal understanding" },
-    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", description: "Complex reasoning and coding" },
-    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", description: "Fast with thinking budgets" },
-    { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite", description: "High-throughput, low cost" },
-    { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", description: "Stable multimodal model" },
-  ],
-  "local-ollama": [
-    { id: "smollm2", name: "SmolLM2 1.7B", description: "Default lightweight local model" },
-    { id: "smollm2:360m", name: "SmolLM2 360M Instruct", description: "Ultra-compact on-device model" },
-    { id: "llama4", name: "Llama 4", description: "Meta's latest open model" },
-    { id: "qwen3", name: "Qwen 3", description: "Dense and MoE reasoning" },
-    { id: "deepseek-r1", name: "DeepSeek R1", description: "Advanced open reasoning" },
-    { id: "deepseek-r1:1.5b", name: "DeepSeek R1 1.5B", description: "Compact reasoning model" },
-    { id: "gemma3", name: "Gemma 3", description: "Google's efficient model" },
-    { id: "gemma2:2b", name: "Gemma 2B", description: "Lightweight Google model" },
-    { id: "mistral", name: "Mistral 7B", description: "Efficient and versatile" },
-    { id: "qwen2.5-coder", name: "Qwen 2.5 Coder", description: "Strong coding model" },
-    { id: "llama3.2", name: "Llama 3.2", description: "Compact open model" },
-    { id: "llama3.2:1b", name: "Llama 3.2 1B", description: "Smallest Llama for edge devices" },
-    { id: "phi4", name: "Phi-4", description: "Microsoft's compact model" },
-    { id: "phi3:mini", name: "Phi-3 Mini", description: "3.8B model with strong reasoning" },
-    { id: "phi2", name: "Phi-2", description: "Efficient 2.7B Microsoft model" },
-    { id: "tinyllama", name: "TinyLlama 1.1B", description: "Ultra-light Llama architecture" },
-    { id: "phonelm", name: "PhoneLM", description: "Built for on-device phone inference" },
-  ],
-  "local-llamacpp": [
-    { id: "smollm2-1.7b", name: "SmolLM2 1.7B", description: "Default lightweight GGUF" },
-    { id: "smollm2-360m-instruct", name: "SmolLM2 360M Instruct", description: "Ultra-compact GGUF" },
-    { id: "llama-4-scout", name: "Llama 4 Scout", description: "Latest Llama GGUF" },
-    { id: "qwen3-8b", name: "Qwen 3 8B", description: "Strong reasoning GGUF" },
-    { id: "deepseek-r1-8b", name: "DeepSeek R1 8B", description: "Reasoning GGUF model" },
-    { id: "deepseek-r1-1.5b", name: "DeepSeek R1 1.5B", description: "Compact reasoning GGUF" },
-    { id: "gemma-3-4b", name: "Gemma 3 4B", description: "Efficient Google GGUF" },
-    { id: "gemma-2b", name: "Gemma 2B", description: "Lightweight Google GGUF" },
-    { id: "mistral-7b", name: "Mistral 7B", description: "Versatile GGUF model" },
-    { id: "phi-4-mini", name: "Phi-4 Mini", description: "Compact Microsoft GGUF" },
-    { id: "phi-3-mini", name: "Phi-3 Mini", description: "3.8B reasoning GGUF" },
-    { id: "phi-2", name: "Phi-2", description: "Efficient 2.7B GGUF" },
-    { id: "tinyllama-1.1b", name: "TinyLlama 1.1B", description: "Ultra-light GGUF" },
-    { id: "llama-3.2-1b", name: "Llama 3.2 1B", description: "Smallest Llama GGUF" },
-    { id: "phonelm-0.5b", name: "PhoneLM 0.5B", description: "Tiny phone GGUF" },
-    { id: "phonelm-1.5b", name: "PhoneLM 1.5B", description: "Phone-optimized GGUF" },
-  ],
-  custom: [],
-};
-
 interface ProviderFormData {
   name: string;
   type: ProviderType;
@@ -156,6 +89,7 @@ export default function Providers() {
 
   const { data: providers, isLoading, refetch } = trpc.providers.list.useQuery();
   const { data: multiChatProviders = [] } = trpc.llm.listProviders.useQuery();
+  const { data: catalogModels = [] } = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
   const createProvider = trpc.providers.create.useMutation({
     onSuccess: () => {
       toast.success("Provider created successfully");
@@ -239,11 +173,14 @@ export default function Providers() {
   };
 
   const getAvailableModels = () => {
-    // Get models for the selected provider type or from the multi-chat provider selection
-    if (selectedMultiChatProvider && providerModels[selectedMultiChatProvider]) {
-      return providerModels[selectedMultiChatProvider];
-    }
-    return providerModels[selectedType] || [];
+    // Use unified catalog as source of truth
+    return catalogModels
+      .filter((m) => (m.name || "").trim() !== "")
+      .map((m) => ({
+        id: m.name,
+        name: m.displayName,
+        description: m.description,
+      }));
   };
 
   const handleToggleEnabled = (id: number, currentEnabled: boolean | null) => {
@@ -310,28 +247,7 @@ export default function Providers() {
                       return;
                     }
 
-                    // Fallback provider list for when API returns empty
-                    const fallbackProviders = [
-                      { id: 'anthropic', name: 'Anthropic', type: 'cloud' },
-                      { id: 'openai', name: 'OpenAI', type: 'cloud' },
-                      { id: 'google', name: 'Google', type: 'cloud' },
-                      { id: 'meta', name: 'Meta', type: 'cloud' },
-                      { id: 'mistral', name: 'Mistral AI', type: 'cloud' },
-                      { id: 'microsoft', name: 'Microsoft', type: 'cloud' },
-                      { id: 'qwen', name: 'Qwen', type: 'cloud' },
-                      { id: 'xai', name: 'xAI', type: 'cloud' },
-                      { id: 'cohere', name: 'Cohere', type: 'cloud' },
-                      { id: 'butterfly', name: 'Butterfly', type: 'cloud' },
-                      { id: 'moonshot', name: 'Moonshot', type: 'cloud' },
-                      { id: 'palantir', name: 'Palantir', type: 'cloud' },
-                      { id: 'perplexity', name: 'Perplexity', type: 'cloud' },
-                      { id: 'deepseek', name: 'DeepSeek', type: 'cloud' },
-                      { id: 'ollama', name: 'Ollama', type: 'local' },
-                    ];
-
-                    // Search in both API providers and fallback list
-                    const providerList = multiChatProviders.length > 0 ? multiChatProviders : fallbackProviders;
-                    const provider = providerList.find(p => p.id === value);
+                    const provider = multiChatProviders.find(p => p.id === value);
 
                     if (provider) {
                       // Update form with provider name
@@ -356,23 +272,7 @@ export default function Providers() {
                       <SelectValue placeholder="Select a provider..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(multiChatProviders.length > 0 ? multiChatProviders : [
-                        { id: 'anthropic', name: 'Anthropic', type: 'cloud' },
-                        { id: 'openai', name: 'OpenAI', type: 'cloud' },
-                        { id: 'google', name: 'Google', type: 'cloud' },
-                        { id: 'meta', name: 'Meta', type: 'cloud' },
-                        { id: 'mistral', name: 'Mistral AI', type: 'cloud' },
-                        { id: 'microsoft', name: 'Microsoft', type: 'cloud' },
-                        { id: 'qwen', name: 'Qwen', type: 'cloud' },
-                        { id: 'xai', name: 'xAI', type: 'cloud' },
-                        { id: 'cohere', name: 'Cohere', type: 'cloud' },
-                        { id: 'butterfly', name: 'Butterfly', type: 'cloud' },
-                        { id: 'moonshot', name: 'Moonshot', type: 'cloud' },
-                        { id: 'palantir', name: 'Palantir', type: 'cloud' },
-                        { id: 'perplexity', name: 'Perplexity', type: 'cloud' },
-                        { id: 'deepseek', name: 'DeepSeek', type: 'cloud' },
-                        { id: 'ollama', name: 'Ollama', type: 'local' },
-                      ]).map((provider) => (
+                      {multiChatProviders.map((provider) => (
                         <SelectItem key={provider.id} value={provider.id}>
                           {provider.name}
                         </SelectItem>

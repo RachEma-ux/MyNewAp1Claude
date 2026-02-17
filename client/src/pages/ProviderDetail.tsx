@@ -14,70 +14,6 @@ import { toast } from "sonner";
 import { ArrowLeft, Save, Trash2, CheckCircle, XCircle, Cloud, Server, Loader2, RefreshCw, Zap, Shield } from "lucide-react";
 import { ProviderCapabilitiesEditor } from "@/components/ProviderCapabilitiesEditor";
 
-// Model options for each provider type
-const providerModels: Record<string, { value: string; label: string; description: string }[]> = {
-  openai: [
-    { value: "gpt-4.1", label: "GPT-4.1", description: "Smartest non-reasoning model" },
-    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini", description: "Fast and capable" },
-    { value: "gpt-4.1-nano", label: "GPT-4.1 Nano", description: "Fastest, most cost-efficient" },
-    { value: "o3", label: "o3", description: "Advanced reasoning model" },
-    { value: "o4-mini", label: "o4 Mini", description: "Fast reasoning model" },
-    { value: "gpt-4o", label: "GPT-4o", description: "Multimodal flagship model" },
-    { value: "gpt-4o-mini", label: "GPT-4o Mini", description: "Fast and affordable" },
-  ],
-  anthropic: [
-    { value: "claude-opus-4-6", label: "Claude Opus 4.6", description: "Most capable, advanced reasoning" },
-    { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", description: "Fast and intelligent" },
-    { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", description: "Fast and cost-efficient" },
-    { value: "claude-opus-4-5-20251101", label: "Claude Opus 4.5", description: "Complex coding and analysis" },
-    { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", description: "Balanced speed and capability" },
-  ],
-  google: [
-    { value: "gemini-3-pro", label: "Gemini 3 Pro", description: "Most powerful reasoning model" },
-    { value: "gemini-3-flash", label: "Gemini 3 Flash", description: "Fast multimodal understanding" },
-    { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "Complex reasoning and coding" },
-    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Fast with thinking budgets" },
-    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash", description: "Stable multimodal model" },
-  ],
-  "local-llamacpp": [
-    { value: "custom", label: "Custom Model", description: "Specify GGUF model path" },
-    { value: "smollm2-1.7b", label: "SmolLM2 1.7B", description: "Default lightweight GGUF" },
-    { value: "smollm2-360m-instruct", label: "SmolLM2 360M Instruct", description: "Ultra-compact GGUF" },
-    { value: "llama-4-scout", label: "Llama 4 Scout", description: "Latest Llama GGUF" },
-    { value: "qwen3-8b", label: "Qwen 3 8B", description: "Strong reasoning GGUF" },
-    { value: "deepseek-r1-8b", label: "DeepSeek R1 8B", description: "Reasoning GGUF model" },
-    { value: "deepseek-r1-1.5b", label: "DeepSeek R1 1.5B", description: "Compact reasoning GGUF" },
-    { value: "gemma-3-4b", label: "Gemma 3 4B", description: "Efficient Google GGUF" },
-    { value: "gemma-2b", label: "Gemma 2B", description: "Lightweight Google GGUF" },
-    { value: "mistral-7b", label: "Mistral 7B", description: "Versatile GGUF model" },
-    { value: "phi-4-mini", label: "Phi-4 Mini", description: "Compact Microsoft GGUF" },
-    { value: "phi-3-mini", label: "Phi-3 Mini", description: "3.8B reasoning GGUF" },
-    { value: "phi-2", label: "Phi-2", description: "Efficient 2.7B GGUF" },
-    { value: "tinyllama-1.1b", label: "TinyLlama 1.1B", description: "Ultra-light GGUF" },
-    { value: "llama-3.2-1b", label: "Llama 3.2 1B", description: "Smallest Llama GGUF" },
-    { value: "phonelm-0.5b", label: "PhoneLM 0.5B", description: "Tiny phone GGUF" },
-    { value: "phonelm-1.5b", label: "PhoneLM 1.5B", description: "Phone-optimized GGUF" },
-  ],
-  "local-ollama": [
-    { value: "smollm2", label: "SmolLM2 1.7B", description: "Default lightweight local model" },
-    { value: "smollm2:360m", label: "SmolLM2 360M Instruct", description: "Ultra-compact on-device model" },
-    { value: "llama4", label: "Llama 4", description: "Meta's latest open model" },
-    { value: "qwen3", label: "Qwen 3", description: "Dense and MoE reasoning" },
-    { value: "deepseek-r1", label: "DeepSeek R1", description: "Advanced open reasoning" },
-    { value: "deepseek-r1:1.5b", label: "DeepSeek R1 1.5B", description: "Compact reasoning model" },
-    { value: "gemma3", label: "Gemma 3", description: "Google's efficient model" },
-    { value: "gemma2:2b", label: "Gemma 2B", description: "Lightweight Google model" },
-    { value: "mistral", label: "Mistral 7B", description: "Efficient and versatile" },
-    { value: "qwen2.5-coder", label: "Qwen 2.5 Coder", description: "Strong coding model" },
-    { value: "llama3.2", label: "Llama 3.2", description: "Compact open model" },
-    { value: "llama3.2:1b", label: "Llama 3.2 1B", description: "Smallest Llama for edge devices" },
-    { value: "phi4", label: "Phi-4", description: "Microsoft's compact model" },
-    { value: "phi3:mini", label: "Phi-3 Mini", description: "3.8B model with strong reasoning" },
-    { value: "phi2", label: "Phi-2", description: "Efficient 2.7B Microsoft model" },
-    { value: "tinyllama", label: "TinyLlama 1.1B", description: "Ultra-light Llama architecture" },
-    { value: "phonelm", label: "PhoneLM", description: "Built for on-device phone inference" },
-  ],
-};
 
 export default function ProviderDetail() {
   const params = useParams<{ id: string }>();
@@ -97,6 +33,7 @@ export default function ProviderDetail() {
 
   const { data: providers, refetch: refetchProviders } = trpc.providers.list.useQuery();
   const provider = providers?.find(p => p.id === providerId);
+  const { data: catalogModels = [] } = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
 
   // Fetch provider capabilities for the capabilities editor
   const { data: providerCapabilities, refetch: refetchCapabilities } = trpc.providers.capabilities.get.useQuery(
@@ -195,7 +132,13 @@ export default function ProviderDetail() {
     }
   };
 
-  const availableModels = providerModels[provider.type] || [];
+  const availableModels = catalogModels
+    .filter((m) => (m.name || "").trim() !== "")
+    .map((m) => ({
+      value: m.name,
+      label: m.displayName,
+      description: m.description,
+    }));
   const providerTypeLabels: Record<string, string> = {
     openai: "OpenAI",
     anthropic: "Anthropic",

@@ -142,12 +142,7 @@ const blockConfigSchemas: Record<string, Array<{
       key: "model",
       label: "AI Model",
       type: "select",
-      options: [
-        { value: "gpt-4.1", label: "GPT-4.1" },
-        { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
-        { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
-        { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-      ],
+      options: [], // Populated dynamically from unified catalog
       required: true,
     },
     {
@@ -236,8 +231,21 @@ export function BlockConfigModal({
   currentConfig = {},
 }: BlockConfigModalProps) {
   const [config, setConfig] = useState<BlockConfig>(currentConfig);
-  const schema = blockConfigSchemas[blockType] || [];
   const { data: secrets = [] } = trpc.secrets.list.useQuery();
+  const { data: catalogModels = [] } = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
+
+  // Merge static schema with dynamic catalog data for model selects
+  const schema = (blockConfigSchemas[blockType] || []).map((field) => {
+    if (field.key === "model" && field.type === "select" && (!field.options || field.options.length === 0)) {
+      return {
+        ...field,
+        options: catalogModels
+          .filter((m) => (m.name || "").trim() !== "")
+          .map((m) => ({ value: m.name, label: m.displayName })),
+      };
+    }
+    return field;
+  });
 
   useEffect(() => {
     // Initialize config with current values or defaults

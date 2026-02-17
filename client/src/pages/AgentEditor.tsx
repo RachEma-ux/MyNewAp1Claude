@@ -34,12 +34,6 @@ const ROLE_CLASSES = [
   { value: 'custom', label: 'Custom' },
 ];
 
-const MODELS = [
-  { value: 'gpt-4.1', label: 'GPT-4.1' },
-  { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
-  { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-];
 
 const AVAILABLE_TOOLS = [
   'web_search',
@@ -76,6 +70,12 @@ export function AgentEditor({ agentId }: { agentId?: string }) {
     hasToolAccess: false,
     allowedTools: [],
   });
+
+  // Unified catalog as single source of truth for model list
+  const { data: catalogModels = [] } = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
+  const MODELS = catalogModels
+    .filter((m) => (m.name || "").trim() !== "")
+    .map((m) => ({ value: m.name, label: m.displayName }));
 
   // Fetch agent if editing
   const { data: agent, isLoading: isLoadingAgent } = trpc.agents.get.useQuery(
