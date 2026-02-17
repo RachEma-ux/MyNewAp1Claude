@@ -45,11 +45,14 @@ export default function LLMCataloguePage() {
         <ChevronLeft className="h-4 w-4 mr-1" />Back to LLM
       </Button>
 
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Catalogue</h1>
-        <p className="text-muted-foreground mt-1">
-          Unified view of all hub models and registered provider models
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Catalogue</h1>
+          <p className="text-muted-foreground mt-1">
+            Unified view of all hub models and registered provider models
+          </p>
+        </div>
+        <Button onClick={() => navigate("/llm/catalogue/manage")}>Manage</Button>
       </div>
 
       {/* Row 1: Providers */}
