@@ -50,65 +50,67 @@ export default function LLMCataloguePage() {
       </div>
 
       {/* Row 1: Providers */}
-      <div className="grid gap-3 grid-cols-4 mb-3">
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Providers</p>
+      <div className="grid gap-2 grid-cols-4 mb-4">
         <Card>
-          <CardContent className="py-3 px-4 text-center">
-            <Server className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
-            <p className="text-2xl font-bold">{availableProviderCount || <span className="text-sm text-muted-foreground">Coming soon</span>}</p>
-            <p className="text-[11px] text-muted-foreground">Available</p>
+          <CardContent className="py-2 px-3 text-center">
+            <Server className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+            <p className="text-lg font-bold leading-tight">{availableProviderCount || <span className="text-[10px] text-muted-foreground">Coming soon</span>}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Available</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="py-3 px-4 text-center">
-            <Cloud className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
-            <p className="text-2xl font-bold">{configuredProviderCount || <span className="text-sm text-muted-foreground">Coming soon</span>}</p>
-            <p className="text-[11px] text-muted-foreground">Configured</p>
+          <CardContent className="py-2 px-3 text-center">
+            <Cloud className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+            <p className="text-lg font-bold leading-tight">{configuredProviderCount || <span className="text-[10px] text-muted-foreground">Coming soon</span>}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Configured</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="py-3 px-4 text-center">
-            <Zap className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
-            <p className="text-2xl font-bold text-muted-foreground text-sm">Coming soon</p>
-            <p className="text-[11px] text-muted-foreground">Active</p>
+          <CardContent className="py-2 px-3 text-center">
+            <Zap className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+            <p className="text-lg font-bold leading-tight text-muted-foreground text-[10px]">Coming soon</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Active</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="py-3 px-4 text-center">
-            <Server className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
-            <p className="text-2xl font-bold text-muted-foreground text-sm">Coming soon</p>
-            <p className="text-[11px] text-muted-foreground">Offline</p>
+          <CardContent className="py-2 px-3 text-center">
+            <Server className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+            <p className="text-lg font-bold leading-tight text-muted-foreground text-[10px]">Coming soon</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Offline</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Row 2: Models */}
-      <div className="grid gap-3 grid-cols-4 mb-6">
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Models</p>
+      <div className="grid gap-2 grid-cols-4 mb-6">
         <Card>
-          <CardContent className="py-3 px-4 text-center">
-            <Download className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
-            <p className="text-2xl font-bold">{downloadableCount || <span className="text-sm text-muted-foreground">Coming soon</span>}</p>
-            <p className="text-[11px] text-muted-foreground">Downloadable</p>
+          <CardContent className="py-2 px-3 text-center">
+            <Download className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+            <p className="text-lg font-bold leading-tight">{downloadableCount || <span className="text-[10px] text-muted-foreground">Coming soon</span>}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Downloadable</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="py-3 px-4 text-center">
-            <HardDrive className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
-            <p className="text-2xl font-bold">{availableModelCount || <span className="text-sm text-muted-foreground">Coming soon</span>}</p>
-            <p className="text-[11px] text-muted-foreground">Available</p>
+          <CardContent className="py-2 px-3 text-center">
+            <HardDrive className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+            <p className="text-lg font-bold leading-tight">{availableModelCount || <span className="text-[10px] text-muted-foreground">Coming soon</span>}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Available</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="py-3 px-4 text-center">
-            <Zap className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
-            <p className="text-2xl font-bold">{activeModelCount || <span className="text-sm text-muted-foreground">Coming soon</span>}</p>
-            <p className="text-[11px] text-muted-foreground">Active</p>
+          <CardContent className="py-2 px-3 text-center">
+            <Zap className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+            <p className="text-lg font-bold leading-tight">{activeModelCount || <span className="text-[10px] text-muted-foreground">Coming soon</span>}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Active</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="py-3 px-4 text-center">
-            <Package className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
-            <p className="text-2xl font-bold text-muted-foreground text-sm">Coming soon</p>
-            <p className="text-[11px] text-muted-foreground">Deprecated</p>
+          <CardContent className="py-2 px-3 text-center">
+            <Package className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+            <p className="text-lg font-bold leading-tight text-muted-foreground text-[10px]">Coming soon</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Deprecated</p>
           </CardContent>
         </Card>
       </div>
