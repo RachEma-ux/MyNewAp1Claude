@@ -229,35 +229,84 @@ export default function LLMCataloguePage() {
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
       ) : catalogModels && catalogModels.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {catalogModels
-            .filter((m) => (m.name || "").trim() !== "")
-            .map((model) => (
-              <Card key={`${model.source}-${model.id}`} className="hover:bg-accent/50 transition-colors">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-base">{model.displayName}</CardTitle>
-                    {model.isProviderModel ? (
+        <>
+          {/* Provider sections — group provider models under their provider */}
+          {(() => {
+            const providerModels = catalogModels.filter((m) => m.isProviderModel && (m.name || "").trim() !== "");
+            const hubModels = catalogModels.filter((m) => !m.isProviderModel && (m.name || "").trim() !== "");
+            const providerGroups = new Map<number, { name: string; models: typeof providerModels }>();
+            providerModels.forEach((m) => {
+              if (m.providerId == null) return;
+              if (!providerGroups.has(m.providerId)) {
+                providerGroups.set(m.providerId, { name: m.providerName || `Provider ${m.providerId}`, models: [] });
+              }
+              providerGroups.get(m.providerId)!.models.push(m);
+            });
+            return (
+              <>
+                {Array.from(providerGroups.entries()).map(([providerId, group]) => (
+                  <div key={`provider-group-${providerId}`} className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Server className="h-4 w-4 text-blue-500" />
+                      <h2 className="text-lg font-semibold">{group.name}</h2>
                       <Badge className="bg-blue-600 text-white text-xs">Provider</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-xs">Hub</Badge>
-                    )}
+                      <Badge variant="secondary" className="text-xs">{group.models.length} model{group.models.length !== 1 ? "s" : ""}</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {group.models.map((model) => (
+                        <Card key={`${model.source}-${model.id}`} className="hover:bg-accent/50 transition-colors">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-start justify-between">
+                              <CardTitle className="text-base">{model.displayName}</CardTitle>
+                              <Badge variant="outline" className="text-xs">Model</Badge>
+                            </div>
+                            <CardDescription className="text-xs">{model.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex gap-1.5 flex-wrap">
+                              <Badge variant="secondary" className="text-xs">{model.category}</Badge>
+                              {model.parameters && <Badge variant="outline" className="text-xs">{model.parameters}</Badge>}
+                              {model.size && <Badge variant="outline" className="text-xs">{model.size}</Badge>}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
-                  <CardDescription className="text-xs">{model.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex gap-1.5 flex-wrap">
-                    <Badge variant="secondary" className="text-xs">{model.category}</Badge>
-                    {model.parameters && <Badge variant="outline" className="text-xs">{model.parameters}</Badge>}
-                    {model.size && <Badge variant="outline" className="text-xs">{model.size}</Badge>}
-                    {model.isProviderModel && model.providerName && (
-                      <Badge variant="outline" className="text-xs">{model.providerName}</Badge>
-                    )}
+                ))}
+                {hubModels.length > 0 && (
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <h2 className="text-lg font-semibold">Hub Models</h2>
+                      <Badge variant="secondary" className="text-xs">{hubModels.length}</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {hubModels.map((model) => (
+                        <Card key={`${model.source}-${model.id}`} className="hover:bg-accent/50 transition-colors">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-start justify-between">
+                              <CardTitle className="text-base">{model.displayName}</CardTitle>
+                              <Badge variant="outline" className="text-xs">Hub</Badge>
+                            </div>
+                            <CardDescription className="text-xs">{model.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex gap-1.5 flex-wrap">
+                              <Badge variant="secondary" className="text-xs">{model.category}</Badge>
+                              {model.parameters && <Badge variant="outline" className="text-xs">{model.parameters}</Badge>}
+                              {model.size && <Badge variant="outline" className="text-xs">{model.size}</Badge>}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-        </div>
+                )}
+              </>
+            );
+          })()}
+        </>
       ) : (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
