@@ -1,395 +1,368 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, Search, Filter, Loader2, Cloud, Server, Package, Download, HardDrive, Zap, Brain, FlaskConical, ShieldCheck, ShieldX } from "lucide-react";
+import {
+  ChevronLeft,
+  Search,
+  Loader2,
+  Server,
+  Brain,
+  Package,
+  Workflow,
+  Bot,
+  RefreshCw,
+  LayoutGrid,
+  ArrowRight,
+  type LucideIcon,
+} from "lucide-react";
+import {
+  ENTRY_TYPES,
+  ENTRY_TYPE_DEFS,
+  type EntryType,
+  getCategoriesForType,
+  CAPABILITIES,
+} from "@shared/catalog-taxonomy";
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const TYPE_ICONS: Record<EntryType, LucideIcon> = {
+  provider: Server,
+  llm: Brain,
+  model: Package,
+  agent: Workflow,
+  bot: Bot,
+};
+
+const TYPE_COLORS: Record<EntryType, string> = {
+  provider: "bg-blue-600/20 text-blue-400 border-blue-600/30",
+  llm: "bg-purple-600/20 text-purple-400 border-purple-600/30",
+  model: "bg-emerald-600/20 text-emerald-400 border-emerald-600/30",
+  agent: "bg-orange-600/20 text-orange-400 border-orange-600/30",
+  bot: "bg-pink-600/20 text-pink-400 border-pink-600/30",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  active: "bg-green-600/20 text-green-400 border-green-600/30",
+  draft: "bg-yellow-600/20 text-yellow-400 border-yellow-600/30",
+  deprecated: "bg-red-600/20 text-red-400 border-red-600/30",
+  disabled: "bg-gray-600/20 text-gray-400 border-gray-600/30",
+};
+
+// ============================================================================
+// Component
+// ============================================================================
 
 export default function LLMCataloguePage() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [category, setCategory] = useState<"text" | "code" | "embedding" | "all">("all");
-  const [source, setSource] = useState<"all" | "hub" | "providers" | "registry">("all");
+  const [activeType, setActiveType] = useState<EntryType | "all">("all");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  const { data: catalogModels, isLoading } = trpc.modelDownloads.getUnifiedCatalog.useQuery({
-    search: searchQuery || undefined,
-    category,
-    source,
+  // Primary data source: catalog entries
+  const { data: entries = [], isLoading, refetch } = trpc.catalogManage.list.useQuery(
+    activeType === "all" ? {} : { entryType: activeType }
+  );
+
+  // Sync providers mutation
+  const syncMutation = trpc.catalogManage.syncProviders.useMutation({
+    onSuccess: (result) => {
+      refetch();
+      if (result.created > 0) {
+        console.log(`[Catalog] Synced ${result.created} providers`);
+      }
+    },
   });
-  const { data: providers } = trpc.providers.list.useQuery();
-  const { data: availableProviders = [] } = trpc.llm.listProviders.useQuery();
-  const { data: downloads = [] } = trpc.modelDownloads.getAll.useQuery();
-  const { data: installedModels = [] } = trpc.models.list.useQuery({});
-  const { data: llmIdentities = [] } = trpc.llm.list.useQuery({});
-  const { data: creationProjects = [] } = trpc.llm.listCreationProjects.useQuery({});
-  const { data: registryEntries = [] } = trpc.catalogRegistry.listForDropdown.useQuery({});
 
-  const availableProviderCount = availableProviders.length;
-  const configuredProviderCount = providers?.length ?? 0;
-  const downloadableCount = catalogModels?.filter((m) => !m.isProviderModel).length ?? 0;
-  const availableModelCount = downloads.filter((d: any) => d.status === "completed").length;
-  const activeModelCount = installedModels.length;
+  // Auto-sync providers on mount
+  useEffect(() => {
+    syncMutation.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- Computed data ----
+
+  // Count per type (from unfiltered list)
+  const { data: allEntries = [] } = trpc.catalogManage.list.useQuery({});
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: allEntries.length };
+    for (const t of ENTRY_TYPES) counts[t] = 0;
+    for (const e of allEntries) {
+      if (counts[e.entryType] !== undefined) counts[e.entryType]++;
+    }
+    return counts;
+  }, [allEntries]);
+
+  // Category chips for current type
+  const categoryChips = useMemo(() => {
+    if (activeType === "all") return [];
+    const catMap = getCategoriesForType(activeType);
+    return Object.entries(catMap).map(([key, def]) => ({
+      key,
+      label: def.label,
+      count: entries.filter((e) => e.category === key).length,
+    }));
+  }, [activeType, entries]);
+
+  // Filtered entries
+  const filteredEntries = useMemo(() => {
+    let result = entries;
+    if (activeCategory) {
+      result = result.filter((e) => e.category === activeCategory);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (e) =>
+          e.name.toLowerCase().includes(q) ||
+          (e.displayName ?? "").toLowerCase().includes(q) ||
+          (e.description ?? "").toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [entries, activeCategory, searchQuery]);
+
+  // Reset category when type changes
+  useEffect(() => {
+    setActiveCategory(null);
+  }, [activeType]);
+
+  // ---- Render ----
 
   return (
     <div className="container mx-auto py-8 max-w-6xl px-4">
+      {/* Navigation */}
       <div className="flex gap-2 mb-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/llm")}>
           <ChevronLeft className="h-4 w-4 mr-1" />Back to LLM
         </Button>
         <Button variant="ghost" size="sm" onClick={() => navigate("/llm/catalogue/manage")}>
-          <ChevronLeft className="h-4 w-4 mr-1" />Back to Manage Catalogue
+          <ChevronLeft className="h-4 w-4 mr-1" />Manage Catalogue
         </Button>
       </div>
 
+      {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Catalogue</h1>
           <p className="text-muted-foreground mt-1">
-            Unified view of all hub models and registered provider models
+            Unified view of all catalog entries — providers, LLMs, models, agents &amp; bots
           </p>
         </div>
-        <Button onClick={() => navigate("/llm/catalogue/manage")}>Manage</Button>
-      </div>
-
-      {/* Row 1: Providers */}
-      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Providers</p>
-      <div className="grid gap-2 grid-cols-4 mb-4">
-        <Card>
-          <CardContent className="py-2 px-3 text-center">
-            <Server className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
-            <p className="text-lg font-bold leading-tight">{availableProviderCount || <span className="text-[10px] text-muted-foreground">Coming soon</span>}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Available</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-2 px-3 text-center">
-            <Cloud className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
-            <p className="text-lg font-bold leading-tight">{configuredProviderCount || <span className="text-[10px] text-muted-foreground">Coming soon</span>}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Configured</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-2 px-3 text-center">
-            <Brain className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
-            <p className="text-lg font-bold leading-tight">{llmIdentities.length || <span className="text-[10px] text-muted-foreground">0</span>}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Registered LLMs</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-2 px-3 text-center">
-            <FlaskConical className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
-            <p className="text-lg font-bold leading-tight">{creationProjects.length || <span className="text-[10px] text-muted-foreground">0</span>}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Projects</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Row 2: Models */}
-      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Models</p>
-      <div className="grid gap-2 grid-cols-4 mb-6">
-        <Card>
-          <CardContent className="py-2 px-3 text-center">
-            <Download className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
-            <p className="text-lg font-bold leading-tight">{downloadableCount || <span className="text-[10px] text-muted-foreground">Coming soon</span>}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Downloadable</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-2 px-3 text-center">
-            <HardDrive className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
-            <p className="text-lg font-bold leading-tight">{availableModelCount || <span className="text-[10px] text-muted-foreground">Coming soon</span>}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Available</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-2 px-3 text-center">
-            <Zap className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
-            <p className="text-lg font-bold leading-tight">{activeModelCount || <span className="text-[10px] text-muted-foreground">Coming soon</span>}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Active</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-2 px-3 text-center">
-            <Package className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
-            <p className="text-lg font-bold leading-tight text-muted-foreground text-[10px]">Coming soon</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Deprecated</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="flex gap-4 mb-6 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            placeholder="Search models..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+            Sync
+          </Button>
+          <Button onClick={() => navigate("/llm/catalogue/manage")}>
+            <LayoutGrid className="h-4 w-4 mr-1" />Manage
+          </Button>
         </div>
-        <Select value={category} onValueChange={(v: any) => setCategory(v)}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="text">Text Generation</SelectItem>
-            <SelectItem value="code">Code Generation</SelectItem>
-            <SelectItem value="embedding">Embeddings</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={source} onValueChange={(v: any) => setSource(v)}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Source" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Sources</SelectItem>
-            <SelectItem value="hub">Hub Models</SelectItem>
-            <SelectItem value="providers">Provider Models</SelectItem>
-            <SelectItem value="registry">Published Registry</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
-      {/* Registered LLMs */}
-      {llmIdentities.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <Brain className="h-4 w-4 text-primary" />
-            <h2 className="text-lg font-semibold">Registered LLMs</h2>
-            <Badge variant="secondary" className="text-xs">{llmIdentities.length}</Badge>
+      {/* Architectural Stack Banner */}
+      <Card className="mb-6 border-dashed">
+        <CardContent className="py-3 px-4">
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground flex-wrap">
+            {ENTRY_TYPES.map((t, i) => {
+              const Icon = TYPE_ICONS[t];
+              const def = ENTRY_TYPE_DEFS[t];
+              return (
+                <span key={t} className="flex items-center gap-1">
+                  {i > 0 && <ArrowRight className="h-3 w-3 mx-1 text-muted-foreground/50" />}
+                  <Icon className="h-3.5 w-3.5" />
+                  <span className="font-medium">{def.label}</span>
+                  <span className="text-xs opacity-60">({def.abstractionLevel})</span>
+                </span>
+              );
+            })}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {llmIdentities
-              .filter((llm: any) => !searchQuery || llm.name.toLowerCase().includes(searchQuery.toLowerCase()))
-              .map((llm: any) => (
-                <Card key={`llm-${llm.id}`} className="hover:bg-accent/50 transition-colors cursor-pointer" onClick={() => navigate(`/llm/${llm.id}`)}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-base">{llm.name}</CardTitle>
-                      <Badge className="bg-purple-600 text-white text-xs">LLM</Badge>
-                    </div>
-                    <CardDescription className="text-xs">{llm.description || "No description"}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-1.5 flex-wrap">
-                      <Badge variant="secondary" className="text-xs capitalize">{llm.role}</Badge>
-                      {llm.ownerTeam && <Badge variant="outline" className="text-xs">{llm.ownerTeam}</Badge>}
-                      {llm.archived && <Badge variant="destructive" className="text-xs">Archived</Badge>}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stats Row */}
+      <div className="grid gap-2 grid-cols-5 mb-6">
+        {ENTRY_TYPES.map((t) => {
+          const Icon = TYPE_ICONS[t];
+          const def = ENTRY_TYPE_DEFS[t];
+          const count = typeCounts[t] ?? 0;
+          return (
+            <Card
+              key={t}
+              className={`cursor-pointer transition-colors hover:bg-accent/50 ${activeType === t ? "ring-1 ring-primary" : ""}`}
+              onClick={() => setActiveType(activeType === t ? "all" : t)}
+            >
+              <CardContent className="py-2 px-3 text-center">
+                <Icon className="h-3.5 w-3.5 text-muted-foreground mx-auto mb-0.5" />
+                <p className="text-lg font-bold leading-tight">{count}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{def.label}s</p>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Type Tabs */}
+      <Tabs
+        value={activeType}
+        onValueChange={(v) => setActiveType(v as EntryType | "all")}
+        className="mb-4"
+      >
+        <TabsList className="w-full justify-start flex-wrap h-auto gap-1 bg-transparent p-0">
+          <TabsTrigger value="all" className="data-[state=active]:bg-accent">
+            All <Badge variant="secondary" className="ml-1 text-xs px-1.5">{typeCounts.all}</Badge>
+          </TabsTrigger>
+          {ENTRY_TYPES.map((t) => {
+            const Icon = TYPE_ICONS[t];
+            const def = ENTRY_TYPE_DEFS[t];
+            return (
+              <TabsTrigger key={t} value={t} className="data-[state=active]:bg-accent">
+                <Icon className="h-3.5 w-3.5 mr-1" />
+                {def.label}
+                <Badge variant="secondary" className="ml-1 text-xs px-1.5">{typeCounts[t] ?? 0}</Badge>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
+
+      {/* Category Filter Chips */}
+      {categoryChips.length > 0 && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <Badge
+            variant={activeCategory === null ? "default" : "outline"}
+            className="cursor-pointer text-xs"
+            onClick={() => setActiveCategory(null)}
+          >
+            All
+          </Badge>
+          {categoryChips.map((chip) => (
+            <Badge
+              key={chip.key}
+              variant={activeCategory === chip.key ? "default" : "outline"}
+              className="cursor-pointer text-xs"
+              onClick={() => setActiveCategory(activeCategory === chip.key ? null : chip.key)}
+            >
+              {chip.label} ({chip.count})
+            </Badge>
+          ))}
         </div>
       )}
 
-      {/* Creation Projects */}
-      {creationProjects.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <FlaskConical className="h-4 w-4 text-orange-500" />
-            <h2 className="text-lg font-semibold">Creation Projects</h2>
-            <Badge variant="secondary" className="text-xs">{creationProjects.length}</Badge>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {creationProjects
-              .filter((p: any) => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-              .map((project: any) => (
-                <Card key={`proj-${project.id}`} className="hover:bg-accent/50 transition-colors">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-base">{project.name}</CardTitle>
-                      <Badge variant="outline" className="text-xs capitalize">{project.status}</Badge>
-                    </div>
-                    <CardDescription className="text-xs">
-                      {project.baseModel?.name || "Custom model"} &middot; {project.target?.useCase?.replace(/_/g, " ") || "General"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-1.5 flex-wrap">
-                      <Badge variant="secondary" className="text-xs">{project.baseModel?.size || "—"}</Badge>
-                      <Badge variant="outline" className="text-xs capitalize">{project.currentPhase?.replace(/_/g, " ").replace("phase ", "P") || "Planning"}</Badge>
-                      {project.progress > 0 && <Badge variant="outline" className="text-xs">{project.progress}%</Badge>}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </div>
-      )}
+      {/* Search */}
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+        <Input
+          placeholder={`Search ${activeType === "all" ? "all entries" : ENTRY_TYPE_DEFS[activeType].label + "s"}...`}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
 
-      {(llmIdentities.length > 0 || creationProjects.length > 0) && <Separator className="mb-6" />}
+      <Separator className="mb-6" />
 
-      {/* Providers Section */}
-      {providers && providers.length > 0 && (source === "all" || source === "providers") && (
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <Server className="h-4 w-4 text-blue-500" />
-            <h2 className="text-lg font-semibold">Providers</h2>
-            <Badge variant="secondary" className="text-xs">{providers.filter((p: any) => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase())).length}</Badge>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {providers
-              .filter((p: any) => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-              .map((provider: any) => {
-                const config = provider.config || {};
-                const modelCount = (config.models || []).length;
-                const isLocal = provider.type?.startsWith("local-") || provider.kind === "local";
-                const endpoint = config.apiEndpoint || config.baseUrl || config.baseURL || "";
-                return (
-                  <Card key={`provider-${provider.id}`} className="hover:bg-accent/50 transition-colors cursor-pointer" onClick={() => navigate(`/providers/${provider.id}`)}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between">
-                        <CardTitle className="text-base">{provider.name}</CardTitle>
-                        <Badge className="bg-blue-600 text-white text-xs">Provider</Badge>
-                      </div>
-                      <CardDescription className="text-xs">
-                        {provider.type} {endpoint ? `\u2022 ${endpoint}` : ""}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex gap-1.5 flex-wrap">
-                        {isLocal ? (
-                          <Badge variant="secondary" className="text-xs"><Server className="h-3 w-3 mr-1" />Local</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs"><Cloud className="h-3 w-3 mr-1" />Cloud</Badge>
-                        )}
-                        <Badge variant="outline" className="text-xs">{modelCount} model{modelCount !== 1 ? "s" : ""}</Badge>
-                        {provider.enabled ? (
-                          <Badge className="bg-green-600/20 text-green-400 border-green-600/30 text-xs">Active</Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs">Disabled</Badge>
-                        )}
-                        {provider.priority != null && (
-                          <Badge variant="outline" className="text-xs">Priority {provider.priority}</Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-          </div>
-        </div>
-      )}
-
-      {providers && providers.length > 0 && <Separator className="mb-6" />}
-
-      {/* Models Section */}
+      {/* Entry Cards */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
-      ) : catalogModels && catalogModels.filter((m) => (m.name || "").trim() !== "").length > 0 ? (
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <Package className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-lg font-semibold">Models</h2>
-            <Badge variant="secondary" className="text-xs">{catalogModels.filter((m) => (m.name || "").trim() !== "").length}</Badge>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {catalogModels
-              .filter((m) => (m.name || "").trim() !== "")
-              .map((model) => {
-                const hubModelNames = new Set(installedModels.map((m: any) => m.name?.toLowerCase()));
-                const isInHub = hubModelNames.has(model.name?.toLowerCase());
-                const governanceNames = new Set(llmIdentities.map((l: any) => l.name?.toLowerCase()));
-                const isInGovernance = governanceNames.has(model.name?.toLowerCase());
-                const purposeBuilt = model.bestFor || "";
-                return (
-                  <Card key={`${model.source}-${model.id}`} className="hover:bg-accent/50 transition-colors">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between">
-                        <CardTitle className="text-base">{model.displayName}</CardTitle>
-                        <Badge variant="outline" className="text-xs">Model</Badge>
-                      </div>
-                      <CardDescription className="text-xs">
-                        {purposeBuilt ? `Purpose-built: ${purposeBuilt}` : "Purpose-built: empty"}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex gap-1.5 flex-wrap">
-                        <Badge variant="secondary" className="text-xs">{model.category}</Badge>
-                        {model.parameters && <Badge variant="outline" className="text-xs">{model.parameters}</Badge>}
-                        {model.size && <Badge variant="outline" className="text-xs">{model.size}</Badge>}
-                        {model.isProviderModel && (
-                          <Badge className="bg-blue-600/20 text-blue-400 border-blue-600/30 text-xs">{model.providerName}</Badge>
-                        )}
-                        {isInHub ? (
-                          <Badge className="bg-green-600/20 text-green-400 border-green-600/30 text-xs"><HardDrive className="h-3 w-3 mr-1" />Hub</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs text-muted-foreground">Not in Hub</Badge>
-                        )}
-                        {isInGovernance ? (
-                          <Badge className="bg-purple-600/20 text-purple-400 border-purple-600/30 text-xs"><ShieldCheck className="h-3 w-3 mr-1" />Governance</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs text-muted-foreground"><ShieldX className="h-3 w-3 mr-1" />Not in Governance</Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-          </div>
+      ) : filteredEntries.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredEntries.map((entry) => {
+            const entryType = entry.entryType as EntryType;
+            const Icon = TYPE_ICONS[entryType] ?? Package;
+            const colorClass = TYPE_COLORS[entryType] ?? TYPE_COLORS.model;
+            const statusClass = STATUS_COLORS[entry.status] ?? STATUS_COLORS.draft;
+            const def = ENTRY_TYPE_DEFS[entryType];
+            const categories = getCategoriesForType(entryType);
+            const categoryLabel = entry.category ? categories[entry.category]?.label : null;
+            const caps = (entry.capabilities as string[] | null) ?? [];
+
+            return (
+              <Card
+                key={entry.id}
+                className="hover:bg-accent/50 transition-colors cursor-pointer"
+                onClick={() => navigate(`/llm/catalogue/manage`)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <CardTitle className="text-base">{entry.displayName || entry.name}</CardTitle>
+                    <Badge className={`text-xs ${colorClass}`}>
+                      <Icon className="h-3 w-3 mr-1" />
+                      {def?.label ?? entryType}
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-xs line-clamp-2">
+                    {entry.description || def?.coreQuestion || "No description"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {/* Status badge */}
+                    <Badge className={`text-xs ${statusClass}`}>{entry.status}</Badge>
+
+                    {/* Category badge */}
+                    {categoryLabel && (
+                      <Badge variant="secondary" className="text-xs">{categoryLabel}</Badge>
+                    )}
+
+                    {/* Scope */}
+                    <Badge variant="outline" className="text-xs">{entry.scope}</Badge>
+
+                    {/* Provider link indicator */}
+                    {entry.providerId && (
+                      <Badge variant="outline" className="text-xs">
+                        <Server className="h-3 w-3 mr-0.5" />linked
+                      </Badge>
+                    )}
+
+                    {/* Tags (first 2) */}
+                    {(entry.tags as string[] | null)?.slice(0, 2).map((tag, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">{tag}</Badge>
+                    ))}
+
+                    {/* Capabilities (first 3) */}
+                    {caps.slice(0, 3).map((cap) => (
+                      <Badge key={cap} variant="secondary" className="text-xs">
+                        {CAPABILITIES[cap]?.label ?? cap}
+                      </Badge>
+                    ))}
+                    {caps.length > 3 && (
+                      <Badge variant="outline" className="text-xs">+{caps.length - 3}</Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Package className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No models found matching your filters.</p>
+            <p className="text-muted-foreground mb-2">
+              {searchQuery || activeCategory
+                ? "No entries match your filters."
+                : "No catalog entries yet."}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => navigate("/llm/catalogue/manage")}>
+              Add entries in Manage
+            </Button>
           </CardContent>
         </Card>
-      )}
-
-      {/* Published Registry Section */}
-      {(source === "all" || source === "registry") && registryEntries.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <ShieldCheck className="h-4 w-4 text-green-500" />
-            <h2 className="text-lg font-semibold">Published Registry</h2>
-            <Badge variant="secondary" className="text-xs">{registryEntries.length}</Badge>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {registryEntries.map((entry: any) => (
-              <Card key={entry.id} className="hover:bg-accent/50 transition-colors border-green-900/30">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-base">{entry.displayName || entry.name}</CardTitle>
-                    <Badge className="bg-green-600/20 text-green-400 border-green-600/30 text-xs">
-                      Published
-                    </Badge>
-                  </div>
-                  <CardDescription className="text-xs">
-                    {entry.entryType === "provider" ? "Provider" : "Model"} &middot; v{entry.versionLabel}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex gap-1.5 flex-wrap">
-                    <Badge variant="outline" className="text-xs">{entry.entryType}</Badge>
-                    {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
-                      <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
-                    ))}
-                    <Badge variant="outline" className="text-xs font-mono">
-                      {entry.snapshotHash?.substring(0, 8)}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
       )}
     </div>
   );

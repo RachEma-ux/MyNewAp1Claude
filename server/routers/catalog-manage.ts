@@ -193,7 +193,7 @@ export const catalogManageRouter = router({
       if (data.category || data.subCategory || data.capabilities) {
         const existing = await getCatalogEntryById(id);
         if (!existing) throw new Error(`Catalog entry ${id} not found`);
-        const entryType = existing.entryType as "provider" | "model";
+        const entryType = existing.entryType as "provider" | "llm" | "model" | "agent" | "bot";
 
         if (data.category) {
           const validCats = getValidCategoryKeys(entryType);
@@ -624,6 +624,61 @@ export const catalogManageRouter = router({
         await updateCatalogEntry(input.catalogEntryId, { status: "active" }, 1);
         throw new Error(`Publishing failed: ${e.message}`);
       }
+    }),
+
+  /**
+   * Sync providers — auto-creates catalog entries for providers that don't have one.
+   * Returns the number of entries created.
+   */
+  syncProviders: protectedProcedure
+    .mutation(async () => {
+      const allProviders = await providerDb.getAllProviders();
+      const existingEntries = await getCatalogEntries({ entryType: "provider" });
+      const existingProviderIds = new Set(
+        existingEntries
+          .filter((e) => e.providerId != null)
+          .map((e) => e.providerId!)
+      );
+      // Also match by name for entries created without providerId
+      const existingNames = new Set(
+        existingEntries.map((e) => e.name.toLowerCase())
+      );
+
+      let created = 0;
+      for (const provider of allProviders) {
+        if (existingProviderIds.has(provider.id) || existingNames.has(provider.name.toLowerCase())) {
+          continue;
+        }
+        // Determine category from provider type/kind
+        let category = "cloud_api";
+        if (provider.type?.startsWith("local-") || provider.kind === "local") {
+          category = "local_runtime";
+        } else if (provider.type === "custom") {
+          category = "custom_adapter";
+        }
+
+        await createCatalogEntry({
+          name: provider.name,
+          displayName: provider.name,
+          description: `Auto-synced from provider: ${provider.type}`,
+          entryType: "provider",
+          scope: "app",
+          status: "active",
+          origin: "discovery",
+          reviewState: "approved",
+          providerId: provider.id,
+          config: { providerType: provider.type, kind: provider.kind },
+          tags: [provider.type, provider.kind ?? "cloud"].filter(Boolean) as string[],
+          category,
+          subCategory: null,
+          capabilities: null,
+          createdBy: 1,
+        });
+        created++;
+      }
+
+      audit("catalog.providers.synced", null, { created, total: allProviders.length });
+      return { created, total: allProviders.length };
     }),
 
   /**
