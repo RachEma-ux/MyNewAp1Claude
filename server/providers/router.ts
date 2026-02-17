@@ -54,7 +54,7 @@ export const providerRouter = router({
 
       // Register provider in registry
       const registry = getProviderRegistry();
-      await registry.registerProvider({
+      const runtimeProvider = await registry.registerProvider({
         id: provider.id,
         name: provider.name,
         type: provider.type as ProviderType,
@@ -65,6 +65,45 @@ export const providerRouter = router({
         createdAt: provider.createdAt,
         updatedAt: provider.updatedAt,
       });
+
+      // Auto-discover models from the provider and persist them
+      try {
+        let discoveredModels: string[] = [];
+        if ("getSupportedModels" in runtimeProvider && typeof (runtimeProvider as any).getSupportedModels === "function") {
+          discoveredModels = (runtimeProvider as any).getSupportedModels();
+        } else {
+          const caps = runtimeProvider.getCapabilities();
+          discoveredModels = caps.supportedModels || [];
+        }
+
+        if (discoveredModels.length > 0) {
+          // Update provider config with discovered models for catalogue visibility
+          const existingConfig = (provider.config as Record<string, unknown>) || {};
+          await providerDb.updateProvider(provider.id, {
+            config: { ...existingConfig, models: discoveredModels, defaultModel: discoveredModels[0] },
+          } as any);
+
+          // Insert each model into the models DB table for Models Hub visibility
+          const { createModel, getAllModels } = await import("../db");
+          const existingModels = await getAllModels();
+          const existingNames = new Set(existingModels.map((m: any) => m.name));
+
+          for (const modelName of discoveredModels) {
+            if (existingNames.has(modelName)) continue; // skip duplicates
+            const isEmbedding = /embed/i.test(modelName);
+            await createModel({
+              name: modelName,
+              displayName: modelName,
+              modelType: isEmbedding ? "embedding" : "llm",
+              status: "ready",
+            } as any);
+          }
+
+          console.log(`[ProviderRouter] Auto-discovered ${discoveredModels.length} model(s) for ${provider.name}: ${discoveredModels.join(", ")}`);
+        }
+      } catch (err: any) {
+        console.warn(`[ProviderRouter] Model auto-discovery failed for ${provider.name}: ${err.message}`);
+      }
 
       return provider;
     }),
