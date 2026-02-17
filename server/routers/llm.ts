@@ -865,8 +865,54 @@ export const llmRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { db, insertInto } = await import("../db");
+      const { insertInto, getDb } = await import("../db");
       const { llmCreationProjects, llmCreationAuditEvents } = await import("../../drizzle/schema");
+      const { sql } = await import("drizzle-orm");
+
+      // Ensure the table exists (migration may not have run)
+      const db = getDb();
+      if (!db) throw new Error("Database not available");
+      try {
+        await db.execute(sql`SELECT 1 FROM llm_creation_projects LIMIT 0`);
+      } catch {
+        // Table doesn't exist — create it inline
+        console.log("[LLM Create] Table llm_creation_projects missing, creating...");
+        await db.execute(sql`
+          CREATE TABLE IF NOT EXISTS "llm_creation_projects" (
+            "id" serial PRIMARY KEY,
+            "name" varchar(255) NOT NULL,
+            "description" text,
+            "path" varchar(10) NOT NULL,
+            "target" json NOT NULL,
+            "baseModel" json,
+            "status" varchar(50) NOT NULL DEFAULT 'draft',
+            "currentPhase" varchar(50),
+            "progress" integer DEFAULT 0,
+            "finalModelPath" varchar(512),
+            "ollamaModelName" varchar(255),
+            "deploymentStatus" varchar(50),
+            "llmId" integer,
+            "createdBy" integer NOT NULL,
+            "createdAt" timestamp DEFAULT now() NOT NULL,
+            "updatedAt" timestamp DEFAULT now() NOT NULL,
+            "completedAt" timestamp
+          )
+        `);
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS "llm_creation_audit_events" (
+            "id" serial PRIMARY KEY,
+            "eventType" varchar(100) NOT NULL,
+            "projectId" integer NOT NULL,
+            "actor" integer NOT NULL,
+            "phase" varchar(50),
+            "action" varchar(100) NOT NULL,
+            "payload" json,
+            "status" varchar(50) NOT NULL DEFAULT 'success',
+            "errorMessage" text,
+            "createdAt" timestamp DEFAULT now() NOT NULL
+          )
+        `);
+        console.log("[LLM Create] Tables created successfully");
+      }
 
       const [project] = await insertInto(llmCreationProjects)
         .values({
@@ -882,15 +928,19 @@ export const llmRouter = router({
         .returning();
 
       // Audit event
-      await insertInto(llmCreationAuditEvents).values({
-        eventType: "project.created",
-        projectId: project.id,
-        actor: ctx.user.id,
-        phase: "phase_0_planning",
-        action: "create_project",
-        payload: { name: input.name, path: input.path, target: input.target },
-        status: "success",
-      });
+      try {
+        await insertInto(llmCreationAuditEvents).values({
+          eventType: "project.created",
+          projectId: project.id,
+          actor: ctx.user.id,
+          phase: "phase_0_planning",
+          action: "create_project",
+          payload: { name: input.name, path: input.path, target: input.target },
+          status: "success",
+        });
+      } catch (e) {
+        console.warn("[LLM Create] Audit event insert failed:", e);
+      }
 
       return project;
     }),
