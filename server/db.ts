@@ -1707,6 +1707,7 @@ export async function getCatalogEntries(filter?: {
   scope?: string;
   origin?: string;
   reviewState?: string;
+  category?: string;
 }): Promise<CatalogEntry[]> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
@@ -1717,6 +1718,7 @@ export async function getCatalogEntries(filter?: {
   if (filter?.scope) conditions.push(eq(catalogEntries.scope, filter.scope));
   if (filter?.origin) conditions.push(eq(catalogEntries.origin, filter.origin));
   if (filter?.reviewState) conditions.push(eq(catalogEntries.reviewState, filter.reviewState));
+  if (filter?.category) conditions.push(eq(catalogEntries.category, filter.category));
 
   const query = db.select().from(catalogEntries);
   const filtered = conditions.length > 0 ? query.where(and(...conditions)) : query;
@@ -1757,7 +1759,7 @@ export async function createCatalogEntry(data: InsertCatalogEntry): Promise<Cata
 
 export async function updateCatalogEntry(
   id: number,
-  data: Partial<Pick<InsertCatalogEntry, "name" | "displayName" | "description" | "config" | "tags" | "status" | "providerId" | "origin" | "reviewState" | "approvedBy" | "approvedAt">>,
+  data: Partial<Pick<InsertCatalogEntry, "name" | "displayName" | "description" | "config" | "tags" | "status" | "providerId" | "origin" | "reviewState" | "approvedBy" | "approvedAt" | "category" | "subCategory" | "capabilities">>,
   updatedBy: number
 ): Promise<CatalogEntry> {
   const db = getDb();
