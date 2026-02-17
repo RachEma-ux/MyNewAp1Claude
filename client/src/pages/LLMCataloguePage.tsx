@@ -42,9 +42,14 @@ export default function LLMCataloguePage() {
 
   return (
     <div className="container mx-auto py-8 max-w-6xl px-4">
-      <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate("/llm")}>
-        <ChevronLeft className="h-4 w-4 mr-1" />Back to LLM
-      </Button>
+      <div className="flex gap-2 mb-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/llm")}>
+          <ChevronLeft className="h-4 w-4 mr-1" />Back to LLM
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => navigate("/llm/catalogue/manage")}>
+          <ChevronLeft className="h-4 w-4 mr-1" />Back to Manage Catalogue
+        </Button>
+      </div>
 
       <div className="mb-6 flex items-start justify-between">
         <div>
