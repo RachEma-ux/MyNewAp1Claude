@@ -865,7 +865,7 @@ export const llmRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { insertInto, getDb } = await import("../db");
+      const { insertInto, getDb, updateTable, eq } = await import("../db");
       const { llmCreationProjects, llmCreationAuditEvents } = await import("../../drizzle/schema");
       const { sql } = await import("drizzle-orm");
 
@@ -940,6 +940,66 @@ export const llmRouter = router({
         });
       } catch (e) {
         console.warn("[LLM Create] Audit event insert failed:", e);
+      }
+
+      // Auto-register LLM identity in the registry
+      try {
+        const useCaseRoleMap: Record<string, string> = {
+          chat_assistant: "executor",
+          enterprise_doc_qa: "executor",
+          coding_helper: "executor",
+          router: "router",
+          agent: "planner",
+        };
+        const target = input.target as any;
+        const role = useCaseRoleMap[target?.useCase] || "executor";
+
+        const pathLabel = input.path === "PATH_A" ? "Fine-tuning" : "Pre-training";
+        const baseModel = input.baseModel as any;
+        const baseModelInfo = baseModel
+          ? `Base model: ${baseModel.name || "TBD"}${baseModel.size ? ` (${baseModel.size})` : ""}`
+          : "Base model: TBD";
+
+        const description = [
+          `[Creation Project] ${pathLabel}`,
+          baseModelInfo,
+          `Use case: ${target?.useCase || "general"}`,
+          `Deployment: ${target?.deployment || "local"}`,
+          target?.contextLength ? `Context: ${target.contextLength}` : null,
+          `Phase: phase_0_planning | Status: draft`,
+        ].filter(Boolean).join(" | ");
+
+        const llm = await createLLM({
+          name: input.name,
+          description,
+          role: role as any,
+          ownerTeam: null,
+          createdBy: ctx.user.id,
+        });
+
+        // Link the creation project to the new LLM identity
+        await updateTable(llmCreationProjects)
+          .set({ llmId: llm.id })
+          .where(eq(llmCreationProjects.id, project.id));
+
+        project.llmId = llm.id;
+
+        // Audit the auto-registration
+        try {
+          await insertInto(llmCreationAuditEvents).values({
+            eventType: "llm.auto_registered",
+            projectId: project.id,
+            actor: ctx.user.id,
+            phase: "phase_0_planning",
+            action: "auto_register_llm",
+            payload: { llmId: llm.id, role, name: input.name },
+            status: "success",
+          });
+        } catch (_) {}
+
+        console.log(`[LLM Create] Auto-registered LLM identity #${llm.id} for project #${project.id}`);
+      } catch (regErr) {
+        console.warn("[LLM Create] Auto-registration of LLM identity failed:", regErr);
       }
 
       return project;
