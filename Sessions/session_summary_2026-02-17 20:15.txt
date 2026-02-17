@@ -1,0 +1,67 @@
+Session Summary - 2026-02-17 20:15
+
+## Features Implemented
+
+### Catalog Taxonomy System (Category/SubCategory/Capabilities)
+- Added 3 new columns to `catalogEntries` table: `category`, `subCategory`, `capabilities`
+- Created `shared/catalog-taxonomy.ts` as single source of truth for taxonomy definitions
+- Server-side validation on create (superRefine) and update mutations
+- DB migration `0005_catalog_taxonomy.sql` with ALTER TABLE statements
+- UI: category filter dropdown, category/subcategory column in table, capability chip selector in create/edit dialog
+
+### Extended to 5 Entry Types (Provider, LLM, Model, Agent, Bot)
+Previously only "provider" and "model". Now supports all 5 types with full definitions:
+
+1. **Provider** — Infrastructure access layer (Cloud API, Local Runtime, Custom Adapter, Edge, Air-Gapped, Mock, Archived)
+2. **LLM** — Technology class (General Purpose, Code, Multimodal, Domain Specific, Small Language Model)
+3. **Model** — Trained instance (Base LLM, Embedding, Speech, Fine-Tuned, Adapter, Quantized, Distilled, Experimental, Composite)
+4. **Agent** — Orchestrated intelligent entity (Conversational, Task Executor, Orchestrator, Autonomous, Specialist)
+5. **Bot** — Lightweight automated responder (Chat Bot, Command Bot, Notification Bot, Integration Bot, Q&A Bot)
+
+Each type has:
+- Detailed JSDoc comment with definition, characteristics, and examples
+- Category map with subcategories
+- Appropriate capabilities (functional, operational, governance, meta)
+- Dedicated icon in UI (Server, Brain, Package, Workflow, Bot)
+
+### Capabilities Extended
+New capabilities for new types: memory, multi_step, coordination, channel_binding, long_running, lightweight, policy_bound
+
+### Types Definition Document
+Created `Types Definition.md` with full definitions, comparison table, and architectural stack diagram.
+
+### Tested End-to-End (Local)
+Created 5 test entries on localhost:3000, one per type:
+1. Provider: Ollama Local Runtime (local_runtime/single_node)
+2. LLM: GPT-4 Family (general_purpose/reasoning)
+3. Model: Mistral 7B Instruct v0.3 (base_llm/text_only) — HuggingFace source
+4. Agent: Code Reviewer Agent (task_executor/coder)
+5. Bot: Awesome AI Tools Bot (qa_bot/docs) — GitHub source
+
+Admin-origin entries auto-approve; discovery-origin entries get needs_review.
+
+## Commits
+- `b88a3fc` feat: Add catalog taxonomy with category/subcategory/capabilities classification
+- `bb75ea7` feat: Extend catalog to 5 entry types — Provider, LLM, Model, Agent, Bot
+- `f677eaa` docs: Add Types Definition reference for the 5 catalog entry types
+
+## Deployments
+- v3.0.83: https://rocky-concerning-auburn-rows.trycloudflare.com (taxonomy feature)
+- v3.0.84: https://jason-usgs-mit-hansen.trycloudflare.com (5 entry types)
+- Note: Deploy DB not available — UI renders correctly but data ops need PostgreSQL (local only)
+
+## Files Modified
+- `shared/catalog-taxonomy.ts` — Full rewrite: 5 entry types, definitions, category maps, expanded capabilities
+- `server/routers/catalog-manage.ts` — entryType enum expanded to 5, update validation added
+- `client/src/pages/CatalogManagePage.tsx` — 5-type dropdown, category filter, type icons, capability chips
+- `drizzle/schema.ts` — Added category, subCategory, capabilities columns
+- `server/db.ts` — Category filter + update type support
+- `drizzle/0005_catalog_taxonomy.sql` — Migration
+- `Types Definition.md` — Reference document
+
+## Technical Notes
+- EntryType is now a shared type exported from catalog-taxonomy.ts
+- ENTRY_TYPES array and ENTRY_TYPE_DEFS metadata map drive the UI dynamically
+- CATEGORY_MAP keyed by EntryType routes to the correct category definitions
+- Capabilities appliesTo now references all 5 EntryType values
+- Sandbox /tmp issue persisted — used node scripts and helper shell scripts as workarounds
