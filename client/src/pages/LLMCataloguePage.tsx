@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, Search, Filter, Loader2, Cloud, Server, Package, Download, HardDrive, Zap, Brain, FlaskConical } from "lucide-react";
+import { ChevronLeft, Search, Filter, Loader2, Cloud, Server, Package, Download, HardDrive, Zap, Brain, FlaskConical, ShieldCheck, ShieldX } from "lucide-react";
 
 export default function LLMCataloguePage() {
   const [, navigate] = useLocation();
@@ -292,33 +292,46 @@ export default function LLMCataloguePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {catalogModels
               .filter((m) => (m.name || "").trim() !== "")
-              .map((model) => (
-                <Card key={`${model.source}-${model.id}`} className="hover:bg-accent/50 transition-colors">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-base">{model.displayName}</CardTitle>
-                      <Badge variant="outline" className="text-xs">Model</Badge>
-                    </div>
-                    <CardDescription className="text-xs">
-                      {model.isProviderModel
-                        ? `Available via ${model.providerName}`
-                        : model.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-1.5 flex-wrap">
-                      <Badge variant="secondary" className="text-xs">{model.category}</Badge>
-                      {model.parameters && <Badge variant="outline" className="text-xs">{model.parameters}</Badge>}
-                      {model.size && <Badge variant="outline" className="text-xs">{model.size}</Badge>}
-                      {model.isProviderModel ? (
-                        <Badge className="bg-blue-600/20 text-blue-400 border-blue-600/30 text-xs">{model.providerName}</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">Hub</Badge>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              .map((model) => {
+                const hubModelNames = new Set(installedModels.map((m: any) => m.name?.toLowerCase()));
+                const isInHub = hubModelNames.has(model.name?.toLowerCase());
+                const governanceNames = new Set(llmIdentities.map((l: any) => l.name?.toLowerCase()));
+                const isInGovernance = governanceNames.has(model.name?.toLowerCase());
+                const purposeBuilt = model.bestFor || "";
+                return (
+                  <Card key={`${model.source}-${model.id}`} className="hover:bg-accent/50 transition-colors">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-base">{model.displayName}</CardTitle>
+                        <Badge variant="outline" className="text-xs">Model</Badge>
+                      </div>
+                      <CardDescription className="text-xs">
+                        {purposeBuilt ? `Purpose-built: ${purposeBuilt}` : "Purpose-built: empty"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex gap-1.5 flex-wrap">
+                        <Badge variant="secondary" className="text-xs">{model.category}</Badge>
+                        {model.parameters && <Badge variant="outline" className="text-xs">{model.parameters}</Badge>}
+                        {model.size && <Badge variant="outline" className="text-xs">{model.size}</Badge>}
+                        {model.isProviderModel && (
+                          <Badge className="bg-blue-600/20 text-blue-400 border-blue-600/30 text-xs">{model.providerName}</Badge>
+                        )}
+                        {isInHub ? (
+                          <Badge className="bg-green-600/20 text-green-400 border-green-600/30 text-xs"><HardDrive className="h-3 w-3 mr-1" />Hub</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">Not in Hub</Badge>
+                        )}
+                        {isInGovernance ? (
+                          <Badge className="bg-purple-600/20 text-purple-400 border-purple-600/30 text-xs"><ShieldCheck className="h-3 w-3 mr-1" />Governance</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-muted-foreground"><ShieldX className="h-3 w-3 mr-1" />Not in Governance</Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
           </div>
         </div>
       ) : (
