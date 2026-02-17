@@ -238,7 +238,7 @@ export default function LLMCataloguePage() {
                   <div className="flex items-start justify-between">
                     <CardTitle className="text-base">{model.displayName}</CardTitle>
                     {model.isProviderModel ? (
-                      <Badge className="bg-blue-600 text-white text-xs">Provider</Badge>
+                      <Badge className="bg-blue-600 text-white text-xs">{model.providerName || "Provider"}</Badge>
                     ) : (
                       <Badge variant="outline" className="text-xs">Hub</Badge>
                     )}
@@ -250,8 +250,8 @@ export default function LLMCataloguePage() {
                     <Badge variant="secondary" className="text-xs">{model.category}</Badge>
                     {model.parameters && <Badge variant="outline" className="text-xs">{model.parameters}</Badge>}
                     {model.size && <Badge variant="outline" className="text-xs">{model.size}</Badge>}
-                    {model.isProviderModel && model.providerName && (
-                      <Badge variant="outline" className="text-xs">{model.providerName}</Badge>
+                    {model.isProviderModel && (
+                      <Badge variant="outline" className="text-xs">Model</Badge>
                     )}
                   </div>
                 </CardContent>
