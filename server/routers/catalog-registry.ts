@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 import {
   getActiveBundles,
   getBundleByHash,
@@ -19,7 +19,7 @@ export const catalogRegistryRouter = router({
    * Get all active published bundles
    * Used by dropdowns and consumers to list available entries
    */
-  getActive: publicProcedure
+  getActive: protectedProcedure
     .query(async () => {
       return await getActiveBundles();
     }),
@@ -27,7 +27,7 @@ export const catalogRegistryRouter = router({
   /**
    * Lookup a bundle by its snapshot hash (integrity verification)
    */
-  getByHash: publicProcedure
+  getByHash: protectedProcedure
     .input(z.object({ hash: z.string().length(64) }))
     .query(async ({ input }) => {
       const bundle = await getBundleByHash(input.hash);
@@ -38,7 +38,7 @@ export const catalogRegistryRouter = router({
   /**
    * Get the latest active bundle for a specific catalog entry
    */
-  getByEntry: publicProcedure
+  getByEntry: protectedProcedure
     .input(z.object({ catalogEntryId: z.number().int().positive() }))
     .query(async ({ input }) => {
       const bundle = await getActiveBundleForEntry(input.catalogEntryId);
@@ -49,7 +49,7 @@ export const catalogRegistryRouter = router({
   /**
    * List for dropdown consumption — returns simplified active entries
    */
-  listForDropdown: publicProcedure
+  listForDropdown: protectedProcedure
     .input(z.object({
       entryType: z.enum(["provider", "model"]).optional(),
     }).optional())
@@ -81,7 +81,7 @@ export const catalogRegistryRouter = router({
   /**
    * Get audit events for catalog management
    */
-  auditLog: publicProcedure
+  auditLog: protectedProcedure
     .input(z.object({
       catalogEntryId: z.number().int().positive().optional(),
       eventType: z.string().optional(),

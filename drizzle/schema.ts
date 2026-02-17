@@ -2479,8 +2479,17 @@ export const catalogEntries = pgTable("catalog_entries", {
   // Scope (for future multi-scope resolution)
   scope: varchar("scope", { length: 50 }).default("app").notNull(),
 
-  // Status in the catalog lifecycle
-  status: varchar("status", { length: 50 }).default("draft").notNull(), // draft, validating, validated, publishing, published, deprecated
+  // Status in the catalog lifecycle: draft, active, deprecated, disabled
+  // (validating/publishing are transient states set during async operations)
+  status: varchar("status", { length: 50 }).default("draft").notNull(),
+
+  // Authority: origin of the entry
+  origin: varchar("origin", { length: 50 }).default("admin").notNull(), // admin, discovery, api
+  // Authority: review state
+  reviewState: varchar("reviewState", { length: 50 }).default("approved").notNull(), // needs_review, approved, rejected
+  // Authority: who approved and when
+  approvedBy: integer("approvedBy"),
+  approvedAt: timestamp("approvedAt"),
 
   // Provider reference (for model entries)
   providerId: integer("providerId"),

@@ -51,17 +51,33 @@ import {
   Cpu,
   Layers,
   MessageSquare,
+  Shield,
+  ShieldCheck,
+  ShieldX,
+  Zap,
 } from "lucide-react";
 
 type EntryType = "provider" | "model";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-600/20 text-gray-400 border-gray-600/30",
-  validating: "bg-yellow-600/20 text-yellow-400 border-yellow-600/30",
-  validated: "bg-blue-600/20 text-blue-400 border-blue-600/30",
-  publishing: "bg-orange-600/20 text-orange-400 border-orange-600/30",
-  published: "bg-green-600/20 text-green-400 border-green-600/30",
+  active: "bg-green-600/20 text-green-400 border-green-600/30",
   deprecated: "bg-red-600/20 text-red-400 border-red-600/30",
+  disabled: "bg-red-800/20 text-red-500 border-red-800/30",
+  validating: "bg-yellow-600/20 text-yellow-400 border-yellow-600/30",
+  publishing: "bg-orange-600/20 text-orange-400 border-orange-600/30",
+};
+
+const REVIEW_COLORS: Record<string, string> = {
+  needs_review: "bg-amber-600/20 text-amber-400 border-amber-600/30",
+  approved: "bg-emerald-600/20 text-emerald-400 border-emerald-600/30",
+  rejected: "bg-rose-600/20 text-rose-400 border-rose-600/30",
+};
+
+const ORIGIN_COLORS: Record<string, string> = {
+  admin: "bg-blue-600/20 text-blue-400 border-blue-600/30",
+  discovery: "bg-purple-600/20 text-purple-400 border-purple-600/30",
+  api: "bg-cyan-600/20 text-cyan-400 border-cyan-600/30",
 };
 
 export default function CatalogManagePage() {
@@ -138,6 +154,12 @@ export default function CatalogManagePage() {
   });
   const recallMutation = trpc.catalogManage.recall.useMutation({
     onSuccess: () => refetchBundles(),
+  });
+  const approveMutation = trpc.catalogManage.approve.useMutation({
+    onSuccess: () => refetch(),
+  });
+  const activateMutation = trpc.catalogManage.activate.useMutation({
+    onSuccess: () => refetch(),
   });
 
   // Filter entries by search
@@ -310,7 +332,8 @@ export default function CatalogManagePage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Scope</TableHead>
+                    <TableHead>Review</TableHead>
+                    <TableHead>Origin</TableHead>
                     <TableHead>Tags</TableHead>
                     <TableHead>Updated</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -345,7 +368,21 @@ export default function CatalogManagePage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="text-xs text-muted-foreground">{entry.scope}</span>
+                        <Badge className={`text-xs ${REVIEW_COLORS[entry.reviewState] || ""}`}>
+                          {entry.reviewState === "needs_review" ? (
+                            <Shield className="h-3 w-3 mr-1" />
+                          ) : entry.reviewState === "approved" ? (
+                            <ShieldCheck className="h-3 w-3 mr-1" />
+                          ) : (
+                            <ShieldX className="h-3 w-3 mr-1" />
+                          )}
+                          {entry.reviewState}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
+                          {entry.origin}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
@@ -363,6 +400,30 @@ export default function CatalogManagePage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-1 justify-end">
+                          {entry.reviewState === "needs_review" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => approveMutation.mutate({ id: entry.id, activateNow: false })}
+                              disabled={approveMutation.isPending}
+                              title="Approve"
+                              className="text-emerald-400 hover:text-emerald-300"
+                            >
+                              <ShieldCheck className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {entry.status === "draft" && entry.reviewState === "approved" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => activateMutation.mutate({ id: entry.id })}
+                              disabled={activateMutation.isPending}
+                              title="Activate"
+                              className="text-green-400 hover:text-green-300"
+                            >
+                              <Zap className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button variant="ghost" size="sm" onClick={() => openVersions(entry.id)} title="Version history">
                             <History className="h-4 w-4" />
                           </Button>
@@ -540,11 +601,11 @@ export default function CatalogManagePage() {
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3">Ready to Publish</h3>
             {(() => {
-              const publishable = entries.filter((e: any) => e.status === "validated" || e.status === "published");
+              const publishable = entries.filter((e: any) => e.status === "active");
               if (publishable.length === 0) return (
                 <div className="text-center py-8 text-muted-foreground border rounded-md">
-                  <p className="text-sm">No validated entries ready for publishing</p>
-                  <p className="text-xs mt-1">Validate entries in the Validation tab first</p>
+                  <p className="text-sm">No active entries ready for publishing</p>
+                  <p className="text-xs mt-1">Approve and activate entries first</p>
                 </div>
               );
               return (
