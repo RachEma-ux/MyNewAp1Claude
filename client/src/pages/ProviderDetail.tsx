@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CatalogSelect } from "@/components/CatalogSelect";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Trash2, CheckCircle, XCircle, Cloud, Server, Loader2, RefreshCw, Zap, Shield } from "lucide-react";
 import { ProviderCapabilitiesEditor } from "@/components/ProviderCapabilitiesEditor";
@@ -33,7 +33,6 @@ export default function ProviderDetail() {
 
   const { data: providers, refetch: refetchProviders } = trpc.providers.list.useQuery();
   const provider = providers?.find(p => p.id === providerId);
-  const { data: catalogModels = [] } = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
 
   // Fetch provider capabilities for the capabilities editor
   const { data: providerCapabilities, refetch: refetchCapabilities } = trpc.providers.capabilities.get.useQuery(
@@ -132,13 +131,6 @@ export default function ProviderDetail() {
     }
   };
 
-  const availableModels = catalogModels
-    .filter((m) => (m.name || "").trim() !== "")
-    .map((m) => ({
-      value: m.name,
-      label: m.displayName,
-      description: m.description,
-    }));
   const providerTypeLabels: Record<string, string> = {
     openai: "OpenAI",
     anthropic: "Anthropic",
@@ -298,34 +290,15 @@ export default function ProviderDetail() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="defaultModel">Default Model</Label>
-                <Select
+                <CatalogSelect
+                  entryType="model"
                   value={formData.defaultModel}
                   onValueChange={(value) => setFormData({ ...formData, defaultModel: value })}
-                >
-                  <SelectTrigger id="defaultModel">
-                    <SelectValue placeholder="Select a model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableModels.map((model) => (
-                      <SelectItem key={model.value} value={model.value}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{model.label}</span>
-                          <span className="text-xs text-muted-foreground">{model.description}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select a model"
+                  linkedProvider={provider?.name}
+                  valueField="name"
+                />
               </div>
-
-              {formData.defaultModel && (
-                <div className="p-4 bg-muted rounded-lg">
-                  <h4 className="font-medium mb-2">Selected Model</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {availableModels.find(m => m.value === formData.defaultModel)?.description}
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
 

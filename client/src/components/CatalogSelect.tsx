@@ -26,12 +26,16 @@ interface CatalogSelectProps {
   entryType?: EntryType | EntryType[];
   category?: string;
   value?: string;
-  onValueChange: (id: string) => void;
+  onValueChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
   showTypeIcon?: boolean;
   showCategory?: boolean;
+  /** Filter entries by matching tag or config.providerId */
+  linkedProvider?: string;
+  /** Which field to use as the select value: "id" (default) or "name" */
+  valueField?: "id" | "name";
 }
 
 export function CatalogSelect({
@@ -44,6 +48,8 @@ export function CatalogSelect({
   className,
   showTypeIcon = true,
   showCategory = false,
+  linkedProvider,
+  valueField = "id",
 }: CatalogSelectProps) {
   // When filtering by a single type, pass it to the hook; otherwise fetch all
   const singleType = typeof entryType === "string" ? entryType : undefined;
@@ -51,11 +57,26 @@ export function CatalogSelect({
     singleType || category ? { entryType: singleType, category } : undefined
   );
 
-  // Client-side filter for multi-type arrays
+  // Client-side filter for multi-type arrays + linked provider, sorted alphabetically
   const filtered = useMemo(() => {
-    if (!Array.isArray(entryType)) return entries;
-    return entries.filter((e) => (entryType as EntryType[]).includes(e.entryType as EntryType));
-  }, [entries, entryType]);
+    let list = Array.isArray(entryType)
+      ? entries.filter((e) => (entryType as EntryType[]).includes(e.entryType as EntryType))
+      : entries;
+
+    // Filter by linked provider (match tags or config.providerId)
+    if (linkedProvider) {
+      const key = linkedProvider.toLowerCase();
+      list = list.filter((e) => {
+        const tags = (e.tags as string[] | null) ?? [];
+        const configProvider = (e.config as any)?.providerId ?? "";
+        return tags.some((t) => t.toLowerCase() === key) || configProvider.toLowerCase() === key;
+      });
+    }
+
+    return [...list].sort((a, b) =>
+      (a.displayName || a.name).localeCompare(b.displayName || b.name)
+    );
+  }, [entries, entryType, linkedProvider]);
 
   // Group entries by type when showing multiple types
   const grouped = useMemo(() => {
@@ -101,7 +122,7 @@ export function CatalogSelect({
                   {typeDef?.label ?? type}
                 </SelectLabel>
                 {items.map((entry) => (
-                  <SelectItem key={entry.id} value={String(entry.id)}>
+                  <SelectItem key={entry.id} value={valueField === "name" ? entry.name : String(entry.id)}>
                     <span className="flex items-center gap-2">
                       {entry.displayName || entry.name}
                       {showCategory && entry.category && (
@@ -120,7 +141,7 @@ export function CatalogSelect({
           filtered.map((entry) => {
             const Icon = showTypeIcon ? TYPE_ICONS[entry.entryType as EntryType] : null;
             return (
-              <SelectItem key={entry.id} value={String(entry.id)}>
+              <SelectItem key={entry.id} value={valueField === "name" ? entry.name : String(entry.id)}>
                 <span className="flex items-center gap-2">
                   {Icon && <Icon className="size-3.5" />}
                   {entry.displayName || entry.name}

@@ -46,6 +46,8 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CatalogSelect } from "@/components/CatalogSelect";
+import { useCatalogEntries } from "@/hooks/useCatalogEntries";
 
 // ============================================================================
 // Types
@@ -496,7 +498,7 @@ function ConfigurationStep({
 }) {
   const [, navigate] = useLocation();
   const [useCustomModel, setUseCustomModel] = useState(false);
-  const catalogQuery = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
+  const { entries: catalogModelEntries } = useCatalogEntries({ entryType: "model" });
 
   const updateRuntime = (updates: Partial<typeof configuration.runtime>) => {
     onUpdate({ runtime: { ...configuration.runtime, ...updates } });
@@ -511,21 +513,18 @@ function ConfigurationStep({
   };
 
   const handleCatalogModelSelect = (value: string) => {
-    if (value === "__custom__") {
-      setUseCustomModel(true);
-      return;
-    }
     setUseCustomModel(false);
-    const model = catalogQuery.data?.find((m) => m.name === value);
+    const model = catalogModelEntries.find((m) => m.name === value);
     if (model) {
       updateModel({ name: model.name, contextLength: undefined });
-      // Auto-fill provider from catalog
-      if (model.isProviderModel && model.providerName) {
+      // Auto-fill provider from catalog tags/config
+      const config = model.config as any;
+      const providerName = config?.providerId ?? "";
+      if (providerName) {
         const localProviders = ["ollama", "llama.cpp", "local-ollama"];
-        const providerType = model.providerName.toLowerCase();
         updateRuntime({
-          type: localProviders.some((p) => providerType.includes(p)) ? "local" : "cloud",
-          provider: providerType,
+          type: localProviders.some((p) => providerName.toLowerCase().includes(p)) ? "local" : "cloud",
+          provider: providerName.toLowerCase(),
         });
       }
     }
@@ -600,44 +599,25 @@ function ConfigurationStep({
             <Label>
               Model Name <span className="text-destructive">*</span>
             </Label>
-            {catalogQuery.isLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading catalog...
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <CatalogSelect
+                  entryType="model"
+                  value={useCustomModel ? "" : (configuration.model.name || "")}
+                  onValueChange={handleCatalogModelSelect}
+                  placeholder="Select a model from catalog..."
+                  valueField="name"
+                />
               </div>
-            ) : (
-              <Select
-                value={useCustomModel ? "__custom__" : (configuration.model.name || undefined)}
-                onValueChange={handleCatalogModelSelect}
+              <Button
+                variant={useCustomModel ? "default" : "outline"}
+                size="sm"
+                type="button"
+                onClick={() => setUseCustomModel(!useCustomModel)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a model from catalog..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {catalogQuery.data && catalogQuery.data.filter((m) => !m.isProviderModel).length > 0 && (
-                    <>
-                      <SelectItem value="__hub_label__" disabled>Hub Models</SelectItem>
-                      {catalogQuery.data.filter((m) => !m.isProviderModel).map((model) => (
-                        <SelectItem key={`hub-${model.id}`} value={model.name}>
-                          {model.displayName} ({model.parameters})
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {catalogQuery.data && catalogQuery.data.filter((m) => m.isProviderModel).length > 0 && (
-                    <>
-                      <SelectItem value="__provider_label__" disabled>Provider Models</SelectItem>
-                      {catalogQuery.data.filter((m) => m.isProviderModel).map((model) => (
-                        <SelectItem key={`prov-${model.id}`} value={model.name}>
-                          {model.displayName} ({model.providerName})
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  <SelectItem value="__custom__">Other (custom model name)</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
+                Custom
+              </Button>
+            </div>
 
             {useCustomModel && (
               <Input

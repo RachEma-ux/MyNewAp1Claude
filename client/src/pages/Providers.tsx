@@ -17,6 +17,8 @@ import { Plus, Settings, Trash2, CheckCircle, XCircle, Loader2, Cloud, Server, Z
 import { TestProviderButton } from "@/components/TestProviderButton";
 import { RoutingAuditViewer } from "@/components/RoutingAuditViewer";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CatalogSelect } from "@/components/CatalogSelect";
+import { useCatalogEntries } from "@/hooks/useCatalogEntries";
 
 type ProviderType = "openai" | "anthropic" | "google" | "local-llamacpp" | "local-ollama" | "custom";
 
@@ -88,8 +90,8 @@ export default function Providers() {
   const [isModelsOpen, setIsModelsOpen] = useState(false);
 
   const { data: providers, isLoading, refetch } = trpc.providers.list.useQuery();
-  const { data: multiChatProviders = [] } = trpc.llm.listProviders.useQuery();
-  const { data: catalogModels = [] } = trpc.modelDownloads.getUnifiedCatalog.useQuery({});
+  const { entries: catalogProviderEntries } = useCatalogEntries({ entryType: "provider" });
+  const { entries: catalogModelEntries } = useCatalogEntries({ entryType: "model" });
   const createProvider = trpc.providers.create.useMutation({
     onSuccess: () => {
       toast.success("Provider created successfully");
@@ -173,13 +175,12 @@ export default function Providers() {
   };
 
   const getAvailableModels = () => {
-    // Use unified catalog as source of truth
-    return catalogModels
+    return catalogModelEntries
       .filter((m) => (m.name || "").trim() !== "")
       .map((m) => ({
         id: m.name,
-        name: m.displayName,
-        description: m.description,
+        name: m.displayName || m.name,
+        description: m.description || "",
       }));
   };
 
@@ -238,50 +239,24 @@ export default function Providers() {
                 <div className="flex gap-2">
                 <div className="flex-1 space-y-2">
                   <Label htmlFor="multichat-provider">Select Provider</Label>
-                  <Select value={selectedMultiChatProvider} onValueChange={(value) => {
-                    setSelectedMultiChatProvider(value);
-                    // Handle custom provider
-                    if (value === 'custom') {
-                      setFormData({ ...formData, name: 'Custom Provider', baseUrl: '' });
-                      setSelectedType('custom');
-                      return;
-                    }
-
-                    const provider = multiChatProviders.find(p => p.id === value);
-
-                    if (provider) {
-                      // Update form with provider name
-                      setFormData({ ...formData, name: provider.name });
-
-                      // Auto-select type based on provider ID
-                      if (provider.type === 'local' || value === 'ollama') {
-                        setSelectedType('local-ollama');
-                      } else if (value === 'openai') {
-                        setSelectedType('openai');
-                      } else if (value === 'anthropic') {
-                        setSelectedType('anthropic');
-                      } else if (value === 'google') {
-                        setSelectedType('google');
-                      } else {
-                        // All other cloud providers use custom type
-                        setSelectedType('custom');
+                  <CatalogSelect
+                    entryType="provider"
+                    value={selectedMultiChatProvider}
+                    onValueChange={(value) => {
+                      setSelectedMultiChatProvider(value);
+                      const entry = catalogProviderEntries.find((e) => String(e.id) === value);
+                      if (entry) {
+                        setFormData({ ...formData, name: entry.displayName || entry.name });
+                        const name = entry.name.toLowerCase();
+                        if (name === 'ollama') setSelectedType('local-ollama');
+                        else if (name === 'openai') setSelectedType('openai');
+                        else if (name === 'anthropic') setSelectedType('anthropic');
+                        else if (name === 'google') setSelectedType('google');
+                        else setSelectedType('custom');
                       }
-                    }
-                  }}>
-                    <SelectTrigger id="multichat-provider">
-                      <SelectValue placeholder="Select a provider..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {multiChatProviders.map((provider) => (
-                        <SelectItem key={provider.id} value={provider.id}>
-                          {provider.name}
-                        </SelectItem>
-                      ))}
-                      <SelectItem key="custom" value="custom">
-                        Custom (OpenAI-compatible endpoint)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                    }}
+                    placeholder="Select a provider..."
+                  />
                 </div>
 
                 {/* Default Provider Type */}
