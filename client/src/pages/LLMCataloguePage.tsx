@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, Search, Filter, Loader2, Cloud, Server, Package } from "lucide-react";
+import { ChevronLeft, Search, Filter, Loader2, Cloud, Package } from "lucide-react";
 
 export default function LLMCataloguePage() {
   const [, navigate] = useLocation();
@@ -25,9 +25,10 @@ export default function LLMCataloguePage() {
     category,
     source,
   });
+  const { data: providers } = trpc.providers.list.useQuery();
 
-  const hubCount = catalogModels?.filter((m) => !m.isProviderModel).length ?? 0;
-  const providerCount = catalogModels?.filter((m) => m.isProviderModel).length ?? 0;
+  const providerCount = providers?.length ?? 0;
+  const modelCount = catalogModels?.length ?? 0;
 
   return (
     <div className="container mx-auto py-8 max-w-6xl px-4">
@@ -43,31 +44,22 @@ export default function LLMCataloguePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 grid-cols-3 mb-6">
-        <Card>
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Package className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-2xl font-bold">{catalogModels?.length ?? 0}</p>
-              <p className="text-xs text-muted-foreground">Total Models</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <Server className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-2xl font-bold">{hubCount}</p>
-              <p className="text-xs text-muted-foreground">Hub Models</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 grid-cols-2 mb-6">
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
             <Cloud className="h-5 w-5 text-muted-foreground" />
             <div>
               <p className="text-2xl font-bold">{providerCount}</p>
-              <p className="text-xs text-muted-foreground">Provider Models</p>
+              <p className="text-xs text-muted-foreground">Configured Providers</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4 flex items-center gap-3">
+            <Package className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-2xl font-bold">{modelCount}</p>
+              <p className="text-xs text-muted-foreground">Available Models</p>
             </div>
           </CardContent>
         </Card>
