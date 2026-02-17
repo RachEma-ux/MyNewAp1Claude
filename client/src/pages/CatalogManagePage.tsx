@@ -118,6 +118,7 @@ export default function CatalogManagePage() {
   const [formCategory, setFormCategory] = useState("");
   const [formSubCategory, setFormSubCategory] = useState("");
   const [formCapabilities, setFormCapabilities] = useState<string[]>([]);
+  const [formProviderId, setFormProviderId] = useState<string>("");
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -140,6 +141,7 @@ export default function CatalogManagePage() {
   const [publishNotes, setPublishNotes] = useState("");
 
   // Data queries
+  const { data: providers = [] } = trpc.providers.list.useQuery({});
   const { data: entries = [], isLoading, refetch } = trpc.catalogManage.list.useQuery({
     ...(typeFilter !== "all" ? { entryType: typeFilter } : {}),
     ...(categoryFilter !== "all" ? { category: categoryFilter } : {}),
@@ -208,6 +210,7 @@ export default function CatalogManagePage() {
     setFormCategory("");
     setFormSubCategory("");
     setFormCapabilities([]);
+    setFormProviderId("");
     setDialogOpen(true);
   }
 
@@ -222,6 +225,7 @@ export default function CatalogManagePage() {
     setFormCategory(entry.category || "");
     setFormSubCategory(entry.subCategory || "");
     setFormCapabilities(entry.capabilities || []);
+    setFormProviderId(entry.providerId ? String(entry.providerId) : "");
     setDialogOpen(true);
   }
 
@@ -240,6 +244,8 @@ export default function CatalogManagePage() {
 
     const tags = formTags.split(",").map((t) => t.trim()).filter(Boolean);
 
+    const providerId = formProviderId && formProviderId !== "none" ? parseInt(formProviderId, 10) : undefined;
+
     if (editingEntry) {
       updateMutation.mutate({
         id: editingEntry.id,
@@ -251,6 +257,7 @@ export default function CatalogManagePage() {
         category: formCategory || undefined,
         subCategory: formSubCategory || undefined,
         capabilities: formCapabilities.length > 0 ? formCapabilities : undefined,
+        providerId,
       });
     } else {
       createMutation.mutate({
@@ -260,6 +267,7 @@ export default function CatalogManagePage() {
         entryType: formEntryType,
         config: parsedConfig,
         tags,
+        providerId,
         category: formCategory || undefined,
         subCategory: formSubCategory || undefined,
         capabilities: formCapabilities.length > 0 ? formCapabilities : undefined,
@@ -857,16 +865,16 @@ export default function CatalogManagePage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingEntry ? "Edit Entry" : "New Catalog Entry"}</DialogTitle>
             <DialogDescription>
               {editingEntry
                 ? "Update this catalog entry's details"
-                : "Create a new provider or model entry in the catalog"}
+                : "Create a new entry in the catalog"}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 overflow-y-auto pr-2">
             {!editingEntry && (
               <div className="grid gap-2">
                 <Label>Type</Label>
@@ -969,6 +977,25 @@ export default function CatalogManagePage() {
               <Label>Description</Label>
               <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="What this entry does..." rows={2} />
             </div>
+            {formEntryType !== "provider" && (
+              <div className="grid gap-2">
+                <Label>Linked Provider</Label>
+                <Select value={formProviderId} onValueChange={setFormProviderId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select provider (for validation)..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {providers.map((p: any) => (
+                      <SelectItem key={p.id} value={String(p.id)}>
+                        {p.name} ({p.type})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Required for validation — links this entry to a provider runtime</p>
+              </div>
+            )}
             <div className="grid gap-2">
               <Label>Tags (comma-separated)</Label>
               <Input value={formTags} onChange={(e) => setFormTags(e.target.value)} placeholder="local, ollama, inference" />
