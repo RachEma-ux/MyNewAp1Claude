@@ -161,7 +161,7 @@ export default function NewProviderPage() {
   const createProvider = trpc.providers.create.useMutation({
     onSuccess: () => {
       toast.success(data.enableNow ? "Provider activated!" : "Provider saved as draft.");
-      navigate("/llm/provider-wizard");
+      navigate("/llm");
     },
     onError: (err) => toast.error(`Failed: ${err.message}`),
   });
@@ -835,7 +835,7 @@ export default function NewProviderPage() {
     <div className="container mx-auto py-6 max-w-2xl px-4">
       {/* Header */}
       <div className="mb-6">
-        <Button variant="ghost" size="sm" className="mb-2" onClick={() => navigate("/llm/provider-wizard")}>
+        <Button variant="ghost" size="sm" className="mb-2" onClick={() => navigate("/llm")}>
           <ChevronLeft className="h-4 w-4 mr-1" />Back
         </Button>
         <h1 className="text-2xl font-bold">Add Provider</h1>
