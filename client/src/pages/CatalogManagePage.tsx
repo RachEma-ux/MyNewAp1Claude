@@ -120,6 +120,7 @@ export default function CatalogManagePage() {
   const [formSubCategory, setFormSubCategory] = useState("");
   const [formCapabilities, setFormCapabilities] = useState<string[]>([]);
   const [formProviderId, setFormProviderId] = useState<string>("");
+  const [createStep, setCreateStep] = useState(0);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -211,6 +212,7 @@ export default function CatalogManagePage() {
     setFormSubCategory("");
     setFormCapabilities([]);
     setFormProviderId("");
+    setCreateStep(0);
     setDialogOpen(true);
   }
 
@@ -965,51 +967,111 @@ export default function CatalogManagePage() {
               )}
             </div>
 
-            <div className="grid gap-2">
-              <Label>Name</Label>
-              <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g., my-ollama-provider" />
-            </div>
-            <div className="grid gap-2">
-              <Label>Display Name</Label>
-              <Input value={formDisplayName} onChange={(e) => setFormDisplayName(e.target.value)} placeholder="e.g., My Ollama Provider" />
-            </div>
-            <div className="grid gap-2">
-              <Label>Description</Label>
-              <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="What this entry does..." rows={2} />
-            </div>
-            {formEntryType !== "provider" && (
-              <div className="grid gap-2">
-                <Label>Linked Provider</Label>
-                <CatalogSelect
-                  entryType="provider"
-                  value={formProviderId === "none" ? "" : formProviderId}
-                  onValueChange={(v) => setFormProviderId(v || "none")}
-                  placeholder="Select provider (for validation)..."
-                />
-                <p className="text-xs text-muted-foreground">Required for validation — links this entry to a provider runtime</p>
+            {/* Step Progress Bar */}
+            {!editingEntry && (
+              <div className="flex items-center justify-center gap-2 py-3">
+                {["Details", "Validation", "Policies", "Integration", "Review"].map((label, i) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCreateStep(i)}
+                      className={`flex flex-col items-center gap-1 group`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-colors ${
+                        i === createStep
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : i < createStep
+                          ? "bg-primary/20 text-primary border-primary/50"
+                          : "bg-muted text-muted-foreground border-muted-foreground/30"
+                      }`}>
+                        {i + 1}
+                      </div>
+                      <span className={`text-[10px] ${i === createStep ? "text-primary font-medium" : "text-muted-foreground"}`}>
+                        {label}
+                      </span>
+                    </button>
+                    {i < 4 && <div className={`w-6 h-0.5 mb-4 ${i < createStep ? "bg-primary/50" : "bg-muted-foreground/20"}`} />}
+                  </div>
+                ))}
               </div>
             )}
-            <div className="grid gap-2">
-              <Label>Tags (comma-separated)</Label>
-              <Input value={formTags} onChange={(e) => setFormTags(e.target.value)} placeholder="local, ollama, inference" />
-            </div>
-            <div className="grid gap-2">
-              <Label>Configuration (JSON)</Label>
-              <Textarea
-                value={formConfig}
-                onChange={(e) => setFormConfig(e.target.value)}
-                placeholder="{}"
-                rows={4}
-                className="font-mono text-xs"
-              />
-            </div>
+
+            {/* Step 1: Details (existing form) */}
+            {(editingEntry || createStep === 0) && (
+              <>
+                <div className="grid gap-2">
+                  <Label>Name</Label>
+                  <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g., my-ollama-provider" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Display Name</Label>
+                  <Input value={formDisplayName} onChange={(e) => setFormDisplayName(e.target.value)} placeholder="e.g., My Ollama Provider" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Description</Label>
+                  <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="What this entry does..." rows={2} />
+                </div>
+                {formEntryType !== "provider" && (
+                  <div className="grid gap-2">
+                    <Label>Linked Provider</Label>
+                    <CatalogSelect
+                      entryType="provider"
+                      value={formProviderId === "none" ? "" : formProviderId}
+                      onValueChange={(v) => setFormProviderId(v || "none")}
+                      placeholder="Select provider (for validation)..."
+                    />
+                    <p className="text-xs text-muted-foreground">Required for validation — links this entry to a provider runtime</p>
+                  </div>
+                )}
+                <div className="grid gap-2">
+                  <Label>Tags (comma-separated)</Label>
+                  <Input value={formTags} onChange={(e) => setFormTags(e.target.value)} placeholder="local, ollama, inference" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Configuration (JSON)</Label>
+                  <Textarea
+                    value={formConfig}
+                    onChange={(e) => setFormConfig(e.target.value)}
+                    placeholder="{}"
+                    rows={4}
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Steps 2-5: Coming Soon */}
+            {!editingEntry && createStep > 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                  <Loader2 className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground">Coming Soon</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">
+                  {["", "Validation rules and schema checks", "Policy assignment and governance", "API integration and webhooks", "Final review and confirmation"][createStep]}
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
+            {!editingEntry && createStep > 0 && (
+              <Button variant="outline" onClick={() => setCreateStep(createStep - 1)}>Back</Button>
+            )}
             <Button variant="outline" onClick={closeDialog}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!formName || saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {editingEntry ? "Save Changes" : "Create"}
-            </Button>
+            {editingEntry && (
+              <Button onClick={handleSave} disabled={!formName || saving}>
+                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save Changes
+              </Button>
+            )}
+            {!editingEntry && createStep < 4 && (
+              <Button onClick={() => setCreateStep(createStep + 1)}>Next</Button>
+            )}
+            {!editingEntry && createStep === 4 && (
+              <Button onClick={handleSave} disabled={!formName || saving}>
+                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Create
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
