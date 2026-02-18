@@ -9,9 +9,7 @@ export async function createDocument(data: InsertDocument) {
   const db = getDb();
   if (!db) throw new Error('Database not available');
   
-  const result: any = await db.insert(documents).values(data);
-  // Get the inserted document by ID
-  const [document] = await db.select().from(documents).where(eq(documents.id, result[0].insertId));
+  const [document] = await db.insert(documents).values(data).returning();
   return document;
 }
 

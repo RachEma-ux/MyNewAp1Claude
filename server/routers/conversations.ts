@@ -72,7 +72,6 @@ export const conversationsRouter = router({
         wsId = workspaces[0]?.id ?? 1;
       }
 
-      // Create conversation (PostgreSQL: use .returning() instead of insertId)
       const [conversation] = await db.insert(conversations).values({
         workspaceId: wsId,
         userId: ctx.user.id,

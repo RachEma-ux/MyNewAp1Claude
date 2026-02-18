@@ -89,10 +89,7 @@ export async function createSandbox(input: CreateSandboxInput): Promise<Agent> {
   const db = getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
-  const [result] = await db.insert(agents).values(agentData);
-  const agentId = result.insertId;
-
-  const [agent] = await db.select().from(agents).where(eq(agents.id, agentId)).limit(1);
+  const [agent] = await db.insert(agents).values(agentData).returning();
 
   return agent;
 }

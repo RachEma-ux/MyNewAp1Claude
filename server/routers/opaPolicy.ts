@@ -180,7 +180,7 @@ export const opaPolicyRouter = router({
         }
 
         // Save the policy
-        const result = await db.insert(policies).values({
+        const [saved] = await db.insert(policies).values({
           workspaceId: input.workspaceId,
           name: input.name,
           content: input.regoContent,
@@ -190,11 +190,11 @@ export const opaPolicyRouter = router({
           createdBy: ctx.user.id,
           createdAt: new Date(),
           updatedAt: new Date(),
-        });
+        }).returning();
 
         return {
           success: true,
-          policyId: result[0].insertId,
+          policyId: saved.id,
         };
       } catch (error) {
         throw new TRPCError({

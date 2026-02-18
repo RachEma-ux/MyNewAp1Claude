@@ -332,14 +332,14 @@ pnpm test
 ### Prerequisites
 
 - Node.js 18+
-- MySQL/TiDB database
+- PostgreSQL 14+ database
 - (Optional) OPA server for production policy evaluation
 
 ### Environment Variables
 
 ```bash
 # Database
-DATABASE_URL=mysql://user:pass@host/db
+DATABASE_URL=postgresql://user:pass@host/db
 
 # JWT signing
 JWT_SECRET=your-secret-key

@@ -98,14 +98,12 @@ export async function assignProviderToWorkspace(data: InsertWorkspaceProvider): 
     throw new Error("Database not available");
   }
 
-  const result = await db.insert(workspaceProviders).values(data);
-  const id = Number(result[0].insertId);
-  
-  const created = await getWorkspaceProviderById(id);
+  const [created] = await db.insert(workspaceProviders).values(data).returning();
+
   if (!created) {
     throw new Error("Failed to assign provider to workspace");
   }
-  
+
   return created;
 }
 

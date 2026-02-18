@@ -37,14 +37,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
-import { Pool } from 'pg';
-
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
-let _pgPool: Pool | null = null;
-
-async function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 export function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -103,74 +96,6 @@ export function updateTable<T extends Parameters<NonNullable<ReturnType<typeof g
   const dbInstance = getDb();
   if (!dbInstance) throw new Error("Database not available");
   return dbInstance.update(table);
-}
-
-async function getPgPool(): Promise<Pool | null> {
-  // Return existing pool if available
-  if (_pgPool) {
-    try {
-      // Test connection
-      const client = await _pgPool.connect();
-      client.release();
-      return _pgPool;
-    } catch (error) {
-      console.warn("[Database] Existing pool failed, creating new one");
-      await _pgPool.end();
-      _pgPool = null;
-    }
-  }
-
-  if (!process.env.DATABASE_URL) {
-    console.error("[Database] ❌ DATABASE_URL not set - cannot create connection pool");
-    return null;
-  }
-
-  // Log sanitized connection string
-  const sanitizedUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':****@');
-  console.log("[Database] DATABASE_URL format:", sanitizedUrl);
-
-  // Try to establish connection with retries
-  const maxAttempts = 5;
-  const retryDelay = 2000;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      console.log(`[Database] Attempting PostgreSQL connection (attempt ${attempt}/${maxAttempts})...`);
-
-      _pgPool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        max: 10, // Maximum pool size
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000,
-      });
-
-      // Test the connection
-      const client = await _pgPool.connect();
-      client.release();
-
-      console.log("[Database] ✅ PostgreSQL connection established successfully");
-      return _pgPool;
-    } catch (error: any) {
-      console.error(`[Database] ❌ Connection attempt ${attempt} failed:`, error.message);
-      console.error('[Database] Error code:', error.code);
-
-      if (_pgPool) {
-        await _pgPool.end();
-        _pgPool = null;
-      }
-
-      if (attempt < maxAttempts) {
-        const delay = retryDelay * attempt;
-        console.log(`[Database] Retrying in ${delay}ms...`);
-        await sleep(delay);
-      } else {
-        console.error("[Database] Max connection attempts reached");
-        return null;
-      }
-    }
-  }
-
-  return null;
 }
 
 // ============================================================================
@@ -1191,74 +1116,30 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  console.log('[createLLM] Inserting data:', JSON.stringify(data));
-
-  // Use PostgreSQL pool for raw queries
-  const now = new Date();
-  const insertData = {
-    name: data.name,
-    description: data.description ?? null,
-    role: data.role,
-    ownerTeam: data.ownerTeam ?? null,
-    archived: data.archived ?? false,
-    createdBy: data.createdBy,
-    createdAt: data.createdAt ?? now,
-    updatedAt: data.updatedAt ?? now,
-  };
-
-  console.log('[createLLM] Normalized insert data:', JSON.stringify(insertData));
-
   try {
-    // Get PostgreSQL connection pool
-    const pool = await getPgPool();
-    if (!pool) throw new Error("PostgreSQL connection pool not available");
-
-    // Execute raw parameterized query (PostgreSQL uses $1, $2, etc. instead of ?)
-    const result = await pool.query(
-      `INSERT INTO llms (name, description, role, "ownerTeam", archived, "createdBy", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id`,
-      [
-        insertData.name,
-        insertData.description,
-        insertData.role,
-        insertData.ownerTeam,
-        insertData.archived,
-        insertData.createdBy,
-        insertData.createdAt,
-        insertData.updatedAt,
-      ]
-    );
-
-    const insertId = result.rows[0]?.id;
-
-    if (!insertId) {
-      throw new Error('Failed to get inserted LLM ID');
-    }
-
-    console.log('[createLLM] Successfully inserted with ID:', insertId);
+    const [created] = await db.insert(llms).values({
+      name: data.name,
+      description: data.description ?? null,
+      role: data.role,
+      ownerTeam: data.ownerTeam ?? null,
+      archived: data.archived ?? false,
+      createdBy: data.createdBy,
+      createdAt: data.createdAt ?? new Date(),
+      updatedAt: data.updatedAt ?? new Date(),
+    }).returning();
 
     // Emit audit event
     await emitLLMAuditEvent({
       eventType: "llm.created",
-      llmId: insertId,
+      llmId: created.id,
       actor: data.createdBy,
       actorType: "user",
       payload: { name: data.name, role: data.role },
     });
 
-    // Fetch and return the created LLM using Drizzle
-    const created = await db.select().from(llms).where(eq(llms.id, insertId)).limit(1);
-    return created[0];
+    return created;
   } catch (error: any) {
-    console.error('[createLLM] Insert failed:', error);
-    console.error('[createLLM] Error details:', {
-      message: error.message,
-      code: error.code,
-      detail: error.detail,
-      hint: error.hint,
-    });
-    console.error('[createLLM] Data was:', JSON.stringify(insertData));
+    console.error('[createLLM] Insert failed:', error.message);
     throw new Error(`Failed to create LLM: ${error.message}`);
   }
 }
