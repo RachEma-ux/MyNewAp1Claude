@@ -13,7 +13,7 @@ import WorkspaceDetail from "./pages/WorkspaceDetail";
 import WorkspaceHome from "./pages/WorkspaceHome";
 import Models from "./pages/Models";
 import Documents from "./pages/Documents";
-import Agents from "./pages/Agents";
+// Agents page replaced by AgentsPage (governance-aware)
 import AgentChat from "./pages/AgentChat";
 import Chat from "./pages/Chat";
 import Automation from "./pages/Automation";
@@ -142,20 +142,19 @@ function Router() {
       <Route path="/automation/triggers" component={() => <ProtectedRoute component={TriggersStore} />} />
       <Route path="/automation/actions" component={() => <ProtectedRoute component={ActionsStore} />} />
       <Route path="/automation/settings" component={() => <ProtectedRoute component={AutomationSettings} />} />
-        <Route path="/automation/secrets" component={SecretsPage} />
-        <Route path="/templates" component={TemplatesPage} />
-        <Route path="/agents" component={AgentsPage} />
-        <Route path="/agents/create" component={AgentsPage} />
-        <Route path="/agents/:id" component={AgentDetailPage} />
-        <Route path="/agent-dashboard" component={AgentDashboardPage} />
-        <Route path="/protocols" component={ProtocolsPage} />
-        <Route path="/promotion-requests" component={PromotionRequestsPage} />
+        <Route path="/automation/secrets" component={() => <ProtectedRoute component={SecretsPage} />} />
+        <Route path="/templates" component={() => <ProtectedRoute component={TemplatesPage} />} />
+        <Route path="/agents" component={() => <ProtectedRoute component={AgentsPage} />} />
+        <Route path="/agents/create" component={() => <ProtectedRoute component={AgentsPage} />} />
+        <Route path="/agents/:id" component={() => <ProtectedRoute component={AgentDetailPage} />} />
+        <Route path="/agent-dashboard" component={() => <ProtectedRoute component={AgentDashboardPage} />} />
+        <Route path="/protocols" component={() => <ProtectedRoute component={ProtocolsPage} />} />
+        <Route path="/promotion-requests" component={() => <ProtectedRoute component={PromotionRequestsPage} />} />
         <Route path="/drift-detection" component={() => <ProtectedRoute component={DriftDetectionPage} />} />
       <Route path="/compliance-export" component={() => <ProtectedRoute component={ComplianceExportPage} />} />
       <Route path="/auto-remediation" component={() => <ProtectedRoute component={AutoRemediationPage} />} />
       <Route path="/tools-management" component={() => <ProtectedRoute component={ToolsManagementPage} />} />
       <Route path="/documents" component={() => <ProtectedRoute component={Documents} />} />
-      <Route path="/agents" component={() => <ProtectedRoute component={Agents} />} />
       <Route path="/agents/:agentId/chat" component={() => <ProtectedRoute component={AgentChat} />} />
       <Route path="/setup/ollama" component={() => <ProtectedRoute component={OllamaSetup} />} />
       <Route path="/chat" component={() => <ProtectedRoute component={Chat} />} />

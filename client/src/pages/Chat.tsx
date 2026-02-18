@@ -206,6 +206,8 @@ function ChatInner() {
 
   const messages = currentChat?.messages ?? [];
 
+  const saveConversationMutation = trpc.chat.saveConversation.useMutation();
+
   const { data: workspaces } = trpc.workspaces.list.useQuery();
   const { data: allProviders } = trpc.providers.list.useQuery();
 
@@ -412,6 +414,18 @@ function ChatInner() {
                   reason: data.routing.auditReasons?.join(', ') || 'Unified routing',
                 });
               }
+              // Persist conversation to DB (fire and forget)
+              const chatTitle = currentChat?.title || userContent.slice(0, 50);
+              const dbMessages = [
+                ...allMessages,
+                { role: "assistant" as const, content: data.content },
+              ];
+              saveConversationMutation.mutate({
+                title: chatTitle,
+                messages: dbMessages,
+                providerId: selectedProvider ?? undefined,
+                workspaceId: selectedWorkspace ?? undefined,
+              });
             } else if (data.type === 'error') {
               toast.error(`Streaming error: ${data.error}`);
               setIsStreaming(false);
@@ -441,6 +455,15 @@ function ChatInner() {
 
   const handleSaveChat = () => {
     saveChat();
+    // Also persist to DB
+    if (currentChat && currentChat.messages.length > 0) {
+      saveConversationMutation.mutate({
+        title: currentChat.title,
+        messages: currentChat.messages.map((m) => ({ role: m.role, content: m.content })),
+        providerId: selectedProvider ?? undefined,
+        workspaceId: selectedWorkspace ?? undefined,
+      });
+    }
     toast.success("Chat saved");
   };
 
