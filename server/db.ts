@@ -541,8 +541,8 @@ export async function getConversationsWithDetails(userId: number, workspaceId?: 
       title: conversations.title,
       agentId: conversations.agentId,
       agentName: agents.name,
-      status: sql<string>`CASE 
-        WHEN ${conversations.updatedAt} > DATE_SUB(NOW(), INTERVAL 1 HOUR) THEN 'active'
+      status: sql<string>`CASE
+        WHEN ${conversations.updatedAt} > NOW() - INTERVAL '1 hour' THEN 'active'
         ELSE 'completed'
       END`,
       createdAt: conversations.createdAt,
