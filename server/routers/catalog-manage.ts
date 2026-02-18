@@ -408,7 +408,7 @@ export const catalogManageRouter = router({
               ]);
               results.testPrompt = {
                 passed: true,
-                response: response.text || response.content || "[response received]",
+                response: (response as any).text || (response as any).content || "[response received]",
                 latencyMs: Date.now() - promptStart,
                 message: "Test prompt successful",
               };
