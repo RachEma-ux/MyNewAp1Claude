@@ -175,8 +175,21 @@ export default function Providers() {
   };
 
   const getAvailableModels = () => {
+    // Filter models by selected provider
+    const providerEntry = catalogProviderEntries.find((e) => String(e.id) === selectedMultiChatProvider);
+    const providerKey = providerEntry?.name?.toLowerCase() || "";
+
     return catalogModelEntries
-      .filter((m) => (m.name || "").trim() !== "")
+      .filter((m) => {
+        if ((m.name || "").trim() === "") return false;
+        // If a provider is selected, only show its models
+        if (providerKey) {
+          const tags = (m.tags as string[] | null) ?? [];
+          const configProvider = (m.config as any)?.providerId ?? "";
+          return tags.some((t) => t.toLowerCase() === providerKey) || configProvider.toLowerCase() === providerKey;
+        }
+        return true;
+      })
       .map((m) => ({
         id: m.name,
         name: m.displayName || m.name,
@@ -246,22 +259,23 @@ export default function Providers() {
                       setSelectedMultiChatProvider(value);
                       const entry = catalogProviderEntries.find((e) => String(e.id) === value);
                       if (entry) {
-                        setFormData({ ...formData, name: entry.displayName || entry.name });
+                        setFormData({ ...formData, name: entry.displayName || entry.name, selectedModels: [] });
                         const name = entry.name.toLowerCase();
                         if (name === 'ollama') setSelectedType('local-ollama');
                         else if (name === 'openai') setSelectedType('openai');
                         else if (name === 'anthropic') setSelectedType('anthropic');
                         else if (name === 'google') setSelectedType('google');
                         else setSelectedType('custom');
+                        setIsModelsOpen(true);
                       }
                     }}
                     placeholder="Select a provider..."
                   />
                 </div>
 
-                {/* Default Provider Type */}
+                {/* Provider Type */}
                 <div className="flex-1 space-y-2">
-                  <Label>Default Providers</Label>
+                  <Label>Provider Type</Label>
                   <Select value={selectedType} onValueChange={(value) => setSelectedType(value as ProviderType)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select default..." />

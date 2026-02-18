@@ -417,6 +417,10 @@ jobs:
           COOKIE_SECRET: ${{ secrets.COOKIE_SECRET || secrets.JWT_SECRET }}
           # App ID for OAuth
           VITE_APP_ID: ${{ github.event.inputs.app_id }}
+          # LLM Provider API keys (auto-provisioned on startup)
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           echo "🚀 Starting application..."
 
@@ -447,6 +451,9 @@ jobs:
           JWT_SECRET="${JWT_SECRET}" \
           COOKIE_SECRET="${COOKIE_SECRET:-$JWT_SECRET}" \
           VITE_APP_ID="${VITE_APP_ID}" \
+          OPENAI_API_KEY="${OPENAI_API_KEY}" \
+          ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+          GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
           node dist/index.js &
           SERVER_PID=$!
 

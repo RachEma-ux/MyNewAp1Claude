@@ -14,6 +14,9 @@ import { handleAgentChatStream } from "../agents/stream";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
 import { getDb } from "../db";
+import { syncRegistryOnStartup } from "../routers/catalog-manage";
+import { providers as providersTable } from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -100,12 +103,51 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+const ENV_PROVIDER_MAP = [
+  { envKey: "OPENAI_API_KEY", name: "OpenAI", type: "openai" },
+  { envKey: "ANTHROPIC_API_KEY", name: "Anthropic", type: "anthropic" },
+  { envKey: "GOOGLE_API_KEY", name: "Google", type: "google" },
+] as const;
+
+async function autoProvisionProviders() {
+  try {
+    const db = getDb();
+    if (!db) return;
+
+    for (const { envKey, name, type } of ENV_PROVIDER_MAP) {
+      const apiKey = process.env[envKey];
+      if (!apiKey) continue;
+
+      // Check if provider already exists
+      const existing = await db.select().from(providersTable).where(eq(providersTable.type, type)).limit(1);
+      if (existing.length > 0) continue;
+
+      await db.insert(providersTable).values({
+        name,
+        type,
+        enabled: true,
+        priority: 50,
+        config: { apiKey },
+      });
+      console.log(`[AutoProvision] Created ${name} provider from ${envKey}`);
+    }
+  } catch (error: any) {
+    console.warn(`[AutoProvision] Skipped — ${error.message}`);
+  }
+}
+
 async function startServer() {
   // Run database migrations first
   await runMigrations();
 
+  // Auto-provision providers from env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+  await autoProvisionProviders();
+
   // Initialize providers from database
   await initializeProviders();
+
+  // Auto-seed catalog entries from PROVIDERS constant
+  await syncRegistryOnStartup();
 
   const app = express();
   const server = createServer(app);
