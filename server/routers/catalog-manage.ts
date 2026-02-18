@@ -780,3 +780,91 @@ export const catalogManageRouter = router({
       return { success: true };
     }),
 });
+
+/**
+ * Auto-seed catalog_entries from PROVIDERS on server startup.
+ * Safe to call multiple times — skips entries that already exist.
+ */
+export async function syncRegistryOnStartup() {
+  try {
+    const { PROVIDERS } = await import("../llm/providers");
+    const existingEntries = await getCatalogEntries({});
+    const existingKeys = new Set<string>();
+    for (const e of existingEntries) {
+      existingKeys.add(e.name.toLowerCase());
+      if (e.displayName) existingKeys.add(e.displayName.toLowerCase());
+    }
+
+    let providersCreated = 0;
+    let modelsCreated = 0;
+
+    for (const provider of Object.values(PROVIDERS)) {
+      if (!existingKeys.has(provider.id.toLowerCase()) && !existingKeys.has(provider.name.toLowerCase())) {
+        const category = provider.type === "local" ? "local_runtime" : "cloud_api";
+        const caps: string[] = [];
+        if (provider.requiresApiKey) caps.push("internet_required");
+        if (provider.type === "local") caps.push("low_latency", "sandbox");
+
+        await createCatalogEntry({
+          name: provider.id,
+          displayName: provider.name,
+          description: `${provider.company} — ${provider.strengths.join(", ")}`,
+          entryType: "provider",
+          scope: "app",
+          status: "active",
+          origin: "discovery",
+          reviewState: "approved",
+          providerId: null,
+          config: { registryId: provider.id, type: provider.type, baseUrl: provider.baseUrl ?? null },
+          tags: [provider.type, ...provider.strengths],
+          category,
+          subCategory: null,
+          capabilities: caps.length > 0 ? caps : null,
+          createdBy: 1,
+        });
+        existingKeys.add(provider.id.toLowerCase());
+        existingKeys.add(provider.name.toLowerCase());
+        providersCreated++;
+      }
+
+      for (const model of provider.models) {
+        if (existingKeys.has(model.id.toLowerCase()) || existingKeys.has(model.name.toLowerCase())) continue;
+
+        const caps: string[] = [];
+        if (model.contextLength && model.contextLength >= 100000) caps.push("high_context");
+        if (model.contextLength && model.contextLength <= 8192) caps.push("low_latency");
+        if (model.id.includes("embed") || model.id.includes("rerank")) caps.push("cost_optimized");
+        if (provider.type === "local") caps.push("low_latency", "sandbox");
+
+        await createCatalogEntry({
+          name: model.id,
+          displayName: model.name,
+          description: `${model.name} by ${provider.company}${model.contextLength ? ` — ${(model.contextLength / 1000).toFixed(0)}K context` : ""}${model.size ? ` — ${model.size}` : ""}`,
+          entryType: "model",
+          scope: "app",
+          status: "active",
+          origin: "discovery",
+          reviewState: "approved",
+          providerId: null,
+          config: { providerId: provider.id, providerName: provider.name, contextLength: model.contextLength ?? null, size: model.size ?? null },
+          tags: [provider.id, ...(model.strengths ?? provider.strengths)],
+          category: "base_llm",
+          subCategory: model.contextLength && model.contextLength >= 100000 ? "multimodal" : "text_only",
+          capabilities: caps.length > 0 ? Array.from(new Set(caps)) : null,
+          createdBy: 1,
+        });
+        existingKeys.add(model.id.toLowerCase());
+        existingKeys.add(model.name.toLowerCase());
+        modelsCreated++;
+      }
+    }
+
+    if (providersCreated > 0 || modelsCreated > 0) {
+      console.log(`[CatalogSync] Seeded ${providersCreated} providers and ${modelsCreated} models`);
+    } else {
+      console.log(`[CatalogSync] Catalog already populated (${existingEntries.length} entries)`);
+    }
+  } catch (error: any) {
+    console.warn(`[CatalogSync] Skipped — ${error.message}`);
+  }
+}
