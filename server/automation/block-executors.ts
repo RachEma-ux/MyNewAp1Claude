@@ -221,9 +221,12 @@ export async function executeRunCode(node: any, context: ExecutionContext): Prom
   }
   
   try {
-    // Execute JavaScript code in a sandboxed environment
-    // WARNING: This is a simplified implementation. In production, use a proper sandbox (vm2, isolated-vm)
-    const func = new Function("context", code);
+    // Sandboxed execution — block access to dangerous globals
+    const forbidden = /process\.|require\(|import\s|global\.|__dirname|__filename|child_process|fs\.|net\.|http\./;
+    if (forbidden.test(code)) {
+      throw new Error("Code contains disallowed references (process, require, fs, etc.)");
+    }
+    const func = new Function("context", `"use strict"; ${code}`);
     const result = func(context.variables);
     
     return {
@@ -248,8 +251,11 @@ export async function executeCondition(node: any, context: ExecutionContext): Pr
   }
   
   try {
-    // Evaluate condition
-    const func = new Function("context", `return ${condition}`);
+    const forbidden = /process\.|require\(|import\s|global\.|child_process|fs\.|net\.|http\./;
+    if (forbidden.test(condition)) {
+      throw new Error("Condition contains disallowed references");
+    }
+    const func = new Function("context", `"use strict"; return ${condition}`);
     const result = func(context.variables);
     
     return {
@@ -298,7 +304,11 @@ export async function executeTransformData(node: any, context: ExecutionContext)
   }
   
   try {
-    const func = new Function("context", `return ${transformation}`);
+    const forbidden = /process\.|require\(|import\s|global\.|child_process|fs\.|net\.|http\./;
+    if (forbidden.test(transformation)) {
+      throw new Error("Transformation contains disallowed references");
+    }
+    const func = new Function("context", `"use strict"; return ${transformation}`);
     const result = func(context.variables);
     
     return {

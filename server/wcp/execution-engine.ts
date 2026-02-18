@@ -240,8 +240,12 @@ async function executeRunCode(
   }
 
   try {
-    // Create a sandboxed function with access to context variables
+    const forbidden = /process\.|require\(|import\s|global\.|child_process|fs\.|net\.|http\./;
+    if (forbidden.test(code)) {
+      throw new Error("Code contains disallowed references (process, require, fs, etc.)");
+    }
     const sandboxedFunction = new Function("context", `
+      "use strict";
       const { variables } = context;
       ${code}
     `);

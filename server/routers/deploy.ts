@@ -15,7 +15,7 @@ function getGitHubConfig() {
   if (!repo) {
     try {
       const { execSync } = require("child_process");
-      const remoteUrl = execSync("git config --get remote.origin.url", { encoding: "utf8" }).trim();
+      const remoteUrl = execSync("git config --get remote.origin.url", { encoding: "utf8", timeout: 5000 }).trim();
       // Parse repo from URL formats like:
       // https://github.com/owner/repo.git
       // git@github.com:owner/repo.git

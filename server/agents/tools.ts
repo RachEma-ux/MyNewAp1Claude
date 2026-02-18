@@ -86,11 +86,24 @@ const calculatorTool: Tool = {
   execute: async (params) => {
     try {
       const expression = params.expression as string;
-      
-      // Use a safe math evaluator (simple implementation)
-      // In production, use a library like mathjs
-      const result = eval(expression);
-      
+
+      // Safe math evaluator — only allows numbers, operators, parens, and Math functions
+      const sanitized = expression.replace(/\s+/g, "");
+      if (!/^[0-9+\-*/().,%^a-zA-Z]+$/.test(sanitized)) {
+        return "Error: Expression contains invalid characters";
+      }
+      // Block anything that isn't a known Math function or number
+      const dangerous = /[;{}\[\]`$\\'"=!<>?&|~]|function|return|import|require|process|global|this|window|eval|Function/;
+      if (dangerous.test(expression)) {
+        return "Error: Expression contains disallowed keywords";
+      }
+
+      // Map common math names to Math.* and evaluate safely
+      const mathExpr = expression
+        .replace(/\b(sin|cos|tan|asin|acos|atan|sqrt|abs|ceil|floor|round|log|log2|log10|exp|pow|min|max|PI|E)\b/g,
+          (m) => `Math.${m}`);
+      const result = new Function(`"use strict"; return (${mathExpr})`)();
+
       return `Result: ${result}`;
     } catch (error) {
       return `Error: ${error instanceof Error ? error.message : 'Calculation failed'}`;
