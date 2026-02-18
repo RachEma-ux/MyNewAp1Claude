@@ -2,18 +2,46 @@
  * Catalog Taxonomy — Single source of truth for entry type classification.
  * Imported by both server (validation) and client (form dropdowns).
  *
+ * ══════════════════════════════════════════════════════════════════════════════
+ *  THE FIVE FUNDAMENTALLY DIFFERENT ENTITIES
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ *  Term      │ What It Is                                              │ Ontological Level
+ *  ──────────┼─────────────────────────────────────────────────────────┼──────────────────
+ *  Provider  │ An infrastructure service that hosts and serves models  │ Infrastructure
+ *            │ via APIs, managing authentication, quotas, billing,     │ layer
+ *            │ and execution environments                              │
+ *  ──────────┼─────────────────────────────────────────────────────────┼──────────────────
+ *  LLM       │ A large language model architecture — a neural network │ Model
+ *            │ design specialized for language understanding and       │ layer
+ *            │ generation                                              │
+ *  ──────────┼─────────────────────────────────────────────────────────┼──────────────────
+ *  Model     │ A trained computational function (architecture +       │ Inference
+ *            │ learned weights) that performs inference                │ layer
+ *  ──────────┼─────────────────────────────────────────────────────────┼──────────────────
+ *  Agent     │ A goal-directed decision system that selects actions   │ Control
+ *            │ based on objectives, state, memory, and environment    │ layer
+ *  ──────────┼─────────────────────────────────────────────────────────┼──────────────────
+ *  Bot       │ A deployed, often user-facing application instance     │ Application
+ *            │ that exposes capabilities through an interface         │ layer
+ *  ──────────┴─────────────────────────────────────────────────────────┴──────────────────
+ *
+ *  These entities operate at different abstraction layers and are NOT interchangeable.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
  * ┌──────────────────────────────────────────────────────────────────────────┐
  * │                    ARCHITECTURAL STACK                                  │
  * │                                                                         │
  * │    Provider  →  LLM  →  Model  →  Agent or Bot  →  Workflow             │
  * │                                                                         │
- * │  Layer        │ Abstraction       │ Core Question                       │
+ * │  Entity       │ Ontological Level │ Core Question                       │
  * │  ────────────-┼───────────────────┼──────────────────────────────────── │
  * │  Provider     │ Infrastructure    │ Where does it run?                  │
- * │  LLM          │ Technology Class  │ What kind of AI is this?            │
- * │  Model        │ Trained Instance  │ Which exact version?                │
- * │  Agent        │ Intelligent System│ Who is acting?                      │
- * │  Bot          │ App-Layer Automat.│ What automation responds?           │
+ * │  LLM          │ Model             │ What kind of AI is this?            │
+ * │  Model        │ Inference         │ Which exact version / weights?      │
+ * │  Agent        │ Control           │ Who is acting and deciding?         │
+ * │  Bot          │ Application       │ What interface responds to users?   │
  * └──────────────────────────────────────────────────────────────────────────┘
  */
 
