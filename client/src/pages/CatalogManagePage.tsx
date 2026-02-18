@@ -2,8 +2,6 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import {
-  getCategoriesForType,
-  getSubCategories,
   getCapabilitiesForType,
   ENTRY_TYPES,
   ENTRY_TYPE_DEFS,
@@ -75,6 +73,7 @@ import {
   Rocket,
 } from "lucide-react";
 import { CatalogSelect } from "@/components/CatalogSelect";
+import { MultiAxisPanel } from "@/components/MultiAxisPanel";
 
 const TYPE_ICONS: Record<string, any> = {
   provider: Server,
@@ -107,12 +106,37 @@ const ORIGIN_COLORS: Record<string, string> = {
   api: "bg-cyan-600/20 text-cyan-400 border-cyan-600/30",
 };
 
+/** Inline component to show classification badges for a table row */
+function ClassificationBadges({ entryId }: { entryId: number }) {
+  const { data: nodes } = trpc.catalogManage.getClassifications.useQuery(
+    { catalogEntryId: entryId },
+  );
+  if (!nodes || nodes.length === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  // Show up to 3 axis-level labels, +N overflow
+  const labels = nodes.map((n: any) => n.label);
+  const shown = labels.slice(0, 3);
+  const overflow = labels.length - 3;
+  return (
+    <div className="flex gap-0.5 flex-wrap">
+      {shown.map((label: string, i: number) => (
+        <Badge key={i} variant="secondary" className="text-[10px] px-1 py-0">
+          {label}
+        </Badge>
+      ))}
+      {overflow > 0 && (
+        <span className="text-[10px] text-muted-foreground">+{overflow}</span>
+      )}
+    </div>
+  );
+}
+
 export default function CatalogManagePage() {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<"catalog" | "validation" | "publishing" | "audit">("catalog");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | EntryType>("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   // Create/Edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -123,8 +147,7 @@ export default function CatalogManagePage() {
   const [formEntryType, setFormEntryType] = useState<EntryType>("provider");
   const [formTags, setFormTags] = useState("");
   const [formConfig, setFormConfig] = useState("{}");
-  const [formCategory, setFormCategory] = useState("");
-  const [formSubCategory, setFormSubCategory] = useState("");
+  const [formClassifications, setFormClassifications] = useState<number[]>([]);
   const [formCapabilities, setFormCapabilities] = useState<string[]>([]);
   const [formProviderId, setFormProviderId] = useState<string>("");
   const [createStep, setCreateStep] = useState(0);
@@ -224,10 +247,11 @@ export default function CatalogManagePage() {
   const [publishVersion, setPublishVersion] = useState("");
   const [publishNotes, setPublishNotes] = useState("");
 
+  const trpcUtils = trpc.useUtils();
+
   // Data queries
   const { data: entries = [], isLoading, refetch } = trpc.catalogManage.list.useQuery({
     ...(typeFilter !== "all" ? { entryType: typeFilter } : {}),
-    ...(categoryFilter !== "all" ? { category: categoryFilter } : {}),
   });
   const { data: versions = [] } = trpc.catalogManage.listVersions.useQuery(
     { catalogEntryId: versionsEntryId! },
@@ -238,10 +262,18 @@ export default function CatalogManagePage() {
 
   // Mutations
   const createMutation = trpc.catalogManage.create.useMutation({
-    onSuccess: () => { refetch(); closeDialog(); },
+    onSuccess: (created) => {
+      if (formClassifications.length > 0) {
+        classifyMutation.mutate({ catalogEntryId: created.id, nodeIds: formClassifications });
+      }
+      refetch(); closeDialog();
+    },
   });
   const updateMutation = trpc.catalogManage.update.useMutation({
-    onSuccess: () => { refetch(); closeDialog(); },
+    onSuccess: (_, vars) => {
+      classifyMutation.mutate({ catalogEntryId: vars.id, nodeIds: formClassifications });
+      refetch(); closeDialog();
+    },
   });
   const deleteMutation = trpc.catalogManage.delete.useMutation({
     onSuccess: () => { refetch(); setDeleteDialogOpen(false); setDeletingEntry(null); },
@@ -270,6 +302,7 @@ export default function CatalogManagePage() {
   const activateMutation = trpc.catalogManage.activate.useMutation({
     onSuccess: () => refetch(),
   });
+  const classifyMutation = trpc.catalogManage.classify.useMutation();
 
   // Filter entries by search
   const filteredEntries = entries.filter((e: any) => {
@@ -290,8 +323,7 @@ export default function CatalogManagePage() {
     setFormEntryType("provider");
     setFormTags("");
     setFormConfig("{}");
-    setFormCategory("");
-    setFormSubCategory("");
+    setFormClassifications([]);
     setFormCapabilities([]);
     setFormProviderId("");
     setCreateStep(0);
@@ -306,11 +338,15 @@ export default function CatalogManagePage() {
     setFormEntryType(entry.entryType);
     setFormTags((entry.tags || []).join(", "));
     setFormConfig(JSON.stringify(entry.config || {}, null, 2));
-    setFormCategory(entry.category || "");
-    setFormSubCategory(entry.subCategory || "");
+    setFormClassifications([]);
     setFormCapabilities(entry.capabilities || []);
     setFormProviderId(entry.providerId ? String(entry.providerId) : "");
     setDialogOpen(true);
+    // Load classifications from DB
+    trpcUtils.catalogManage.getClassifications
+      .fetch({ catalogEntryId: entry.id })
+      .then((nodes) => setFormClassifications(nodes.map((n: any) => n.id)))
+      .catch(() => {});
   }
 
   function closeDialog() {
@@ -319,8 +355,9 @@ export default function CatalogManagePage() {
   }
 
   // Whether the current form targets an enterprise or SaaS provider
-  const isEnterprise = formEntryType === "provider" && formCategory === "cloud_api" && formSubCategory === "enterprise_managed";
-  const isSaas = formEntryType === "provider" && formCategory === "cloud_api" && formSubCategory === "official_saas";
+  // (advanced wizard steps — kept for future taxonomy-driven detection)
+  const isEnterprise = false;
+  const isSaas = false;
   const hasAdvancedSteps = isEnterprise || isSaas;
 
   // Dynamic step labels
@@ -463,8 +500,6 @@ export default function CatalogManagePage() {
         description: formDescription || undefined,
         config: fullConfig,
         tags,
-        category: formCategory || undefined,
-        subCategory: formSubCategory || undefined,
         capabilities: formCapabilities.length > 0 ? formCapabilities : undefined,
         providerId,
       });
@@ -477,8 +512,6 @@ export default function CatalogManagePage() {
         config: fullConfig,
         tags,
         providerId,
-        category: formCategory || undefined,
-        subCategory: formSubCategory || undefined,
         capabilities: formCapabilities.length > 0 ? formCapabilities : undefined,
       });
     }
@@ -551,7 +584,7 @@ export default function CatalogManagePage() {
                 className="pl-9"
               />
             </div>
-            <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v as any); setCategoryFilter("all"); }}>
+            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -560,30 +593,6 @@ export default function CatalogManagePage() {
                 {ENTRY_TYPES.map((t) => (
                   <SelectItem key={t} value={t}>{ENTRY_TYPE_DEFS[t].label}s</SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-            <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {typeFilter !== "all" ? (
-                  Object.entries(getCategoriesForType(typeFilter as EntryType)).map(([key, cat]) => (
-                    <SelectItem key={key} value={key}>{cat.label}</SelectItem>
-                  ))
-                ) : (
-                  ENTRY_TYPES.map((t) => {
-                    const cats = Object.entries(getCategoriesForType(t));
-                    if (cats.length === 0) return null;
-                    return [
-                      <SelectItem key={`_hdr_${t}`} value={`_hdr_${t}`} disabled>{ENTRY_TYPE_DEFS[t].label}</SelectItem>,
-                      ...cats.map(([key, cat]) => (
-                        <SelectItem key={`${t}-${key}`} value={key}>{cat.label}</SelectItem>
-                      ))
-                    ];
-                  })
-                )}
               </SelectContent>
             </Select>
           </div>
@@ -609,7 +618,7 @@ export default function CatalogManagePage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Category</TableHead>
+                    <TableHead>Classification</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Review</TableHead>
                     <TableHead>Origin</TableHead>
@@ -640,32 +649,7 @@ export default function CatalogManagePage() {
                         ); })()}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          {entry.category ? (
-                            <Badge variant="secondary" className="text-xs w-fit">
-                              {getCategoriesForType(entry.entryType)[entry.category]?.label || entry.category}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                          {entry.subCategory && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {getSubCategories(entry.category)?.[entry.subCategory] || entry.subCategory}
-                            </span>
-                          )}
-                          {entry.capabilities && entry.capabilities.length > 0 && (
-                            <div className="flex gap-0.5 flex-wrap mt-0.5">
-                              {entry.capabilities.slice(0, 2).map((c: string) => (
-                                <Badge key={c} variant="outline" className="text-[10px] px-1 py-0">
-                                  {c.replace(/_/g, " ")}
-                                </Badge>
-                              ))}
-                              {entry.capabilities.length > 2 && (
-                                <span className="text-[10px] text-muted-foreground">+{entry.capabilities.length - 2}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <ClassificationBadges entryId={entry.id} />
                       </TableCell>
                       <TableCell>
                         <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>
@@ -1089,8 +1073,7 @@ export default function CatalogManagePage() {
                 <Label>Type</Label>
                 <Select value={formEntryType} onValueChange={(v) => {
                   setFormEntryType(v as EntryType);
-                  setFormCategory("");
-                  setFormSubCategory("");
+                  setFormClassifications([]);
                   setFormCapabilities([]);
                 }}>
                   <SelectTrigger>
@@ -1107,45 +1090,17 @@ export default function CatalogManagePage() {
               </div>
             )}
 
-            {/* Category */}
+            {/* Multi-Axis Classification */}
             <div className="grid gap-2">
-              <Label>Category</Label>
-              <Select value={formCategory} onValueChange={(v) => {
-                setFormCategory(v);
-                setFormSubCategory("");
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(getCategoriesForType(formEntryType)).map(([key, cat]) => (
-                    <SelectItem key={key} value={key}>
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formCategory && getCategoriesForType(formEntryType)[formCategory] && (
-                <p className="text-xs text-muted-foreground">{getCategoriesForType(formEntryType)[formCategory].description}</p>
-              )}
-            </div>
-
-            {/* Sub-Category (conditional) */}
-            {formCategory && getSubCategories(formCategory) && Object.keys(getSubCategories(formCategory)!).length > 0 && (
-              <div className="grid gap-2">
-                <Label>Sub-Category</Label>
-                <Select value={formSubCategory} onValueChange={setFormSubCategory}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select sub-category..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(getSubCategories(formCategory)!).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Label>Classification</Label>
+              <div className="border rounded-md p-2 max-h-[280px] overflow-y-auto">
+                <MultiAxisPanel
+                  entryType={formEntryType}
+                  selectedNodeIds={formClassifications}
+                  onSelectionChange={setFormClassifications}
+                />
               </div>
-            )}
+            </div>
 
             {/* Capabilities (multi-select chips) */}
             <div className="grid gap-2">
@@ -1560,7 +1515,7 @@ export default function CatalogManagePage() {
                       <span>Name: <span className="text-foreground">{formName || "—"}</span></span>
                       <span>Display: <span className="text-foreground">{formDisplayName || "—"}</span></span>
                       <span>Type: <span className="text-foreground">{ENTRY_TYPE_DEFS[formEntryType]?.label}</span></span>
-                      <span>Category: <span className="text-foreground">{formCategory || "—"} / {formSubCategory || "—"}</span></span>
+                      <span>Classifications: <span className="text-foreground">{formClassifications.length || "—"}</span></span>
                       {formTags && <span className="col-span-2">Tags: <span className="text-foreground">{formTags}</span></span>}
                     </div>
                   </div>
