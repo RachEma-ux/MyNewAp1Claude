@@ -14,7 +14,7 @@ import { handleAgentChatStream } from "../agents/stream";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
 import { getDb } from "../db";
-import { syncRegistryOnStartup } from "../routers/catalog-manage";
+import { syncRegistryOnStartup, autoDetectLiveModels } from "../routers/catalog-manage";
 import { seedTaxonomy } from "../db";
 import { startCleanupInterval } from "../catalog-import/session-service";
 import { getSession } from "../catalog-import/session-service";
@@ -151,6 +151,9 @@ async function startServer() {
 
   // Auto-seed catalog entries from PROVIDERS constant
   await syncRegistryOnStartup();
+
+  // Auto-detect live models from configured providers (Ollama, etc.)
+  await autoDetectLiveModels();
 
   // Auto-seed taxonomy nodes from multi-axis definitions
   try {
