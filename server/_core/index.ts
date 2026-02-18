@@ -16,6 +16,8 @@ import { sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { syncRegistryOnStartup } from "../routers/catalog-manage";
 import { seedTaxonomy } from "../db";
+import { startCleanupInterval } from "../catalog-import/session-service";
+import { getSession } from "../catalog-import/session-service";
 import { providers as providersTable } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -162,6 +164,9 @@ async function startServer() {
     console.warn(`[TaxonomySeed] Skipped — ${error.message}`);
   }
 
+  // Start import session cleanup interval
+  startCleanupInterval();
+
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
@@ -206,6 +211,87 @@ async function startServer() {
   app.post("/api/chat/stream", handleChatStream);
   // Agent chat streaming endpoint
   app.get("/api/agents/:agentId/chat/stream", handleAgentChatStream);
+
+  // Import session SSE stream
+  app.get("/api/import/stream", async (req, res) => {
+    const sessionId = req.query.sessionId as string;
+    if (!sessionId) {
+      res.status(400).json({ error: "sessionId required" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const sendEvent = (data: any) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // Poll session status every 2 seconds
+    const interval = setInterval(async () => {
+      try {
+        const session = await getSession(sessionId);
+        if (!session) {
+          sendEvent({ type: "error", sessionId, message: "Session not found" });
+          clearInterval(interval);
+          res.end();
+          return;
+        }
+
+        sendEvent({
+          type: "status",
+          sessionId,
+          status: session.status,
+          summary: session.summary,
+        });
+
+        // Terminal states
+        if (["completed", "failed", "expired"].includes(session.status)) {
+          sendEvent({
+            type: session.status === "completed" ? "complete" : "error",
+            sessionId,
+            status: session.status,
+            summary: session.summary,
+            message: session.error,
+          });
+          clearInterval(interval);
+          res.end();
+        }
+      } catch (e: any) {
+        sendEvent({ type: "error", sessionId, message: e.message });
+        clearInterval(interval);
+        res.end();
+      }
+    }, 2000);
+
+    req.on("close", () => {
+      clearInterval(interval);
+    });
+  });
+
+  // Simple in-memory rate limiting for import endpoints
+  const importRateMap = new Map<string, number[]>();
+  const IMPORT_RATE_LIMIT = 10; // max requests per minute
+  app.use("/api/trpc/catalogImport", (req, res, next) => {
+    const key = req.ip || "unknown";
+    const now = Date.now();
+    const windowMs = 60 * 1000;
+
+    let timestamps = importRateMap.get(key) || [];
+    timestamps = timestamps.filter((t) => now - t < windowMs);
+
+    if (timestamps.length >= IMPORT_RATE_LIMIT) {
+      res.status(429).json({ error: "Too many import requests. Try again later." });
+      return;
+    }
+
+    timestamps.push(now);
+    importRateMap.set(key, timestamps);
+    next();
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

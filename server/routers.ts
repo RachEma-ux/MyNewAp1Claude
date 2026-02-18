@@ -36,6 +36,7 @@ import { diagnosticRouter } from "./routers/diagnostic";
 import { deployRouter } from "./routers/deploy";
 import { catalogManageRouter } from "./routers/catalog-manage";
 import { catalogRegistryRouter } from "./routers/catalog-registry";
+import { catalogImportRouter } from "./catalog-import/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -70,6 +71,7 @@ export const appRouter = router({
   deploy: deployRouter, // Deployment management
   catalogManage: catalogManageRouter, // Catalog Management CRUD
   catalogRegistry: catalogRegistryRouter, // Catalog Registry (read-only consumption)
+  catalogImport: catalogImportRouter, // Catalog Import & Discovery
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

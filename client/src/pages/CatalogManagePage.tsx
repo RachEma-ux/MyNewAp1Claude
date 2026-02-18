@@ -77,9 +77,11 @@ import {
   FileText,
   Rocket,
   ChevronDown,
+  Download,
 } from "lucide-react";
 import { CatalogSelect } from "@/components/CatalogSelect";
 import { MultiAxisPanel } from "@/components/MultiAxisPanel";
+import { CatalogImportWizard } from "@/components/CatalogImportWizard";
 
 const TYPE_ICONS: Record<string, any> = {
   provider: Server,
@@ -143,6 +145,9 @@ export default function CatalogManagePage() {
   const [activeTab, setActiveTab] = useState<"catalog" | "validation" | "publishing" | "audit">("catalog");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | EntryType>("all");
+
+  // Import wizard state
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
 
   // Create/Edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -565,9 +570,14 @@ export default function CatalogManagePage() {
             Create, edit, and manage catalog entries before publishing
           </p>
         </div>
-        <Button onClick={openCreateDialog}>
-          <Plus className="h-4 w-4 mr-2" />New Entry
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setImportWizardOpen(true)}>
+            <Download className="h-4 w-4 mr-2" />Import
+          </Button>
+          <Button onClick={openCreateDialog}>
+            <Plus className="h-4 w-4 mr-2" />New Entry
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
@@ -2290,6 +2300,13 @@ export default function CatalogManagePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import Wizard */}
+      <CatalogImportWizard
+        open={importWizardOpen}
+        onOpenChange={setImportWizardOpen}
+        onComplete={() => refetch()}
+      />
     </div>
   );
 }

@@ -50,6 +50,13 @@
       "when": 1771545600000,
       "tag": "0006_taxonomy_multi_axis",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771632000000,
+      "tag": "0007_catalog_import",
+      "breakpoints": true
     }
   ]
 }
