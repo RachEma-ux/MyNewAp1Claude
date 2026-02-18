@@ -1,0 +1,379 @@
+DATABASE DEEP SCAN ANALYSIS REPORT
+===================================
+Date: 2026-02-18
+Project: MyNewAppV1 — LLM Control Plane
+
+================================================================================
+1. DATABASE INFRASTRUCTURE
+================================================================================
+
+Database: PostgreSQL (via Drizzle ORM + node-postgres)
+Connection: Lazy-initialized from DATABASE_URL env var
+Pool: max=10, idle=30s, connection timeout=10s, 5 retry attempts
+ORM: drizzle-orm/node-postgres with full schema import
+Serialization: SuperJSON (dates, etc.) via tRPC
+
+Entry point: server/db.ts (1962 lines)
+  - getDb() — lazy singleton Drizzle instance
+  - getPgPool() — raw pg Pool with retry logic
+  - db.select/insert/update/delete proxy object
+  - ~60 helper functions (CRUD for each domain)
+
+Schema: drizzle/schema.ts (2619 lines)
+Relations: drizzle/relations.ts (1 line — EMPTY, no relations defined)
+
+ISSUE: relations.ts is empty. No Drizzle relations configured.
+All joins are done manually in db.ts query functions.
+
+================================================================================
+2. SCHEMA FILES (4 total)
+================================================================================
+
+A) drizzle/schema.ts — PRIMARY (2619 lines, PostgreSQL pgTable)
+   Contains ALL 60+ tables as pgTable definitions.
+
+B) drizzle/wiki-schema.ts — WIKI (136 lines, PostgreSQL pgTable)
+   4 tables: wiki_categories, wiki_pages, wiki_revisions, wiki_attachments
+   Has proper Drizzle relations defined internally.
+   References users from schema.ts (foreign key).
+
+C) drizzle/trigger-registry-schema.ts — DEAD CODE (284 lines, MySQL mysqlTable)
+   CRITICAL ISSUE: Uses mysqlTable + mysqlEnum (MySQL/MariaDB ORM)
+   NOT compatible with PostgreSQL. This file CANNOT work with the database.
+   Defines: trigger_registry, action_registry (MySQL versions)
+   These same tables already exist in schema.ts as pgTable (PostgreSQL).
+   This file is a DUPLICATE with wrong dialect.
+
+D) drizzle/relations.ts — EMPTY (1 line: `import {} from "./schema";`)
+
+================================================================================
+3. ALL TABLES (63 tables in schema.ts + 4 in wiki-schema.ts = 67 total)
+================================================================================
+
+DOMAIN: User Management (2 tables)
+  users                     — id, openId(unique), name, email, loginMethod, role, timestamps
+  workspace_members          — id, workspaceId, userId, role, createdAt
+
+DOMAIN: Workspace System (1 table)
+  workspaces                — id, name, description, ownerId, embedding/chunking settings, vectorDb, routingProfile(json), timestamps
+
+DOMAIN: Model Management (7 tables)
+  models                    — id, name, displayName, modelType, huggingFace metadata, file info, status, performance metrics
+  model_configs             — id, modelId, userId, inference params (temperature, topP, etc.)
+  model_downloads           — id, modelId, userId, source/dest, progress tracking, scheduling
+  model_versions            — id, modelId, version, source, changelog, isLatest/isDeprecated
+  model_conversions         — id, modelId, userId, source/target format, quantization, progress
+  model_shares              — id, modelId, storagePath, checksum, referenceCount
+  model_share_references    — id, shareId, userId, workspaceId
+
+DOMAIN: Document Management (2 tables)
+  documents                 — id, workspaceId, file info, processing status, metadata, chunkCount
+  document_chunks           — id, documentId, content, chunkIndex, vectorId
+
+DOMAIN: Agent System (6 tables)
+  agents                    — id, workspaceId, createdBy, name, roleClass, lifecycle, systemPrompt, modelId(varchar!), governance fields
+  agent_history             — id, agentId, eventType, eventData, status tracking
+  agentVersions             — id, agentId, version, agentSnapshot(json), policy digests
+  promotionRequests         — id, agentId, requestedBy, status, diff info, approval workflow, SLA
+  promotionEvents           — id, promotionRequestId, eventType, actor, details
+  protocols                 — id, workspaceId, name, content(markdown), version, tags
+
+DOMAIN: Conversations (2 tables)
+  conversations             — id, workspaceId, agentId, title, userId, modelId(integer!), temperature
+  messages                  — id, conversationId, role, content, tokenCount, retrievedChunks, toolCalls
+
+DOMAIN: Automation/Workflows (7 tables)
+  workflows                 — id, userId, workspaceId, nodes/edges(text), trigger config, versioning, permissions
+  workflow_versions          — id, workflowId, version, nodes/edges snapshot, publishing metadata
+  workflow_executions        — id, workflowId, versionId, status, trigger info, execution context
+  workflow_execution_logs    — id, executionId, nodeId/type/label, status, input/output(json)
+  workflow_runs              — id, workflowId, status, triggerData, executionLog(json)
+  workflow_templates         — id, name, category, workflowDefinition(json), tags
+  wcp_workflows              — id, userId, nodes/edges, wcpBytecode, status
+  wcp_executions             — id, workflowId, workflowName, status, executionLog
+
+DOMAIN: Provider System (6 tables)
+  providers                 — id, name, type, enabled, priority, config(json), costPer1kTokens, kind, capabilities, policyTags, limits
+  workspace_providers        — id, workspaceId, providerId, enabled, priority, quotaTokensPerDay
+  provider_usage             — id, workspaceId, providerId, modelName, tokensUsed, cost, latencyMs
+  provider_health_checks     — id, providerId, status, responseTimeMs
+  routing_audit_logs         — id, workspaceId, requestId, primary/actual providerId, routeTaken, auditReasons, metrics
+  provider_metrics           — id, providerId, latency percentiles, reliability metrics, usage metrics, time period
+
+DOMAIN: Trigger & Action Registry (2 tables — each ~60 columns)
+  trigger_registry          — 14-gate compliance protocol, ~60 columns
+  action_registry           — Similar to trigger_registry, ~60 columns
+
+DOMAIN: Model Analytics (2 tables)
+  download_analytics        — id, downloadId, modelId, userId, bandwidth metrics, network info
+  model_benchmarks          — id, modelId, benchmarkType/Name, score, performance metrics
+
+DOMAIN: Hardware (1 table)
+  hardware_profiles         — id, userId, CPU/GPU/RAM info, capability flags, performanceScore
+
+DOMAIN: Plugin System (1 table)
+  plugins                   — id, name, displayName, version, runtime, entryPoint, permissions, enabled
+
+DOMAIN: Knowledge Packs (1 table)
+  knowledge_packs           — id, name, version, documentCount, packData(json)
+
+DOMAIN: System Settings (1 table)
+  system_settings           — id, settingKey(unique), settingValue, settingType
+
+DOMAIN: Secrets (1 table)
+  secrets                   — id, userId, key, encryptedValue, description (unique: userId+key)
+
+DOMAIN: Agent Governance (6 tables)
+  agent_proofs              — id, agentId, policyDecision, hashes, signature
+  policy_versions           — id, policySet, version, bundle(json), policyHash
+  policyExceptions          — id, agentId, policyId, time-bound approval
+  policyReloads             — id, OCI ref, digest, cosign verification, rollback tracking
+  incidents                 — id, title, severity, frozen environments, lifecycle
+
+DOMAIN: Policy Management (2 tables)
+  policies                  — id, workspaceId, name, content(json), hash, isActive/isTemplate
+  policyTemplates           — id, name(unique), category, content(json), version
+
+DOMAIN: Key Rotation (5 tables)
+  service_certificates      — id, serviceName, certificate/keys(PEM), validity period, rotation tracking
+  attestation_keys          — id, keyName, keyType, public/privateKey, validity, rotation tracking
+  key_rotations             — id, rotationType, targetName, status, old/newKeyId, overlap window
+  key_rotation_audit_logs   — id, rotationId, action, performer, verification
+  key_rotation_policies     — id, policyName, rotation schedule, overlap window, auto-rotate
+  key_rotation_schedules    — id, policyId, rotationId, scheduledAt, status
+
+DOMAIN: LLM Control Plane (8 tables)
+  llms                      — id, name, role, ownerTeam, archived
+  llm_versions              — id, llmId, version, environment, config(json), policy validation, attestation
+  llm_promotions            — id, llmVersionId, from/toEnvironment, approval workflow
+  llm_attestations          — id, llmVersionId, evidence(json), verification details
+  llm_drift_events          — id, llmVersionId, severity, signal, expected/observed
+  llm_audit_events          — id, eventType, references, payload(json), trust chain
+
+DOMAIN: LLM Creation Pipeline (5 tables)
+  llm_creation_projects     — id, name, path(A/B), target, baseModel, status, phases
+  llm_datasets              — id, projectId, type, source, format, quality metrics
+  llm_training_runs         — id, projectId, trainingType, config, metrics, GPU/cost tracking
+  llm_evaluations           — id, projectId, trainingRunId, benchmarks, results, comparison
+  llm_quantizations         — id, projectId, quantization config, output, quality comparison
+  llm_creation_audit_events — id, eventType, references, phase/action/payload
+
+DOMAIN: Catalog Management (4 tables)
+  catalog_entries           — id, name, displayName, entryType, category/subCategory/capabilities, scope, status, origin, reviewState, config(json), tags, validation
+  catalog_entry_versions    — id, catalogEntryId, version, config snapshot, configHash
+  publish_bundles           — id, catalogEntryId, versionLabel, snapshot(json), snapshotHash, policy gate
+  catalog_audit_events      — id, eventType, references, payload(json)
+
+DOMAIN: Wiki (4 tables — wiki-schema.ts)
+  wiki_categories           — id, name(unique), description, icon, displayOrder
+  wiki_pages                — id, title, slug(unique), content, categoryId(FK), authorId(FK), version
+  wiki_revisions            — id, pageId(FK cascade), content, authorId(FK), revisionNumber
+  wiki_attachments          — id, pageId(FK cascade), filename, url, type, size, uploadedBy(FK)
+
+================================================================================
+4. MIGRATIONS (7 total)
+================================================================================
+
+0000_numerous_power_pack.sql    — Initial: ALL 55+ tables + indexes (massive 1142-line file)
+0001_useful_swarm.sql           — Added: workspaces.routingProfile, providers routing fields (kind, capabilities, policyTags, limits)
+0002_loose_prodigy.sql          — Added: LLM creation tables (projects, datasets, training_runs, evaluations, quantizations, creation_audit)
+0003_conscious_shadow_king.sql  — Added: catalog_entries, catalog_entry_versions, publish_bundles, catalog_audit_events
+0004_catalog_authority.sql      — Modified: catalog_entries + origin, reviewState, approvedBy, approvedAt; status cleanup
+0005_catalog_taxonomy.sql       — Modified: catalog_entries + category, subCategory, capabilities
+
+drizzle/migrations/20260102161654_add_registry_tables.sql — ORPHAN MySQL MIGRATION
+  CRITICAL: This is a MySQL migration (AUTO_INCREMENT, ENUM, ON UPDATE CURRENT_TIMESTAMP)
+  It will NOT run on PostgreSQL. It matches trigger-registry-schema.ts (also MySQL).
+  These tables already exist in 0000 as PostgreSQL tables.
+
+================================================================================
+5. DB ACCESSOR FILES (6 files, ~3000 lines total)
+================================================================================
+
+server/db.ts (1962 lines) — MAIN
+  Covers: users, workspaces, workspace_members, models, model_configs, documents,
+  document_chunks, agents, agent_history, conversations, messages, workflows,
+  workflow_versions, workflow_executions, workflow_execution_logs, workflow_runs,
+  catalog_entries, catalog_entry_versions, publish_bundles, catalog_audit_events
+
+server/agents/db.ts (249 lines)
+  Covers: agents (governance-focused queries), agentVersions, promotionRequests
+
+server/documents/db.ts (165 lines)
+  Covers: documents, document_chunks (with workspace-scoped queries)
+
+server/providers/db.ts (229 lines)
+  Covers: providers (with routing fields), workspace_providers
+
+server/providers/analytics-db.ts (226 lines)
+  Covers: provider_usage, provider_health_checks, routing_audit_logs, provider_metrics
+
+server/models/download-db.ts (155 lines)
+  Covers: model_downloads
+
+================================================================================
+6. FRONTEND DATA SOURCES (tRPC queries)
+================================================================================
+
+For provider/model data, the frontend uses MULTIPLE overlapping sources:
+
+Source 1: trpc.providers.list (7 uses) — queries `providers` DB table
+Source 2: trpc.modelDownloads.getUnifiedCatalog (6 uses) — merges model hub + provider models
+Source 3: trpc.catalogManage.list (4 uses) — queries `catalog_entries` table
+Source 4: trpc.llm.listProviders (2 uses) — queries PROVIDERS constant (server/llm/providers.ts)
+Source 5: trpc.models.list (2 uses) — queries `models` DB table
+Source 6: trpc.chat.getAvailableProviders — queries `providers` DB for chat-ready ones
+Source 7: trpc.providers.getModels — queries provider runtime for live model list
+
+ISSUE: 7 different data sources for "what providers/models exist"
+After CatalogSelect refactor, CatalogSelect uses Source 3 exclusively.
+But other parts of the app still use Sources 1, 2, 4, 5, 6, 7.
+
+================================================================================
+7. CRITICAL ISSUES FOUND
+================================================================================
+
+ISSUE 1: DEAD MYSQL SCHEMA FILE
+  File: drizzle/trigger-registry-schema.ts
+  Uses mysqlTable/mysqlEnum — incompatible with PostgreSQL
+  Duplicates trigger_registry + action_registry already in schema.ts as pgTable
+  Should be DELETED.
+
+ISSUE 2: ORPHAN MYSQL MIGRATION
+  File: drizzle/migrations/20260102161654_add_registry_tables.sql
+  Uses MySQL syntax (AUTO_INCREMENT, ENUM, ON UPDATE CURRENT_TIMESTAMP)
+  Will fail on PostgreSQL. Should be DELETED.
+
+ISSUE 3: EMPTY RELATIONS FILE
+  File: drizzle/relations.ts — contains only `import {} from "./schema";`
+  No Drizzle relations defined. All joins are manual.
+  Not blocking but prevents use of Drizzle's relational query API.
+
+ISSUE 4: NO FOREIGN KEY CONSTRAINTS IN MAIN SCHEMA
+  The main schema.ts defines 63 tables but has ZERO foreign key constraints.
+  Only wiki-schema.ts has proper FK references (categoryId, authorId, pageId).
+  Example: agents.workspaceId has no FK to workspaces.id
+  Example: documents.workspaceId has no FK to workspaces.id
+  Example: conversations.agentId has no FK to agents.id
+  This means orphaned records can exist with no referential integrity.
+
+ISSUE 5: MODELID TYPE MISMATCH
+  agents.modelId is varchar(255) — stores model NAME as string
+  conversations.modelId is integer — stores model ID as number
+  These reference different things despite the same column name.
+
+ISSUE 6: DUPLICATE WORKFLOW TABLES
+  workflow_executions + workflow_runs — both track workflow execution state
+  workflow_execution_logs — linked to workflow_executions
+  workflow_runs has its own executionLog(json)
+  These appear to be duplicated functionality.
+
+ISSUE 7: 7 OVERLAPPING PROVIDER/MODEL DATA SOURCES
+  Frontend queries 7 different tRPC endpoints for provider/model data.
+  Each returns differently shaped data.
+  catalog_entries was meant to unify this but coexists with the old sources.
+
+ISSUE 8: PROVIDERS TABLE vs CATALOG_ENTRIES TABLE
+  `providers` (DB table): Runtime-registered providers with config/API keys
+  `catalog_entries` (DB table): Catalog of all providers/models/agents/bots
+  `PROVIDERS` (JS constant): Hardcoded provider registry in server/llm/providers.ts
+  Three different "sources of truth" for provider data.
+  syncRegistry bridges PROVIDERS → catalog_entries, but providers table is independent.
+
+ISSUE 9: MASSIVE 0000 MIGRATION
+  The initial migration creates ALL 55+ tables in one file (1142 lines).
+  Any new PostgreSQL deployment must run this entire file.
+  If it fails partway through, partial state is hard to recover.
+
+ISSUE 10: SCHEMA SIZE (2619 lines)
+  Schema.ts is a single monolithic file with 67 table definitions.
+  No domain-based splitting (wiki-schema.ts is the only breakout).
+  Hard to navigate and maintain.
+
+================================================================================
+8. DB WIRING DIAGRAM (simplified)
+================================================================================
+
+                     ┌──────────────────────┐
+                     │    PostgreSQL DB      │
+                     │  (DATABASE_URL)       │
+                     └──────────┬───────────┘
+                                │
+                     ┌──────────┴───────────┐
+                     │   drizzle/schema.ts   │
+                     │   (63 pgTable defs)   │
+                     │   + wiki-schema.ts    │
+                     │   (4 more tables)     │
+                     └──────────┬───────────┘
+                                │
+              ┌─────────────────┼──────────────────┐
+              │                 │                   │
+     ┌────────┴────────┐  ┌────┴──────┐   ┌───────┴──────────┐
+     │   server/db.ts   │  │ domain    │   │ server/routers/  │
+     │  (main queries)  │  │  db.ts    │   │ (tRPC routers)   │
+     │  1962 lines      │  │ files     │   │ import getDb()   │
+     └────────┬────────┘  └────┬──────┘   └───────┬──────────┘
+              │                 │                   │
+              └─────────────────┼──────────────────┘
+                                │
+                     ┌──────────┴───────────┐
+                     │    tRPC appRouter     │
+                     │  (server/routers.ts)  │
+                     └──────────┬───────────┘
+                                │
+                     ┌──────────┴───────────┐
+                     │   Client (React)      │
+                     │  trpc.X.useQuery()    │
+                     │  trpc.X.useMutation() │
+                     └──────────────────────┘
+
+ALSO IN PLAY (not DB-backed):
+  server/llm/providers.ts → PROVIDERS constant (15 providers, 64 models)
+  → Synced to catalog_entries via syncRegistry mutation
+
+================================================================================
+9. DEPLOY GAP ANALYSIS
+================================================================================
+
+LOCAL (PostgreSQL running):
+  - All 67 tables available
+  - catalog_entries populated via syncRegistry
+  - providers table populated via provider init
+  - Full CRUD works
+
+GITHUB ACTIONS DEPLOY (PostgreSQL service container):
+  - All tables created via migrations
+  - syncRegistry can run (auto-sync on LLMCataloguePage mount)
+  - Data ephemeral (destroyed after 15-min tunnel)
+
+CLOUDFLARE DEPLOY (no PostgreSQL):
+  - DATABASE_URL not set
+  - getDb() returns null
+  - All DB queries return [] or undefined (graceful degradation)
+  - CatalogSelect dropdowns: EMPTY (no catalog_entries)
+  - Old hardcoded PROVIDERS constant: still works for pages that use it
+  - PROVIDERS registry (server/llm/providers.ts): accessible but not shown in dropdowns
+
+================================================================================
+10. RECOMMENDATIONS SUMMARY
+================================================================================
+
+IMMEDIATE (for CatalogSelect fix):
+  1. Add in-memory fallback: when DB unavailable, CatalogSelect should
+     fall back to PROVIDERS constant data
+  2. Add loading/empty states to CatalogSelect component
+
+CLEANUP:
+  3. DELETE drizzle/trigger-registry-schema.ts (dead MySQL code)
+  4. DELETE drizzle/migrations/20260102161654_add_registry_tables.sql (dead MySQL migration)
+
+MEDIUM-TERM:
+  5. Consolidate provider/model data sources (7 → 1 via catalog_entries)
+  6. Add foreign key constraints to schema.ts
+  7. Fix modelId type mismatch (agents vs conversations)
+  8. Remove duplicate workflow_runs table (use workflow_executions only)
+  9. Populate drizzle/relations.ts with proper relations
+
+LONG-TERM:
+  10. Split schema.ts into domain-specific files
+  11. Address the 3 provider data sources (providers table, catalog_entries, PROVIDERS constant)
