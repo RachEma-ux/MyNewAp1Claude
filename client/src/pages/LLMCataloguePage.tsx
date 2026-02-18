@@ -144,9 +144,6 @@ export default function LLMCataloguePage() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/llm")}>
           <ChevronLeft className="h-4 w-4 mr-1" />Back to LLM
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => navigate("/llm/catalogue/manage")}>
-          <ChevronLeft className="h-4 w-4 mr-1" />Manage Catalogue
-        </Button>
       </div>
 
       {/* Header */}
@@ -157,20 +154,22 @@ export default function LLMCataloguePage() {
             Unified view of all catalog entries — providers, LLMs, models, agents &amp; bots
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-          >
-            <RefreshCw className={`h-4 w-4 mr-1 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-            Sync
-          </Button>
-          <Button onClick={() => navigate("/llm/catalogue/manage")}>
-            <LayoutGrid className="h-4 w-4 mr-1" />Manage
-          </Button>
-        </div>
+        <Button onClick={() => navigate("/llm/catalogue/manage")}>
+          <LayoutGrid className="h-4 w-4 mr-1" />Manage
+        </Button>
+      </div>
+
+      {/* Sync + Architectural Stack Banner */}
+      <div className="flex justify-end mb-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => syncMutation.mutate()}
+          disabled={syncMutation.isPending}
+        >
+          <RefreshCw className={`h-4 w-4 mr-1 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+          Sync
+        </Button>
       </div>
 
       {/* Architectural Stack Banner */}
