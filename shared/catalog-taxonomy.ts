@@ -6,7 +6,7 @@
  *  THE FIVE FUNDAMENTALLY DIFFERENT ENTITIES
  * ══════════════════════════════════════════════════════════════════════════════
  *
- *  Term      │ What It Is                                              │ Ontological Level
+ *  Type      │ What It Is                                              │ Ontological Level
  *  ──────────┼─────────────────────────────────────────────────────────┼──────────────────
  *  Provider  │ An infrastructure service that hosts and serves models  │ Infrastructure
  *            │ via APIs, managing authentication, quotas, billing,     │ layer
