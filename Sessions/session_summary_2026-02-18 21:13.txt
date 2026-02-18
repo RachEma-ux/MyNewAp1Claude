@@ -1,0 +1,65 @@
+Session Summary — 2026-02-18 21:13
+====================================
+(Continuation of session 2026-02-18 21:06)
+
+## Focus: Taxonomy Finalization, Testing Tools, TMPDIR Fix
+
+### Commits Made This Sub-Session (2)
+
+1. **9bdfa74** — `docs: Add session summary 2026-02-18 21:06`
+2. **7662758** — `docs: Add 4 guard-rail rules to taxonomy file concept section`
+
+### Full Day Commits (main branch, chronological)
+1. 5fdaa28 — fix: Purge all MySQL patterns
+2. cbe440b — fix: Security hardening
+3. 721d59d — fix: Remove dead test-db import
+4. 6563689 — docs: Session summary 09:00
+5. 88e1910 — ui: Catalogue page UI tweaks
+6. 12ed8fa — feat: Catalog wizard 5-step progress bar
+7. 9104705 — feat: Catalog wizard config persistence + validation + review
+8. c52808b — docs: Five Entities table
+9. ef17e0a — docs: Clean Comparison Table
+10. 5393b39 — docs: AI Platform Compliance Design Matrix
+11. f933910 — feat: Bulk page testing HTML launchers
+12. 13d9185 — docs: Rename Term to Type
+13. 66940e9 — docs: Agent Ontology + Multi-Axis Classification Model
+14. 745eba5 — docs: File concept + multi-type axes + versioning strategy
+15. 7662758 — docs: 4 guard-rail rules
+16. 9bdfa74 — docs: Session summary 21:06
+17. cd5bcad — docs: Session summary 19:16
+18. 5ad4e2f — docs: Session summary 20:35
+
+### Taxonomy File Final State (shared/catalog-taxonomy.ts)
+~1060 lines total. Comment sections:
+1. File Concept + 4 Guard-Rail Rules
+2. The Natural Way (multi-axis for all 5 types + DB schema design)
+3. Concept Limit (versioning) + Chosen Solution (soft approach)
+4. Five Fundamentally Different Entities table
+5. Clean Comparison Table
+6. AI Platform Compliance Design Matrix (5-layer governance)
+7. Clean Unified Agent Ontology (9 categories, 102 classes)
+8. Multi-Axis Agent Classification Model (UI architecture rationale)
+9. Architectural Stack diagram
+
+### Architecture Decisions (design only, no code)
+- Comments = spec for humans, DB = runtime truth for code
+- All 5 types get multi-axis classification (not just Agent)
+- DB schema: taxonomy_axes, taxonomy_subcategories, taxonomy_classes, taxonomy_inference_rules
+- Generic <MultiAxisPanel type={entryType}> for all types
+- Soft versioning (active boolean, no version column)
+- Namespaced keys + inference rules to handle cross-axis near-duplicates
+
+### TMPDIR Fix Applied
+- Root cause: Claude Code sandbox uses hardcoded /tmp for internal task dirs
+- /tmp on Termux is read-only (Android system mount, can't symlink without root)
+- Fix: added `export TMPDIR=/data/data/com.termux/files/usr/tmp` to ~/.bashrc and ~/.profile
+- Requires Claude Code restart to take effect
+- Should fix all sandbox /tmp errors (gh, sleep, chained commands, for loops)
+
+### Deploys
+- v3.0.101: https://wonderful-avatar-psychological-empty.trycloudflare.com
+- v3.0.102: https://stands-library-exterior-returning.trycloudflare.com
+
+### Next Steps
+- Restart Claude Code to test TMPDIR fix
+- Implement Agent wizard DB schema + seed migration when ready
