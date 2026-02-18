@@ -211,6 +211,295 @@
  *    - User-Facing Interaction Safety
  *
  * ══════════════════════════════════════════════════════════════════════════════
+ *  CLEAN UNIFIED AGENT ONTOLOGY
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ *  Three-Dropdown Filtering System
+ *  (Type = Agent → Category → Sub-Category → Class)
+ *
+ *  Type: Agent
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  1. Cognitive Architecture
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Sub-Category               │ Classes
+ *  ───────────────────────────┼────────────────────────────────────────────────
+ *  Reactive Systems           │ Simple Reflex, Rule-Based, Heuristic
+ *  State-Based Systems        │ Model-Based Reflex, Bayesian
+ *  Deliberative Systems       │ Goal-Based, Planning, Search-Based,
+ *                             │ Constraint-Satisfaction, Logic-Based
+ *  Decision-Theoretic         │ Utility-Based, Game-Theoretic
+ *  Learning-Centric           │ Reinforcement-Based Architecture,
+ *                             │ Model-Based RL Architecture
+ *  Advanced Cognitive         │ Neuro-Symbolic, Generative Architecture,
+ *                             │ LLM-Based Architecture, Meta-Reasoning
+ *                             │ Architecture, Self-Reflective Architecture,
+ *                             │ Theory-of-Mind Architecture
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  2. Functional Role
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Sub-Category               │ Classes
+ *  ───────────────────────────┼────────────────────────────────────────────────
+ *  Interface Roles            │ Conversational, Advisory, Recommendation,
+ *                             │ Decision Support
+ *  Expert Roles               │ Specialist, Data Analysis, Code Generation,
+ *                             │ Research, Evaluation
+ *  Execution Roles            │ Task Executor, Workflow Executor, Testing
+ *                             │ Agent, Monitoring Agent
+ *  Coordination Roles         │ Orchestrator, Coordination Agent,
+ *                             │ Optimization Agent
+ *  Governance Roles           │ Compliance Agent, Security Agent, Audit Agent
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  3. Organizational Structure
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Sub-Category               │ Classes
+ *  ───────────────────────────┼────────────────────────────────────────────────
+ *  Single-Unit                │ Single-Agent
+ *  Distributed                │ Multi-Agent System (MAS), Peer-to-Peer, Swarm
+ *  Centralized                │ Centralized Coordination, Hierarchical
+ *  Hybrid                     │ Hybrid, Federated System
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  4. Autonomy Level
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Sub-Category               │ Classes
+ *  ───────────────────────────┼────────────────────────────────────────────────
+ *  Reactive Autonomy          │ Reactive
+ *  Assisted                   │ Human-in-the-Loop, Semi-Autonomous
+ *  Independent                │ Fully Autonomous, Self-Governing
+ *  Self-Evolving              │ Self-Improving, Self-Replicating
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  5. Embodiment
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Sub-Category               │ Classes
+ *  ───────────────────────────┼────────────────────────────────────────────────
+ *  Software                   │ Software Agent, Virtual Agent
+ *  Cyber-Physical             │ Cyber-Physical Agent, IoT Agent
+ *  Physical                   │ Robotic Agent, Mobile Physical Agent
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  6. Learning Paradigm
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Sub-Category               │ Classes
+ *  ───────────────────────────┼────────────────────────────────────────────────
+ *  Supervised                 │ Supervised Learning
+ *  Unsupervised               │ Unsupervised Learning, Self-Supervised Learning
+ *  Reinforcement              │ Reinforcement Learning, Policy-Based RL,
+ *                             │ Value-Based RL, Actor-Critic, Model-Free RL,
+ *                             │ Model-Based RL
+ *  Online & Continual         │ Online Learning, Continual Learning
+ *  Transfer & Distributed     │ Transfer Learning, Federated Learning
+ *  Evolutionary & Meta        │ Evolutionary Learning, Meta-Learning
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  7. Decision Paradigm
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Sub-Category               │ Classes
+ *  ───────────────────────────┼────────────────────────────────────────────────
+ *  Deterministic              │ Deterministic Decision
+ *  Probabilistic              │ Stochastic Decision, Probabilistic Inference
+ *  Risk & Economic            │ Risk-Sensitive Decision, Market-Based Decision
+ *  Strategic                  │ Adversarial, Cooperative, Competitive,
+ *                             │ Nash-Equilibrium
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  8. Governance & Safety
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Sub-Category               │ Classes
+ *  ───────────────────────────┼────────────────────────────────────────────────
+ *  Policy Control             │ Policy-Constrained, Compliance-Enforcing
+ *  Alignment                  │ Alignment-Constrained, Fairness-Aware
+ *  Transparency               │ Auditable, Explainable
+ *  Security                   │ Secure, Privacy-Preserving, Sandbox-Limited
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  9. Cognitive Capability
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Sub-Category               │ Classes
+ *  ───────────────────────────┼────────────────────────────────────────────────
+ *  Minimal                    │ Stateless
+ *  Contextual                 │ Stateful, Context-Aware
+ *  World Modeling             │ World-Modeling, Self-Modeling
+ *  Higher-Order               │ Reflective, Meta-Cognitive, Theory-of-Mind,
+ *                             │ Creative Generative
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  Structural Guarantees
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  - Type is fixed to Agent
+ *  - Each Class belongs to exactly one Sub-Category
+ *  - Each Sub-Category belongs to exactly one Category
+ *  - No duplication across axes
+ *  - No conceptual overlap
+ *  - Suitable for compliance matrix construction
+ *  - Suitable for schema validation (JSON/Zod/OpenAPI)
+ *  - Fully enumerable and machine-usable
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
+ *  MULTI-AXIS AGENT CLASSIFICATION MODEL
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ *  Why a Vertical Multi-Axis Classification Panel Is the Correct UI
+ *  Architecture
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  Core Principle
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  An agent is not defined by a single characteristic.
+ *  It is defined across multiple independent dimensions:
+ *
+ *    - How it reasons           → Cognitive Architecture
+ *    - What role it performs    → Functional Role
+ *    - How it is organized     → Organizational Structure
+ *    - How autonomous it is    → Autonomy Level
+ *    - Where it exists         → Embodiment
+ *    - How it learns           → Learning Paradigm
+ *    - How it decides          → Decision Paradigm
+ *    - What constraints govern → Governance & Safety
+ *    - How deep its cognition  → Cognitive Capability
+ *
+ *  Each of these is an independent axis.
+ *  Together, they form the complete semantic identity of an agent.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  The Problem to Solve
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Real-world agents are multi-dimensional systems.
+ *  A single descriptive path cannot accurately model:
+ *
+ *    - A conversational LLM-based system
+ *    - That operates in a multi-agent structure
+ *    - With human oversight
+ *    - Running purely in software
+ *    - Using reinforcement learning
+ *    - Making probabilistic decisions
+ *    - Under strict compliance controls
+ *    - With contextual awareness
+ *
+ *  These are orthogonal properties. They must coexist.
+ *  They must be selectable independently.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  Why a Vertical Multi-Axis Classification Panel Is the Solution
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  1. It Mirrors the Ontology Structure
+ *     ─────────────────────────────────
+ *     The ontology itself is organized into independent axes.
+ *     A vertical panel directly represents that structure:
+ *       - One section per axis
+ *       - No conceptual mixing
+ *       - No hierarchy confusion
+ *       - No artificial constraints
+ *     The UI becomes a direct reflection of the ontology.
+ *
+ *  2. It Preserves Conceptual Purity
+ *     ──────────────────────────────
+ *     Each axis remains:
+ *       - Internally structured
+ *       - Mutually exclusive within itself
+ *       - Isolated from other axes
+ *     This prevents:
+ *       - Architecture leaking into governance
+ *       - Learning paradigms mixing with decision theory
+ *       - Organizational structure conflicting with autonomy
+ *     Each dimension stays clean.
+ *
+ *  3. It Enables Complete Agent Modeling
+ *     ─────────────────────────────────
+ *     A vertical axis panel allows:
+ *       - Full multi-dimensional tagging
+ *       - Accurate semantic identity
+ *       - Enterprise-grade specification
+ *     An agent is no longer partially described. It is fully classified.
+ *     This is critical for:
+ *       - Compliance matrices
+ *       - Governance enforcement
+ *       - Policy gating
+ *       - Capability validation
+ *       - Audit traceability
+ *
+ *  4. It Supports Deterministic Validation
+ *     ────────────────────────────────────
+ *     Because each axis is independent:
+ *       - Exactly one selection per axis can be enforced (strict mode)
+ *       - Controlled multi-selection can be allowed where logically valid
+ *       - Contradictory configurations can be blocked
+ *     Validation becomes structured and predictable.
+ *     This is essential for:
+ *       - Schema validation
+ *       - Orchestrator enforcement
+ *       - Policy engines
+ *       - Promotion gates
+ *
+ *  5. It Scales Without Breaking
+ *     ─────────────────────────
+ *     Future additions can be handled safely:
+ *       - New classes can be added inside an axis
+ *       - New sub-categories can be inserted
+ *       - Entire new axes can be introduced if required
+ *     The vertical structure scales horizontally across dimensions,
+ *     not vertically into complexity.
+ *     This keeps the system extensible without becoming chaotic.
+ *
+ *  6. It Improves Cognitive Clarity for Users
+ *     ──────────────────────────────────────
+ *     From a UX perspective:
+ *       - Each section is mentally scoped
+ *       - Users focus on one dimension at a time
+ *       - The structure is predictable
+ *       - The model feels structured and intentional
+ *     It reduces ambiguity and improves decision quality.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  Architectural Benefits
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  A vertical multi-axis classification panel ensures:
+ *    - Ontological integrity
+ *    - Multi-dimensional accuracy
+ *    - Strict separation of concerns
+ *    - Compliance readiness
+ *    - Governance alignment
+ *    - Schema-friendly design
+ *    - Enterprise scalability
+ *
+ *  It transforms classification from a linear choice into a structured
+ *  identity model.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  Final Position
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  The vertical multi-axis classification panel is not a UI preference.
+ *  It is a structural necessity.
+ *
+ *  It aligns:
+ *    - The ontology
+ *    - The validation model
+ *    - The governance framework
+ *    - The compliance matrix
+ *    - The orchestrator logic
+ *
+ *  And most importantly — it allows agents to be modeled as what they
+ *  truly are: multi-dimensional intelligent systems.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
  *
  * ┌──────────────────────────────────────────────────────────────────────────┐
  * │                    ARCHITECTURAL STACK                                  │
