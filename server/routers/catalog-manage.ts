@@ -762,6 +762,130 @@ export const catalogManageRouter = router({
 });
 
 /**
+ * Auto-detect live models from configured providers on startup.
+ * Scans DB providers with reachable endpoints and auto-creates catalog entries.
+ * Safe to call multiple times — skips entries that already exist (idempotent).
+ * Never blocks startup on failure.
+ */
+export async function autoDetectLiveModels() {
+  try {
+    const { discoverFromApiUrl } = await import("../catalog-import/discovery-service");
+    const { PROVIDERS } = await import("../llm/providers");
+
+    // 1. Get all enabled providers from DB
+    const allProviders = await providerDb.getAllProviders();
+    const enabledProviders = allProviders.filter((p: any) => p.enabled !== false);
+
+    if (enabledProviders.length === 0) {
+      console.log("[AutoDetect] No enabled providers found, skipping live model detection");
+      return;
+    }
+
+    // 2. Resolve base URL for each provider
+    type ProviderTarget = { provider: any; baseUrl: string; apiKey?: string };
+    const targets: ProviderTarget[] = [];
+
+    for (const provider of enabledProviders) {
+      const config = (provider.config as Record<string, any>) || {};
+      let baseUrl = config.baseUrl || config.apiUrl || config.endpoint || null;
+
+      // Fall back to PROVIDERS constant baseUrl (e.g. Ollama → http://localhost:11434)
+      if (!baseUrl && PROVIDERS[provider.type]?.baseUrl) {
+        baseUrl = PROVIDERS[provider.type].baseUrl;
+      }
+
+      // Skip cloud providers without a baseUrl (don't hit paid APIs uninvited)
+      if (!baseUrl) continue;
+
+      // Skip if provider has apiKey requirement but no key configured
+      const registryProvider = PROVIDERS[provider.type];
+      if (registryProvider?.requiresApiKey && !config.apiKey) continue;
+
+      targets.push({ provider, baseUrl, apiKey: config.apiKey });
+    }
+
+    if (targets.length === 0) {
+      console.log("[AutoDetect] No providers with reachable endpoints, skipping");
+      return;
+    }
+
+    // 3. Discover models from each provider (parallel, with 10s timeout per provider)
+    const results = await Promise.allSettled(
+      targets.map(async ({ provider, baseUrl, apiKey }) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        try {
+          const models = await discoverFromApiUrl(baseUrl, apiKey);
+          return { provider, models };
+        } finally {
+          clearTimeout(timeout);
+        }
+      })
+    );
+
+    // 4. Collect all discovered models
+    const discovered: Array<{ provider: any; model: any }> = [];
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value.models.length > 0) {
+        for (const model of result.value.models) {
+          discovered.push({ provider: result.value.provider, model });
+        }
+      }
+    }
+
+    if (discovered.length === 0) {
+      console.log(`[AutoDetect] Scanned ${targets.length} provider(s), no new models discovered`);
+      return;
+    }
+
+    // 5. Dedup against existing catalog entries
+    const existingEntries = await getCatalogEntries({});
+    const existingKeys = new Set<string>();
+    for (const e of existingEntries) {
+      existingKeys.add(e.name.toLowerCase());
+      if (e.displayName) existingKeys.add(e.displayName.toLowerCase());
+    }
+
+    let created = 0;
+    for (const { provider, model } of discovered) {
+      const name = model.name || model.id;
+      if (existingKeys.has(name.toLowerCase())) continue;
+
+      await createCatalogEntry({
+        name,
+        displayName: name,
+        description: model.description || `Live-detected from ${provider.name}`,
+        entryType: "model",
+        scope: "app",
+        status: "active",
+        origin: "discovery",
+        reviewState: "approved",
+        providerId: provider.id,
+        config: {
+          ...(model.metadata || {}),
+          detectedAt: new Date().toISOString(),
+        },
+        tags: [provider.name, "auto-detected"],
+        category: "base_llm",
+        subCategory: null,
+        capabilities: null,
+        createdBy: 1,
+      });
+      existingKeys.add(name.toLowerCase());
+      created++;
+    }
+
+    if (created > 0) {
+      console.log(`[AutoDetect] Discovered ${created} new model(s) from ${targets.length} provider(s)`);
+    } else {
+      console.log(`[AutoDetect] Scanned ${targets.length} provider(s), all models already in catalog`);
+    }
+  } catch (error: any) {
+    console.warn(`[AutoDetect] Skipped — ${error.message}`);
+  }
+}
+
+/**
  * Auto-seed catalog_entries from PROVIDERS on server startup.
  * Safe to call multiple times — skips entries that already exist.
  */
