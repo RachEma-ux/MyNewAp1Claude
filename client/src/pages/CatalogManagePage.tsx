@@ -40,6 +40,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   ChevronLeft,
   Plus,
   Pencil,
@@ -71,6 +76,7 @@ import {
   Code,
   FileText,
   Rocket,
+  ChevronDown,
 } from "lucide-react";
 import { CatalogSelect } from "@/components/CatalogSelect";
 import { MultiAxisPanel } from "@/components/MultiAxisPanel";
@@ -1091,43 +1097,70 @@ export default function CatalogManagePage() {
             )}
 
             {/* Multi-Axis Classification */}
-            <div className="grid gap-2">
-              <Label>Classification</Label>
-              <div className="border rounded-md p-2 max-h-[280px] overflow-y-auto">
-                <MultiAxisPanel
-                  entryType={formEntryType}
-                  selectedNodeIds={formClassifications}
-                  onSelectionChange={setFormClassifications}
-                />
+            <Collapsible defaultOpen>
+              <div className="border rounded-md">
+                <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 hover:bg-muted/50 rounded-t-md">
+                  <span className="text-sm font-medium">Classification</span>
+                  <div className="flex items-center gap-2">
+                    {formClassifications.length > 0 && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {formClassifications.length}
+                      </Badge>
+                    )}
+                    <ChevronDown className="size-4 text-muted-foreground transition-transform [[data-state=closed]_&]:rotate-[-90deg]" />
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-3 pb-3 max-h-[280px] overflow-y-auto">
+                    <MultiAxisPanel
+                      entryType={formEntryType}
+                      selectedNodeIds={formClassifications}
+                      onSelectionChange={setFormClassifications}
+                    />
+                  </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
 
-            {/* Capabilities (multi-select chips) */}
-            <div className="grid gap-2">
-              <Label>Capabilities</Label>
-              <div className="flex flex-wrap gap-1.5 p-2 border rounded-md min-h-[38px]">
-                {Object.entries(getCapabilitiesForType(formEntryType)).map(([key, cap]) => {
-                  const selected = formCapabilities.includes(key);
-                  return (
-                    <Badge
-                      key={key}
-                      variant={selected ? "default" : "outline"}
-                      className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
-                      onClick={() => {
-                        setFormCapabilities((prev) =>
-                          selected ? prev.filter((c) => c !== key) : [...prev, key]
+            {/* Capabilities */}
+            <Collapsible>
+              <div className="border rounded-md">
+                <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 hover:bg-muted/50 rounded-t-md">
+                  <span className="text-sm font-medium">Capabilities</span>
+                  <div className="flex items-center gap-2">
+                    {formCapabilities.length > 0 && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {formCapabilities.length}
+                      </Badge>
+                    )}
+                    <ChevronDown className="size-4 text-muted-foreground transition-transform [[data-state=closed]_&]:rotate-[-90deg]" />
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-3 pb-3">
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {Object.entries(getCapabilitiesForType(formEntryType)).map(([key, cap]) => {
+                        const selected = formCapabilities.includes(key);
+                        return (
+                          <Badge
+                            key={key}
+                            variant={selected ? "default" : "outline"}
+                            className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
+                            onClick={() => {
+                              setFormCapabilities((prev) =>
+                                selected ? prev.filter((c) => c !== key) : [...prev, key]
+                              );
+                            }}
+                          >
+                            {cap.label}
+                          </Badge>
                         );
-                      }}
-                    >
-                      {cap.label}
-                    </Badge>
-                  );
-                })}
+                      })}
+                    </div>
+                  </div>
+                </CollapsibleContent>
               </div>
-              {formCapabilities.length > 0 && (
-                <p className="text-xs text-muted-foreground">{formCapabilities.length} selected</p>
-              )}
-            </div>
+            </Collapsible>
 
             {/* Step Progress Bar */}
             {!editingEntry && (
