@@ -3,6 +3,83 @@
  * Imported by both server (validation) and client (form dropdowns).
  *
  * ══════════════════════════════════════════════════════════════════════════════
+ *  1. FILE CONCEPT
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ *  Comments = design spec for humans.
+ *  DB = runtime truth for code.
+ *  Clean separation. No duplication of purpose.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
+ *  2. THE NATURAL WAY OF DOING THINGS
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ *  Every type in the taxonomy is multi-dimensional, not just Agent.
+ *
+ *  Provider isn't just "cloud API" — it has:
+ *    - Hosting model (cloud, on-prem, hybrid, edge)
+ *    - Auth architecture (OAuth, API key, mTLS, IAM)
+ *    - Compliance profile (SOC2, HIPAA, ISO, none)
+ *    - Pricing model (pay-per-token, subscription, free, custom)
+ *    - Geographic scope (single-region, multi-region, global)
+ *    - SLA tier (enterprise, standard, best-effort)
+ *
+ *  LLM isn't just "transformer" — it has:
+ *    - Architecture family (transformer, diffusion, mixture-of-experts, etc.)
+ *    - Modality (text, vision, multimodal, audio, code)
+ *    - Training approach (pre-trained, fine-tuned, RLHF, distilled)
+ *    - License (open-source, commercial, research-only)
+ *    - Size class (small, medium, large, frontier)
+ *
+ *  Model isn't just a version number — it has:
+ *    - Quantization (fp32, fp16, int8, int4, GGUF)
+ *    - Deployment target (GPU, CPU, edge, serverless)
+ *    - Promotion state (sandbox, governed, production)
+ *    - Benchmark profile (reasoning, coding, creative, factual)
+ *    - Cost tier (free, low, medium, high)
+ *
+ *  Bot isn't just a channel — it has:
+ *    - Interface type (web chat, messaging, voice, API, embedded)
+ *    - State management (stateless, session, persistent)
+ *    - Interaction pattern (Q&A, task-oriented, open-ended)
+ *    - User scope (internal, customer-facing, public)
+ *    - Governance binding (none, inherited, explicit)
+ *
+ *  Same pattern: each type has orthogonal axes, each axis has
+ *  sub-categories and classes, and a single dropdown chain can't
+ *  capture the full identity.
+ *
+ *  The DB schema generalizes cleanly:
+ *    - taxonomy_axes — axis per type (not just agent)
+ *    - taxonomy_subcategories — grouped under axes
+ *    - taxonomy_classes — leaf values
+ *    - taxonomy_inference_rules — cross-axis suggestions
+ *
+ *  One generic <MultiAxisPanel type={entryType}> component renders
+ *  the right axes for any type. The wizard becomes type-agnostic.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
+ *  3.1 THE CONCEPT LIMIT
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ *  Versioning — if the ontology evolves (new classes, renamed
+ *  sub-categories, deprecated axes), existing agents reference old
+ *  values. Two options:
+ *
+ *    - Soft approach: classes have an active boolean. Deprecated
+ *      classes stay readable but aren't shown in the wizard dropdown.
+ *
+ *    - Strict approach: taxonomy version column. Each agent records
+ *      which ontology version it was classified against.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
+ *  3.2 THE CHOSEN SOLUTION
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ *  We will go soft approach for now — simpler, and the ontology is
+ *  unlikely to change drastically once seeded.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
  *  THE FIVE FUNDAMENTALLY DIFFERENT ENTITIES
  * ══════════════════════════════════════════════════════════════════════════════
  *
