@@ -3,6 +3,9 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getProviderRegistry } from "../providers/registry";
 import type { Message } from "../providers/types";
 import { trackProviderUsage } from "../providers/usage";
+import { getDb } from "../db";
+import { conversations, messages as messagesTable } from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 export const chatRouter = router({
   // Send a message and get a response from the selected provider
@@ -243,6 +246,50 @@ export const chatRouter = router({
         console.error('[ChatRouter] Streaming error:', error);
         throw error;
       }
+    }),
+
+  // Save a full conversation (title + messages) to the database
+  saveConversation: protectedProcedure
+    .input(z.object({
+      title: z.string().min(1).max(500),
+      messages: z.array(z.object({
+        role: z.enum(["user", "assistant", "system"]),
+        content: z.string(),
+      })),
+      providerId: z.number().optional(),
+      workspaceId: z.number().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      if (!db) return { saved: false, reason: "no_db" };
+
+      // Resolve workspace
+      let wsId = input.workspaceId;
+      if (!wsId) {
+        const { getUserWorkspaces } = await import("../db");
+        const workspaces = await getUserWorkspaces(ctx.user.id);
+        wsId = workspaces[0]?.id ?? 1;
+      }
+
+      // Create conversation
+      const [conv] = await db.insert(conversations).values({
+        workspaceId: wsId,
+        userId: ctx.user.id,
+        title: input.title,
+      }).returning();
+
+      // Bulk insert messages
+      if (input.messages.length > 0) {
+        await db.insert(messagesTable).values(
+          input.messages.map((m) => ({
+            conversationId: conv.id,
+            role: m.role,
+            content: m.content,
+          }))
+        );
+      }
+
+      return { saved: true, conversationId: conv.id };
     }),
 
   // Test provider connection

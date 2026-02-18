@@ -5,10 +5,25 @@ import { executeAgent } from './executor';
 
 export async function handleAgentChatStream(req: Request, res: Response) {
   try {
-    const user = await sdk.authenticateRequest(req);
-    if (!user) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+    let user;
+    if (process.env.DEV_MODE === "true") {
+      user = {
+        id: 1,
+        openId: "dev-user-001",
+        name: "Dev User",
+        email: "dev@example.com",
+        loginMethod: "dev-mode",
+        role: "admin" as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastSignedIn: new Date(),
+      };
+    } else {
+      user = await sdk.authenticateRequest(req);
+      if (!user) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
     }
 
     const { agentId } = req.params;

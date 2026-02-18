@@ -32,6 +32,8 @@ export default function AgentChat() {
     { enabled: !!agentId && !!agent }
   );
 
+  const createConversationMutation = trpc.conversations.createConversation.useMutation();
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -58,7 +60,7 @@ export default function AgentChat() {
       // Create conversation if none exists
       let conversationId = conversations?.[0]?.id;
       if (!conversationId) {
-        const newConv = await trpc.conversations.createConversation.useMutation().mutateAsync({
+        const newConv = await createConversationMutation.mutateAsync({
           agentId: parseInt(agentId),
           title: userMessage.substring(0, 50)
         });

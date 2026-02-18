@@ -55,7 +55,8 @@ export const conversationsRouter = router({
    */
   createConversation: protectedProcedure
     .input(z.object({
-      agentId: z.number(),
+      agentId: z.number().optional(),
+      workspaceId: z.number().optional(),
       title: z.string().min(1).max(255).optional(),
       initialMessage: z.string().min(1).optional(),
     }))
@@ -63,16 +64,21 @@ export const conversationsRouter = router({
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
 
-      // Create conversation
-      const result = await db.insert(conversations).values({
-        workspaceId: ctx.user.id,
+      // Use provided workspaceId, or fall back to user's first workspace
+      let wsId = input.workspaceId;
+      if (!wsId) {
+        const { getUserWorkspaces } = await import("../db");
+        const workspaces = await getUserWorkspaces(ctx.user.id);
+        wsId = workspaces[0]?.id ?? 1;
+      }
+
+      // Create conversation (PostgreSQL: use .returning() instead of insertId)
+      const [conversation] = await db.insert(conversations).values({
+        workspaceId: wsId,
         userId: ctx.user.id,
-        agentId: input.agentId,
+        agentId: input.agentId ?? null,
         title: input.title || "New Conversation",
-      });
-      
-      const conversationId = Number(result[0].insertId);
-      const [conversation] = await db.select().from(conversations).where(eq(conversations.id, conversationId));
+      }).returning();
 
       // Add initial message if provided
       if (input.initialMessage) {
@@ -80,8 +86,7 @@ export const conversationsRouter = router({
           conversationId: conversation.id,
           role: "user",
           content: input.initialMessage,
-          userId: ctx.user.id,
-        } as any);
+        });
       }
 
       return conversation;
@@ -154,16 +159,12 @@ export const conversationsRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
       }
 
-      // Add message
-      const result = await db.insert(messages).values({
+      // Add message (PostgreSQL: use .returning())
+      const [message] = await db.insert(messages).values({
         conversationId: input.conversationId,
         role: input.role,
         content: input.content,
-        userId: ctx.user.id,
-      } as any);
-      
-      const messageId = Number(result[0].insertId);
-      const [message] = await db.select().from(messages).where(eq(messages.id, messageId));
+      }).returning();
 
       // Update conversation timestamp
       await db
