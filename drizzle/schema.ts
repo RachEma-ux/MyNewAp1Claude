@@ -48,7 +48,7 @@ export const workspaces = pgTable("workspaces", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  ownerId: integer("ownerId").notNull(),
+  ownerId: integer("ownerId").notNull().references(() => users.id),
 
   // Workspace settings
   embeddingModel: varchar("embeddingModel", { length: 255 }).default("bge-small-en-v1.5"),
@@ -72,8 +72,8 @@ export type InsertWorkspace = typeof workspaces.$inferInsert;
 
 export const workspaceMembers = pgTable("workspace_members", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspaceId").notNull(),
-  userId: integer("userId").notNull(),
+  workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
+  userId: integer("userId").notNull().references(() => users.id),
   role: varchar("role", { length: 50 }).default("viewer").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -120,8 +120,8 @@ export type InsertModel = typeof models.$inferInsert;
 
 export const modelConfigs = pgTable("model_configs", {
   id: serial("id").primaryKey(),
-  modelId: integer("modelId").notNull(),
-  userId: integer("userId").notNull(),
+  modelId: integer("modelId").notNull().references(() => models.id),
+  userId: integer("userId").notNull().references(() => users.id),
   
   // Inference parameters
   temperature: varchar("temperature", { length: 10 }).default("0.7"),
@@ -147,7 +147,7 @@ export type InsertModelConfig = typeof modelConfigs.$inferInsert;
 
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspaceId").notNull(),
+  workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
   
   // File information
   filename: varchar("filename", { length: 255 }).notNull(),
@@ -170,7 +170,7 @@ export const documents = pgTable("documents", {
   chunkCount: integer("chunkCount").default(0),
   embeddingModel: varchar("embeddingModel", { length: 255 }),
   
-  uploadedBy: integer("uploadedBy").notNull(),
+  uploadedBy: integer("uploadedBy").notNull().references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -180,7 +180,7 @@ export type InsertDocument = typeof documents.$inferInsert;
 
 export const documentChunks = pgTable("document_chunks", {
   id: serial("id").primaryKey(),
-  documentId: integer("documentId").notNull(),
+  documentId: integer("documentId").notNull().references(() => documents.id),
   
   // Chunk content
   content: text("content").notNull(),
@@ -254,7 +254,7 @@ export type AgentRoleClass = typeof AgentRoleClass[keyof typeof AgentRoleClass];
 // Agent history tracking
 export const agentHistory = pgTable("agent_history", {
   id: serial("id").primaryKey(),
-  agentId: integer("agentId").notNull(),
+  agentId: integer("agentId").notNull().references(() => agents.id),
   
   // Event details
   eventType: varchar("eventType", { length: 50 }).notNull(),
@@ -283,23 +283,23 @@ export type InsertAgentHistory = typeof agentHistory.$inferInsert;
 // Agent Protocols
 export const protocols = pgTable("protocols", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspaceId").notNull(),
-  
+  workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
+
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  
+
   // Protocol content (markdown)
   content: text("content").notNull(),
-  
+
   // Metadata
   version: integer("version").default(1),
   tags: json("tags"), // Array of tags for categorization
-  
+
   // File info
   fileName: varchar("fileName", { length: 255 }),
   fileSize: integer("fileSize"), // in bytes
-  
-  createdBy: integer("createdBy").notNull(),
+
+  createdBy: integer("createdBy").notNull().references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -309,14 +309,14 @@ export type InsertProtocol = typeof protocols.$inferInsert;
 
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspaceId").notNull(),
-  agentId: integer("agentId"),
-  
+  workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
+  agentId: integer("agentId").references(() => agents.id),
+
   title: varchar("title", { length: 500 }),
-  userId: integer("userId").notNull(),
-  
+  userId: integer("userId").notNull().references(() => users.id),
+
   // Conversation settings
-  modelId: integer("modelId"),
+  modelId: integer("modelId").references(() => models.id), // FK to models.id (integer), distinct from agents.modelId (varchar)
   temperature: varchar("temperature", { length: 10 }),
   
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -328,7 +328,7 @@ export type InsertConversation = typeof conversations.$inferInsert;
 
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
-  conversationId: integer("conversationId").notNull(),
+  conversationId: integer("conversationId").notNull().references(() => conversations.id),
   
   role: varchar("role", { length: 50 }).notNull(),
   content: text("content").notNull(),
@@ -350,8 +350,8 @@ export type InsertMessage = typeof messages.$inferInsert;
 
 export const workflows = pgTable("workflows", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(), // Owner of the workflow
-  workspaceId: integer("workspaceId"), // Optional: can be linked to workspace
+  userId: integer("userId").notNull().references(() => users.id), // Owner of the workflow
+  workspaceId: integer("workspaceId").references(() => workspaces.id), // Optional: can be linked to workspace
   
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
@@ -389,7 +389,7 @@ export type InsertWorkflow = typeof workflows.$inferInsert;
 // Workflow Versions (immutable snapshots)
 export const workflowVersions = pgTable("workflow_versions", {
   id: serial("id").primaryKey(),
-  workflowId: integer("workflowId").notNull(), // FK to workflows
+  workflowId: integer("workflowId").notNull().references(() => workflows.id), // FK to workflows
   version: integer("version").notNull(), // Incremental version number (1, 2, 3...)
   
   // Snapshot of workflow at publish time
@@ -405,7 +405,7 @@ export const workflowVersions = pgTable("workflow_versions", {
   
   // Publishing metadata
   publishedAt: timestamp("publishedAt").defaultNow().notNull(),
-  publishedBy: integer("publishedBy").notNull(), // FK to users
+  publishedBy: integer("publishedBy").notNull().references(() => users.id), // FK to users
   changeNotes: text("changeNotes"),
   status: varchar("status", { length: 50 }).default("published"),
 });
@@ -413,8 +413,8 @@ export const workflowVersions = pgTable("workflow_versions", {
 // Workflow Executions (runtime execution tracking)
 export const workflowExecutions = pgTable("workflow_executions", {
   id: serial("id").primaryKey(),
-  workflowId: integer("workflowId").notNull(), // FK to workflows
-  versionId: integer("versionId"), // FK to workflow_versions (null for draft executions)
+  workflowId: integer("workflowId").notNull().references(() => workflows.id), // FK to workflows
+  versionId: integer("versionId").references(() => workflowVersions.id), // FK to workflow_versions (null for draft executions)
   
   // Execution metadata
   status: varchar("status", { length: 50 }).notNull().default("pending"),
@@ -437,7 +437,7 @@ export const workflowExecutions = pgTable("workflow_executions", {
 // Workflow Execution Logs (step-by-step execution logs)
 export const workflowExecutionLogs = pgTable("workflow_execution_logs", {
   id: serial("id").primaryKey(),
-  executionId: integer("executionId").notNull(), // FK to workflow_executions
+  executionId: integer("executionId").notNull().references(() => workflowExecutions.id), // FK to workflow_executions
   
   // Node/step information
   nodeId: varchar("nodeId", { length: 255 }).notNull(),
@@ -475,24 +475,7 @@ export type CreateWorkflowInput = {
   workspaceId?: number;
 };
 
-export const workflowRuns = pgTable("workflow_runs", {
-  id: serial("id").primaryKey(),
-  workflowId: integer("workflowId").notNull(),
-  
-  status: varchar("status", { length: 50 }).notNull(),
-  startedAt: timestamp("startedAt").defaultNow().notNull(),
-  completedAt: timestamp("completedAt"),
-  
-  // Execution details
-  triggerData: json("triggerData"),
-  executionLog: json("executionLog"),
-  errorMessage: text("errorMessage"),
-  
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export type WorkflowRun = typeof workflowRuns.$inferSelect;
-export type InsertWorkflowRun = typeof workflowRuns.$inferInsert;
+// NOTE: workflow_runs table removed — use workflowExecutions instead (same structure, actively used)
 
 // ============================================================================
 // Provider System (Provider Hub Integration)
@@ -549,8 +532,8 @@ export type InsertProvider = typeof providers.$inferInsert;
 
 export const workspaceProviders = pgTable("workspace_providers", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspaceId").notNull(),
-  providerId: integer("providerId").notNull(),
+  workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
+  providerId: integer("providerId").notNull().references(() => providers.id),
   
   enabled: boolean("enabled").default(true),
   priority: integer("priority").default(50),
@@ -564,8 +547,8 @@ export type InsertWorkspaceProvider = typeof workspaceProviders.$inferInsert;
 
 export const providerUsage = pgTable("provider_usage", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspaceId").notNull(),
-  providerId: integer("providerId").notNull(),
+  workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
+  providerId: integer("providerId").notNull().references(() => providers.id),
   
   modelName: varchar("modelName", { length: 255 }),
   tokensUsed: integer("tokensUsed").notNull(),
@@ -581,7 +564,7 @@ export type InsertProviderUsage = typeof providerUsage.$inferInsert;
 // Provider Health Monitoring
 export const providerHealthChecks = pgTable("provider_health_checks", {
   id: serial("id").primaryKey(),
-  providerId: integer("providerId").notNull(),
+  providerId: integer("providerId").notNull().references(() => providers.id),
   
   status: varchar("status", { length: 50 }).notNull(),
   responseTimeMs: integer("responseTimeMs"),
@@ -596,12 +579,12 @@ export type InsertProviderHealthCheck = typeof providerHealthChecks.$inferInsert
 // Routing Audit Log - Track every routing decision for compliance and debugging
 export const routingAuditLogs = pgTable("routing_audit_logs", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspaceId"),
+  workspaceId: integer("workspaceId").references(() => workspaces.id),
   requestId: varchar("requestId", { length: 64 }).notNull(),
 
   // Routing decision
-  primaryProviderId: integer("primaryProviderId").notNull(),
-  actualProviderId: integer("actualProviderId").notNull(),
+  primaryProviderId: integer("primaryProviderId").notNull().references(() => providers.id),
+  actualProviderId: integer("actualProviderId").notNull().references(() => providers.id),
   routeTaken: varchar("routeTaken", { length: 50 }).notNull(),  // 'PRIMARY' | 'FALLBACK_1' | 'FALLBACK_2' | etc.
 
   // Audit info
@@ -622,7 +605,7 @@ export type InsertRoutingAuditLog = typeof routingAuditLogs.$inferInsert;
 // Provider Performance Metrics
 export const providerMetrics = pgTable("provider_metrics", {
   id: serial("id").primaryKey(),
-  providerId: integer("providerId").notNull(),
+  providerId: integer("providerId").notNull().references(() => providers.id),
   
   // Performance metrics
   avgLatencyMs: integer("avgLatencyMs"),
@@ -1387,8 +1370,8 @@ export type InsertWCPExecution = typeof wcpExecutions.$inferInsert;
 
 export const agents = pgTable("agents", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspaceId").notNull(),
-  createdBy: integer("createdBy").notNull(),
+  workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
+  createdBy: integer("createdBy").notNull().references(() => users.id),
   
   // Identity
   name: varchar("name", { length: 255 }).notNull(),
@@ -1402,7 +1385,7 @@ export const agents = pgTable("agents", {
   
   // Configuration
   systemPrompt: text("systemPrompt").notNull(),
-  modelId: varchar("modelId", { length: 255 }).notNull(),
+  modelId: varchar("modelId", { length: 255 }).notNull(), // Stores catalog model name (e.g., "gpt-4o"), not an integer FK
   temperature: decimal("temperature", { precision: 3, scale: 2 }).default("0.7"),
   
   // Capabilities & Limits
@@ -1433,11 +1416,11 @@ export type InsertAgent = typeof agents.$inferInsert;
 // Agent versions for audit trail and rollback
 export const agentVersions = pgTable("agentVersions", {
   id: serial("id").primaryKey(),
-  agentId: integer("agentId").notNull(),
-  
+  agentId: integer("agentId").notNull().references(() => agents.id),
+
   // Version metadata
   version: integer("version").notNull(),
-  createdBy: integer("createdBy").notNull(),
+  createdBy: integer("createdBy").notNull().references(() => users.id),
   changeNotes: text("changeNotes"),
   
   // Full snapshot
@@ -1459,10 +1442,10 @@ export type InsertAgentVersion = typeof agentVersions.$inferInsert;
 // Promotion requests (human-in-the-loop approvals)
 export const promotionRequests = pgTable("promotionRequests", {
   id: serial("id").primaryKey(),
-  agentId: integer("agentId").notNull(),
+  agentId: integer("agentId").notNull().references(() => agents.id),
 
   // Request metadata
-  requestedBy: integer("requestedBy").notNull(),
+  requestedBy: integer("requestedBy").notNull().references(() => users.id),
   status: varchar("status", { length: 50 }).notNull().default("pending"),
   approvers: json("approvers"), // Array of user IDs who can approve
   notes: text("notes"),

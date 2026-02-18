@@ -239,12 +239,23 @@ function ChatInner() {
   }, [selectedWorkspace, routingProfile]);
 
   // Map catalog provider selection to DB provider ID
+  // Uses config.providerId and tags for stable matching (not fragile name comparison)
   useEffect(() => {
     if (selectedCatalogProvider && allProviders) {
-      const match = allProviders.find(
-        (p) => p.name.toLowerCase() === selectedCatalogProvider.name.toLowerCase()
-          || p.name.toLowerCase() === (selectedCatalogProvider.displayName ?? "").toLowerCase()
-      );
+      const catalogId = (selectedCatalogProvider.config as any)?.providerId ?? "";
+      const catalogTags = (selectedCatalogProvider.tags as string[] | null) ?? [];
+      const catalogName = selectedCatalogProvider.name.toLowerCase();
+
+      const match = allProviders.find((p) => {
+        const pType = p.type.toLowerCase();
+        const pName = p.name.toLowerCase();
+        // Match by config.providerId → provider.type (most stable)
+        if (catalogId && pType === catalogId.toLowerCase()) return true;
+        // Match by tags containing the provider type
+        if (catalogTags.some((t) => t.toLowerCase() === pType)) return true;
+        // Last resort: name match
+        return pName === catalogName;
+      });
       setSelectedProvider(match?.id ?? null);
     } else if (!catalogProvider) {
       setSelectedProvider(null);
