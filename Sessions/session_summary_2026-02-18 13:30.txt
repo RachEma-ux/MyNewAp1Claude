@@ -1,0 +1,61 @@
+Session Summary — 2026-02-18 13:30
+====================================
+
+## Focus: Security Hardening, Dead Code Cleanup, Catalog Wizard
+
+### Commits Made (6)
+
+1. **5fdaa28** — `fix: Purge all MySQL patterns — use Drizzle .returning(), add governance audit table`
+   - Replaced all insertId (MySQL) with .returning() (PostgreSQL) across 10 files
+   - Added governance_audit_logs table + DB persistence in governanceLogger
+   - Removed dead getPgPool/Pool/sleep from server/db.ts
+   - Fixed mysql2 import in test, updated docs to PostgreSQL
+   - 17 files, +179/-212
+
+2. **cbe440b** — `fix: Security hardening — kill eval/code-injection, restrict CORS, delete dead files`
+   - Replaced eval() in calculator tool with safe math evaluator
+   - Added strict-mode + forbidden-keyword guards to all new Function() calls
+   - Restricted WebSocket CORS from "*" to env-configured origin
+   - Deleted triggers.old.ts (478 lines), test-db.ts (270 lines)
+   - 7 files, +41/-762
+
+3. **721d59d** — `fix: Remove dead test-db import from server entry point`
+   - Removed import("./test-db") from server/_core/index.ts that crashed startup
+   - 1 file, -4 lines
+
+4. **6563689** — `docs: Add session summary 2026-02-18 09:00`
+
+5. **88e1910** — `ui: Catalogue page — remove back link, reposition Sync and Manage buttons`
+   - Removed "Manage Catalogue" back-arrow link
+   - Moved Sync button right-aligned above architectural stack card
+   - Moved Manage button to right side of header
+
+6. **9104705** — `feat: Catalog wizard — persist config, dynamic labels, validation, review summary`
+   - 5-step wizard for New Catalog Entry dialog
+   - Provider > Cloud API > Enterprise Managed: Security & Governance, Performance,
+     Integration, Monitoring & Observability
+   - Provider > Cloud API > Official SaaS: API Architecture, Security & Compliance,
+     Reliability & Performance, Developer Experience
+   - All other type/category combos show "Coming Soon"
+   - Step 2-5 form data packed into config JSON on save
+   - Dynamic step labels per subcategory
+   - Validation gates (Name required, auth protocols required, etc.)
+   - Review summary card on step 5 showing all data from steps 1-4
+   - +1045 lines
+
+### Infrastructure
+- Dev server running on http://localhost:3000 (Vite HMR + tsx watch)
+- Ollama running with 3 models
+- PostgreSQL running locally
+- All 5 providers loaded (Ollama, Anthropic, 3x OpenAI)
+- Builder Deploy triggered (run 22136922507) — tunnel was live at
+  https://oops-telescope-tolerance-blanket.trycloudflare.com
+
+### Net Session Impact
+- ~1000 lines of dead/insecure code removed
+- ~1100 lines of new catalog wizard UI added
+- Zero MySQL patterns remain in codebase
+- All DB inserts use Drizzle .returning()
+- eval() and unguarded new Function() eliminated
+- CORS locked down
+- Catalog entry creation now has enterprise-grade multi-step wizard
