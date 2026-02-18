@@ -10,6 +10,12 @@
  *  DB = runtime truth for code.
  *  Clean separation. No duplication of purpose.
  *
+ *  Rules:
+ *    - Comments = spec. DB = runtime. Don't mix them.
+ *    - Every type is multi-dimensional. Don't flatten it.
+ *    - The schema is 4 tables. Don't invent your own.
+ *    - Versioning is soft. Don't over-engineer it.
+ *
  * ══════════════════════════════════════════════════════════════════════════════
  *  2. THE NATURAL WAY OF DOING THINGS
  * ══════════════════════════════════════════════════════════════════════════════
