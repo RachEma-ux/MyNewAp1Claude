@@ -1305,6 +1305,39 @@ export type InsertPolicyVersion = typeof policyVersions.$inferInsert;
 
 
 // ============================================================================
+// Governance Audit Logs
+// ============================================================================
+
+export const governanceAuditLogs = pgTable("governance_audit_logs", {
+  id: serial("id").primaryKey(),
+
+  // Decision code (e.g., ADMISSION_ALLOW, PROMOTION_DENIED, POLICY_HOTRELOAD)
+  code: varchar("code", { length: 100 }).notNull(),
+
+  // Context
+  agentId: integer("agentId"),
+  workspaceId: varchar("workspaceId", { length: 255 }),
+  actorId: varchar("actorId", { length: 255 }),
+
+  // Decision
+  decision: varchar("decision", { length: 20 }), // allow | deny
+  reason: text("reason"),
+
+  // Additional data
+  details: json("details"),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: index("idx_gov_audit_code").on(table.code),
+  agentIdx: index("idx_gov_audit_agent").on(table.agentId),
+  createdAtIdx: index("idx_gov_audit_created").on(table.createdAt),
+}));
+
+export type GovernanceAuditLog = typeof governanceAuditLogs.$inferSelect;
+export type InsertGovernanceAuditLog = typeof governanceAuditLogs.$inferInsert;
+
+
+// ============================================================================
 // WCP (Workflow Composition Protocol) Workflows
 // ============================================================================
 

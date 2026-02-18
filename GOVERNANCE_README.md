@@ -18,7 +18,7 @@ The Agent Governance Platform provides a complete solution for organizations to:
 ### Prerequisites
 
 - Node.js 18+
-- MySQL 8.0+ or compatible database
+- PostgreSQL 14+ database
 - Docker (optional)
 - External Orchestrator service
 - OPA (Open Policy Agent) service
@@ -37,7 +37,7 @@ pnpm install
 cp .env.example .env
 
 # Configure environment variables
-# DATABASE_URL=mysql://user:password@localhost:3306/agent_governance
+# DATABASE_URL=postgresql://user:password@localhost:5432/agent_governance
 # ORCHESTRATOR_BASE_URL=https://orchestrator.example.com
 # OPA_BASE_URL=https://opa.example.com
 
@@ -101,7 +101,7 @@ tRPC API Layer
     ↓
 Service Layer (Business Logic)
     ↓
-Data Layer (MySQL/TiDB)
+Data Layer (PostgreSQL)
     ↓
 External Services (Orchestrator, OPA)
 ```
@@ -233,7 +233,7 @@ See [Deployment Guide](./DEPLOYMENT.md) for detailed instructions.
 
 ```bash
 # Database
-DATABASE_URL=mysql://user:password@localhost:3306/agent_governance
+DATABASE_URL=postgresql://user:password@localhost:5432/agent_governance
 
 # Authentication
 JWT_SECRET=your-secret-key

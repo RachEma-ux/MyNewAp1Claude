@@ -49,12 +49,13 @@ export const wcpWorkflowsRouter = router({
         console.log('[wcpWorkflows.saveWorkflow] Creating new workflow');
         const result: any = await db.execute(
           sql`INSERT INTO wcp_workflows (userId, name, description, nodes, edges, status)
-              VALUES (${ctx.user.id}, ${name}, ${description || ""}, ${nodes}, ${edges}, ${status})`
+              VALUES (${ctx.user.id}, ${name}, ${description || ""}, ${nodes}, ${edges}, ${status})
+              RETURNING id`
         );
-        console.log('[wcpWorkflows.saveWorkflow] Insert result:', result);
-        console.log('[wcpWorkflows.saveWorkflow] New workflow ID:', result[0].insertId);
+        const newId = result.rows?.[0]?.id ?? result[0]?.id;
+        console.log('[wcpWorkflows.saveWorkflow] New workflow ID:', newId);
 
-        return { id: result[0].insertId, message: "Workflow created successfully" };
+        return { id: newId, message: "Workflow created successfully" };
       }
     }),
 
@@ -208,10 +209,11 @@ export const wcpWorkflowsRouter = router({
       console.log('[wcpWorkflows.createExecution] Creating execution record...');
       const result: any = await db.execute(
         sql`INSERT INTO wcp_executions (workflowId, workflowName, status, startedAt)
-            VALUES (${input.workflowId}, ${input.workflowName}, ${input.status}, NOW())`
+            VALUES (${input.workflowId}, ${input.workflowName}, ${input.status}, NOW())
+            RETURNING id`
       );
 
-      const executionId = result[0].insertId;
+      const executionId = result.rows?.[0]?.id ?? result[0]?.id;
       console.log('[wcpWorkflows.createExecution] Execution created with ID:', executionId);
 
       // Execute workflow asynchronously (don't wait for completion)

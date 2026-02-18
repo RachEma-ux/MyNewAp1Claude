@@ -115,16 +115,16 @@ export async function createConversation(data: {
   const db = getDb();
   if (!db) throw new Error('Database not available');
   
-  const result = await db.insert(conversations).values({
+  const [conv] = await db.insert(conversations).values({
     workspaceId: data.workspaceId,
     agentId: data.agentId,
     title: data.title,
     userId: data.userId,
     modelId: data.modelId,
     temperature: data.temperature,
-  });
+  }).returning();
 
-  return Number(result[0].insertId);
+  return conv.id;
 }
 
 /**
@@ -194,16 +194,16 @@ export async function addMessage(data: {
   const db = getDb();
   if (!db) throw new Error('Database not available');
   
-  const result = await db.insert(messages).values({
+  const [msg] = await db.insert(messages).values({
     conversationId: data.conversationId,
     role: data.role,
     content: data.content,
     tokenCount: data.tokenCount,
     retrievedChunks: data.retrievedChunks ? JSON.stringify(data.retrievedChunks) : null,
     toolCalls: data.toolCalls ? JSON.stringify(data.toolCalls) : null,
-  });
+  }).returning();
 
-  return Number(result[0].insertId);
+  return msg.id;
 }
 
 /**

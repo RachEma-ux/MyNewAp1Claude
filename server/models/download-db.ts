@@ -18,8 +18,8 @@ export async function createModelDownload(data: Omit<InsertModelDownload, "id">)
   const db = getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(modelDownloads).values(data);
-  return result[0].insertId;
+  const [download] = await db.insert(modelDownloads).values(data).returning();
+  return download.id;
 }
 
 export async function updateDownloadProgress(

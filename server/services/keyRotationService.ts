@@ -44,11 +44,8 @@ export async function createServiceCertificate(
   const db = getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(serviceCertificates).values(input);
-  const certId = Number(result[0].insertId);
-  
-  const created = await db.select().from(serviceCertificates).where(eq(serviceCertificates.id, certId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(serviceCertificates).values(input).returning();
+  return created;
 }
 
 /**
@@ -138,11 +135,8 @@ export async function createAttestationKey(
   const db = getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(attestationKeys).values(input);
-  const keyId = Number(result[0].insertId);
-  
-  const created = await db.select().from(attestationKeys).where(eq(attestationKeys.id, keyId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(attestationKeys).values(input).returning();
+  return created;
 }
 
 /**
@@ -231,11 +225,8 @@ export async function createKeyRotation(
   const db = getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(keyRotations).values(input);
-  const rotationId = Number(result[0].insertId);
-  
-  const created = await db.select().from(keyRotations).where(eq(keyRotations.id, rotationId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(keyRotations).values(input).returning();
+  return created;
 }
 
 /**
@@ -301,11 +292,8 @@ export async function createAuditLog(
   const db = getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(keyRotationAuditLogs).values(input);
-  const logId = Number(result[0].insertId);
-  
-  const created = await db.select().from(keyRotationAuditLogs).where(eq(keyRotationAuditLogs.id, logId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(keyRotationAuditLogs).values(input).returning();
+  return created;
 }
 
 /**
@@ -333,11 +321,8 @@ export async function createKeyRotationPolicy(
   const db = getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(keyRotationPolicies).values(input);
-  const policyId = Number(result[0].insertId);
-  
-  const created = await db.select().from(keyRotationPolicies).where(eq(keyRotationPolicies.id, policyId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(keyRotationPolicies).values(input).returning();
+  return created;
 }
 
 /**
@@ -381,11 +366,8 @@ export async function createKeyRotationSchedule(
   const db = getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(keyRotationSchedules).values(input);
-  const scheduleId = Number(result[0].insertId);
-  
-  const created = await db.select().from(keyRotationSchedules).where(eq(keyRotationSchedules.id, scheduleId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(keyRotationSchedules).values(input).returning();
+  return created;
 }
 
 /**
