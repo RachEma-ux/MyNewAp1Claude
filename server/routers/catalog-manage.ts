@@ -24,6 +24,10 @@ import {
   recallPublishBundle,
   createCatalogAuditEvent,
   approveCatalogEntry,
+  getTaxonomyTree,
+  getEntryClassifications,
+  setEntryClassifications,
+  seedTaxonomy,
 } from "../db";
 import { createHash } from "crypto";
 import {
@@ -777,6 +781,55 @@ export const catalogManageRouter = router({
     .mutation(async ({ input }) => {
       await recallPublishBundle(input.bundleId);
       audit("catalog.bundle.recalled", null, { bundleId: input.bundleId }, input.bundleId);
+      return { success: true };
+    }),
+
+  // ============================================================================
+  // Taxonomy Endpoints
+  // ============================================================================
+
+  /**
+   * Get the full taxonomy tree for an entry type.
+   * Returns all nodes (axes, subcategories, classes) for building the multi-axis panel.
+   */
+  taxonomyTree: protectedProcedure
+    .input(z.object({ entryType: entryTypeSchema }))
+    .query(async ({ input }) => {
+      return await getTaxonomyTree(input.entryType);
+    }),
+
+  /**
+   * Seed taxonomy nodes from the TS definitions into the DB.
+   * Idempotent — safe to call multiple times.
+   */
+  taxonomySeed: adminProcedure
+    .mutation(async () => {
+      const result = await seedTaxonomy();
+      audit("catalog.taxonomy.seeded", null, result);
+      return result;
+    }),
+
+  /**
+   * Get multi-axis classifications for a catalog entry.
+   */
+  getClassifications: protectedProcedure
+    .input(z.object({ catalogEntryId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return await getEntryClassifications(input.catalogEntryId);
+    }),
+
+  /**
+   * Set multi-axis classifications for a catalog entry.
+   * Replaces all existing classifications with the provided node IDs.
+   */
+  classify: protectedProcedure
+    .input(z.object({
+      catalogEntryId: z.number().int().positive(),
+      nodeIds: z.array(z.number().int().positive()),
+    }))
+    .mutation(async ({ input }) => {
+      await setEntryClassifications(input.catalogEntryId, input.nodeIds);
+      audit("catalog.entry.classified", input.catalogEntryId, { nodeIds: input.nodeIds });
       return { success: true };
     }),
 });

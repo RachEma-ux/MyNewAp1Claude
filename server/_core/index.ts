@@ -15,6 +15,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { syncRegistryOnStartup } from "../routers/catalog-manage";
+import { seedTaxonomy } from "../db";
 import { providers as providersTable } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -148,6 +149,18 @@ async function startServer() {
 
   // Auto-seed catalog entries from PROVIDERS constant
   await syncRegistryOnStartup();
+
+  // Auto-seed taxonomy nodes from multi-axis definitions
+  try {
+    const result = await seedTaxonomy();
+    if (result.created > 0) {
+      console.log(`[TaxonomySeed] Seeded ${result.created} new taxonomy nodes (${result.skipped} existing)`);
+    } else {
+      console.log(`[TaxonomySeed] Taxonomy already populated (${result.skipped} nodes)`);
+    }
+  } catch (error: any) {
+    console.warn(`[TaxonomySeed] Skipped — ${error.message}`);
+  }
 
   const app = express();
   const server = createServer(app);

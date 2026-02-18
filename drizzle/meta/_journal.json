@@ -43,6 +43,13 @@
       "when": 1771459200000,
       "tag": "0005_catalog_taxonomy",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771545600000,
+      "tag": "0006_taxonomy_multi_axis",
+      "breakpoints": true
     }
   ]
 }

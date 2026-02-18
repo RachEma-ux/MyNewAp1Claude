@@ -2633,3 +2633,67 @@ export const catalogAuditEvents = pgTable("catalog_audit_events", {
 
 export type CatalogAuditEvent = typeof catalogAuditEvents.$inferSelect;
 export type InsertCatalogAuditEvent = typeof catalogAuditEvents.$inferInsert;
+
+// ============================================================================
+// Taxonomy — Self-referential tree for multi-axis classification
+// ============================================================================
+
+/**
+ * Taxonomy Nodes — Global self-referential tree.
+ * Axes (top-level), subcategories (mid-level), and classes (leaf) for all 5 entity types.
+ */
+export const taxonomyNodes = pgTable("taxonomy_nodes", {
+  id: serial("id").primaryKey(),
+  parentId: integer("parentId").references((): any => taxonomyNodes.id),
+  entryType: varchar("entryType", { length: 50 }).notNull(), // provider | llm | model | agent | bot
+  level: varchar("level", { length: 20 }).notNull(), // axis | subcategory | class
+  key: varchar("key", { length: 100 }).notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  description: text("description"),
+  sortOrder: integer("sortOrder").default(0),
+  active: boolean("active").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => ({
+  uniqueKey: uniqueIndex("idx_taxonomy_node_unique").on(table.entryType, table.parentId, table.key),
+  typeLevelIdx: index("idx_taxonomy_type_level").on(table.entryType, table.level),
+  parentIdx: index("idx_taxonomy_parent").on(table.parentId),
+}));
+
+export type TaxonomyNode = typeof taxonomyNodes.$inferSelect;
+export type InsertTaxonomyNode = typeof taxonomyNodes.$inferInsert;
+
+/**
+ * Taxonomy Inference Rules — Cross-node suggestions.
+ * "If source node is selected, suggest this other node."
+ */
+export const taxonomyInferenceRules = pgTable("taxonomy_inference_rules", {
+  id: serial("id").primaryKey(),
+  sourceNodeId: integer("sourceNodeId").references(() => taxonomyNodes.id).notNull(),
+  suggestedNodeId: integer("suggestedNodeId").references(() => taxonomyNodes.id).notNull(),
+  confidence: varchar("confidence", { length: 10 }).default("medium"), // low | medium | high
+  description: text("description"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type TaxonomyInferenceRule = typeof taxonomyInferenceRules.$inferSelect;
+export type InsertTaxonomyInferenceRule = typeof taxonomyInferenceRules.$inferInsert;
+
+/**
+ * Catalog Entry Classifications — Junction table linking entries to taxonomy nodes.
+ * One row per axis selection per catalog entry. Replaces flat category/subCategory.
+ */
+export const catalogEntryClassifications = pgTable("catalog_entry_classifications", {
+  id: serial("id").primaryKey(),
+  catalogEntryId: integer("catalogEntryId").references(() => catalogEntries.id).notNull(),
+  taxonomyNodeId: integer("taxonomyNodeId").references(() => taxonomyNodes.id).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  uniqueClassification: uniqueIndex("idx_classification_unique").on(table.catalogEntryId, table.taxonomyNodeId),
+  entryIdx: index("idx_classification_entry").on(table.catalogEntryId),
+  nodeIdx: index("idx_classification_node").on(table.taxonomyNodeId),
+}));
+
+export type CatalogEntryClassification = typeof catalogEntryClassifications.$inferSelect;
+export type InsertCatalogEntryClassification = typeof catalogEntryClassifications.$inferInsert;

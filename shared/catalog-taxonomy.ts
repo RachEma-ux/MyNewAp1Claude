@@ -1216,3 +1216,472 @@ export function getValidSubCategoryKeys(category: string): string[] {
 export function getAllCapabilityKeys(): string[] {
   return Object.keys(CAPABILITIES);
 }
+
+// ============================================================================
+// Multi-Axis Classification Data
+// ============================================================================
+
+/**
+ * Axis definition for multi-dimensional taxonomy.
+ * Each axis has a key, label, description, and children (subcategories or classes).
+ */
+export interface AxisNode {
+  key: string;
+  label: string;
+  description?: string;
+  children?: AxisNode[];
+}
+
+export interface AxisDef {
+  key: string;
+  label: string;
+  description: string;
+  children: AxisNode[];
+}
+
+// ── Provider Axes (6 axes, 2-level: axis → classes) ──
+
+export const PROVIDER_AXES: AxisDef[] = [
+  {
+    key: "hosting_model", label: "Hosting Model", description: "Where the provider runs",
+    children: [
+      { key: "cloud", label: "Cloud" },
+      { key: "on_prem", label: "On-Premises" },
+      { key: "hybrid", label: "Hybrid" },
+      { key: "edge", label: "Edge" },
+    ],
+  },
+  {
+    key: "auth_architecture", label: "Auth Architecture", description: "How authentication is handled",
+    children: [
+      { key: "oauth", label: "OAuth" },
+      { key: "api_key", label: "API Key" },
+      { key: "mtls", label: "mTLS" },
+      { key: "iam", label: "IAM" },
+    ],
+  },
+  {
+    key: "compliance_profile", label: "Compliance Profile", description: "Regulatory compliance level",
+    children: [
+      { key: "soc2", label: "SOC2" },
+      { key: "hipaa", label: "HIPAA" },
+      { key: "iso27001", label: "ISO 27001" },
+      { key: "none", label: "None" },
+    ],
+  },
+  {
+    key: "pricing_model", label: "Pricing Model", description: "How usage is billed",
+    children: [
+      { key: "pay_per_token", label: "Pay-per-Token" },
+      { key: "subscription", label: "Subscription" },
+      { key: "free", label: "Free" },
+      { key: "custom", label: "Custom" },
+    ],
+  },
+  {
+    key: "geographic_scope", label: "Geographic Scope", description: "Regional availability",
+    children: [
+      { key: "single_region", label: "Single Region" },
+      { key: "multi_region", label: "Multi-Region" },
+      { key: "global", label: "Global" },
+    ],
+  },
+  {
+    key: "sla_tier", label: "SLA Tier", description: "Service level agreement tier",
+    children: [
+      { key: "enterprise", label: "Enterprise" },
+      { key: "standard", label: "Standard" },
+      { key: "best_effort", label: "Best Effort" },
+    ],
+  },
+];
+
+// ── LLM Axes (5 axes, 2-level: axis → classes) ──
+
+export const LLM_AXES: AxisDef[] = [
+  {
+    key: "architecture_family", label: "Architecture Family", description: "Core neural architecture type",
+    children: [
+      { key: "transformer", label: "Transformer" },
+      { key: "diffusion", label: "Diffusion" },
+      { key: "mixture_of_experts", label: "Mixture-of-Experts" },
+      { key: "state_space", label: "State Space" },
+      { key: "hybrid", label: "Hybrid" },
+    ],
+  },
+  {
+    key: "modality", label: "Modality", description: "Input/output types supported",
+    children: [
+      { key: "text", label: "Text" },
+      { key: "vision", label: "Vision" },
+      { key: "multimodal", label: "Multimodal" },
+      { key: "audio", label: "Audio" },
+      { key: "code", label: "Code" },
+    ],
+  },
+  {
+    key: "training_approach", label: "Training Approach", description: "How the model was trained",
+    children: [
+      { key: "pre_trained", label: "Pre-trained" },
+      { key: "fine_tuned", label: "Fine-tuned" },
+      { key: "rlhf", label: "RLHF" },
+      { key: "distilled", label: "Distilled" },
+    ],
+  },
+  {
+    key: "license", label: "License", description: "Usage license type",
+    children: [
+      { key: "open_source", label: "Open Source" },
+      { key: "commercial", label: "Commercial" },
+      { key: "research_only", label: "Research Only" },
+    ],
+  },
+  {
+    key: "size_class", label: "Size Class", description: "Model parameter size category",
+    children: [
+      { key: "small", label: "Small (<3B)" },
+      { key: "medium", label: "Medium (3B-30B)" },
+      { key: "large", label: "Large (30B-100B)" },
+      { key: "frontier", label: "Frontier (>100B)" },
+    ],
+  },
+];
+
+// ── Model Axes (5 axes, 2-level: axis → classes) ──
+
+export const MODEL_AXES: AxisDef[] = [
+  {
+    key: "quantization", label: "Quantization", description: "Weight precision format",
+    children: [
+      { key: "fp32", label: "FP32" },
+      { key: "fp16", label: "FP16" },
+      { key: "int8", label: "INT8" },
+      { key: "int4", label: "INT4" },
+      { key: "gguf", label: "GGUF" },
+    ],
+  },
+  {
+    key: "deployment_target", label: "Deployment Target", description: "Where the model runs",
+    children: [
+      { key: "gpu", label: "GPU" },
+      { key: "cpu", label: "CPU" },
+      { key: "edge", label: "Edge" },
+      { key: "serverless", label: "Serverless" },
+    ],
+  },
+  {
+    key: "promotion_state", label: "Promotion State", description: "Lifecycle stage",
+    children: [
+      { key: "sandbox", label: "Sandbox" },
+      { key: "governed", label: "Governed" },
+      { key: "production", label: "Production" },
+    ],
+  },
+  {
+    key: "benchmark_profile", label: "Benchmark Profile", description: "Primary strength area",
+    children: [
+      { key: "reasoning", label: "Reasoning" },
+      { key: "coding", label: "Coding" },
+      { key: "creative", label: "Creative" },
+      { key: "factual", label: "Factual" },
+    ],
+  },
+  {
+    key: "cost_tier", label: "Cost Tier", description: "Inference cost level",
+    children: [
+      { key: "free", label: "Free" },
+      { key: "low", label: "Low" },
+      { key: "medium", label: "Medium" },
+      { key: "high", label: "High" },
+    ],
+  },
+];
+
+// ── Agent Axes (9 axes, full 3-level: axis → subcategory → class) ──
+
+export const AGENT_AXES: AxisDef[] = [
+  {
+    key: "cognitive_architecture", label: "Cognitive Architecture", description: "How the agent reasons",
+    children: [
+      { key: "cog_reactive", label: "Reactive Systems", children: [
+        { key: "cog_simple_reflex", label: "Simple Reflex" },
+        { key: "cog_rule_based", label: "Rule-Based" },
+        { key: "cog_heuristic", label: "Heuristic" },
+      ]},
+      { key: "cog_state_based", label: "State-Based Systems", children: [
+        { key: "cog_model_based_reflex", label: "Model-Based Reflex" },
+        { key: "cog_bayesian", label: "Bayesian" },
+      ]},
+      { key: "cog_deliberative", label: "Deliberative Systems", children: [
+        { key: "cog_goal_based", label: "Goal-Based" },
+        { key: "cog_planning", label: "Planning" },
+        { key: "cog_search_based", label: "Search-Based" },
+        { key: "cog_constraint_satisfaction", label: "Constraint-Satisfaction" },
+        { key: "cog_logic_based", label: "Logic-Based" },
+      ]},
+      { key: "cog_decision_theoretic", label: "Decision-Theoretic", children: [
+        { key: "cog_utility_based", label: "Utility-Based" },
+        { key: "cog_game_theoretic", label: "Game-Theoretic" },
+      ]},
+      { key: "cog_learning_centric", label: "Learning-Centric", children: [
+        { key: "cog_rl_arch", label: "Reinforcement-Based Architecture" },
+        { key: "cog_model_based_rl_arch", label: "Model-Based RL Architecture" },
+      ]},
+      { key: "cog_advanced", label: "Advanced Cognitive", children: [
+        { key: "cog_neuro_symbolic", label: "Neuro-Symbolic" },
+        { key: "cog_generative", label: "Generative Architecture" },
+        { key: "cog_llm_based", label: "LLM-Based Architecture" },
+        { key: "cog_meta_reasoning", label: "Meta-Reasoning Architecture" },
+        { key: "cog_self_reflective", label: "Self-Reflective Architecture" },
+        { key: "cog_theory_of_mind", label: "Theory-of-Mind Architecture" },
+      ]},
+    ],
+  },
+  {
+    key: "functional_role", label: "Functional Role", description: "What role the agent performs",
+    children: [
+      { key: "role_interface", label: "Interface Roles", children: [
+        { key: "role_conversational", label: "Conversational" },
+        { key: "role_advisory", label: "Advisory" },
+        { key: "role_recommendation", label: "Recommendation" },
+        { key: "role_decision_support", label: "Decision Support" },
+      ]},
+      { key: "role_expert", label: "Expert Roles", children: [
+        { key: "role_specialist", label: "Specialist" },
+        { key: "role_data_analysis", label: "Data Analysis" },
+        { key: "role_code_generation", label: "Code Generation" },
+        { key: "role_research", label: "Research" },
+        { key: "role_evaluation", label: "Evaluation" },
+      ]},
+      { key: "role_execution", label: "Execution Roles", children: [
+        { key: "role_task_executor", label: "Task Executor" },
+        { key: "role_workflow_executor", label: "Workflow Executor" },
+        { key: "role_testing_agent", label: "Testing Agent" },
+        { key: "role_monitoring_agent", label: "Monitoring Agent" },
+      ]},
+      { key: "role_coordination", label: "Coordination Roles", children: [
+        { key: "role_orchestrator", label: "Orchestrator" },
+        { key: "role_coordination_agent", label: "Coordination Agent" },
+        { key: "role_optimization_agent", label: "Optimization Agent" },
+      ]},
+      { key: "role_governance", label: "Governance Roles", children: [
+        { key: "role_compliance_agent", label: "Compliance Agent" },
+        { key: "role_security_agent", label: "Security Agent" },
+        { key: "role_audit_agent", label: "Audit Agent" },
+      ]},
+    ],
+  },
+  {
+    key: "organizational_structure", label: "Organizational Structure", description: "How agents are organized",
+    children: [
+      { key: "org_single", label: "Single-Unit", children: [
+        { key: "org_single_agent", label: "Single-Agent" },
+      ]},
+      { key: "org_distributed", label: "Distributed", children: [
+        { key: "org_mas", label: "Multi-Agent System (MAS)" },
+        { key: "org_peer_to_peer", label: "Peer-to-Peer" },
+        { key: "org_swarm", label: "Swarm" },
+      ]},
+      { key: "org_centralized", label: "Centralized", children: [
+        { key: "org_centralized_coordination", label: "Centralized Coordination" },
+        { key: "org_hierarchical", label: "Hierarchical" },
+      ]},
+      { key: "org_hybrid", label: "Hybrid", children: [
+        { key: "org_hybrid_system", label: "Hybrid" },
+        { key: "org_federated", label: "Federated System" },
+      ]},
+    ],
+  },
+  {
+    key: "autonomy_level", label: "Autonomy Level", description: "How autonomous the agent is",
+    children: [
+      { key: "auto_reactive", label: "Reactive Autonomy", children: [
+        { key: "auto_reactive_agent", label: "Reactive" },
+      ]},
+      { key: "auto_assisted", label: "Assisted", children: [
+        { key: "auto_hitl", label: "Human-in-the-Loop" },
+        { key: "auto_semi", label: "Semi-Autonomous" },
+      ]},
+      { key: "auto_independent", label: "Independent", children: [
+        { key: "auto_fully", label: "Fully Autonomous" },
+        { key: "auto_self_governing", label: "Self-Governing" },
+      ]},
+      { key: "auto_evolving", label: "Self-Evolving", children: [
+        { key: "auto_self_improving", label: "Self-Improving" },
+        { key: "auto_self_replicating", label: "Self-Replicating" },
+      ]},
+    ],
+  },
+  {
+    key: "embodiment", label: "Embodiment", description: "Where the agent exists",
+    children: [
+      { key: "emb_software", label: "Software", children: [
+        { key: "emb_software_agent", label: "Software Agent" },
+        { key: "emb_virtual_agent", label: "Virtual Agent" },
+      ]},
+      { key: "emb_cyber_physical", label: "Cyber-Physical", children: [
+        { key: "emb_cyber_physical_agent", label: "Cyber-Physical Agent" },
+        { key: "emb_iot_agent", label: "IoT Agent" },
+      ]},
+      { key: "emb_physical", label: "Physical", children: [
+        { key: "emb_robotic_agent", label: "Robotic Agent" },
+        { key: "emb_mobile_physical", label: "Mobile Physical Agent" },
+      ]},
+    ],
+  },
+  {
+    key: "learning_paradigm", label: "Learning Paradigm", description: "How the agent learns",
+    children: [
+      { key: "learn_supervised", label: "Supervised", children: [
+        { key: "learn_supervised_learning", label: "Supervised Learning" },
+      ]},
+      { key: "learn_unsupervised", label: "Unsupervised", children: [
+        { key: "learn_unsupervised_learning", label: "Unsupervised Learning" },
+        { key: "learn_self_supervised", label: "Self-Supervised Learning" },
+      ]},
+      { key: "learn_reinforcement", label: "Reinforcement", children: [
+        { key: "learn_rl", label: "Reinforcement Learning" },
+        { key: "learn_policy_rl", label: "Policy-Based RL" },
+        { key: "learn_value_rl", label: "Value-Based RL" },
+        { key: "learn_actor_critic", label: "Actor-Critic" },
+        { key: "learn_model_free_rl", label: "Model-Free RL" },
+        { key: "learn_model_based_rl", label: "Model-Based RL" },
+      ]},
+      { key: "learn_online", label: "Online & Continual", children: [
+        { key: "learn_online_learning", label: "Online Learning" },
+        { key: "learn_continual", label: "Continual Learning" },
+      ]},
+      { key: "learn_transfer", label: "Transfer & Distributed", children: [
+        { key: "learn_transfer_learning", label: "Transfer Learning" },
+        { key: "learn_federated", label: "Federated Learning" },
+      ]},
+      { key: "learn_evolutionary", label: "Evolutionary & Meta", children: [
+        { key: "learn_evolutionary_learning", label: "Evolutionary Learning" },
+        { key: "learn_meta_learning", label: "Meta-Learning" },
+      ]},
+    ],
+  },
+  {
+    key: "decision_paradigm", label: "Decision Paradigm", description: "How the agent decides",
+    children: [
+      { key: "dec_deterministic", label: "Deterministic", children: [
+        { key: "dec_deterministic_decision", label: "Deterministic Decision" },
+      ]},
+      { key: "dec_probabilistic", label: "Probabilistic", children: [
+        { key: "dec_stochastic", label: "Stochastic Decision" },
+        { key: "dec_probabilistic_inference", label: "Probabilistic Inference" },
+      ]},
+      { key: "dec_risk", label: "Risk & Economic", children: [
+        { key: "dec_risk_sensitive", label: "Risk-Sensitive Decision" },
+        { key: "dec_market_based", label: "Market-Based Decision" },
+      ]},
+      { key: "dec_strategic", label: "Strategic", children: [
+        { key: "dec_adversarial", label: "Adversarial" },
+        { key: "dec_cooperative", label: "Cooperative" },
+        { key: "dec_competitive", label: "Competitive" },
+        { key: "dec_nash", label: "Nash-Equilibrium" },
+      ]},
+    ],
+  },
+  {
+    key: "governance_safety", label: "Governance & Safety", description: "What constraints govern the agent",
+    children: [
+      { key: "gov_policy", label: "Policy Control", children: [
+        { key: "gov_policy_constrained", label: "Policy-Constrained" },
+        { key: "gov_compliance_enforcing", label: "Compliance-Enforcing" },
+      ]},
+      { key: "gov_alignment", label: "Alignment", children: [
+        { key: "gov_alignment_constrained", label: "Alignment-Constrained" },
+        { key: "gov_fairness_aware", label: "Fairness-Aware" },
+      ]},
+      { key: "gov_transparency", label: "Transparency", children: [
+        { key: "gov_auditable", label: "Auditable" },
+        { key: "gov_explainable", label: "Explainable" },
+      ]},
+      { key: "gov_security", label: "Security", children: [
+        { key: "gov_secure", label: "Secure" },
+        { key: "gov_privacy_preserving", label: "Privacy-Preserving" },
+        { key: "gov_sandbox_limited", label: "Sandbox-Limited" },
+      ]},
+    ],
+  },
+  {
+    key: "cognitive_capability", label: "Cognitive Capability", description: "How deep the agent's cognition is",
+    children: [
+      { key: "cap_minimal", label: "Minimal", children: [
+        { key: "cap_stateless", label: "Stateless" },
+      ]},
+      { key: "cap_contextual", label: "Contextual", children: [
+        { key: "cap_stateful", label: "Stateful" },
+        { key: "cap_context_aware", label: "Context-Aware" },
+      ]},
+      { key: "cap_world_modeling", label: "World Modeling", children: [
+        { key: "cap_world_model", label: "World-Modeling" },
+        { key: "cap_self_model", label: "Self-Modeling" },
+      ]},
+      { key: "cap_higher_order", label: "Higher-Order", children: [
+        { key: "cap_reflective", label: "Reflective" },
+        { key: "cap_meta_cognitive", label: "Meta-Cognitive" },
+        { key: "cap_theory_of_mind", label: "Theory-of-Mind" },
+        { key: "cap_creative_generative", label: "Creative Generative" },
+      ]},
+    ],
+  },
+];
+
+// ── Bot Axes (5 axes, 2-level: axis → classes) ──
+
+export const BOT_AXES: AxisDef[] = [
+  {
+    key: "interface_type", label: "Interface Type", description: "How users interact with the bot",
+    children: [
+      { key: "web_chat", label: "Web Chat" },
+      { key: "messaging", label: "Messaging" },
+      { key: "voice", label: "Voice" },
+      { key: "api", label: "API" },
+      { key: "embedded", label: "Embedded" },
+    ],
+  },
+  {
+    key: "state_management", label: "State Management", description: "How bot state is handled",
+    children: [
+      { key: "stateless", label: "Stateless" },
+      { key: "session", label: "Session" },
+      { key: "persistent", label: "Persistent" },
+    ],
+  },
+  {
+    key: "interaction_pattern", label: "Interaction Pattern", description: "How the bot engages",
+    children: [
+      { key: "qa", label: "Q&A" },
+      { key: "task_oriented", label: "Task-Oriented" },
+      { key: "open_ended", label: "Open-Ended" },
+    ],
+  },
+  {
+    key: "user_scope", label: "User Scope", description: "Who the bot serves",
+    children: [
+      { key: "internal", label: "Internal" },
+      { key: "customer_facing", label: "Customer-Facing" },
+      { key: "public", label: "Public" },
+    ],
+  },
+  {
+    key: "governance_binding", label: "Governance Binding", description: "How governance is applied",
+    children: [
+      { key: "none", label: "None" },
+      { key: "inherited", label: "Inherited" },
+      { key: "explicit", label: "Explicit" },
+    ],
+  },
+];
+
+// ── Unified Axes Map ──
+
+export const AXES_MAP: Record<EntryType, AxisDef[]> = {
+  provider: PROVIDER_AXES,
+  llm: LLM_AXES,
+  model: MODEL_AXES,
+  agent: AGENT_AXES,
+  bot: BOT_AXES,
+};
