@@ -30,11 +30,6 @@ import {
   seedTaxonomy,
 } from "../db";
 import { createHash } from "crypto";
-import {
-  getValidCategoryKeys,
-  getValidSubCategoryKeys,
-  getAllCapabilityKeys,
-} from "../../shared/catalog-taxonomy";
 
 /** Helper to emit audit events without blocking the response */
 function audit(eventType: string, catalogEntryId: number | null, payload: any, bundleId?: number) {
@@ -69,42 +64,7 @@ const createEntrySchema = z.object({
   config: z.any().optional(),
   tags: z.array(z.string()).optional(),
   origin: originSchema.optional(),
-  category: z.string().max(100).optional(),
-  subCategory: z.string().max(100).optional(),
   capabilities: z.array(z.string()).optional(),
-}).superRefine((data, ctx) => {
-  if (data.category) {
-    const validCategories = getValidCategoryKeys(data.entryType);
-    if (!validCategories.includes(data.category)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["category"],
-        message: `Invalid category "${data.category}" for entry type "${data.entryType}". Valid: ${validCategories.join(", ")}`,
-      });
-    }
-  }
-  if (data.subCategory && data.category) {
-    const validSubs = getValidSubCategoryKeys(data.category);
-    if (validSubs.length > 0 && !validSubs.includes(data.subCategory)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["subCategory"],
-        message: `Invalid subCategory "${data.subCategory}" for category "${data.category}". Valid: ${validSubs.join(", ")}`,
-      });
-    }
-  }
-  if (data.capabilities) {
-    const allValid = getAllCapabilityKeys();
-    for (const cap of data.capabilities) {
-      if (!allValid.includes(cap)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["capabilities"],
-          message: `Unknown capability "${cap}". Valid: ${allValid.join(", ")}`,
-        });
-      }
-    }
-  }
 });
 
 const updateEntrySchema = z.object({
@@ -115,8 +75,6 @@ const updateEntrySchema = z.object({
   providerId: z.number().int().positive().optional(),
   config: z.any().optional(),
   tags: z.array(z.string()).optional(),
-  category: z.string().max(100).optional(),
-  subCategory: z.string().max(100).optional(),
   capabilities: z.array(z.string()).optional(),
 });
 
@@ -192,37 +150,6 @@ export const catalogManageRouter = router({
     .input(updateEntrySchema)
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
-
-      // Validate taxonomy fields against the entry's type
-      if (data.category || data.subCategory || data.capabilities) {
-        const existing = await getCatalogEntryById(id);
-        if (!existing) throw new Error(`Catalog entry ${id} not found`);
-        const entryType = existing.entryType as "provider" | "llm" | "model" | "agent" | "bot";
-
-        if (data.category) {
-          const validCats = getValidCategoryKeys(entryType);
-          if (!validCats.includes(data.category)) {
-            throw new Error(`Invalid category "${data.category}" for ${entryType}. Valid: ${validCats.join(", ")}`);
-          }
-        }
-        if (data.subCategory) {
-          const cat = data.category || existing.category;
-          if (cat) {
-            const validSubs = getValidSubCategoryKeys(cat);
-            if (validSubs.length > 0 && !validSubs.includes(data.subCategory)) {
-              throw new Error(`Invalid subCategory "${data.subCategory}" for category "${cat}". Valid: ${validSubs.join(", ")}`);
-            }
-          }
-        }
-        if (data.capabilities) {
-          const allValid = getAllCapabilityKeys();
-          for (const cap of data.capabilities) {
-            if (!allValid.includes(cap)) {
-              throw new Error(`Unknown capability "${cap}". Valid: ${allValid.join(", ")}`);
-            }
-          }
-        }
-      }
 
       const entry = await updateCatalogEntry(id, data, 1);
       audit("catalog.entry.updated", id, { changes: Object.keys(data) });
