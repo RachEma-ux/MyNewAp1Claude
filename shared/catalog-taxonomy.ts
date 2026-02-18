@@ -28,6 +28,23 @@
  *
  *  These entities operate at different abstraction layers and are NOT interchangeable.
  *
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  CLEAN COMPARISON TABLE
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Layer               │ Provider              │ LLM                 │ Model                  │ Agent                 │ Bot
+ *  ────────────────────┼───────────────────────┼─────────────────────┼────────────────────────┼───────────────────────┼────────────────────────
+ *  Abstraction Level   │ Infrastructure        │ Technology Class    │ Trained Instance       │ Intelligent System    │ App Layer Automation
+ *  Core Question       │ Where does it run?    │ What kind of AI?    │ Which exact version?   │ Who is acting?        │ What automation responds?
+ *  Owns Models?        │ Yes                   │ No                  │ No                     │ Uses them             │ Uses them
+ *  Has Memory?         │ No                    │ No                  │ No                     │ Yes                   │ Minimal
+ *  Has Tools?          │ Exposes capabilities  │ No                  │ No                     │ Yes                   │ Rarely
+ *  Has Goals?          │ No                    │ No                  │ No                     │ Yes                   │ Usually fixed task
+ *  Statefulness        │ No                    │ No                  │ No                     │ Stateful              │ Mostly stateless
+ *  Governance Binding  │ Infrastructure level  │ No                  │ No                     │ Yes                   │ Usually none
+ *  Multi-step Planning │ No                    │ No                  │ No                     │ Yes                   │ Limited
+ *  Typical Placement   │ Backend provider layer│ AI category         │ Version selection layer│ Orchestrator entity   │ UI/Channel wrapper
+ *
  * ══════════════════════════════════════════════════════════════════════════════
  *
  * ┌──────────────────────────────────────────────────────────────────────────┐
