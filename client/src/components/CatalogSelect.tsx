@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Server, Brain, Package, Workflow, Bot, type LucideIcon } from "lucide-react";
+import { Loader2, Server, Brain, Package, Workflow, Bot, Plus, type LucideIcon } from "lucide-react";
 import { ENTRY_TYPE_DEFS, type EntryType } from "@shared/catalog-taxonomy";
 import { useCatalogEntries } from "@/hooks/useCatalogEntries";
 
@@ -36,6 +36,8 @@ interface CatalogSelectProps {
   linkedProvider?: string;
   /** Which field to use as the select value: "id" (default) or "name" */
   valueField?: "id" | "name";
+  /** Show a "Custom..." option at the bottom that triggers this callback */
+  onCustom?: () => void;
 }
 
 export function CatalogSelect({
@@ -50,6 +52,7 @@ export function CatalogSelect({
   showCategory = false,
   linkedProvider,
   valueField = "id",
+  onCustom,
 }: CatalogSelectProps) {
   // When filtering by a single type, pass it to the hook; otherwise fetch all
   const singleType = typeof entryType === "string" ? entryType : undefined;
@@ -103,8 +106,16 @@ export function CatalogSelect({
     );
   }
 
+  const handleValueChange = (val: string) => {
+    if (val === "__custom__" && onCustom) {
+      onCustom();
+      return;
+    }
+    onValueChange(val);
+  };
+
   return (
-    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+    <Select value={value} onValueChange={handleValueChange} disabled={disabled}>
       <SelectTrigger className={className}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
@@ -159,6 +170,17 @@ export function CatalogSelect({
           <div className="px-2 py-4 text-center text-sm text-muted-foreground">
             No entries found
           </div>
+        )}
+        {onCustom && (
+          <>
+            <SelectSeparator />
+            <SelectItem value="__custom__">
+              <span className="flex items-center gap-2 text-muted-foreground">
+                <Plus className="size-3.5" />
+                Custom...
+              </span>
+            </SelectItem>
+          </>
         )}
       </SelectContent>
     </Select>
