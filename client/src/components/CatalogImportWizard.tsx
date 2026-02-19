@@ -133,6 +133,15 @@ export function CatalogImportWizard({
     onOpenChange(isOpen);
   };
 
+  // Well-known base URLs for cloud providers (registryId → API base)
+  const PROVIDER_BASE_URLS: Record<string, string> = {
+    openai: "https://api.openai.com",
+    anthropic: "https://api.anthropic.com",
+    google: "https://generativelanguage.googleapis.com",
+    "local-ollama": "http://localhost:11434",
+    "local-llamacpp": "http://localhost:8080",
+  };
+
   // When a provider is selected from the dropdown, auto-fill URL and key
   const handleProviderSelect = async (value: string) => {
     setSelectedProviderId(value);
@@ -140,13 +149,20 @@ export function CatalogImportWizard({
     try {
       const entry = await trpcUtils.catalogManage.getById.fetch({ id: Number(value) });
       const config = entry.config as Record<string, any> | null;
-      // baseUrl lives in the catalog entry's config
-      const url = config?.baseUrl || config?.apiUrl || config?.endpoint;
+      const registryId = config?.registryId as string | undefined; // e.g. "openai"
+      const providerType = config?.type as string | undefined;
+
+      // 1. Auto-fill base URL: catalog config → well-known URL by type
+      const url = config?.baseUrl || config?.apiUrl || config?.endpoint
+        || (registryId && PROVIDER_BASE_URLS[registryId])
+        || (providerType && PROVIDER_BASE_URLS[providerType]);
       if (url) setBaseUrl(url);
-      // apiKey lives in the providers registry, referenced by config.registryId
-      if (config?.registryId) {
+
+      // 2. Auto-fill API key: look up provider in providers table by type
+      if (registryId) {
         try {
-          const provider = await trpcUtils.providers.getById.fetch({ id: Number(config.registryId) });
+          const providers = await trpcUtils.providers.list.fetch({ type: registryId as any });
+          const provider = providers?.[0];
           const provConfig = provider?.config as Record<string, any> | null;
           if (provConfig?.apiKey) setApiKey(provConfig.apiKey);
         } catch {
