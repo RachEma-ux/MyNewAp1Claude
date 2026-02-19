@@ -12,7 +12,8 @@ import {
 } from "./session-service";
 import { checkDuplicates, buildPreviewSummary } from "./dedup-service";
 import { discoverFromApiUrl } from "./discovery-service";
-import { createCatalogEntry, createCatalogAuditEvent, getDb, updateCatalogEntry, getCatalogEntryById } from "../db";
+import { createCatalogEntry, createCatalogAuditEvent, getDb, getCatalogEntryById } from "../db";
+import { getProviderById, updateProvider } from "../providers/db";
 import { importAuditLogs } from "../../drizzle/schema";
 import type { BulkCreateResult, BulkCreateResultEntry } from "@shared/catalog-import-types";
 
@@ -58,22 +59,25 @@ export const catalogImportRouter = router({
         // Update session to previewing
         await updateSessionStatus(session.id, "previewing", summary);
 
-        // Save apiKey back to the provider catalog entry for reuse
+        // Save apiKey back to the provider registry for reuse
         if (input.providerId && input.apiKey) {
           try {
-            const providerEntry = await getCatalogEntryById(input.providerId);
-            if (providerEntry) {
-              const existingConfig = (providerEntry.config as Record<string, any>) || {};
-              if (existingConfig.apiKey !== input.apiKey) {
-                await updateCatalogEntry(
-                  input.providerId,
-                  { config: { ...existingConfig, apiKey: input.apiKey } },
-                  ctx.user?.id ?? 1
-                );
+            const catalogEntry = await getCatalogEntryById(input.providerId);
+            const entryConfig = (catalogEntry?.config as Record<string, any>) || {};
+            const registryId = entryConfig.registryId;
+            if (registryId) {
+              const provider = await getProviderById(Number(registryId));
+              if (provider) {
+                const provConfig = (provider.config as Record<string, any>) || {};
+                if (provConfig.apiKey !== input.apiKey) {
+                  await updateProvider(provider.id, {
+                    config: { ...provConfig, apiKey: input.apiKey },
+                  });
+                }
               }
             }
           } catch (e: any) {
-            console.warn(`[CatalogImport] Failed to save apiKey to provider ${input.providerId}: ${e.message}`);
+            console.warn(`[CatalogImport] Failed to save apiKey to provider registry: ${e.message}`);
           }
         }
 
