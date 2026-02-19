@@ -12,7 +12,7 @@ import {
 } from "./session-service";
 import { checkDuplicates, buildPreviewSummary } from "./dedup-service";
 import { discoverFromApiUrl } from "./discovery-service";
-import { createCatalogEntry, createCatalogAuditEvent, getDb, getCatalogEntryById } from "../db";
+import { createCatalogEntry, createCatalogAuditEvent, getDb, getCatalogEntryById, updateCatalogEntry } from "../db";
 import { getProvidersByType, updateProvider } from "../providers/db";
 import { importAuditLogs } from "../../drizzle/schema";
 import type { BulkCreateResult, BulkCreateResultEntry } from "@shared/catalog-import-types";
@@ -59,14 +59,29 @@ export const catalogImportRouter = router({
         // Update session to previewing
         await updateSessionStatus(session.id, "previewing", summary);
 
-        // Save apiKey back to the provider registry for reuse
+        // Save apiKey back for reuse in future auto-fill
         if (input.providerId && input.apiKey) {
+          // Save to catalog entry config (primary source for auto-fill)
+          try {
+            const catalogEntry = await getCatalogEntryById(input.providerId);
+            const entryConfig = (catalogEntry?.config as Record<string, any>) || {};
+            if (entryConfig.apiKey !== input.apiKey) {
+              await updateCatalogEntry(
+                input.providerId,
+                { config: { ...entryConfig, apiKey: input.apiKey } },
+                ctx.user?.id ?? 1
+              );
+            }
+          } catch (e: any) {
+            console.warn(`[CatalogImport] Failed to save apiKey to catalog entry: ${e.message}`);
+          }
+
+          // Also save to provider registry if it exists
           try {
             const catalogEntry = await getCatalogEntryById(input.providerId);
             const entryConfig = (catalogEntry?.config as Record<string, any>) || {};
             const registryId = entryConfig.registryId as string | undefined;
             if (registryId) {
-              // registryId is the provider type string (e.g. "openai"), not a numeric ID
               const providers = await getProvidersByType(registryId);
               const provider = providers[0];
               if (provider) {
