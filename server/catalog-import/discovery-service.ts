@@ -9,14 +9,14 @@ import type { PreviewEntry } from "@shared/catalog-import-types";
 // ============================================================================
 
 const DEFAULT_ALLOWED_DOMAINS = [
-  "api.openai.com",
-  "api.anthropic.com",
-  "generativelanguage.googleapis.com",
-  "api.mistral.ai",
-  "api.cohere.com",
-  "api.together.xyz",
-  "api.groq.com",
-  "api.perplexity.ai",
+  "openai.com",
+  "anthropic.com",
+  "googleapis.com",
+  "mistral.ai",
+  "cohere.com",
+  "together.xyz",
+  "groq.com",
+  "perplexity.ai",
   "localhost",
   "127.0.0.1",
   "0.0.0.0",
