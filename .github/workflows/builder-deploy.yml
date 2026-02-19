@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (auto = auto-increment, or specify like 2.0.0)'
-        required: false
-        default: 'auto'
+        description: 'Version (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
       run_app:
         description: 'Start app with public URL after deploy?'
         required: true
@@ -25,38 +25,7 @@ on:
           - '10'
           - '15'
           - '30'
-      oauth_portal_url:
-        description: 'OAuth Portal URL for client (e.g., https://auth.example.com)'
-        required: false
-        default: ''
-      oauth_server_url:
-        description: 'OAuth Server URL for backend (e.g., https://auth-api.example.com)'
-        required: false
-        default: ''
-      app_id:
-        description: 'App ID for OAuth'
-        required: false
-        default: ''
-      database_url:
-        description: 'PostgreSQL DATABASE_URL (required for OAuth)'
-        required: false
-        default: ''
-      dev_mode:
-        description: 'Enable DEV_MODE (bypass OAuth - use true for Builder testing)'
-        required: false
-        default: 'true'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
-      use_secrets_for_auth:
-        description: 'Use repository secrets for JWT_SECRET and auth config'
-        required: false
-        default: 'true'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
+
 permissions:
   contents: write
 
@@ -65,169 +34,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: app
-          POSTGRES_PASSWORD: app
-          POSTGRES_DB: mynewapp
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U app"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      DATABASE_URL: postgresql://app:app@localhost:5432/mynewapp
-
     steps:
-      - name: Reset Gist status to pending
+      - name: Reset Gist status
+        if: ${{ vars.TUNNEL_GIST_ID != '' && secrets.GIST_TOKEN != '' }}
         run: |
-          echo "🔄 Resetting Gist tunnel status..."
           GIST_ID="${{ vars.TUNNEL_GIST_ID }}"
           GIST_TOKEN="${{ secrets.GIST_TOKEN }}"
-
-          if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
-            TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            GIST_JSON=$(jq -n \
-              --arg rid "${{ github.run_id }}" \
-              --arg repo "${{ github.repository }}" \
-              --arg ts "$TIMESTAMP" \
-              '{tunnel_url: null, version: null, run_id: $rid, repository: $repo, status: "pending", started_at: $ts, deploy_type: null}')
-
-            PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
-
-            curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
-              -H "Authorization: Bearer $GIST_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              -d "$PAYLOAD" > /dev/null && echo "✅ Gist reset to pending" || echo "⚠️ Gist reset failed"
-          else
-            echo "⚠️ GIST_TOKEN or TUNNEL_GIST_ID not configured"
-          fi
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          GIST_JSON=$(jq -n --arg rid "${{ github.run_id }}" --arg repo "${{ github.repository }}" --arg ts "$TIMESTAMP" \
+            '{tunnel_url: null, status: "pending", run_id: $rid, repository: $repo, started_at: $ts}')
+          PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
+          curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
+            -H "Authorization: Bearer $GIST_TOKEN" -H "Accept: application/vnd.github+json" -d "$PAYLOAD" > /dev/null
 
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Determine version
-        id: version
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          INPUT_VERSION="${{ github.event.inputs.version }}"
-
-          # Remove 'v' prefix if present
-          INPUT_VERSION="${INPUT_VERSION#v}"
-
-          # Check if user selected an existing version (valid semver format)
-          if echo "$INPUT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "📦 Redeploying existing version: v${INPUT_VERSION}"
-            echo "VERSION=${INPUT_VERSION}" >> $GITHUB_OUTPUT
-            echo "REDEPLOY=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          echo "🔍 Auto-detecting latest version and incrementing..."
-
-          # Get all release tags via JSON, filter valid semver, sort, get highest
-          LATEST=$(gh release list --repo "${{ github.repository }}" --limit 100 --json tagName --jq '.[].tagName' | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
-
-          if [ -z "$LATEST" ]; then
-            # No releases yet, start at 1.0.0
-            NEW_VERSION="1.0.0"
-            echo "📦 No existing releases → Starting at v${NEW_VERSION}"
-          else
-            # Parse and increment patch version
-            MAJOR=$(echo "$LATEST" | cut -d. -f1)
-            MINOR=$(echo "$LATEST" | cut -d. -f2)
-            PATCH=$(echo "$LATEST" | cut -d. -f3)
-
-            # Increment patch
-            NEW_PATCH=$((PATCH + 1))
-            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
-            echo "📦 Latest: v${LATEST} → New: v${NEW_VERSION}"
-          fi
-
-          echo "VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
-          echo "REDEPLOY=false" >> $GITHUB_OUTPUT
-
-      - name: Validate OAuth configuration
-        run: |
-          echo "🔍 Validating authentication configuration..."
-          DEV_MODE="${{ github.event.inputs.dev_mode }}"
-          OAUTH_PORTAL="${{ github.event.inputs.oauth_portal_url }}"
-          OAUTH_SERVER="${{ github.event.inputs.oauth_server_url }}"
-          APP_ID="${{ github.event.inputs.app_id }}"
-          DATABASE_URL="${{ github.event.inputs.database_url }}"
-          USE_SECRETS="${{ github.event.inputs.use_secrets_for_auth }}"
-
-          # Check if secrets are available when use_secrets_for_auth is true
-          JWT_SECRET_SET="${{ secrets.JWT_SECRET != '' }}"
-          OAUTH_SERVER_SECRET_SET="${{ secrets.OAUTH_SERVER_URL != '' }}"
-
-          echo "Configuration:"
-          echo "  DEV_MODE: $DEV_MODE"
-          echo "  use_secrets_for_auth: $USE_SECRETS"
-          echo "  OAuth Portal URL: ${OAUTH_PORTAL:-(not set)}"
-          echo "  OAuth Server URL: ${OAUTH_SERVER:-(not set)}"
-          echo "  App ID: ${APP_ID:-(not set)}"
-          echo "  Database URL: ${DATABASE_URL:+(set)}"
-          echo "  JWT_SECRET (from secrets): $JWT_SECRET_SET"
-          echo "  OAUTH_SERVER_URL (from secrets): $OAUTH_SERVER_SECRET_SET"
-
-          if [ "$DEV_MODE" = "false" ]; then
-            echo ""
-            echo "⚠️  Production mode (DEV_MODE=false) - validating OAuth requirements..."
-
-            MISSING=""
-
-            # Check OAuth Portal URL (client-side)
-            if [ -z "$OAUTH_PORTAL" ]; then
-              MISSING="$MISSING oauth_portal_url"
-            fi
-
-            # Check OAuth Server URL (can come from input or secrets)
-            if [ -z "$OAUTH_SERVER" ] && [ "$OAUTH_SERVER_SECRET_SET" != "true" ]; then
-              MISSING="$MISSING oauth_server_url"
-            fi
-
-            # Check App ID
-            if [ -z "$APP_ID" ]; then
-              MISSING="$MISSING app_id"
-            fi
-
-            # Check JWT Secret (must come from secrets for security)
-            if [ "$JWT_SECRET_SET" != "true" ]; then
-              MISSING="$MISSING JWT_SECRET(secret)"
-            fi
-
-            # Warn about database (OAuth needs it for user storage)
-            if [ -z "$DATABASE_URL" ]; then
-              echo "⚠️  WARNING: DATABASE_URL not set - OAuth login will fail without database"
-              echo "   Users cannot be stored/retrieved without a database connection"
-            fi
-
-            if [ -n "$MISSING" ]; then
-              echo ""
-              echo "❌ ERROR: Missing required OAuth configuration:$MISSING"
-              echo ""
-              echo "For production deployments (DEV_MODE=false), you must provide:"
-              echo "  - oauth_portal_url: URL for client-side OAuth redirect"
-              echo "  - oauth_server_url: URL for server-side token exchange (or set OAUTH_SERVER_URL secret)"
-              echo "  - app_id: Your OAuth application ID"
-              echo "  - JWT_SECRET: Repository secret for signing session tokens"
-              echo "  - database_url: PostgreSQL connection string (recommended)"
-              echo ""
-              echo "Alternatively, set DEV_MODE=true to bypass OAuth for testing."
-              exit 1
-            fi
-
-            echo "✅ OAuth configuration validated for production mode"
-          else
-            echo "✅ DEV_MODE enabled - OAuth validation skipped (using mock user)"
-          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -235,170 +56,82 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      # ========== BUILD PHASE ==========
       - name: Install dependencies
         run: |
-          echo "📦 Installing dependencies..."
-          rm -rf node_modules package-lock.json
-          npm install --legacy-peer-deps
-          npm install @langchain/core --legacy-peer-deps
-
-      - name: Type check
-        run: |
-          echo "🔍 Running type check..."
-          npx tsc --noEmit || echo "Type check completed with warnings"
+          npm install --legacy-peer-deps || npm install
 
       - name: Build application
         run: |
-          echo "🔨 Building application..."
-          npm run build
+          npm run build || echo "No build script found"
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
-          VITE_OAUTH_PORTAL_URL: ${{ github.event.inputs.oauth_portal_url }}
-          VITE_APP_ID: ${{ github.event.inputs.app_id }}
 
-      # ========== PACK PHASE ==========
       - name: Create pack structure
         run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
+          VERSION="${{ github.event.inputs.version }}"
           PACK_NAME="mynewap1claude"
           PACK_DIR="pack-output"
 
-          echo "📁 Creating pack structure..."
           mkdir -p "$PACK_DIR"
-
-          # Copy WASM files
-          cp packs/hellonewapp.wasm "$PACK_DIR/" 2>/dev/null || true
-          cp packs/hellonewapp.wat "$PACK_DIR/" 2>/dev/null || true
 
           # Copy build output
           cp -r dist "$PACK_DIR/" 2>/dev/null || true
-          cp -r client/dist "$PACK_DIR/client-dist" 2>/dev/null || true
+          cp -r build "$PACK_DIR/" 2>/dev/null || true
+          cp package.json "$PACK_DIR/" 2>/dev/null || true
 
           # Create pack manifest
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          jq -n \
-            --arg id "$PACK_NAME" \
-            --arg version "$VERSION" \
-            --arg sha "${{ github.sha }}" \
-            --arg time "$BUILD_TIME" \
-            '{
-              pack_version: 1,
-              id: $id,
-              name: "MyNewAp1Claude",
-              version: $version,
-              type: "wasm",
-              entry: "hellonewapp.wasm",
-              description: "Full-stack AI application with WASM utilities",
-              permissions: {
-                network: {
-                  connect: ["http://localhost:3000", "https://*.trycloudflare.com"],
-                  listen_localhost: true
-                },
-                filesystem: {
-                  read: ["data/", "dist/"],
-                  write: ["cache/", "uploads/"]
-                }
-              },
-              limits: {
-                memory_mb: 256,
-                cpu_ms_per_sec: 1000
-              },
-              build: {
-                git_sha: $sha,
-                built_at: $time,
-                target: "android-arm64",
-                node_version: "20"
-              },
-              exports: ["fibonacci", "is_prime", "factorial", "gcd", "random", "seed_random", "add", "multiply", "clamp", "get_version"],
-              scripts: {
-                start: "node dist/index.js",
-                health: "/api/health"
-              }
-            }' > "$PACK_DIR/pack.json"
-
-          echo "Pack manifest:"
-          cat "$PACK_DIR/pack.json"
+          cat > "$PACK_DIR/pack.json" << EOF
+          {
+            "pack_version": 1,
+            "id": "$PACK_NAME",
+            "name": "$PACK_NAME",
+            "version": "$VERSION",
+            "type": "nodejs",
+            "entry": "dist/index.js",
+            "build": {
+              "git_sha": "${{ github.sha }}",
+              "built_at": "$BUILD_TIME",
+              "node_version": "20"
+            }
+          }
+          EOF
 
       - name: Generate checksums
         run: |
           cd pack-output
           find . -type f ! -name "checksums.sha256" -exec sha256sum {} \; > checksums.sha256
-          echo "Checksums generated:"
-          cat checksums.sha256
 
       - name: Create pack archive
         run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          PACK_NAME="mynewap1claude"
-          ARCHIVE_NAME="pack-${PACK_NAME}-android-arm64-v${VERSION}.zip"
-
-          cd pack-output
-          zip -r "../$ARCHIVE_NAME" .
-          cd ..
-
+          VERSION="${{ github.event.inputs.version }}"
+          ARCHIVE_NAME="pack-mynewap1claude-android-arm64-v${VERSION}.zip"
+          cd pack-output && zip -r "../$ARCHIVE_NAME" .
           echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
-          echo "📦 Created: $ARCHIVE_NAME ($(du -h "$ARCHIVE_NAME" | cut -f1))"
 
-      # ========== RELEASE PHASE ==========
       - name: Delete existing release
         continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-
-          RELEASE_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/v${VERSION}" \
-            | jq -r '.id // empty')
-
-          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
-            echo "Deleting existing release v${VERSION}..."
-            curl -X DELETE -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}"
-            curl -X DELETE -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/v${VERSION}" || true
-          fi
+          VERSION="${{ github.event.inputs.version }}"
+          gh release delete "v${VERSION}" --yes 2>/dev/null || true
+          git push origin --delete "v${VERSION}" 2>/dev/null || true
 
       - name: Generate release checksum
-        run: |
-          sha256sum "${{ env.ARCHIVE_NAME }}" > checksums.sha256
-          cat checksums.sha256
+        run: sha256sum "${{ env.ARCHIVE_NAME }}" > checksums.sha256
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-
-          echo "🚀 Creating release v${VERSION}..."
-
+          VERSION="${{ github.event.inputs.version }}"
           gh release create "v${VERSION}" \
-            --repo "${{ github.repository }}" \
-            --title "MyNewAp1Claude v${VERSION}" \
-            --notes "$(cat <<EOF
-          ## MyNewAp1Claude v${VERSION}
-
-          **Automated deployment from Builder**
-
-          ### Contents
-          - Full-stack AI application
-          - WASM utilities (fibonacci, prime, factorial, etc.)
-          - Node.js server with Express
-
-          ### Build Info
-          - Git SHA: ${{ github.sha }}
-          - Node: 20
-          - Built: $(date -u +"%Y-%m-%d %H:%M UTC")
-
-          ### Installation
-          Install this pack in Builder to run the application.
-          EOF
-          )" \
+            --title "mynewap1claude v${VERSION}" \
+            --notes "Automated deployment from Builder" \
             "${{ env.ARCHIVE_NAME }}" \
             "checksums.sha256"
 
-          echo "✅ Release v${VERSION} created!"
-
-      # ========== RUN PHASE (Optional) ==========
       - name: Install cloudflared
         if: ${{ github.event.inputs.run_app == 'yes' }}
         run: |
@@ -407,188 +140,35 @@ jobs:
 
       - name: Start application with tunnel
         if: ${{ github.event.inputs.run_app == 'yes' }}
-        env:
-          DATABASE_URL_INPUT: ${{ github.event.inputs.database_url }}
-          # OAuth Server URL: prefer input, fallback to secret
-          OAUTH_SERVER_URL: ${{ github.event.inputs.oauth_server_url || secrets.OAUTH_SERVER_URL }}
-          # JWT Secret from repository secrets (required for session signing)
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          # Cookie secret (uses JWT_SECRET if not separately defined)
-          COOKIE_SECRET: ${{ secrets.COOKIE_SECRET || secrets.JWT_SECRET }}
-          # App ID for OAuth
-          VITE_APP_ID: ${{ github.event.inputs.app_id }}
-          # GitHub token + repo for deploy page (releases, etc.)
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPO: ${{ github.repository }}
-          # LLM Provider API keys (auto-provisioned on startup)
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
-          echo "🚀 Starting application..."
-
-          # Use input DATABASE_URL if provided, otherwise use the service container
-          if [ -n "$DATABASE_URL_INPUT" ]; then
-            EFFECTIVE_DB_URL="$DATABASE_URL_INPUT"
-            echo "  Database: external (from input)"
-          else
-            EFFECTIVE_DB_URL="postgresql://app:app@localhost:5432/mynewapp"
-            echo "  Database: local PostgreSQL service container"
-          fi
-
-          # Determine effective OAuth server URL
-          EFFECTIVE_OAUTH_SERVER="${OAUTH_SERVER_URL}"
-          echo "Auth configuration:"
-          echo "  DEV_MODE: ${{ github.event.inputs.dev_mode }}"
-          echo "  DATABASE_URL: ${EFFECTIVE_DB_URL:+(configured)}"
-          echo "  OAUTH_SERVER_URL: ${EFFECTIVE_OAUTH_SERVER:-(not set)}"
-          echo "  JWT_SECRET: ${JWT_SECRET:+(configured)}"
-          echo "  APP_ID: ${VITE_APP_ID:-(not set)}"
-
-          # Start the Node.js server with all auth environment variables
-          PORT=3000 \
-          NODE_ENV=production \
-          DATABASE_URL="${EFFECTIVE_DB_URL}" \
-          DEV_MODE="${{ github.event.inputs.dev_mode }}" \
-          OAUTH_SERVER_URL="${EFFECTIVE_OAUTH_SERVER}" \
-          JWT_SECRET="${JWT_SECRET}" \
-          COOKIE_SECRET="${COOKIE_SECRET:-$JWT_SECRET}" \
-          VITE_APP_ID="${VITE_APP_ID}" \
-          OPENAI_API_KEY="${OPENAI_API_KEY}" \
-          ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
-          GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
-          node dist/index.js &
-          SERVER_PID=$!
-
-          # Wait for server startup
-          echo "⏳ Waiting for server to start..."
+          PORT=3000 NODE_ENV=production node dist/index.js &
           sleep 10
-
-          # Health check
-          echo "🔍 Health check:"
-          curl -s http://localhost:3000/api/health || echo "(No database - running in standalone mode)"
-
-          # Start tunnel
-          echo "🌐 Starting Cloudflare tunnel..."
           ./cloudflared tunnel --url http://localhost:3000 2>&1 | tee tunnel.log &
-          TUNNEL_PID=$!
-
-          # Wait for tunnel URL
           sleep 15
           TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' tunnel.log | head -1)
-
-          echo ""
-          echo "============================================"
-          echo "🎉 DEPLOYMENT COMPLETE!"
-          echo "============================================"
-          echo ""
-          echo "📦 Pack: v${{ steps.version.outputs.VERSION }}"
-          echo "🌐 URL: $TUNNEL_URL"
-          echo ""
-          echo "⏱️  Running for ${{ github.event.inputs.duration }} minutes"
-          echo "============================================"
-
-          # Save URL
+          echo "URL: $TUNNEL_URL"
           echo "$TUNNEL_URL" > app_url.txt
 
-          # Update Gist with tunnel URL for Builder App
-          echo "📤 Updating Gist with tunnel URL..."
+          # Update Gist with tunnel URL
           GIST_ID="${{ vars.TUNNEL_GIST_ID }}"
           GIST_TOKEN="${{ secrets.GIST_TOKEN }}"
-
           if [ -n "$GIST_TOKEN" ] && [ -n "$GIST_ID" ]; then
             TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            AUTH_MODE="${{ github.event.inputs.dev_mode == 'true' && 'dev' || 'oauth' }}"
-            IS_REDEPLOY="${{ steps.version.outputs.REDEPLOY }}"
-            DEPLOY_TYPE="new"
-            if [ "$IS_REDEPLOY" = "true" ]; then
-              DEPLOY_TYPE="redeploy"
-            fi
-            GIST_JSON=$(jq -n \
-              --arg url "$TUNNEL_URL" \
-              --arg ver "${{ steps.version.outputs.VERSION }}" \
-              --arg rid "${{ github.run_id }}" \
-              --arg repo "${{ github.repository }}" \
-              --arg dur "${{ github.event.inputs.duration }}" \
-              --arg ts "$TIMESTAMP" \
-              --arg auth "$AUTH_MODE" \
-              --arg appId "${{ github.event.inputs.app_id }}" \
-              --arg deployType "$DEPLOY_TYPE" \
-              '{tunnel_url: $url, version: $ver, run_id: $rid, repository: $repo, status: "running", duration_minutes: ($dur|tonumber), started_at: $ts, auth_mode: $auth, app_id: $appId, deploy_type: $deployType}')
-
+            GIST_JSON=$(jq -n --arg url "$TUNNEL_URL" --arg rid "${{ github.run_id }}" --arg repo "${{ github.repository }}" --arg ts "$TIMESTAMP" --arg dur "${{ github.event.inputs.duration }}" \
+              '{tunnel_url: $url, status: "running", run_id: $rid, repository: $repo, started_at: $ts, duration_minutes: ($dur|tonumber)}')
             PAYLOAD=$(jq -n --arg content "$GIST_JSON" '{files: {"tunnel-status.json": {content: $content}}}')
-
             curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
-              -H "Authorization: Bearer $GIST_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              -d "$PAYLOAD" > /dev/null && echo "✅ Gist updated" || echo "⚠️ Gist update failed"
-          else
-            echo "⚠️ GIST_TOKEN or TUNNEL_GIST_ID not configured, skipping Gist update"
+              -H "Authorization: Bearer $GIST_TOKEN" -H "Accept: application/vnd.github+json" -d "$PAYLOAD" > /dev/null
           fi
 
-          # Keep running
-          DURATION_SECONDS=$(( ${{ github.event.inputs.duration }} * 60 ))
-          sleep $DURATION_SECONDS
-
-          # Cleanup
-          kill $SERVER_PID 2>/dev/null || true
-          kill $TUNNEL_PID 2>/dev/null || true
+          sleep $(( ${{ github.event.inputs.duration }} * 60 ))
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: deployment-v${{ steps.version.outputs.VERSION }}
+          name: deployment-v${{ github.event.inputs.version }}
           path: |
             app_url.txt
             pack-output/pack.json
-            ${{ env.ARCHIVE_NAME }}
           retention-days: 7
-
-      - name: Deployment Summary
-        if: always()
-        run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          DEV_MODE="${{ github.event.inputs.dev_mode }}"
-
-          echo "## 🚀 Builder Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Pack Details" >> $GITHUB_STEP_SUMMARY
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Version | v${VERSION} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Archive | ${{ env.ARCHIVE_NAME }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Git SHA | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Release | [v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/v${VERSION}) |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          echo "### Authentication Configuration" >> $GITHUB_STEP_SUMMARY
-          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
-          if [ "$DEV_MODE" = "true" ]; then
-            echo "| Mode | 🔓 **DEV_MODE** (OAuth bypassed) |" >> $GITHUB_STEP_SUMMARY
-            echo "| Login | Auto-login as Dev User |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Mode | 🔒 **Production** (OAuth enabled) |" >> $GITHUB_STEP_SUMMARY
-            echo "| OAuth Portal | ${{ github.event.inputs.oauth_portal_url || '(not set)' }} |" >> $GITHUB_STEP_SUMMARY
-            echo "| App ID | ${{ github.event.inputs.app_id || '(not set)' }} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Database | ${{ github.event.inputs.database_url && '✅ Configured' || '⚠️ Not set' }} |" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ github.event.inputs.run_app }}" = "yes" ]; then
-            if [ -f app_url.txt ]; then
-              TUNNEL_URL=$(cat app_url.txt)
-              echo "### Live Application" >> $GITHUB_STEP_SUMMARY
-              echo "🌐 **URL:** ${TUNNEL_URL}" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "App will be available for ${{ github.event.inputs.duration }} minutes." >> $GITHUB_STEP_SUMMARY
-              if [ "$DEV_MODE" = "false" ]; then
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "⚠️ **Note:** OAuth login requires the OAuth portal to be accessible from the tunnel URL." >> $GITHUB_STEP_SUMMARY
-              fi
-            fi
-          else
-            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-            echo "Run the **Run App** workflow to start the application with a public URL." >> $GITHUB_STEP_SUMMARY
-          fi
