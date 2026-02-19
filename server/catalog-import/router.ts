@@ -12,7 +12,7 @@ import {
 } from "./session-service";
 import { checkDuplicates, buildPreviewSummary } from "./dedup-service";
 import { discoverFromApiUrl } from "./discovery-service";
-import { createCatalogEntry, createCatalogAuditEvent, getDb } from "../db";
+import { createCatalogEntry, createCatalogAuditEvent, getDb, updateCatalogEntry, getCatalogEntryById } from "../db";
 import { importAuditLogs } from "../../drizzle/schema";
 import type { BulkCreateResult, BulkCreateResultEntry } from "@shared/catalog-import-types";
 
@@ -25,6 +25,7 @@ export const catalogImportRouter = router({
       z.object({
         baseUrl: z.string().transform((v) => /^https?:\/\//i.test(v) ? v : `https://${v}`).pipe(z.string().url()),
         apiKey: z.string().optional(),
+        providerId: z.number().int().positive().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -56,6 +57,25 @@ export const catalogImportRouter = router({
 
         // Update session to previewing
         await updateSessionStatus(session.id, "previewing", summary);
+
+        // Save apiKey back to the provider catalog entry for reuse
+        if (input.providerId && input.apiKey) {
+          try {
+            const providerEntry = await getCatalogEntryById(input.providerId);
+            if (providerEntry) {
+              const existingConfig = (providerEntry.config as Record<string, any>) || {};
+              if (existingConfig.apiKey !== input.apiKey) {
+                await updateCatalogEntry(
+                  input.providerId,
+                  { config: { ...existingConfig, apiKey: input.apiKey } },
+                  ctx.user?.id ?? 1
+                );
+              }
+            }
+          } catch (e: any) {
+            console.warn(`[CatalogImport] Failed to save apiKey to provider ${input.providerId}: ${e.message}`);
+          }
+        }
 
         return { sessionId: session.id };
       } catch (e: any) {

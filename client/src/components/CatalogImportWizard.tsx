@@ -3,6 +3,7 @@
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { CatalogSelect } from "@/components/CatalogSelect";
 import {
   Dialog,
   DialogContent,
@@ -109,6 +110,7 @@ export function CatalogImportWizard({
   const [importResult, setImportResult] = useState<BulkCreateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [forceConflicts, setForceConflicts] = useState(false);
+  const [selectedProviderId, setSelectedProviderId] = useState("");
 
   const discoverMutation = trpc.catalogImport.discoverFromApi.useMutation();
   const trpcUtils = trpc.useUtils();
@@ -126,8 +128,23 @@ export function CatalogImportWizard({
       setImportResult(null);
       setError(null);
       setForceConflicts(false);
+      setSelectedProviderId("");
     }
     onOpenChange(isOpen);
+  };
+
+  // When a provider is selected from the dropdown, auto-fill URL and key
+  const handleProviderSelect = async (value: string) => {
+    setSelectedProviderId(value);
+    if (!value) return;
+    try {
+      const entry = await trpcUtils.catalogManage.getById.fetch({ id: Number(value) });
+      const config = entry.config as Record<string, any> | null;
+      if (config?.baseUrl) setBaseUrl(config.baseUrl);
+      if (config?.apiKey) setApiKey(config.apiKey);
+    } catch {
+      // Ignore fetch errors — user can still type manually
+    }
   };
 
   // Step 2 → Step 3: Trigger discovery
@@ -137,6 +154,7 @@ export function CatalogImportWizard({
       const result = await discoverMutation.mutateAsync({
         baseUrl,
         apiKey: apiKey || undefined,
+        providerId: selectedProviderId ? Number(selectedProviderId) : undefined,
       });
 
       if (result.error) {
@@ -254,6 +272,18 @@ export function CatalogImportWizard({
         {/* Step 2: Input Form */}
         {step === 2 && method === "api_discovery" && (
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Provider (optional)</Label>
+              <CatalogSelect
+                entryType="provider"
+                value={selectedProviderId}
+                onValueChange={handleProviderSelect}
+                placeholder="Select a provider to auto-fill..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Select a catalog provider to auto-fill URL and API key, or enter manually below
+              </p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="baseUrl">Provider API Base URL</Label>
               <Input
