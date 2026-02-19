@@ -48,14 +48,62 @@ export async function testConnection(
   pat?: string
 ): Promise<TestResult> {
   const start = Date.now();
+  const normalizedUrl = baseUrl.replace(/\/$/, "");
+  const isAnthropic = normalizedUrl.includes("anthropic.com");
+
+  // --- Anthropic-specific test ---
+  if (isAnthropic) {
+    try {
+      const url = `${normalizedUrl}/v1/models`;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+      };
+      if (pat) headers["x-api-key"] = pat;
+
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (res.ok) {
+        const body = await res.json();
+        const models = body.data || [];
+        return {
+          status: "ok",
+          capabilities: ["chat"],
+          modelCount: models.length,
+          latencyMs: Date.now() - start,
+        };
+      }
+
+      const errText = await res.text().catch(() => res.statusText);
+      return {
+        status: "error",
+        capabilities: [],
+        modelCount: 0,
+        error: `Anthropic API returned ${res.status}: ${errText.slice(0, 200)}`,
+        latencyMs: Date.now() - start,
+      };
+    } catch (e: any) {
+      return {
+        status: "error",
+        capabilities: [],
+        modelCount: 0,
+        error: `Could not reach Anthropic at ${normalizedUrl}: ${e.message}`,
+        latencyMs: Date.now() - start,
+      };
+    }
+  }
+
+  // --- OpenAI-compatible /v1/models ---
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
   if (pat) headers["Authorization"] = `Bearer ${pat}`;
 
-  // Try OpenAI-compatible /v1/models first
   try {
-    const url = `${baseUrl.replace(/\/$/, "")}/v1/models`;
+    const url = `${normalizedUrl}/v1/models`;
     const res = await fetch(url, {
       headers,
       signal: AbortSignal.timeout(10000),
@@ -65,7 +113,6 @@ export async function testConnection(
       const body = await res.json();
       const models = body.data || [];
       const capabilities: string[] = ["chat"];
-      // Detect embedding models
       if (models.some((m: any) => /embed/i.test(m.id))) {
         capabilities.push("embeddings");
       }
@@ -77,7 +124,6 @@ export async function testConnection(
       };
     }
 
-    // Non-OK response
     const errText = await res.text().catch(() => res.statusText);
     return {
       status: "error",
