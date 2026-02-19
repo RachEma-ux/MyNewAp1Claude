@@ -1221,7 +1221,25 @@ export default function CatalogManagePage() {
                     <CatalogSelect
                       entryType="provider"
                       value={formProviderId === "none" ? "" : formProviderId}
-                      onValueChange={(v) => setFormProviderId(v || "none")}
+                      onValueChange={async (v) => {
+                        const id = v || "none";
+                        setFormProviderId(id);
+                        if (id !== "none") {
+                          try {
+                            const entry = await trpcUtils.catalogManage.getById.fetch({ id: parseInt(id) });
+                            if (entry) {
+                              if (!formName) setFormName(entry.name || "");
+                              if (!formDisplayName) setFormDisplayName(entry.displayName || "");
+                              if (!formDescription) setFormDescription(entry.description || "");
+                              if (formConfig === "{}") setFormConfig(entry.config ? JSON.stringify(entry.config, null, 2) : "{}");
+                              if (!formTags) setFormTags(Array.isArray(entry.tags) ? entry.tags.join(", ") : "");
+                              if (formCapabilities.length === 0 && Array.isArray(entry.capabilities)) setFormCapabilities(entry.capabilities);
+                            }
+                          } catch (e) {
+                            // silently ignore — user can still fill manually
+                          }
+                        }
+                      }}
                       placeholder="Select provider (for validation)..."
                     />
                     <p className="text-xs text-muted-foreground">Required for validation — links this entry to a provider runtime</p>
