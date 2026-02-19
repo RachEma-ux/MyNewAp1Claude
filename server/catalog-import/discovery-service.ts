@@ -115,6 +115,33 @@ function detectProviderType(baseUrl: string): ProviderType {
 }
 
 // ============================================================================
+// Canonical URL Mapping — resolve well-known vanity URLs to actual API bases
+// ============================================================================
+
+const CANONICAL_API_URLS: Record<string, string> = {
+  "openai.com": "https://api.openai.com",
+  "anthropic.com": "https://api.anthropic.com",
+  "mistral.ai": "https://api.mistral.ai",
+  "cohere.com": "https://api.cohere.com",
+  "together.xyz": "https://api.together.xyz",
+  "groq.com": "https://api.groq.com",
+  "perplexity.ai": "https://api.perplexity.ai",
+};
+
+function normalizeBaseUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    // Check if the hostname (or its parent) maps to a canonical API URL
+    for (const [domain, canonical] of Object.entries(CANONICAL_API_URLS)) {
+      if (parsed.hostname === domain || parsed.hostname === `www.${domain}`) {
+        return canonical;
+      }
+    }
+  } catch { /* keep original */ }
+  return url;
+}
+
+// ============================================================================
 // Main Discovery Function
 // ============================================================================
 
@@ -122,6 +149,9 @@ export async function discoverFromApiUrl(
   baseUrl: string,
   apiKey?: string
 ): Promise<PreviewEntry[]> {
+  // Normalize well-known URLs (e.g. openai.com → api.openai.com)
+  baseUrl = normalizeBaseUrl(baseUrl);
+
   // Validate domain
   if (!isDomainAllowed(baseUrl)) {
     throw new Error(`Domain not in allowlist. Allowed: ${getAllowedDomains().join(", ")}`);
