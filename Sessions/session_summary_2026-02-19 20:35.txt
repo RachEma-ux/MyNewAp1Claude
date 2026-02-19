@@ -1,0 +1,51 @@
+Session Summary — 2026-02-19 20:35
+=====================================
+
+## Focus: Provider PAT Authentication — Bug Fixes & Activation
+
+### Completed
+1. **Fixed case-insensitive provider lookup for PAT auto-fill**
+   - Root cause: `registryId` from catalog entry was capitalized ("OpenAI") but provider registry types are lowercase ("openai")
+   - Lowercased `registryId` in PROVIDER_BASE_URLS lookup, Source B (type query), and Source C (name match)
+   - File: `client/src/components/ConnectProviderModal.tsx`
+
+2. **Fixed provider switch not resetting PAT field**
+   - When switching providers in the Connect modal, PAT/URL/test results now clear before auto-filling new provider data
+   - File: `client/src/components/ConnectProviderModal.tsx`
+
+3. **Fixed empty PAT for local providers (Ollama, llama.cpp)**
+   - `validateAndStore` router now accepts optional PAT (was requiring min 1 char)
+   - Service layer skips secret encryption when no PAT provided
+   - File: `server/provider-connections/router.ts`, `server/provider-connections/service.ts`
+
+4. **Fixed delete connection cascade**
+   - Delete now removes audit logs and secrets before the connection (FK constraint)
+   - File: `server/provider-connections/db.ts`
+
+5. **Cleared invalid Anthropic API key**
+   - Old key (ant-api03-...) was expired/invalid, cleared from provider registry
+
+6. **Activated provider connections locally**
+   - OpenAI: Connection #1 — ACTIVE, 97 models
+   - Ollama: Connection #3 — ACTIVE, 3 models
+
+7. **Deployed to tunnel and verified**
+   - Tunnel: https://colorado-chargers-featured-infants.trycloudflare.com (v3.0.137)
+   - All 3 provider endpoints (OpenAI, Ollama, Anthropic) respond correctly
+   - No API keys on tunnel (GitHub secrets not set), but router/service/auth logic confirmed working
+
+### Commits Pushed
+- c269ef2 fix: Case-insensitive provider registry lookup for PAT auto-fill
+- 3e5a048 fix: Allow empty PAT for local providers, reset fields on provider switch
+
+### Key Files Modified
+- `client/src/components/ConnectProviderModal.tsx` — case fix, provider switch reset
+- `server/provider-connections/router.ts` — optional PAT in validateAndStore
+- `server/provider-connections/service.ts` — skip encryption when no PAT
+- `server/provider-connections/db.ts` — cascade delete audit logs + secrets
+
+### Notes
+- Gist CDN caching can be sticky; use GitHub API directly to bypass
+- Tunnel gist now has two files: `deploy-status.json` and `tunnel-status.json`
+- Anthropic needs a valid API key (current format: sk-ant-api03-...)
+- Multiple workflow triggers from Builder app + CLI cause duplicates; only trigger from one source
