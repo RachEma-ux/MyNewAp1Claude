@@ -112,7 +112,7 @@ export function ConnectProviderModal({
     onOpenChange(isOpen);
   };
 
-  // Auto-fill URL when provider is selected
+  // Auto-fill URL and API key when provider is selected
   const handleProviderSelect = async (value: string) => {
     setSelectedProviderId(value);
     if (!value) return;
@@ -125,6 +125,7 @@ export function ConnectProviderModal({
         config?.providerId ||
         entry.name) as string | undefined;
 
+      // 1. Auto-fill base URL
       const url =
         config?.baseUrl ||
         config?.apiUrl ||
@@ -132,6 +133,37 @@ export function ConnectProviderModal({
         (registryId && PROVIDER_BASE_URLS[registryId]) ||
         undefined;
       if (url) setBaseUrl(url);
+
+      // 2. Auto-fill API key from multiple sources
+      let foundKey: string | undefined;
+
+      // Source A: catalog entry config
+      if (config?.apiKey) {
+        foundKey = config.apiKey as string;
+      }
+
+      // Source B: provider registry by type
+      if (!foundKey && registryId) {
+        try {
+          const providers = await trpcUtils.providers.list.fetch({ type: registryId as any });
+          const provConfig = providers?.[0]?.config as Record<string, any> | null;
+          if (provConfig?.apiKey) foundKey = provConfig.apiKey as string;
+        } catch { /* ignore */ }
+      }
+
+      // Source C: provider registry by name match
+      if (!foundKey) {
+        try {
+          const allProviders = await trpcUtils.providers.list.fetch({});
+          const match = allProviders.find((p: any) =>
+            p.type === registryId || p.name.toLowerCase() === entry.name.toLowerCase()
+          );
+          const matchConfig = match?.config as Record<string, any> | null;
+          if (matchConfig?.apiKey) foundKey = matchConfig.apiKey as string;
+        } catch { /* ignore */ }
+      }
+
+      if (foundKey) setPat(foundKey);
     } catch {
       // Ignore — user can type manually
     }
