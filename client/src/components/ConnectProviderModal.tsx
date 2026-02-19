@@ -121,9 +121,10 @@ export function ConnectProviderModal({
         id: Number(value),
       });
       const config = entry.config as Record<string, any> | null;
-      const registryId = (config?.registryId ||
+      const rawRegistryId = (config?.registryId ||
         config?.providerId ||
         entry.name) as string | undefined;
+      const registryId = rawRegistryId?.toLowerCase();
 
       // 1. Auto-fill base URL
       const url =
@@ -156,7 +157,7 @@ export function ConnectProviderModal({
         try {
           const allProviders = await trpcUtils.providers.list.fetch({});
           const match = allProviders.find((p: any) =>
-            p.type === registryId || p.name.toLowerCase() === entry.name.toLowerCase()
+            p.type?.toLowerCase() === registryId || p.name.toLowerCase() === entry.name.toLowerCase()
           );
           const matchConfig = match?.config as Record<string, any> | null;
           if (matchConfig?.apiKey) foundKey = matchConfig.apiKey as string;
