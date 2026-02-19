@@ -98,7 +98,11 @@ export async function deleteConnection(id: number): Promise<void> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  // Cascade deletes secrets automatically
+  // Delete audit logs first (FK no cascade)
+  await db.delete(providerAuditLog).where(eq(providerAuditLog.connectionId, id));
+  // Secrets cascade automatically, but be explicit
+  await db.delete(providerSecrets).where(eq(providerSecrets.connectionId, id));
+  // Delete connection
   await db.delete(providerConnections).where(eq(providerConnections.id, id));
 }
 

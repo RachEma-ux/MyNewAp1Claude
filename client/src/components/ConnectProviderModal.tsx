@@ -115,6 +115,10 @@ export function ConnectProviderModal({
   // Auto-fill URL and API key when provider is selected
   const handleProviderSelect = async (value: string) => {
     setSelectedProviderId(value);
+    setPat("");
+    setBaseUrl("");
+    setTestResult(null);
+    setStep("form");
     if (!value) return;
     try {
       const entry = await trpcUtils.catalogManage.getById.fetch({
