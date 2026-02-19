@@ -221,7 +221,7 @@ export async function createProviderConnection(params: {
  */
 export async function validateAndStoreSecret(params: {
   connectionId: number;
-  pat: string;
+  pat?: string;
   actor: number;
 }): Promise<TestResult> {
   const conn = await getConnectionById(params.connectionId);
@@ -243,14 +243,15 @@ export async function validateAndStoreSecret(params: {
     return result;
   }
 
-  // Test succeeded — encrypt and store
-  const encryptedPat = encrypt(params.pat);
-
-  await insertSecret({
-    connectionId: conn.id,
-    encryptedPat,
-    keyVersion: 1,
-  });
+  // Test succeeded — encrypt and store (skip if no PAT, e.g. local providers)
+  if (params.pat) {
+    const encryptedPat = encrypt(params.pat);
+    await insertSecret({
+      connectionId: conn.id,
+      encryptedPat,
+      keyVersion: 1,
+    });
+  }
 
   // Transition to VALIDATED
   await updateConnectionStatus(conn.id, "validated", {

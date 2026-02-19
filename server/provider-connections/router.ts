@@ -75,13 +75,13 @@ export const providerConnectionsRouter = router({
     .input(
       z.object({
         connectionId: z.number().int(),
-        pat: z.string().min(1),
+        pat: z.string().default(""),
       })
     )
     .mutation(async ({ ctx, input }) => {
       return validateAndStoreSecret({
         connectionId: input.connectionId,
-        pat: input.pat,
+        pat: input.pat || undefined,
         actor: ctx.user?.id ?? 1,
       });
     }),
