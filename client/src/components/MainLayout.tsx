@@ -49,6 +49,7 @@ import {
   BookOpen,
   Wand2,
   List,
+  Plug,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -132,6 +133,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       icon: <Cloud className="w-5 h-5" />,
       children: [
         { label: "Manage", icon: <Cloud className="w-4 h-4" />, href: "/providers" },
+        { label: "Connections", icon: <Plug className="w-4 h-4" />, href: "/providers/connections" },
         { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/settings" },
       ]
     },
