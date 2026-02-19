@@ -80,6 +80,7 @@ import LLMTrainingDashboard from "@/pages/LLMTrainingDashboard";
 import DeploymentStatus from "@/pages/DeploymentStatus";
 import DeployPage from "@/pages/DeployPage";
 import CatalogManagePage from "@/pages/CatalogManagePage";
+import ProviderConnectionsPage from "@/pages/ProviderConnectionsPage";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -166,6 +167,7 @@ function Router() {
       <Route path="/wcp/executions/:id" component={() => <ProtectedRoute component={WCPExecutionDetails} />} />
             <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
             <Route path="/resources" component={() => <ProtectedRoute component={ResourceMonitor} />} />
+      <Route path="/providers/connections" component={() => <ProtectedRoute component={ProviderConnectionsPage} />} />
       <Route path="/providers" component={() => <ProtectedRoute component={Providers} />} />
       <Route path="/providers/:id" component={() => <ProtectedRoute component={ProviderDetail} />} />
               <Route path="/providers-analytics" component={() => <ProtectedRoute component={ProviderAnalytics} />} />
