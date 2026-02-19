@@ -53,13 +53,23 @@ export async function testConnection(
 
   // --- Anthropic-specific test ---
   if (isAnthropic) {
+    if (!pat) {
+      return {
+        status: "error",
+        capabilities: [],
+        modelCount: 0,
+        error: "Anthropic requires an API key. Please enter your PAT.",
+        latencyMs: Date.now() - start,
+      };
+    }
     try {
       const url = `${normalizedUrl}/v1/models`;
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "anthropic-version": "2023-06-01",
+        "x-api-key": pat,
+        "Authorization": `Bearer ${pat}`,
       };
-      if (pat) headers["x-api-key"] = pat;
 
       const res = await fetch(url, {
         headers,
