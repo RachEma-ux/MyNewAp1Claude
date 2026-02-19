@@ -417,8 +417,9 @@ jobs:
           COOKIE_SECRET: ${{ secrets.COOKIE_SECRET || secrets.JWT_SECRET }}
           # App ID for OAuth
           VITE_APP_ID: ${{ github.event.inputs.app_id }}
-          # GitHub token for deploy page (releases, etc.)
+          # GitHub token + repo for deploy page (releases, etc.)
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
           # LLM Provider API keys (auto-provisioned on startup)
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
