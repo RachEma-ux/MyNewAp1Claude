@@ -133,13 +133,21 @@ export function CatalogImportWizard({
     onOpenChange(isOpen);
   };
 
-  // Well-known base URLs for cloud providers (registryId → API base)
+  // Well-known base URLs for cloud providers (providerId → API base)
   const PROVIDER_BASE_URLS: Record<string, string> = {
     openai: "https://api.openai.com",
     anthropic: "https://api.anthropic.com",
     google: "https://generativelanguage.googleapis.com",
-    "local-ollama": "http://localhost:11434",
-    "local-llamacpp": "http://localhost:8080",
+    meta: "https://api.llama.com",
+    mistral: "https://api.mistral.ai",
+    microsoft: "https://models.inference.ai.azure.com",
+    qwen: "https://dashscope-intl.aliyuncs.com",
+    xai: "https://api.x.ai",
+    cohere: "https://api.cohere.com",
+    deepseek: "https://api.deepseek.com",
+    perplexity: "https://api.perplexity.ai",
+    ollama: "http://localhost:11434",
+    llamacpp: "http://localhost:8080",
   };
 
   // When a provider is selected from the dropdown, auto-fill URL and key
@@ -149,10 +157,10 @@ export function CatalogImportWizard({
     try {
       const entry = await trpcUtils.catalogManage.getById.fetch({ id: Number(value) });
       const config = entry.config as Record<string, any> | null;
-      const registryId = config?.registryId as string | undefined; // e.g. "openai"
+      const registryId = (config?.registryId || config?.providerId || entry.name) as string | undefined;
       const providerType = config?.type as string | undefined;
 
-      // 1. Auto-fill base URL: catalog config → well-known URL by type
+      // 1. Auto-fill base URL: catalog config → well-known URL by name/type
       const url = config?.baseUrl || config?.apiUrl || config?.endpoint
         || (registryId && PROVIDER_BASE_URLS[registryId])
         || (providerType && PROVIDER_BASE_URLS[providerType]);

@@ -26,7 +26,7 @@ export const catalogImportRouter = router({
       z.object({
         baseUrl: z.string().transform((v) => /^https?:\/\//i.test(v) ? v : `https://${v}`).pipe(z.string().url()),
         apiKey: z.string().optional(),
-        providerId: z.number().int().positive().optional(),
+        providerId: z.number().int().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
