@@ -23,7 +23,7 @@ export const catalogImportRouter = router({
   discoverFromApi: protectedProcedure
     .input(
       z.object({
-        baseUrl: z.string().url(),
+        baseUrl: z.string().transform((v) => /^https?:\/\//i.test(v) ? v : `https://${v}`).pipe(z.string().url()),
         apiKey: z.string().optional(),
       })
     )
