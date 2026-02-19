@@ -11,7 +11,8 @@ const pages = [
   "/tools-management", "/compliance-export", "/drift-detection", "/protocols",
   "/embeddings", "/vectordb"
 ];
-pages.forEach(p => window.open("http://localhost:3000" + p, "_blank"));
+const base = window.location.origin;
+pages.forEach(p => window.open(base + p, "_blank"));
 </script>
 <p>28 tabs should be opening. If blocked by popup blocker, allow popups for this page.</p>
 </body></html>
