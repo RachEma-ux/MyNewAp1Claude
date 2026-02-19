@@ -79,6 +79,7 @@ import {
   Rocket,
   ChevronDown,
   Download,
+  PenLine,
 } from "lucide-react";
 import { CatalogSelect } from "@/components/CatalogSelect";
 import { MultiAxisPanel } from "@/components/MultiAxisPanel";
@@ -146,6 +147,9 @@ export default function CatalogManagePage() {
   const [activeTab, setActiveTab] = useState<"catalog" | "validation" | "publishing" | "audit">("catalog");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | EntryType>("all");
+
+  // New Entry chooser popup
+  const [newEntryPopupOpen, setNewEntryPopupOpen] = useState(false);
 
   // Import wizard state
   const [importWizardOpen, setImportWizardOpen] = useState(false);
@@ -571,14 +575,9 @@ export default function CatalogManagePage() {
             Create, edit, and manage catalog entries before publishing
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setImportWizardOpen(true)}>
-            <Download className="h-4 w-4 mr-2" />Import
-          </Button>
-          <Button onClick={openCreateDialog}>
-            <Plus className="h-4 w-4 mr-2" />New Entry
-          </Button>
-        </div>
+        <Button onClick={() => setNewEntryPopupOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />New Entry
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
@@ -1072,6 +1071,34 @@ export default function CatalogManagePage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* New Entry Chooser Popup */}
+      <Dialog open={newEntryPopupOpen} onOpenChange={setNewEntryPopupOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>New Entry</DialogTitle>
+            <DialogDescription>How would you like to add catalog entries?</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-4">
+            <button
+              onClick={() => { setNewEntryPopupOpen(false); setImportWizardOpen(true); }}
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-accent transition-colors cursor-pointer"
+            >
+              <Download className="h-6 w-6" />
+              <span className="font-medium text-sm">Import</span>
+              <span className="text-xs text-muted-foreground text-center">Discover and import entries</span>
+            </button>
+            <button
+              onClick={() => { setNewEntryPopupOpen(false); openCreateDialog(); }}
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-accent transition-colors cursor-pointer"
+            >
+              <PenLine className="h-6 w-6" />
+              <span className="font-medium text-sm">Create</span>
+              <span className="text-xs text-muted-foreground text-center">Create entries manually</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
