@@ -80,10 +80,12 @@ import {
   ChevronDown,
   Download,
   PenLine,
+  Plug,
 } from "lucide-react";
 import { CatalogSelect } from "@/components/CatalogSelect";
 import { MultiAxisPanel } from "@/components/MultiAxisPanel";
 import { CatalogImportWizard } from "@/components/CatalogImportWizard";
+import { ConnectProviderModal } from "@/components/ConnectProviderModal";
 
 const TYPE_ICONS: Record<string, any> = {
   provider: Server,
@@ -153,6 +155,8 @@ export default function CatalogManagePage() {
 
   // Import wizard state
   const [importWizardOpen, setImportWizardOpen] = useState(false);
+  // Connect Provider modal state
+  const [connectModalOpen, setConnectModalOpen] = useState(false);
 
   // Create/Edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1079,7 +1083,15 @@ export default function CatalogManagePage() {
             <DialogTitle>New Entry</DialogTitle>
             <DialogDescription>How would you like to add catalog entries?</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 py-4">
+          <div className="grid grid-cols-3 gap-3 py-4">
+            <button
+              onClick={() => { setNewEntryPopupOpen(false); setConnectModalOpen(true); }}
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-accent transition-colors cursor-pointer"
+            >
+              <Plug className="h-6 w-6" />
+              <span className="font-medium text-sm">Connect</span>
+              <span className="text-xs text-muted-foreground text-center">Authenticate a provider</span>
+            </button>
             <button
               onClick={() => { setNewEntryPopupOpen(false); setImportWizardOpen(true); }}
               className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-accent transition-colors cursor-pointer"
@@ -2351,6 +2363,13 @@ export default function CatalogManagePage() {
       <CatalogImportWizard
         open={importWizardOpen}
         onOpenChange={setImportWizardOpen}
+        onComplete={() => refetch()}
+      />
+
+      {/* Connect Provider Modal */}
+      <ConnectProviderModal
+        open={connectModalOpen}
+        onOpenChange={setConnectModalOpen}
         onComplete={() => refetch()}
       />
     </div>
