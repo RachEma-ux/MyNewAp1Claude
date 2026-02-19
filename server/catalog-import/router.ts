@@ -13,7 +13,7 @@ import {
 import { checkDuplicates, buildPreviewSummary } from "./dedup-service";
 import { discoverFromApiUrl } from "./discovery-service";
 import { createCatalogEntry, createCatalogAuditEvent, getDb, getCatalogEntryById } from "../db";
-import { getProviderById, updateProvider } from "../providers/db";
+import { getProvidersByType, updateProvider } from "../providers/db";
 import { importAuditLogs } from "../../drizzle/schema";
 import type { BulkCreateResult, BulkCreateResultEntry } from "@shared/catalog-import-types";
 
@@ -64,9 +64,11 @@ export const catalogImportRouter = router({
           try {
             const catalogEntry = await getCatalogEntryById(input.providerId);
             const entryConfig = (catalogEntry?.config as Record<string, any>) || {};
-            const registryId = entryConfig.registryId;
+            const registryId = entryConfig.registryId as string | undefined;
             if (registryId) {
-              const provider = await getProviderById(Number(registryId));
+              // registryId is the provider type string (e.g. "openai"), not a numeric ID
+              const providers = await getProvidersByType(registryId);
+              const provider = providers[0];
               if (provider) {
                 const provConfig = (provider.config as Record<string, any>) || {};
                 if (provConfig.apiKey !== input.apiKey) {
