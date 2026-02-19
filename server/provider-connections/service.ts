@@ -316,11 +316,17 @@ export async function healthCheck(connectionId: number): Promise<TestResult> {
     throw new Error("Health check only applicable to active connections");
   }
 
-  // Decrypt PAT for the probe
+  // Decrypt PAT for the probe (optional — local providers may have no secret)
+  let pat: string | undefined;
   const secret = await getLatestSecret(connectionId);
-  if (!secret) throw new Error("No secret found for connection");
+  if (secret) {
+    try {
+      pat = decrypt(secret.encryptedPat);
+    } catch {
+      // Encryption key rotated or corrupt — probe without PAT
+    }
+  }
 
-  const pat = decrypt(secret.encryptedPat);
   const result = await testConnection(conn.baseUrl, pat);
 
   if (result.status === "ok") {
