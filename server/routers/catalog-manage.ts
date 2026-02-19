@@ -105,8 +105,15 @@ export const catalogManageRouter = router({
    * Get a single catalog entry by ID
    */
   getById: protectedProcedure
-    .input(z.object({ id: z.number().int().positive() }))
+    .input(z.object({ id: z.number().int() }))
     .query(async ({ input }) => {
+      // Negative IDs are synthetic static-catalog entries
+      if (input.id < 0) {
+        const { getStaticCatalogEntries } = await import("@shared/static-catalog");
+        const staticEntry = getStaticCatalogEntries().find((e) => e.id === input.id);
+        if (!staticEntry) throw new Error(`Catalog entry ${input.id} not found`);
+        return { ...staticEntry, providerId: null, createdAt: null, updatedAt: null };
+      }
       const entry = await getCatalogEntryById(input.id);
       if (!entry) throw new Error(`Catalog entry ${input.id} not found`);
       return entry;

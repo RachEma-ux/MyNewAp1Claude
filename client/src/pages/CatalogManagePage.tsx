@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { getStaticCatalogEntries } from "@shared/static-catalog";
 import {
   getCapabilitiesForType,
   ENTRY_TYPES,
@@ -1203,6 +1204,36 @@ export default function CatalogManagePage() {
             {/* Step 1: Details (existing form) */}
             {(editingEntry || createStep === 0) && (
               <>
+                {!editingEntry && (
+                  <div className="grid gap-2">
+                    <Label>{formEntryType === "provider" ? "Base Provider" : "Linked Provider"}</Label>
+                    <CatalogSelect
+                      entryType="provider"
+                      value={formProviderId === "none" ? "" : formProviderId}
+                      onValueChange={(v) => {
+                        setFormProviderId(v || "none");
+                        if (v) {
+                          const all = getStaticCatalogEntries();
+                          const match = all.find((e) => String(e.id) === v);
+                          if (match) {
+                            setFormName(match.name);
+                            setFormDisplayName(match.displayName);
+                            setFormDescription(match.entryType + " — " + match.category);
+                            setFormConfig(JSON.stringify(match.config, null, 2));
+                            setFormTags(match.tags.join(", "));
+                            if (match.capabilities.length > 0) setFormCapabilities(match.capabilities);
+                          }
+                        }
+                      }}
+                      placeholder={formEntryType === "provider" ? "Select a provider to auto-fill..." : "Select provider (for validation)..."}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {formEntryType === "provider"
+                        ? "Select a provider to auto-fill the form fields below"
+                        : "Required for validation — links this entry to a provider runtime"}
+                    </p>
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label>Name</Label>
                   <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g., my-ollama-provider" />
@@ -1215,36 +1246,6 @@ export default function CatalogManagePage() {
                   <Label>Description</Label>
                   <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="What this entry does..." rows={2} />
                 </div>
-                {formEntryType !== "provider" && (
-                  <div className="grid gap-2">
-                    <Label>Linked Provider</Label>
-                    <CatalogSelect
-                      entryType="provider"
-                      value={formProviderId === "none" ? "" : formProviderId}
-                      onValueChange={async (v) => {
-                        const id = v || "none";
-                        setFormProviderId(id);
-                        if (id !== "none") {
-                          try {
-                            const entry = await trpcUtils.catalogManage.getById.fetch({ id: parseInt(id) });
-                            if (entry) {
-                              if (!formName) setFormName(entry.name || "");
-                              if (!formDisplayName) setFormDisplayName(entry.displayName || "");
-                              if (!formDescription) setFormDescription(entry.description || "");
-                              if (formConfig === "{}") setFormConfig(entry.config ? JSON.stringify(entry.config, null, 2) : "{}");
-                              if (!formTags) setFormTags(Array.isArray(entry.tags) ? entry.tags.join(", ") : "");
-                              if (formCapabilities.length === 0 && Array.isArray(entry.capabilities)) setFormCapabilities(entry.capabilities);
-                            }
-                          } catch (e) {
-                            // silently ignore — user can still fill manually
-                          }
-                        }
-                      }}
-                      placeholder="Select provider (for validation)..."
-                    />
-                    <p className="text-xs text-muted-foreground">Required for validation — links this entry to a provider runtime</p>
-                  </div>
-                )}
                 <div className="grid gap-2">
                   <Label>Tags (comma-separated)</Label>
                   <Input value={formTags} onChange={(e) => setFormTags(e.target.value)} placeholder="local, ollama, inference" />
