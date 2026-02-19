@@ -61,7 +61,7 @@ export default function ProviderConnectionsPage() {
 
   const healthCheckMutation = trpc.providerConnections.healthCheck.useMutation({
     onSuccess: (result) => {
-      toast.success(`Health: ${result.healthStatus} (${result.latencyMs}ms)`);
+      toast.success(`Health: ${result.status} (${result.latencyMs}ms)`);
       refetch();
     },
     onError: (err) => toast.error(`Health check failed: ${err.message}`),
