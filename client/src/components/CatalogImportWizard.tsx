@@ -140,8 +140,19 @@ export function CatalogImportWizard({
     try {
       const entry = await trpcUtils.catalogManage.getById.fetch({ id: Number(value) });
       const config = entry.config as Record<string, any> | null;
-      if (config?.baseUrl) setBaseUrl(config.baseUrl);
-      if (config?.apiKey) setApiKey(config.apiKey);
+      // baseUrl lives in the catalog entry's config
+      const url = config?.baseUrl || config?.apiUrl || config?.endpoint;
+      if (url) setBaseUrl(url);
+      // apiKey lives in the providers registry, referenced by config.registryId
+      if (config?.registryId) {
+        try {
+          const provider = await trpcUtils.providers.getById.fetch({ id: Number(config.registryId) });
+          const provConfig = provider?.config as Record<string, any> | null;
+          if (provConfig?.apiKey) setApiKey(provConfig.apiKey);
+        } catch {
+          // Provider registry lookup failed — user can enter key manually
+        }
+      }
     } catch {
       // Ignore fetch errors — user can still type manually
     }
