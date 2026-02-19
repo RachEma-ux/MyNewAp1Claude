@@ -158,17 +158,40 @@ export function CatalogImportWizard({
         || (providerType && PROVIDER_BASE_URLS[providerType]);
       if (url) setBaseUrl(url);
 
-      // 2. Auto-fill API key: look up provider in providers table by type
-      if (registryId) {
+      // 2. Auto-fill API key from multiple sources
+      let apiKey: string | undefined;
+
+      // Source A: catalog entry's own config (saved back from previous discovery)
+      if (config?.apiKey) {
+        apiKey = config.apiKey as string;
+      }
+
+      // Source B: providers registry table (auto-provisioned from env vars)
+      if (!apiKey && registryId) {
         try {
           const providers = await trpcUtils.providers.list.fetch({ type: registryId as any });
-          const provider = providers?.[0];
-          const provConfig = provider?.config as Record<string, any> | null;
-          if (provConfig?.apiKey) setApiKey(provConfig.apiKey);
+          const provConfig = providers?.[0]?.config as Record<string, any> | null;
+          if (provConfig?.apiKey) apiKey = provConfig.apiKey as string;
         } catch {
-          // Provider registry lookup failed — user can enter key manually
+          // Provider registry lookup failed
         }
       }
+
+      // Source C: fetch all providers and match by name
+      if (!apiKey) {
+        try {
+          const allProviders = await trpcUtils.providers.list.fetch({});
+          const match = allProviders.find((p: any) =>
+            p.type === registryId || p.name.toLowerCase() === entry.name.toLowerCase()
+          );
+          const matchConfig = match?.config as Record<string, any> | null;
+          if (matchConfig?.apiKey) apiKey = matchConfig.apiKey as string;
+        } catch {
+          // Fallback lookup failed
+        }
+      }
+
+      if (apiKey) setApiKey(apiKey);
     } catch {
       // Ignore fetch errors — user can still type manually
     }
