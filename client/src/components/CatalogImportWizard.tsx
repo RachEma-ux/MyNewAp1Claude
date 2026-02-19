@@ -111,10 +111,7 @@ export function CatalogImportWizard({
   const [forceConflicts, setForceConflicts] = useState(false);
 
   const discoverMutation = trpc.catalogImport.discoverFromApi.useMutation();
-  const previewQuery = trpc.catalogImport.getPreview.useQuery(
-    { sessionId: sessionId! },
-    { enabled: false }
-  );
+  const trpcUtils = trpc.useUtils();
   const bulkCreateMutation = trpc.catalogImport.bulkCreate.useMutation();
 
   // Reset state when dialog closes
@@ -149,16 +146,20 @@ export function CatalogImportWizard({
 
       setSessionId(result.sessionId);
 
-      // Fetch preview
-      const preview = await previewQuery.refetch();
-      if (preview.data) {
+      // Fetch preview using the sessionId from the result directly (not stale state)
+      const preview = await trpcUtils.catalogImport.getPreview.fetch(
+        { sessionId: result.sessionId }
+      );
+      if (preview && preview.rows.length > 0) {
         setPreviewRows(
-          preview.data.rows.map((r: PreviewEntry) => ({
+          preview.rows.map((r: PreviewEntry) => ({
             ...r,
             selected: r.duplicateStatus === "new" || r.duplicateStatus === "fuzzy_match",
           }))
         );
         setStep(3);
+      } else {
+        setError("Discovery completed but no models were returned");
       }
     } catch (e: any) {
       setError(e.message);
