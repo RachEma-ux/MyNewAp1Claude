@@ -12,11 +12,17 @@ const DEFAULT_ALLOWED_DOMAINS = [
   "openai.com",
   "anthropic.com",
   "googleapis.com",
+  "generativelanguage.googleapis.com",
   "mistral.ai",
   "cohere.com",
   "together.xyz",
   "groq.com",
   "perplexity.ai",
+  "deepseek.com",
+  "x.ai",
+  "llama.com",
+  "aliyuncs.com",
+  "inference.ai.azure.com",
   "localhost",
   "127.0.0.1",
   "0.0.0.0",
@@ -77,7 +83,19 @@ async function fetchOllamaModels(baseUrl: string): Promise<RawModel[]> {
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`Ollama API returned ${res.status}: ${res.statusText}`);
 
-  const body = await res.json();
+  const text = await res.text();
+  let body: any;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    // Ollama sometimes returns NDJSON or extra whitespace — try first line
+    const firstLine = text.split("\n").find((l) => l.trim().startsWith("{"));
+    if (firstLine) {
+      body = JSON.parse(firstLine);
+    } else {
+      throw new Error(`Ollama returned invalid JSON: ${text.slice(0, 200)}`);
+    }
+  }
   const models = (body.models || []) as any[];
 
   return models.map((m: any) => ({
@@ -103,7 +121,11 @@ function detectProviderType(baseUrl: string): ProviderType {
   const lower = baseUrl.toLowerCase();
   if (lower.includes("openai.com") || lower.includes("together.xyz") ||
       lower.includes("groq.com") || lower.includes("mistral.ai") ||
-      lower.includes("perplexity.ai")) {
+      lower.includes("perplexity.ai") || lower.includes("deepseek.com") ||
+      lower.includes("x.ai") || lower.includes("cohere.com") ||
+      lower.includes("anthropic.com") || lower.includes("googleapis.com") ||
+      lower.includes("llama.com") || lower.includes("aliyuncs.com") ||
+      lower.includes("azure.com")) {
     return "openai";
   }
   // Local URLs with common Ollama port
@@ -126,6 +148,8 @@ const CANONICAL_API_URLS: Record<string, string> = {
   "together.xyz": "https://api.together.xyz",
   "groq.com": "https://api.groq.com",
   "perplexity.ai": "https://api.perplexity.ai",
+  "deepseek.com": "https://api.deepseek.com",
+  "x.ai": "https://api.x.ai",
 };
 
 function normalizeBaseUrl(url: string): string {
