@@ -2774,3 +2774,98 @@ export const importAuditLogs = pgTable("import_audit_logs", {
 
 export type ImportAuditLog = typeof importAuditLogs.$inferSelect;
 export type InsertImportAuditLog = typeof importAuditLogs.$inferInsert;
+
+// ============================================================================
+// Provider Connections & PAT Authentication (Governed)
+// ============================================================================
+
+/**
+ * Lifecycle status enum for provider connections.
+ * Transitions enforced by backend state machine:
+ *   DRAFT → VALIDATED → ACTIVE → FAILED → DISABLED
+ *                                  ↑ (rotate)
+ *                               ROTATED ──→ ACTIVE
+ */
+export type ProviderConnectionStatus =
+  | "draft"
+  | "validated"
+  | "active"
+  | "failed"
+  | "disabled"
+  | "rotated";
+
+/**
+ * Provider Connections — Workspace-scoped authenticated connection instances.
+ * Links a catalog provider definition to a concrete authenticated endpoint.
+ */
+export const providerConnections = pgTable("provider_connections", {
+  id: serial("id").primaryKey(),
+  providerId: integer("providerId").notNull(),            // FK to catalog_entries.id (provider type)
+  workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
+  baseUrl: text("baseUrl").notNull(),
+  lifecycleStatus: varchar("lifecycleStatus", { length: 30 }).default("draft").notNull().$type<ProviderConnectionStatus>(),
+  healthStatus: varchar("healthStatus", { length: 30 }),  // ok, degraded, unreachable
+  lastHealthCheck: timestamp("lastHealthCheck"),
+  secretVersion: integer("secretVersion").default(1).notNull(),
+  capabilities: json("capabilities").$type<string[]>(),   // ["chat", "embeddings", ...]
+  modelCount: integer("modelCount"),
+  createdBy: integer("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => ({
+  workspaceIdx: index("idx_pconn_workspace").on(table.workspaceId),
+  providerIdx: index("idx_pconn_provider").on(table.providerId),
+  statusIdx: index("idx_pconn_status").on(table.lifecycleStatus),
+}));
+
+export type ProviderConnection = typeof providerConnections.$inferSelect;
+export type InsertProviderConnection = typeof providerConnections.$inferInsert;
+
+/**
+ * Provider Secrets — Isolated encrypted PAT storage.
+ * Access restricted to orchestrator runtime only.
+ * PAT is encrypted with AES-256-GCM before storage.
+ */
+export const providerSecrets = pgTable("provider_secrets", {
+  id: serial("id").primaryKey(),
+  connectionId: integer("connectionId").notNull().references(() => providerConnections.id, { onDelete: "cascade" }),
+  encryptedPat: text("encryptedPat").notNull(),
+  keyVersion: integer("keyVersion").default(1).notNull(),
+  rotatedFrom: integer("rotatedFrom"),                     // FK to previous providerSecrets.id
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  connectionIdx: index("idx_psecret_connection").on(table.connectionId),
+}));
+
+export type ProviderSecret = typeof providerSecrets.$inferSelect;
+export type InsertProviderSecret = typeof providerSecrets.$inferInsert;
+
+/**
+ * Provider Audit Log — Immutable event trail for connection lifecycle.
+ * No UPDATE or DELETE should ever be issued against this table.
+ */
+export type ProviderAuditAction =
+  | "CONNECTION_CREATED"
+  | "CONNECTION_TESTED"
+  | "CONNECTION_ACTIVATED"
+  | "CONNECTION_FAILED"
+  | "CONNECTION_DISABLED"
+  | "SECRET_ROTATED"
+  | "HEALTH_CHECK_OK"
+  | "HEALTH_CHECK_FAILED";
+
+export const providerAuditLog = pgTable("provider_audit_log", {
+  id: serial("id").primaryKey(),
+  connectionId: integer("connectionId").notNull().references(() => providerConnections.id),
+  action: varchar("action", { length: 50 }).notNull().$type<ProviderAuditAction>(),
+  actor: integer("actor").notNull(),                       // userId who performed action
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  connectionIdx: index("idx_paudit_connection").on(table.connectionId),
+  actionIdx: index("idx_paudit_action").on(table.action),
+  timestampIdx: index("idx_paudit_timestamp").on(table.createdAt),
+}));
+
+export type ProviderAuditLogEntry = typeof providerAuditLog.$inferSelect;
+export type InsertProviderAuditLogEntry = typeof providerAuditLog.$inferInsert;
