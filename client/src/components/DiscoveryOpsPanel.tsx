@@ -99,39 +99,39 @@ export function DiscoveryHealthPanel() {
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Window</CardTitle>
+          <CardHeader className="pb-1 pt-4 px-4">
+            <CardTitle className="text-xs font-medium text-muted-foreground truncate">Window</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">Last {windowDays}d</div>
+          <CardContent className="px-4 pb-4">
+            <div className="text-xl font-bold">Last {windowDays}d</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Attempts</CardTitle>
+          <CardHeader className="pb-1 pt-4 px-4">
+            <CardTitle className="text-xs font-medium text-muted-foreground truncate">Attempts</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalAttempts}</div>
+          <CardContent className="px-4 pb-4">
+            <div className="text-xl font-bold">{totalAttempts}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Failure Rate</CardTitle>
+          <CardHeader className="pb-1 pt-4 px-4">
+            <CardTitle className="text-xs font-medium text-muted-foreground truncate">Failure Rate</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${Number(failureRate) > 50 ? "text-red-400" : Number(failureRate) > 20 ? "text-yellow-400" : "text-green-400"}`}>
+          <CardContent className="px-4 pb-4">
+            <div className={`text-xl font-bold ${Number(failureRate) > 50 ? "text-red-400" : Number(failureRate) > 20 ? "text-yellow-400" : "text-green-400"}`}>
               {failureRate}%
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Promotion Candidates</CardTitle>
+          <CardHeader className="pb-1 pt-4 px-4">
+            <CardTitle className="text-xs font-medium text-muted-foreground truncate">Candidates</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{candidates.filter((c: any) => c.status === "OPEN").length}</div>
+          <CardContent className="px-4 pb-4">
+            <div className="text-xl font-bold">{candidates.filter((c: any) => c.status === "OPEN").length}</div>
           </CardContent>
         </Card>
       </div>
@@ -152,9 +152,9 @@ export function DiscoveryHealthPanel() {
             ) : (
               <div className="space-y-2">
                 {failureReasons.map((fr: any) => (
-                  <div key={fr.reason} className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{fr.reason}</span>
-                    <Badge variant="outline">{fr.count}</Badge>
+                  <div key={fr.reason} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="text-muted-foreground truncate text-xs" title={fr.reason}>{fr.reason}</span>
+                    <Badge variant="outline" className="shrink-0">{fr.count}</Badge>
                   </div>
                 ))}
               </div>
@@ -176,18 +176,19 @@ export function DiscoveryHealthPanel() {
             ) : (
               <div className="space-y-2">
                 {stats.slice(0, 8).map((s) => (
-                  <div key={s.domain} className="flex items-center justify-between text-sm">
+                  <div key={s.domain} className="flex items-center justify-between gap-2 text-sm min-w-0">
                     <button
-                      className="text-left text-primary hover:underline truncate max-w-[200px]"
+                      className="text-left text-primary hover:underline truncate text-xs min-w-0"
                       onClick={() => setSelectedDomain(s.domain)}
+                      title={s.domain}
                     >
                       {s.domain}
                     </button>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-xs">{s.attemptsTotal} attempts</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-muted-foreground text-[10px]">{s.attemptsTotal} att.</span>
                       {s.attemptsFailed > 0 && (
                         <Badge variant="outline" className="text-[10px] border-red-600/30 text-red-400">
-                          {Math.round(s.attemptsFailed / s.attemptsTotal * 100)}% fail
+                          {Math.round(s.attemptsFailed / s.attemptsTotal * 100)}%
                         </Badge>
                       )}
                     </div>
@@ -202,13 +203,13 @@ export function DiscoveryHealthPanel() {
       {/* Promotion Candidates Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Promotion Candidates ({candidates.length})
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-sm flex items-center gap-2 truncate">
+              <Shield className="h-4 w-4 shrink-0" />
+              <span className="truncate">Candidates ({candidates.length})</span>
             </CardTitle>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px] h-8 text-xs">
+              <SelectTrigger className="w-[120px] h-8 text-xs shrink-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -376,19 +377,19 @@ function PromotionReviewDrawer({
 
   return (
     <Sheet open={!!domain} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-[500px] sm:w-[600px] overflow-y-auto">
+      <SheetContent className="w-[400px] sm:w-[500px] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <span className="font-mono">{domain}</span>
+          <SheetTitle className="flex items-center gap-2 min-w-0">
+            <span className="font-mono text-sm truncate" title={domain || ""}>{domain}</span>
             {candidate && (
               <Badge variant="outline" className={STATUS_BADGE[candidate.status] || ""}>
                 {candidate.status}
               </Badge>
             )}
           </SheetTitle>
-          <SheetDescription>
+          <SheetDescription className="text-xs">
             {candidate
-              ? `First detected: ${new Date(candidate.firstDetectedAt).toLocaleDateString()} | Last seen: ${new Date(candidate.lastSeenAt).toLocaleDateString()}`
+              ? `Detected: ${new Date(candidate.firstDetectedAt).toLocaleDateString()} · Last: ${new Date(candidate.lastSeenAt).toLocaleDateString()}`
               : "Loading..."}
           </SheetDescription>
         </SheetHeader>
@@ -401,21 +402,21 @@ function PromotionReviewDrawer({
                 <CardTitle className="text-sm">Summary Signals</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total attempts</span>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex justify-between gap-1">
+                    <span className="text-muted-foreground">Total</span>
                     <span className="font-medium">{stats.attemptsTotal}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-1">
                     <span className="text-muted-foreground">Failed</span>
                     <span className="font-medium text-red-400">{stats.attemptsFailed}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-1">
                     <span className="text-muted-foreground">Partial</span>
                     <span className="font-medium text-yellow-400">{stats.attemptsPartial}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">bestUrl null rate</span>
+                  <div className="flex justify-between gap-1">
+                    <span className="text-muted-foreground">Null URL</span>
                     <span className="font-medium">{(stats.bestUrlNullRate * 100).toFixed(0)}%</span>
                   </div>
                 </div>
@@ -525,22 +526,22 @@ function PromotionReviewDrawer({
               ) : (
                 <div className="space-y-1">
                   {events.map((ev: any) => (
-                    <div key={ev.id} className="text-xs bg-muted/50 rounded px-2 py-1.5 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                    <div key={ev.id} className="text-xs bg-muted/50 rounded px-2 py-1.5 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0 truncate">
                         {ev.status === "ok" ? (
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
                         ) : ev.status === "failed" ? (
-                          <XCircle className="h-3 w-3 text-red-500" />
+                          <XCircle className="h-3 w-3 text-red-500 shrink-0" />
                         ) : (
-                          <AlertTriangle className="h-3 w-3 text-yellow-500" />
+                          <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />
                         )}
                         <span>{ev.status}</span>
                         {ev.failureReason && (
-                          <span className="text-muted-foreground">{ev.failureReason}</span>
+                          <span className="text-muted-foreground truncate">{ev.failureReason}</span>
                         )}
                       </div>
-                      <span className="text-muted-foreground">
-                        {new Date(ev.createdAt).toLocaleString()}
+                      <span className="text-muted-foreground shrink-0 text-[10px]">
+                        {new Date(ev.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                   ))}
@@ -583,7 +584,7 @@ function PromotionReviewDrawer({
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 pt-2">
+          <div className="flex flex-wrap gap-2 pt-2">
             {candidate?.status === "OPEN" && (
               <Button size="sm" variant="outline" onClick={handleMarkInReview} disabled={markInReviewMut.isPending}>
                 {markInReviewMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
@@ -607,7 +608,7 @@ function PromotionReviewDrawer({
                   disabled={acceptMut.isPending}
                 >
                   {acceptMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                  Accept & Create Patch
+                  Accept
                 </Button>
               </>
             )}
