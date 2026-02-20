@@ -15,7 +15,7 @@ const VALID_TRANSITIONS: Record<ProviderConnectionStatus, ProviderConnectionStat
   validated: ["active"],
   active:    ["failed", "disabled"],
   failed:    ["disabled", "validated"],   // can re-test after failure
-  disabled:  ["draft"],                   // re-enable starts fresh
+  disabled:  ["draft", "active"],          // re-enable directly if secret still stored
   rotated:   ["active"],
 };
 
