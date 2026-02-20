@@ -1,0 +1,69 @@
+Session Summary — 2026-02-20 08:45 UTC
+========================================
+
+## Objective
+Complete all remaining Provider Discovery execution tasks (9 items), deploy, and test.
+
+## What Was Done
+
+### 1. Structured discovery_attempt Log (Step 0)
+- Added `emitDiscoveryAttempt()` function to `server/routers/discover-provider.ts`
+- Emits structured JSON on every return path: domain, status, failureReason, timings, candidateCount, bestUrl presence
+- All 7 return paths in `discoverProvider()` now emit the log
+
+### 2. Unit Tests — 45 Tests (Steps 0, 1, 2, 4, 7, 8)
+- Created `server/routers/discovery.test.ts`
+- Step 0: DB write prevention (source file scan for imports/writes)
+- Step 1: Registry matching — exact, subdomain, www strip, case-insensitive, slug lookup, modelsListProbe validation
+- Step 2: SSRF guard — HTTPS enforcement, userinfo rejection, blocked IPs (127.x, 10.x, 192.168.x, 169.254.x, ::1), public IP allow, no-DNS-records fail
+- Step 4: safeFetch constraints — verified 8s timeout, 512KB body cap, 3 redirect hops from source
+- Step 7: BestUrl gate — credible evidence check, confidence threshold, probe status [200, 401, 403]
+- Step 8: mapDiscoveryError — all failure reason classifications + edge cases
+
+### 3. ConnectProviderModal Cleanup (Step 11)
+- Removed legacy domain hacks: `registryId`, `providerId`, `entry.name` fallback chain
+- Now uses `registrySlug` exclusively via `findProviderBySlug()`
+- Removed unused `PROVIDER_API_URLS` map and `KNOWN_PROVIDERS` import
+- Simplified API key lookup to registrySlug-based provider fetch + name match fallback
+
+### 4. Secrets as References (Step 11)
+- Already implemented via connection service: PAT encrypted with AES-256-GCM, stored in `provider_secrets` table
+- Catalog entries never store raw secrets — connection references the encrypted store
+
+### 5. Model Inventory Sync (Step 12)
+- Added `syncModelInventory()` to `server/provider-connections/service.ts`
+- Fires async (fire-and-forget) after connection activation
+- Fetches /v1/models or /api/tags, updates modelCount on connection
+- Supports OpenAI-compatible and Ollama formats, handles PAT decryption for auth
+
+### 6. Execution Checklist — 73/73 Complete (100%)
+- Updated `docs/provider-discovery-execution-tasks.md` — all items checked off
+
+## Commits
+- `8bd1cc5` feat: Complete remaining Provider Discovery tasks — tests, logging, cleanup
+
+## Deploy
+- Deployed v3.0.151 via Builder Deploy workflow
+- Tunnel: https://strikes-brochures-stocks-anaheim.trycloudflare.com
+
+## API Test Results (11 endpoints verified)
+- discoverProvider: OpenAI (5ms), Ollama (25ms), DeepSeek (132ms) — all registry hits
+- discoverProvider unknown domain: graceful DNS_FAILED in 34ms
+- discoveryOps.stats: 4 domain stats from test calls
+- discoveryOps.candidates: empty (no promotions)
+- discoveryOps.topFailureReasons: DNS_FAILED: 1
+- discoveryOps.domainStats: per-domain detail
+- discoveryOps.recentEvents: structured events with timings/IPs/debug
+- catalogManage.list: catalog entries returned
+- providerConnections.list: empty (no connections yet)
+
+## Files Modified
+- server/routers/discover-provider.ts — structured log emitter + all return paths
+- server/routers/discovery.test.ts — NEW, 45 unit tests
+- client/src/components/ConnectProviderModal.tsx — removed domain hacks
+- server/provider-connections/service.ts — model inventory sync on activation
+- docs/provider-discovery-execution-tasks.md — 73/73 checked
+
+## TypeScript & Tests
+- `npm run check` (tsc --noEmit): clean, no errors
+- `npx vitest run server/routers/discovery.test.ts`: 45/45 pass (37ms)
