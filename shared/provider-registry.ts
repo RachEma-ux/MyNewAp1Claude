@@ -241,7 +241,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
   },
 ];
 
-// ── Lookup functions ─────────────────────────────────────────────────
+// ── Lookup functions (memoized) ──────────────────────────────────────
 
 /**
  * Normalize a domain for matching: lowercase, strip www., strip trailing dots.
@@ -250,36 +250,43 @@ function normalizeDomain(domain: string): string {
   return domain.toLowerCase().replace(/^www\./, "").replace(/\.$/, "");
 }
 
+// Pre-built lookup maps (computed once at module load)
+const _domainMap = new Map<string, KnownProvider>();
+const _slugMap = new Map<string, KnownProvider>();
+for (const p of KNOWN_PROVIDERS) {
+  _slugMap.set(p.slug, p);
+  for (const d of p.domains) {
+    _domainMap.set(normalizeDomain(d), p);
+  }
+}
+
 /**
  * Find a known provider by website domain.
  * Supports exact match and subdomain match (e.g. "console.anthropic.com" matches "anthropic.com").
+ * Uses pre-built Map for O(1) exact lookups.
  */
 export function findKnownProvider(domain: string): KnownProvider | undefined {
   const needle = normalizeDomain(domain);
 
-  // Exact match first
-  for (const provider of KNOWN_PROVIDERS) {
-    for (const d of provider.domains) {
-      if (normalizeDomain(d) === needle) return provider;
-    }
-  }
+  // O(1) exact match
+  const exact = _domainMap.get(needle);
+  if (exact) return exact;
 
   // Subdomain match (needle ends with ".knownDomain")
-  for (const provider of KNOWN_PROVIDERS) {
-    for (const d of provider.domains) {
-      const nd = normalizeDomain(d);
-      if (needle.endsWith("." + nd)) return provider;
-    }
-  }
+  let subdomainMatch: KnownProvider | undefined;
+  _domainMap.forEach((provider, knownDomain) => {
+    if (!subdomainMatch && needle.endsWith("." + knownDomain)) subdomainMatch = provider;
+  });
+  if (subdomainMatch) return subdomainMatch;
 
   return undefined;
 }
 
 /**
- * Find a known provider by slug.
+ * Find a known provider by slug. O(1) via pre-built Map.
  */
 export function findProviderBySlug(slug: string): KnownProvider | undefined {
-  return KNOWN_PROVIDERS.find((p) => p.slug === slug);
+  return _slugMap.get(slug);
 }
 
 /**
