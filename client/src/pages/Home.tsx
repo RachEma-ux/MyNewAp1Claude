@@ -14,6 +14,8 @@ import {
   Cpu,
   HardDrive,
   Zap,
+  Plug,
+  Search,
 } from "lucide-react";
 
 // Version: 2025-01-04 - Agent Creation Wizard Fix
@@ -22,6 +24,8 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const { data: workspaces, isLoading: workspacesLoading } = trpc.workspaces.list.useQuery();
   const { data: models, isLoading: modelsLoading } = trpc.models.list.useQuery({});
+  const { data: connections } = trpc.providerConnections.list.useQuery({ workspaceId: 1 });
+  const activeConnections = connections?.filter((c: any) => c.lifecycleStatus === "active") ?? [];
 
   const stats = [
     {
@@ -39,18 +43,18 @@ export default function Home() {
       color: "text-green-500",
     },
     {
+      title: "Providers",
+      value: activeConnections.length,
+      icon: <Plug className="h-5 w-5" />,
+      href: "/providers/connections",
+      color: "text-cyan-500",
+    },
+    {
       title: "Agents",
       value: 0,
       icon: <Bot className="h-5 w-5" />,
       href: "/agents",
       color: "text-purple-500",
-    },
-    {
-      title: "Documents",
-      value: 0,
-      icon: <Database className="h-5 w-5" />,
-      href: "/documents",
-      color: "text-orange-500",
     },
   ];
 
@@ -70,18 +74,18 @@ export default function Home() {
       color: "bg-green-500/10 text-green-500",
     },
     {
+      title: "Discover Providers",
+      description: "Find and connect LLM providers automatically",
+      icon: <Search className="h-6 w-6" />,
+      href: "/llm/catalogue/manage",
+      color: "bg-cyan-500/10 text-cyan-500",
+    },
+    {
       title: "Upload Documents",
       description: "Add documents to your knowledge base",
       icon: <Database className="h-6 w-6" />,
       href: "/documents",
       color: "bg-purple-500/10 text-purple-500",
-    },
-    {
-      title: "Download Models",
-      description: "Browse and download AI models",
-      icon: <Package className="h-6 w-6" />,
-      href: "/models",
-      color: "bg-orange-500/10 text-orange-500",
     },
   ];
 
