@@ -60,7 +60,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
   {
     slug: "google",
     name: "Google AI",
-    domains: ["ai.google.dev", "generativelanguage.googleapis.com", "aistudio.google.com"],
+    domains: ["ai.google.dev", "generativelanguage.googleapis.com", "aistudio.google.com", "google.com"],
     apiUrl: "https://generativelanguage.googleapis.com",
     description: "Gemini family of models",
     compatibility: "custom",
