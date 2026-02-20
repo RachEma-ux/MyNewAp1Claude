@@ -64,6 +64,13 @@
       "when": 1771718400000,
       "tag": "0008_provider_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1771804800000,
+      "tag": "0009_discovery_ops",
+      "breakpoints": true
     }
   ]
 }
