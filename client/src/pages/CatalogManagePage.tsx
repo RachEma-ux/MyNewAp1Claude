@@ -1314,6 +1314,23 @@ export default function CatalogManagePage() {
                     setFormConfig(JSON.stringify({ baseUrl: url }, null, 2));
                   }
                 }}
+                onAddToCatalog={(result) => {
+                  const slug = result.registrySlug
+                    || result.domain.replace(/\.(com|ai|io|dev|org|net|co)$/i, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+                  const normalizedUrl = discoverUrl.trim().replace(/^(?!https?:\/\/)/i, "https://");
+                  createMutation.mutate({
+                    name: slug,
+                    displayName: result.name || slug,
+                    description: result.description || undefined,
+                    entryType: "provider",
+                    config: {
+                      baseUrl: result.api?.bestUrl || undefined,
+                      registryId: result.registrySlug || undefined,
+                      websiteUrl: normalizedUrl,
+                    },
+                    tags: [result.domain],
+                  });
+                }}
               />
             )}
 
@@ -2469,6 +2486,7 @@ function DiscoverSection({
   onApply,
   onUndo,
   onApplyCandidate,
+  onAddToCatalog,
 }: {
   discoverUrl: string;
   setDiscoverUrl: (v: string) => void;
@@ -2480,6 +2498,7 @@ function DiscoverSection({
   onApply: (result: any) => void;
   onUndo: () => void;
   onApplyCandidate: (url: string) => void;
+  onAddToCatalog: (result: any) => void;
 }) {
   const discoverMutation = trpc.catalogManage.discoverProvider.useMutation();
 
@@ -2735,7 +2754,11 @@ function DiscoverSection({
                   Undo Apply
                 </Button>
               )}
-              <Button size="sm" onClick={() => onApply(discoverResult)}>
+              <Button size="sm" variant="default" onClick={() => onAddToCatalog(discoverResult)}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add to Catalog
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => onApply(discoverResult)}>
                 Apply to Form
               </Button>
             </div>
