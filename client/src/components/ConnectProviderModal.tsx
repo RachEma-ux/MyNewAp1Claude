@@ -111,8 +111,8 @@ export function ConnectProviderModal({
       });
       const config = entry.config as Record<string, any> | null;
 
-      // Resolve provider via registrySlug (the canonical lookup key)
-      const registrySlug = config?.registrySlug as string | undefined;
+      // Resolve provider via registrySlug or registryId (the canonical lookup key)
+      const registrySlug = (config?.registrySlug ?? config?.registryId) as string | undefined;
       const knownProvider = registrySlug ? findProviderBySlug(registrySlug) : undefined;
 
       // Auto-fill base URL from registry, then config overrides
