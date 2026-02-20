@@ -127,6 +127,10 @@ export function CatalogImportWizard({
   const websiteDiscoverMutation = trpc.catalogManage.discoverProvider.useMutation();
   const trpcUtils = trpc.useUtils();
   const bulkCreateMutation = trpc.catalogImport.bulkCreate.useMutation();
+  const catalogListQuery = trpc.catalogManage.list.useQuery({ entryType: "provider" });
+  const existingSlugs = new Set(
+    (catalogListQuery.data || []).map((e: any) => e.name?.toLowerCase())
+  );
   const registerMutation = trpc.catalogManage.create.useMutation({
     onSuccess: () => {
       trpcUtils.catalogManage.list.invalidate();
@@ -172,11 +176,24 @@ export function CatalogImportWizard({
     setBatchDiscovering(false);
   };
 
+  const getSlug = (result: any) =>
+    result.registrySlug || result.domain.replace(/\.(com|ai|io|dev|org|net|co)$/i, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+
+  const isAlreadyRegistered = (result: any) => {
+    if (!result) return false;
+    const slug = getSlug(result);
+    return existingSlugs.has(slug.toLowerCase());
+  };
+
   const registerOne = async (index: number) => {
     const entry = batchResults[index];
     if (!entry?.data?.name) return;
     const result = entry.data;
-    const slug = result.registrySlug || result.domain.replace(/\.(com|ai|io|dev|org|net|co)$/i, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    const slug = getSlug(result);
+    if (existingSlugs.has(slug.toLowerCase())) {
+      toast.error(`${result.name || slug} already exists in catalog`);
+      return;
+    }
     try {
       await registerMutation.mutateAsync({
         name: slug,
@@ -202,7 +219,7 @@ export function CatalogImportWizard({
   const registerAll = async () => {
     const registerable = batchResults
       .map((e, i) => ({ ...e, i }))
-      .filter((e) => e.status === "found" && e.data?.name && !e.registered);
+      .filter((e) => e.status === "found" && e.data?.name && !e.registered && !isAlreadyRegistered(e.data));
     for (const entry of registerable) {
       await registerOne(entry.i);
     }
@@ -374,7 +391,7 @@ export function CatalogImportWizard({
 
   const selectedCount = previewRows.filter((r) => r.selected).length;
 
-  const batchFoundCount = batchResults.filter((r) => r.status === "found" && r.data?.name && !r.registered).length;
+  const batchFoundCount = batchResults.filter((r) => r.status === "found" && r.data?.name && !r.registered && !isAlreadyRegistered(r.data)).length;
   const batchRegisteredCount = batchResults.filter((r) => r.registered).length;
 
   return (
@@ -490,6 +507,9 @@ export function CatalogImportWizard({
                     </>
                   )}
                 </p>
+                {websiteDiscoverMutation.data && isAlreadyRegistered(websiteDiscoverMutation.data as any) ? (
+                  <Badge variant="outline" className="text-muted-foreground border-muted text-xs">Exists</Badge>
+                ) : (
                 <Button
                   size="sm"
                   variant="default"
@@ -497,7 +517,11 @@ export function CatalogImportWizard({
                   disabled={!(websiteDiscoverMutation.data as any)?.name || registerMutation.isPending}
                   onClick={() => {
                     const result = websiteDiscoverMutation.data as any;
-                    const slug = result.registrySlug || result.domain.replace(/\.(com|ai|io|dev|org|net|co)$/i, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+                    const slug = getSlug(result);
+                    if (existingSlugs.has(slug.toLowerCase())) {
+                      toast.error(`${result.name || slug} already exists in catalog`);
+                      return;
+                    }
                     registerMutation.mutate({
                       name: slug,
                       displayName: result.name || slug,
@@ -515,6 +539,7 @@ export function CatalogImportWizard({
                   {registerMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
                   Register
                 </Button>
+                )}
               </div>
               {websiteDiscoverMutation.isError && (
                 <p className="text-xs text-red-400">Discovery failed — enter URL manually below</p>
@@ -884,6 +909,8 @@ export function CatalogImportWizard({
                 <div className="shrink-0">
                   {entry.registered ? (
                     <Badge variant="outline" className="text-green-400 border-green-600/30">Registered</Badge>
+                  ) : entry.status === "found" && d?.name && isAlreadyRegistered(d) ? (
+                    <Badge variant="outline" className="text-muted-foreground border-muted">Exists</Badge>
                   ) : entry.status === "found" && d?.name ? (
                     <Button
                       size="sm"
