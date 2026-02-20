@@ -583,31 +583,33 @@ export default function CatalogManagePage() {
         <ChevronLeft className="h-4 w-4 mr-1" />Back to Catalogue
       </Button>
 
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Manage Catalogue</h1>
-          <p className="text-muted-foreground mt-1">
-            Create, edit, and manage catalog entries before publishing
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight">Manage Catalogue</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Create, edit, and manage catalog entries
           </p>
         </div>
-        <Button onClick={() => setNewEntryPopupOpen(true)}>
+        <Button onClick={() => setNewEntryPopupOpen(true)} className="shrink-0 self-start">
           <Plus className="h-4 w-4 mr-2" />New Entry
         </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList>
-          <TabsTrigger value="catalog">Catalog</TabsTrigger>
-          <TabsTrigger value="validation">Validation</TabsTrigger>
-          <TabsTrigger value="publishing">Publishing</TabsTrigger>
-          <TabsTrigger value="audit">Audit Log</TabsTrigger>
-          <TabsTrigger value="discovery-ops">Discovery Ops</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList>
+            <TabsTrigger value="catalog">Catalog</TabsTrigger>
+            <TabsTrigger value="validation">Validate</TabsTrigger>
+            <TabsTrigger value="publishing">Publish</TabsTrigger>
+            <TabsTrigger value="audit">Audit</TabsTrigger>
+            <TabsTrigger value="discovery-ops">Discovery</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="catalog" className="mt-4">
           {/* Filters */}
-          <div className="flex gap-3 mb-4">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap gap-3 mb-4">
+            <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search entries..."
@@ -617,7 +619,7 @@ export default function CatalogManagePage() {
               />
             </div>
             <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
