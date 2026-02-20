@@ -99,7 +99,7 @@ export function DiscoveryHealthPanel() {
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Window</CardTitle>
@@ -137,7 +137,7 @@ export function DiscoveryHealthPanel() {
       </div>
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Top Failure Reasons */}
         <Card>
           <CardHeader>
@@ -225,6 +225,7 @@ export function DiscoveryHealthPanel() {
           {candidates.length === 0 ? (
             <p className="text-sm text-muted-foreground">No promotion candidates</p>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -240,7 +241,7 @@ export function DiscoveryHealthPanel() {
               <TableBody>
                 {candidates.map((c: any) => (
                   <TableRow key={c.id}>
-                    <TableCell className="font-mono text-xs">{c.domain}</TableCell>
+                    <TableCell className="font-mono text-xs truncate max-w-[200px]" title={c.domain}>{c.domain}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={STATUS_BADGE[c.status] || ""}>
                         {c.status}
@@ -271,6 +272,7 @@ export function DiscoveryHealthPanel() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
