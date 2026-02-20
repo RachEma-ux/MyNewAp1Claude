@@ -46,6 +46,16 @@ import { getProviderRegistry } from "../providers/registry";
 import * as providerDb from "../providers/db";
 import { discoverProvider } from "./discover-provider";
 
+// ── Rate Limiting & Caching ─────────────────────────────────────────
+const _rateLimitBuckets = new Map<string, { windowStart: number; count: number }>();
+const _discoveryCache = new Map<string, { result: any; ts: number }>();
+// Clean up stale entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  _rateLimitBuckets.forEach((v, k) => { if (now - v.windowStart > 120_000) _rateLimitBuckets.delete(k); });
+  _discoveryCache.forEach((v, k) => { if (now - v.ts > 120_000) _discoveryCache.delete(k); });
+}, 300_000);
+
 // ============================================================================
 // Input Schemas
 // ============================================================================
@@ -108,11 +118,40 @@ export const catalogManageRouter = router({
    * Discover provider metadata from a website URL.
    * Returns name, description, API URL candidates — never writes to DB.
    * Logs discovery event for monitoring/promotion triggers.
+   *
+   * Rate limited: 10 req/min per user. Cached: 60s per domain.
    */
   discoverProvider: protectedProcedure
     .input(z.object({ websiteUrl: z.string().url() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Rate limit: 10 requests per minute per user
+      const userId = ctx.user?.id ?? 0;
+      const now = Date.now();
+      const windowMs = 60_000;
+      const maxRequests = 10;
+      const key = `discover:${userId}`;
+      let bucket = _rateLimitBuckets.get(key);
+      if (!bucket || now - bucket.windowStart > windowMs) {
+        bucket = { windowStart: now, count: 0 };
+        _rateLimitBuckets.set(key, bucket);
+      }
+      bucket.count++;
+      if (bucket.count > maxRequests) {
+        throw new Error("Rate limit exceeded — max 10 discovery requests per minute");
+      }
+
+      // Short-TTL cache (60s) — return cached result for same domain
+      const domain = input.websiteUrl.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].toLowerCase();
+      const cached = _discoveryCache.get(domain);
+      if (cached && now - cached.ts < 60_000) {
+        return cached.result;
+      }
+
       const result = await discoverProvider(input.websiteUrl);
+
+      // Cache result
+      _discoveryCache.set(domain, { result, ts: now });
+
       // Log event asynchronously (non-blocking)
       import("./discovery-ops").then(({ logDiscoveryEvent }) => {
         logDiscoveryEvent(result).catch(() => {});
