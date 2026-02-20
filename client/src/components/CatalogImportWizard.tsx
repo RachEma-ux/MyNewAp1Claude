@@ -112,6 +112,11 @@ export function CatalogImportWizard({
   const [forceConflicts, setForceConflicts] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
+  const normalizeUrl = (u: string) => {
+    const v = u.trim();
+    if (!v) return v;
+    return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  };
 
   const discoverMutation = trpc.catalogImport.discoverFromApi.useMutation();
   const websiteDiscoverMutation = trpc.catalogManage.discoverProvider.useMutation();
@@ -347,7 +352,7 @@ export function CatalogImportWizard({
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && websiteUrl.trim()) {
                       e.preventDefault();
-                      websiteDiscoverMutation.mutateAsync({ websiteUrl: websiteUrl.trim() }).then((result: any) => {
+                      websiteDiscoverMutation.mutateAsync({ websiteUrl: normalizeUrl(websiteUrl) }).then((result: any) => {
                         if (result.api?.bestUrl) setBaseUrl(result.api.bestUrl);
                       }).catch(() => {});
                     }
@@ -359,7 +364,7 @@ export function CatalogImportWizard({
                   className="shrink-0"
                   disabled={!websiteUrl.trim() || websiteDiscoverMutation.isPending}
                   onClick={() => {
-                    websiteDiscoverMutation.mutateAsync({ websiteUrl: websiteUrl.trim() }).then((result: any) => {
+                    websiteDiscoverMutation.mutateAsync({ websiteUrl: normalizeUrl(websiteUrl) }).then((result: any) => {
                       if (result.api?.bestUrl) setBaseUrl(result.api.bestUrl);
                     }).catch(() => {});
                   }}
