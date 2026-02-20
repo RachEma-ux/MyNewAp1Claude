@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { CatalogSelect } from "@/components/CatalogSelect";
-import { KNOWN_PROVIDERS, findProviderBySlug } from "@shared/provider-registry";
+import { findProviderBySlug } from "@shared/provider-registry";
 import {
   Dialog,
   DialogContent,
@@ -57,12 +57,6 @@ interface TestResult {
   latencyMs: number;
 }
 
-// Build base-URL lookup from the shared provider registry
-const PROVIDER_API_URLS: Record<string, string> = Object.fromEntries(
-  KNOWN_PROVIDERS
-    .filter((p) => p.apiUrl || p.defaultLocalUrl)
-    .map((p) => [p.slug, (p.apiUrl ?? p.defaultLocalUrl)!])
-);
 
 export function ConnectProviderModal({
   open,
@@ -117,50 +111,34 @@ export function ConnectProviderModal({
       });
       const config = entry.config as Record<string, any> | null;
 
-      // Try shared registry via registrySlug first, then fall back to legacy fields
+      // Resolve provider via registrySlug (the canonical lookup key)
       const registrySlug = config?.registrySlug as string | undefined;
       const knownProvider = registrySlug ? findProviderBySlug(registrySlug) : undefined;
 
-      const rawRegistryId = (registrySlug ||
-        config?.registryId ||
-        config?.providerId ||
-        entry.name) as string | undefined;
-      const registryId = rawRegistryId?.toLowerCase();
-
-      // 1. Auto-fill base URL — prefer registry, then config, then legacy map
+      // Auto-fill base URL from registry, then config overrides
       const url =
         knownProvider?.apiUrl ||
         knownProvider?.defaultLocalUrl ||
         config?.baseUrl ||
-        config?.apiUrl ||
-        config?.endpoint ||
-        (registryId && PROVIDER_API_URLS[registryId]) ||
         undefined;
       if (url) setBaseUrl(url);
 
-      // 2. Auto-fill API key from multiple sources
+      // Auto-fill API key from provider registry by slug or name
       let foundKey: string | undefined;
 
-      // Source A: catalog entry config
-      if (config?.apiKey) {
-        foundKey = config.apiKey as string;
-      }
-
-      // Source B: provider registry by type
-      if (!foundKey && registryId) {
+      if (registrySlug) {
         try {
-          const providers = await trpcUtils.providers.list.fetch({ type: registryId as any });
+          const providers = await trpcUtils.providers.list.fetch({ type: registrySlug as any });
           const provConfig = providers?.[0]?.config as Record<string, any> | null;
           if (provConfig?.apiKey) foundKey = provConfig.apiKey as string;
         } catch { /* ignore */ }
       }
 
-      // Source C: provider registry by name match
       if (!foundKey) {
         try {
           const allProviders = await trpcUtils.providers.list.fetch({});
           const match = allProviders.find((p: any) =>
-            p.type?.toLowerCase() === registryId || p.name.toLowerCase() === entry.name.toLowerCase()
+            p.name.toLowerCase() === entry.name.toLowerCase()
           );
           const matchConfig = match?.config as Record<string, any> | null;
           if (matchConfig?.apiKey) foundKey = matchConfig.apiKey as string;

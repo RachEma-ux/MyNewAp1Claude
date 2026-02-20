@@ -161,6 +161,25 @@ function elapsed(start: number): number {
   return Math.round(performance.now() - start);
 }
 
+// ── Structured Log Emitter ──────────────────────────────────────────
+
+function emitDiscoveryAttempt(result: DiscoverResult) {
+  const entry = {
+    event: "discovery_attempt",
+    ts: new Date().toISOString(),
+    domain: result.domain,
+    source: result.source,
+    status: result.status,
+    failureReason: result.failureReason ?? null,
+    bestUrl: result.api.bestUrl !== null,
+    candidateCount: result.api.candidates.length,
+    registrySlug: result.registrySlug ?? null,
+    timingsMs: result.debug.timingsMs,
+    warnings: result.warnings,
+  };
+  console.log(`[DiscoveryAttempt] ${JSON.stringify(entry)}`);
+}
+
 // ── Main Discovery Function ──────────────────────────────────────────
 
 export async function discoverProvider(websiteUrl: string): Promise<DiscoverResult> {
@@ -184,7 +203,9 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
   try {
     domain = extractDomain(normalizedUrl);
   } catch {
-    return makeFailedResult("INVALID_URL", "Invalid website URL format.", normalizedUrl, debug, totalStart);
+    const r = makeFailedResult("INVALID_URL", "Invalid website URL format.", normalizedUrl, debug, totalStart);
+    emitDiscoveryAttempt(r);
+    return r;
   }
 
   const isDev = process.env.NODE_ENV === "development";
@@ -202,7 +223,7 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       ? "Domain could not be resolved."
       : "URL blocked by outbound security policy.";
 
-    return {
+    const r: DiscoverResult = {
       name: null,
       description: null,
       api: { bestUrl: null, candidates: [] },
@@ -213,6 +234,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       warnings: [warning],
       debug: { ...debug, timingsMs: { ...debug.timingsMs, total: elapsed(totalStart) } },
     };
+    emitDiscoveryAttempt(r);
+    return r;
   }
   if (validation.resolvedIPs) debug.resolvedIPs.push(...validation.resolvedIPs);
 
@@ -222,7 +245,7 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
   const knownProvider = findKnownProvider(domain);
   if (knownProvider && knownProvider.apiUrl) {
     console.log(`[Discovery] Registry hit: ${knownProvider.slug}`);
-    return {
+    const r: DiscoverResult = {
       name: knownProvider.name,
       description: knownProvider.description,
       api: {
@@ -247,12 +270,14 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       warnings,
       debug: { ...debug, timingsMs: { ...debug.timingsMs, total: elapsed(totalStart) } },
     };
+    emitDiscoveryAttempt(r);
+    return r;
   }
 
   // If registry match but local (no apiUrl), still return registry info
   if (knownProvider && !knownProvider.apiUrl) {
     console.log(`[Discovery] Registry hit (local): ${knownProvider.slug}`);
-    return {
+    const r: DiscoverResult = {
       name: knownProvider.name,
       description: knownProvider.description,
       api: {
@@ -279,6 +304,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       warnings,
       debug: { ...debug, timingsMs: { ...debug.timingsMs, total: elapsed(totalStart) } },
     };
+    emitDiscoveryAttempt(r);
+    return r;
   }
 
   // 4. Fetch HTML
@@ -313,7 +340,7 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
 
     const hasUsableData = bestUrl !== null || heuristicCandidates.length > 0;
 
-    return {
+    const r: DiscoverResult = {
       name: null,
       description: null,
       api: { bestUrl, candidates: heuristicCandidates },
@@ -324,6 +351,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       warnings,
       debug: { ...debug, timingsMs: { ...debug.timingsMs, total: elapsed(totalStart) } },
     };
+    emitDiscoveryAttempt(r);
+    return r;
   }
 
   console.log(
@@ -338,7 +367,7 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
   } catch {
     debug.timingsMs.parse = elapsed(parseStart);
     warnings.push("Unable to parse website metadata.");
-    return {
+    const r: DiscoverResult = {
       name: null,
       description: null,
       api: { bestUrl: null, candidates: [] },
@@ -349,6 +378,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       warnings,
       debug: { ...debug, timingsMs: { ...debug.timingsMs, total: elapsed(totalStart) } },
     };
+    emitDiscoveryAttempt(r);
+    return r;
   }
 
   // Extract name
@@ -509,11 +540,7 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
 
   debug.timingsMs.total = elapsed(totalStart);
 
-  console.log(
-    `[Discovery] domain=${domain} source=website status=${status} name="${name}" bestUrl=${bestUrl} candidates=${viableCandidates.length} timings=${JSON.stringify(debug.timingsMs)}`
-  );
-
-  return {
+  const result: DiscoverResult = {
     name,
     description,
     api: { bestUrl, candidates: viableCandidates },
@@ -524,6 +551,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
     warnings,
     debug,
   };
+  emitDiscoveryAttempt(result);
+  return result;
 }
 
 // ── Probe a candidate URL ────────────────────────────────────────────

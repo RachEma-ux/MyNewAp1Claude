@@ -286,6 +286,61 @@ export async function activateConnection(
 
   await updateConnectionStatus(conn.id, "active");
   await appendAuditLog(conn.id, "CONNECTION_ACTIVATED", actor);
+
+  // Fire-and-forget model inventory sync
+  syncModelInventory(conn).catch((e) =>
+    console.log(`[ProviderConnections] Model sync skipped for conn ${conn.id}: ${e.message}`)
+  );
+}
+
+/**
+ * Sync model inventory — fetches model list and stores as JSON on the connection.
+ * Runs async after activation so it doesn't block the UX.
+ */
+async function syncModelInventory(conn: ProviderConnection): Promise<void> {
+  const baseUrl = conn.baseUrl?.replace(/\/$/, "");
+  if (!baseUrl) return;
+
+  // Decrypt PAT if available
+  let pat: string | undefined;
+  try {
+    const secret = await getLatestSecret(conn.id);
+    if (secret?.encryptedPat) {
+      pat = decrypt(secret.encryptedPat);
+    }
+  } catch {
+    // No secret — local provider
+  }
+
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (pat) headers["Authorization"] = `Bearer ${pat}`;
+  if (baseUrl.includes("anthropic")) headers["anthropic-version"] = "2023-06-01";
+  if (pat && baseUrl.includes("anthropic")) headers["x-api-key"] = pat;
+
+  // Try /v1/models first, then /api/tags (Ollama)
+  let modelIds: string[] = [];
+  for (const path of ["/v1/models", "/api/tags"]) {
+    try {
+      const res = await fetch(`${baseUrl}${path}`, {
+        headers,
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) continue;
+      const body = await res.json();
+      const list = body.data || body.models || [];
+      modelIds = list.map((m: any) => m.id || m.name || "").filter(Boolean);
+      if (modelIds.length > 0) break;
+    } catch {
+      continue;
+    }
+  }
+
+  if (modelIds.length > 0) {
+    await updateConnectionStatus(conn.id, conn.lifecycleStatus as any, {
+      modelCount: modelIds.length,
+    });
+    console.log(`[ProviderConnections] Synced ${modelIds.length} models for conn ${conn.id}`);
+  }
 }
 
 // ============================================================================
