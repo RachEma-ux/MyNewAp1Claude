@@ -71,6 +71,8 @@ export interface ApiCandidate {
   probeType?: "registry-probe" | "openai-shape-best-effort";
   probe?: { path: string; status: number | null };
   evidence?: string;
+  models?: string[];
+  modelCount?: number;
 }
 
 // ── Error Mapping ───────────────────────────────────────────────────
@@ -308,7 +310,57 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
     return r;
   }
 
-  // 4. Fetch HTML
+  // 4. Phase 1: Direct API probing (multi-subdomain × multi-path)
+  console.log(`[Discovery] Phase 1: Direct API probing for ${domain}`);
+  const apiProbeStart = performance.now();
+  const apiProbeCandidates = await probeHeuristicCandidates(domain, isDev);
+  debug.timingsMs.probe = elapsed(apiProbeStart);
+
+  if (apiProbeCandidates.length > 0) {
+    const bestUrl = selectBestUrl(apiProbeCandidates);
+    if (bestUrl) {
+      console.log(`[Discovery] Phase 1 hit: ${bestUrl}`);
+      // Still fetch HTML briefly for name/description
+      let apiName: string | null = null;
+      let apiDescription: string | null = null;
+      try {
+        const quickFetch = await safeFetch(normalizedUrl, {
+          allowHttp: isDev,
+          maxBodyBytes: 256 * 1024,
+          totalTimeoutMs: 4000,
+        });
+        if (quickFetch.ok) {
+          const q$ = cheerio.load(quickFetch.body);
+          const ogName = q$('meta[property="og:site_name"]').attr("content");
+          apiName = ogName?.trim() || cleanTitle(q$("title").text()) || null;
+          apiDescription = q$('meta[name="description"]').attr("content")?.trim()
+            || q$('meta[property="og:description"]').attr("content")?.trim()
+            || null;
+        }
+      } catch { /* name lookup is best-effort */ }
+
+      if (!apiName) {
+        apiName = domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1);
+      }
+
+      debug.timingsMs.total = elapsed(totalStart);
+      const r: DiscoverResult = {
+        name: apiName,
+        description: apiDescription,
+        api: { bestUrl, candidates: apiProbeCandidates },
+        source: "website",
+        domain,
+        status: "ok",
+        warnings,
+        debug,
+      };
+      emitDiscoveryAttempt(r);
+      return r;
+    }
+  }
+
+  // 5. Phase 2: Fetch HTML (fallback when direct probing didn't find a confirmed API)
+  console.log(`[Discovery] Phase 2: HTML scraping for ${domain}`);
   const fetchStart = performance.now();
   const fetchResult = await safeFetch(normalizedUrl, {
     allowHttp: isDev,
@@ -555,22 +607,44 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
   return result;
 }
 
-// ── Probe a candidate URL ────────────────────────────────────────────
+// ── API Probe Paths & Subdomains ─────────────────────────────────────
 
-async function probeCandidate(
-  baseUrl: string,
+const API_PATHS = [
+  "/v1/models",
+  "/studio/v1/models",   // AI21
+  "/v2/models",          // Cohere
+  "/api/v1/models",
+  "/v1/engines",         // older OpenAI style
+  "/models",             // bare
+];
+
+const API_SUBDOMAINS = [
+  "api",
+  "studio",
+  "developers",
+  "platform",
+];
+
+// ── Probe a single URL ──────────────────────────────────────────────
+
+interface ProbeResult {
+  path: string;
+  status: number | null;
+  models?: string[];      // model IDs from 200 response
+  modelCount?: number;
+}
+
+async function probeSingleUrl(
+  url: string,
+  path: string,
   allowHttp: boolean
-): Promise<{ path: string; status: number | null } | null> {
-  const path = "/v1/models";
-  const url = `${baseUrl}${path}`;
-
-  // SSRF validate the candidate
+): Promise<ProbeResult | null> {
   const validation = await validateExternalUrl(url, { allowHttp });
   if (!validation.safe) return null;
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
+    const timeout = setTimeout(() => controller.abort(), 2500);
 
     const res = await fetch(url, {
       method: "GET",
@@ -582,44 +656,105 @@ async function probeCandidate(
     });
 
     clearTimeout(timeout);
-    return { path, status: res.status };
+    const result: ProbeResult = { path, status: res.status };
+
+    // Read response body on 200 to extract model info
+    if (res.status === 200) {
+      try {
+        const text = await res.text();
+        const body = JSON.parse(text.slice(0, 32768)); // limit parse size
+        // OpenAI-compatible: { data: [{ id: "model-name" }, ...] }
+        if (body.data && Array.isArray(body.data)) {
+          result.models = body.data.slice(0, 20).map((m: any) => m.id || m.name).filter(Boolean);
+          result.modelCount = body.data.length;
+        }
+        // Some providers: { models: [{ name: "..." }, ...] }
+        else if (body.models && Array.isArray(body.models)) {
+          result.models = body.models.slice(0, 20).map((m: any) => m.id || m.name || m.model).filter(Boolean);
+          result.modelCount = body.models.length;
+        }
+        // Bare array: [{ id: "..." }, ...]
+        else if (Array.isArray(body)) {
+          result.models = body.slice(0, 20).map((m: any) => m.id || m.name).filter(Boolean);
+          result.modelCount = body.length;
+        }
+      } catch {
+        // JSON parse failed — still a valid 200 probe
+      }
+    }
+
+    return result;
   } catch {
     return null;
   }
 }
 
-// ── Heuristic candidates (when HTML fetch fails) ─────────────────────
+// ── Probe a candidate base URL with multiple paths ──────────────────
+
+async function probeCandidate(
+  baseUrl: string,
+  allowHttp: boolean
+): Promise<ProbeResult | null> {
+  // Try all paths in parallel for speed
+  const probes = API_PATHS.map((path) =>
+    probeSingleUrl(`${baseUrl}${path}`, path, allowHttp)
+  );
+  const results = await Promise.all(probes);
+
+  // Pick best result: prefer 200 with models, then 200, then 401/403
+  let best: ProbeResult | null = null;
+  for (const r of results) {
+    if (!r) continue;
+    if (r.status === 200 && r.models?.length) return r; // ideal — stop early
+    if (r.status === 200 && (!best || best.status !== 200)) best = r;
+    if ((r.status === 401 || r.status === 403) && !best) best = r;
+  }
+  return best;
+}
+
+// ── Direct API probing (Phase 1) ────────────────────────────────────
 
 async function probeHeuristicCandidates(
   domain: string,
   allowHttp: boolean
 ): Promise<ApiCandidate[]> {
-  const candidates: ApiCandidate[] = [
-    {
-      url: `https://api.${domain}`,
-      confidence: 20,
-      confidenceLabel: "low",
-      evidence: "api-subdomain-heuristic",
-    },
-  ];
+  // Build candidate base URLs from subdomain patterns
+  const baseUrls = API_SUBDOMAINS.map((sub) => `https://${sub}.${domain}`);
+  // Also try the bare domain itself
+  baseUrls.push(`https://${domain}`);
 
-  for (const candidate of candidates) {
-    const probeResult = await probeCandidate(candidate.url, allowHttp);
-    if (probeResult) {
-      candidate.probe = probeResult;
-      candidate.probeType = "openai-shape-best-effort";
-      if (probeResult.status === 200) {
-        candidate.confidence = Math.min(candidate.confidence + 50, 90);
-      } else if (probeResult.status === 401 || probeResult.status === 403) {
-        candidate.confidence = Math.min(candidate.confidence + 45, 90);
-      }
-      candidate.confidenceLabel = confidenceLabel(candidate.confidence);
+  // Probe all subdomains in parallel
+  const probePromises = baseUrls.map(async (baseUrl): Promise<ApiCandidate | null> => {
+    const result = await probeCandidate(baseUrl, allowHttp);
+    if (!result) return null;
+
+    let confidence = 20;
+    if (result.status === 200 && result.models?.length) {
+      confidence = 90;
+    } else if (result.status === 200) {
+      confidence = 70;
+    } else if (result.status === 401 || result.status === 403) {
+      confidence = 65;
     } else {
-      candidate.confidence = 0;
+      return null; // not useful
     }
-  }
 
-  return candidates.filter((c) => c.confidence > 0);
+    return {
+      url: `${baseUrl}${result.path.replace(/\/models$|\/engines$/, "")}`,
+      confidence,
+      confidenceLabel: confidenceLabel(confidence),
+      probeType: "openai-shape-best-effort",
+      probe: { path: result.path, status: result.status },
+      evidence: "api-probe",
+      models: result.models,
+      modelCount: result.modelCount,
+    };
+  });
+
+  const results = await Promise.all(probePromises);
+  return results
+    .filter((c): c is ApiCandidate => c !== null)
+    .sort((a, b) => b.confidence - a.confidence);
 }
 
 // ── BestUrl Selection Gate ───────────────────────────────────────────
@@ -637,6 +772,7 @@ function selectBestUrl(candidates: ApiCandidate[]): string | null {
     const hasCredibleEvidence =
       c.evidence === "base-url-text" ||
       c.evidence === "Known provider registry" ||
+      c.evidence === "api-probe" ||
       (c.evidence === "api-subdomain-heuristic" && probeOk) ||
       (c.evidence === "html-link" && probeOk);
 

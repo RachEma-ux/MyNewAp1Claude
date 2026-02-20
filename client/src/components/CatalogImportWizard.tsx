@@ -114,6 +114,9 @@ export function CatalogImportWizard({
   const [forceConflicts, setForceConflicts] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
+  const [batchResults, setBatchResults] = useState<Array<{ url: string; status: "pending" | "discovering" | "found" | "failed"; data?: any; registered?: boolean }>>([]);
+  const [batchDiscovering, setBatchDiscovering] = useState(false);
+  const [batchPopupOpen, setBatchPopupOpen] = useState(false);
   const normalizeUrl = (u: string) => {
     const v = u.trim();
     if (!v) return v;
@@ -127,9 +130,83 @@ export function CatalogImportWizard({
   const registerMutation = trpc.catalogManage.create.useMutation({
     onSuccess: () => {
       trpcUtils.catalogManage.list.invalidate();
-      toast.success("Provider registered to catalog!");
     },
   });
+
+  const runBatchDiscovery = async () => {
+    const urls = websiteUrl
+      .split(/[,\n]+/)
+      .map((u) => u.trim())
+      .filter(Boolean);
+    if (urls.length === 0) return;
+
+    const entries = urls.map((url) => ({ url: normalizeUrl(url), status: "pending" as const }));
+    setBatchResults(entries);
+    setBatchDiscovering(true);
+    setBatchPopupOpen(true);
+
+    // Discover all in parallel, updating state as each finishes
+    await Promise.allSettled(
+      entries.map(async (entry, i) => {
+        setBatchResults((prev) => {
+          const copy = [...prev];
+          copy[i] = { ...copy[i], status: "discovering" };
+          return copy;
+        });
+        try {
+          const result = await websiteDiscoverMutation.mutateAsync({ websiteUrl: entry.url });
+          setBatchResults((prev) => {
+            const copy = [...prev];
+            copy[i] = { ...copy[i], status: result.name ? "found" : "failed", data: result };
+            return copy;
+          });
+        } catch {
+          setBatchResults((prev) => {
+            const copy = [...prev];
+            copy[i] = { ...copy[i], status: "failed" };
+            return copy;
+          });
+        }
+      })
+    );
+    setBatchDiscovering(false);
+  };
+
+  const registerOne = async (index: number) => {
+    const entry = batchResults[index];
+    if (!entry?.data?.name) return;
+    const result = entry.data;
+    const slug = result.registrySlug || result.domain.replace(/\.(com|ai|io|dev|org|net|co)$/i, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    try {
+      await registerMutation.mutateAsync({
+        name: slug,
+        displayName: result.name || slug,
+        description: result.description || undefined,
+        entryType: "provider",
+        config: {
+          baseUrl: result.api?.bestUrl || undefined,
+          registryId: result.registrySlug || undefined,
+          websiteUrl: entry.url,
+        },
+        tags: [result.domain],
+      });
+      const updated = [...batchResults];
+      updated[index] = { ...entry, registered: true };
+      setBatchResults(updated);
+      toast.success(`Registered: ${result.name}`);
+    } catch (e: any) {
+      toast.error(`Failed to register ${result.name}: ${e.message}`);
+    }
+  };
+
+  const registerAll = async () => {
+    const registerable = batchResults
+      .map((e, i) => ({ ...e, i }))
+      .filter((e) => e.status === "found" && e.data?.name && !e.registered);
+    for (const entry of registerable) {
+      await registerOne(entry.i);
+    }
+  };
 
   // Reset state when dialog closes
   const handleOpenChange = (isOpen: boolean) => {
@@ -297,7 +374,11 @@ export function CatalogImportWizard({
 
   const selectedCount = previewRows.filter((r) => r.selected).length;
 
+  const batchFoundCount = batchResults.filter((r) => r.status === "found" && r.data?.name && !r.registered).length;
+  const batchRegisteredCount = batchResults.filter((r) => r.registered).length;
+
   return (
+    <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
@@ -354,12 +435,36 @@ export function CatalogImportWizard({
               </Label>
               <div className="flex gap-2">
                 <Input
-                  placeholder="https://fireworks.ai"
+                  placeholder="ai21.com, reka.ai, voyage.ai"
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && websiteUrl.trim()) {
                       e.preventDefault();
+                      const urls = websiteUrl.split(/[,\n]+/).map((u) => u.trim()).filter(Boolean);
+                      if (urls.length > 1) {
+                        runBatchDiscovery();
+                      } else {
+                        websiteDiscoverMutation.mutateAsync({ websiteUrl: normalizeUrl(websiteUrl) }).then((result: any) => {
+                          if (result.api?.bestUrl) {
+                            setBaseUrl(result.api.bestUrl);
+                            if (result.authType !== "none") toast.success("API URL discovered! Enter your PAT key below.", { duration: 6000 });
+                          }
+                        }).catch(() => {});
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={!websiteUrl.trim() || websiteDiscoverMutation.isPending || batchDiscovering}
+                  onClick={() => {
+                    const urls = websiteUrl.split(/[,\n]+/).map((u) => u.trim()).filter(Boolean);
+                    if (urls.length > 1) {
+                      runBatchDiscovery();
+                    } else {
                       websiteDiscoverMutation.mutateAsync({ websiteUrl: normalizeUrl(websiteUrl) }).then((result: any) => {
                         if (result.api?.bestUrl) {
                           setBaseUrl(result.api.bestUrl);
@@ -368,33 +473,28 @@ export function CatalogImportWizard({
                       }).catch(() => {});
                     }
                   }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  disabled={!websiteUrl.trim() || websiteDiscoverMutation.isPending}
-                  onClick={() => {
-                    websiteDiscoverMutation.mutateAsync({ websiteUrl: normalizeUrl(websiteUrl) }).then((result: any) => {
-                      if (result.api?.bestUrl) {
-                        setBaseUrl(result.api.bestUrl);
-                        if (result.authType !== "none") toast.success("API URL discovered! Enter your PAT key below.", { duration: 6000 });
-                      }
-                    }).catch(() => {});
-                  }}
                 >
                   {websiteDiscoverMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Globe className="h-4 w-4" />
                   )}
-                  Discover
                 </Button>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-green-400">
+                  {websiteDiscoverMutation.isSuccess && websiteDiscoverMutation.data && (
+                    <>
+                      Found: {(websiteDiscoverMutation.data as any).name || (websiteDiscoverMutation.data as any).domain}
+                      {(websiteDiscoverMutation.data as any).api?.bestUrl && ` — ${(websiteDiscoverMutation.data as any).api.bestUrl}`}
+                    </>
+                  )}
+                </p>
                 <Button
                   size="sm"
                   variant="default"
-                  className="shrink-0"
-                  disabled={!(websiteDiscoverMutation.data as any)?.name || !(websiteDiscoverMutation.data as any)?.api?.bestUrl || registerMutation.isPending}
+                  className="h-6 text-xs shrink-0"
+                  disabled={!(websiteDiscoverMutation.data as any)?.name || registerMutation.isPending}
                   onClick={() => {
                     const result = websiteDiscoverMutation.data as any;
                     const slug = result.registrySlug || result.domain.replace(/\.(com|ai|io|dev|org|net|co)$/i, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
@@ -412,21 +512,15 @@ export function CatalogImportWizard({
                     });
                   }}
                 >
-                  {registerMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                  {registerMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
                   Register
                 </Button>
               </div>
-              {websiteDiscoverMutation.isSuccess && websiteDiscoverMutation.data && (
-                <p className="text-xs text-green-400">
-                  Found: {(websiteDiscoverMutation.data as any).name || (websiteDiscoverMutation.data as any).domain}
-                  {(websiteDiscoverMutation.data as any).api?.bestUrl && ` — ${(websiteDiscoverMutation.data as any).api.bestUrl}`}
-                </p>
-              )}
               {websiteDiscoverMutation.isError && (
                 <p className="text-xs text-red-400">Discovery failed — enter URL manually below</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Paste a provider website to auto-detect the API URL
+                Paste one or more provider websites (comma-separated) to auto-detect
               </p>
             </div>
 
@@ -715,5 +809,111 @@ export function CatalogImportWizard({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Batch Discovery Results Popup */}
+    <Dialog open={batchPopupOpen} onOpenChange={setBatchPopupOpen}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            Batch Discovery Results
+            {batchDiscovering && <Loader2 className="inline h-4 w-4 animate-spin ml-2" />}
+          </DialogTitle>
+          <DialogDescription>
+            {batchDiscovering
+              ? `Discovering ${batchResults.length} providers...`
+              : `${batchResults.filter((r) => r.status === "found").length} found, ${batchResults.filter((r) => r.status === "failed").length} failed, ${batchRegisteredCount} registered`
+            }
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-1 py-2">
+          {batchResults.map((entry, i) => {
+            const d = entry.data;
+            const modelCount = d?.api?.candidates?.[0]?.modelCount;
+            const authType = d?.authType;
+            return (
+              <div key={i} className="flex items-center gap-3 p-2 rounded border bg-muted/20 text-sm">
+                {/* Status icon */}
+                <div className="shrink-0 w-5">
+                  {entry.status === "discovering" && <Loader2 className="h-4 w-4 animate-spin text-blue-400" />}
+                  {entry.status === "pending" && <Globe className="h-4 w-4 text-muted-foreground" />}
+                  {entry.status === "found" && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                  {entry.status === "failed" && <XCircle className="h-4 w-4 text-red-400" />}
+                </div>
+
+                {/* Provider info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium truncate">{d?.name || entry.url}</span>
+                    {entry.status === "found" && (
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${d?.api?.bestUrl ? "text-green-400 border-green-600/30" : "text-yellow-400 border-yellow-600/30"}`}>
+                        {d?.status === "ok" ? "OK" : d?.status === "partial" ? "Partial" : "Failed"}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {entry.status === "found" && d?.api?.bestUrl
+                      ? d.api.bestUrl
+                      : entry.status === "found"
+                      ? "No API URL detected"
+                      : entry.status === "failed"
+                      ? "Discovery failed"
+                      : entry.status === "discovering"
+                      ? "Discovering..."
+                      : "Waiting..."}
+                  </div>
+                  {entry.status === "found" && (
+                    <div className="flex gap-2 mt-0.5">
+                      {modelCount != null && (
+                        <span className="text-[10px] text-muted-foreground">{modelCount} model{modelCount !== 1 ? "s" : ""}</span>
+                      )}
+                      {authType && authType !== "none" && (
+                        <span className="text-[10px] text-muted-foreground">Auth: {authType}</span>
+                      )}
+                      {authType === "none" && (
+                        <span className="text-[10px] text-muted-foreground">No auth required</span>
+                      )}
+                      {d?.domain && (
+                        <span className="text-[10px] text-muted-foreground">{d.domain}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Register button */}
+                <div className="shrink-0">
+                  {entry.registered ? (
+                    <Badge variant="outline" className="text-green-400 border-green-600/30">Registered</Badge>
+                  ) : entry.status === "found" && d?.name ? (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-7 text-xs"
+                      onClick={() => registerOne(i)}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Register
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => setBatchPopupOpen(false)}>
+            Close
+          </Button>
+          {batchFoundCount > 0 && (
+            <Button size="sm" onClick={registerAll}>
+              <Plus className="h-4 w-4 mr-1" />
+              Register All ({batchFoundCount})
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
