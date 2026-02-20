@@ -178,6 +178,28 @@ export async function getUserByOpenId(openId: string) {
 // Workspace Management
 // ============================================================================
 
+/**
+ * Ensure at least one workspace exists. Idempotent — safe to call on every startup.
+ */
+export async function ensureDefaultWorkspace(): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+
+  try {
+    const rows = await db.select({ id: workspaces.id }).from(workspaces).limit(1);
+    if (rows.length > 0) return;
+
+    await db.insert(workspaces).values({
+      name: "Default",
+      description: "Auto-created default workspace",
+      ownerId: 1,
+    });
+    console.log("[Workspace] Created default workspace");
+  } catch (error: any) {
+    console.warn(`[Workspace] ensureDefaultWorkspace skipped — ${error.message}`);
+  }
+}
+
 export async function createWorkspace(workspace: InsertWorkspace): Promise<Workspace> {
   const db = getDb();
   if (!db) throw new Error("Database not available");

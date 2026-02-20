@@ -13,7 +13,7 @@ import { handleChatStream } from "../chat/stream";
 import { handleAgentChatStream } from "../agents/stream";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
-import { getDb } from "../db";
+import { getDb, ensureDefaultWorkspace } from "../db";
 import { syncRegistryOnStartup, autoDetectLiveModels } from "../routers/catalog-manage";
 import { seedTaxonomy } from "../db";
 import { startCleanupInterval } from "../catalog-import/session-service";
@@ -142,6 +142,9 @@ async function autoProvisionProviders() {
 async function startServer() {
   // Run database migrations first
   await runMigrations();
+
+  // Ensure at least one workspace exists (idempotent)
+  await ensureDefaultWorkspace();
 
   // Auto-provision providers from env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
   await autoProvisionProviders();

@@ -44,6 +44,7 @@ function audit(eventType: string, catalogEntryId: number | null, payload: any, b
 }
 import { getProviderRegistry } from "../providers/registry";
 import * as providerDb from "../providers/db";
+import { discoverProvider } from "./discover-provider";
 
 // ============================================================================
 // Input Schemas
@@ -99,6 +100,22 @@ export const catalogManageRouter = router({
     )
     .query(async ({ input }) => {
       return await getCatalogEntries(input ?? {});
+    }),
+
+  /**
+   * Discover provider metadata from a website URL.
+   * Returns name, description, API URL candidates — never writes to DB.
+   * Logs discovery event for monitoring/promotion triggers.
+   */
+  discoverProvider: protectedProcedure
+    .input(z.object({ websiteUrl: z.string().url() }))
+    .mutation(async ({ input }) => {
+      const result = await discoverProvider(input.websiteUrl);
+      // Log event asynchronously (non-blocking)
+      import("./discovery-ops").then(({ logDiscoveryEvent }) => {
+        logDiscoveryEvent(result).catch(() => {});
+      }).catch(() => {});
+      return result;
     }),
 
   /**
@@ -766,6 +783,7 @@ export const catalogManageRouter = router({
       audit("catalog.entry.classified", input.catalogEntryId, { nodeIds: input.nodeIds });
       return { success: true };
     }),
+
 });
 
 /**
