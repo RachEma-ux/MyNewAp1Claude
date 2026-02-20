@@ -1,0 +1,29 @@
+Session Summary — 2026-02-20 17:55
+
+## Focus: Deploy & Browser Test All Pages
+
+### Deployed v3.0.163
+- Triggered Builder Deploy workflow
+- Cancelled duplicate run (22234939739), kept run 22234942775
+- Tunnel URL: https://corrected-probability-ons-blend.trycloudflare.com
+- Build took longer than usual (~4 min) but completed successfully
+
+### Bulk Page Testing
+- Opened open-all-tunnel.html to test all 27 pages at once
+- Browser popup blocker initially blocked tabs — user allowed popups and reloaded
+- All 27 pages opened successfully in browser tabs
+
+### Updated open-all-tunnel.html (local only)
+- Rewrote client/public/open-all-tunnel.html with a button-click approach
+- Big "Open All 27 Pages" button triggers window.open from user click (bypasses popup blockers)
+- Includes fallback links at bottom
+- Dark themed UI
+- Note: This change is local only, not yet on a deployed tunnel (will be included in next deploy)
+
+### No Bug Fixes This Session
+- All previous fixes (state machine, modal close, base URL auto-fill) already committed and pushed
+- This session was deploy + browser testing only
+
+### Sandbox Issues
+- /tmp permission errors (EACCES) persisted — sleep, termux-open-url blocked in sandbox
+- Workaround: used `am start` Android intent for opening URLs
