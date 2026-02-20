@@ -66,6 +66,8 @@ const createEntrySchema = z.object({
   tags: z.array(z.string()).optional(),
   origin: originSchema.optional(),
   capabilities: z.array(z.string()).optional(),
+  category: z.string().optional(),
+  subCategory: z.string().optional(),
 });
 
 const updateEntrySchema = z.object({

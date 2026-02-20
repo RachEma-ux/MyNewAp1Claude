@@ -512,7 +512,7 @@ export const discoveryOpsRouter = router({
   accept: adminProcedure
     .input(z.object({
       domain: z.string(),
-      draftRegistryEntry: z.record(z.unknown()),
+      draftRegistryEntry: z.record(z.string(), z.unknown()),
       notes: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {

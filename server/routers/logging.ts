@@ -55,7 +55,7 @@ export const loggingRouter = router({
     .input(z.object({
       name: z.string(),
       value: z.number(),
-      tags: z.record(z.string()).optional(),
+      tags: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const metricsCollector = getMetricsCollector();
