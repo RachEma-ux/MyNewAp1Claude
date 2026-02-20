@@ -38,6 +38,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Download,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -123,6 +124,12 @@ export function CatalogImportWizard({
   const websiteDiscoverMutation = trpc.catalogManage.discoverProvider.useMutation();
   const trpcUtils = trpc.useUtils();
   const bulkCreateMutation = trpc.catalogImport.bulkCreate.useMutation();
+  const registerMutation = trpc.catalogManage.create.useMutation({
+    onSuccess: () => {
+      trpcUtils.catalogManage.list.invalidate();
+      toast.success("Provider registered to catalog!");
+    },
+  });
 
   // Reset state when dialog closes
   const handleOpenChange = (isOpen: boolean) => {
@@ -381,6 +388,32 @@ export function CatalogImportWizard({
                   ) : (
                     <Globe className="h-4 w-4" />
                   )}
+                  Discover
+                </Button>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="shrink-0"
+                  disabled={!(websiteDiscoverMutation.data as any)?.name || !(websiteDiscoverMutation.data as any)?.api?.bestUrl || registerMutation.isPending}
+                  onClick={() => {
+                    const result = websiteDiscoverMutation.data as any;
+                    const slug = result.registrySlug || result.domain.replace(/\.(com|ai|io|dev|org|net|co)$/i, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+                    registerMutation.mutate({
+                      name: slug,
+                      displayName: result.name || slug,
+                      description: result.description || undefined,
+                      entryType: "provider",
+                      config: {
+                        baseUrl: result.api?.bestUrl || undefined,
+                        registryId: result.registrySlug || undefined,
+                        websiteUrl: normalizeUrl(websiteUrl),
+                      },
+                      tags: [result.domain],
+                    });
+                  }}
+                >
+                  {registerMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                  Register
                 </Button>
               </div>
               {websiteDiscoverMutation.isSuccess && websiteDiscoverMutation.data && (
