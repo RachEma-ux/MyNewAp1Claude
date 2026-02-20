@@ -26,6 +26,7 @@ describe("State Machine — Valid Transitions", () => {
     ["failed", "disabled"],
     ["failed", "validated"],
     ["disabled", "draft"],
+    ["disabled", "active"],
     ["rotated", "active"],
   ];
 
@@ -44,7 +45,6 @@ describe("State Machine — Invalid Transitions", () => {
     ["validated", "failed"],
     ["active", "draft"],
     ["active", "validated"],
-    ["disabled", "active"],     // must go through draft
     ["disabled", "validated"],
     ["failed", "active"],       // must re-validate
   ];

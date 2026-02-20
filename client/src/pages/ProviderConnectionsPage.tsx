@@ -327,10 +327,7 @@ export default function ProviderConnectionsPage() {
       <ConnectProviderModal
         open={connectModalOpen}
         onOpenChange={setConnectModalOpen}
-        onComplete={() => {
-          refetch();
-          setConnectModalOpen(false);
-        }}
+        onComplete={() => refetch()}
       />
     </div>
   );
