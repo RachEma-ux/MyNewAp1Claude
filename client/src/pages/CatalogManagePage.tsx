@@ -644,11 +644,11 @@ export default function CatalogManagePage() {
               </Button>
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead className="min-w-[180px]">Name</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Classification</TableHead>
                     <TableHead>Status</TableHead>
@@ -663,10 +663,10 @@ export default function CatalogManagePage() {
                   {filteredEntries.map((entry: any) => (
                     <TableRow key={entry.id}>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{entry.displayName || entry.name}</div>
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{entry.displayName || entry.name}</div>
                           {entry.description && (
-                            <div className="text-xs text-muted-foreground truncate max-w-[250px]">
+                            <div className="text-xs text-muted-foreground truncate max-w-[300px]" title={entry.description}>
                               {entry.description}
                             </div>
                           )}
@@ -795,9 +795,9 @@ export default function CatalogManagePage() {
                 return (
                   <Card key={entry.id}>
                     <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <CardTitle className="text-base">{entry.displayName || entry.name}</CardTitle>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <CardTitle className="text-base truncate">{entry.displayName || entry.name}</CardTitle>
                           {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
                             <Badge variant="outline" className="text-xs">
                               <Icon className="h-3 w-3 mr-1" />
@@ -2636,9 +2636,9 @@ function DiscoverSection({
           )}
 
           {discoverResult.api?.bestUrl && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">API:</span>
-              <code className="bg-muted px-2 py-0.5 rounded text-xs">{discoverResult.api.bestUrl}</code>
+            <div className="flex items-center gap-2 text-sm min-w-0">
+              <span className="text-muted-foreground shrink-0">API:</span>
+              <code className="bg-muted px-2 py-0.5 rounded text-xs truncate" title={discoverResult.api.bestUrl}>{discoverResult.api.bestUrl}</code>
               {discoverResult.api.candidates?.[0] && (
                 <Badge variant="outline" className={
                   discoverResult.api.candidates[0].confidenceLabel === "high" ? "border-green-600/30 text-green-400" :
@@ -2669,9 +2669,9 @@ function DiscoverSection({
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-1 pt-2">
                 {discoverResult.api.candidates.slice(1).map((c: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5">
-                    <div className="flex items-center gap-2">
-                      <code>{c.url}</code>
+                  <div key={i} className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <code className="truncate" title={c.url}>{c.url}</code>
                       {c.probe && <Badge variant="outline" className="text-[10px]">{c.probe.status}</Badge>}
                       {c.probeType === "openai-shape-best-effort" && (
                         <span className="text-muted-foreground">(best-effort)</span>
@@ -2688,9 +2688,9 @@ function DiscoverSection({
 
           {/* When bestUrl is null but candidates exist — show all as clickable */}
           {!discoverResult.api?.bestUrl && discoverResult.api?.candidates?.length === 1 && (
-            <div className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5">
-              <div className="flex items-center gap-2">
-                <code>{discoverResult.api.candidates[0].url}</code>
+            <div className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <code className="truncate" title={discoverResult.api.candidates[0].url}>{discoverResult.api.candidates[0].url}</code>
                 {discoverResult.api.candidates[0].probe && (
                   <Badge variant="outline" className="text-[10px]">{discoverResult.api.candidates[0].probe.status}</Badge>
                 )}
