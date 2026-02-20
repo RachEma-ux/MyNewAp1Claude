@@ -87,6 +87,7 @@ import { MultiAxisPanel } from "@/components/MultiAxisPanel";
 import { CatalogImportWizard } from "@/components/CatalogImportWizard";
 import { ConnectProviderModal } from "@/components/ConnectProviderModal";
 import { DiscoveryHealthPanel } from "@/components/DiscoveryOpsPanel";
+import { toast } from "sonner";
 
 const TYPE_ICONS: Record<string, any> = {
   provider: Server,
@@ -1287,6 +1288,9 @@ export default function CatalogManagePage() {
                   const currentTags = formTags ? formTags.split(",").map((t: string) => t.trim()) : [];
                   if (!currentTags.includes(result.domain)) currentTags.push(result.domain);
                   setFormTags(currentTags.join(", "));
+                  if (result.api?.bestUrl && result.authType !== "none") {
+                    toast.success("Provider API URL discovered! Enter your PAT key in the Configuration JSON to connect.", { duration: 6000 });
+                  }
                 }}
                 onUndo={() => {
                   if (preApplySnapshot) {
@@ -1363,7 +1367,10 @@ export default function CatalogManagePage() {
                   <Input value={formTags} onChange={(e) => setFormTags(e.target.value)} placeholder="local, ollama, inference" />
                 </div>
                 <div className="grid gap-2">
-                  <Label>Configuration (JSON)</Label>
+                  <Label className="flex items-center gap-2">
+                    Configuration (JSON)
+                    {(() => { try { const c = JSON.parse(formConfig); return c.baseUrl ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : null; } catch { return null; } })()}
+                  </Label>
                   <Textarea
                     value={formConfig}
                     onChange={(e) => setFormConfig(e.target.value)}
