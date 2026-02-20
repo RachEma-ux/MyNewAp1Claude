@@ -39,6 +39,7 @@ import {
   ArrowRight,
   Download,
 } from "lucide-react";
+import { toast } from "sonner";
 import type {
   PreviewEntry,
   BulkCreateResult,
@@ -353,7 +354,10 @@ export function CatalogImportWizard({
                     if (e.key === "Enter" && websiteUrl.trim()) {
                       e.preventDefault();
                       websiteDiscoverMutation.mutateAsync({ websiteUrl: normalizeUrl(websiteUrl) }).then((result: any) => {
-                        if (result.api?.bestUrl) setBaseUrl(result.api.bestUrl);
+                        if (result.api?.bestUrl) {
+                          setBaseUrl(result.api.bestUrl);
+                          if (result.authType !== "none") toast.success("API URL discovered! Enter your PAT key below.", { duration: 6000 });
+                        }
                       }).catch(() => {});
                     }
                   }}
@@ -365,7 +369,10 @@ export function CatalogImportWizard({
                   disabled={!websiteUrl.trim() || websiteDiscoverMutation.isPending}
                   onClick={() => {
                     websiteDiscoverMutation.mutateAsync({ websiteUrl: normalizeUrl(websiteUrl) }).then((result: any) => {
-                      if (result.api?.bestUrl) setBaseUrl(result.api.bestUrl);
+                      if (result.api?.bestUrl) {
+                        setBaseUrl(result.api.bestUrl);
+                        if (result.authType !== "none") toast.success("API URL discovered! Enter your PAT key below.", { duration: 6000 });
+                      }
                     }).catch(() => {});
                   }}
                 >
@@ -405,7 +412,10 @@ export function CatalogImportWizard({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="baseUrl">Provider API Base URL</Label>
+              <Label htmlFor="baseUrl" className="flex items-center gap-2">
+                Provider API Base URL
+                {baseUrl && websiteDiscoverMutation.isSuccess && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+              </Label>
               <Input
                 id="baseUrl"
                 placeholder="https://api.openai.com"
