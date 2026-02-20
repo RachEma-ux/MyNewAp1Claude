@@ -2869,3 +2869,149 @@ export const providerAuditLog = pgTable("provider_audit_log", {
 
 export type ProviderAuditLogEntry = typeof providerAuditLog.$inferSelect;
 export type InsertProviderAuditLogEntry = typeof providerAuditLog.$inferInsert;
+
+// ============================================================================
+// Provider Discovery Ops — Events, Promotion Candidates, Patch Artifacts
+// ============================================================================
+
+/**
+ * Discovery attempt status enum
+ */
+export const discoveryAttemptStatusEnum = pgEnum("discovery_attempt_status", [
+  "ok", "partial", "failed",
+]);
+
+/**
+ * Discovery failure reason enum
+ */
+export const discoveryFailureReasonEnum = pgEnum("discovery_failure_reason", [
+  "INVALID_URL", "SSRF_BLOCKED", "DNS_FAILED", "FETCH_TIMEOUT",
+  "FETCH_TOO_LARGE", "FETCH_HTTP_ERROR", "PARSE_FAILED",
+  "NO_METADATA_FOUND", "NO_CANDIDATES", "PROBE_ALL_FAILED",
+]);
+
+/**
+ * Provider Discovery Events — Immutable log of every discovery attempt.
+ * Used for trend detection, failure monitoring, and promotion triggers.
+ * 30-day retention policy.
+ */
+export const providerDiscoveryEvents = pgTable("provider_discovery_events", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  actorId: integer("actorId"),
+  domain: text("domain").notNull(),
+  normalizedUrl: text("normalizedUrl"),
+  status: varchar("status", { length: 20 }).notNull().$type<"ok" | "partial" | "failed">(),
+  failureReason: varchar("failureReason", { length: 50 }).$type<string>(),
+  bestUrl: text("bestUrl"),
+  candidateCount: integer("candidateCount").default(0),
+  probeSummary: json("probeSummary").$type<Array<{ url: string; path: string; status: number | null; probeType: string }>>(),
+  warnings: json("warnings").$type<string[]>(),
+  debug: json("debug").$type<Record<string, unknown>>(),
+}, (table) => ({
+  domainIdx: index("idx_pde_domain").on(table.domain),
+  createdAtIdx: index("idx_pde_created_at").on(table.createdAt),
+  domainCreatedAtIdx: index("idx_pde_domain_created_at").on(table.domain, table.createdAt),
+  statusIdx: index("idx_pde_status").on(table.status),
+}));
+
+export type ProviderDiscoveryEvent = typeof providerDiscoveryEvents.$inferSelect;
+export type InsertProviderDiscoveryEvent = typeof providerDiscoveryEvents.$inferInsert;
+
+/**
+ * Candidate status for registry promotion workflow
+ */
+export const candidateStatusEnum = pgEnum("candidate_status", [
+  "OPEN", "IN_REVIEW", "ACCEPTED", "REJECTED",
+]);
+
+/**
+ * Reject category enum
+ */
+export const rejectCategoryEnum = pgEnum("reject_category", [
+  "NOT_A_PROVIDER", "TOO_NICHE", "DUPLICATE_OF_EXISTING",
+  "TEMPORARY_OUTAGE", "NEEDS_MANUAL_CONNECT_ONLY",
+  "SECURITY_POLICY_BLOCK", "OTHER",
+]);
+
+/**
+ * Registry Promotion Candidates — Domains that fail discovery often enough
+ * to warrant manual review for registry inclusion.
+ */
+export const registryPromotionCandidates = pgTable("registry_promotion_candidates", {
+  id: serial("id").primaryKey(),
+  domain: text("domain").notNull().unique(),
+  status: varchar("status", { length: 20 }).default("OPEN").notNull().$type<"OPEN" | "IN_REVIEW" | "ACCEPTED" | "REJECTED">(),
+
+  firstDetectedAt: timestamp("firstDetectedAt").defaultNow().notNull(),
+  lastDetectedAt: timestamp("lastDetectedAt").defaultNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+
+  // Trigger signals
+  triggerType: varchar("triggerType", { length: 50 }),
+  attemptsTotal: integer("attemptsTotal").default(0).notNull(),
+  attemptsFailed: integer("attemptsFailed").default(0).notNull(),
+  bestUrlNullRate: decimal("bestUrlNullRate", { precision: 5, scale: 4 }).default("0"),
+
+  // Review
+  reviewedBy: integer("reviewedBy"),
+  reviewedAt: timestamp("reviewedAt"),
+
+  // Rejection
+  rejectedBy: integer("rejectedBy"),
+  rejectedAt: timestamp("rejectedAt"),
+  rejectCategory: varchar("rejectCategory", { length: 50 }),
+  rejectNotes: text("rejectNotes"),
+  rejectSnapshot: json("rejectSnapshot").$type<Record<string, unknown>>(),
+
+  // Acceptance
+  acceptedBy: integer("acceptedBy"),
+  acceptedAt: timestamp("acceptedAt"),
+  patchId: integer("patchId"),
+
+  // Draft registry entry (proposed KnownProvider fields)
+  draftRegistryEntry: json("draftRegistryEntry").$type<Record<string, unknown>>(),
+
+  // Cooldown / reopen
+  attemptsSinceReject: integer("attemptsSinceReject").default(0).notNull(),
+  autoReopenedAt: timestamp("autoReopenedAt"),
+  autoReopenReason: varchar("autoReopenReason", { length: 30 }),
+  autoReopenEvidence: json("autoReopenEvidence").$type<Record<string, unknown>>(),
+}, (table) => ({
+  statusIdx: index("idx_rpc_status").on(table.status),
+  lastSeenIdx: index("idx_rpc_last_seen").on(table.lastSeenAt),
+  domainIdx: index("idx_rpc_domain").on(table.domain),
+  statusLastSeenIdx: index("idx_rpc_status_last_seen").on(table.status, table.lastSeenAt),
+}));
+
+export type RegistryPromotionCandidate = typeof registryPromotionCandidates.$inferSelect;
+export type InsertRegistryPromotionCandidate = typeof registryPromotionCandidates.$inferInsert;
+
+/**
+ * Patch artifact status for registry patches
+ */
+export const patchArtifactStatusEnum = pgEnum("patch_artifact_status", [
+  "PROPOSED", "MERGED", "ABANDONED",
+]);
+
+/**
+ * Registry Patch Artifacts — Proposed registry entries generated from
+ * promotion acceptance. Links to PR URL for tracking.
+ */
+export const registryPatchArtifacts = pgTable("registry_patch_artifacts", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdBy: integer("createdBy").notNull(),
+  sourceDomain: text("sourceDomain").notNull(),
+  status: varchar("status", { length: 20 }).default("PROPOSED").notNull().$type<"PROPOSED" | "MERGED" | "ABANDONED">(),
+  draftRegistryEntry: json("draftRegistryEntry").notNull().$type<Record<string, unknown>>(),
+  notes: text("notes"),
+  linkedPrUrl: text("linkedPrUrl"),
+}, (table) => ({
+  domainIdx: index("idx_rpa_source_domain").on(table.sourceDomain),
+  statusIdx: index("idx_rpa_status").on(table.status),
+  createdAtIdx: index("idx_rpa_created_at").on(table.createdAt),
+}));
+
+export type RegistryPatchArtifact = typeof registryPatchArtifacts.$inferSelect;
+export type InsertRegistryPatchArtifact = typeof registryPatchArtifacts.$inferInsert;

@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { CatalogSelect } from "@/components/CatalogSelect";
+import { KNOWN_PROVIDERS, findProviderBySlug } from "@shared/provider-registry";
 import {
   Dialog,
   DialogContent,
@@ -56,22 +57,12 @@ interface TestResult {
   latencyMs: number;
 }
 
-// Well-known base URLs for auto-fill
-const PROVIDER_BASE_URLS: Record<string, string> = {
-  openai: "https://api.openai.com",
-  anthropic: "https://api.anthropic.com",
-  google: "https://generativelanguage.googleapis.com",
-  meta: "https://api.llama.com",
-  mistral: "https://api.mistral.ai",
-  microsoft: "https://models.inference.ai.azure.com",
-  qwen: "https://dashscope-intl.aliyuncs.com",
-  xai: "https://api.x.ai",
-  cohere: "https://api.cohere.com",
-  deepseek: "https://api.deepseek.com",
-  perplexity: "https://api.perplexity.ai",
-  ollama: "http://localhost:11434",
-  llamacpp: "http://localhost:8080",
-};
+// Build base-URL lookup from the shared provider registry
+const PROVIDER_API_URLS: Record<string, string> = Object.fromEntries(
+  KNOWN_PROVIDERS
+    .filter((p) => p.apiUrl || p.defaultLocalUrl)
+    .map((p) => [p.slug, (p.apiUrl ?? p.defaultLocalUrl)!])
+);
 
 export function ConnectProviderModal({
   open,
@@ -125,17 +116,25 @@ export function ConnectProviderModal({
         id: Number(value),
       });
       const config = entry.config as Record<string, any> | null;
-      const rawRegistryId = (config?.registryId ||
+
+      // Try shared registry via registrySlug first, then fall back to legacy fields
+      const registrySlug = config?.registrySlug as string | undefined;
+      const knownProvider = registrySlug ? findProviderBySlug(registrySlug) : undefined;
+
+      const rawRegistryId = (registrySlug ||
+        config?.registryId ||
         config?.providerId ||
         entry.name) as string | undefined;
       const registryId = rawRegistryId?.toLowerCase();
 
-      // 1. Auto-fill base URL
+      // 1. Auto-fill base URL — prefer registry, then config, then legacy map
       const url =
+        knownProvider?.apiUrl ||
+        knownProvider?.defaultLocalUrl ||
         config?.baseUrl ||
         config?.apiUrl ||
         config?.endpoint ||
-        (registryId && PROVIDER_BASE_URLS[registryId]) ||
+        (registryId && PROVIDER_API_URLS[registryId]) ||
         undefined;
       if (url) setBaseUrl(url);
 

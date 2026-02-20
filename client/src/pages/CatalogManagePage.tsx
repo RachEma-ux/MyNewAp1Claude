@@ -86,6 +86,7 @@ import { CatalogSelect } from "@/components/CatalogSelect";
 import { MultiAxisPanel } from "@/components/MultiAxisPanel";
 import { CatalogImportWizard } from "@/components/CatalogImportWizard";
 import { ConnectProviderModal } from "@/components/ConnectProviderModal";
+import { DiscoveryHealthPanel } from "@/components/DiscoveryOpsPanel";
 
 const TYPE_ICONS: Record<string, any> = {
   provider: Server,
@@ -146,7 +147,7 @@ function ClassificationBadges({ entryId }: { entryId: number }) {
 
 export default function CatalogManagePage() {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"catalog" | "validation" | "publishing" | "audit">("catalog");
+  const [activeTab, setActiveTab] = useState<"catalog" | "validation" | "publishing" | "audit" | "discovery-ops">("catalog");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | EntryType>("all");
 
@@ -171,6 +172,16 @@ export default function CatalogManagePage() {
   const [formCapabilities, setFormCapabilities] = useState<string[]>([]);
   const [formProviderId, setFormProviderId] = useState<string>("");
   const [createStep, setCreateStep] = useState(0);
+
+  // Discovery state
+  const [discoverUrl, setDiscoverUrl] = useState("");
+  const [discoverResult, setDiscoverResult] = useState<any>(null);
+  const [showCandidates, setShowCandidates] = useState(false);
+  // Undo snapshot: captures form state before Apply so admin can revert
+  const [preApplySnapshot, setPreApplySnapshot] = useState<{
+    formName: string; formDisplayName: string; formDescription: string;
+    formConfig: string; formTags: string;
+  } | null>(null);
 
   // Step 2: Security & Governance
   const [authProtocols, setAuthProtocols] = useState<string[]>([]);
@@ -590,6 +601,7 @@ export default function CatalogManagePage() {
           <TabsTrigger value="validation">Validation</TabsTrigger>
           <TabsTrigger value="publishing">Publishing</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
+          <TabsTrigger value="discovery-ops">Discovery Ops</TabsTrigger>
         </TabsList>
 
         <TabsContent value="catalog" className="mt-4">
@@ -1074,6 +1086,10 @@ export default function CatalogManagePage() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="discovery-ops" className="mt-4">
+          <DiscoveryHealthPanel />
+        </TabsContent>
       </Tabs>
 
       {/* New Entry Chooser Popup */}
@@ -1238,6 +1254,61 @@ export default function CatalogManagePage() {
                   </div>
                 ))}
               </div>
+            )}
+
+            {/* Discover from Website — only for new provider entries */}
+            {!editingEntry && formEntryType === "provider" && createStep === 0 && (
+              <DiscoverSection
+                discoverUrl={discoverUrl}
+                setDiscoverUrl={setDiscoverUrl}
+                discoverResult={discoverResult}
+                setDiscoverResult={setDiscoverResult}
+                showCandidates={showCandidates}
+                setShowCandidates={setShowCandidates}
+                preApplySnapshot={preApplySnapshot}
+                onApply={(result: any) => {
+                  // Capture snapshot before applying (for undo)
+                  setPreApplySnapshot({ formName, formDisplayName, formDescription, formConfig, formTags });
+                  const slug = result.registrySlug
+                    || result.domain.replace(/\.(com|ai|io|dev|org|net|co)$/i, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+                  setFormName(slug);
+                  if (result.name) setFormDisplayName(result.name);
+                  if (result.description) setFormDescription(result.description);
+                  try {
+                    const existing = JSON.parse(formConfig || "{}");
+                    existing.baseUrl = result.api.bestUrl;
+                    if (result.registrySlug) existing.registrySlug = result.registrySlug;
+                    setFormConfig(JSON.stringify(existing, null, 2));
+                  } catch {
+                    setFormConfig(JSON.stringify({ baseUrl: result.api.bestUrl }, null, 2));
+                  }
+                  const currentTags = formTags ? formTags.split(",").map((t: string) => t.trim()) : [];
+                  if (!currentTags.includes(result.domain)) currentTags.push(result.domain);
+                  setFormTags(currentTags.join(", "));
+                }}
+                onUndo={() => {
+                  if (preApplySnapshot) {
+                    setFormName(preApplySnapshot.formName);
+                    setFormDisplayName(preApplySnapshot.formDisplayName);
+                    setFormDescription(preApplySnapshot.formDescription);
+                    setFormConfig(preApplySnapshot.formConfig);
+                    setFormTags(preApplySnapshot.formTags);
+                    setPreApplySnapshot(null);
+                  }
+                }}
+                onApplyCandidate={(url: string) => {
+                  if (!preApplySnapshot) {
+                    setPreApplySnapshot({ formName, formDisplayName, formDescription, formConfig, formTags });
+                  }
+                  try {
+                    const existing = JSON.parse(formConfig || "{}");
+                    existing.baseUrl = url;
+                    setFormConfig(JSON.stringify(existing, null, 2));
+                  } catch {
+                    setFormConfig(JSON.stringify({ baseUrl: url }, null, 2));
+                  }
+                }}
+              />
             )}
 
             {/* Step 1: Details (existing form) */}
@@ -2372,6 +2443,290 @@ export default function CatalogManagePage() {
         onOpenChange={setConnectModalOpen}
         onComplete={() => refetch()}
       />
+    </div>
+  );
+}
+
+// ── Discover from Website Component ──────────────────────────────────
+
+function DiscoverSection({
+  discoverUrl,
+  setDiscoverUrl,
+  discoverResult,
+  setDiscoverResult,
+  showCandidates,
+  setShowCandidates,
+  preApplySnapshot,
+  onApply,
+  onUndo,
+  onApplyCandidate,
+}: {
+  discoverUrl: string;
+  setDiscoverUrl: (v: string) => void;
+  discoverResult: any;
+  setDiscoverResult: (v: any) => void;
+  showCandidates: boolean;
+  setShowCandidates: (v: boolean) => void;
+  preApplySnapshot: any;
+  onApply: (result: any) => void;
+  onUndo: () => void;
+  onApplyCandidate: (url: string) => void;
+}) {
+  const discoverMutation = trpc.catalogManage.discoverProvider.useMutation();
+
+  const handleDiscover = async () => {
+    if (!discoverUrl.trim()) return;
+    setDiscoverResult(null);
+    try {
+      const result = await discoverMutation.mutateAsync({ websiteUrl: discoverUrl.trim() });
+      setDiscoverResult(result);
+    } catch (e: any) {
+      setDiscoverResult({ error: e.message, status: "failed" });
+    }
+  };
+
+  const handleCopyDebug = () => {
+    if (!discoverResult?.debug && !discoverResult?.domain) return;
+    const debug = discoverResult.debug || {};
+    const lines = [
+      `Domain: ${discoverResult.domain || "unknown"}`,
+      `Normalized URL: ${debug.normalizedUrl || discoverResult.domain || "unknown"}`,
+      `Status: ${discoverResult.status || "unknown"}`,
+      discoverResult.failureReason ? `Failure Reason: ${discoverResult.failureReason}` : null,
+      `Timestamp: ${new Date().toISOString()}`,
+      debug.redirectHops?.length ? `Redirect Hops: ${JSON.stringify(debug.redirectHops)}` : null,
+      debug.resolvedIPs?.length ? `Resolved IPs: ${JSON.stringify(debug.resolvedIPs)}` : null,
+      discoverResult.api?.candidates?.length
+        ? `Probe Statuses: ${JSON.stringify(discoverResult.api.candidates.map((c: any) => ({ url: c.url, status: c.probe?.status ?? null })))}`
+        : null,
+      debug.timingsMs ? `Timings: ${JSON.stringify(debug.timingsMs)}` : null,
+      discoverResult.warnings?.length ? `Warnings: ${discoverResult.warnings.join("; ")}` : null,
+    ].filter(Boolean);
+    navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
+  };
+
+  const status = discoverResult?.status;
+  const isFailed = status === "failed";
+  const isPartial = status === "partial";
+  const hasResult = discoverResult && (discoverResult.name || discoverResult.status);
+  const hasError = discoverResult?.error && !discoverResult?.name && !discoverResult?.status;
+
+  return (
+    <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+      <Label className="flex items-center gap-2">
+        <Globe className="h-4 w-4" />
+        Discover from Website
+        <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+      </Label>
+      <div className="flex gap-2">
+        <Input
+          placeholder="https://fireworks.ai"
+          value={discoverUrl}
+          onChange={(e) => setDiscoverUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleDiscover()}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDiscover}
+          disabled={!discoverUrl.trim() || discoverMutation.isPending}
+          className="shrink-0"
+        >
+          {discoverMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Search className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Paste a provider's official website to auto-fill form fields
+      </p>
+
+      {/* Legacy error fallback (no structured status) */}
+      {hasError && (
+        <div className="text-sm text-red-400 bg-red-950/20 border border-red-600/30 rounded p-3">
+          {discoverResult.error}
+        </div>
+      )}
+
+      {/* Failed banner */}
+      {isFailed && (
+        <div className="bg-red-950/20 border border-red-600/30 rounded p-3 space-y-2">
+          <div className="flex items-center gap-2 text-sm text-red-400">
+            <XCircle className="h-4 w-4 shrink-0" />
+            <span>Discovery failed — please fill fields manually</span>
+          </div>
+          {discoverResult.warnings?.length > 0 && (
+            <div className="text-xs text-red-300/70">
+              {discoverResult.warnings.map((w: string, i: number) => <p key={i}>{w}</p>)}
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground" onClick={handleCopyDebug}>
+              Copy debug details
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Partial banner */}
+      {isPartial && !discoverResult.name && (
+        <div className="bg-yellow-950/20 border border-yellow-600/30 rounded p-3 space-y-2">
+          <div className="flex items-center gap-2 text-sm text-yellow-400">
+            <Activity className="h-4 w-4 shrink-0" />
+            <span>Discovery incomplete — manual entry may be required</span>
+          </div>
+          {discoverResult.warnings?.length > 0 && (
+            <div className="text-xs text-yellow-300/70">
+              {discoverResult.warnings.map((w: string, i: number) => <p key={i}>{w}</p>)}
+            </div>
+          )}
+          {/* Show candidates even on partial */}
+          {discoverResult.api?.candidates?.length > 0 && (
+            <div className="space-y-1 pt-1">
+              <p className="text-xs text-yellow-400">Available candidates:</p>
+              {discoverResult.api.candidates.map((c: any, i: number) => (
+                <div key={i} className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <code>{c.url}</code>
+                    {c.probe && <Badge variant="outline" className="text-[10px]">{c.probe.status}</Badge>}
+                    {c.probeType === "openai-shape-best-effort" && (
+                      <span className="text-muted-foreground">(best-effort)</span>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => onApplyCandidate(c.url)}>
+                    Use this
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground" onClick={handleCopyDebug}>
+              Copy debug details
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* OK / Partial with data — Result Card */}
+      {hasResult && discoverResult.name && !isFailed && (
+        <div className="border rounded-lg p-3 space-y-2 bg-background">
+          {/* Partial banner inside card */}
+          {isPartial && (
+            <div className="flex items-center gap-2 text-xs text-yellow-400 bg-yellow-950/20 border border-yellow-600/30 rounded px-2 py-1.5 mb-1">
+              <Activity className="h-3 w-3 shrink-0" />
+              Discovery incomplete — some fields may need manual entry
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <span className="font-medium">{discoverResult.name}</span>
+              <Badge variant="outline" className={discoverResult.source === "registry" ? "border-green-600/30 text-green-400" : "border-blue-600/30 text-blue-400"}>
+                {discoverResult.source === "registry" ? "Registry" : "Website"}
+              </Badge>
+            </div>
+          </div>
+
+          {discoverResult.description && (
+            <p className="text-sm text-muted-foreground">{discoverResult.description}</p>
+          )}
+
+          {discoverResult.api?.bestUrl && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">API:</span>
+              <code className="bg-muted px-2 py-0.5 rounded text-xs">{discoverResult.api.bestUrl}</code>
+              {discoverResult.api.candidates?.[0] && (
+                <Badge variant="outline" className={
+                  discoverResult.api.candidates[0].confidenceLabel === "high" ? "border-green-600/30 text-green-400" :
+                  discoverResult.api.candidates[0].confidenceLabel === "medium" ? "border-yellow-600/30 text-yellow-400" :
+                  "border-gray-600/30 text-gray-400"
+                }>
+                  {discoverResult.api.candidates[0].confidence} {discoverResult.api.candidates[0].confidenceLabel}
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {!discoverResult.api?.bestUrl && discoverResult.api?.candidates?.length > 0 && (
+            <p className="text-sm text-yellow-400">No confirmed API URL. Choose a candidate to apply:</p>
+          )}
+
+          {/* Best-effort probe note */}
+          {discoverResult.api?.candidates?.some((c: any) => c.probeType === "openai-shape-best-effort") && (
+            <p className="text-xs text-muted-foreground italic">Probed as OpenAI-compatible (best effort)</p>
+          )}
+
+          {/* Candidates */}
+          {discoverResult.api?.candidates?.length > 1 && (
+            <Collapsible open={showCandidates} onOpenChange={setShowCandidates}>
+              <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                <ChevronDown className={`h-3 w-3 transition-transform ${showCandidates ? "rotate-180" : ""}`} />
+                {discoverResult.api.candidates.length - 1} other candidate{discoverResult.api.candidates.length > 2 ? "s" : ""}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-1 pt-2">
+                {discoverResult.api.candidates.slice(1).map((c: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <code>{c.url}</code>
+                      {c.probe && <Badge variant="outline" className="text-[10px]">{c.probe.status}</Badge>}
+                      {c.probeType === "openai-shape-best-effort" && (
+                        <span className="text-muted-foreground">(best-effort)</span>
+                      )}
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => onApplyCandidate(c.url)}>
+                      Use this
+                    </Button>
+                  </div>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* When bestUrl is null but candidates exist — show all as clickable */}
+          {!discoverResult.api?.bestUrl && discoverResult.api?.candidates?.length === 1 && (
+            <div className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5">
+              <div className="flex items-center gap-2">
+                <code>{discoverResult.api.candidates[0].url}</code>
+                {discoverResult.api.candidates[0].probe && (
+                  <Badge variant="outline" className="text-[10px]">{discoverResult.api.candidates[0].probe.status}</Badge>
+                )}
+              </div>
+              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => onApplyCandidate(discoverResult.api.candidates[0].url)}>
+                Use this
+              </Button>
+            </div>
+          )}
+
+          {/* Warnings */}
+          {discoverResult.warnings?.length > 0 && (
+            <div className="text-xs text-yellow-400">
+              {discoverResult.warnings.map((w: string, i: number) => <p key={i}>{w}</p>)}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={handleCopyDebug}>
+                Copy debug details
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              {preApplySnapshot && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onUndo}>
+                  Undo Apply
+                </Button>
+              )}
+              <Button size="sm" onClick={() => onApply(discoverResult)}>
+                Apply to Form
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
