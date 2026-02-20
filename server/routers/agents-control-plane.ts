@@ -132,7 +132,7 @@ export const agentsControlPlaneRouter = router({
           "on_promotion_attempt",
           "before_execute",
         ]),
-        changeSet: z.record(z.any()).optional(),
+        changeSet: z.record(z.string(), z.any()).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
