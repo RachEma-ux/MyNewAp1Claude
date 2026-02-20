@@ -2476,11 +2476,17 @@ function DiscoverSection({
 }) {
   const discoverMutation = trpc.catalogManage.discoverProvider.useMutation();
 
+  const normalizeUrl = (u: string) => {
+    const v = u.trim();
+    if (!v) return v;
+    return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  };
+
   const handleDiscover = async () => {
     if (!discoverUrl.trim()) return;
     setDiscoverResult(null);
     try {
-      const result = await discoverMutation.mutateAsync({ websiteUrl: discoverUrl.trim() });
+      const result = await discoverMutation.mutateAsync({ websiteUrl: normalizeUrl(discoverUrl) });
       setDiscoverResult(result);
     } catch (e: any) {
       setDiscoverResult({ error: e.message, status: "failed" });
