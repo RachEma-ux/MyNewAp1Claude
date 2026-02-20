@@ -153,10 +153,31 @@ export function domainToSlug(domain: string): string {
 }
 
 function cleanTitle(raw: string): string {
-  return raw
+  // Split on common title separators: |, –, —, " - "
+  const segments = raw.split(/\s*[|–—]\s*|\s+-\s+/).map(s => s.trim()).filter(Boolean);
+  if (segments.length > 1) {
+    // Pick the shortest segment with ≤4 words (likely the brand name)
+    const brand = segments
+      .filter(s => s.split(/\s+/).length <= 4)
+      .sort((a, b) => a.length - b.length)[0];
+    if (brand) return brand.replace(/[.!]+$/, "").trim();
+  }
+  // Single segment or no short candidate — strip known suffixes
+  return (segments[0] || raw)
     .replace(/\s*[-–|:]\s*(Home|Official Site|Welcome|Homepage|API).*$/i, "")
-    .replace(/\s*\|\s*$/i, "")
+    .replace(/[.!]+$/, "")
     .trim();
+}
+
+function cleanDescription(raw: string): string {
+  if (raw.length <= 200) return raw.trim();
+  // Truncate to 200 chars and cut at the last sentence boundary
+  const truncated = raw.slice(0, 200);
+  const lastSentence = truncated.search(/[.!?]\s+[^.!?]*$/);
+  if (lastSentence > 80) {
+    return truncated.slice(0, lastSentence + 1).trim();
+  }
+  return truncated.trimEnd().replace(/[,;:\s]+$/, "") + "…";
 }
 
 function elapsed(start: number): number {
@@ -333,9 +354,11 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
           const q$ = cheerio.load(quickFetch.body);
           const ogName = q$('meta[property="og:site_name"]').attr("content");
           apiName = ogName?.trim() || cleanTitle(q$("title").text()) || null;
-          apiDescription = q$('meta[name="description"]').attr("content")?.trim()
+          if (apiName) apiName = cleanTitle(apiName);
+          const rawDesc = q$('meta[name="description"]').attr("content")?.trim()
             || q$('meta[property="og:description"]').attr("content")?.trim()
             || null;
+          apiDescription = rawDesc ? cleanDescription(rawDesc) : null;
         }
       } catch { /* name lookup is best-effort */ }
 
@@ -438,7 +461,7 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
   let name: string | null = null;
   const ogSiteName = $('meta[property="og:site_name"]').attr("content");
   if (ogSiteName) {
-    name = ogSiteName.trim();
+    name = cleanTitle(ogSiteName.trim());
   } else {
     // Try JSON-LD
     $('script[type="application/ld+json"]').each((_, el) => {
@@ -463,12 +486,11 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
 
   // Extract description
   let description: string | null = null;
-  const metaDesc = $('meta[name="description"]').attr("content");
-  if (metaDesc) {
-    description = metaDesc.trim();
-  } else {
-    const ogDesc = $('meta[property="og:description"]').attr("content");
-    if (ogDesc) description = ogDesc.trim();
+  const rawMetaDesc = $('meta[name="description"]').attr("content")?.trim()
+    || $('meta[property="og:description"]').attr("content")?.trim()
+    || null;
+  if (rawMetaDesc) {
+    description = cleanDescription(rawMetaDesc);
   }
 
   debug.timingsMs.parse = elapsed(parseStart);
