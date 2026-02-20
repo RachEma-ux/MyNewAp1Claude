@@ -111,8 +111,10 @@ export function CatalogImportWizard({
   const [error, setError] = useState<string | null>(null);
   const [forceConflicts, setForceConflicts] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
 
   const discoverMutation = trpc.catalogImport.discoverFromApi.useMutation();
+  const websiteDiscoverMutation = trpc.catalogManage.discoverProvider.useMutation();
   const trpcUtils = trpc.useUtils();
   const bulkCreateMutation = trpc.catalogImport.bulkCreate.useMutation();
 
@@ -129,6 +131,7 @@ export function CatalogImportWizard({
       setError(null);
       setForceConflicts(false);
       setSelectedProviderId("");
+      setWebsiteUrl("");
     }
     onOpenChange(isOpen);
   };
@@ -330,6 +333,63 @@ export function CatalogImportWizard({
         {/* Step 2: Input Form */}
         {step === 2 && method === "api_discovery" && (
           <div className="space-y-4 py-4">
+            {/* Discover from Website */}
+            <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+              <Label className="flex items-center gap-2 text-sm">
+                <Search className="h-4 w-4" />
+                Discover from Website
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://fireworks.ai"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && websiteUrl.trim()) {
+                      e.preventDefault();
+                      websiteDiscoverMutation.mutateAsync({ websiteUrl: websiteUrl.trim() }).then((result: any) => {
+                        if (result.api?.bestUrl) setBaseUrl(result.api.bestUrl);
+                      }).catch(() => {});
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={!websiteUrl.trim() || websiteDiscoverMutation.isPending}
+                  onClick={() => {
+                    websiteDiscoverMutation.mutateAsync({ websiteUrl: websiteUrl.trim() }).then((result: any) => {
+                      if (result.api?.bestUrl) setBaseUrl(result.api.bestUrl);
+                    }).catch(() => {});
+                  }}
+                >
+                  {websiteDiscoverMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Globe className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              {websiteDiscoverMutation.isSuccess && websiteDiscoverMutation.data && (
+                <p className="text-xs text-green-400">
+                  Found: {(websiteDiscoverMutation.data as any).name || (websiteDiscoverMutation.data as any).domain}
+                  {(websiteDiscoverMutation.data as any).api?.bestUrl && ` — ${(websiteDiscoverMutation.data as any).api.bestUrl}`}
+                </p>
+              )}
+              {websiteDiscoverMutation.isError && (
+                <p className="text-xs text-red-400">Discovery failed — enter URL manually below</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Paste a provider website to auto-detect the API URL
+              </p>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+              <div className="relative flex justify-center text-xs"><span className="bg-background px-2 text-muted-foreground">or select manually</span></div>
+            </div>
+
             <div className="space-y-2">
               <Label>Provider (optional)</Label>
               <CatalogSelect
@@ -338,9 +398,6 @@ export function CatalogImportWizard({
                 onValueChange={handleProviderSelect}
                 placeholder="Select a provider to auto-fill..."
               />
-              <p className="text-xs text-muted-foreground">
-                Select a catalog provider to auto-fill URL and API key, or enter manually below
-              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="baseUrl">Provider API Base URL</Label>
