@@ -260,7 +260,7 @@ export default function Automation() {
                 key={template.id} 
                 className="hover:shadow-lg transition-shadow cursor-pointer hover:border-primary/50"
                 onClick={() => {
-                  toast.info("Template feature coming soon");
+                  setLocation(`/automation/builder?template=${template.id}`);
                 }}
               >
                 <CardHeader>

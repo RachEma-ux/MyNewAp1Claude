@@ -96,10 +96,19 @@ export default function DocumentsDashboard() {
     await bulkDeleteMutation.mutateAsync({ documentIds: Array.from(selectedIds) });
   };
 
+  const [previewDocumentId, setPreviewDocumentId] = useState<number | null>(null);
+
   const handlePreviewDocument = (document: any) => {
     setSelectedDocument(document);
+    setPreviewDocumentId(document.id);
     setShowPreviewModal(true);
   };
+
+  // Fetch real chunks when preview modal is open
+  const { data: chunks, isLoading: chunksLoading } = trpc.documents.getChunks.useQuery(
+    { documentId: previewDocumentId! },
+    { enabled: !!previewDocumentId && showPreviewModal }
+  );
 
   const displayDocuments = documents || emptyDocuments;
 
@@ -467,18 +476,42 @@ export default function DocumentsDashboard() {
               <div>
                 <h4 className="text-sm font-medium mb-2">Chunk Preview</h4>
                 <div className="space-y-2">
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <Badge variant="outline">Chunk 1 of {selectedDocument.chunksCreated}</Badge>
-                        <span className="text-xs text-muted-foreground">1024 characters</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        This is a preview of the first chunk. In production, this would show the actual
-                        chunk content retrieved from the vector database...
-                      </p>
-                    </CardContent>
-                  </Card>
+                  {chunksLoading ? (
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">Loading chunks...</p>
+                      </CardContent>
+                    </Card>
+                  ) : chunks && chunks.length > 0 ? (
+                    chunks.slice(0, 5).map((chunk: any, idx: number) => (
+                      <Card key={chunk.id}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <Badge variant="outline">Chunk {chunk.chunkIndex + 1} of {chunks.length}</Badge>
+                            <span className="text-xs text-muted-foreground">{chunk.content.length} characters</span>
+                          </div>
+                          {chunk.heading && (
+                            <p className="text-xs font-medium text-primary mb-1">{chunk.heading}</p>
+                          )}
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">
+                            {chunk.content}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <Card>
+                      <CardContent className="p-4">
+                        <p className="text-sm text-muted-foreground">No chunks found for this document.</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {chunks && chunks.length > 5 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Showing 5 of {chunks.length} chunks
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

@@ -5,6 +5,8 @@ import { getDb } from "../db";
 import { agents, policies } from "../../drizzle/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { evaluateAgentCompliance, extractPolicyRules } from "../services/policyEvaluation";
+import { createHash } from "crypto";
+import { getToolRegistry } from "../agents/tools";
 
 export const agentsRouter = router({
   // List all agents for current user's workspace
@@ -185,7 +187,8 @@ export const agentsRouter = router({
   detectAllDrift: protectedProcedure.query(async ({ ctx }) => {
     const db = getDb();
     const workspaceId = ctx.user.id;
-    
+
+    // Fetch all non-archived agents
     const agentList = await db
       .select()
       .from(agents)
@@ -195,23 +198,86 @@ export const agentsRouter = router({
           ne(agents.status, "archived")
         )
       );
-    
-    // Mock drift detection - in production, compare against baseline
-    const driftResults = agentList.map((agent) => ({
-      agentId: agent.id,
-      agentName: agent.name,
-      hasDrift: Math.random() > 0.7, // 30% have drift
-      driftType: Math.random() > 0.5 ? "policy_change" : "spec_tamper",
-      severity: Math.random() > 0.6 ? "high" : Math.random() > 0.3 ? "medium" : "low",
-      changes: [
-        {
-          field: "temperature",
-          oldValue: 0.7,
-          newValue: parseFloat(agent.temperature || "0.7"),
-        },
-      ],
-    }));
-    
+
+    // Fetch the active policy for the workspace
+    const activePolicy = await db
+      .select()
+      .from(policies)
+      .where(
+        and(
+          eq(policies.workspaceId, workspaceId),
+          eq(policies.isActive, true),
+          eq(policies.isTemplate, false)
+        )
+      )
+      .limit(1);
+
+    const currentPolicyHash = activePolicy[0]
+      ? createHash("sha256").update(activePolicy[0].content || "").digest("hex").slice(0, 16)
+      : null;
+
+    const driftResults = agentList.map((agent) => {
+      const changes: { field: string; oldValue: any; newValue: any }[] = [];
+      let hasDrift = false;
+      let driftType = "none";
+      let severity: "low" | "medium" | "high" = "low";
+
+      // Check 1: Policy digest drift — does the agent's stored policyDigest match the current policy hash?
+      if (agent.status === "governed" && currentPolicyHash) {
+        if (agent.policyDigest && agent.policyDigest !== currentPolicyHash) {
+          hasDrift = true;
+          driftType = "policy_change";
+          severity = "high";
+          changes.push({
+            field: "policyDigest",
+            oldValue: agent.policyDigest,
+            newValue: currentPolicyHash,
+          });
+        } else if (!agent.policyDigest) {
+          // Governed agent with no recorded policy digest — drift by omission
+          hasDrift = true;
+          driftType = "policy_change";
+          severity = "medium";
+          changes.push({
+            field: "policyDigest",
+            oldValue: null,
+            newValue: currentPolicyHash,
+          });
+        }
+      }
+
+      // Check 2: Spec tamper — compare stored policySetHash against computed hash of agent config fields
+      const specString = JSON.stringify({
+        systemPrompt: agent.systemPrompt,
+        modelId: agent.modelId,
+        temperature: agent.temperature,
+        allowedTools: agent.allowedTools,
+        hasDocumentAccess: agent.hasDocumentAccess,
+        hasToolAccess: agent.hasToolAccess,
+      });
+      const computedSpecHash = createHash("sha256").update(specString).digest("hex").slice(0, 16);
+
+      if (agent.policySetHash && agent.policySetHash !== computedSpecHash) {
+        hasDrift = true;
+        driftType = hasDrift ? "policy_change_and_spec_tamper" : "spec_tamper";
+        severity = "high";
+        changes.push({
+          field: "policySetHash",
+          oldValue: agent.policySetHash,
+          newValue: computedSpecHash,
+        });
+      }
+
+      return {
+        agentId: agent.id,
+        agentName: agent.name,
+        hasDrift,
+        driftType,
+        severity,
+        changes,
+      };
+    });
+
     return driftResults;
   }),
 
@@ -221,7 +287,7 @@ export const agentsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
       const workspaceId = ctx.user.id;
-      
+
       const agent = await db
         .select()
         .from(agents)
@@ -232,27 +298,77 @@ export const agentsRouter = router({
           )
         )
         .limit(1);
-      
+
       if (!agent[0]) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Agent not found",
         });
       }
-      
+
+      const a = agent[0];
+      const changes: { field: string; oldValue: any; newValue: any }[] = [];
+      let hasDrift = false;
+      let driftType = "none";
+      let severity: "low" | "medium" | "high" = "low";
+
+      // Check policy digest drift
+      const activePolicy = await db
+        .select()
+        .from(policies)
+        .where(
+          and(
+            eq(policies.workspaceId, workspaceId),
+            eq(policies.isActive, true),
+            eq(policies.isTemplate, false)
+          )
+        )
+        .limit(1);
+
+      const currentPolicyHash = activePolicy[0]
+        ? createHash("sha256").update(activePolicy[0].content || "").digest("hex").slice(0, 16)
+        : null;
+
+      if (a.status === "governed" && currentPolicyHash && a.policyDigest !== currentPolicyHash) {
+        hasDrift = true;
+        driftType = "policy_change";
+        severity = "high";
+        changes.push({
+          field: "policyDigest",
+          oldValue: a.policyDigest || null,
+          newValue: currentPolicyHash,
+        });
+      }
+
+      // Check spec tamper
+      const specString = JSON.stringify({
+        systemPrompt: a.systemPrompt,
+        modelId: a.modelId,
+        temperature: a.temperature,
+        allowedTools: a.allowedTools,
+        hasDocumentAccess: a.hasDocumentAccess,
+        hasToolAccess: a.hasToolAccess,
+      });
+      const computedSpecHash = createHash("sha256").update(specString).digest("hex").slice(0, 16);
+
+      if (a.policySetHash && a.policySetHash !== computedSpecHash) {
+        hasDrift = true;
+        driftType = changes.length > 0 ? "policy_change_and_spec_tamper" : "spec_tamper";
+        severity = "high";
+        changes.push({
+          field: "policySetHash",
+          oldValue: a.policySetHash,
+          newValue: computedSpecHash,
+        });
+      }
+
       return {
-        agentId: agent[0].id,
-        agentName: agent[0].name,
-        hasDrift: Math.random() > 0.7,
-        driftType: "policy_change",
-        severity: "medium",
-        changes: [
-          {
-            field: "systemPrompt",
-            oldValue: "Original prompt",
-            newValue: agent[0].systemPrompt,
-          },
-        ],
+        agentId: a.id,
+        agentName: a.name,
+        hasDrift,
+        driftType,
+        severity,
+        changes,
       };
     }),
 
@@ -346,43 +462,14 @@ export const agentsRouter = router({
 
   // List available tools
   listTools: protectedProcedure.query(async ({ ctx }) => {
-    return [
-      {
-        id: "tool_1",
-        name: "Web Search",
-        category: "information",
-        description: "Search the web for information",
-        enabled: true,
-      },
-      {
-        id: "tool_2",
-        name: "Database Query",
-        category: "data",
-        description: "Execute database queries",
-        enabled: true,
-      },
-      {
-        id: "tool_3",
-        name: "File Operations",
-        category: "file",
-        description: "Read and write files",
-        enabled: false,
-      },
-      {
-        id: "tool_4",
-        name: "Email Sender",
-        category: "communication",
-        description: "Send emails",
-        enabled: true,
-      },
-      {
-        id: "tool_5",
-        name: "API Caller",
-        category: "integration",
-        description: "Call external APIs",
-        enabled: true,
-      },
-    ];
+    const registry = getToolRegistry();
+    return registry.list().map((tool) => ({
+      id: tool.name,
+      name: tool.name,
+      category: "general",
+      description: tool.description,
+      enabled: true,
+    }));
   }),
 
   // Deploy agent template

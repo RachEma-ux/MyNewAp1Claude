@@ -118,9 +118,10 @@ export default function AutomationBuilder() {
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [selectedNodeForConfig, setSelectedNodeForConfig] = useState<Node | null>(null);
 
-  // Get workflow ID from URL parameter
+  // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const idParam = urlParams.get('id');
+  const templateParam = urlParams.get('template');
 
   // Fetch workflow if editing
   const { data: existingWorkflow } = trpc.automation.getWorkflow.useQuery(
@@ -133,7 +134,7 @@ export default function AutomationBuilder() {
     if (existingWorkflow) {
       setWorkflowId(existingWorkflow.id);
       setWorkflowName(existingWorkflow.name);
-      
+
       // Parse and load nodes
       try {
         const parsedNodes = JSON.parse(existingWorkflow.nodes);
@@ -141,7 +142,7 @@ export default function AutomationBuilder() {
       } catch (e) {
         console.error("Failed to parse nodes:", e);
       }
-      
+
       // Parse and load edges
       try {
         const parsedEdges = JSON.parse(existingWorkflow.edges);
@@ -149,10 +150,95 @@ export default function AutomationBuilder() {
       } catch (e) {
         console.error("Failed to parse edges:", e);
       }
-      
+
       toast.success(`Loaded workflow: ${existingWorkflow.name}`);
     }
   }, [existingWorkflow, setNodes, setEdges]);
+
+  // Template blueprints
+  const templateBlueprints: Record<string, { name: string; nodes: Node[]; edges: Edge[] }> = {
+    "1": {
+      name: "Email Notification",
+      nodes: [
+        { id: "time-trigger-t1", type: "workflow", data: { label: "Time Trigger", blockType: "trigger" }, position: { x: 250, y: 50 } },
+        { id: "email-action-t1", type: "workflow", data: { label: "Send Email", blockType: "action" }, position: { x: 250, y: 200 } },
+      ],
+      edges: [
+        { id: "e-t1-1", source: "time-trigger-t1", target: "email-action-t1", animated: true },
+      ],
+    },
+    "2": {
+      name: "Data Processing",
+      nodes: [
+        { id: "webhook-trigger-t2", type: "workflow", data: { label: "Webhook", blockType: "trigger" }, position: { x: 250, y: 50 } },
+        { id: "database-action-t2", type: "workflow", data: { label: "Database Query", blockType: "action" }, position: { x: 250, y: 200 } },
+        { id: "code-action-t2", type: "workflow", data: { label: "Run Code", blockType: "action" }, position: { x: 250, y: 350 } },
+      ],
+      edges: [
+        { id: "e-t2-1", source: "webhook-trigger-t2", target: "database-action-t2", animated: true },
+        { id: "e-t2-2", source: "database-action-t2", target: "code-action-t2", animated: true },
+      ],
+    },
+    "3": {
+      name: "Webhook Integration",
+      nodes: [
+        { id: "webhook-trigger-t3", type: "workflow", data: { label: "Webhook", blockType: "trigger" }, position: { x: 250, y: 50 } },
+        { id: "code-action-t3", type: "workflow", data: { label: "Run Code", blockType: "action" }, position: { x: 250, y: 200 } },
+        { id: "chat-action-t3", type: "workflow", data: { label: "Send Message", blockType: "action" }, position: { x: 250, y: 350 } },
+      ],
+      edges: [
+        { id: "e-t3-1", source: "webhook-trigger-t3", target: "code-action-t3", animated: true },
+        { id: "e-t3-2", source: "code-action-t3", target: "chat-action-t3", animated: true },
+      ],
+    },
+    "4": {
+      name: "Scheduled Task",
+      nodes: [
+        { id: "time-trigger-t4", type: "workflow", data: { label: "Time Trigger", blockType: "trigger" }, position: { x: 250, y: 50 } },
+        { id: "code-action-t4", type: "workflow", data: { label: "Run Code", blockType: "action" }, position: { x: 250, y: 200 } },
+      ],
+      edges: [
+        { id: "e-t4-1", source: "time-trigger-t4", target: "code-action-t4", animated: true },
+      ],
+    },
+    "5": {
+      name: "API Call",
+      nodes: [
+        { id: "time-trigger-t5", type: "workflow", data: { label: "Time Trigger", blockType: "trigger" }, position: { x: 250, y: 50 } },
+        { id: "code-action-t5a", type: "workflow", data: { label: "Run Code", blockType: "action", config: { label: "HTTP Request" } }, position: { x: 250, y: 200 } },
+        { id: "code-action-t5b", type: "workflow", data: { label: "Run Code", blockType: "action", config: { label: "Process Response" } }, position: { x: 250, y: 350 } },
+      ],
+      edges: [
+        { id: "e-t5-1", source: "time-trigger-t5", target: "code-action-t5a", animated: true },
+        { id: "e-t5-2", source: "code-action-t5a", target: "code-action-t5b", animated: true },
+      ],
+    },
+    "6": {
+      name: "Conditional Logic",
+      nodes: [
+        { id: "webhook-trigger-t6", type: "workflow", data: { label: "Webhook", blockType: "trigger" }, position: { x: 250, y: 50 } },
+        { id: "code-action-t6", type: "workflow", data: { label: "Run Code", blockType: "action", config: { label: "Condition" } }, position: { x: 250, y: 200 } },
+        { id: "ai-action-t6", type: "workflow", data: { label: "AI Processing", blockType: "action" }, position: { x: 100, y: 370 } },
+        { id: "email-action-t6", type: "workflow", data: { label: "Send Email", blockType: "action" }, position: { x: 400, y: 370 } },
+      ],
+      edges: [
+        { id: "e-t6-1", source: "webhook-trigger-t6", target: "code-action-t6", animated: true },
+        { id: "e-t6-2", source: "code-action-t6", target: "ai-action-t6", animated: true },
+        { id: "e-t6-3", source: "code-action-t6", target: "email-action-t6", animated: true },
+      ],
+    },
+  };
+
+  // Load template from URL param
+  useEffect(() => {
+    if (templateParam && !idParam && templateBlueprints[templateParam]) {
+      const blueprint = templateBlueprints[templateParam];
+      setWorkflowName(blueprint.name);
+      setNodes(blueprint.nodes);
+      setEdges(blueprint.edges);
+      toast.success(`Loaded template: ${blueprint.name}`);
+    }
+  }, [templateParam]);
   
   const saveMutation = trpc.automation.createWorkflow.useMutation({
     onSuccess: (data) => {
