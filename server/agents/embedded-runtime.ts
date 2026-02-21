@@ -9,6 +9,30 @@ import { getDb } from "../db";
 import { agents, agent_proofs } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
+import { z } from "zod";
+import { getOPAEngine } from "./opa-engine";
+
+// Zod schema for validating agent restore data
+const agentRestoreSchema = z.object({
+  name: z.string().min(1).max(255),
+  roleClass: z.string().min(1).max(50),
+  status: z.string().max(50).default("draft"),
+  systemPrompt: z.string().min(1),
+  modelId: z.string().min(1).max(255),
+  createdBy: z.number().int().positive(),
+  description: z.string().nullish(),
+  tags: z.unknown().optional(),
+  lifecycle: z.unknown().optional(),
+  temperature: z.string().nullish(),
+  capabilities: z.unknown().optional(),
+  limits: z.unknown().optional(),
+  hasDocumentAccess: z.boolean().nullish(),
+  hasToolAccess: z.boolean().nullish(),
+  allowedTools: z.unknown().optional(),
+  policyDigest: z.string().max(64).nullish(),
+  policySetHash: z.string().max(64).nullish(),
+  lockedFields: z.unknown().optional(),
+}).passthrough();
 
 export interface AgentSpec {
   mode: "sandbox" | "governed";
@@ -123,8 +147,31 @@ export async function startAgent(
       };
     }
 
-    // TODO: Verify policy hash matches current policy
-    // This would require fetching the current policy hash and comparing
+    // Verify policy hash matches current policy
+    try {
+      const opa = getOPAEngine();
+      const policyInfo = opa.getPolicyInfo();
+      if (policyInfo.bundleHash && proofBundle.policyHash) {
+        const currentPolicyHash = `sha256:${policyInfo.bundleHash}`;
+        if (proofBundle.policyHash !== currentPolicyHash) {
+          // Policy has changed since agent was approved — invalidate
+          await db
+            .update(agents)
+            .set({ governanceStatus: "GOVERNED_INVALIDATED" })
+            .where(eq(agents.id, agentId));
+
+          return {
+            success: false,
+            agentId,
+            status: "denied",
+            reason: "Policy hash mismatch - agent governance invalidated"
+          };
+        }
+      }
+    } catch (policyErr) {
+      // If OPA is not available, fail closed
+      console.warn("[Runtime] Could not verify policy hash:", policyErr instanceof Error ? policyErr.message : String(policyErr));
+    }
   }
 
   // All checks passed - agent can start
@@ -334,14 +381,35 @@ export async function backupAgents(workspaceId: number): Promise<any[]> {
 export async function restoreAgents(
   workspaceId: number,
   backup: any[]
-): Promise<void> {
+): Promise<{ restored: number; skipped: number }> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
+  if (!Array.isArray(backup)) {
+    throw new Error("Restore data must be an array");
+  }
+
+  let restored = 0;
+  let skipped = 0;
+
   for (const agentData of backup) {
+    const result = agentRestoreSchema.safeParse(agentData);
+    if (!result.success) {
+      const errors = result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ");
+      console.warn(`[Restore] Skipping invalid agent entry: ${errors}`);
+      skipped++;
+      continue;
+    }
+
+    // Strip id to avoid PK conflicts — DB generates a new serial id
+    const { id, ...validated } = result.data as any;
+
     await db.insert(agents).values({
-      ...agentData,
+      ...validated,
       workspaceId // Ensure workspace ID is correct
     });
+    restored++;
   }
+
+  return { restored, skipped };
 }

@@ -3,6 +3,7 @@ import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import { sanitizeErrorForLogging } from "./log-utils";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -91,7 +92,7 @@ export function registerOAuthRoutes(app: Express) {
 
       res.redirect(302, "/");
     } catch (error) {
-      console.error("[OAuth] Callback failed", error);
+      console.error("[OAuth] Callback failed:", sanitizeErrorForLogging(error));
       
       // Check if it's a database error
       const errorMessage = error instanceof Error ? error.message : String(error);

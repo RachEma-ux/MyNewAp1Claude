@@ -21,6 +21,7 @@ import { getSession } from "../catalog-import/session-service";
 import { providers as providersTable } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { encrypt } from "./encryption";
+import { sdk } from "./sdk";
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -288,6 +289,54 @@ async function startServer() {
     next();
   });
 
+  // CSRF protection — validate Origin header for state-changing requests
+  app.use("/api", (req, res, next) => {
+    // Skip safe (read-only) methods
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+      return next();
+    }
+
+    // Skip OAuth callback (redirect flow sends no Origin)
+    if (req.path === "/oauth/callback") {
+      return next();
+    }
+
+    const origin = req.headers.origin;
+
+    // Allow requests with no Origin header (same-origin browser requests, non-browser clients)
+    if (!origin) {
+      return next();
+    }
+
+    // Validate Origin against allowed origins
+    if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+      return next();
+    }
+
+    // In development with no CORS_ORIGINS set, also check Host header match
+    const host = req.headers.host;
+    if (host) {
+      try {
+        const originUrl = new URL(origin);
+        if (originUrl.host === host) {
+          return next();
+        }
+      } catch {
+        // Invalid origin URL — reject
+      }
+    }
+
+    // If allowedOrigins is empty (production same-origin only), the origin must match the host
+    if (allowedOrigins.length === 0) {
+      // Already checked host match above — if we got here, it doesn't match
+      res.status(403).json({ error: "CSRF validation failed: origin mismatch" });
+      return;
+    }
+
+    res.status(403).json({ error: "CSRF validation failed: origin not allowed" });
+    return;
+  });
+
   // Health check endpoint
   app.get("/api/health", async (req, res) => {
     const health = {
@@ -329,6 +378,20 @@ async function startServer() {
 
   // Import session SSE stream
   app.get("/api/import/stream", async (req, res) => {
+    // Authentication check
+    if (process.env.DEV_MODE !== "true" || process.env.NODE_ENV === "production") {
+      try {
+        const user = await sdk.authenticateRequest(req);
+        if (!user) {
+          res.status(401).json({ error: "Authentication required" });
+          return;
+        }
+      } catch {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
+    }
+
     const sessionId = req.query.sessionId as string;
     if (!sessionId) {
       res.status(400).json({ error: "sessionId required" });

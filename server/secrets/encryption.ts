@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { sanitizeErrorForLogging } from "../_core/log-utils";
 
 /**
  * Secrets encryption module using AES-256-GCM
@@ -105,7 +106,7 @@ export function decrypt(encrypted: string): string {
     
     return decrypted;
   } catch (error) {
-    console.error("[Decryption] Failed to decrypt:", error);
+    console.error("[Decryption] Failed to decrypt:", sanitizeErrorForLogging(error));
     throw new Error("Decryption failed");
   }
 }

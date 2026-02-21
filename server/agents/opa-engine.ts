@@ -14,12 +14,32 @@ import * as crypto from "crypto";
 
 export class OPAEngine {
   private opaUrl: string;
+  private opaAuthToken: string | null;
   private policyBundleHash: string | null = null;
   private policySetHash: string | null = null;
   private lastLoadedAt: Date | null = null;
 
   constructor(opaUrl: string = "http://localhost:8181") {
     this.opaUrl = opaUrl;
+    this.opaAuthToken = process.env.OPA_AUTH_TOKEN || null;
+
+    if (!this.opaAuthToken && process.env.NODE_ENV === "production") {
+      console.warn("[OPA] WARNING: OPA_AUTH_TOKEN is not set. OPA requests are unauthenticated. Set OPA_AUTH_TOKEN for production security.");
+    }
+  }
+
+  /**
+   * Build headers for OPA requests, including auth token if configured
+   */
+  private getHeaders(contentType?: string): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (contentType) {
+      headers["Content-Type"] = contentType;
+    }
+    if (this.opaAuthToken) {
+      headers["Authorization"] = `Bearer ${this.opaAuthToken}`;
+    }
+    return headers;
   }
 
   /**
@@ -107,9 +127,7 @@ export class OPAEngine {
   private async uploadBundle(bundleData: Buffer): Promise<void> {
     const response = await fetch(`${this.opaUrl}/v1/policies/agents`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: this.getHeaders("application/json"),
       body: bundleData.toString('utf-8'),
     });
 
@@ -122,7 +140,9 @@ export class OPAEngine {
    * Compute policy set hash
    */
   private async computePolicySetHash(): Promise<string> {
-    const response = await fetch(`${this.opaUrl}/v1/policies`);
+    const response = await fetch(`${this.opaUrl}/v1/policies`, {
+      headers: this.getHeaders(),
+    });
     const policies = await response.json();
 
     const policyIds = Object.keys(policies.result || {}).sort();
@@ -157,9 +177,7 @@ export class OPAEngine {
     // Query OPA
     const response = await fetch(`${this.opaUrl}/v1/data/agents/admission`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: this.getHeaders("application/json"),
       body: JSON.stringify({ input }),
     });
 
@@ -226,9 +244,7 @@ export class OPAEngine {
 
     const response = await fetch(`${this.opaUrl}/v1/data/agents/simulate`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: this.getHeaders("application/json"),
       body: JSON.stringify({ input }),
     });
 

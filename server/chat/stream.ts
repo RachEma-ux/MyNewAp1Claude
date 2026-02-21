@@ -6,6 +6,7 @@ import { trackProviderUsage } from '../providers/usage';
 import { sdk } from '../_core/sdk';
 import { ENV } from '../_core/env';
 import { providerRouter } from '../inference/provider-router';
+import { sanitizeErrorForLogging } from '../_core/log-utils';
 
 // Zod schema for chat stream request body
 const chatStreamSchema = z.object({
@@ -163,7 +164,7 @@ export async function handleChatStream(req: Request, res: Response) {
           }
         }
       } catch (ragError) {
-        console.error('[ChatStream] RAG error:', ragError);
+        console.error('[ChatStream] RAG error:', sanitizeErrorForLogging(ragError));
         // Continue without RAG if it fails
       }
     }
@@ -247,7 +248,7 @@ export async function handleChatStream(req: Request, res: Response) {
         }
       }
     } catch (error) {
-      console.error('[ChatStream] Streaming error:', error);
+      console.error('[ChatStream] Streaming error:', sanitizeErrorForLogging(error));
       res.write(`data: ${JSON.stringify({
         type: 'error',
         error: error instanceof Error ? error.message : 'Unknown streaming error',
@@ -255,7 +256,7 @@ export async function handleChatStream(req: Request, res: Response) {
       res.end();
     }
   } catch (error) {
-    console.error('[ChatStream] Request error:', error);
+    console.error('[ChatStream] Request error:', sanitizeErrorForLogging(error));
     if (!res.headersSent) {
       res.status(500).json({ error: 'Internal server error' });
     }
