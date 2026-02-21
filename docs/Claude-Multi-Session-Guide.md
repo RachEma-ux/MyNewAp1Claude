@@ -232,4 +232,138 @@ git status
 
 ---
 
+## Advanced: Agent Teams (Built-in Orchestration)
+
+Claude Code has an experimental **Agent Teams** feature — a built-in supervisor/orchestrator pattern where one session acts as a **team lead** coordinating multiple **teammate** agents.
+
+### How It Differs from Manual Multi-Sessions
+
+| | Manual Multi-Sessions (tmux) | Agent Teams |
+|---|---|---|
+| **Control** | You switch windows and coordinate | Lead agent coordinates automatically |
+| **Communication** | Via shared files | Built-in mailbox and task list |
+| **Task assignment** | You tell each session what to do | Lead assigns, teammates self-claim |
+| **Awareness** | Sessions are fully independent | Teammates see shared task status |
+
+### Enable Agent Teams
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}
+```
+
+### Start an Agent Team
+
+Just tell Claude what you need in natural language:
+
+```
+Create an agent team to build this feature. Spawn three teammates:
+- One for frontend components
+- One for backend API routes
+- One for writing tests
+```
+
+Claude creates the team, spawns teammates, assigns tasks, and coordinates.
+
+### Display Modes
+
+- **In-process** (default): all teammates in your main terminal. Use `Shift+Down` to cycle between them.
+- **Split panes**: each teammate gets its own tmux pane. Add to settings:
+  ```json
+  { "teammateMode": "tmux" }
+  ```
+
+### What the Lead Agent Can Do
+
+- Create and manage a **shared task list**
+- **Assign tasks** to specific teammates or let them self-claim
+- **Require plan approval** before teammates implement changes
+- **Send messages** to individual teammates or broadcast to all
+- **Shut down** teammates and clean up when done
+
+### Require Plan Approval
+
+For risky changes, make teammates plan first:
+
+```
+Spawn an architect teammate to refactor the auth module.
+Require plan approval before they make any changes.
+```
+
+The lead reviews and approves/rejects plans before implementation begins.
+
+### Best Use Cases for Agent Teams
+
+1. **Parallel code review** — security, performance, and test coverage each reviewed by a separate agent
+2. **Feature development** — frontend, backend, and tests split across teammates
+3. **Debugging competing hypotheses** — multiple agents investigate different theories simultaneously
+4. **Research** — explore a problem from multiple angles at once
+
+### Example: Parallel Code Review
+
+```
+Create an agent team to review PR #142. Spawn three reviewers:
+- One focused on security implications
+- One checking performance impact
+- One validating test coverage
+Have them each review and report findings.
+```
+
+### Example: Debugging with Competing Hypotheses
+
+```
+Users report the app exits after one message instead of staying connected.
+Spawn 5 teammates to investigate different hypotheses. Have them talk to
+each other to try to disprove each other's theories, like a scientific
+debate.
+```
+
+### Subagents vs Agent Teams
+
+Claude Code also has **subagents** — lightweight workers within a single session:
+
+| | Subagents | Agent Teams |
+|---|---|---|
+| **Context** | Share parent's context | Fully independent |
+| **Communication** | Report back to parent only | Message each other directly |
+| **Coordination** | Parent manages everything | Shared task list, self-coordination |
+| **Token cost** | Lower | Higher |
+| **Best for** | Quick focused tasks | Complex collaborative work |
+
+Use **subagents** for simple parallel tasks. Use **agent teams** when agents need to discuss, challenge, and coordinate with each other.
+
+### Limitations (Experimental)
+
+- No session resumption for teammates after `/resume`
+- One team per session
+- No nested teams (teammates can't spawn their own teams)
+- Higher token usage (each teammate is a full Claude instance)
+- Split pane mode requires tmux
+- Lead is fixed for the lifetime of the team
+
+### Cleanup
+
+Always clean up when done:
+
+```
+Clean up the team
+```
+
+Shut down all teammates first, then ask the lead to clean up.
+
+---
+
+## References
+
+- [Agent Teams - Claude Code Docs](https://code.claude.com/docs/en/agent-teams)
+- [Subagents - Claude Docs](https://docs.claude.com/en/docs/agent-sdk/subagents)
+- [Claude Agent SDK - npm](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk)
+
+---
+
 *Guide created for Termux on Android (aarch64). Tested with Claude Code v2.1.42 and tmux.*
