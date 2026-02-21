@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## CRITICAL: Device Workflow Rules
+
+- **DO NOT run builds, tests, or dev servers on device.** No local builds or test runs unless explicitly instructed otherwise.
+- **Work with file tools only** (Read, Edit, Write, Glob, Grep) and **push to GitHub**.
+- **Never modify files on device outside of git workflow** — edit, commit, push.
+- Once built on GitHub (CI), pull to device.
+
 ## Project Overview
 
 MyNewAppV1 is a local-first AI development platform (LLM Control Plane) built as a full-stack TypeScript monorepo. It provides workspace-based management for LLM providers, document ingestion/RAG, agent orchestration, automation workflows, and governance features.
