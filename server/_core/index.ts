@@ -20,6 +20,7 @@ import { startCleanupInterval } from "../catalog-import/session-service";
 import { getSession } from "../catalog-import/session-service";
 import { providers as providersTable } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { encrypt } from "./encryption";
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -130,7 +131,7 @@ async function autoProvisionProviders() {
         type,
         enabled: true,
         priority: 50,
-        config: { apiKey },
+        config: { apiKey: encrypt(apiKey) },
       });
       console.log(`[AutoProvision] Created ${name} provider from ${envKey}`);
     }
@@ -291,7 +292,28 @@ async function startServer() {
     });
   });
 
-  // Simple in-memory rate limiting for import endpoints
+  // Global rate limiting for all API endpoints
+  const globalRateMap = new Map<string, number[]>();
+  const GLOBAL_RATE_LIMIT = 100; // max requests per minute per IP
+  app.use("/api", (req, res, next) => {
+    const key = req.ip || "unknown";
+    const now = Date.now();
+    const windowMs = 60 * 1000;
+
+    let timestamps = globalRateMap.get(key) || [];
+    timestamps = timestamps.filter((t) => now - t < windowMs);
+
+    if (timestamps.length >= GLOBAL_RATE_LIMIT) {
+      res.status(429).json({ error: "Too many requests. Try again later." });
+      return;
+    }
+
+    timestamps.push(now);
+    globalRateMap.set(key, timestamps);
+    next();
+  });
+
+  // Stricter rate limiting for import endpoints
   const importRateMap = new Map<string, number[]>();
   const IMPORT_RATE_LIMIT = 10; // max requests per minute
   app.use("/api/trpc/catalogImport", (req, res, next) => {

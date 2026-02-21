@@ -361,6 +361,10 @@ class ResourceManager {
 export const resourceManager = new ResourceManager();
 
 // Periodic cleanup
-setInterval(() => {
+const _resourceCleanupInterval = setInterval(() => {
   resourceManager.cleanupStaleModels();
 }, 15 * 60 * 1000); // Every 15 minutes
+
+export function stopResourceCleanup() {
+  clearInterval(_resourceCleanupInterval);
+}

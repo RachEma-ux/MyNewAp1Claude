@@ -328,6 +328,10 @@ class RealtimeCollaborationService {
 export const realtimeCollaborationService = new RealtimeCollaborationService();
 
 // Clean up inactive participants every 5 minutes
-setInterval(() => {
+const _realtimeCleanupInterval = setInterval(() => {
   realtimeCollaborationService.cleanupInactive();
 }, 300000);
+
+export function stopRealtimeCleanup() {
+  clearInterval(_realtimeCleanupInterval);
+}

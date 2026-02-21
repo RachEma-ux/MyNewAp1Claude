@@ -50,11 +50,15 @@ import { discoverProvider } from "./discover-provider";
 const _rateLimitBuckets = new Map<string, { windowStart: number; count: number }>();
 const _discoveryCache = new Map<string, { result: any; ts: number }>();
 // Clean up stale entries every 5 minutes
-setInterval(() => {
+const _catalogCleanupInterval = setInterval(() => {
   const now = Date.now();
   _rateLimitBuckets.forEach((v, k) => { if (now - v.windowStart > 120_000) _rateLimitBuckets.delete(k); });
   _discoveryCache.forEach((v, k) => { if (now - v.ts > 120_000) _discoveryCache.delete(k); });
 }, 300_000);
+
+export function stopCatalogCleanup() {
+  clearInterval(_catalogCleanupInterval);
+}
 
 // ============================================================================
 // Input Schemas

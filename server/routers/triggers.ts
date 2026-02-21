@@ -315,7 +315,7 @@ export const triggersRouter = router({
     }),
   
   // List all triggers
-  list: publicProcedure
+  list: protectedProcedure
     .input(
       z.object({
         status: z.enum(["draft", "pending_approval", "approved", "rejected", "deprecated"]).optional(),

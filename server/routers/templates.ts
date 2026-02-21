@@ -7,7 +7,7 @@ import { TRPCError } from "@trpc/server";
 
 export const templatesRouter = router({
   // List all public templates
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({
       category: z.enum(["productivity", "data", "communication", "monitoring"]).optional(),
     }).optional())
@@ -30,7 +30,7 @@ export const templatesRouter = router({
     }),
 
   // Get template by ID
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
