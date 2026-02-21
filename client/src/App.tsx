@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -7,81 +8,83 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl, isOAuthConfigured } from "./const";
 import MainLayout from "./components/MainLayout";
-import Home from "./pages/Home";
-import Workspaces from "./pages/Workspaces";
-import WorkspaceDetail from "./pages/WorkspaceDetail";
-import WorkspaceHome from "./pages/WorkspaceHome";
-import Models from "./pages/Models";
-import Documents from "./pages/Documents";
-// Agents page replaced by AgentsPage (governance-aware)
-import AgentChat from "./pages/AgentChat";
-import Chat from "./pages/Chat";
-import Automation from "./pages/Automation";
-import Settings from "./pages/Settings";
-import Providers from "./pages/Providers";
-import ProviderDetail from "./pages/ProviderDetail";
-import Analytics from "./pages/Analytics";
-import OllamaSetup from "./pages/OllamaSetup";
-import ProviderAnalytics from "./pages/ProviderAnalytics";
-import ModelBrowser from "./pages/ModelBrowser";
-import HardwareProfile from "./pages/HardwareProfile";
-import DownloadAnalytics from "./pages/DownloadAnalytics";
-import LocalInference from "./pages/LocalInference";
-import AgentDashboard from "./pages/AgentDashboard";
-import AutomationBuilder from "./pages/AutomationBuilder";
-import AgentTemplates from "./pages/AgentTemplates";
-import AutomationExecutions from "./pages/AutomationExecutions";
-import AutomationExecutionDetails from "./pages/AutomationExecutionDetails";
-import TriggersStore from "./pages/TriggersStore";
-import ActionsStore from "./pages/ActionsStore";
-import AutomationSettings from "./pages/AutomationSettings";
-import DocumentUpload from "./pages/DocumentUpload";
-import CodeEditor from "./pages/CodeEditor";
-import EmbeddingsManagement from "./pages/EmbeddingsManagement";
-import VectorDBManagement from "./pages/VectorDBManagement";
-import Conversations from "./pages/Conversations";
-import DocumentsDashboard from "./pages/DocumentsDashboard";
-import ResourceMonitor from "./pages/ResourceMonitor";
-import HardwarePage from "./pages/infrastructure/HardwarePage";
-import SoftwarePage from "./pages/infrastructure/SoftwarePage";
-import SecretsPage from "./pages/SecretsPage";
-import TemplatesPage from "./pages/TemplatesPage";
-import AgentsPage from "./pages/AgentsPage";
-import AgentEditorPage from "@/pages/AgentEditorPage";
-import AgentDashboardPage from "@/pages/AgentDashboardPage";
-import ProtocolsPage from "@/pages/ProtocolsPage";
-import WCPWorkflowBuilder from "@/pages/WCPWorkflowBuilder";
-import WCPWorkflowsList from "@/pages/WCPWorkflowsList";
-import WCPExecutions from "@/pages/WCPExecutions";
-import WCPExecutionDetails from "@/pages/WCPExecutionDetails";
-import PromotionRequestsPage from "@/pages/PromotionRequestsPage";
-import DriftDetectionPage from "@/pages/DriftDetectionPage";
-import ComplianceExportPage from "@/pages/ComplianceExportPage";
-import ErrorAnalysisDashboard from "@/pages/ErrorAnalysisDashboard";
-import PolicyManagement from "@/pages/PolicyManagement";
-import AgentDetailPage from "@/pages/AgentDetailPage";
-import { AgentList } from "@/pages/AgentList";
-import { AgentEditor } from "@/pages/AgentEditor";
-import AutoRemediationPage from "@/pages/AutoRemediationPage";
-import ToolsManagementPage from "@/pages/ToolsManagementPage";
-import WikiPage from "@/pages/WikiPage";
-import WikiArticle from "@/pages/WikiArticle";
-import WikiEditor from "@/pages/WikiEditor";
-import LLMDashboard from "@/pages/LLMDashboard";
-import LLMControlPlane from "@/pages/LLMControlPlane";
-import LLMWizard from "@/pages/LLMWizard";
-import LLMCreationWizard from "@/pages/LLMCreationWizard";
-import LLMProviderConfigWizard from "@/pages/LLMProviderConfigWizard";
-import NewProviderPage from "@/pages/NewProviderPage";
-import LLMCataloguePage from "@/pages/LLMCataloguePage";
-import LLMPromotions from "@/pages/LLMPromotions";
-import LLMDetailPage from "@/pages/LLMDetailPage";
-import LLMTrainingDashboard from "@/pages/LLMTrainingDashboard";
-import DeploymentStatus from "@/pages/DeploymentStatus";
-import DeployPage from "@/pages/DeployPage";
-import CatalogManagePage from "@/pages/CatalogManagePage";
-import ProviderConnectionsPage from "@/pages/ProviderConnectionsPage";
 import { Loader2 } from "lucide-react";
+
+// Lazy-loaded page components (code splitting)
+const Home = lazy(() => import("./pages/Home"));
+const Workspaces = lazy(() => import("./pages/Workspaces"));
+const WorkspaceDetail = lazy(() => import("./pages/WorkspaceDetail"));
+const WorkspaceHome = lazy(() => import("./pages/WorkspaceHome"));
+const Models = lazy(() => import("./pages/Models"));
+const Documents = lazy(() => import("./pages/Documents"));
+// Agents page replaced by AgentsPage (governance-aware)
+const AgentChat = lazy(() => import("./pages/AgentChat"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Automation = lazy(() => import("./pages/Automation"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Providers = lazy(() => import("./pages/Providers"));
+const ProviderDetail = lazy(() => import("./pages/ProviderDetail"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const OllamaSetup = lazy(() => import("./pages/OllamaSetup"));
+const ProviderAnalytics = lazy(() => import("./pages/ProviderAnalytics"));
+const ModelBrowser = lazy(() => import("./pages/ModelBrowser"));
+const HardwareProfile = lazy(() => import("./pages/HardwareProfile"));
+const DownloadAnalytics = lazy(() => import("./pages/DownloadAnalytics"));
+const LocalInference = lazy(() => import("./pages/LocalInference"));
+// AgentDashboard removed — consolidated into AgentDashboardPage
+const AutomationBuilder = lazy(() => import("./pages/AutomationBuilder"));
+const AgentTemplates = lazy(() => import("./pages/AgentTemplates"));
+const AutomationExecutions = lazy(() => import("./pages/AutomationExecutions"));
+const AutomationExecutionDetails = lazy(() => import("./pages/AutomationExecutionDetails"));
+const TriggersStore = lazy(() => import("./pages/TriggersStore"));
+const ActionsStore = lazy(() => import("./pages/ActionsStore"));
+const AutomationSettings = lazy(() => import("./pages/AutomationSettings"));
+const DocumentUpload = lazy(() => import("./pages/DocumentUpload"));
+const CodeEditor = lazy(() => import("./pages/CodeEditor"));
+const EmbeddingsManagement = lazy(() => import("./pages/EmbeddingsManagement"));
+const VectorDBManagement = lazy(() => import("./pages/VectorDBManagement"));
+const Conversations = lazy(() => import("./pages/Conversations"));
+const DocumentsDashboard = lazy(() => import("./pages/DocumentsDashboard"));
+const ResourceMonitor = lazy(() => import("./pages/ResourceMonitor"));
+const HardwarePage = lazy(() => import("./pages/infrastructure/HardwarePage"));
+const SoftwarePage = lazy(() => import("./pages/infrastructure/SoftwarePage"));
+const SecretsPage = lazy(() => import("./pages/SecretsPage"));
+const TemplatesPage = lazy(() => import("./pages/TemplatesPage"));
+const AgentsPage = lazy(() => import("./pages/AgentsPage"));
+const AgentEditorPage = lazy(() => import("@/pages/AgentEditorPage"));
+const AgentDashboardPage = lazy(() => import("@/pages/AgentDashboardPage"));
+const ProtocolsPage = lazy(() => import("@/pages/ProtocolsPage"));
+const WCPWorkflowBuilder = lazy(() => import("@/pages/WCPWorkflowBuilder"));
+const WCPWorkflowsList = lazy(() => import("@/pages/WCPWorkflowsList"));
+const WCPExecutions = lazy(() => import("@/pages/WCPExecutions"));
+const WCPExecutionDetails = lazy(() => import("@/pages/WCPExecutionDetails"));
+const PromotionRequestsPage = lazy(() => import("@/pages/PromotionRequestsPage"));
+const DriftDetectionPage = lazy(() => import("@/pages/DriftDetectionPage"));
+const ComplianceExportPage = lazy(() => import("@/pages/ComplianceExportPage"));
+const ErrorAnalysisDashboard = lazy(() => import("@/pages/ErrorAnalysisDashboard"));
+const PolicyManagement = lazy(() => import("@/pages/PolicyManagement"));
+const AgentDetailPage = lazy(() => import("@/pages/AgentDetailPage"));
+const AgentList = lazy(() => import("@/pages/AgentList").then(m => ({ default: m.AgentList })));
+const AgentEditor = lazy(() => import("@/pages/AgentEditor").then(m => ({ default: m.AgentEditor })));
+const AutoRemediationPage = lazy(() => import("@/pages/AutoRemediationPage"));
+const ToolsManagementPage = lazy(() => import("@/pages/ToolsManagementPage"));
+const WikiPage = lazy(() => import("@/pages/WikiPage"));
+const WikiArticle = lazy(() => import("@/pages/WikiArticle"));
+const WikiEditor = lazy(() => import("@/pages/WikiEditor"));
+const LLMDashboard = lazy(() => import("@/pages/LLMDashboard"));
+const LLMControlPlane = lazy(() => import("@/pages/LLMControlPlane"));
+const LLMWizard = lazy(() => import("@/pages/LLMWizard"));
+const LLMCreationWizard = lazy(() => import("@/pages/LLMCreationWizard"));
+const LLMProviderConfigWizard = lazy(() => import("@/pages/LLMProviderConfigWizard"));
+const NewProviderPage = lazy(() => import("@/pages/NewProviderPage"));
+const LLMCataloguePage = lazy(() => import("@/pages/LLMCataloguePage"));
+const LLMPromotions = lazy(() => import("@/pages/LLMPromotions"));
+const LLMDetailPage = lazy(() => import("@/pages/LLMDetailPage"));
+const LLMTrainingDashboard = lazy(() => import("@/pages/LLMTrainingDashboard"));
+const DeploymentStatus = lazy(() => import("@/pages/DeploymentStatus"));
+const DeployPage = lazy(() => import("@/pages/DeployPage"));
+const CatalogManagePage = lazy(() => import("@/pages/CatalogManagePage"));
+const ProviderConnectionsPage = lazy(() => import("@/pages/ProviderConnectionsPage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -135,7 +138,8 @@ function Router() {
           <Route path="/code" component={() => <ProtectedRoute component={CodeEditor} />} />
       <Route path="/embeddings" component={() => <ProtectedRoute component={EmbeddingsManagement} />} />
       <Route path="/vectordb" component={() => <ProtectedRoute component={VectorDBManagement} />} />
-      <Route path="/agents/dashboard" component={() => <ProtectedRoute component={AgentDashboard} />} />
+      {/* Redirect /agents/dashboard to governance-aware dashboard */}
+      <Route path="/agents/dashboard" component={() => <ProtectedRoute component={AgentDashboardPage} />} />
       <Route path="/agents/templates" component={() => <ProtectedRoute component={AgentTemplates} />} />
       <Route path="/automation/builder" component={() => <ProtectedRoute component={AutomationBuilder} />} />
       <Route path="/automation/executions/:id" component={() => <ProtectedRoute component={AutomationExecutionDetails} />} />
@@ -177,7 +181,9 @@ function Router() {
       <Route path="/infrastructure/software/:item" component={() => <ProtectedRoute component={SoftwarePage} />} />
       <Route path="/error-analysis" component={() => <ProtectedRoute component={ErrorAnalysisDashboard} />} />
       <Route path="/policies" component={() => <ProtectedRoute component={PolicyManagement} />} />
-      <Route path="/agent-detail/:id" component={() => <ProtectedRoute component={AgentDetailPage} />} />
+      {/* Redirect stale /agent-detail/:id to canonical /agents/:id */}
+      <Route path="/agent-detail/:id">{(params) => <Redirect to={`/agents/${params.id}`} />}</Route>
+      {/* Governance agent routes — consolidated under /governance/agents */}
       <Route path="/governance/agents" component={() => <ProtectedRoute component={AgentList} />} />
       <Route path="/governance/agents/create" component={() => <ProtectedRoute component={() => <AgentEditor />} />} />
       <Route path="/governance/agents/:agentId/edit" component={({ agentId }) => <ProtectedRoute component={() => <AgentEditor agentId={agentId} />} />} />
@@ -213,7 +219,13 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          }>
+            <Router />
+          </Suspense>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

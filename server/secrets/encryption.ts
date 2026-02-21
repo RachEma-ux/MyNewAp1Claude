@@ -34,9 +34,11 @@ function getEncryptionKey(): string {
     return cachedEncryptionKey;
   }
   
-  // Generate a random key if not set (for development/testing)
-  console.warn("[Secrets] SECRETS_ENCRYPTION_KEY not set, using random key (data will not persist across restarts)");
-  cachedEncryptionKey = crypto.randomBytes(32).toString("hex");
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("[Secrets] FATAL: SECRETS_ENCRYPTION_KEY is required in production (min 32 chars). Set it in your environment variables.");
+  }
+  console.warn("[Secrets] WARNING: SECRETS_ENCRYPTION_KEY not set. Using dev fallback (NOT safe for production)");
+  cachedEncryptionKey = "dev-secrets-fallback-key-00000000000000000000";
   return cachedEncryptionKey;
 }
 
