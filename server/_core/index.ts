@@ -210,15 +210,17 @@ async function startServer() {
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
     // Content-Security-Policy — allow self, inline styles (for Radix/shadcn), and data: URIs for images
+    // In development, Vite injects inline scripts for HMR — allow 'unsafe-inline' for script-src
+    const isDev = process.env.NODE_ENV === "development";
     res.setHeader(
       "Content-Security-Policy",
       [
         "default-src 'self'",
-        "script-src 'self'",
+        isDev ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https:",
         "font-src 'self' data:",
-        "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com http://localhost:11434 http://localhost:8080 http://localhost:8181",
+        "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com http://localhost:11434 http://localhost:8080 http://localhost:8181" + (isDev ? " ws://localhost:*" : ""),
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
