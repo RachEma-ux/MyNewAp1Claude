@@ -11,6 +11,7 @@ import { providerRouter as unifiedRouter } from "../inference/provider-router";
 import { getDb } from "../db";
 import { routingAuditLogs } from "../../drizzle/schema";
 import { desc, eq, and, gte } from "drizzle-orm";
+import { decrypt, isEncrypted } from "../_core/encryption";
 
 // Strip sensitive keys (apiKey, apiSecret, etc.) from provider config before returning to clients
 function redactProviderConfig(provider: any) {
@@ -52,6 +53,29 @@ export const providerRouter = router({
     .query(async ({ input }) => {
       const provider = await providerDb.getProviderById(input.id);
       return provider ? redactProviderConfig(provider) : null;
+    }),
+
+  // Get decrypted API key for a provider type (used by import wizard auto-fill)
+  getApiKeyByType: protectedProcedure
+    .input(z.object({
+      type: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const providers = await providerDb.getProvidersByType(input.type);
+      if (!providers.length) return { apiKey: null };
+
+      const config = providers[0].config as Record<string, any> | null;
+      if (!config?.apiKey || typeof config.apiKey !== "string") return { apiKey: null };
+
+      // Decrypt if the key was stored encrypted (auto-provisioned from env vars)
+      try {
+        if (isEncrypted(config.apiKey)) {
+          return { apiKey: decrypt(config.apiKey) };
+        }
+      } catch {
+        // Decryption failed — key might be plaintext
+      }
+      return { apiKey: config.apiKey };
     }),
 
   // Create new provider

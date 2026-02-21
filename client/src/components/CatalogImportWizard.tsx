@@ -276,40 +276,36 @@ export function CatalogImportWizard({
         || (providerType && PROVIDER_BASE_URLS[providerType]);
       if (url) setBaseUrl(url);
 
-      // 2. Auto-fill API key from multiple sources
-      let apiKey: string | undefined;
+      // 2. Auto-fill API key — use dedicated decrypt endpoint
+      let resolvedKey: string | undefined;
 
-      // Source A: catalog entry's own config (saved back from previous discovery)
+      // Source A: catalog entry's own config (plaintext, saved from previous discovery)
       if (config?.apiKey) {
-        apiKey = config.apiKey as string;
+        resolvedKey = config.apiKey as string;
       }
 
-      // Source B: providers registry table (auto-provisioned from env vars)
-      if (!apiKey && registryId) {
+      // Source B: provider registry via dedicated decrypt endpoint (handles encrypted keys)
+      if (!resolvedKey && registryId) {
         try {
-          const providers = await trpcUtils.providers.list.fetch({ type: registryId as any });
-          const provConfig = providers?.[0]?.config as Record<string, any> | null;
-          if (provConfig?.apiKey) apiKey = provConfig.apiKey as string;
+          const result = await trpcUtils.providers.getApiKeyByType.fetch({ type: registryId });
+          if (result?.apiKey) resolvedKey = result.apiKey;
         } catch {
-          // Provider registry lookup failed
+          // Provider key lookup failed
         }
       }
 
-      // Source C: fetch all providers and match by name
-      if (!apiKey) {
-        try {
-          const allProviders = await trpcUtils.providers.list.fetch({});
-          const match = allProviders.find((p: any) =>
-            p.type === registryId || p.name.toLowerCase() === entry.name.toLowerCase()
-          );
-          const matchConfig = match?.config as Record<string, any> | null;
-          if (matchConfig?.apiKey) apiKey = matchConfig.apiKey as string;
-        } catch {
-          // Fallback lookup failed
+      // Source C: try matching by provider name
+      if (!resolvedKey) {
+        const typesToTry = [providerType, entry.name.toLowerCase()].filter(Boolean) as string[];
+        for (const t of typesToTry) {
+          try {
+            const result = await trpcUtils.providers.getApiKeyByType.fetch({ type: t });
+            if (result?.apiKey) { resolvedKey = result.apiKey; break; }
+          } catch { /* skip */ }
         }
       }
 
-      if (apiKey) setApiKey(apiKey);
+      if (resolvedKey) setApiKey(resolvedKey);
     } catch {
       // Ignore fetch errors — user can still type manually
     }
