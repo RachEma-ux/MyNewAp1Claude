@@ -1,0 +1,51 @@
+Session Summary — 2026-02-19 22:21
+
+## Goal
+Implement Provider Connections Dashboard page for managing PAT-authenticated provider connections.
+
+## What Was Done
+
+### 1. Created ProviderConnectionsPage.tsx
+- New page at /providers/connections following Providers.tsx card-grid pattern
+- Header with title, Refresh button, "Connect Provider" button (opens ConnectProviderModal)
+- 4 stat cards: Total Connections, Active, Failed, Models
+- Connection cards grid (responsive 2-col/3-col) showing:
+  - Provider name (resolved from catalog), base URL
+  - Lifecycle status badge (color-coded: green/active, blue/validated, gray/draft, red/failed, gray/disabled)
+  - Health status badge (ok/unreachable/not checked)
+  - Model count, capabilities badges, secret version
+  - Last health check timestamp
+  - Action buttons: Health Check, Disable/Enable, Delete
+- Empty state with CTA
+- Per-card loading spinner on health check
+
+### 2. Added Route & Navigation
+- Route `/providers/connections` in App.tsx (placed before `/providers/:id` to avoid conflict)
+- "Connections" nav item with Plug icon in MainLayout.tsx under Providers menu
+
+### 3. Fixed Health Check Service (server-side)
+- `server/provider-connections/service.ts`: healthCheck() now gracefully handles:
+  - Local providers with no stored secret (Ollama) — probes without PAT
+  - Encrypted PATs that can't be decrypted after encryption key rotation — probes without PAT
+- Previously both cases threw hard errors
+
+### 4. Fixed Toast Message
+- Changed `result.healthStatus` to `result.status` in health check toast (mutation returns TestResult, not DB row)
+
+## Testing Results
+- Ollama: active, healthy, 3 models, 5ms latency
+- OpenAI: re-connected with fresh PAT after key rotation, active, healthy, 97 models
+- Health Check, Disable/Enable, Delete buttons all functional
+- Connect Provider modal works from the page
+- Deployed to tunnel (fresh DB shows empty state correctly)
+
+## Commits
+- 1e3052a feat: Add Provider Connections dashboard page
+- 4e93010 fix: Handle missing/undecryptable secrets in health check
+- 22e8cb8 fix: Correct health check toast to use result.status
+
+## Files Modified
+- client/src/pages/ProviderConnectionsPage.tsx (new)
+- client/src/App.tsx (added route + import)
+- client/src/components/MainLayout.tsx (added nav item + Plug import)
+- server/provider-connections/service.ts (graceful secret handling)

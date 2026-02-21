@@ -1,0 +1,60 @@
+Session Summary — 2026-02-20 12:50
+
+## Focus: Fix Connect Flow End-to-End (3 Bugs)
+
+### Bug 1 Fix: "Enable" button crashes on disabled connections
+- Problem: State machine only allowed disabled → draft, not disabled → active.
+  Clicking "Enable" on a disabled connection threw "Invalid state transition: disabled → active".
+- Fix: Added "active" to disabled transitions in server/provider-connections/state-machine.ts:18
+- Updated test: Moved disabled→active from invalid to valid test pairs in provider-connections.test.ts
+- Safe because disableConnection() does NOT delete secrets — encrypted PAT remains valid.
+
+### Bug 2 Fix: Success screen never shown — modal auto-closes
+- Problem: ConnectProviderModal's onComplete callback in ProviderConnectionsPage.tsx
+  called setConnectModalOpen(false), closing the modal before the user sees the
+  "Provider Connected" green checkmark.
+- Fix: Removed setConnectModalOpen(false) from onComplete. Now only calls refetch().
+  User sees success screen and clicks "Done" to close manually.
+- CatalogManagePage.tsx already had the correct pattern (just refetch).
+
+### Bug 3 Fix: Base URL doesn't auto-fill when provider selected
+- Problem: ConnectProviderModal.tsx looked for config.registrySlug but catalog entries
+  store the provider slug as config.registryId. findProviderBySlug() was never called.
+- Fix: Changed lookup to use config.registrySlug ?? config.registryId as fallback.
+- Verified all 15 catalog provider entries have registryId, none have registrySlug.
+
+### PAT Auto-Fill Investigation
+- PAT auto-fill relies on providers table having rows with config.apiKey.
+- Server auto-provisions from env vars (OPENAI_API_KEY, etc.) at startup.
+- Providers table is empty because GitHub repo secrets aren't configured.
+- Left as-is — PAT is intentionally manual entry in the governed connect flow.
+
+### Testing
+- CI Build workflow: PASSED (type check + build in 1m10s)
+- API E2E tests via tunnel:
+  - Health check: PASS
+  - Create DRAFT connection: PASS
+  - Validate with bad PAT (401 rejected): PASS
+  - Status stays draft after failed validation: PASS
+  - draft→active guard: PASS (correctly blocked)
+  - State machine disabled→active: PASS (verified inline)
+  - Delete/cleanup: PASS
+- Full lifecycle (validate→activate→disable→re-enable) couldn't be tested via API
+  (no running LLM provider in CI), but state machine transitions verified.
+
+### Commits
+- c610f2e fix: Allow disabled→active transition and keep success screen visible
+- efe829e fix: Auto-fill Base URL by reading config.registryId fallback
+
+### Files Changed
+- server/provider-connections/state-machine.ts — disabled transitions: ["draft", "active"]
+- server/provider-connections/provider-connections.test.ts — updated valid/invalid pairs
+- client/src/pages/ProviderConnectionsPage.tsx — removed premature modal close
+- client/src/components/ConnectProviderModal.tsx — registrySlug ?? registryId fallback
+
+### Notes
+- Sandbox /tmp permission issues persisted throughout session (EACCES mkdir /tmp/claude-10358/...)
+  Longer-running commands (vitest, tsc, node scripts) blocked. Simple commands worked.
+- Termux DNS resolution failed for some trycloudflare.com subdomains. Workaround: use node -e
+  for simple fetch calls, or open in browser via termux-open-url.
+- Multiple duplicate Builder Deploy runs triggered each time — need to cancel extras immediately.

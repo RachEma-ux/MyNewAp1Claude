@@ -1,0 +1,57 @@
+Session Summary — 2026-02-19 07:54
+====================================
+
+## Focus: Catalog Import Wizard — Provider Auto-Fill Feature (Fix + Ship)
+
+### Problem Solved
+When selecting a provider (e.g. OpenAI) from the dropdown in the Catalog Import
+Wizard's API Discovery step, the Base URL and API Key fields should auto-fill.
+Initial implementation didn't work due to data architecture misunderstandings.
+
+### Root Cause Chain
+1. **First attempt**: Looked for apiKey in catalog entry config — but it's not stored there
+2. **Second attempt**: Used `providers.getById(Number(registryId))` — but registryId is a
+   string like "openai", not a numeric ID. `Number("openai")` = NaN → silent failure.
+3. **Third attempt**: Used `providers.list({ type: registryId })` — works for baseUrl but
+   provider registry may not have entries (no env var auto-provisioning on deploy).
+4. **Final fix**: Multi-source lookup + save-back to catalog entry config.
+
+### Data Architecture (Key Insight)
+- `catalog_entries` config: `{ registryId: "openai", type: "cloud", baseUrl: null }`
+- `providers` table config: `{ apiKey: "sk-..." }` (only if auto-provisioned from env var)
+- registryId is a type STRING, not a numeric foreign key
+- Cloud providers (OpenAI, Anthropic) have null baseUrl in catalog — need well-known fallback
+
+### Final Solution
+**Client (CatalogImportWizard.tsx)**:
+- Well-known base URL map: openai → api.openai.com, anthropic → api.anthropic.com, etc.
+- API key lookup from 3 sources (in order):
+  A. Catalog entry's own `config.apiKey` (saved from previous discovery)
+  B. Provider registry by type (`providers.list({ type: "openai" })`)
+  C. All providers matched by name (fallback)
+
+**Server (catalog-import/router.ts)**:
+- After successful discovery, saves apiKey to BOTH:
+  - Catalog entry config (primary source for future auto-fill)
+  - Provider registry (if exists, for other features that read from there)
+
+### Behavior
+- First use: URL auto-fills, key must be entered manually (no saved key yet)
+- After first discovery: both URL and key auto-fill on subsequent selections
+
+### Commits (5 total, all pushed to main)
+1. **c1bf389** — feat: Auto-fill discovery wizard from catalog provider selection
+2. **49f2c12** — fix: Auto-fill credentials from provider registry, not catalog config
+3. **ea87171** — docs: Session summary 2026-02-19 01:52
+4. **9325429** — fix: Look up provider by type string, not numeric ID
+5. **5fd724a** — fix: Multi-source API key lookup + save key to catalog entry config
+
+### Deploys
+- v3.0.116: https://holmes-qty-oil-chocolate.trycloudflare.com (initial, broken)
+- v3.0.117: https://compete-messaging-plans-john.trycloudflare.com (type fix, partial)
+- v3.0.118: https://fire-rebate-over-stating.trycloudflare.com (URL works, key doesn't)
+- v3.0.119: https://santa-stayed-kissing-governing.trycloudflare.com (working)
+
+### Files Modified
+- `client/src/components/CatalogImportWizard.tsx` — provider dropdown + auto-fill logic
+- `server/catalog-import/router.ts` — providerId input + dual save-back logic

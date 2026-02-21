@@ -1,0 +1,33 @@
+Session Summary — 2026-02-21 00:00
+
+## Changes Made
+
+### 1. Fix scraped provider names & descriptions (commit b799bea)
+- Improved `cleanTitle()` in `server/routers/discover-provider.ts` to split on common title separators (|, –, —, " - ") and pick the shortest ≤4-word segment as the brand name
+- Added `cleanDescription()` to truncate long descriptions at 200 chars with sentence boundary awareness
+- Applied cleaning to both Phase 1 quick-fetch and Phase 2 full-parse extraction paths
+- Fixed existing dirty catalog entries via tRPC:
+  - id=123: "Hugging Face – The AI community building the future." → "Hugging Face"
+  - id=134: "Connect, protect, and build everywhere | Cloudflare" → "Cloudflare"
+  - id=126: "WRITER" → "Writer"
+  - id=128: Cleaned Reka AI description (removed \n, trimmed)
+
+### 2. Catalog import wizard duplicate detection (commit e2c4b9a)
+- Added duplicate detection to CatalogImportWizard.tsx
+- Shows "Exists" badge instead of Register button for providers already in catalog
+- Prevents duplicate registrations in both single and batch import flows
+
+### 3. Claude Code permanent permissions setup
+- Created `~/.claude/settings.json` with pre-approved tools:
+  Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, NotebookEdit,
+  Bash patterns for: git, gh, npm, npx, node, curl, ls, mkdir, grep, python3, cat, sleep, termux-open-url, export
+- Settings apply from next session onward; current session uses Shift+Tab for Accept All
+
+### Deployments
+- Deploy #407 (run 22245284633) — triggered for commit e2c4b9a
+- Deploy #408 (run 22245396233) — triggered after settings update
+
+## Files Modified
+- server/routers/discover-provider.ts
+- client/src/components/CatalogImportWizard.tsx
+- ~/.claude/settings.json (global permissions)

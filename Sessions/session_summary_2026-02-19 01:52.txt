@@ -1,0 +1,91 @@
+Session Summary — 2026-02-19 01:52
+====================================
+
+## Focus: Catalog Import Wizard — Provider Auto-Fill Credentials
+
+### Problem
+When a user opens the Catalog Import Wizard (API Discovery mode) and selects
+a provider (e.g. OpenAI) from the new dropdown, the Base URL and API Key
+fields should auto-fill from existing saved data. They don't — the fields
+stay blank even though the provider is selected.
+
+### Root Cause (Investigated)
+The data architecture spans TWO tables:
+1. **catalog_entries** table (entryType="provider") — stores `config.registryId`,
+   `config.type`, `config.baseUrl` (may be null for cloud providers like OpenAI)
+2. **providers** table (the registry) — stores `config.apiKey`, `config.apiEndpoint`, etc.
+
+The catalog entry's `config.registryId` is a STRING like "openai" (the provider ID
+string from the PROVIDERS constant), NOT a numeric foreign key to providers.id.
+
+### What We Changed (2 commits, both pushed)
+
+**Commit c1bf389** — feat: Auto-fill discovery wizard from catalog provider selection
+- Added `<CatalogSelect entryType="provider">` dropdown to step 2 of wizard
+- Added `handleProviderSelect` that fetches catalog entry and tries to read config
+- Added `providerId` param to server discoverFromApi endpoint
+- Added server-side logic to save apiKey back after discovery
+
+**Commit 49f2c12** — fix: Auto-fill credentials from provider registry, not catalog config
+- Changed client to look up `config.registryId` → fetch from `providers.getById`
+- Added fallbacks for URL: `config.baseUrl || config.apiUrl || config.endpoint`
+- Changed server to save apiKey to provider registry instead of catalog entry
+
+### Why It Still Doesn't Work (likely causes to investigate)
+
+1. **registryId mismatch**: `config.registryId` is a string like "openai" but
+   `trpcUtils.providers.getById.fetch({ id: Number(registryId) })` expects a
+   numeric DB id. `Number("openai")` = NaN → fetch fails silently (caught).
+
+2. **baseUrl may be null**: For cloud providers like OpenAI, `config.baseUrl` in
+   the catalog entry may be null (OpenAI's base URL comes from the PROVIDERS
+   constant, not stored in the DB entry). Need to fall back to the well-known
+   URL from the provider type.
+
+3. **providers table config shape**: The providers table config may store
+   `apiEndpoint` (not `baseUrl`) and `apiKey` — need to verify exact field names
+   by checking actual DB data or the provider creation code in `server/_core/index.ts`.
+
+### Files Involved
+- `client/src/components/CatalogImportWizard.tsx` — wizard UI + handleProviderSelect
+- `client/src/components/CatalogSelect.tsx` — reusable provider dropdown (works fine)
+- `server/catalog-import/router.ts` — discoverFromApi endpoint + apiKey save-back
+- `server/routers/catalog-manage.ts` — catalog CRUD + seed logic (line 652 shows config shape)
+- `server/providers/db.ts` — getProviderById, updateProvider
+- `server/providers/router.ts` — tRPC providers.getById
+- `drizzle/schema.ts` — catalog_entries (line 2484), providers (line 497)
+- `server/_core/index.ts` — line 133 shows `config: { apiKey }` for provider creation
+
+### Key Data References
+- Catalog entry config shape: `{ registryId: "openai", type: "cloud", baseUrl: null }`
+- Providers table config shape: `{ apiKey: "sk-..." }` (possibly also apiEndpoint)
+- PROVIDERS constant has well-known baseUrls (e.g. "https://api.openai.com")
+
+### Deploys This Session
+- v3.0.116: https://holmes-qty-oil-chocolate.trycloudflare.com (commit c1bf389)
+- v3.0.117: https://compete-messaging-plans-john.trycloudflare.com (commit 49f2c12)
+
+---
+
+## TODO List
+
+### Must Fix (Auto-Fill Feature)
+- [ ] Fix registryId lookup: it's a string ("openai"), not a numeric ID.
+      Need to query providers table by `type` or `name` instead of by numeric id,
+      OR look up the numeric providers.id from the registryId string.
+- [ ] Handle null baseUrl for cloud providers: fall back to well-known URLs
+      from the PROVIDERS constant or hardcode known provider base URLs.
+- [ ] Verify actual providers table config field names by querying DB or
+      reading provider init code (`server/_core/index.ts`).
+- [ ] Add console.log debugging in handleProviderSelect to trace what
+      values are returned from each fetch (catalog entry config, provider config).
+- [ ] Test with OpenAI, Anthropic, and a local provider (Ollama) to verify.
+
+### Nice to Have
+- [ ] Show a loading spinner on the URL/Key fields while auto-fill is fetching
+- [ ] If provider has no saved apiKey, show a hint "No API key saved for this provider"
+- [ ] Consider storing apiKey in catalog entry config too (denormalized) for simpler lookup
+
+### Server-Side Save-Back
+- [ ] Fix the save-back logic in router.ts to use correct registryId resolution
+      (same string-vs-numeric mismatch issue as the client)

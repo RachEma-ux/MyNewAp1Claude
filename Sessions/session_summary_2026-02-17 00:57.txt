@@ -1,0 +1,57 @@
+SESSION SUMMARY - 2026-02-17
+=============================
+
+PROJECT: MyNewAp1Claude (LLM Control Plane)
+BRANCH: main
+
+COMMITS THIS SESSION
+--------------------
+1. 76f8268 - fix: Auto-fill base URL in New Provider wizard for known API families
+
+WHAT WAS DONE
+-------------
+Fixed NewProviderPage.tsx (/llm/new-provider) - the 8-step New Provider creation wizard
+was not auto-filling the base URL when selecting an Ollama-based provider.
+
+Changes made to client/src/pages/NewProviderPage.tsx:
+  - Added DEFAULT_BASE_URLS map at module level (lines 132-136):
+      ollama_compat  -> http://localhost:11434
+      openai_compat  -> https://api.openai.com/v1
+      anthropic_compat -> https://api.anthropic.com/v1
+
+  - Updated the API Family Select onValueChange handler (lines 283-295):
+      When user selects a family, the base URL is auto-filled if empty
+      or still set to another default. For Ollama, auth is also set to "none"
+      since no API key is needed. Custom user-entered URLs are preserved.
+
+BUILD & DEPLOY
+--------------
+- Triggered "Builder Deploy" workflow (run ID: 22080642384)
+- Deployed version: 3.0.42
+- Tunnel URL: https://eight-gentle-optics-bedding.trycloudflare.com
+- Verified /llm/new-provider page opened in browser
+
+CONTEXT FROM PREVIOUS SESSION (carried over)
+---------------------------------------------
+Prior work that led to this fix:
+  - Wired LLMProviderConfigWizard.tsx to unified catalog (getUnifiedCatalog)
+  - Added Ollama connection test to server/llm/provider-test.ts
+  - Added providerTypeMap and defaultBaseUrls to LLMProviderConfigWizard.tsx
+  - Unified all wizards (/llm/wizard, /llm/create, /llm/provider-wizard,
+    /llm/new-provider, /models/browser) on single catalog source
+  - Fixed LLMCreationWizard.tsx step 3 to show provider + hub models
+  - Added "Configured Providers" section derived from catalog
+  - Multiple deploy/verify cycles via Cloudflare tunnel
+
+KEY FILES MODIFIED (all sessions combined)
+------------------------------------------
+  client/src/pages/NewProviderPage.tsx        - Base URL auto-fill (this session)
+  client/src/pages/LLMProviderConfigWizard.tsx - Catalog integration, DB persistence
+  client/src/pages/LLMCreationWizard.tsx       - Unified catalog, error handling
+  server/llm/provider-test.ts                  - Ollama connection test
+
+LESSON LEARNED
+--------------
+The "Builder Deploy" workflow stays in_progress for the full 15-min tunnel duration.
+Don't poll gh run status waiting for "completed". Instead check Gist 54451f4f49427f293bfdc9fc0a037b2d
+for the tunnel URL ~60-90s after triggering.

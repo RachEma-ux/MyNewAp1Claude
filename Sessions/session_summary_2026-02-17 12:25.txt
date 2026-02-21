@@ -1,0 +1,54 @@
+Session Summary - 2026-02-17 12:25
+
+## Features Implemented
+
+### 1. Auto-discover provider models on creation (implemented then rolled back)
+- Modified `server/providers/router.ts` to auto-discover models from providers on creation
+- After `registerProvider()`, called `getSupportedModels()` to get discovered models
+- Updated provider config with `models` and `defaultModel` for catalogue visibility
+- Inserted each model into `models` DB table for Models Hub visibility
+- Embedding model detection via `/embed/` regex pattern
+- **Rolled back** (reverted both commits) per user request due to catalogue display issues
+
+### 2. Catalogue page - Separate Providers and Models sections
+- Replaced the single flat grid with two distinct sections:
+  - **Providers section**: One card per provider with blue "Provider" badge, type, endpoint, Local/Cloud location, model count, Active/Disabled status, priority
+  - **Models section**: One card per model with "Model" badge, purpose-built info, provider name, category
+- Commit: `9d35814`
+
+### 3. Enhanced model cards with Purpose-built, Governance, and Hub status
+- Replaced "Available via..." with Purpose-built field (`bestFor` from catalogue data), showing "Purpose-built: empty" if not set
+- Added Governance check: purple "Governance" badge if model name matches an LLM identity, or "Not in Governance" otherwise
+- Added Hub check: green "Hub" badge if model exists in models DB table, or "Not in Hub" otherwise
+- Added ShieldCheck/ShieldX icons for governance indicators
+- Commit: `00eefd0`
+
+### 4. Manage button on Catalogue page
+- Added "Manage" button top-right aligned with "Catalogue" title
+- Created `/llm/catalogue/manage` route with "Coming soon" landing page
+- Added `useLocation` import to App.tsx for navigation
+- Commit: `e8ce7ac`
+
+### 5. Created test provider "WWWWWZ PROV" and "NEW PROVIDER 3+" with custom models
+- WWWWWZ PROV: auto-discovered tinyllama, phi3, nomic-embed-text from Ollama
+- NEW PROVIDER 3+: manually configured with Model 1, Midel 2, Midel 3
+
+## Deployments
+- Multiple Builder Deploy workflows triggered throughout session
+- Final deploy: v3.0.71 at https://legend-refine-whose-klein.trycloudflare.com
+
+## Key Commits (chronological)
+- `34ebc62` feat: Auto-discover provider models (later reverted)
+- `9de402f` fix: Show provider name badge (later reverted)
+- `6f13aa6` Revert auto-discover
+- `1f6eb82` Revert provider badge fix
+- `deaf3cf` fix: Group catalogue by provider (later reverted)
+- `45b87f8` Revert grouping
+- `9d35814` feat: Separate Providers and Models sections in catalogue page
+- `00eefd0` feat: Enhance model cards with Purpose-built, Governance, and Hub status
+- `e8ce7ac` feat: Add Manage button to catalogue page with coming soon landing
+
+## Technical Notes
+- `tsx watch` does NOT auto-reload on Android/Termux - server must be manually restarted after code changes
+- Dev server restarted by killing PIDs and running `nohup npm run dev`
+- `am start -a android.intent.action.VIEW` works for opening URLs when `termux-open-url` fails in sandbox

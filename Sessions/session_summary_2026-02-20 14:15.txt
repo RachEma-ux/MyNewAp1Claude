@@ -1,0 +1,27 @@
+Session Summary — 2026-02-20 14:15
+
+## Focus: Deploy & Test Base URL Auto-Fill Fix
+
+### Deployed and Tested
+- Deployed v3.0.161 via Builder Deploy with 30-min tunnel
+- Opened /providers/connections in browser
+- Confirmed Base URL auto-fills when selecting a provider (e.g., OpenAI → https://api.openai.com)
+- The registryId fix from previous session (efe829e) is working correctly
+
+### PAT Auto-Fill Clarification
+- User reported PAT field doesn't auto-fill for OpenAI
+- Investigated: providers table is empty (0 rows)
+- Root cause: OPENAI_API_KEY GitHub secret is not configured (only GIST_TOKEN exists)
+- The auto-provision code (server/_core/index.ts:115) runs at startup but skips
+  when env vars are empty
+- Each tunnel deploy uses a fresh PostgreSQL container — all data lost on expiry
+- On production with persistent DB, PATs stored via Connect flow will persist
+- User confirmed this is understood and acceptable — no fix needed
+
+### No Code Changes
+- All fixes were committed and pushed in the previous session
+- This session was deploy + manual browser testing only
+
+### Commits (from previous session, already pushed)
+- c610f2e fix: Allow disabled→active transition and keep success screen visible
+- efe829e fix: Auto-fill Base URL by reading config.registryId fallback

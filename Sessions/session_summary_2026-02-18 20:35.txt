@@ -1,0 +1,86 @@
+Session Summary — 2026-02-18 20:35
+====================================
+(Continuation of session 2026-02-18 19:16)
+
+## Focus: Taxonomy Documentation, Agent Ontology, Testing Tools, Deploy
+
+### Commits Made (4)
+
+1. **5393b39** — `docs: Add AI Platform Compliance Design Matrix to catalog taxonomy`
+   - 5-layer governance framework (Provider, LLM, Model, Agent, Bot)
+   - Cross-layer controls, compliance hierarchy, governance principles
+   - +165 lines
+
+2. **f933910** — `feat: Add bulk page testing HTML launchers`
+   - open-all-local.html — opens 28 pages on localhost:3000
+   - open-all-tunnel.html — opens 28 pages on tunnel URL
+   - Uses window.open() to launch all tabs from one page load
+   - Served via Vite dev server (client/public/)
+
+3. **13d9185** — `docs: Rename 'Term' to 'Type' in taxonomy entities table header`
+   - 1 word changed in Five Entities table
+
+4. **66940e9** — `docs: Add Agent Ontology + Multi-Axis Classification Model to taxonomy`
+   - Clean Unified Agent Ontology: 9 categories, 40 sub-categories, 102 classes
+     - Cognitive Architecture (20 classes)
+     - Functional Role (19 classes)
+     - Organizational Structure (8 classes)
+     - Autonomy Level (7 classes)
+     - Embodiment (6 classes)
+     - Learning Paradigm (15 classes)
+     - Decision Paradigm (9 classes)
+     - Governance & Safety (9 classes)
+     - Cognitive Capability (9 classes)
+   - Multi-Axis Classification Model: rationale for vertical panel UI
+     - Agents classified across all 9 dimensions simultaneously
+     - 6 architectural benefits documented
+   - +289 lines
+
+### Testing Innovation: Bulk Page Launcher
+- Problem: termux-open-url opens one URL at a time, switching between apps
+- Solution: HTML files with window.open() served by dev server
+- One termux-open-url call opens 28 tabs at once
+- Files: client/public/open-all-local.html, open-all-tunnel.html
+- Saved to memory (testing-tools-tips.md) as reusable technique
+
+### Taxonomy File Structure (shared/catalog-taxonomy.ts)
+The file now contains 6 documentation sections (all as comments):
+1. Five Fundamentally Different Entities table
+2. Clean Comparison Table (10-row feature matrix)
+3. AI Platform Compliance Design Matrix (5-layer governance)
+4. Clean Unified Agent Ontology (9 categories, 102 classes)
+5. Multi-Axis Agent Classification Model (UI architecture rationale)
+6. Architectural Stack diagram
+
+### Duplicate Analysis
+- Identified 4 cross-axis near-duplicate pairs in Agent Ontology:
+  - Theory-of-Mind Architecture (Cat 1) vs Theory-of-Mind (Cat 9)
+  - Model-Based RL Architecture (Cat 1) vs Model-Based RL (Cat 6)
+  - Reinforcement-Based Architecture (Cat 1) vs Reinforcement Learning (Cat 6)
+  - Federated System (Cat 3) vs Federated Learning (Cat 6)
+- Not true duplicates — same concept from different angles (architecture vs paradigm vs capability)
+- Solution designed: namespaced storage keys, distinct display labels, cross-axis inference rules
+
+### Architecture Decision: Agent Wizard Implementation
+- Comments = design spec for humans (documentation only)
+- DB = runtime source of truth for code (queryable, versionable, admin-editable)
+- Planned schema:
+  - agent_taxonomy_axes (~9 rows)
+  - agent_taxonomy_subcategories (~40 rows)
+  - agent_taxonomy_classes (102 rows)
+  - agent_taxonomy_inference_rules (~4 rows)
+- Wizard UI reads from DB, not hardcoded arrays
+- Agent entries store 9-axis classification as structured JSON
+- Soft versioning via active boolean on classes
+- NOT yet implemented — design phase only
+
+### Deploys
+- Builder Deploy triggered: run 22152930416
+- Tunnel: https://wonderful-avatar-psychological-empty.trycloudflare.com
+- Version 3.0.101
+
+### Infrastructure
+- Dev server running on http://localhost:3000
+- Ollama running with 3 models
+- PostgreSQL running locally
+- 6 providers loaded

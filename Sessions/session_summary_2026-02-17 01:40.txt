@@ -1,0 +1,58 @@
+SESSION SUMMARY - 2026-02-17 01:40
+====================================
+
+PROJECT: MyNewAp1Claude (LLM Control Plane)
+BRANCH: main
+
+COMMITS THIS SESSION (7 commits)
+---------------------------------
+1. 2954f25 - refactor: Replace all hardcoded model lists with unified catalog
+2. d482efd - fix: Show provider count and model count in Catalogue stats
+3. f03854b - feat: Add Available Providers count card to Catalogue page
+4. c5ff4ba - feat: Rework Catalogue stats into 5 cards with correct semantics
+5. ba5a437 - fix: Use 4-col grid for Catalogue stats so text fits inside cards
+6. c43afcb - fix: Reorganize Catalogue stats into 2 rows of 4 cards
+7. fa8b1bb - fix: Smaller text, row labels for Providers/Models stat cards
+
+WHAT WAS DONE
+-------------
+Major refactor: Unified Catalog as single source of truth for all model lists.
+
+1. CLIENT-SIDE - Replaced hardcoded model lists in 5 files:
+   - LLMCataloguePage.tsx: Built full catalogue page (was "coming soon")
+     with search, filters, model grid, and 2-row stats dashboard
+   - Providers.tsx: Removed ~130 lines of hardcoded providerModels map
+     and fallback provider arrays, now uses unified catalog
+   - ProviderDetail.tsx: Removed ~65 lines of duplicate providerModels,
+     now derives availableModels from getUnifiedCatalog
+   - AgentEditor.tsx: Replaced static 4-item MODELS array with catalog query
+   - BlockConfigModal.tsx: Dynamic model options from catalog for automation blocks
+
+2. SERVER-SIDE - Cleaned up 3 files:
+   - llm-policy-engine.ts: Removed static model allowlist (10 hardcoded IDs),
+     now relies solely on dynamic provider DB check
+   - hybrid-router.ts: Extracted tier patterns to MODEL_QUALITY_TIERS const
+   - _core/llm.ts: Made invokeLLM model configurable via param/env var
+
+3. CATALOGUE PAGE STATS DASHBOARD:
+   - Row 1 (PROVIDERS): Available | Configured | Active (coming soon) | Offline (coming soon)
+   - Row 2 (MODELS): Downloadable | Available | Active | Deprecated (coming soon)
+   - Correct semantics: Downloadable=hub catalog, Available=downloaded, Active=installed
+   - Compact card layout with small text that fits inside cards
+
+BUILD & DEPLOY
+--------------
+- Multiple deploy cycles (v3.0.45 through v3.0.51)
+- Final deployed version: 3.0.51
+- Tunnel URL: https://sitemap-almost-relatively-taxi.trycloudflare.com
+
+KEY FILES MODIFIED
+------------------
+  client/src/pages/LLMCataloguePage.tsx        - Full catalogue with stats dashboard
+  client/src/pages/Providers.tsx               - Removed hardcoded models
+  client/src/pages/ProviderDetail.tsx           - Removed hardcoded models
+  client/src/pages/AgentEditor.tsx              - Catalog-driven model list
+  client/src/components/automation/BlockConfigModal.tsx - Dynamic model options
+  server/policies/llm-policy-engine.ts          - Dynamic provider-based allowlist
+  server/inference/hybrid-router.ts             - Extracted quality tier const
+  server/_core/llm.ts                           - Configurable default model

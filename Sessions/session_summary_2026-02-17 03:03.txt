@@ -1,0 +1,45 @@
+SESSION SUMMARY - 2026-02-17 03:03
+====================================
+
+PROJECT: MyNewAp1Claude (LLM Control Plane)
+BRANCH: main
+
+COMMITS THIS SESSION (1 commit)
+---------------------------------
+1. 4fa81f4 - docs: Add Providers/Models Catalog section to ARCHITECTURE.md
+
+WHAT WAS DONE
+-------------
+1. ARCHITECTURE EVALUATION:
+   - Delivered a full architecture evaluation of the project covering:
+     project stats (100K TS lines, 75 pages, 201 server files, 27 domains),
+     strengths (tRPC type safety, domain-organized server, unified catalog,
+     hybrid routing, workspace isolation), issues and technical debt
+     (monolithic routers.ts, god-file db.ts, schema.ts size, strict:false,
+     route duplication, legacy code), security observations, scalability
+     patterns, and frontend architecture concerns.
+   - Provided prioritized recommendations (extract inline routers, split db.ts,
+     clean dead code, add lazy loading, enable strict TS, add job queue,
+     scope body parser limit).
+
+2. ARCHITECTURE.MD UPDATE - Providers/Models Catalog:
+   - Replaced the old "Model Management System" section with comprehensive
+     "Providers and Models Catalog" documentation covering:
+     * Unified Catalog (getUnifiedCatalog) - merges Hub Models + Provider Models
+     * Provider Lifecycle table: Available → Configured → Active → Offline
+     * Model Lifecycle table: Downloadable → Available → Active → Deprecated
+     * Catalogue Page (LLMCataloguePage.tsx) - stats dashboard, search, grid
+     * Consumer Pages table - 5 client pages using unified catalog
+     * Policy Engine Integration - dynamic allowlist via getEnabledProviders()
+     * Provider Routing - hybrid router with MODEL_QUALITY_TIERS
+     * Key Files reference table (7 files with roles)
+   - Fixed inaccurate "MySQL/TiDB" references to "PostgreSQL" in Storage Layer
+     and Technology Stack Summary sections.
+
+3. BUILD & DEPLOY:
+   - Deployed version: 3.0.53
+   - Tunnel URL: https://inherited-march-dividend-wales.trycloudflare.com
+
+KEY FILES MODIFIED
+------------------
+  ARCHITECTURE.md  - Added Providers/Models Catalog section (+80 lines, -6 lines)

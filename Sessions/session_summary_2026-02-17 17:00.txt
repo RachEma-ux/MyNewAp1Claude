@@ -1,0 +1,88 @@
+Session Summary - 2026-02-17 17:00
+
+## Features Implemented
+
+### Catalog Management System (4 Phases)
+
+Full catalog lifecycle: authoring → validation → publishing → registry.
+
+#### Phase 1 - Schema & CRUD
+- New DB tables: `catalog_entries`, `catalog_entry_versions`, `publish_bundles`
+- `catalog_entries`: name, displayName, description, entryType (provider/model), scope (app/workspace/org/global), status lifecycle (draft→validating→validated→publishing→published→deprecated), config JSON, tags, validation state
+- `catalog_entry_versions`: immutable config snapshots with auto-incrementing version, SHA-256 hash, change notes
+- `publish_bundles`: frozen versioned snapshots for registry consumption with hash integrity
+- tRPC router `catalogManage` with 6 endpoints: list, getById, create, update, delete, listVersions
+- DB helper functions in `server/db.ts` with automatic version snapshots on create/update
+- `CatalogManagePage.tsx` replacing "Coming soon" with full CRUD UI:
+  - Tabbed layout (Catalog, Validation, Publishing, Audit Log)
+  - DataTable with search + type filter
+  - Create/Edit dialog (name, display name, description, type, tags, JSON config editor)
+  - Delete confirmation dialog
+  - Version history dialog with snapshot hashes
+  - Status badges with color-coded lifecycle states
+- Fixed: Zod v4 + tRPC v11 incompatibility with `z.record(z.unknown())` → replaced with `z.any()`
+
+#### Phase 2 - Validation & Orchestrator Handshake
+- `catalogManage.validate` mutation performing 4-step orchestrator handshake:
+  - Health check (provider.healthCheck() with 30s timeout)
+  - Capabilities check (provider.getCapabilities())
+  - Models discovery (duck-typed getSupportedModels() or capabilities fallback)
+  - Test prompt (optional, sends test to first discovered model with 30s timeout)
+- Provider resolution: by providerId field, config, or name match
+- Status transitions: draft → validating → validated (all pass) or back to draft
+- Validation tab UI with:
+  - Test Prompt toggle switch
+  - Entry cards with status badges and "Validate" button
+  - 4-panel results grid (Health, Capabilities, Models, Test Prompt) with pass/fail icons
+  - Error panel for failed validations
+
+#### Phase 3 - Publishing & Wizard
+- `catalogManage.publish` mutation: creates immutable snapshot bundle with SHA-256 hash
+- Auto-superseding: new publish automatically marks previous active bundles as "superseded"
+- `catalogManage.listBundles` query with status filtering
+- `catalogManage.recall` mutation to mark bundles as recalled
+- Publishing tab UI with:
+  - "Ready to Publish" section showing validated entries
+  - 3-step publish wizard dialog (Review config → Set version label → Confirm)
+  - Success screen with green checkmark
+  - Published Bundles table with version, status, hash, timestamp, Recall button
+
+#### Phase 4 - Registry, Audit & Dropdown Wiring
+- New `catalog_audit_events` DB table (eventType, catalogEntryId, publishBundleId, actor, payload, timestamp)
+- New read-only `catalogRegistry` router with:
+  - `getActive` - all active published bundles
+  - `getByHash` - lookup by SHA-256 hash (integrity verification)
+  - `getByEntry` - latest active bundle for a specific entry
+  - `listForDropdown` - simplified format for dropdown consumers
+  - `auditLog` - query audit events with filters
+- 6 instrumented audit events: catalog.entry.created, .updated, .deleted, .validated, catalog.bundle.published, .recalled
+- Non-blocking fire-and-forget audit logging
+- Audit Log tab in Manage page with event type badges, smart detail extraction
+- "Published Registry" source added to Catalogue page's source dropdown
+- Registry section showing published entries with green "Published" badge, version, tags, hash
+
+## Files Created
+- `client/src/pages/CatalogManagePage.tsx` - Full catalog management UI
+- `server/routers/catalog-manage.ts` - CRUD + validation + publishing tRPC router
+- `server/routers/catalog-registry.ts` - Read-only registry consumption router
+- `drizzle/0002_loose_prodigy.sql` - Migration: catalog_entries, catalog_entry_versions, publish_bundles
+- `drizzle/0003_conscious_shadow_king.sql` - Migration: catalog_audit_events
+
+## Files Modified
+- `drizzle/schema.ts` - Added 4 new tables (catalog_entries, catalog_entry_versions, publish_bundles, catalog_audit_events)
+- `server/db.ts` - Added ~15 DB helper functions for catalog CRUD, publishing, audit
+- `server/routers.ts` - Wired catalogManage and catalogRegistry routers into appRouter
+- `client/src/App.tsx` - Replaced inline "Coming soon" route with CatalogManagePage component, removed unused useLocation import
+- `client/src/pages/LLMCataloguePage.tsx` - Added "Published Registry" source filter and registry section
+
+## Deployments
+- Final deploy: tunnel at https://large-chester-potato-explicit.trycloudflare.com
+
+## Key Commit
+- `5d159ec` feat: Implement Catalog Management system (4 phases)
+
+## Technical Notes
+- Zod v4 (4.3.5) with tRPC v11: `z.record(z.unknown())` causes `_zod` property error at runtime; use `z.any()` instead
+- `tsx watch` still does NOT auto-reload on Android/Termux - manual server restart required
+- Sandbox permission issues with `sleep` and `gh` commands persist - use `dangerouslyDisableSandbox` or full paths
+- Validation test prompt times out on tinyllama with 30s limit on this hardware (expected)

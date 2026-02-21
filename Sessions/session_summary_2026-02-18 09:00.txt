@@ -1,0 +1,63 @@
+Session Summary — 2026-02-18 09:00
+====================================
+
+## Focus: MySQL Purge, Security Hardening, Dead Code Cleanup
+
+### Context
+Resumed after a crash. Previous session was working on governance/security compliance
+and removing MySQL patterns from the PostgreSQL codebase.
+
+### Commits Made (3)
+
+1. **5fdaa28** — `fix: Purge all MySQL patterns — use Drizzle .returning(), add governance audit table`
+   - Replaced all `result[0].insertId` (MySQL-ism) with Drizzle `.returning()` across 10 files
+   - Files: agents/db.ts, documents/db.ts, models/download-db.ts, providers/db.ts,
+     routers/opaPolicy.ts, routers/wcpWorkflows.ts, services/agentService.ts,
+     services/keyRotationService.ts, db.ts (createLLM)
+   - Added `governance_audit_logs` table to drizzle/schema.ts
+   - Enhanced governanceLogger.ts with DB persistence (fire-and-forget writes)
+   - Removed dead `getPgPool()`, `_pgPool`, `Pool` import, `sleep()` from server/db.ts
+   - Fixed mysql2 import in agents.complete.test.ts → node-postgres
+   - Updated docs: MySQL/TiDB → PostgreSQL in scripts/add-governance-wiki.ts
+   - 17 files changed, +179/-212
+
+2. **cbe440b** — `fix: Security hardening — kill eval/code-injection, restrict CORS, delete dead files`
+   - CRITICAL: Replaced `eval()` in calculator tool with safe math-only evaluator
+   - Added strict-mode + forbidden-keyword guards to all `new Function()` calls:
+     - server/automation/block-executors.ts (3 locations: runCode, condition, transform)
+     - server/wcp/execution-engine.ts (1 location: runCode block)
+   - Restricted WebSocket CORS from `origin: "*"` to `process.env.CORS_ORIGIN || localhost:3000`
+   - Added timeout to execSync in deploy router
+   - Deleted dead files: triggers.old.ts (478 lines), test-db.ts (270 lines)
+   - 7 files changed, +41/-762
+
+3. **721d59d** — `fix: Remove dead test-db import from server entry point`
+   - Removed `import("./test-db")` from server/_core/index.ts that was crashing startup
+   - 1 file changed, -4 lines
+
+### Scan Results Summary
+
+#### Security Issues Found & Fixed
+- eval() in calculator tool — FIXED (safe math evaluator)
+- new Function() without guards (4 locations) — FIXED (strict mode + blocklist)
+- CORS origin: "*" on WebSocket — FIXED (env-configured)
+- execSync without timeout — FIXED
+
+#### Remaining Items (not critical, noted for future)
+- 27 TODO/FIXME markers across server/ (mostly stub implementations)
+- Several publicProcedure routes (deploy, diagnostics, wiki) — acceptable for local dev
+- OPA evaluator is still stubbed (not connected to real OPA engine)
+- Promotion service crypto uses HMAC (TODO says upgrade to PKI)
+
+### Server Status
+- Starts clean on port 3001
+- DB migrations pass
+- 4 providers loaded (Ollama skipped — not running)
+- 81 catalog entries synced
+- No errors
+
+### Net Impact
+- ~1000 lines of dead/insecure code removed across sessions
+- Zero MySQL patterns remain in codebase
+- All DB inserts use Drizzle .returning() consistently
+- Governance audit logs now persist to database

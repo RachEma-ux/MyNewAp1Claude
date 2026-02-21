@@ -1,0 +1,71 @@
+Session Summary — 2026-02-18 21:06
+====================================
+(Continuation of session 2026-02-18 20:35)
+
+## Focus: Taxonomy Design Documentation — Full Ontology Spec
+
+### Commits Made (4)
+
+1. **5393b39** — `docs: Add AI Platform Compliance Design Matrix to catalog taxonomy`
+   - 5-layer governance framework (+165 lines)
+
+2. **f933910** — `feat: Add bulk page testing HTML launchers`
+   - open-all-local.html + open-all-tunnel.html in client/public/
+
+3. **13d9185** — `docs: Rename 'Term' to 'Type' in taxonomy entities table header`
+
+4. **66940e9** — `docs: Add Agent Ontology + Multi-Axis Classification Model to taxonomy`
+   - 9 categories, 40 sub-categories, 102 classes
+   - Multi-axis vertical panel rationale (+289 lines)
+
+5. **745eba5** — `docs: Add file concept, multi-type axes design, and versioning strategy`
+   - Section 1: File concept (comments = spec, DB = runtime truth)
+   - Section 2: Multi-dimensional axes for all 5 types
+   - Section 3.1: Versioning concern
+   - Section 3.2: Soft approach chosen (+77 lines)
+
+6. **7662758** — `docs: Add 4 guard-rail rules to taxonomy file concept section`
+   - Don't mix comments and DB
+   - Don't flatten multi-dimensional types
+   - Don't invent your own schema (4 tables)
+   - Don't over-engineer versioning
+
+### Taxonomy File Final Structure (shared/catalog-taxonomy.ts)
+Now contains 7 documentation sections as comments:
+1. File Concept + 4 Guard-Rail Rules
+2. The Natural Way (multi-axis for all 5 types + DB schema)
+3. Concept Limit (versioning) + Chosen Solution (soft approach)
+4. Five Fundamentally Different Entities table
+5. Clean Comparison Table (10-row feature matrix)
+6. AI Platform Compliance Design Matrix (5-layer governance)
+7. Clean Unified Agent Ontology (9 categories, 102 classes)
+8. Multi-Axis Agent Classification Model (UI architecture rationale)
+9. Architectural Stack diagram
+
+### Key Design Decisions Made (no code yet)
+- Agent wizard: vertical multi-axis panel (9 independent selectors)
+- All 5 types get multi-axis classification, not just Agent
+- DB tables: taxonomy_axes, taxonomy_subcategories, taxonomy_classes, taxonomy_inference_rules
+- Generic <MultiAxisPanel type={entryType}> component for all types
+- Soft versioning: active boolean on classes (no version column)
+- Namespaced storage keys to avoid cross-axis duplicates
+- Cross-axis inference rules as DB data, not hardcoded logic
+
+### Duplicate Analysis (Agent Ontology)
+- 102 total classes across 9 axes
+- 4 cross-axis near-duplicate pairs identified
+- Solution: namespaced keys + distinct display labels + inference rules
+
+### Deploys
+- Tunnel was live: https://wonderful-avatar-psychological-empty.trycloudflare.com (v3.0.101)
+- All pages tested via bulk launcher HTML files
+
+### Testing Innovation
+- Bulk page launcher: HTML files with window.open() served by Vite
+- Saved to memory/testing-tools-tips.md as reusable technique
+
+### Infrastructure
+- Dev server: http://localhost:3000
+- Ollama: 3 models
+- PostgreSQL: running locally
+- 6 providers loaded

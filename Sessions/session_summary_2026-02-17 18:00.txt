@@ -1,0 +1,37 @@
+Session Summary - 2026-02-17 18:00
+
+## Features Implemented
+
+### Auto-discover Provider Models on Creation
+When a new provider is created (e.g., Ollama), it now automatically:
+1. Discovers available models via `getSupportedModels()` (duck-typed, falls back to `getCapabilities().supportedModels`)
+2. Updates provider config with `models` array and `defaultModel` — makes them visible in the Catalogue page
+3. Inserts models into the `models` DB table — makes them visible in the Models Hub
+4. Auto-detects embedding models by name pattern (`/embed/i`)
+5. Skips duplicate model names already in DB
+6. Non-blocking — wrapped in try/catch so discovery failures don't break provider creation
+
+### Tested End-to-End
+- Created test Ollama provider "TEST-AUTODISCOVERY"
+- 3 models auto-discovered: tinyllama:latest, phi3:latest, nomic-embed-text:latest
+- All 3 appeared in Catalogue page (via provider config)
+- All 3 appeared in Models Hub (via models DB table)
+- nomic-embed-text correctly classified as "embedding" type
+- Cleaned up test provider after verification
+
+## Files Modified
+- `server/providers/router.ts` — Added ~40 lines to `providers.create` mutation for auto-discovery after registry registration
+
+## Key Commit
+- `fd4bd35` feat: Auto-discover provider models on creation and populate catalogue & models hub
+
+## Deployment
+- Tunnel: https://besides-mechanics-rim-closed.trycloudflare.com
+- Version: 3.0.75
+
+## Technical Notes
+- `getSupportedModels()` is on concrete provider classes (Ollama, LlamaCpp, Custom) but NOT on ILLMProvider interface — used duck-typing check: `"getSupportedModels" in provider`
+- Provider config `models` and `defaultModel` fields are what `getUnifiedCatalog` reads for catalogue visibility
+- Models DB table is what `models.list` reads for Models Hub visibility
+- Existing sandbox/sleep permission issues on Termux persist — used dangerouslyDisableSandbox and node workarounds
+- Gist CDN caching issue: `githubusercontent.com/raw/` returns stale data; use `gh api gists/<id>` to bypass cache
