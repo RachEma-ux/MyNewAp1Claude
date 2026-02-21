@@ -20,7 +20,7 @@ function getEncryptionKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY;
 
   if (!key) {
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV === "production" && process.env.DEV_MODE !== "true") {
       throw new Error("[Encryption] ENCRYPTION_KEY is required in production. Set it in your environment variables.");
     }
     // Dev fallback: use a deterministic key so encrypted data survives restarts.

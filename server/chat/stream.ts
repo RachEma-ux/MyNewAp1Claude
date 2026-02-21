@@ -26,9 +26,9 @@ const chatStreamSchema = z.object({
 
 export async function handleChatStream(req: Request, res: Response) {
   try {
-    // Authenticate user (DEV_MODE bypasses authentication in non-production only)
+    // Authenticate user (DEV_MODE bypasses authentication)
     let user;
-    if (ENV.isDevMode && !ENV.isProduction) {
+    if (ENV.isDevMode) {
       user = {
         id: 1,
         openId: "dev-user-001",

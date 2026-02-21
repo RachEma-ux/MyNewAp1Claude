@@ -6,7 +6,7 @@ import { executeAgent } from './executor';
 export async function handleAgentChatStream(req: Request, res: Response) {
   try {
     let user;
-    if (process.env.DEV_MODE === "true" && process.env.NODE_ENV !== "production") {
+    if (process.env.DEV_MODE === "true") {
       user = {
         id: 1,
         openId: "dev-user-001",
