@@ -90,7 +90,6 @@ Merge LLM Control Plane with Fixes to Main
 
 ### 2. Review Changes
 Review these critical files:
-- `render.yaml` - Verify DEV_MODE is commented out
 - `server/llm/db.ts` - Check the JOIN query optimization
 - `server/llm/router.ts` - Review API endpoints
 - `client/src/pages/LlmDashboard.tsx` - Check button handlers
@@ -154,14 +153,7 @@ Once approved:
 
 ### After Merging
 
-1. **Deploy to Production**
-   ```bash
-   # Render will auto-deploy, or manually:
-   git pull origin claude/analyze-codebase-iS3WI
-   # Deploy using render.yaml
-   ```
-
-2. **Run Database Migrations**
+1. **Run Database Migrations**
    ```bash
    npm run db:push
    # or
@@ -204,7 +196,6 @@ All details are in these files (already in the branch):
 - **`PR_TEMPLATE.md`** - Complete PR description
 - **`MERGE_SUMMARY.md`** - Merge overview
 - **`FIXES_APPLIED.md`** - Detailed fixes documentation
-- **`RENDER_DEPLOYMENT.md`** - Deployment guide
 
 ---
 

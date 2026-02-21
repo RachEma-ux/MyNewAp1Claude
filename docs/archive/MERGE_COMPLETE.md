@@ -71,13 +71,11 @@ claude/update-main-WNVY0 (NEW - updated main)
 
 ### 🔧 Critical Fixes
 1. ✅ **Performance** - N+1 query → Single JOIN (99% improvement)
-2. ✅ **Security** - DEV_MODE removed from production config
-3. ✅ **UX** - All action buttons fully functional
+2. ✅ **UX** - All action buttons fully functional
 4. ✅ **Testing** - 100% unit test coverage for DB operations
 
 ### 📦 Deployment Configs
-- `render.yaml` - Render (recommended, production-ready)
-- `railway.toml` + `nixpacks.toml` - Railway alternative
+- `railway.toml` + `nixpacks.toml` - Railway
 - `vercel.json` - Vercel option
 
 ### 📚 Documentation
@@ -86,7 +84,6 @@ claude/update-main-WNVY0 (NEW - updated main)
 - `FIXES_APPLIED.md` - Before/after fixes analysis
 - `PR_TEMPLATE.md` - Complete PR description
 - `CREATE_PR.md` - PR creation guide
-- `RENDER_DEPLOYMENT.md` - Deployment instructions
 - `EVALUATION_YVcio-7Aa4C.md` - Original evaluation report
 
 ---
@@ -130,12 +127,10 @@ Let's verify the merge is complete:
 - [x] `server/llm/db.test.ts` - Unit tests
 - [x] `client/src/pages/LlmDashboard.tsx` - Dashboard
 - [x] `client/src/pages/LlmControlPlane.tsx` - Control plane
-- [x] `render.yaml` - Deployment config
 - [x] `drizzle/schema.ts` - Updated with LLM tables
 
 ### Fixes Applied ✅
 - [x] N+1 query optimized (JOIN-based)
-- [x] DEV_MODE removed from render.yaml
 - [x] Action buttons wired up with handlers
 - [x] Unit tests added (258 lines)
 
@@ -175,34 +170,12 @@ Let's verify the merge is complete:
 
 ---
 
-## 🚀 Ready for Deployment
-
-The merged branch `claude/update-main-WNVY0` is **production-ready**:
-
-### Deploy to Render
-
-1. **Update GitHub Default Branch:**
-   - Point to `claude/update-main-WNVY0`
-
-2. **Deploy:**
-   - Render will auto-detect `render.yaml`
-   - Auto-create database
-   - Auto-deploy application
-
-3. **Verify:**
-   - Check OAuth authentication works
-   - Test LLM dashboard at `/llm/dashboard`
-   - Verify buttons functionality
-
----
-
 ## 📈 Impact Summary
 
 | Metric | Before | After | Change |
 |--------|--------|-------|--------|
 | **Features** | Basic app | LLM Control Plane | ➕ Major feature |
 | **Database Queries** | N+1 (101 for 100 items) | 1 (JOIN) | ⬇️ 99% |
-| **Security** | DEV_MODE enabled | OAuth required | ✅ Hardened |
 | **UX** | 0/3 buttons working | 3/3 working | ✅ Complete |
 | **Test Coverage** | 0% | 100% (DB layer) | ✅ Tested |
 | **Deployments** | 1 option | 3 platforms | ➕ Flexibility |
@@ -214,8 +187,7 @@ The merged branch `claude/update-main-WNVY0` is **production-ready**:
 
 ### Immediate Actions
 1. ✅ **Update Main Branch** - Point to `claude/update-main-WNVY0`
-2. ✅ **Deploy to Production** - Use `render.yaml`
-3. ✅ **Run Migrations** - Apply database schema changes
+2. ✅ **Run Migrations** - Apply database schema changes
 
 ### Post-Deployment
 1. Monitor application performance
@@ -238,7 +210,6 @@ The merged branch `claude/update-main-WNVY0` is **production-ready**:
 ### Documentation Files
 All available in `claude/update-main-WNVY0`:
 
-- **Setup:** `RENDER_DEPLOYMENT.md` (deployment guide)
 - **Details:** `MERGE_SUMMARY.md` (complete overview)
 - **Fixes:** `FIXES_APPLIED.md` (before/after analysis)
 - **PR Template:** `PR_TEMPLATE.md` (if creating PR)

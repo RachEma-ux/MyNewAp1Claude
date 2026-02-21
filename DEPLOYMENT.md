@@ -140,53 +140,6 @@ server {
 
 ---
 
-## Render
-
-### Quick Start
-
-1. Go to **render.com**, sign up with GitHub
-2. Click **New+ > Web Service**, select `RachEma-ux/MyNewAp1Claude`
-3. Render auto-fills from `render.yaml`:
-   - **Build:** `pnpm install && pnpm build`
-   - **Start:** `pnpm start`
-4. Add a free PostgreSQL database — Render sets `DATABASE_URL` automatically
-5. Deploy (first build takes 3–5 min)
-
-### render.yaml Blueprint
-
-Connect via **Dashboard > New+ > Blueprint** to auto-deploy from `render.yaml`.
-
-### Manual Dashboard Setup
-
-```
-Name: mynewap1claude
-Environment: Node
-Branch: main
-Build Command: pnpm install --frozen-lockfile && pnpm run build && pnpm run db:push
-Start Command: pnpm start
-```
-
-### Render Free Tier
-
-- 750 hours/month, auto-sleeps after 15 min inactivity
-- Free PostgreSQL for 90 days
-- 100 GB bandwidth/month
-
-### Render Troubleshooting
-
-**ELIFECYCLE build error (OOM):**
-- Render free tier has 512 MB RAM; Vite build may exceed it
-- Disable sourcemaps in `vite.config.ts` (`sourcemap: false`)
-- Limit parallel file ops (`maxParallelFileOps: 2`)
-- Target `es2020` with esbuild minifier
-- If builds still fail, upgrade to Starter plan ($7/mo)
-
-**Migrations not applied:** Run `pnpm run db:push` in Render Shell.
-
-**Rollback:** Go to Events tab > click "Rollback to this deploy" on a previous successful deployment.
-
----
-
 ## Railway
 
 ### Quick Start

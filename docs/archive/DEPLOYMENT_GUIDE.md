@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers deploying the LLM Control Plane to Render.com.
+This guide covers deploying the LLM Control Plane.
 
 **Status:** Ready for deployment
 
@@ -50,14 +50,6 @@ OPENAI_API_KEY=sk-...
 GOOGLE_API_KEY=...
 ```
 
-### Verify Environment Variables:
-
-1. Log in to Render Dashboard
-2. Go to your web service
-3. Click "Environment" tab
-4. Verify `DATABASE_URL` is set correctly
-5. Verify `NODE_ENV` is set to `production`
-
 ---
 
 ## Deployment Steps
@@ -71,27 +63,17 @@ GOOGLE_API_KEY=...
 3. Review the changes
 4. Merge the PR
 
-#### Step 2: Automatic Deployment
-
-Once merged, Render will automatically:
-1. Detect the new commit on `main`
-2. Pull the latest code
-3. Run `pnpm install`
-4. Run `pnpm run build` (which includes database migrations)
-5. Start the server with `pnpm start`
-
-#### Step 3: Verify Deployment
-
-Check Render Logs for:
-- "Build successful"
-- "Migrations applied"
-- "Server listening on port..."
-
-#### Step 4: Manual Migration (If Needed)
+#### Step 2: Build and Start
 
 ```bash
-# In Render Shell:
-cd /opt/render/project/src
+pnpm install
+pnpm run build
+pnpm start
+```
+
+#### Step 3: Run Migrations (If Needed)
+
+```bash
 pnpm run db:push
 ```
 
@@ -123,7 +105,7 @@ pnpm start
 ### 1. Verify Application Health
 
 ```bash
-curl https://your-app.onrender.com/api/health
+curl https://your-app.example.com/api/health
 ```
 
 ### 2. Test Core Functionality
@@ -136,7 +118,6 @@ curl https://your-app.onrender.com/api/health
 ### 3. Verify Database Tables
 
 ```bash
-# Via Render Shell or psql:
 psql $DATABASE_URL -c "\dt llm*"
 psql $DATABASE_URL -c "SELECT COUNT(*) FROM llms"
 ```
@@ -151,8 +132,6 @@ psql $DATABASE_URL -c "SELECT COUNT(*) FROM llms"
 
 **Solution:**
 ```bash
-# Via Render Shell:
-cd /opt/render/project/src
 pnpm run db:push
 ```
 
@@ -180,23 +159,17 @@ psql $DATABASE_URL -c "SELECT 1"
 
 ## Rollback Procedure
 
-### Option 1: Rollback via Render
-
-1. Go to "Events" tab
-2. Find previous successful deployment
-3. Click "Rollback to this deploy"
-
-### Option 2: Revert Git Changes
+### Option 1: Revert Git Changes
 
 ```bash
 git revert <merge-commit-sha>
 git push origin main
 ```
 
-### Option 3: Rollback Migrations
+### Option 2: Rollback Migrations
 
 ```bash
-# Via Render Shell / psql:
+# Via psql:
 psql $DATABASE_URL
 # DROP TABLE IF EXISTS ... (as needed)
 ```

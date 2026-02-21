@@ -78,30 +78,7 @@ const query = db!
 - ✅ Significantly improved dashboard load time
 - ✅ Better scalability for large datasets
 
-### 2. 🔒 Security: Removed DEV_MODE from Production
-
-**Problem:** `render.yaml` had `DEV_MODE: true` which bypasses OAuth authentication
-
-**Before:**
-```yaml
-- key: DEV_MODE
-  value: true  # ⚠️ Security risk!
-```
-
-**After:**
-```yaml
-# DEV_MODE removed for security - enable OAuth authentication in production
-# Uncomment ONLY for local testing (bypasses OAuth):
-# - key: DEV_MODE
-#   value: true
-```
-
-**Impact:**
-- ✅ Production deployments now require OAuth authentication
-- ✅ No unauthorized access risk
-- ✅ Clear documentation for local development
-
-### 3. 🎨 UX: Wired Up Action Buttons
+### 2. 🎨 UX: Wired Up Action Buttons
 
 **Problem:** Edit, Clone, and Archive buttons had no onClick handlers
 
@@ -131,7 +108,7 @@ const handleArchive = (llmId: number, llmName: string) => {
 - ✅ Loading states during operations
 - ✅ Tooltips explaining each action
 
-### 4. 🧪 Testing: Added Comprehensive Unit Tests
+### 3. 🧪 Testing: Added Comprehensive Unit Tests
 
 **Added:** `server/llm/db.test.ts` with full coverage
 
@@ -155,16 +132,7 @@ const handleArchive = (llmId: number, llmName: string) => {
 
 ## 📦 Deployment Configurations
 
-### Render (Recommended) ⭐
-- **File:** `render.yaml`
-- **Features:**
-  - Auto database provisioning
-  - Auto-generated JWT secret
-  - One-click deployment
-  - Free tier available
-- **Documentation:** `RENDER_DEPLOYMENT.md`
-
-### Railway (Alternative)
+### Railway
 - **Files:** `railway.toml`, `nixpacks.toml`
 - **Features:**
   - Nixpacks build system
@@ -194,7 +162,6 @@ const handleArchive = (llmId: number, llmName: string) => {
 | `server/llm/db.test.ts` | 258 | Unit tests |
 | `client/src/pages/LlmDashboard.tsx` | 243 | Dashboard UI |
 | `client/src/pages/LlmControlPlane.tsx` | 50 | Control plane UI |
-| `render.yaml` | 30 | Render deployment |
 | `FIXES_APPLIED.md` | 225 | Fixes documentation |
 | `MERGE_SUMMARY.md` | 222 | Merge overview |
 
@@ -209,7 +176,7 @@ const handleArchive = (llmId: number, llmName: string) => {
 ### Removed Files
 | File | Reason |
 |------|--------|
-| `Dockerfile` | Using Nixpacks/Render instead |
+| `Dockerfile` | Using Nixpacks instead |
 | `docker-compose.yml` | Not needed for cloud deployment |
 
 ---
@@ -229,12 +196,7 @@ Expected: ✅ All tests pass
 3. Check Network tab in DevTools
 4. Verify: Only 1 query for listing LLMs
 
-### 3. Verify Security Fix
-1. Deploy to Render using `render.yaml`
-2. Try accessing without OAuth
-3. Verify: Redirects to login page
-
-### 4. Verify UX Fix
+### 3. Verify UX Fix
 - Click **Edit** button → Should route to control plane with `mode=edit`
 - Click **Clone** button → Should route to control plane with `mode=clone`
 - Click **Archive** button → Should show confirmation → Archive LLM
@@ -247,7 +209,6 @@ Expected: ✅ All tests pass
 | Metric | Before | After | Improvement |
 |--------|--------|-------|-------------|
 | **Database Queries** | 101 (N+1) | 1 (JOIN) | ⬇️ 99% |
-| **Security** | DEV_MODE enabled | OAuth required | ✅ Secure |
 | **Button Functionality** | 0/3 working | 3/3 working | ✅ 100% |
 | **Test Coverage** | 0% | 100% (DB layer) | ✅ Complete |
 | **Features** | Basic app | LLM Control Plane | ✅ New system |
@@ -259,7 +220,6 @@ Expected: ✅ All tests pass
 ### New Documentation Files
 - **`FIXES_APPLIED.md`** - Detailed before/after comparisons for all fixes
 - **`MERGE_SUMMARY.md`** - Complete merge overview and instructions
-- **`RENDER_DEPLOYMENT.md`** - Step-by-step Render deployment guide
 - **`RAILWAY_DEPLOYMENT.md`** - Railway deployment instructions
 - **`VERCEL_DEPLOYMENT.md`** - Vercel deployment guide
 - **`EVALUATION_YVcio-7Aa4C.md`** - Original evaluation report (from evaluation branch)
@@ -289,9 +249,8 @@ Expected: ✅ All tests pass
 ## 🚀 Post-Merge Tasks
 
 ### Immediate
-1. Deploy to Render using `render.yaml`
-2. Run database migrations
-3. Verify production deployment
+1. Run database migrations
+2. Verify production deployment
 
 ### Future Enhancements (Non-Blocking)
 1. Implement LLM wizard (currently placeholder)
@@ -306,8 +265,7 @@ Expected: ✅ All tests pass
 ## 🔍 Review Focus Areas
 
 ### Critical
-1. **Security:** Verify DEV_MODE is removed in `render.yaml:21-24`
-2. **Performance:** Review JOIN query in `server/llm/db.ts:109-116`
+1. **Performance:** Review JOIN query in `server/llm/db.ts:109-116`
 3. **Database Schema:** Check LLM tables in `drizzle/schema.ts:1854-1904`
 
 ### Important
@@ -324,7 +282,6 @@ If you have questions about:
 - **Database:** Check `drizzle/schema.ts` LLM tables
 - **API:** Review `server/llm/router.ts` procedures
 - **UI:** Check `client/src/pages/Llm*.tsx` components
-- **Deployment:** See `RENDER_DEPLOYMENT.md`
 - **Fixes:** Read `FIXES_APPLIED.md` for detailed explanations
 
 ---
