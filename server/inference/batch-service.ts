@@ -296,6 +296,10 @@ class BatchInferenceService {
 export const batchService = new BatchInferenceService();
 
 // Periodic cleanup
-setInterval(() => {
+const _batchCleanupInterval = setInterval(() => {
   batchService.cleanup();
 }, 60 * 60 * 1000); // Every hour
+
+export function stopBatchCleanup() {
+  clearInterval(_batchCleanupInterval);
+}

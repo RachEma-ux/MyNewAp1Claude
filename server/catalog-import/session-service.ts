@@ -115,9 +115,9 @@ export async function getPreviewRows(sessionId: string): Promise<PreviewEntry[]>
     description: r.description ?? null,
     source: r.source,
     metadata: (r.metadata as Record<string, unknown>) ?? {},
-    duplicateStatus: r.duplicateStatus as any,
-    riskLevel: r.riskLevel as any,
-    validationIssues: (r.validationIssues as any[]) ?? [],
+    duplicateStatus: r.duplicateStatus as "new" | "exact_match" | "fuzzy_match" | "conflict",
+    riskLevel: r.riskLevel as "low" | "medium" | "high",
+    validationIssues: (r.validationIssues ?? []) as Array<{ field: string; message: string; severity: "warning" | "error" }>,
   }));
 }
 

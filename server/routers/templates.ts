@@ -7,7 +7,7 @@ import { TRPCError } from "@trpc/server";
 
 export const templatesRouter = router({
   // List all public templates
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({
       category: z.enum(["productivity", "data", "communication", "monitoring"]).optional(),
     }).optional())
@@ -30,7 +30,7 @@ export const templatesRouter = router({
     }),
 
   // Get template by ID
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
@@ -70,15 +70,17 @@ export const templatesRouter = router({
       
       // Create workflow from template
       const workflowName = input.workflowName || `${template[0].name} (Copy)`;
-      const workflowDef = template[0].workflowDefinition as any;
-      
+      const workflowDef = template[0].workflowDefinition as Record<string, unknown>;
+
       const [newWorkflow] = await db.insert(workflows).values({
         name: workflowName,
         description: template[0].description || "",
-        definition: workflowDef,
+        nodes: JSON.stringify(workflowDef?.nodes ?? "[]"),
+        edges: JSON.stringify(workflowDef?.edges ?? "[]"),
         userId: ctx.user.id,
-        isActive: false,
-      } as any).returning();
+        status: "draft",
+        enabled: false,
+      }).returning();
 
       // Increment usage count
       await db

@@ -95,12 +95,12 @@ export const policiesRouter = router({
         createdBy: ctx.user.id,
         name: input.name,
         description: input.description,
-        content: input.content as any,
+        content: input.content,
         hash,
-        rules: rules as any,
+        rules: rules,
         isActive: true,
         isTemplate: input.isTemplate,
-      } as any);
+      });
 
       return { success: true };
     }),
@@ -334,12 +334,12 @@ export const policiesRouter = router({
         createdBy: ctx.user.id,
         name: input.name,
         description: input.description,
-        content: template[0].content as any,
+        content: template[0].content,
         hash,
-        rules: template[0].rules as any,
+        rules: template[0].rules,
         isActive: true,
         isTemplate: false,
-      } as any);
+      });
 
       // Increment template usage count
       await db

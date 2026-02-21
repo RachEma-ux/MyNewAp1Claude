@@ -344,7 +344,7 @@ class ProviderRouter {
       if (!db) return null;
 
       const result = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
-      return (result[0] as any)?.routingProfile || null;
+      return (result[0] as Record<string, unknown>)?.routingProfile as RoutingProfile || null;
     } catch {
       return null;
     }
@@ -362,10 +362,10 @@ class ProviderRouter {
       type: p.type,
       enabled: p.enabled ?? true,
       priority: p.priority ?? 50,
-      kind: (p as any).kind || 'cloud',
-      capabilities: (p as any).capabilities || [],
-      policyTags: (p as any).policyTags || [],
-      limits: (p as any).limits || null,
+      kind: p.kind || 'cloud',
+      capabilities: p.capabilities || [],
+      policyTags: p.policyTags || [],
+      limits: p.limits || null,
       costPer1kTokens: p.costPer1kTokens,
     }));
   }

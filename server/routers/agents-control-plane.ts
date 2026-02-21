@@ -59,16 +59,15 @@ export const agentsControlPlaneRouter = router({
 
       // If ID provided, update existing draft
       if (input.id) {
-        const existing = await (db.query as any).agents.findFirst({
-          where: and(
-
+        const [existing] = await db
+          .select()
+          .from(agents)
+          .where(and(
             eq(agents.id, input.id),
-
             eq(agents.createdBy, userId),
-
             eq(agents.lifecycleState, "draft")
-          ),
-        });
+          ))
+          .limit(1);
 
         if (!existing) {
           throw new TRPCError({
@@ -111,7 +110,13 @@ export const agentsControlPlaneRouter = router({
         createdBy: userId,
       };
 
-      await db.insert(agents).values(draft as any);
+      await db.insert(agents).values({
+        name: input.identity?.name ?? "Untitled Agent",
+        description: input.identity?.description ?? null,
+        workspaceId: 1,
+        lifecycleState: "draft",
+        createdBy: userId,
+      });
 
       return draft;
     }),
@@ -174,9 +179,11 @@ export const agentsControlPlaneRouter = router({
     .query(async ({ input, ctx }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const agent = await (db.query as any).agents.findFirst({
-        where: eq(agents.id, input.id),
-      });
+      const [agent] = await db
+        .select()
+        .from(agents)
+        .where(eq(agents.id, input.id))
+        .limit(1);
 
       if (!agent) {
         throw new TRPCError({
@@ -207,14 +214,14 @@ export const agentsControlPlaneRouter = router({
       const userId = ctx.user.id; // Use numeric ID instead of openId string
 
       // Load draft
-      const draft = await (db.query as any).agents.findFirst({
-        where: and(
-
+      const [draft] = await db
+        .select()
+        .from(agents)
+        .where(and(
           eq(agents.id, input.id),
-
           eq(agents.lifecycleState, "draft")
-        ),
-      });
+        ))
+        .limit(1);
 
       if (!draft) {
         throw new TRPCError({
@@ -265,11 +272,11 @@ export const agentsControlPlaneRouter = router({
       // Record history
       await db.insert(agentHistory).values({
         agentId: input.id,
-        event: "admitted_to_sandbox",
-        timestamp: now,
-        actor: userId,
-        details: JSON.stringify({ policyResult }),
-      } as any);
+        eventType: "admitted_to_sandbox",
+        actorId: userId,
+        description: "Agent admitted to sandbox",
+        metadata: { policyResult },
+      });
 
       return { success: true, agentId: input.id };
     }),
@@ -285,9 +292,11 @@ export const agentsControlPlaneRouter = router({
       const userId = ctx.user.openId();
 
       // Load source agent
-      const source = await (db.query as any).agents.findFirst({
-        where: eq(agents.id, input.id),
-      });
+      const [source] = await db
+        .select()
+        .from(agents)
+        .where(eq(agents.id, input.id))
+        .limit(1);
 
       if (!source) {
         throw new TRPCError({
@@ -315,7 +324,13 @@ export const agentsControlPlaneRouter = router({
         governanceProof: null,
       };
 
-      await db.insert(agents).values(fork as any);
+      await db.insert(agents).values({
+        name: input.newName || `${source.name} (Copy)`,
+        description: source.description,
+        workspaceId: source.workspaceId,
+        lifecycleState: "draft",
+        createdBy: userId,
+      });
 
       return { id: forkId, ...fork };
     }),
@@ -340,14 +355,14 @@ export const agentsControlPlaneRouter = router({
       const userId = ctx.user.id; // Use numeric ID instead of openId string
 
       // Load sandbox agent
-      const agent = await (db.query as any).agents.findFirst({
-        where: and(
-
+      const [agent] = await db
+        .select()
+        .from(agents)
+        .where(and(
           eq(agents.id, input.id),
-
           eq(agents.lifecycleState, "sandbox")
-        ),
-      });
+        ))
+        .limit(1);
 
       if (!agent) {
         throw new TRPCError({
@@ -372,7 +387,7 @@ export const agentsControlPlaneRouter = router({
       }
 
       // Generate governance proof
-      const specHash = computeSpecHash(agent as any);
+      const specHash = computeSpecHash(agent);
       const proof = {
         proofHash: `proof_${Date.now()}`,
         policyDigest: policyResult.policyDigest,
@@ -385,8 +400,13 @@ export const agentsControlPlaneRouter = router({
       // Store proof
       await db.insert(agentProofs).values({
         agentId: input.id,
-        ...proof,
-      } as any);
+        policyDecision: policyResult.status,
+        policyHash: policyResult.policySetHash || "unknown",
+        specHash,
+        authority: "system",
+        signedAt: new Date(),
+        signature: proof.signature,
+      });
 
       // Promote to governed
       const now = new Date().toISOString();
@@ -407,11 +427,11 @@ export const agentsControlPlaneRouter = router({
       // Record history
       await db.insert(agentHistory).values({
         agentId: input.id,
-        event: "promoted_to_governed",
-        timestamp: now,
-        actor: userId,
-        details: JSON.stringify({ proof }),
-      } as any);
+        eventType: "promoted_to_governed",
+        actorId: userId,
+        description: "Agent promoted to governed",
+        metadata: { proof },
+      });
 
       return { success: true, proof };
     }),
@@ -444,11 +464,11 @@ export const agentsControlPlaneRouter = router({
       // Record history
       await db.insert(agentHistory).values({
         agentId: input.id,
-        event: "disabled",
-        timestamp: now,
-        actor: userId,
-        details: JSON.stringify({ reason: input.reason }),
-      } as any);
+        eventType: "disabled",
+        actorId: userId,
+        description: input.reason,
+        metadata: { reason: input.reason },
+      });
 
       return { success: true };
     }),
@@ -461,9 +481,11 @@ export const agentsControlPlaneRouter = router({
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const agent = await (db.query as any).agents.findFirst({
-        where: eq(agents.id, input.id),
-      });
+      const [agent] = await db
+        .select()
+        .from(agents)
+        .where(eq(agents.id, input.id))
+        .limit(1);
 
       if (!agent) {
         throw new TRPCError({
@@ -473,8 +495,8 @@ export const agentsControlPlaneRouter = router({
       }
 
       // Extract actions from capabilities
-      const capabilities = agent.capabilities as any;
-      const actions = capabilities?.actions || [];
+      const capabilities = (agent.capabilities ?? {}) as Record<string, unknown>;
+      const actions = (capabilities.actions as unknown[]) || [];
 
       return { actions };
     }),
@@ -485,15 +507,14 @@ export const agentsControlPlaneRouter = router({
   listDrafts: protectedProcedure.query(async ({ ctx }) => {
     const db = getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-    const drafts = await (db.query as any).agents.findMany({
-      where: and(
-
+    const drafts = await db
+      .select()
+      .from(agents)
+      .where(and(
         eq(agents.createdBy, ctx.user.id),
-
         eq(agents.lifecycleState, "draft")
-      ),
-      orderBy: [desc(agents.updatedAt)],
-    });
+      ))
+      .orderBy(desc(agents.updatedAt));
 
     return drafts;
   }),

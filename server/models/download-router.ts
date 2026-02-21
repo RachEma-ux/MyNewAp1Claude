@@ -318,11 +318,12 @@ export const modelDownloadRouter = router({
       try {
         const enabledProviders = await getEnabledProviders();
         for (const provider of enabledProviders) {
-          const config = provider.config as any;
-          const models: string[] = config?.models || [];
+          const config = provider.config as Record<string, unknown>;
+          const models = (config?.models || []) as string[];
           // Include defaultModel if not already in models list
-          if (config?.defaultModel && !models.includes(config.defaultModel)) {
-            models.push(config.defaultModel);
+          const defaultModel = config?.defaultModel as string | undefined;
+          if (defaultModel && !models.includes(defaultModel)) {
+            models.push(defaultModel);
           }
           models.forEach((modelName: string, idx: number) => {
             providerModelEntries.push({
@@ -396,8 +397,8 @@ export const modelDownloadRouter = router({
         throw new Error(`Provider ${input.providerId} not found`);
       }
 
-      const config = (provider.config as any) || {};
-      const models: string[] = config.models || [];
+      const config = (provider.config as Record<string, unknown>) || {};
+      const models: string[] = (config.models as string[]) || [];
 
       if (models.includes(input.modelName)) {
         return { added: false, message: "Model already exists in provider" };
@@ -406,7 +407,7 @@ export const modelDownloadRouter = router({
       models.push(input.modelName);
       await updateProvider(provider.id, {
         config: { ...config, models },
-      } as any);
+      });
 
       return { added: true, message: `Added ${input.modelName} to ${provider.name}` };
     }),

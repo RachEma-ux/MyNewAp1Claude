@@ -56,13 +56,13 @@ export const catalogRegistryRouter = router({
     .query(async ({ input }) => {
       const bundles = await getActiveBundles();
       return bundles
-        .filter((b: any) => {
+        .filter((b) => {
           if (!input?.entryType) return true;
-          const snap = b.snapshot as any;
+          const snap = b.snapshot as Record<string, unknown>;
           return snap?.entryType === input.entryType;
         })
-        .map((b: any) => {
-          const snap = b.snapshot as any;
+        .map((b) => {
+          const snap = b.snapshot as Record<string, unknown>;
           return {
             id: b.id,
             catalogEntryId: b.catalogEntryId,

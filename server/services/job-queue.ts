@@ -269,6 +269,10 @@ class JobQueue extends EventEmitter {
 export const jobQueue = new JobQueue();
 
 // Cleanup old jobs every hour
-setInterval(() => {
+const _jobCleanupInterval = setInterval(() => {
   jobQueue.cleanupOldJobs();
 }, 60 * 60 * 1000);
+
+export function stopJobCleanup() {
+  clearInterval(_jobCleanupInterval);
+}

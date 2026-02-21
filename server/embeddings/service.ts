@@ -184,9 +184,9 @@ export class EmbeddingService {
     return results.map(result => ({
       id: result.id as number,
       score: result.score,
-      documentId: (result.payload as any).documentId,
-      chunkIndex: (result.payload as any).chunkIndex,
-      content: (result.payload as any).content,
+      documentId: (result.payload as Record<string, unknown>)?.documentId as number,
+      chunkIndex: (result.payload as Record<string, unknown>)?.chunkIndex as number,
+      content: (result.payload as Record<string, unknown>)?.content as string,
     }));
   }
 

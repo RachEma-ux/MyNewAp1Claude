@@ -182,6 +182,10 @@ class WebSocketService {
 export const websocketService = new WebSocketService();
 
 // Broadcast queue stats every 10 seconds
-setInterval(() => {
+const _wsStatsInterval = setInterval(() => {
   websocketService.broadcastQueueStats();
 }, 10000);
+
+export function stopWsStats() {
+  clearInterval(_wsStatsInterval);
+}

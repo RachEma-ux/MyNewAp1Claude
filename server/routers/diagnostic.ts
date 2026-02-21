@@ -3,13 +3,13 @@
  */
 
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 
 export const diagnosticRouter = router({
   /**
    * Test if device detection is working
    */
-  testDeviceDetection: publicProcedure.query(async () => {
+  testDeviceDetection: protectedProcedure.query(async () => {
     try {
       const { detectDeviceSpecs } = await import("../llm/device-detection");
       const specs = await detectDeviceSpecs();
@@ -28,7 +28,7 @@ export const diagnosticRouter = router({
       return {
         success: false,
         error: error.message,
-        stack: error.stack,
+        // stack traces omitted for security
       };
     }
   }),
@@ -36,7 +36,7 @@ export const diagnosticRouter = router({
   /**
    * Test if Ollama installation check is working
    */
-  testOllamaCheck: publicProcedure.query(async () => {
+  testOllamaCheck: protectedProcedure.query(async () => {
     try {
       const { checkProviderInstallation } = await import("../llm/provider-installation");
       const result = await checkProviderInstallation('ollama');
@@ -49,7 +49,7 @@ export const diagnosticRouter = router({
       return {
         success: false,
         error: error.message,
-        stack: error.stack,
+        // stack traces omitted for security
       };
     }
   }),
@@ -57,7 +57,7 @@ export const diagnosticRouter = router({
   /**
    * Test if Ollama provider exists in registry
    */
-  testOllamaProvider: publicProcedure.query(async () => {
+  testOllamaProvider: protectedProcedure.query(async () => {
     try {
       const { getProvider } = await import("../llm/providers");
       const ollama = getProvider('ollama');
@@ -85,7 +85,7 @@ export const diagnosticRouter = router({
       return {
         success: false,
         error: error.message,
-        stack: error.stack,
+        // stack traces omitted for security
       };
     }
   }),
@@ -93,7 +93,7 @@ export const diagnosticRouter = router({
   /**
    * Full diagnostic test
    */
-  fullDiagnostic: publicProcedure.query(async () => {
+  fullDiagnostic: protectedProcedure.query(async () => {
     const results: any = {
       timestamp: new Date().toISOString(),
       tests: {},

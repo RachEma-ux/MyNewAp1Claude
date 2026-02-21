@@ -306,7 +306,7 @@ export const actionsRouter = router({
         criticalViolations,
         majorIssues,
         lastValidated: new Date(),
-      } as any); // Type assertion: input validation ensures all required fields exist
+      } as any);
 
       return {
         success: true,
@@ -316,7 +316,7 @@ export const actionsRouter = router({
     }),
 
   // List all actions (with filtering)
-  list: publicProcedure
+  list: protectedProcedure
     .input(
       z.object({
         status: z.enum(["draft", "pending_approval", "approved", "rejected", "deprecated"]).optional(),
@@ -342,7 +342,7 @@ export const actionsRouter = router({
     }),
 
   // Get single action by ID
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();

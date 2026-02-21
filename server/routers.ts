@@ -1,5 +1,5 @@
 import { z } from "zod";
-// Note: Missing import for COOKIE_NAME - will be added by linter
+import { TRPCError } from "@trpc/server";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -18,6 +18,7 @@ import { embeddingsRouter } from "./embeddings/embeddings-router";
 import { vectordbRouter } from "./vectordb/vectordb-router";
 import { documentsRouter } from "./documents/documents-router";
 import { documentsApiRouter } from "./documents/documents-api-router";
+import { documentsCrudRouter } from "./documents/documents-crud-router";
 import { automationRouter } from "./automation/automation-router";
 import { secretsRouter } from "./secrets/secrets-router";
 import { triggersRouter } from "./routers/triggers";
@@ -118,7 +119,7 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.id);
         if (!hasAccess) {
-          throw new Error("Access denied");
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         return await db.getWorkspaceById(input.id);
       }),
@@ -138,7 +139,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.id);
         if (!hasAccess) {
-          throw new Error("Access denied");
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         const { id, ...updates } = input;
         await db.updateWorkspace(id, updates);
@@ -151,10 +152,10 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.id);
         if (!hasAccess) {
-          throw new Error("Access denied");
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         const workspace = await db.getWorkspaceById(input.id);
-        return (workspace as any)?.routingProfile || {
+        return (workspace as Record<string, unknown>)?.routingProfile || {
           defaultRoute: 'AUTO',
           dataSensitivity: 'LOW',
           qualityTier: 'BALANCED',
@@ -182,11 +183,11 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.id);
         if (!hasAccess) {
-          throw new Error("Access denied");
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         await db.updateWorkspace(input.id, {
           routingProfile: input.routingProfile,
-        } as any);
+        } as Record<string, unknown>);
         return { success: true };
       }),
 
@@ -195,7 +196,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const workspace = await db.getWorkspaceById(input.id);
         if (!workspace || workspace.ownerId !== ctx.user.id) {
-          throw new Error("Access denied");
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         await db.deleteWorkspace(input.id);
         return { success: true };
@@ -305,133 +306,8 @@ export const appRouter = router({
       }),
   }),
 
-  // ============================================================================
-  // Document Management
-  // ============================================================================
-  
-  documents: router({
-    list: protectedProcedure
-      .input(z.object({ workspaceId: z.number() }))
-      .query(async ({ ctx, input }) => {
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.workspaceId);
-        if (!hasAccess) {
-          throw new Error("Access denied");
-        }
-        return await db.getWorkspaceDocuments(input.workspaceId);
-      }),
-
-    get: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ ctx, input }) => {
-        const document = await db.getDocumentById(input.id);
-        if (!document) {
-          throw new Error("Document not found");
-        }
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, document.workspaceId);
-        if (!hasAccess) {
-          throw new Error("Access denied");
-        }
-        return document;
-      }),
-
-    create: protectedProcedure
-      .input(
-        z.object({
-          workspaceId: z.number(),
-          filename: z.string(),
-          fileType: z.string(),
-          fileSize: z.number(),
-          fileUrl: z.string(),
-          fileKey: z.string(),
-          title: z.string().optional(),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.workspaceId);
-        if (!hasAccess) {
-          throw new Error("Access denied");
-        }
-        return await db.createDocument({
-          ...input,
-          uploadedBy: ctx.user.id,
-        });
-      }),
-
-    update: protectedProcedure
-      .input(
-        z.object({
-          id: z.number(),
-          status: z.enum(["pending", "processing", "completed", "error"]).optional(),
-          errorMessage: z.string().optional(),
-          chunkCount: z.number().optional(),
-          embeddingModel: z.string().optional(),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const document = await db.getDocumentById(input.id);
-        if (!document) {
-          throw new Error("Document not found");
-        }
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, document.workspaceId);
-        if (!hasAccess) {
-          throw new Error("Access denied");
-        }
-        const { id, ...updates } = input;
-        await db.updateDocument(id, updates);
-        return { success: true };
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        const document = await db.getDocumentById(input.id);
-        if (!document) {
-          throw new Error("Document not found");
-        }
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, document.workspaceId);
-        if (!hasAccess) {
-          throw new Error("Access denied");
-        }
-        await db.deleteDocument(input.id);
-        return { success: true };
-      }),
-
-    // Upload and process document
-    upload: protectedProcedure
-      .input(
-        z.object({
-          workspaceId: z.number(),
-          filename: z.string(),
-          fileType: z.string(),
-          fileSize: z.number(),
-          fileContent: z.string(), // Base64 encoded
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const { processDocumentUpload } = await import("./documents/processor");
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.workspaceId);
-        if (!hasAccess) {
-          throw new Error("Access denied");
-        }
-        return await processDocumentUpload(input, ctx.user.id);
-      }),
-
-    // Get document chunks
-    getChunks: protectedProcedure
-      .input(z.object({ documentId: z.number() }))
-      .query(async ({ ctx, input }) => {
-        const { getDocumentChunks } = await import("./documents/db");
-        const document = await db.getDocumentById(input.documentId);
-        if (!document) {
-          throw new Error("Document not found");
-        }
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, document.workspaceId);
-        if (!hasAccess) {
-          throw new Error("Access denied");
-        }
-        return await getDocumentChunks(input.documentId);
-      }),
-  }),
+  // Document CRUD (extracted from inline to documents/documents-crud-router.ts)
+  documents: documentsCrudRouter,
 
   // Agent management is now handled by agentsRouter
   // See server/agents/router.ts
@@ -446,7 +322,7 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.workspaceId);
         if (!hasAccess) {
-          throw new Error("Access denied");
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         return await db.getWorkspaceAgents(input.workspaceId);
       }),
@@ -456,11 +332,11 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const agent = await db.getAgentById(input.id);
         if (!agent) {
-          throw new Error("Agent not found");
+          throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
         }
         const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, agent.workspaceId);
         if (!hasAccess) {
-          throw new Error("Access denied");
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         return agent;
       }),
@@ -483,7 +359,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.workspaceId);
         if (!hasAccess) {
-          throw new Error("Access denied");
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         return await db.createAgent({
           ...input,
@@ -510,11 +386,11 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const agent = await db.getAgentById(input.id);
         if (!agent) {
-          throw new Error("Agent not found");
+          throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
         }
         const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, agent.workspaceId);
         if (!hasAccess) {
-          throw new Error("Access denied");
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         const { id, ...updates } = input;
         await db.updateAgent(id, updates);
@@ -526,11 +402,11 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const agent = await db.getAgentById(input.id);
         if (!agent) {
-          throw new Error("Agent not found");
+          throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
         }
         const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, agent.workspaceId);
         if (!hasAccess) {
-          throw new Error("Access denied");
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
         await db.deleteAgent(input.id);
         return { success: true };

@@ -19,13 +19,16 @@ function getEncryptionKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY;
 
   if (!key) {
-    console.warn('[Encryption] WARNING: No ENCRYPTION_KEY set in environment. Using default key (INSECURE)');
-    // Default key for development only
-    return Buffer.from('dev-key-do-not-use-in-production-replace-with-secure-key-32bytes');
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("[Encryption] ENCRYPTION_KEY is required in production. Set it in your environment variables.");
+    }
+    console.warn('[Encryption] WARNING: No ENCRYPTION_KEY set. Using dev fallback (NOT safe for production)');
+    return scryptSync('dev-fallback-key', randomBytes(0).toString() || 'dev-salt', KEY_LENGTH);
   }
 
-  // Derive a key from the environment variable
-  const salt = Buffer.from('llm-provider-salt'); // Static salt for key derivation
+  // Derive a key from the environment variable using a per-deployment salt
+  // The salt is derived from the key itself to ensure different keys produce different derived keys
+  const salt = Buffer.from(key.slice(0, SALT_LENGTH).padEnd(SALT_LENGTH, '0'));
   return scryptSync(key, salt, KEY_LENGTH);
 }
 

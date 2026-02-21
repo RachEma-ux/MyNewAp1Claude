@@ -83,8 +83,8 @@ export const agentsRouter = router({
         allowedTools: input.allowedTools,
         status: "draft",
         createdBy: ctx.user.id,
-      } as any);
-      
+      });
+
       return { success: true };
     }),
 
@@ -409,8 +409,8 @@ export const agentsRouter = router({
         allowedTools: [],
         status: "draft",
         createdBy: ctx.user.id,
-      } as any);
-      
+      });
+
       return {
         success: true,
         message: `Agent deployed from template ${input.templateId}`,

@@ -29,11 +29,9 @@ export const agentsDiffRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       // Load both agents
-      const [base, compare] = await Promise.all([
-        (db.query as any).agents.findFirst({ where: // @ts-expect-error - Drizzle type inference issue
- eq(agents.id, input.baseId) }),
-        (db.query as any).agents.findFirst({ where: // @ts-expect-error - Drizzle type inference issue
- eq(agents.id, input.compareId) }),
+      const [[base], [compare]] = await Promise.all([
+        db.select().from(agents).where(eq(agents.id, input.baseId)).limit(1),
+        db.select().from(agents).where(eq(agents.id, input.compareId)).limit(1),
       ]);
 
       if (!base || !compare) {

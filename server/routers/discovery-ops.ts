@@ -48,7 +48,7 @@ export async function logDiscoveryEvent(
           probeType: c.probeType || "unknown",
         })),
       warnings: result.warnings,
-      debug: result.debug as any,
+      debug: result.debug,
     });
 
     // After logging, evaluate promotion triggers
@@ -365,7 +365,7 @@ export async function cleanupOldDiscoveryEvents(retentionDays: number = 30): Pro
     const result = await db
       .delete(providerDiscoveryEvents)
       .where(sql`${providerDiscoveryEvents.createdAt} < ${cutoff}`);
-    const count = (result as any)?.rowCount ?? 0;
+    const count = (result as unknown as { rowCount?: number })?.rowCount ?? 0;
     if (count > 0) console.log(`[DiscoveryOps] Cleaned up ${count} events older than ${retentionDays} days`);
     return count;
   } catch (e: any) {
@@ -466,7 +466,7 @@ export const discoveryOpsRouter = router({
         .update(registryPromotionCandidates)
         .set({
           status: "IN_REVIEW",
-          reviewedBy: (ctx as any).user?.id ?? 1,
+          reviewedBy: ctx.user?.id,
           reviewedAt: new Date(),
         })
         .where(eq(registryPromotionCandidates.domain, input.domain));
@@ -494,11 +494,11 @@ export const discoveryOpsRouter = router({
         .update(registryPromotionCandidates)
         .set({
           status: "REJECTED",
-          rejectedBy: (ctx as any).user?.id ?? 1,
+          rejectedBy: ctx.user?.id,
           rejectedAt: new Date(),
           rejectCategory: input.category,
           rejectNotes: input.notes ?? null,
-          rejectSnapshot: stats as any,
+          rejectSnapshot: stats as unknown as Record<string, unknown>,
           attemptsSinceReject: 0,
         })
         .where(eq(registryPromotionCandidates.domain, input.domain));
@@ -519,7 +519,7 @@ export const discoveryOpsRouter = router({
       const db = getDb();
       if (!db) throw new Error("Database not available");
 
-      const userId = (ctx as any).user?.id ?? 1;
+      const userId = ctx.user?.id;
 
       // Create patch artifact
       const [patch] = await db

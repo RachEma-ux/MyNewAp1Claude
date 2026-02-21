@@ -47,7 +47,7 @@ export async function ingestDocument(
   const chunkTexts = chunks.map((c) => c.text);
   const embeddings = await embeddingEngine.generate({
     texts: chunkTexts,
-    model: options.embeddingModel as any,
+    model: options.embeddingModel,
   });
   console.log(`[RAG] Generated ${embeddings.embeddings.length} embeddings`);
   
@@ -99,7 +99,7 @@ export async function ingestFromBuffer(
   const chunkTexts = chunks.map((c) => c.text);
   const embeddings = await embeddingEngine.generate({
     texts: chunkTexts,
-    model: options.embeddingModel as any,
+    model: options.embeddingModel,
   });
   console.log(`[RAG] Generated ${embeddings.embeddings.length} embeddings`);
   

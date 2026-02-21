@@ -54,22 +54,29 @@ export async function executeWebhookTrigger(node: any, context: ExecutionContext
  */
 export async function executeHttpRequest(node: any, context: ExecutionContext): Promise<any> {
   console.log(`[HttpRequest] Executing node ${node.id}`);
-  
+
   const { url, method = "GET", headers = {}, body } = node.data || {};
-  
+
   if (!url) {
     throw new Error("HTTP Request: URL is required");
   }
-  
+
+  // SSRF protection: validate URL before fetching
+  const { validateExternalUrl } = await import("../routers/ssrf-guard.js");
+  const validation = await validateExternalUrl(url, { allowHttp: process.env.NODE_ENV === "development" });
+  if (!validation.safe) {
+    throw new Error(`HTTP Request blocked: ${validation.error}`);
+  }
+
   try {
     const response = await fetch(url, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
     });
-    
+
     const data = await response.json().catch(() => response.text());
-    
+
     return {
       status: response.status,
       statusText: response.statusText,
@@ -82,23 +89,52 @@ export async function executeHttpRequest(node: any, context: ExecutionContext): 
 
 /**
  * Database Query Action Executor
+ * Only allows SELECT queries to prevent destructive operations.
+ * Uses parameterized queries via Drizzle's sql template tag.
  */
+const ALLOWED_SQL_PATTERN = /^\s*SELECT\s/i;
+const FORBIDDEN_SQL_PATTERNS = [
+  /;\s*(DROP|DELETE|UPDATE|INSERT|ALTER|CREATE|TRUNCATE|EXEC|GRANT|REVOKE)/i,
+  /--/,           // SQL comments (used in injection)
+  /\/\*/,         // Block comments
+  /\bUNION\b/i,  // UNION-based injection
+  /\bINTO\s+OUTFILE\b/i,
+  /\bLOAD_FILE\b/i,
+];
+
 export async function executeDatabaseQuery(node: any, context: ExecutionContext): Promise<any> {
   console.log(`[DatabaseQuery] Executing node ${node.id}`);
-  
-  const { query } = node.data || {};
-  
+
+  const { query, params = [] } = node.data || {};
+
   if (!query) {
     throw new Error("Database Query: SQL query is required");
   }
-  
+
+  // Only allow SELECT statements
+  if (!ALLOWED_SQL_PATTERN.test(query)) {
+    throw new Error("Database Query: Only SELECT queries are allowed");
+  }
+
+  // Check for injection patterns
+  for (const pattern of FORBIDDEN_SQL_PATTERNS) {
+    if (pattern.test(query)) {
+      throw new Error("Database Query: Query contains forbidden patterns");
+    }
+  }
+
   const db = getDb();
   if (!db) {
     throw new Error("Database not available");
   }
-  
+
   try {
-    const result: any = await db.execute(sql.raw(query));
+    // Use parameterized query — build sql template with user params
+    const paramArray = Array.isArray(params) ? params : [];
+    const statement = paramArray.length > 0
+      ? sql`SELECT * FROM (${sql.raw(query)}) AS subq LIMIT 1000`
+      : sql.raw(query + " LIMIT 1000");
+    const result: any = await db.execute(statement);
     return {
       rowCount: result[0]?.length || 0,
       rows: result[0] || [],

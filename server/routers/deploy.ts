@@ -117,7 +117,7 @@ interface WorkflowJob {
 
 export const deployRouter = router({
   // Get configuration status
-  getConfig: publicProcedure.query(async () => {
+  getConfig: protectedProcedure.query(async () => {
     const { token, repo } = getGitHubConfig();
     return {
       hasToken: !!token,
@@ -172,7 +172,7 @@ export const deployRouter = router({
     }),
 
   // Get status of a specific deployment run
-  getStatus: publicProcedure
+  getStatus: protectedProcedure
     .input(z.object({ runId: z.number() }))
     .query(async ({ input }) => {
       const { repo } = getGitHubConfig();
@@ -217,7 +217,7 @@ export const deployRouter = router({
     }),
 
   // Get tunnel URL from running/completed deployment
-  getTunnelUrl: publicProcedure
+  getTunnelUrl: protectedProcedure
     .input(z.object({ runId: z.number() }))
     .query(async ({ input }) => {
       const { token, repo } = getGitHubConfig();
@@ -360,7 +360,7 @@ export const deployRouter = router({
     }),
 
   // Get logs and extract tunnel URL (legacy endpoint)
-  getLogs: publicProcedure
+  getLogs: protectedProcedure
     .input(z.object({ runId: z.number() }))
     .query(async ({ input }) => {
       const { token, repo } = getGitHubConfig();
@@ -398,7 +398,7 @@ export const deployRouter = router({
     }),
 
   // List recent deployment runs
-  listHistory: publicProcedure
+  listHistory: protectedProcedure
     .input(z.object({
       limit: z.number().min(1).max(50).default(10),
     }).optional())

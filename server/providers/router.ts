@@ -69,8 +69,8 @@ export const providerRouter = router({
       // Auto-discover models from the provider and persist them
       try {
         let discoveredModels: string[] = [];
-        if ("getSupportedModels" in runtimeProvider && typeof (runtimeProvider as any).getSupportedModels === "function") {
-          discoveredModels = (runtimeProvider as any).getSupportedModels();
+        if ("getSupportedModels" in runtimeProvider && typeof (runtimeProvider as Record<string, unknown>).getSupportedModels === "function") {
+          discoveredModels = (runtimeProvider as unknown as { getSupportedModels(): string[] }).getSupportedModels();
         } else {
           const caps = runtimeProvider.getCapabilities();
           discoveredModels = caps.supportedModels || [];
@@ -81,12 +81,12 @@ export const providerRouter = router({
           const existingConfig = (provider.config as Record<string, unknown>) || {};
           await providerDb.updateProvider(provider.id, {
             config: { ...existingConfig, models: discoveredModels, defaultModel: discoveredModels[0] },
-          } as any);
+          });
 
           // Insert each model into the models DB table for Models Hub visibility
           const { createModel, getAllModels } = await import("../db");
           const existingModels = await getAllModels();
-          const existingNames = new Set(existingModels.map((m: any) => m.name));
+          const existingNames = new Set(existingModels.map(m => m.name));
 
           for (const modelName of discoveredModels) {
             if (existingNames.has(modelName)) continue; // skip duplicates
@@ -96,7 +96,7 @@ export const providerRouter = router({
               displayName: modelName,
               modelType: isEmbedding ? "embedding" : "llm",
               status: "ready",
-            } as any);
+            });
           }
 
           console.log(`[ProviderRouter] Auto-discovered ${discoveredModels.length} model(s) for ${provider.name}: ${discoveredModels.join(", ")}`);
@@ -122,7 +122,7 @@ export const providerRouter = router({
       const { id, ...data } = input;
       
       // Update in database
-      await providerDb.updateProvider(id, data as any);
+      await providerDb.updateProvider(id, data);
 
       // Update in registry if config changed and provider is registered
       if (data.config) {
@@ -288,7 +288,7 @@ export const providerRouter = router({
         }))
         .mutation(async ({ input }) => {
           const { id, ...data } = input;
-          await providerDb.updateWorkspaceProvider(id, data as any);
+          await providerDb.updateWorkspaceProvider(id, data);
         return { success: true };
       }),
 
@@ -498,7 +498,7 @@ export const providerRouter = router({
       }))
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
-        await providerDb.updateProvider(id, data as any);
+        await providerDb.updateProvider(id, data);
         return { success: true };
       }),
 
@@ -512,10 +512,10 @@ export const providerRouter = router({
         }
         return {
           ...provider,
-          kind: (provider as any).kind || 'cloud',
-          capabilities: (provider as any).capabilities || [],
-          policyTags: (provider as any).policyTags || [],
-          limits: (provider as any).limits || null,
+          kind: provider.kind || 'cloud',
+          capabilities: provider.capabilities || [],
+          policyTags: provider.policyTags || [],
+          limits: provider.limits || null,
         };
       }),
   }),

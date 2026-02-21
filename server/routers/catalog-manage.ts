@@ -50,11 +50,15 @@ import { discoverProvider } from "./discover-provider";
 const _rateLimitBuckets = new Map<string, { windowStart: number; count: number }>();
 const _discoveryCache = new Map<string, { result: any; ts: number }>();
 // Clean up stale entries every 5 minutes
-setInterval(() => {
+const _catalogCleanupInterval = setInterval(() => {
   const now = Date.now();
   _rateLimitBuckets.forEach((v, k) => { if (now - v.windowStart > 120_000) _rateLimitBuckets.delete(k); });
   _discoveryCache.forEach((v, k) => { if (now - v.ts > 120_000) _discoveryCache.delete(k); });
 }, 300_000);
+
+export function stopCatalogCleanup() {
+  clearInterval(_catalogCleanupInterval);
+}
 
 // ============================================================================
 // Input Schemas
@@ -363,8 +367,8 @@ export const catalogManageRouter = router({
         // 3. Models discovery
         try {
           let models: string[] = [];
-          if ("getSupportedModels" in provider && typeof (provider as any).getSupportedModels === "function") {
-            models = (provider as any).getSupportedModels();
+          if ("getSupportedModels" in provider && typeof (provider as Record<string, unknown>).getSupportedModels === "function") {
+            models = (provider as unknown as { getSupportedModels(): string[] }).getSupportedModels();
           } else {
             const caps = provider.getCapabilities();
             models = caps.supportedModels || [];
@@ -400,7 +404,7 @@ export const catalogManageRouter = router({
               ]);
               results.testPrompt = {
                 passed: true,
-                response: (response as any).text || (response as any).content || "[response received]",
+                response: (response as unknown as Record<string, unknown>).text as string || (response as unknown as Record<string, unknown>).content as string || "[response received]",
                 latencyMs: Date.now() - promptStart,
                 message: "Test prompt successful",
               };
