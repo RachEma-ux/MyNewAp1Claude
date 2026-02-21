@@ -358,6 +358,87 @@ Shut down all teammates first, then ask the lead to clean up.
 
 ---
 
+## Auto-Approve Bash Commands (No More Prompts)
+
+By default, Claude Code asks permission for every Bash command. You can pre-approve commands in `~/.claude/settings.json`.
+
+### Option 1: Allow All Bash Commands (Recommended)
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "NotebookEdit",
+      "Bash(*)"
+    ]
+  }
+}
+```
+
+`Bash(*)` is a wildcard — Claude can run any command without asking.
+
+### Option 2: Allow Specific Commands Only
+
+If you prefer granular control:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(npm *)",
+      "Bash(node *)",
+      "Bash(grep *)",
+      "Bash(python3 *)",
+      "Bash(gh *)",
+      "Bash(curl *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)"
+    ]
+  }
+}
+```
+
+Each entry follows the pattern `Bash(command-pattern)` where `*` is a wildcard.
+
+### Combined Settings File (Full Example)
+
+Here's a complete `~/.claude/settings.json` with Agent Teams + full Bash access:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "NotebookEdit",
+      "Bash(*)"
+    ]
+  }
+}
+```
+
+> Changes take effect on the next `claude` session — no restart needed.
+
+---
+
 ## References
 
 - [Agent Teams - Claude Code Docs](https://code.claude.com/docs/en/agent-teams)
