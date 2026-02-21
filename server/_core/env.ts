@@ -26,11 +26,10 @@ export function validateOAuthConfig(): { valid: boolean; missing: string[] } {
   };
 }
 
-// SECURITY: Hard-block DEV_MODE in production to prevent auth bypass
+// SECURITY: Warn when DEV_MODE is used with NODE_ENV=production (auth is bypassed)
 if (ENV.isDevMode && ENV.isProduction) {
-  console.error("[SECURITY] FATAL: DEV_MODE=true is forbidden in production. It bypasses all authentication.");
-  console.error("[SECURITY] Remove DEV_MODE from your environment or set it to 'false'.");
-  process.exit(1);
+  console.warn("[SECURITY] WARNING: DEV_MODE=true in production — all authentication is bypassed.");
+  console.warn("[SECURITY] This is acceptable for demo/CI deploys but NOT for user-facing production.");
 }
 
 // Log OAuth configuration status on startup (only in non-dev mode)

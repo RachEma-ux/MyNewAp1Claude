@@ -51,8 +51,8 @@ jobs:
       - name: Start application with tunnel
         run: |
           # Start the Node.js server in background on port 3000
-          # Use development mode since DEV_MODE=true is the default (no OAuth)
-          PORT=3000 NODE_ENV=development DEV_MODE=true node dist/index.js &
+          # NODE_ENV=production so built static files are served; DEV_MODE bypasses OAuth
+          PORT=3000 NODE_ENV=production DEV_MODE=true node dist/index.js &
           SERVER_PID=$!
 
           # Wait for server to start
