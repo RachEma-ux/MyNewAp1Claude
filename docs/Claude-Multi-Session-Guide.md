@@ -158,6 +158,39 @@ All shortcuts use the prefix **CTRL → A** (tap CTRL, then A, then the key).
 
 ---
 
+## Best Uses for Multi-Sessions
+
+### 1. Different Projects in Each Window
+- Window 1: `~/ProjectA` — backend work
+- Window 2: `~/ProjectB` — Android app work
+- Switch context instantly without losing conversation history
+
+### 2. Frontend + Backend Split
+- Window 1: Working on `client/src/` components and pages
+- Window 2: Working on `server/` routes and APIs
+- Both sessions stay focused on their domain
+
+### 3. Code + Git Operations
+- Window 1: Claude writing/editing code
+- Window 2: You manually run git commands, review diffs, resolve conflicts
+- No need to interrupt Claude's flow
+
+### 4. Research + Implementation
+- Window 1: Ask Claude to explore a codebase, explain architecture, find patterns
+- Window 2: Actually implementing changes based on what you learn
+
+### 5. Long Task + Quick Questions
+- Window 1: Claude working on a large feature (many file edits)
+- Window 2: Quick one-off questions — "how does X work?", "what's the syntax for Y?"
+
+### 6. Bug Fix + Feature Work
+- Window 1: Debugging an urgent issue
+- Window 2: Continuing feature development without losing progress
+
+> **Recommended on mobile**: Stick to **2 sessions** — keeps RAM comfortable and covers most workflows. The frontend/backend split or code/git combo tends to be the most productive.
+
+---
+
 ## Tips
 
 - **RAM**: Each Claude Code session uses ~200-400 MB. With limited RAM, stick to 2-3 sessions max.
