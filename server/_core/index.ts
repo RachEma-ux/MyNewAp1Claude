@@ -379,7 +379,7 @@ async function startServer() {
   // Import session SSE stream
   app.get("/api/import/stream", async (req, res) => {
     // Authentication check
-    if (process.env.DEV_MODE !== "true" || process.env.NODE_ENV === "production") {
+    if (process.env.DEV_MODE !== "true") {
       try {
         const user = await sdk.authenticateRequest(req);
         if (!user) {
