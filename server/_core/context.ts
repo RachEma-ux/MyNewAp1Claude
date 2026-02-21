@@ -15,14 +15,15 @@ export async function createContext(
   let user: User | null = null;
 
   // DEV MODE: Auto-login with test user (bypasses OAuth)
-  if (ENV.isDevMode) {
+  // SECURITY: Blocked in production to prevent auth bypass
+  if (ENV.isDevMode && !ENV.isProduction) {
     user = {
       id: 1,
       openId: "dev-user-001",
       name: "Dev User",
       email: "dev@example.com",
       loginMethod: "dev-mode",
-      role: "admin" as const,
+      role: "user" as const,
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),
