@@ -12,6 +12,19 @@ import { getDb } from "../db";
 import { routingAuditLogs } from "../../drizzle/schema";
 import { desc, eq, and, gte } from "drizzle-orm";
 
+// Strip sensitive keys (apiKey, apiSecret, etc.) from provider config before returning to clients
+function redactProviderConfig(provider: any) {
+  if (!provider?.config || typeof provider.config !== "object") return provider;
+  const config = { ...provider.config };
+  for (const key of Object.keys(config)) {
+    if (/key|secret|token|password/i.test(key) && typeof config[key] === "string") {
+      const val = config[key] as string;
+      config[key] = val.length > 8 ? val.slice(0, 4) + "..." + val.slice(-4) : "••••••••";
+    }
+  }
+  return { ...provider, config };
+}
+
 export const providerRouter = router({
   // List all providers
   list: protectedProcedure
@@ -20,13 +33,15 @@ export const providerRouter = router({
       enabledOnly: z.boolean().optional(),
     }).optional())
     .query(async ({ input }) => {
+      let providers;
       if (input?.type) {
-        return await providerDb.getProvidersByType(input.type);
+        providers = await providerDb.getProvidersByType(input.type);
+      } else if (input?.enabledOnly) {
+        providers = await providerDb.getEnabledProviders();
+      } else {
+        providers = await providerDb.getAllProviders();
       }
-      if (input?.enabledOnly) {
-        return await providerDb.getEnabledProviders();
-      }
-      return await providerDb.getAllProviders();
+      return providers.map(redactProviderConfig);
     }),
 
   // Get provider by ID
@@ -35,7 +50,8 @@ export const providerRouter = router({
       id: z.number(),
     }))
     .query(async ({ input }) => {
-      return await providerDb.getProviderById(input.id);
+      const provider = await providerDb.getProviderById(input.id);
+      return provider ? redactProviderConfig(provider) : null;
     }),
 
   // Create new provider
