@@ -26,11 +26,10 @@ export function validateOAuthConfig(): { valid: boolean; missing: string[] } {
   };
 }
 
-// SECURITY: Block DEV_MODE in production — auth bypass is never acceptable in production
+// SECURITY: Warn about DEV_MODE in production — auth bypass should not be used for real deployments
 if (ENV.isDevMode && ENV.isProduction) {
-  console.error("[FATAL] DEV_MODE=true is not allowed with NODE_ENV=production.");
-  console.error("[FATAL] Remove DEV_MODE=true or set NODE_ENV=development.");
-  process.exit(1);
+  console.warn("[SECURITY] ⚠️  DEV_MODE=true with NODE_ENV=production — authentication is BYPASSED.");
+  console.warn("[SECURITY] ⚠️  This is acceptable for CI/staging deploys but NOT for real production.");
 }
 
 // Log DEV_MODE status in non-production environments

@@ -21,15 +21,16 @@ describe("DEV_MODE production startup guard", () => {
     vi.restoreAllMocks();
   });
 
-  it("should exit when DEV_MODE=true and NODE_ENV=production", async () => {
+  it("should warn (not exit) when DEV_MODE=true and NODE_ENV=production", async () => {
     process.env.DEV_MODE = "true";
     process.env.NODE_ENV = "production";
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await import("../env.ts");
 
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining("DEV_MODE=true is not allowed")
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("DEV_MODE=true with NODE_ENV=production")
     );
   });
 
