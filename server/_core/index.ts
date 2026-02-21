@@ -242,14 +242,14 @@ async function startServer() {
   // Periodic cleanup of stale rate limit entries to prevent memory leaks
   setInterval(() => {
     const now = Date.now();
-    for (const [key, timestamps] of globalRateMap) {
+    globalRateMap.forEach((timestamps, key) => {
       const active = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
       if (active.length === 0) {
         globalRateMap.delete(key);
       } else {
         globalRateMap.set(key, active);
       }
-    }
+    });
   }, 5 * 60 * 1000); // Clean up every 5 minutes
 
   app.use("/api", (req, res, next) => {

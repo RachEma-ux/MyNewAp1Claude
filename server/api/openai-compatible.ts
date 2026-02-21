@@ -67,12 +67,13 @@ openaiCompatibleRouter.post("/v1/chat/completions", validateApiKey, async (req, 
     const { model, messages, temperature, max_tokens, stream } = req.body;
     
     if (!model || !messages) {
-      return res.status(400).json({
+      res.status(400).json({
         error: {
           message: "Missing required parameters: model and messages",
           type: "invalid_request_error",
         },
       });
+      return;
     }
     
     // Convert OpenAI format to internal format
@@ -162,12 +163,13 @@ openaiCompatibleRouter.post("/v1/completions", validateApiKey, async (req, res) 
     const { model, prompt, temperature, max_tokens } = req.body;
     
     if (!model || !prompt) {
-      return res.status(400).json({
+      res.status(400).json({
         error: {
           message: "Missing required parameters: model and prompt",
           type: "invalid_request_error",
         },
       });
+      return;
     }
     
     // Convert to chat format
@@ -224,12 +226,13 @@ openaiCompatibleRouter.get("/v1/models/:model", validateApiKey, async (req, res)
     const modelInfo = models.find((m: any) => m.modelId === model);
     
     if (!modelInfo) {
-      return res.status(404).json({
+      res.status(404).json({
         error: {
           message: `Model ${model} not found`,
           type: "invalid_request_error",
         },
       });
+      return;
     }
     
     res.json({

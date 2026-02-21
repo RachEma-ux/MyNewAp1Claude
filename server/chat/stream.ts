@@ -21,7 +21,7 @@ const chatStreamSchema = z.object({
   useRAG: z.boolean().optional(),
   workspaceId: z.number().int().positive().optional(),
   useUnifiedRouting: z.boolean().optional(),
-  taskHints: z.record(z.unknown()).optional(),
+  taskHints: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function handleChatStream(req: Request, res: Response) {

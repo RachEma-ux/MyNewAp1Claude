@@ -77,12 +77,14 @@ router.post("/upload-document", (req, res, next) => {
 
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "No file provided" });
+      res.status(400).json({ error: "No file provided" });
+      return;
     }
 
     const workspaceId = req.body.workspaceId;
     if (!workspaceId) {
-      return res.status(400).json({ error: "Workspace ID required" });
+      res.status(400).json({ error: "Workspace ID required" });
+      return;
     }
 
     // Generate unique file key
