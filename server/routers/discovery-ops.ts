@@ -466,7 +466,7 @@ export const discoveryOpsRouter = router({
         .update(registryPromotionCandidates)
         .set({
           status: "IN_REVIEW",
-          reviewedBy: (ctx as any).user?.id ?? 1,
+          reviewedBy: (ctx as any).user?.id,
           reviewedAt: new Date(),
         })
         .where(eq(registryPromotionCandidates.domain, input.domain));
@@ -494,7 +494,7 @@ export const discoveryOpsRouter = router({
         .update(registryPromotionCandidates)
         .set({
           status: "REJECTED",
-          rejectedBy: (ctx as any).user?.id ?? 1,
+          rejectedBy: (ctx as any).user?.id,
           rejectedAt: new Date(),
           rejectCategory: input.category,
           rejectNotes: input.notes ?? null,
@@ -519,7 +519,7 @@ export const discoveryOpsRouter = router({
       const db = getDb();
       if (!db) throw new Error("Database not available");
 
-      const userId = (ctx as any).user?.id ?? 1;
+      const userId = (ctx as any).user?.id;
 
       // Create patch artifact
       const [patch] = await db

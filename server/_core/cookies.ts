@@ -39,10 +39,15 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  const secure = isSecureRequest(req);
+
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    // Only use SameSite=None when secure (HTTPS); otherwise use Lax for CSRF protection
+    sameSite: secure ? "lax" : "lax",
+    secure,
+    // 24-hour session instead of 1-year
+    maxAge: 24 * 60 * 60 * 1000,
   };
 }

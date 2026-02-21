@@ -54,22 +54,29 @@ export async function executeWebhookTrigger(node: any, context: ExecutionContext
  */
 export async function executeHttpRequest(node: any, context: ExecutionContext): Promise<any> {
   console.log(`[HttpRequest] Executing node ${node.id}`);
-  
+
   const { url, method = "GET", headers = {}, body } = node.data || {};
-  
+
   if (!url) {
     throw new Error("HTTP Request: URL is required");
   }
-  
+
+  // SSRF protection: validate URL before fetching
+  const { validateExternalUrl } = await import("../routers/ssrf-guard.js");
+  const validation = await validateExternalUrl(url, { allowHttp: process.env.NODE_ENV === "development" });
+  if (!validation.safe) {
+    throw new Error(`HTTP Request blocked: ${validation.error}`);
+  }
+
   try {
     const response = await fetch(url, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
     });
-    
+
     const data = await response.json().catch(() => response.text());
-    
+
     return {
       status: response.status,
       statusText: response.statusText,

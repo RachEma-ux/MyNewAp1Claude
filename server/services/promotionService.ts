@@ -209,7 +209,7 @@ async function signSpec(
   };
 
   // MVP: HMAC signature (use JWT_SECRET as signing key)
-  const secret = process.env.JWT_SECRET || "default-secret";
+  const secret = process.env.JWT_SECRET || (() => { if (process.env.NODE_ENV === "production") throw new Error("JWT_SECRET is required in production"); return "dev-only-secret"; })();
   const signature = crypto
     .createHmac("sha256", secret)
     .update(JSON.stringify(payload))
@@ -239,7 +239,7 @@ export async function verifyProof(proof: ProofBundle): Promise<boolean> {
     };
 
     // Verify HMAC signature
-    const secret = process.env.JWT_SECRET || "default-secret";
+    const secret = process.env.JWT_SECRET || (() => { if (process.env.NODE_ENV === "production") throw new Error("JWT_SECRET is required in production"); return "dev-only-secret"; })();
     const expectedSignature = crypto
       .createHmac("sha256", secret)
       .update(JSON.stringify(payload))
