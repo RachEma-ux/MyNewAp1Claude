@@ -439,6 +439,77 @@ Here's a complete `~/.claude/settings.json` with Agent Teams + full Bash access:
 
 ---
 
+## Appendix: Agent Teams Audit Demo Results
+
+The following audit was performed by an Agent Team with 3 specialized teammates running in parallel against the MyNewAp1Claude codebase. It demonstrates the power of multi-agent orchestration for code review.
+
+**Team composition:**
+- **code-quality** (blue) — server code patterns, error handling, dead code
+- **security-auditor** (green) — secrets, XSS, auth gaps, insecure defaults
+- **completeness-auditor** (yellow) — TODOs, mock data, stubs, "coming soon" text
+
+### CRITICAL Findings
+
+| # | Issue | File | Impact |
+|---|---|---|---|
+| 1 | SQL injection via `sql.raw()` | `server/automation/block-executors.ts:101` | User-supplied query passed directly — full DB compromise |
+| 2 | Hardcoded Render API key | `.env:1` | Live key on disk (not in git, but should be rotated) |
+| 3 | DEV_MODE bypasses all auth | `server/_core/context.ts:18-36` | Every request auto-authed as admin when `DEV_MODE=true` |
+
+### HIGH Findings
+
+| # | Issue | File |
+|---|---|---|
+| 4 | SSRF in HTTP executor — fetches arbitrary URLs without SSRF guard | `server/automation/block-executors.ts:55-81` |
+| 5 | Hardcoded encryption fallback key — provider keys encrypted with public default | `server/_core/encryption.ts:22-24` |
+| 6 | Static salt in key derivation | `server/_core/encryption.ts:28` |
+| 7 | Session cookies: SameSite=None + 1-year expiry | `server/_core/cookies.ts:42-48` |
+| 8 | No security headers (helmet, CSP, X-Frame-Options) | `server/_core/index.ts` |
+| 9 | Inconsistent error handling — `routers.ts` throws `Error` instead of `TRPCError` (~20 routes) | `server/routers.ts` |
+| 10 | Hardcoded user ID fallback `?? 1` when auth context missing | `server/routers/discovery-ops.ts:469,497,522` |
+
+### MEDIUM Findings
+
+| # | Issue | Details |
+|---|---|---|
+| 11 | Upload endpoint has no auth | `server/upload.ts:14` — anyone can upload 50MB files |
+| 12 | Excessive public tRPC routes | Diagnostic (4), deploy (5), wiki (8), actions, templates, triggers |
+| 13 | No global rate limiting | Only catalog import has rate limits |
+| 14 | Provider keys stored as plaintext via auto-provision path | `server/_core/index.ts:128-134` |
+| 15 | 130+ `as any` type assertions | Worst: agents-control-plane (15), providers/router (11) |
+| 16 | 5 orphaned router files never mounted | opaPolicy, orchestrator, backup, logging, documents/router |
+| 17 | 4 document router surfaces | Confusing overlap — 3 files + inline in routers.ts |
+| 18 | 6 module-level `setInterval`s with no cleanup | realtime-service, batch-service, resource-manager, etc. |
+| 19 | `db.ts` is 2068 lines | Single file for all DB queries |
+
+### Incomplete Features (30+ simulated)
+
+**Core systems still mocked/simulated:**
+- OPA policy engine (mock verification, mock digests)
+- llama.cpp inference (returns simulated text)
+- Workflow execution engine (fully simulated)
+- Document extraction (PDF/DOCX return placeholders)
+- Voice service (transcription, synthesis, commands all simulated)
+- Model downloads (simulated with fake manifests)
+- Benchmarks (5-second sleep with fake results)
+- GGUF toolchain (conversion/quantization simulated)
+- Embedding generation (simulated)
+- Chat router doesn't save conversations to DB
+- OpenAI-compatible API accepts any key
+
+**27 TODOs** across server code, **18 "Coming Soon"** in UI, **7 `alert()` calls** that should be toasts, **294 `console.log`** in server, **130+ `as any`** type casts.
+
+### Positive Security Observations
+
+- SSRF guard implementation is comprehensive (just not used everywhere)
+- Secrets management module uses proper PBKDF2+AES-256-GCM
+- tRPC auth middleware correctly enforces procedure levels
+- Provider router properly uses `protectedProcedure`
+- Drizzle ORM queries use parameterized queries (SQL injection isolated to one file)
+- `.env` is in `.gitignore` and not tracked by git
+
+---
+
 ## References
 
 - [Agent Teams - Claude Code Docs](https://code.claude.com/docs/en/agent-teams)
