@@ -84,6 +84,7 @@ const LLMTrainingDashboard = lazy(() => import("@/pages/LLMTrainingDashboard"));
 const DeploymentStatus = lazy(() => import("@/pages/DeploymentStatus"));
 const DeployPage = lazy(() => import("@/pages/DeployPage"));
 const CatalogManagePage = lazy(() => import("@/pages/CatalogManagePage"));
+const CandidatePage = lazy(() => import("@/pages/CandidatePage"));
 const ProviderConnectionsPage = lazy(() => import("@/pages/ProviderConnectionsPage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -201,6 +202,7 @@ function Router() {
       <Route path="/llm/provider-wizard" component={() => <ProtectedRoute component={LLMProviderConfigWizard} />} />
       <Route path="/llm/new-provider" component={() => <ProtectedRoute component={NewProviderPage} />} />
       <Route path="/llm/catalogue/manage" component={() => <ProtectedRoute component={CatalogManagePage} />} />
+      <Route path="/llm/catalogue/candidate" component={() => <ProtectedRoute component={CandidatePage} />} />
       <Route path="/llm/catalogue" component={() => <ProtectedRoute component={LLMCataloguePage} />} />
       {/* Deployment Status Page */}
       <Route path="/deployment-status" component={() => <ProtectedRoute component={DeploymentStatus} />} />
