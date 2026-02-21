@@ -36,13 +36,13 @@ export default function DocumentsDashboard() {
   const activeWorkspaceId = workspaces?.[0]?.id;
 
   // Fetch real documents from database
-  const { data: documents, isLoading: documentsLoading } = trpc.documentsManagement.listDocuments.useQuery({
+  const { data: documents, isLoading: documentsLoading } = trpc.documents.list.useQuery({
     workspaceId: activeWorkspaceId!,
   }, {
     enabled: !!activeWorkspaceId,
   });
 
-  const deleteDocumentMutation = trpc.documentsManagement.deleteDocument.useMutation({
+  const deleteDocumentMutation = trpc.documents.delete.useMutation({
     onSuccess: () => {
       toast.success("Document deleted successfully");
     },
@@ -51,7 +51,7 @@ export default function DocumentsDashboard() {
     },
   });
 
-  const bulkDeleteMutation = trpc.documentsManagement.bulkDeleteDocuments.useMutation({
+  const bulkDeleteMutation = trpc.documents.bulkDelete.useMutation({
     onSuccess: () => {
       toast.success(`${selectedIds.size} documents deleted`);
       setSelectedIds(new Set());
@@ -68,7 +68,7 @@ export default function DocumentsDashboard() {
     if (!confirm("Are you sure you want to delete this document? This will also remove all associated vectors.")) {
       return;
     }
-    await deleteDocumentMutation.mutateAsync({ documentId });
+    await deleteDocumentMutation.mutateAsync({ id: documentId });
   };
 
   const handleToggleSelect = (documentId: number) => {

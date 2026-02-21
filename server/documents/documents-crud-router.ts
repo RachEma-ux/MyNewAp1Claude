@@ -114,6 +114,14 @@ export const documentsCrudRouter = router({
       return await processDocumentUpload(input, ctx.user.id);
     }),
 
+  bulkDelete: protectedProcedure
+    .input(z.object({ documentIds: z.array(z.number()) }))
+    .mutation(async ({ input }) => {
+      const { bulkDeleteDocuments } = await import("../db");
+      await bulkDeleteDocuments(input.documentIds);
+      return { success: true };
+    }),
+
   getChunks: protectedProcedure
     .input(z.object({ documentId: z.number() }))
     .query(async ({ ctx, input }) => {

@@ -17,7 +17,6 @@ import { inferenceRouter } from "./inference/inference-router";
 import { embeddingsRouter } from "./embeddings/embeddings-router";
 import { vectordbRouter } from "./vectordb/vectordb-router";
 import { documentsRouter } from "./documents/documents-router";
-import { documentsApiRouter } from "./documents/documents-api-router";
 import { documentsCrudRouter } from "./documents/documents-crud-router";
 import { automationRouter } from "./automation/automation-router";
 import { secretsRouter } from "./secrets/secrets-router";
@@ -59,7 +58,6 @@ export const appRouter = router({
   embeddings: embeddingsRouter,
   vectordb: vectordbRouter,
   documentsApi: documentsRouter,
-  documentsManagement: documentsApiRouter,
   automation: automationRouter,
   secrets: secretsRouter,
   triggers: triggersRouter,
@@ -308,110 +306,6 @@ export const appRouter = router({
 
   // Document CRUD (extracted from inline to documents/documents-crud-router.ts)
   documents: documentsCrudRouter,
-
-  // Agent management is now handled by agentsRouter
-  // See server/agents/router.ts
-  
-  // ============================================================================
-  // Legacy Agent Management (to be removed)
-  // ============================================================================
-  
-  agentsLegacy: router({
-    list: protectedProcedure
-      .input(z.object({ workspaceId: z.number() }))
-      .query(async ({ ctx, input }) => {
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.workspaceId);
-        if (!hasAccess) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
-        return await db.getWorkspaceAgents(input.workspaceId);
-      }),
-
-    get: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ ctx, input }) => {
-        const agent = await db.getAgentById(input.id);
-        if (!agent) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
-        }
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, agent.workspaceId);
-        if (!hasAccess) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
-        return agent;
-      }),
-
-    create: protectedProcedure
-      .input(
-        z.object({
-          workspaceId: z.number(),
-          name: z.string(),
-          description: z.string().optional(),
-          systemPrompt: z.string(),
-          modelId: z.string().optional(),
-          roleClass: z.string().optional(),
-          temperature: z.string().optional(),
-          hasDocumentAccess: z.boolean().optional(),
-          hasToolAccess: z.boolean().optional(),
-          allowedTools: z.array(z.string()).optional(),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.workspaceId);
-        if (!hasAccess) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
-        return await db.createAgent({
-          ...input,
-          modelId: input.modelId || "default",
-          roleClass: input.roleClass || "general",
-          createdBy: ctx.user.id,
-        });
-      }),
-
-    update: protectedProcedure
-      .input(
-        z.object({
-          id: z.number(),
-          name: z.string().optional(),
-          description: z.string().optional(),
-          systemPrompt: z.string().optional(),
-          modelId: z.string().optional(),
-          temperature: z.string().optional(),
-          hasDocumentAccess: z.boolean().optional(),
-          hasToolAccess: z.boolean().optional(),
-          allowedTools: z.array(z.string()).optional(),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const agent = await db.getAgentById(input.id);
-        if (!agent) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
-        }
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, agent.workspaceId);
-        if (!hasAccess) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
-        const { id, ...updates } = input;
-        await db.updateAgent(id, updates);
-        return { success: true };
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        const agent = await db.getAgentById(input.id);
-        if (!agent) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
-        }
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, agent.workspaceId);
-        if (!hasAccess) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
-        await db.deleteAgent(input.id);
-        return { success: true };
-      }),
-  }),
 
   // Note: conversations router is imported from ./routers/conversations.ts (line 35)
 });
