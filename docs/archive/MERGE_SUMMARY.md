@@ -52,11 +52,6 @@ claude/main-merge-WNVY0
 - **Database:**
   - `drizzle/schema.ts` - Added LLM tables with versioning (+60 lines)
 
-#### 📦 Deployment Configurations
-- `railway.toml` + `nixpacks.toml` - Railway deployment
-- `vercel.json` - Vercel deployment
-- Complete documentation for each platform
-
 #### 🔧 Critical Fixes
 1. ✅ N+1 query → Single JOIN query (99% performance gain)
 2. ✅ Action buttons wired up (UX complete)
@@ -64,8 +59,6 @@ claude/main-merge-WNVY0
 
 #### 📚 Documentation
 - `FIXES_APPLIED.md` - Detailed fixes with before/after
-- `RAILWAY_DEPLOYMENT.md` - Railway alternative
-- `VERCEL_DEPLOYMENT.md` - Vercel option
 
 ---
 
@@ -124,7 +117,6 @@ Merge LLM Control Plane with fixes into main
 
 This merge brings in:
 - LLM Control Plane MVP with immutable versioning
-- Deployment configurations for Railway, Vercel
 - Performance fix: N+1 query optimization (JOIN-based query)
 - UX fix: Wired up Edit, Clone, Archive buttons
 - Testing: Added comprehensive unit tests

@@ -140,55 +140,6 @@ server {
 
 ---
 
-## Railway
-
-### Quick Start
-
-1. Go to **railway.app**, sign in with GitHub
-2. Click **Deploy from GitHub repo**, select `RachEma-ux/MyNewAp1Claude`
-3. Add PostgreSQL: click **+ New > Database > Add PostgreSQL** (free, auto-sets `DATABASE_URL`)
-4. Add env vars: `JWT_SECRET`, `NODE_ENV=production`, `PORT=3000`
-5. Click **Settings > Generate Domain** — get `your-app.up.railway.app`
-
-### Railway Free Tier
-
-- $5 credit/month (~500 hours runtime)
-- 1 GB database storage
-
-### Railway Troubleshooting
-
-**Build fails?** Check build logs in Railway dashboard.
-
-**Database errors?** Railway auto-connects `DATABASE_URL`; migrations run on startup.
-
----
-
-## Vercel
-
-### Quick Start
-
-1. Provision an external PostgreSQL database (Neon, Supabase, or Railway)
-2. Go to **vercel.com**, sign in with GitHub
-3. Click **New Project**, import `MyNewAp1Claude`
-4. Set env vars: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`
-5. Deploy
-
-### External Database Options
-
-| Provider  | Free Tier                     |
-|-----------|-------------------------------|
-| Neon      | 512 MB storage, branching     |
-| Supabase  | 500 MB, auth included         |
-| Railway   | $5/mo credit                  |
-
-### Vercel Notes
-
-- Vercel is serverless — the app uses a `vercel-build` script
-- 100 GB bandwidth/month on free tier
-- Run `pnpm db:push` once after first deployment for migrations
-
----
-
 ## Health Check
 
 ```bash

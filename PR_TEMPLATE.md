@@ -132,18 +132,6 @@ const handleArchive = (llmId: number, llmName: string) => {
 
 ## 📦 Deployment Configurations
 
-### Railway
-- **Files:** `railway.toml`, `nixpacks.toml`
-- **Features:**
-  - Nixpacks build system
-  - Custom configuration
-- **Documentation:** `RAILWAY_DEPLOYMENT.md`
-
-### Vercel (Option)
-- **File:** `vercel.json`
-- **Note:** Requires external database
-- **Documentation:** `VERCEL_DEPLOYMENT.md`
-
 ---
 
 ## 📊 Changes Summary
@@ -176,7 +164,7 @@ const handleArchive = (llmId: number, llmName: string) => {
 ### Removed Files
 | File | Reason |
 |------|--------|
-| `Dockerfile` | Using Nixpacks instead |
+| `Dockerfile` | Not needed for current deployment |
 | `docker-compose.yml` | Not needed for cloud deployment |
 
 ---
@@ -220,8 +208,6 @@ Expected: ✅ All tests pass
 ### New Documentation Files
 - **`FIXES_APPLIED.md`** - Detailed before/after comparisons for all fixes
 - **`MERGE_SUMMARY.md`** - Complete merge overview and instructions
-- **`RAILWAY_DEPLOYMENT.md`** - Railway deployment instructions
-- **`VERCEL_DEPLOYMENT.md`** - Vercel deployment guide
 - **`EVALUATION_YVcio-7Aa4C.md`** - Original evaluation report (from evaluation branch)
 
 ### Code Documentation

@@ -87,7 +87,7 @@ Optional:
 
 ## Deployment
 
-See [`DEPLOYMENT.md`](DEPLOYMENT.md) for full deployment guide including Docker, Render, Railway, and Vercel options.
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for full deployment guide including Docker options.
 
 ## License
 

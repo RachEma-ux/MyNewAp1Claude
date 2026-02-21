@@ -74,10 +74,6 @@ claude/update-main-WNVY0 (NEW - updated main)
 2. ✅ **UX** - All action buttons fully functional
 4. ✅ **Testing** - 100% unit test coverage for DB operations
 
-### 📦 Deployment Configs
-- `railway.toml` + `nixpacks.toml` - Railway
-- `vercel.json` - Vercel option
-
 ### 📚 Documentation
 - `MERGE_COMPLETE.md` - This file (merge confirmation)
 - `MERGE_SUMMARY.md` - Detailed merge overview
@@ -178,7 +174,6 @@ Let's verify the merge is complete:
 | **Database Queries** | N+1 (101 for 100 items) | 1 (JOIN) | ⬇️ 99% |
 | **UX** | 0/3 buttons working | 3/3 working | ✅ Complete |
 | **Test Coverage** | 0% | 100% (DB layer) | ✅ Tested |
-| **Deployments** | 1 option | 3 platforms | ➕ Flexibility |
 | **Documentation** | Minimal | 7 docs | ✅ Comprehensive |
 
 ---
