@@ -20,7 +20,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { CatalogSelect } from "@/components/CatalogSelect";
 import { useCatalogEntries } from "@/hooks/useCatalogEntries";
 
-type ProviderType = "openai" | "anthropic" | "google" | "local-llamacpp" | "local-ollama" | "custom";
+type ProviderType = "openai" | "anthropic" | "google" | "groq" | "local-llamacpp" | "local-ollama" | "custom";
 
 interface ProviderFormData {
   name: string;
@@ -50,6 +50,12 @@ const providerTypeInfo: Record<ProviderType, { label: string; icon: React.ReactN
     label: "Google AI",
     icon: <Cloud className="h-5 w-5" />,
     color: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+    description: "cloud",
+  },
+  groq: {
+    label: "Groq",
+    icon: <Zap className="h-5 w-5" />,
+    color: "bg-amber-500/10 text-amber-500 border-amber-500/20",
     description: "cloud",
   },
   "local-llamacpp": {
@@ -210,7 +216,7 @@ export default function Providers() {
     }
   };
 
-  const cloudProviders = providers?.filter(p => ["openai", "anthropic", "google", "custom"].includes(p.type)) || [];
+  const cloudProviders = providers?.filter(p => ["openai", "anthropic", "google", "groq", "custom"].includes(p.type)) || [];
   const localProviders = providers?.filter(p => ["local-llamacpp", "local-ollama"].includes(p.type)) || [];
 
   return (

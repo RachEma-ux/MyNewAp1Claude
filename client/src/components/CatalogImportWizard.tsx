@@ -256,6 +256,7 @@ export function CatalogImportWizard({
     cohere: "https://api.cohere.com",
     deepseek: "https://api.deepseek.com",
     perplexity: "https://api.perplexity.ai",
+    groq: "https://api.groq.com/openai/v1",
     ollama: "http://localhost:11434",
     llamacpp: "http://localhost:8080",
   };

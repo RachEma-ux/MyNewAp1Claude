@@ -30,7 +30,7 @@ export const providerRouter = router({
   // List all providers
   list: protectedProcedure
     .input(z.object({
-      type: z.enum(["local-llamacpp", "local-ollama", "openai", "anthropic", "google", "custom"]).optional(),
+      type: z.enum(["local-llamacpp", "local-ollama", "openai", "anthropic", "google", "groq", "custom"]).optional(),
       enabledOnly: z.boolean().optional(),
     }).optional())
     .query(async ({ input }) => {
@@ -82,7 +82,7 @@ export const providerRouter = router({
   create: protectedProcedure
     .input(z.object({
       name: z.string().min(1).max(255),
-      type: z.enum(["local-llamacpp", "local-ollama", "openai", "anthropic", "google", "custom"]),
+      type: z.enum(["local-llamacpp", "local-ollama", "openai", "anthropic", "google", "groq", "custom"]),
       enabled: z.boolean().optional(),
       priority: z.number().min(0).max(100).optional(),
       config: z.record(z.string(), z.unknown()),

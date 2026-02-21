@@ -112,6 +112,7 @@ const ENV_PROVIDER_MAP = [
   { envKey: "OPENAI_API_KEY", name: "OpenAI", type: "openai" },
   { envKey: "ANTHROPIC_API_KEY", name: "Anthropic", type: "anthropic" },
   { envKey: "GOOGLE_API_KEY", name: "Google", type: "google" },
+  { envKey: "GROQ_API_KEY", name: "Groq", type: "groq" },
 ] as const;
 
 async function autoProvisionProviders() {
@@ -220,7 +221,7 @@ async function startServer() {
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https:",
         "font-src 'self' data:",
-        "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com http://localhost:11434 http://localhost:8080 http://localhost:8181" + (isDev ? " ws://localhost:*" : ""),
+        "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://api.groq.com http://localhost:11434 http://localhost:8080 http://localhost:8181" + (isDev ? " ws://localhost:*" : ""),
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",

@@ -169,6 +169,18 @@ export class ProviderRegistry {
         const { LlamaCppProvider } = await import('./llamacpp');
         return new LlamaCppProvider(config);
       }
+      case 'groq': {
+        const { CustomProvider: GroqCustom } = await import('./custom');
+        // Groq is OpenAI-compatible — use CustomProvider with Groq defaults
+        const groqConfig = {
+          ...config,
+          config: {
+            ...config.config,
+            baseUrl: (config.config.baseUrl as string) || 'https://api.groq.com/openai/v1',
+          },
+        };
+        return new GroqCustom(groqConfig);
+      }
       case 'custom': {
         const { CustomProvider } = await import('./custom');
         return new CustomProvider(config);

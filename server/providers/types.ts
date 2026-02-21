@@ -1,11 +1,12 @@
 // Provider Hub - Core Types and Interfaces
 
-export type ProviderType = 
+export type ProviderType =
   | 'local-llamacpp'
   | 'local-ollama'
   | 'openai'
   | 'anthropic'
   | 'google'
+  | 'groq'
   | 'custom';
 
 export type ProviderStatus = 'active' | 'inactive' | 'error' | 'initializing';
