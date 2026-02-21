@@ -154,28 +154,150 @@ export function buildPromotionInput(
 }
 
 /**
- * Evaluate runtime policy (placeholder for future)
+ * Evaluate runtime policy
  * Used for action authorization, tool usage, resource access
  */
 export async function evaluateRuntimePolicy(input: OPAInput): Promise<OPADecision> {
-  // MVP: Allow all runtime actions
-  // TODO: Implement runtime policy evaluation
+  const denies: Array<{ rule: string; reason: string; field?: string }> = [];
+
+  // Rule 1: Agent must have governance context
+  if (!input.governance) {
+    denies.push({
+      rule: "governance_required",
+      reason: "Agent must have governance context for runtime actions",
+      field: "governance",
+    });
+  }
+
+  // Rule 2: Capability check — agent can only use capabilities it was granted
+  if (input.governance?.capabilities && input.agent?.requestedCapability) {
+    const granted = input.governance.capabilities as string[];
+    const requested = input.agent.requestedCapability as string;
+    if (!granted.includes(requested)) {
+      denies.push({
+        rule: "capability_authorized",
+        reason: `Agent does not have the "${requested}" capability. Granted: ${granted.join(", ")}`,
+        field: "agent.requestedCapability",
+      });
+    }
+  }
+
+  // Rule 3: Network access must be explicitly granted
+  if (input.agent?.requestedCapability === "network") {
+    if (input.sandbox_constraints?.externalCalls === false) {
+      denies.push({
+        rule: "network_blocked",
+        reason: "Network access is blocked by sandbox constraints",
+        field: "sandbox_constraints.externalCalls",
+      });
+    }
+  }
+
+  // Rule 4: Write access must be explicitly granted
+  if (input.agent?.requestedCapability === "write" || input.agent?.requestedCapability === "storage") {
+    if (input.sandbox_constraints?.persistentWrites === false) {
+      denies.push({
+        rule: "write_blocked",
+        reason: "Persistent writes are blocked by sandbox constraints",
+        field: "sandbox_constraints.persistentWrites",
+      });
+    }
+  }
+
+  // Rule 5: Budget check for runtime cost
+  if (input.governance?.economics?.monthly_budget_usd && input.agent?.estimatedCostUsd) {
+    const budget = input.governance.economics.monthly_budget_usd;
+    const spent = input.agent.currentMonthSpendUsd || 0;
+    const estimated = input.agent.estimatedCostUsd;
+    if (spent + estimated > budget) {
+      denies.push({
+        rule: "budget_exceeded",
+        reason: `Action would exceed monthly budget: $${spent} spent + $${estimated} estimated > $${budget} limit`,
+        field: "governance.economics.monthly_budget_usd",
+      });
+    }
+  }
+
+  // Try real OPA if available, fall back to rule-based
+  if (denies.length === 0) {
+    try {
+      const opaResult = await callOPAEngine("runtime/allow", input);
+      return opaResult;
+    } catch {
+      // OPA not available — rule-based evaluation passed, allow
+    }
+  }
+
   return {
-    allowed: true,
-    denies: [],
+    allowed: denies.length === 0,
+    denies,
   };
 }
 
 /**
- * Evaluate interaction policy (placeholder for future)
+ * Evaluate interaction policy
  * Used for user interaction rules, data access
  */
 export async function evaluateInteractionPolicy(input: OPAInput): Promise<OPADecision> {
-  // MVP: Allow all interactions
-  // TODO: Implement interaction policy evaluation
+  const denies: Array<{ rule: string; reason: string; field?: string }> = [];
+
+  // Rule 1: Actor must have a valid role
+  const validRoles = ["agent_admin", "policy_admin", "viewer"];
+  if (!validRoles.includes(input.request.actor.role)) {
+    denies.push({
+      rule: "valid_role",
+      reason: `Invalid actor role: ${input.request.actor.role}`,
+      field: "request.actor.role",
+    });
+  }
+
+  // Rule 2: Viewers cannot modify agents
+  if (input.request.actor.role === "viewer" && input.agent?.action) {
+    const writeActions = ["update", "delete", "execute", "promote", "configure"];
+    if (writeActions.includes(input.agent.action)) {
+      denies.push({
+        rule: "viewer_read_only",
+        reason: `Viewers cannot perform "${input.agent.action}" actions`,
+        field: "agent.action",
+      });
+    }
+  }
+
+  // Rule 3: Compliance agents cannot be modified without policy_admin
+  if (input.agent?.role_class === "compliance" && input.agent?.action === "update") {
+    if (input.request.actor.role !== "policy_admin") {
+      denies.push({
+        rule: "compliance_locked",
+        reason: "Compliance agents can only be modified by policy admins",
+        field: "request.actor.role",
+      });
+    }
+  }
+
+  // Rule 4: Data access scope — agent can only access its workspace data
+  if (input.agent?.targetWorkspaceId && input.agent?.ownWorkspaceId) {
+    if (input.agent.targetWorkspaceId !== input.agent.ownWorkspaceId) {
+      denies.push({
+        rule: "workspace_scope",
+        reason: "Agent cannot access data outside its own workspace",
+        field: "agent.targetWorkspaceId",
+      });
+    }
+  }
+
+  // Try real OPA if available, fall back to rule-based
+  if (denies.length === 0) {
+    try {
+      const opaResult = await callOPAEngine("interaction/allow", input);
+      return opaResult;
+    } catch {
+      // OPA not available — rule-based evaluation passed, allow
+    }
+  }
+
   return {
-    allowed: true,
-    denies: [],
+    allowed: denies.length === 0,
+    denies,
   };
 }
 

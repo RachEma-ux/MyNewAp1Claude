@@ -1,15 +1,33 @@
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { getProviderRegistry } from '../providers/registry';
 import type { Message } from '../providers/types';
 import { trackProviderUsage } from '../providers/usage';
 import { sdk } from '../_core/sdk';
+import { ENV } from '../_core/env';
 import { providerRouter } from '../inference/provider-router';
+
+// Zod schema for chat stream request body
+const chatStreamSchema = z.object({
+  providerId: z.number().int().positive().optional(),
+  messages: z.array(z.object({
+    role: z.enum(["system", "user", "assistant"]),
+    content: z.string().max(500_000), // 500K char limit per message
+  })).min(1).max(200),
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().int().positive().max(200_000).optional(),
+  model: z.string().max(255).optional(),
+  useRAG: z.boolean().optional(),
+  workspaceId: z.number().int().positive().optional(),
+  useUnifiedRouting: z.boolean().optional(),
+  taskHints: z.record(z.unknown()).optional(),
+});
 
 export async function handleChatStream(req: Request, res: Response) {
   try {
     // Authenticate user (DEV_MODE bypasses authentication in non-production only)
     let user;
-    if (process.env.DEV_MODE === "true" && process.env.NODE_ENV !== "production") {
+    if (ENV.isDevMode && !ENV.isProduction) {
       user = {
         id: 1,
         openId: "dev-user-001",
@@ -29,15 +47,19 @@ export async function handleChatStream(req: Request, res: Response) {
       }
     }
 
-    // Parse request body
-    const { providerId, messages, temperature, maxTokens, useRAG, workspaceId, useUnifiedRouting, taskHints, model } = req.body;
-
-    // Validate request - providerId is optional when using unified routing
-    if (!messages || !Array.isArray(messages)) {
-      res.status(400).json({ error: 'Invalid request body: messages required' });
+    // Validate request body with Zod
+    const parseResult = chatStreamSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: 'Invalid request body',
+        details: parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+      });
       return;
     }
 
+    const { providerId, messages, temperature, maxTokens, useRAG, workspaceId, useUnifiedRouting, taskHints, model } = parseResult.data;
+
+    // providerId is required when not using unified routing
     if (!useUnifiedRouting && !providerId) {
       res.status(400).json({ error: 'Invalid request body: providerId required when not using unified routing' });
       return;

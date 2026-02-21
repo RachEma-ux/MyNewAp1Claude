@@ -194,6 +194,61 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // Global rate limiting for all API endpoints — mounted BEFORE route handlers
+  const globalRateMap = new Map<string, number[]>();
+  const GLOBAL_RATE_LIMIT = 100; // max requests per minute per IP
+  const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+
+  // Periodic cleanup of stale rate limit entries to prevent memory leaks
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamps] of globalRateMap) {
+      const active = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+      if (active.length === 0) {
+        globalRateMap.delete(key);
+      } else {
+        globalRateMap.set(key, active);
+      }
+    }
+  }, 5 * 60 * 1000); // Clean up every 5 minutes
+
+  app.use("/api", (req, res, next) => {
+    const key = req.ip || "unknown";
+    const now = Date.now();
+
+    let timestamps = globalRateMap.get(key) || [];
+    timestamps = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+
+    if (timestamps.length >= GLOBAL_RATE_LIMIT) {
+      res.status(429).json({ error: "Too many requests. Try again later." });
+      return;
+    }
+
+    timestamps.push(now);
+    globalRateMap.set(key, timestamps);
+    next();
+  });
+
+  // Stricter rate limiting for import endpoints
+  const importRateMap = new Map<string, number[]>();
+  const IMPORT_RATE_LIMIT = 10; // max requests per minute
+  app.use("/api/trpc/catalogImport", (req, res, next) => {
+    const key = req.ip || "unknown";
+    const now = Date.now();
+
+    let timestamps = importRateMap.get(key) || [];
+    timestamps = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+
+    if (timestamps.length >= IMPORT_RATE_LIMIT) {
+      res.status(429).json({ error: "Too many import requests. Try again later." });
+      return;
+    }
+
+    timestamps.push(now);
+    importRateMap.set(key, timestamps);
+    next();
+  });
+
   // Health check endpoint
   app.get("/api/health", async (req, res) => {
     const health = {
@@ -290,48 +345,6 @@ async function startServer() {
     req.on("close", () => {
       clearInterval(interval);
     });
-  });
-
-  // Global rate limiting for all API endpoints
-  const globalRateMap = new Map<string, number[]>();
-  const GLOBAL_RATE_LIMIT = 100; // max requests per minute per IP
-  app.use("/api", (req, res, next) => {
-    const key = req.ip || "unknown";
-    const now = Date.now();
-    const windowMs = 60 * 1000;
-
-    let timestamps = globalRateMap.get(key) || [];
-    timestamps = timestamps.filter((t) => now - t < windowMs);
-
-    if (timestamps.length >= GLOBAL_RATE_LIMIT) {
-      res.status(429).json({ error: "Too many requests. Try again later." });
-      return;
-    }
-
-    timestamps.push(now);
-    globalRateMap.set(key, timestamps);
-    next();
-  });
-
-  // Stricter rate limiting for import endpoints
-  const importRateMap = new Map<string, number[]>();
-  const IMPORT_RATE_LIMIT = 10; // max requests per minute
-  app.use("/api/trpc/catalogImport", (req, res, next) => {
-    const key = req.ip || "unknown";
-    const now = Date.now();
-    const windowMs = 60 * 1000;
-
-    let timestamps = importRateMap.get(key) || [];
-    timestamps = timestamps.filter((t) => now - t < windowMs);
-
-    if (timestamps.length >= IMPORT_RATE_LIMIT) {
-      res.status(429).json({ error: "Too many import requests. Try again later." });
-      return;
-    }
-
-    timestamps.push(now);
-    importRateMap.set(key, timestamps);
-    next();
   });
 
   // tRPC API

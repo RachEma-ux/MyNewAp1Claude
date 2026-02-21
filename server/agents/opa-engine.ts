@@ -52,19 +52,51 @@ export class OPAEngine {
   }
 
   /**
-   * Verify cosign signature
+   * Verify cosign signature of policy bundle
+   * Uses Ed25519 public key verification against the bundle hash.
+   * Set OPA_COSIGN_PUBLIC_KEY env var to the path of your public key (PEM).
+   * In production, this MUST be configured — unsigned bundles are rejected.
    */
   private async verifyCosignSignature(
     bundlePath: string,
     signaturePath: string
   ): Promise<void> {
-    // In production, use cosign CLI or library
-    // For now, mock verification
-    console.log(`[OPA] Verifying cosign signature for ${bundlePath}...`);
+    const fs = await import("fs/promises");
+    const publicKeyPath = process.env.OPA_COSIGN_PUBLIC_KEY;
 
-    // Example cosign verification:
-    // const { execSync } = require("child_process");
-    // execSync(`cosign verify-blob --key cosign.pub --signature ${signaturePath} ${bundlePath}`);
+    if (!publicKeyPath) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          "[OPA] FATAL: OPA_COSIGN_PUBLIC_KEY is required in production for policy bundle verification. " +
+          "Set it to the path of your cosign public key (PEM format)."
+        );
+      }
+      console.warn("[OPA] WARNING: No OPA_COSIGN_PUBLIC_KEY set. Skipping signature verification (dev only).");
+      return;
+    }
+
+    console.log(`[OPA] Verifying signature for ${bundlePath}...`);
+
+    // Read the public key, bundle, and signature
+    const [publicKeyPem, bundleData, signatureData] = await Promise.all([
+      fs.readFile(publicKeyPath, "utf-8"),
+      fs.readFile(bundlePath),
+      fs.readFile(signaturePath),
+    ]);
+
+    // Verify using Node.js crypto
+    const verify = crypto.createVerify("SHA256");
+    verify.update(bundleData);
+    verify.end();
+
+    const isValid = verify.verify(publicKeyPem, signatureData);
+
+    if (!isValid) {
+      throw new Error(
+        `[OPA] Policy bundle signature verification FAILED for ${bundlePath}. ` +
+        "The bundle may have been tampered with. Aborting policy load."
+      );
+    }
 
     console.log(`[OPA] Signature verified ✓`);
   }

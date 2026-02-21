@@ -13,7 +13,8 @@ const TAG_LENGTH = 16;
 
 /**
  * Get encryption key from environment
- * Falls back to a default key for development (DO NOT USE IN PRODUCTION)
+ * In production, ENCRYPTION_KEY is mandatory.
+ * In development, a deterministic dev-only key is derived (NOT safe for production).
  */
 function getEncryptionKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY;
@@ -22,13 +23,16 @@ function getEncryptionKey(): Buffer {
     if (process.env.NODE_ENV === "production") {
       throw new Error("[Encryption] ENCRYPTION_KEY is required in production. Set it in your environment variables.");
     }
+    // Dev fallback: use a deterministic key so encrypted data survives restarts.
+    // The fixed salt is intentional here — this is dev-only and MUST NOT run in production.
     console.warn('[Encryption] WARNING: No ENCRYPTION_KEY set. Using dev fallback (NOT safe for production)');
-    return scryptSync('dev-fallback-key', randomBytes(0).toString() || 'dev-salt', KEY_LENGTH);
+    return scryptSync('dev-fallback-key-do-not-use-in-prod', 'dev-salt-fixed-16b', KEY_LENGTH);
   }
 
-  // Derive a key from the environment variable using a per-deployment salt
-  // The salt is derived from the key itself to ensure different keys produce different derived keys
-  const salt = Buffer.from(key.slice(0, SALT_LENGTH).padEnd(SALT_LENGTH, '0'));
+  // Derive a proper key using a random salt stored alongside the key.
+  // Use a stable hash of the key as salt to ensure deterministic derivation per deployment.
+  const { createHash } = require('crypto') as typeof import('crypto');
+  const salt = createHash('sha256').update(key).digest().subarray(0, SALT_LENGTH);
   return scryptSync(key, salt, KEY_LENGTH);
 }
 

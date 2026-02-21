@@ -26,7 +26,7 @@ services:
       - key: OAUTH_SERVER_URL
         value: https://api.manus.im
       - key: DEV_MODE
-        value: true
+        value: false
       - key: ANTHROPIC_API_KEY
         sync: false # Optional: Set manually if using Claude models
       - key: OPENAI_API_KEY

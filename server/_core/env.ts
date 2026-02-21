@@ -26,6 +26,13 @@ export function validateOAuthConfig(): { valid: boolean; missing: string[] } {
   };
 }
 
+// SECURITY: Hard-block DEV_MODE in production to prevent auth bypass
+if (ENV.isDevMode && ENV.isProduction) {
+  console.error("[SECURITY] FATAL: DEV_MODE=true is forbidden in production. It bypasses all authentication.");
+  console.error("[SECURITY] Remove DEV_MODE from your environment or set it to 'false'.");
+  process.exit(1);
+}
+
 // Log OAuth configuration status on startup (only in non-dev mode)
 if (!ENV.isDevMode && ENV.isProduction) {
   const { valid, missing } = validateOAuthConfig();
