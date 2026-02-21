@@ -48,8 +48,8 @@ MyNewAp1Claude is a sophisticated, privacy-first AI development platform combini
 └───┬─────────┬──────────┬──────────┬────────────┬────────┘
     │         │          │          │            │
 ┌───┴───┐ ┌──┴───┐  ┌───┴────┐ ┌───┴────┐  ┌────┴─────┐
-│MySQL/ │ │Qdrant│  │  S3/   │ │ Redis  │  │ LLM APIs │
-│ TiDB  │ │Vector│  │ MinIO  │ │ Cache  │  │ Providers│
+│Postgre│ │Qdrant│  │  S3/   │ │ Redis  │  │ LLM APIs │
+│  SQL  │ │Vector│  │ MinIO  │ │ Cache  │  │ Providers│
 └───────┘ └──────┘  └────────┘ └────────┘  └──────────┘
 ```
 
@@ -278,7 +278,7 @@ server/
 |----------|----------|-------|
 | Frontend | React 19, Tailwind 4, Radix UI | ✅ Modern, stable |
 | Backend | Express 4, tRPC 11 | ✅ Battle-tested |
-| Database | Drizzle ORM, MySQL2 | ✅ Type-safe |
+| Database | Drizzle ORM, node-postgres | ✅ Type-safe |
 | AI/ML | @anthropic-ai/sdk, OpenAI, LangChain | ✅ Current |
 | Build | Vite 7, esbuild | ✅ Fast builds |
 | Testing | Vitest | ✅ Good choice |
@@ -447,7 +447,7 @@ Documentation/
 ```yaml
 services:
   - app (Node.js + Vite)
-  - mysql
+  - postgres
   - qdrant (vector DB)
   - redis
   - nginx (reverse proxy)
@@ -471,7 +471,7 @@ services:
 
 3. **No monitoring/logging** - No Prometheus, Grafana, ELK stack
 
-4. **No backup strategy** - No automated backups for MySQL, Qdrant
+4. **No backup strategy** - No automated backups for PostgreSQL, Qdrant
 
 5. **Environment management** - No .env.example file
 
@@ -502,7 +502,7 @@ services:
 
 3. **Create .env.example:**
    ```env
-   DATABASE_URL=mysql://user:pass@localhost:3306/db
+   DATABASE_URL=postgresql://user:pass@localhost:5432/db
    JWT_SECRET=your-secret-here
    # ... all required vars
    ```
@@ -733,15 +733,15 @@ Total Files: 372 TypeScript files
 ### Environment Requirements
 - **Node.js:** 22+ (specified in package.json engines)
 - **pnpm:** 10.4.1+ (locked)
-- **MySQL:** 8.0+ or TiDB
+- **PostgreSQL:** 14+
 - **Redis:** 7+
 - **Qdrant:** Latest (vector DB)
 
 ### Deployment Footprint
-- **Docker Images:** 5 services (app, MySQL, Qdrant, Redis, Nginx)
+- **Docker Images:** 5 services (app, PostgreSQL, Qdrant, Redis, Nginx)
 - **Estimated RAM:** 4-8GB minimum
 - **Disk:** ~10GB (models stored separately)
-- **Ports:** 3000 (app), 3306 (MySQL), 6333 (Qdrant), 6379 (Redis)
+- **Ports:** 3000 (app), 5432 (PostgreSQL), 6333 (Qdrant), 6379 (Redis)
 
 ---
 

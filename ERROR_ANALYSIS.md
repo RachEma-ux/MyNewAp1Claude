@@ -111,8 +111,8 @@ Property 'configSchema' is optional but required
 // Missing required field in action_registry insert
 
 // conversations.ts:71
-Property 'returning' does not exist on type 'MySqlInsertBase...'
-// Should use: .then() or await, not .returning()
+Property 'returning' does not exist on type 'PgInsertBase...'
+// Use .returning() with proper PostgreSQL syntax
 ```
 
 ### Affected Files
@@ -132,17 +132,10 @@ Property 'returning' does not exist on type 'MySqlInsertBase...'
    - Fix type mismatches (string vs number)
 
 2. **Replace deprecated Drizzle methods**
-   - Replace `.returning()` with proper MySQL patterns
-   - Use `.$returningId()` or fetch after insert
+   - Use `.returning()` with PostgreSQL Drizzle patterns
    - Example:
      ```typescript
-     // Wrong:
      const [result] = await db.insert(table).values(data).returning();
-     
-     // Correct for MySQL:
-     const [result] = await db.insert(table).values(data);
-     const id = result.insertId;
-     const [row] = await db.select().from(table).where(eq(table.id, id));
      ```
 
 3. **Fix where clause type errors**
@@ -383,7 +376,7 @@ Type 'MapIterator<[string, number]>' can only be iterated through...
 ## Root Cause #8: Wrong Drizzle Methods (1 error, <1%)
 
 ### Description
-Using incorrect Drizzle ORM methods or patterns for MySQL.
+Using incorrect Drizzle ORM methods or patterns for PostgreSQL.
 
 ### Examples
 
@@ -438,7 +431,7 @@ Type 'typeof SuperJSON' is not assignable to type 'TypeError<"You must define a 
 
 ### Phase 4: Drizzle Type Mismatches (2-3 hours)
 1. ✅ Fix insert operations - add required fields (15 errors)
-2. ✅ Replace .returning() with proper MySQL patterns (5 errors)
+2. ✅ Fix .returning() usage for PostgreSQL (5 errors)
 3. ✅ Fix where clause type errors (10 errors)
 4. ✅ Fix remaining Drizzle issues (9 errors)
 

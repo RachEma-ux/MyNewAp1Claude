@@ -301,7 +301,7 @@ const nodeRegistry: Record<string, NodeDefinition> = {
 
 **Current Schema:**
 ```typescript
-status: mysqlEnum("status", ["draft", "active", "paused"]).default("draft"),
+status: pgEnum("status", ["draft", "active", "paused"]).default("draft"),
 ```
 
 **What's Missing:**
@@ -316,7 +316,7 @@ publishedVersionId: int("publishedVersionId"), // FK to workflow_versions
 draftData: json("draftData"), // Unpublished changes
 
 // Create workflow_versions table
-export const workflowVersions = mysqlTable("workflow_versions", {
+export const workflowVersions = pgTable("workflow_versions", {
   id: int("id").autoincrement().primaryKey(),
   workflowId: int("workflowId").notNull(),
   version: int("version").notNull(), // Incremental version number
@@ -427,27 +427,27 @@ function compileWorkflow(nodes: Node[], edges: Edge[]): ExecutionPlan {
 **Recommendation:**
 ```typescript
 // Add permissions table
-export const workflowPermissions = mysqlTable("workflow_permissions", {
+export const workflowPermissions = pgTable("workflow_permissions", {
   id: int("id").autoincrement().primaryKey(),
   workflowId: int("workflowId").notNull(),
   userId: int("userId").notNull(),
-  permission: mysqlEnum("permission", ["view", "edit", "publish", "execute"]).notNull(),
+  permission: pgEnum("permission", ["view", "edit", "publish", "execute"]).notNull(),
   grantedBy: int("grantedBy").notNull(),
   grantedAt: timestamp("grantedAt").defaultNow().notNull(),
 });
 
 // Add audit log table
-export const workflowAuditLog = mysqlTable("workflow_audit_log", {
+export const workflowAuditLog = pgTable("workflow_audit_log", {
   id: int("id").autoincrement().primaryKey(),
   workflowId: int("workflowId").notNull(),
   userId: int("userId").notNull(),
-  action: mysqlEnum("action", ["create", "edit", "publish", "execute", "delete"]).notNull(),
+  action: pgEnum("action", ["create", "edit", "publish", "execute", "delete"]).notNull(),
   changes: json("changes"), // Diff of what changed
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
 // Add dangerous node allowlist
-export const allowedNodeTypes = mysqlTable("allowed_node_types", {
+export const allowedNodeTypes = pgTable("allowed_node_types", {
   id: int("id").autoincrement().primaryKey(),
   workspaceId: int("workspaceId").notNull(),
   nodeType: varchar("nodeType", { length: 100 }).notNull(),
@@ -486,13 +486,13 @@ export const allowedNodeTypes = mysqlTable("allowed_node_types", {
 **Recommendation:**
 ```typescript
 // Add workflow_executions table (currently missing!)
-export const workflowExecutions = mysqlTable("workflow_executions", {
+export const workflowExecutions = pgTable("workflow_executions", {
   id: varchar("id", { length: 36 }).primaryKey(), // UUID
   workflowId: int("workflowId").notNull(),
   workflowVersionId: int("workflowVersionId").notNull(),
   correlationId: varchar("correlationId", { length: 36 }), // For tracing
   
-  status: mysqlEnum("status", ["queued", "running", "completed", "failed", "cancelled"]).notNull(),
+  status: pgEnum("status", ["queued", "running", "completed", "failed", "cancelled"]).notNull(),
   startedAt: timestamp("startedAt").notNull(),
   completedAt: timestamp("completedAt"),
   duration: int("duration"), // milliseconds
@@ -505,7 +505,7 @@ export const workflowExecutions = mysqlTable("workflow_executions", {
 });
 
 // Add node_execution_logs table
-export const nodeExecutionLogs = mysqlTable("node_execution_logs", {
+export const nodeExecutionLogs = pgTable("node_execution_logs", {
   id: int("id").autoincrement().primaryKey(),
   executionId: varchar("executionId", { length: 36 }).notNull(),
   nodeId: varchar("nodeId", { length: 100 }).notNull(),
@@ -514,7 +514,7 @@ export const nodeExecutionLogs = mysqlTable("node_execution_logs", {
   completedAt: timestamp("completedAt"),
   duration: int("duration"),
   
-  status: mysqlEnum("status", ["running", "completed", "failed", "skipped"]).notNull(),
+  status: pgEnum("status", ["running", "completed", "failed", "skipped"]).notNull(),
   input: json("input"), // Redacted sensitive data
   output: json("output"), // Redacted sensitive data
   error: text("error"),

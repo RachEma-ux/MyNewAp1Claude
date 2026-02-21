@@ -52,11 +52,11 @@ Property 'promotionRequests' does not exist on type '{}'
 
 **Fix:** Add table definition to `drizzle/schema.ts`:
 ```typescript
-export const promotionRequests = mysqlTable("promotion_requests", {
+export const promotionRequests = pgTable("promotion_requests", {
   id: int("id").autoincrement().primaryKey(),
   agentId: int("agentId").notNull(),
   requestedBy: int("requestedBy").notNull(),
-  status: mysqlEnum("status", ["pending", "approved", "rejected"]).notNull(),
+  status: pgEnum("status", ["pending", "approved", "rejected"]).notNull(),
   justification: text("justification"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   // ... other fields
@@ -74,7 +74,7 @@ export const promotionRequests = mysqlTable("promotion_requests", {
 **Errors:**
 ```
 Property 'agentHistory' does not exist on type '{}'
-Property 'timestamp' does not exist on type 'MySqlTableWithColumns<...>'
+Property 'timestamp' does not exist on type 'PgTableWithColumns<...>'
 ```
 
 **Fix:** Verify agentHistory table schema has all required columns

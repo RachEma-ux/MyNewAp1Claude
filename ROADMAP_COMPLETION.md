@@ -314,7 +314,7 @@ All 12 phases of the comprehensive roadmap have been completed, implementing 431
         ┌──────────────────┼──────────────────┐
         │                  │                   │
    ┌────┴────┐      ┌─────┴─────┐      ┌─────┴─────┐
-   │ MySQL   │      │  Qdrant   │      │   Redis   │
+   │PostgreSQL│      │  Qdrant   │      │   Redis   │
    │Database │      │  Vectors  │      │   Cache   │
    └─────────┘      └───────────┘      └───────────┘
 ```

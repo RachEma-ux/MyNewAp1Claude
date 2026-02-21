@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The Key Rotation system has been fully implemented with **complete frontend/backend compatibility**. All components follow strict type safety principles, ensuring seamless integration between the React frontend, tRPC backend, and MySQL database.
+The Key Rotation system has been fully implemented with **complete frontend/backend compatibility**. All components follow strict type safety principles, ensuring seamless integration between the React frontend, tRPC backend, and PostgreSQL database.
 
 ### Compatibility Checklist
 
@@ -63,7 +63,7 @@ The Key Rotation system has been fully implemented with **complete frontend/back
              │ (Drizzle ORM)
              ▼
 ┌─────────────────────────────────────────┐
-│    MySQL Database (6 new tables)         │
+│    PostgreSQL Database (6 new tables)     │
 │  - serviceCertificates                   │
 │  - attestationKeys                       │
 │  - keyRotations                          │

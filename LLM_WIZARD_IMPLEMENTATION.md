@@ -324,7 +324,7 @@ const version = await trpc.llm.createVersion.mutate({
 ```
 User Input → Wizard State → tRPC Client → Server Router → Database Operations
     ↓              ↓             ↓              ↓                ↓
-  Form       localStorage    Validation    Business Logic    MySQL Insert
+  Form       localStorage    Validation    Business Logic    PostgreSQL Insert
                  ↓                                              ↓
            Auto-save                                    Audit Event Logged
               Draft                                             ↓

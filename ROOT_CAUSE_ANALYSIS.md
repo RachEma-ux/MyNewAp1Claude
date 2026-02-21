@@ -69,7 +69,7 @@ Code references database tables (`promotionRequests`, `agentHistory`) that eithe
 ```
 Property 'promotionRequests' does not exist on type '{}'
 Property 'agentHistory' does not exist on type '{}'
-Property 'timestamp' does not exist on type 'MySqlTableWithColumns<...>'
+Property 'timestamp' does not exist on type 'PgTableWithColumns<...>'
 ```
 
 ### Underlying Issue
@@ -95,11 +95,11 @@ Property 'timestamp' does not exist on type 'MySqlTableWithColumns<...>'
 **Step 1: Add promotionRequests table**
 ```typescript
 // drizzle/schema.ts
-export const promotionRequests = mysqlTable("promotion_requests", {
+export const promotionRequests = pgTable("promotion_requests", {
   id: int("id").autoincrement().primaryKey(),
   agentId: int("agentId").notNull(),
   requestedBy: int("requestedBy").notNull(),
-  status: mysqlEnum("status", ["pending", "approved", "rejected", "cancelled"]).default("pending"),
+  status: pgEnum("status", ["pending", "approved", "rejected", "cancelled"]).default("pending"),
   justification: text("justification"),
   reviewedBy: int("reviewedBy"),
   reviewedAt: timestamp("reviewedAt"),
@@ -112,7 +112,7 @@ export const promotionRequests = mysqlTable("promotion_requests", {
 **Step 2: Verify agentHistory schema**
 ```typescript
 // Check if timestamp column exists
-export const agentHistory = mysqlTable("agent_history", {
+export const agentHistory = pgTable("agent_history", {
   // ... existing fields
   timestamp: timestamp("timestamp").defaultNow().notNull(), // Add if missing
 });
@@ -302,7 +302,7 @@ db.insert(agents).values({
 **Option 3: Make fields optional in schema**
 ```typescript
 // drizzle/schema.ts
-mode: mysqlEnum("mode", ["sandbox", "governed"]), // No .notNull()
+mode: pgEnum("mode", ["sandbox", "governed"]), // No .notNull()
 ```
 
 ---

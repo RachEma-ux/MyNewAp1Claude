@@ -281,7 +281,7 @@ keyRotationService.createServiceCertificate()
     ↓
 Database insert (Drizzle ORM)
     ↓
-MySQL (serviceCertificates table)
+PostgreSQL (serviceCertificates table)
     ↓
 Response: { success: true, certificate: {...} }
     ↓
@@ -301,7 +301,7 @@ keyRotationService.incrementKeyUsage(keyId)
     ↓
 Database update (usageCount++, lastUsedAt)
     ↓
-MySQL (attestationKeys table)
+PostgreSQL (attestationKeys table)
     ↓
 Frontend queries getActive() shows updated stats
 ```
@@ -315,7 +315,7 @@ keyRotationService.logRotationAction()
     ↓
 Insert audit log entry
     ↓
-MySQL (keyRotationAuditLogs table)
+PostgreSQL (keyRotationAuditLogs table)
     ↓
 Frontend queries rotations.getStatusSummary()
     ↓

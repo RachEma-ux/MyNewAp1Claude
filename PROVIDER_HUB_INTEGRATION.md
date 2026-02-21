@@ -15,7 +15,7 @@ This document outlines the integration of Provider Hub concepts into MyNewAppV1,
 ├─────────────────────────────────────────┤
 │    Express Server + Node.js Backend     │
 ├─────────────────────────────────────────┤
-│  Database (MySQL) + S3 Storage          │
+│  Database (PostgreSQL) + S3 Storage      │
 └─────────────────────────────────────────┘
 ```
 
@@ -93,7 +93,7 @@ This document outlines the integration of Provider Hub concepts into MyNewAppV1,
 ┌──────────────────────────────────────────────────────────────┐
 │                    Storage Layer                             │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
-│  │  MySQL   │ │    S3    │ │  Redis   │ │  Local   │        │
+│  │ Postgres │ │    S3    │ │  Redis   │ │  Local   │        │
 │  │(Metadata)│ │  (Files) │ │ (Cache)  │ │ (Models) │        │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │
 └──────────────────────────────────────────────────────────────┘

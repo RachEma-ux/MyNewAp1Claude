@@ -36,7 +36,7 @@ Edit `.env` file:
 
 ```env
 # Database
-DATABASE_URL=mysql://user:password@database:3306/unifiedllm
+DATABASE_URL=postgresql://user:password@database:5432/unifiedllm
 
 # JWT
 JWT_SECRET=your-secret-key-here
@@ -53,7 +53,7 @@ QDRANT_URL=http://qdrant:6333
 
 Docker Compose includes:
 - **app** - Main application (port 3000)
-- **database** - MySQL 8.0 (port 3306)
+- **database** - PostgreSQL 16 (port 5432)
 - **qdrant** - Vector database (port 6333)
 - **redis** - Caching (port 6379)
 - **nginx** - Reverse proxy (ports 80, 443)
@@ -180,9 +180,9 @@ ingress:
         - llm.example.com
 
 database:
-  type: mysql
-  host: mysql.default.svc.cluster.local
-  port: 3306
+  type: postgresql
+  host: postgres.default.svc.cluster.local
+  port: 5432
   name: unifiedllm
   user: llmuser
   password: changeme
@@ -349,8 +349,8 @@ services:
     http_port: 3000
 databases:
   - name: db
-    engine: MYSQL
-    version: "8"
+    engine: PG
+    version: "16"
 ```
 
 ```bash
@@ -452,11 +452,11 @@ kubectl logs -f deployment/unified-llm
 ### Database Backup
 
 ```bash
-# MySQL
-mysqldump -u user -p unifiedllm > backup.sql
+# PostgreSQL
+pg_dump -U user unifiedllm > backup.sql
 
 # Restore
-mysql -u user -p unifiedllm < backup.sql
+psql -U user unifiedllm < backup.sql
 ```
 
 ### Qdrant Backup

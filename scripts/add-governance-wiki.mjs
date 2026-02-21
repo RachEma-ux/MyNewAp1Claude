@@ -74,7 +74,7 @@ The Agent Governance Platform is a comprehensive system for managing, monitoring
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │                  Data Layer                              │   │
 │  │  ┌──────────────────────────────────────────────────┐   │   │
-│  │  │ Database (MySQL/TiDB)                            │   │   │
+│  │  │ Database (PostgreSQL)                             │   │   │
 │  │  │ - agents table                                   │   │   │
 │  │  │ - policies table                                 │   │   │
 │  │  │ - events table                                   │   │   │
