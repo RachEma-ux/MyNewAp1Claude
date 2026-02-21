@@ -13,6 +13,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MyNewAppV1 is a local-first AI development platform (LLM Control Plane) built as a full-stack TypeScript monorepo. It provides workspace-based management for LLM providers, document ingestion/RAG, agent orchestration, automation workflows, and governance features.
 
+For detailed architecture, layer mapping, and security controls, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Commands
 
 - **Dev server:** `npm run dev` (runs Express + Vite HMR on port 3000)
@@ -69,7 +71,7 @@ Each domain has its own router, DB queries, and types:
 | `server/embeddings/` | Embedding generation and management |
 | `server/models/` | Model download, benchmarking, versioning |
 | `server/secrets/` | Secret management |
-| `server/policies/` | OPA-based policy enforcement |
+| `server/policies/` | Rule-based policy scoring |
 | `server/wiki/` | Knowledge base wiki |
 | `server/routers/` | Additional tRPC routers (agents, triggers, workflows, deploy, etc.) |
 

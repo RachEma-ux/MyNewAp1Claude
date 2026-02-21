@@ -12,6 +12,7 @@ import { getDb } from "../db";
 import { routingAuditLogs } from "../../drizzle/schema";
 import { desc, eq, and, gte } from "drizzle-orm";
 import { decrypt, isEncrypted } from "../_core/encryption";
+import { getAuditLogger } from "../services/auditLogger";
 
 // Strip sensitive keys (apiKey, apiSecret, etc.) from provider config before returning to clients
 function redactProviderConfig(provider: any) {
@@ -145,6 +146,14 @@ export const providerRouter = router({
         console.warn(`[ProviderRouter] Model auto-discovery failed for ${provider.name}: ${err.message}`);
       }
 
+      getAuditLogger().log({
+        action_type: "PROVIDER_CONNECT",
+        target_type: "provider",
+        target_id: String(provider.id),
+        decision_result: "success",
+        metadata: { name: provider.name, type: provider.type },
+      });
+
       return provider;
     }),
 
@@ -173,6 +182,14 @@ export const providerRouter = router({
         }
       }
 
+      getAuditLogger().log({
+        action_type: "PROVIDER_UPDATE",
+        target_type: "provider",
+        target_id: String(id),
+        decision_result: "success",
+        metadata: { updatedFields: Object.keys(data) },
+      });
+
       return { success: true };
     }),
 
@@ -188,6 +205,13 @@ export const providerRouter = router({
 
       // Delete from database
       await providerDb.deleteProvider(input.id);
+
+      getAuditLogger().log({
+        action_type: "PROVIDER_DELETE",
+        target_type: "provider",
+        target_id: String(input.id),
+        decision_result: "success",
+      });
 
       return { success: true };
     }),

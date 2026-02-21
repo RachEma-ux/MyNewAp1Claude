@@ -280,6 +280,57 @@ describe("Step 2 — SSRF Guard", () => {
     }
   });
 
+  it("blocks 172.16.x.x private range IPs", async () => {
+    const dns = await import("dns");
+    const origResolve4 = dns.promises.resolve4;
+    const origResolve6 = dns.promises.resolve6;
+    dns.promises.resolve4 = vi.fn().mockResolvedValue(["172.16.0.1"]);
+    dns.promises.resolve6 = vi.fn().mockRejectedValue(new Error("no AAAA"));
+
+    try {
+      const result = await validateExternalUrl("https://corp.example.com");
+      expect(result.safe).toBe(false);
+      expect(result.error).toContain("blocked");
+    } finally {
+      dns.promises.resolve4 = origResolve4;
+      dns.promises.resolve6 = origResolve6;
+    }
+  });
+
+  it("blocks IPv6 unique local addresses (fc00::/7)", async () => {
+    const dns = await import("dns");
+    const origResolve4 = dns.promises.resolve4;
+    const origResolve6 = dns.promises.resolve6;
+    dns.promises.resolve4 = vi.fn().mockRejectedValue(new Error("no A"));
+    dns.promises.resolve6 = vi.fn().mockResolvedValue(["fd12:3456:789a::1"]);
+
+    try {
+      const result = await validateExternalUrl("https://v6ula.example.com");
+      expect(result.safe).toBe(false);
+      expect(result.error).toContain("blocked");
+    } finally {
+      dns.promises.resolve4 = origResolve4;
+      dns.promises.resolve6 = origResolve6;
+    }
+  });
+
+  it("blocks IPv6 link-local addresses (fe80::/10)", async () => {
+    const dns = await import("dns");
+    const origResolve4 = dns.promises.resolve4;
+    const origResolve6 = dns.promises.resolve6;
+    dns.promises.resolve4 = vi.fn().mockRejectedValue(new Error("no A"));
+    dns.promises.resolve6 = vi.fn().mockResolvedValue(["fe80::1"]);
+
+    try {
+      const result = await validateExternalUrl("https://v6linklocal.example.com");
+      expect(result.safe).toBe(false);
+      expect(result.error).toContain("blocked");
+    } finally {
+      dns.promises.resolve4 = origResolve4;
+      dns.promises.resolve6 = origResolve6;
+    }
+  });
+
   it("allows valid public IPs", async () => {
     const dns = await import("dns");
     const origResolve4 = dns.promises.resolve4;

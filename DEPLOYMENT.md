@@ -14,10 +14,13 @@ Create a `.env` file in the project root (see `.env.example` for a complete temp
 # Database (Required) — PostgreSQL connection string
 DATABASE_URL=postgresql://user:password@localhost:5432/mynewapp
 
-# Authentication (Optional — app runs in demo mode without these)
+# Authentication — see "Authentication Modes" section below
 JWT_SECRET=your-secret-key-here
 VITE_OAUTH_PORTAL_URL=https://oauth.example.com
 VITE_APP_ID=your-app-id
+
+# Development only — auto-authenticates as dev user (blocked in production)
+# DEV_MODE=true
 
 # Encryption (Required for production — used to encrypt provider secrets)
 ENCRYPTION_KEY=your-32-byte-encryption-key
@@ -33,17 +36,15 @@ OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_API_KEY=AI...
 
-# OPA Policy Engine (Optional)
-OPA_BASE_URL=https://opa.example.com
-OPA_TIMEOUT=30000
-
 # Storage (Optional — defaults to local filesystem)
 S3_BUCKET=
 S3_REGION=
 S3_ACCESS_KEY_ID=
 S3_SECRET_ACCESS_KEY=
 
-# Redis (Optional — for rate limiting in multi-instance deployments)
+# Redis (Required for production multi-instance deployments)
+# Without REDIS_URL, rate limiting uses in-memory storage (single-instance only).
+# Multi-instance deployments MUST set REDIS_URL for distributed rate limiting.
 REDIS_URL=redis://localhost:6379
 
 # Logging
@@ -156,13 +157,33 @@ pg_dump -U user mynewapp > backup_$(date +%Y%m%d).sql
 psql -U user mynewapp < backup_20260221.sql
 ```
 
+## Authentication Modes
+
+The application supports three authentication states:
+
+| Mode | Configuration | Behavior |
+|---|---|---|
+| **DEV_MODE** | `DEV_MODE=true` | Auto-authenticates as dev user. **Blocked in production** — the server will refuse to start if `DEV_MODE=true` and `NODE_ENV=production`. Use for local development and CI only. |
+| **OAuth** | `VITE_APP_ID` + `OAUTH_SERVER_URL` + `JWT_SECRET` set | Real authentication via external OAuth provider. Required for user-facing production deployments. |
+| **Unconfigured** | Neither DEV_MODE nor OAuth env vars set | Only public (unauthenticated) endpoints work. Protected endpoints return 401. |
+
+For development, set `DEV_MODE=true` in your `.env` file. For production, configure OAuth credentials.
+
+## Rate Limiting
+
+Rate limiting is enabled by default using in-memory storage. This is sufficient for single-instance deployments.
+
+For **multi-instance production deployments**, set `REDIS_URL` to enable distributed rate limiting. Without Redis, each instance maintains its own rate limit counters independently, which can allow higher-than-intended request rates.
+
 ## Security Checklist
 
 - [ ] Set `ENCRYPTION_KEY` in production (never use default dev key)
+- [ ] Ensure `DEV_MODE` is NOT set in production environment
+- [ ] Configure OAuth credentials for production authentication
+- [ ] Set `REDIS_URL` for multi-instance rate limiting
 - [ ] Enable HTTPS/TLS via reverse proxy
 - [ ] Set strong database passwords
 - [ ] Configure CORS properly
-- [ ] Enable rate limiting
 - [ ] No secrets in code or git history
 - [ ] Database has backups enabled
 - [ ] Regular dependency audits (`pnpm audit`)

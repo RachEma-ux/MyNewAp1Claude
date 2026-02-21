@@ -1,13 +1,13 @@
 /**
- * LLM Policy Engine - Policy evaluation and admission control
+ * LLM Policy Engine - Rule-based policy evaluation and admission control
  *
- * This is a basic implementation that simulates OPA policy evaluation.
- * In production, this would integrate with actual Open Policy Agent.
+ * Validates LLM configurations against local policy rules (no external
+ * OPA dependency). All rules are evaluated deterministically in-process.
  *
- * Validates LLM configurations against policy rules:
+ * Checks:
  * - Naming conventions
  * - Role-based restrictions
- * - Model allowlists
+ * - Model allowlists (derived from registered providers)
  * - Parameter bounds
  * - Environment constraints
  */
@@ -77,7 +77,7 @@ export interface LLMPolicyInput {
 // ============================================================================
 
 /**
- * Policy Rules - In production, these would come from OPA bundles
+ * Policy Rules - locally defined rule constants
  */
 const POLICY_RULES = {
   naming: {

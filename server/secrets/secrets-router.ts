@@ -7,6 +7,7 @@ import {
   updateSecret,
   deleteSecret,
 } from "./secrets-service";
+import { getAuditLogger } from "../services/auditLogger";
 
 export const secretsRouter = router({
   /**
@@ -21,12 +22,21 @@ export const secretsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      return await createSecret({
+      const secret = await createSecret({
         userId: ctx.user.id,
         key: input.key,
         value: input.value,
         description: input.description,
       });
+      getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "SECRET_CREATE",
+        target_type: "secret",
+        target_id: String(secret.id),
+        decision_result: "success",
+        metadata: { key: input.key },
+      });
+      return secret;
     }),
 
   /**
@@ -57,10 +67,18 @@ export const secretsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      return await updateSecret(input.id, ctx.user.id, {
+      const result = await updateSecret(input.id, ctx.user.id, {
         value: input.value,
         description: input.description,
       });
+      getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "SECRET_UPDATE",
+        target_type: "secret",
+        target_id: String(input.id),
+        decision_result: "success",
+      });
+      return result;
     }),
 
   /**
@@ -70,6 +88,13 @@ export const secretsRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       await deleteSecret(input.id, ctx.user.id);
+      getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "SECRET_DELETE",
+        target_type: "secret",
+        target_id: String(input.id),
+        decision_result: "success",
+      });
       return { success: true };
     }),
 });

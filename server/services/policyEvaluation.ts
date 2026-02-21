@@ -1,7 +1,37 @@
 /**
- * Policy Evaluation Service
- * Evaluates agents against governance policies to determine promotion eligibility
+ * MVP Rule-Based Policy Scoring (not OPA)
+ *
+ * This service implements a lightweight, deterministic rule-based policy
+ * evaluation engine. It scores agents against governance policies using
+ * local rules — no external OPA server is required.
+ *
+ * ## Canonical Policy Schema
+ *
+ * CanonicalPolicy defines the standard shape for all policy documents:
+ *   - policy_id:        Unique identifier for the policy
+ *   - version:          Semver string (e.g. "1.0.0")
+ *   - scope:            What entity the policy applies to ("agent" | "model" | "workspace")
+ *   - conditions:       The rule constraints (uses the existing PolicyRule shape)
+ *   - effect:           "allow" or "deny" — what happens when conditions match
+ *   - priority:         Numeric priority; lower = evaluated first
+ *   - failure_behavior: What to do if the rule can't be evaluated ("fail_open" | "fail_closed")
+ *
+ * PolicyDecision is the structured output of every evaluation:
+ *   - decision:   "allow" or "deny"
+ *   - policy_id:  Which policy produced this decision
+ *   - rule_id:    Which rule within the policy triggered
+ *   - reason:     Human-readable explanation
+ *   - timestamp:  When the decision was made
+ *
+ * ## Conflict Resolution
+ *
+ * When multiple policies apply, explicit "deny" always overrides "allow"
+ * (deny-wins). See resolveConflicts().
  */
+
+// ---------------------------------------------------------------------------
+// Existing interfaces (backward-compatible)
+// ---------------------------------------------------------------------------
 
 export interface PolicyRule {
   maxBudget?: number;
@@ -21,6 +51,8 @@ export interface PolicyEvaluationResult {
   violations: string[];
   warnings: string[];
   score: number; // 0-100
+  /** Structured decision produced alongside the legacy result. */
+  decision?: PolicyDecision;
 }
 
 export interface Agent {
@@ -34,8 +66,51 @@ export interface Agent {
   systemPrompt: string;
 }
 
+// ---------------------------------------------------------------------------
+// Canonical policy schema
+// ---------------------------------------------------------------------------
+
+/** Standard policy document shape. */
+export interface CanonicalPolicy {
+  /** Unique identifier for this policy. */
+  policy_id: string;
+  /** Semver version string (e.g. "1.0.0"). */
+  version: string;
+  /** What entity type this policy governs. */
+  scope: "agent" | "model" | "workspace";
+  /** Rule conditions — uses the existing PolicyRule shape. */
+  conditions: PolicyRule;
+  /** Effect when conditions match: allow the action or deny it. */
+  effect: "allow" | "deny";
+  /** Evaluation priority; lower numbers are evaluated first. */
+  priority: number;
+  /** Behavior when the rule cannot be evaluated. */
+  failure_behavior: "fail_open" | "fail_closed";
+}
+
+/** Structured output of a single policy evaluation. */
+export interface PolicyDecision {
+  /** Final decision. */
+  decision: "allow" | "deny";
+  /** ID of the policy that produced this decision. */
+  policy_id: string;
+  /** ID of the specific rule that triggered. */
+  rule_id: string;
+  /** Human-readable explanation. */
+  reason: string;
+  /** When the decision was made. */
+  timestamp: Date;
+}
+
+// ---------------------------------------------------------------------------
+// Core evaluation (backward-compatible)
+// ---------------------------------------------------------------------------
+
 /**
- * Evaluate an agent against policy rules
+ * Evaluate an agent against policy rules.
+ *
+ * Returns the legacy PolicyEvaluationResult (compliant, violations, score)
+ * with an additional `decision` field containing a PolicyDecision.
  */
 export function evaluateAgentCompliance(agent: Agent, rules: PolicyRule): PolicyEvaluationResult {
   const violations: string[] = [];
@@ -44,8 +119,6 @@ export function evaluateAgentCompliance(agent: Agent, rules: PolicyRule): Policy
 
   // Check budget limits
   if (rules.maxBudget !== undefined) {
-    // In a real implementation, this would check actual usage
-    // For now, we'll check if the agent is configured for high-cost operations
     if (agent.temperature && parseFloat(agent.temperature) > 1.5) {
       violations.push(`Agent temperature (${agent.temperature}) exceeds policy limit for budget control`);
       score -= 20;
@@ -54,7 +127,6 @@ export function evaluateAgentCompliance(agent: Agent, rules: PolicyRule): Policy
 
   // Check token limits
   if (rules.maxTokensPerRequest !== undefined) {
-    // Check system prompt length as a proxy for token usage
     if (agent.systemPrompt.length > rules.maxTokensPerRequest * 4) {
       violations.push(`Agent system prompt exceeds policy token limit (${rules.maxTokensPerRequest} tokens)`);
       score -= 15;
@@ -120,16 +192,67 @@ export function evaluateAgentCompliance(agent: Agent, rules: PolicyRule): Policy
   // Ensure score doesn't go below 0
   score = Math.max(0, score);
 
+  const compliant = violations.length === 0;
+
+  // Build structured PolicyDecision alongside legacy result
+  const decision: PolicyDecision = {
+    decision: compliant ? "allow" : "deny",
+    policy_id: "default",
+    rule_id: compliant ? "all_passed" : "violation",
+    reason: compliant
+      ? "Agent passes all policy checks"
+      : violations.join("; "),
+    timestamp: new Date(),
+  };
+
   return {
-    compliant: violations.length === 0,
+    compliant,
     violations,
     warnings,
     score,
+    decision,
   };
 }
 
+// ---------------------------------------------------------------------------
+// Conflict resolution
+// ---------------------------------------------------------------------------
+
 /**
- * Extract rules from policy content
+ * Resolve conflicts when multiple PolicyDecisions apply.
+ *
+ * Rule: explicit deny always overrides allow (deny-wins).
+ * Among denies, the one with the earliest timestamp wins.
+ * If all decisions allow, the result is allow.
+ */
+export function resolveConflicts(decisions: PolicyDecision[]): PolicyDecision {
+  if (decisions.length === 0) {
+    return {
+      decision: "deny",
+      policy_id: "none",
+      rule_id: "no_policies",
+      reason: "No policies evaluated — default deny",
+      timestamp: new Date(),
+    };
+  }
+
+  const denies = decisions.filter((d) => d.decision === "deny");
+  if (denies.length > 0) {
+    // Pick the first deny (earliest timestamp)
+    denies.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return denies[0];
+  }
+
+  // All allow — return the first
+  return decisions[0];
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract rules from policy content.
  */
 export function extractPolicyRules(policyContent: any): PolicyRule {
   if (!policyContent || typeof policyContent !== "object") {
@@ -154,7 +277,7 @@ export function extractPolicyRules(policyContent: any): PolicyRule {
 }
 
 /**
- * Get policy compliance score description
+ * Get policy compliance score description.
  */
 export function getComplianceScoreDescription(score: number): string {
   if (score >= 90) return "Excellent";

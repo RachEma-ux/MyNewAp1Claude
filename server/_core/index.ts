@@ -143,6 +143,12 @@ async function autoProvisionProviders() {
 }
 
 async function startServer() {
+  // Production safety warnings
+  if (process.env.NODE_ENV === "production" && !process.env.REDIS_URL) {
+    console.warn("[RateLimit] WARNING: REDIS_URL not set. Rate limiting uses in-memory storage (single-instance only).");
+    console.warn("[RateLimit] For multi-instance deployments, set REDIS_URL for distributed rate limiting.");
+  }
+
   // Run database migrations first
   await runMigrations();
 
