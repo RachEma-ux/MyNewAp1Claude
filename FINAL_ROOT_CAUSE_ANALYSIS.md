@@ -202,7 +202,7 @@ await db.insert(agents).values({
 **Option 3: Make fields optional in schema**
 ```typescript
 // drizzle/schema.ts
-mode: mysqlEnum("mode", ["sandbox", "governed"]), // Remove .notNull()
+mode: pgEnum("mode", ["sandbox", "governed"]), // Remove .notNull()
 ```
 
 ---
@@ -257,11 +257,11 @@ Add type conversions or fix type annotations.
 Add table definition to `drizzle/schema.ts`:
 
 ```typescript
-export const promotionRequests = mysqlTable("promotion_requests", {
+export const promotionRequests = pgTable("promotion_requests", {
   id: int("id").autoincrement().primaryKey(),
   agentId: int("agentId").notNull(),
   requestedBy: int("requestedBy").notNull(),
-  status: mysqlEnum("status", ["pending", "approved", "rejected", "cancelled"]).default("pending"),
+  status: pgEnum("status", ["pending", "approved", "rejected", "cancelled"]).default("pending"),
   justification: text("justification"),
   reviewedBy: int("reviewedBy"),
   reviewedAt: timestamp("reviewedAt"),

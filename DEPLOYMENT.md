@@ -1,42 +1,52 @@
-# Agent Governance Platform - Deployment Guide
+# MyNewAppV1 — Deployment Guide
 
 ## Prerequisites
 
-- Node.js 18+ and npm/pnpm
-- MySQL 8.0+ or compatible database
+- Node.js 18+ and pnpm (or npm)
+- PostgreSQL 14+ database
 - Docker (optional, for containerized deployment)
-- External Orchestrator service (for agent lifecycle management)
-- OPA (Open Policy Agent) service (for policy evaluation)
 
 ## Environment Variables
 
-Create a `.env` file in the project root with the following variables:
+Create a `.env` file in the project root (see `.env.example` for a complete template).
 
 ```bash
-# Database
-DATABASE_URL=mysql://user:password@localhost:3306/agent_governance
+# Database (Required) — PostgreSQL connection string
+DATABASE_URL=postgresql://user:password@localhost:5432/mynewapp
 
-# Authentication
+# Authentication (Optional — app runs in demo mode without these)
 JWT_SECRET=your-secret-key-here
-OAUTH_SERVER_URL=https://api.manus.im
-VITE_OAUTH_PORTAL_URL=https://oauth.manus.im
+VITE_OAUTH_PORTAL_URL=https://oauth.example.com
+VITE_APP_ID=your-app-id
+
+# Encryption (Required for production — used to encrypt provider secrets)
+ENCRYPTION_KEY=your-32-byte-encryption-key
 
 # Application
-VITE_APP_ID=your-app-id
-VITE_APP_TITLE=Agent Governance Platform
+PORT=3000
+VITE_APP_TITLE=MyNewAppV1
 VITE_APP_LOGO=/logo.png
 
-# External Services
-ORCHESTRATOR_BASE_URL=https://orchestrator.example.com
-ORCHESTRATOR_API_KEY=your-orchestrator-key
+# Provider API Keys (Optional — auto-provisions providers on startup)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=AI...
 
+# OPA Policy Engine (Optional)
 OPA_BASE_URL=https://opa.example.com
 OPA_TIMEOUT=30000
 
-# Optional
+# Storage (Optional — defaults to local filesystem)
+S3_BUCKET=
+S3_REGION=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+
+# Redis (Optional — for rate limiting in multi-instance deployments)
+REDIS_URL=redis://localhost:6379
+
+# Logging
 LOG_LEVEL=info
-LOG_FILE=/var/log/agent-governance.log
-BACKUP_RETENTION_DAYS=30
 ```
 
 ## Installation
@@ -44,28 +54,31 @@ BACKUP_RETENTION_DAYS=30
 ### 1. Clone and Install Dependencies
 
 ```bash
-git clone <repository>
-cd agent-governance-platform
+git clone https://github.com/RachEma-ux/MyNewAp1Claude.git
+cd MyNewAp1Claude
 pnpm install
 ```
 
 ### 2. Database Setup
 
 ```bash
+# Ensure PostgreSQL is running, then:
+export DATABASE_URL=postgresql://user:password@localhost:5432/mynewapp
+
 # Run migrations
 pnpm db:push
-
-# Seed initial data (optional)
-pnpm db:seed
 ```
 
-### 3. Build
+### 3. Development
 
 ```bash
-# Development
 pnpm dev
+# Server runs on http://localhost:3000
+```
 
-# Production
+### 4. Production Build
+
+```bash
 pnpm build
 pnpm start
 ```
@@ -75,19 +88,7 @@ pnpm start
 ### Build Docker Image
 
 ```bash
-docker build -t agent-governance:latest .
-```
-
-### Run Container
-
-```bash
-docker run -d \
-  --name agent-governance \
-  -p 3000:3000 \
-  -e DATABASE_URL=mysql://user:password@db:3306/agent_governance \
-  -e ORCHESTRATOR_BASE_URL=https://orchestrator.example.com \
-  -e OPA_BASE_URL=https://opa.example.com \
-  agent-governance:latest
+docker build -t mynewapp:latest .
 ```
 
 ### Docker Compose
@@ -97,23 +98,24 @@ version: '3.8'
 
 services:
   app:
-    image: agent-governance:latest
+    image: mynewapp:latest
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: mysql://user:password@db:3306/agent_governance
-      ORCHESTRATOR_BASE_URL: https://orchestrator.example.com
-      OPA_BASE_URL: https://opa.example.com
+      DATABASE_URL: postgresql://user:password@db:5432/mynewapp
+      ENCRYPTION_KEY: your-encryption-key
+      NODE_ENV: production
     depends_on:
       - db
 
   db:
-    image: mysql:8.0
+    image: postgres:16
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: agent_governance
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mynewapp
     volumes:
-      - db_data:/var/lib/mysql
+      - db_data:/var/lib/postgresql/data
 
 volumes:
   db_data:
@@ -121,18 +123,7 @@ volumes:
 
 ## Production Deployment
 
-### 1. SSL/TLS Configuration
-
-```bash
-# Generate SSL certificates
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365
-
-# Configure in environment
-HTTPS_KEY_PATH=/path/to/key.pem
-HTTPS_CERT_PATH=/path/to/cert.pem
-```
-
-### 2. Reverse Proxy Setup (Nginx)
+### 1. Reverse Proxy Setup (Nginx)
 
 ```nginx
 upstream app {
@@ -141,7 +132,7 @@ upstream app {
 
 server {
   listen 443 ssl;
-  server_name governance.example.com;
+  server_name app.example.com;
 
   ssl_certificate /path/to/cert.pem;
   ssl_certificate_key /path/to/key.pem;
@@ -157,226 +148,47 @@ server {
 }
 ```
 
-### 3. Process Management (PM2)
+### 2. Health Check
 
 ```bash
-# Install PM2
-npm install -g pm2
-
-# Create ecosystem.config.js
-cat > ecosystem.config.js << EOF
-module.exports = {
-  apps: [{
-    name: 'agent-governance',
-    script: './dist/server/index.js',
-    instances: 'max',
-    exec_mode: 'cluster',
-    env: {
-      NODE_ENV: 'production',
-      DATABASE_URL: 'mysql://user:password@localhost:3306/agent_governance',
-    }
-  }]
-};
-EOF
-
-# Start application
-pm2 start ecosystem.config.js
-
-# Monitor
-pm2 monit
-```
-
-### 4. Health Checks
-
-```bash
-# Check application health
-curl https://governance.example.com/health
-
-# Check orchestrator connectivity
-curl https://governance.example.com/api/trpc/orchestrator.healthCheck
-
-# Check OPA connectivity
-curl https://governance.example.com/api/trpc/opaPolicy.healthCheck
+curl http://localhost:3000/api/health
 ```
 
 ## Backup and Recovery
 
-### Automated Backups
-
-```bash
-# Enable automatic backups
-pnpm backup:schedule --interval 24 --retention 30
-
-# List backups
-pnpm backup:list
-
-# Restore from backup
-pnpm backup:restore --backup-id <backup-id>
-```
-
 ### Manual Backup
 
 ```bash
-# Create backup
-mysqldump -u user -p agent_governance > backup_$(date +%Y%m%d).sql
-
-# Restore backup
-mysql -u user -p agent_governance < backup_20240115.sql
+pg_dump -U user mynewapp > backup_$(date +%Y%m%d).sql
 ```
 
-## Monitoring and Logging
-
-### Application Logs
+### Restore
 
 ```bash
-# View logs
-tail -f /var/log/agent-governance.log
-
-# Filter by level
-grep "ERROR" /var/log/agent-governance.log
+psql -U user mynewapp < backup_20260221.sql
 ```
-
-### Metrics Collection
-
-The application exposes metrics at `/metrics`:
-
-```bash
-curl https://governance.example.com/metrics
-```
-
-### Health Endpoints
-
-| Endpoint | Purpose |
-|----------|---------|
-| `/health` | Application health |
-| `/api/trpc/orchestrator.healthCheck` | Orchestrator connectivity |
-| `/api/trpc/opaPolicy.healthCheck` | OPA connectivity |
 
 ## Troubleshooting
 
 ### Database Connection Issues
 
 ```bash
-# Test connection
-mysql -h localhost -u user -p -e "SELECT 1"
-
-# Check connection pool
-pnpm db:status
+# Test PostgreSQL connection
+psql $DATABASE_URL -c "SELECT 1"
 ```
 
-### Orchestrator Connection Issues
+### Application Logs
 
 ```bash
-# Test orchestrator connectivity
-curl -H "Authorization: Bearer <token>" \
-  https://orchestrator.example.com/health
-
-# Check logs for errors
-grep "orchestrator" /var/log/agent-governance.log
-```
-
-### OPA Policy Compilation Errors
-
-```bash
-# Validate policy syntax
-curl -X POST https://opa.example.com/v1/compile \
-  -H "Content-Type: application/json" \
-  -d '{"query": "data.agent_governance", "modules": [...]}'
-```
-
-## Performance Tuning
-
-### Database Optimization
-
-```sql
--- Create indexes
-CREATE INDEX idx_agents_workspace ON agents(workspaceId);
-CREATE INDEX idx_policies_workspace ON policies(workspaceId);
-CREATE INDEX idx_events_workspace ON events(workspaceId);
-
--- Enable query cache
-SET GLOBAL query_cache_type = ON;
-SET GLOBAL query_cache_size = 268435456; -- 256MB
-```
-
-### Connection Pooling
-
-```bash
-# Configure in environment
-DB_POOL_MIN=5
-DB_POOL_MAX=20
-DB_POOL_IDLE_TIMEOUT=30000
-```
-
-### Caching
-
-```bash
-# Enable Redis caching
-REDIS_URL=redis://localhost:6379
-CACHE_TTL=3600
+# View application health
+curl http://localhost:3000/api/health
 ```
 
 ## Security Checklist
 
-- [ ] Enable HTTPS/TLS
-- [ ] Configure firewall rules
+- [ ] Set `ENCRYPTION_KEY` in production (never use the default dev key)
+- [ ] Enable HTTPS/TLS via reverse proxy
 - [ ] Set strong database passwords
-- [ ] Enable API authentication
 - [ ] Configure CORS properly
 - [ ] Enable rate limiting
-- [ ] Set up audit logging
-- [ ] Regular security updates
-- [ ] Backup encryption
-- [ ] Monitor for suspicious activity
-
-## Scaling
-
-### Horizontal Scaling
-
-```bash
-# Load balancing with multiple instances
-docker run -d --name app1 -p 3001:3000 agent-governance:latest
-docker run -d --name app2 -p 3002:3000 agent-governance:latest
-docker run -d --name app3 -p 3003:3000 agent-governance:latest
-
-# Configure load balancer to distribute traffic
-```
-
-### Vertical Scaling
-
-```bash
-# Increase resources
-DB_POOL_MAX=50
-NODE_OPTIONS="--max-old-space-size=4096"
-```
-
-## Rollback Procedure
-
-```bash
-# List available versions
-docker image ls agent-governance
-
-# Rollback to previous version
-docker run -d --name agent-governance-prev \
-  agent-governance:previous-tag
-
-# Update load balancer to point to previous version
-```
-
-## Support and Monitoring
-
-For production deployments, ensure:
-
-1. **Monitoring**: Set up alerts for errors, performance degradation
-2. **Logging**: Centralize logs for analysis
-3. **Backups**: Test backup/restore procedures regularly
-4. **Updates**: Plan regular security and dependency updates
-5. **Documentation**: Keep runbooks updated
-
----
-
-## Additional Resources
-
-- [API Documentation](./API_DOCUMENTATION.md)
-- [OPA Policy Guide](./OPA_POLICY_GUIDE.md)
-- [Architecture Guide](./ARCHITECTURE.md)
+- [ ] Regular security updates and dependency audits

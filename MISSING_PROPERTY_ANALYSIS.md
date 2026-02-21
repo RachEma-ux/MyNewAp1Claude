@@ -64,10 +64,10 @@ The 74 MISSING_PROPERTY errors are **NOT random missing fields**—they're sympt
 
 1. **Database schema** (`drizzle/schema.ts`) HAS these fields:
    ```typescript
-   export const agents = mysqlTable("agents", {
+   export const agents = pgTable("agents", {
      // ... basic fields
-     mode: mysqlEnum("mode", ["sandbox", "governed"]),
-     governanceStatus: mysqlEnum("governanceStatus", ["SANDBOX", "GOVERNED_VALID", ...]),
+     mode: pgEnum("mode", ["sandbox", "governed"]),
+     governanceStatus: pgEnum("governanceStatus", ["SANDBOX", "GOVERNED_VALID", ...]),
      governance: json("governance"),
      // ... etc
    });
@@ -179,11 +179,11 @@ export type InsertAgent = typeof agents.$inferInsert;
 **Step 1: Add promotionRequests table**
 ```typescript
 // drizzle/schema.ts
-export const promotionRequests = mysqlTable("promotion_requests", {
+export const promotionRequests = pgTable("promotion_requests", {
   id: int("id").autoincrement().primaryKey(),
   agentId: int("agentId").notNull(),
   requestedBy: int("requestedBy").notNull(),
-  status: mysqlEnum("status", ["pending", "approved", "rejected", "cancelled"]).default("pending"),
+  status: pgEnum("status", ["pending", "approved", "rejected", "cancelled"]).default("pending"),
   justification: text("justification"),
   reviewedBy: int("reviewedBy"),
   reviewedAt: timestamp("reviewedAt"),
@@ -196,7 +196,7 @@ export const promotionRequests = mysqlTable("promotion_requests", {
 **Step 2: Add timestamp to agentHistory**
 ```typescript
 // drizzle/schema.ts
-export const agentHistory = mysqlTable("agent_history", {
+export const agentHistory = pgTable("agent_history", {
   // ... existing fields
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });

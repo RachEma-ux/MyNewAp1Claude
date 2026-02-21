@@ -40,12 +40,12 @@ The `claude/rename-app-YVcio` branch introduces a **LLM Control Plane MVP** feat
 2. **Clean Database Schema** (`drizzle/schema.ts:1854-1904`)
    ```typescript
    // LLMs table - base configuration
-   export const llms = mysqlTable("llms", {
+   export const llms = pgTable("llms", {
      id, name, description, runtime, provider, archived, ...
    });
 
    // LLM Versions - immutable history
-   export const llmVersions = mysqlTable("llm_versions", {
+   export const llmVersions = pgTable("llm_versions", {
      id, llmId, version, config, changeNotes, changeType, ...
    });
    ```

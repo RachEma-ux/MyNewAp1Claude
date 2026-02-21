@@ -165,7 +165,7 @@ Once approved:
    ```bash
    npm run db:push
    # or
-   npx drizzle-kit push:mysql
+   npx drizzle-kit push
    ```
 
 3. **Verify Deployment**

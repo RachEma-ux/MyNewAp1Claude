@@ -1,9 +1,7 @@
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
-import * as schema from "../drizzle/schema.js";
+import pg from 'pg';
 
-const connection = await mysql.createConnection(process.env.DATABASE_URL);
-const db = drizzle(connection, { schema, mode: "default" });
+const client = new pg.Client(process.env.DATABASE_URL);
+await client.connect();
 
 const templates = [
   {
@@ -24,7 +22,7 @@ const templates = [
           id: "action-1",
           type: "database-query",
           position: { x: 300, y: 100 },
-          data: { label: "Fetch Metrics", config: { query: "SELECT * FROM metrics WHERE date = CURDATE()", database: "default" } }
+          data: { label: "Fetch Metrics", config: { query: "SELECT * FROM metrics WHERE date = CURRENT_DATE", database: "default" } }
         },
         {
           id: "action-2",
@@ -114,7 +112,7 @@ const templates = [
           id: "action-2",
           type: "send-message",
           position: { x: 500, y: 100 },
-          data: { label: "Send Alert", config: { channel: "slack", message: "⚠️ Alert: {{metric}} exceeded threshold!" } }
+          data: { label: "Send Alert", config: { channel: "slack", message: "Alert: {{metric}} exceeded threshold!" } }
         }
       ],
       edges: [
@@ -130,10 +128,23 @@ const templates = [
 console.log("Seeding workflow templates...");
 
 for (const template of templates) {
-  await db.insert(schema.workflowTemplates).values(template);
-  console.log(`✓ Created template: ${template.name}`);
+  await client.query(
+    `INSERT INTO workflow_templates (name, description, category, icon, tags, workflow_definition, is_public, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      template.name,
+      template.description,
+      template.category,
+      template.icon,
+      JSON.stringify(template.tags),
+      JSON.stringify(template.workflowDefinition),
+      template.isPublic,
+      template.createdBy,
+    ]
+  );
+  console.log(`Created template: ${template.name}`);
 }
 
-console.log("✓ All templates seeded successfully!");
+console.log("All templates seeded successfully!");
 
-await connection.end();
+await client.end();
