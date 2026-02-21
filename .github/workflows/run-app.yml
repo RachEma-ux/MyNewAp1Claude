@@ -51,7 +51,8 @@ jobs:
       - name: Start application with tunnel
         run: |
           # Start the Node.js server in background on port 3000
-          PORT=3000 NODE_ENV=production node dist/index.js &
+          # Use development mode since DEV_MODE=true is the default (no OAuth)
+          PORT=3000 NODE_ENV=development DEV_MODE=true node dist/index.js &
           SERVER_PID=$!
 
           # Wait for server to start
