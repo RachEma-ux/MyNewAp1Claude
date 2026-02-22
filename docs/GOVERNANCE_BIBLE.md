@@ -1,881 +1,663 @@
-# Governance Bible
+# GOVERNANCE, SECURITY AND COMPLIANCE BIBLE
 
-**MyNewAppV1 — LLM Control Plane**
-**Version:** 1.0
-**Last Updated:** February 22, 2026
+**Governance Bible CGT**
 
----
+**Canonical Governance & Security Standard**
 
-## Table of Contents
-
-1. [Introduction](#1-introduction)
-2. [Platform Architecture](#2-platform-architecture)
-3. [Authentication & Authorization](#3-authentication--authorization)
-4. [Candidate Pipeline — Catalog Onboarding](#4-candidate-pipeline--catalog-onboarding)
-5. [Agent Governance](#5-agent-governance)
-6. [Policy Management](#6-policy-management)
-7. [Drift Detection & Remediation](#7-drift-detection--remediation)
-8. [Compliance & Audit](#8-compliance--audit)
-9. [Security Controls](#9-security-controls)
-10. [Secret Management & Key Rotation](#10-secret-management--key-rotation)
-11. [Workflow Automation Governance](#11-workflow-automation-governance)
-12. [Catalog Import & Discovery Governance](#12-catalog-import--discovery-governance)
-13. [Monitoring & Observability](#13-monitoring--observability)
-14. [Backup & Disaster Recovery](#14-backup--disaster-recovery)
-15. [Environment Profiles & Deployment](#15-environment-profiles--deployment)
-16. [Admin Best Practices](#16-admin-best-practices)
-17. [Glossary](#17-glossary)
+**For:** MyNewAp1Claude Platform
+**Status:** Authoritative Baseline
+**Scope:** Architecture - Agents - Providers - Workflows - UI - Deployment - CI/CD - Runtime - Policy - Secrets - Audit
 
 ---
 
-## 1. Introduction
+## 1. Purpose & Authority
 
-### Purpose
+The Governance Bible CGT defines:
 
-This document is the single source of truth for all governance, security, compliance, and best-practices rules governing the MyNewAppV1 LLM Control Plane. It covers every aspect of the platform that an Admin, Security Officer, or Compliance Auditor needs to understand.
+- The security model of the platform
+- The governance enforcement architecture
+- Policy engine integration requirements
+- Role and permission model
+- Secret lifecycle management
+- Workflow compliance controls
+- Deployment security guarantees
+- Audit and traceability standards
+- Lifecycle review enforcement rules
 
-### Scope
+**This document supersedes archived governance documentation.**
 
-- Catalog onboarding and candidate pipeline
-- Agent lifecycle management and governance
-- Policy enforcement (rule-based and OPA)
-- Security controls (authentication, encryption, SSRF protection)
-- Audit logging and compliance export
-- Workflow automation governance
-- Secret management and key rotation
-- Monitoring, observability, and backup
-
-### Audience
-
-- **Platform Admins** — daily operations, approvals, pipeline management
-- **Security Officers** — security controls, encryption, access review
-- **Compliance Auditors** — audit trails, compliance reports, attestations
-- **Developers** — architecture understanding, integration patterns
+**No component may be published unless compliant with this document.**
 
 ---
 
-## 2. Platform Architecture
+## 2. Governance Model Overview
 
-### Layer Architecture
+### 2.1 Governance Philosophy
 
-```
-┌─────────────────────────────────────────────────┐
-│  Presentation Layer   (client/src/)             │
-│  React 19, Vite, Tailwind, wouter routing       │
-├─────────────────────────────────────────────────┤
-│  API Layer            (server/routers.ts)        │
-│  tRPC 11 routers, Express middleware            │
-├─────────────────────────────────────────────────┤
-│  Governance Layer     (server/services/)         │
-│  Policy evaluation, audit logging, feature flags│
-├─────────────────────────────────────────────────┤
-│  Domain Layer         (server/<domain>/)         │
-│  Business logic per domain (agents, chat, etc.) │
-├─────────────────────────────────────────────────┤
-│  Persistence Layer    (drizzle/, server/db.ts)   │
-│  Drizzle ORM, PostgreSQL, migrations           │
-├─────────────────────────────────────────────────┤
-│  Infrastructure Layer (server/_core/)            │
-│  Env config, auth context, encryption, SDK      │
-└─────────────────────────────────────────────────┘
-```
+The platform enforces:
 
-### Dependency Rules
+- Separation of control and execution
+- Policy-first enforcement
+- Layer isolation
+- Least privilege
+- Auditable transitions
+- Deterministic lifecycle control
 
-**Allowed direction:** Presentation → API → Governance → Domain → Persistence → Infrastructure
-
-**Violations to avoid:**
-- UI must NOT import persistence logic directly
-- Domain logic must NOT import UI components
-- Governance layer must NOT directly mutate DB (goes through domain)
-
-### Key Technology Stack
-
-| Component | Technology |
-|---|---|
-| Frontend | React 19, Vite, Tailwind CSS, wouter |
-| API | tRPC 11, Express 4, Zod validation |
-| Database | PostgreSQL, Drizzle ORM |
-| Auth | OAuth 2.0, JWT sessions |
-| Encryption | AES-256 (provider secrets) |
-| Policy Engine | Rule-based scoring (MVP), OPA/Rego (production) |
+**Nothing executes without policy.**
+**Nothing is published without review.**
+**Nothing bypasses orchestrator enforcement.**
 
 ---
 
-## 3. Authentication & Authorization
+## 3. Governance Layers
 
-### Authentication Model
+The platform is structured into controlled layers:
 
-Three states determine authentication behavior:
+1. **Infrastructure Layer**
+2. **Provider Layer**
+3. **Agent Layer**
+4. **Workflow Layer**
+5. **UI Layer**
+6. **Orchestrator Layer**
+7. **Policy Engine Layer**
+8. **Audit Layer**
 
-| State | Condition | Behavior |
-|---|---|---|
-| **DEV_MODE** | `DEV_MODE=true` + `NODE_ENV≠production` | Auto-authenticates as dev user. Blocked in production. |
-| **OAuth** | `VITE_APP_ID` + `OAUTH_SERVER_URL` configured | Real authentication via OAuth provider |
-| **Unconfigured** | Neither set | Only `publicProcedure` endpoints work |
+Each layer has:
 
-### Authorization Levels
+- Defined ownership
+- Defined enforcement boundary
+- Defined review rules
+- Defined audit trace
 
-Three tRPC procedure levels enforce access control:
-
-| Level | Who Can Access | Use Case |
-|---|---|---|
-| `publicProcedure` | Anyone | Health checks, public data |
-| `protectedProcedure` | Authenticated users | Read ops, authoring ops |
-| `adminProcedure` | Admin role only | Approve, publish, activate, reject, delete |
-
-### Startup Validation Guards
-
-| Condition | Result |
-|---|---|
-| `NODE_ENV=production` + `DEV_MODE=true` | Fatal error — process exits |
-| `NODE_ENV=production` + no `ENCRYPTION_KEY` | Fatal error — process exits |
-| `NODE_ENV=production` + no `REDIS_URL` | Warning — falls back to in-memory rate limiting |
-
-### Authorization Rules by Domain
-
-| Operation | Required Level | Notes |
-|---|---|---|
-| List catalog entries | `protectedProcedure` | Any authenticated user |
-| Create catalog entry | `protectedProcedure` | Entry starts as draft |
-| Approve/Reject entry | `adminProcedure` | Admin only |
-| Activate entry | `adminProcedure` | Requires `reviewState = "approved"` |
-| Publish entry | `adminProcedure` | Requires active + approved |
-| Promote agent | `adminProcedure` | OPA evaluation required |
-| Hot reload policy | `adminProcedure` | Triggers agent revalidation |
-| Manage secrets | `protectedProcedure` | Encrypted at rest |
+**Cross-layer bypass is prohibited.**
 
 ---
 
-## 4. Candidate Pipeline — Catalog Onboarding
+## 4. Policy Engine Governance (OPA Enforcement)
 
-### Overview
+### 4.1 Mandatory Policy Engine
 
-The Candidate Pipeline is a structured 4-stage approval workflow through which all new entries (providers, models, agents, etc.) are onboarded into the platform. **Nothing enters the Catalog directly** — every entry must pass through the full pipeline.
+All sensitive decisions MUST be enforced through the policy engine.
 
-### Pipeline Stages
+No hardcoded access logic allowed in business code.
 
-```
-Import/Create → Submit (tag: "candidate") → Register → Validate → Publish → Catalog
-```
+### 4.2 Enforcement Points
 
-| Stage | Tag | Location | Action | Who |
-|---|---|---|---|---|
-| **Submit** | `candidate` | Import Wizard | Discover & submit provider | Any user |
-| **Register** | `registered` | Candidate → Register tab | Admin reviews and registers | Admin |
-| **Validate** | `validated` | Candidate → Validate tab | Admin verifies and validates | Admin |
-| **Publish** | `published` | Candidate → Publish tab | Admin publishes to Catalog | Admin |
+Policies must be enforced at:
 
-### Detailed Stage Descriptions
+- API middleware
+- Workflow execution nodes
+- Agent invocation boundary
+- Provider invocation boundary
+- Publishing lifecycle transitions
 
-#### Stage 1: Submit
+### 4.3 Policy Requirements
 
-**Who:** Any authenticated user
-**Where:** LLM → Manage Catalogue → `+ New Entry` → Import → API Discovery
-**What happens:**
-- User enters a provider URL (e.g., `ai21.com`)
-- System probes the URL for API endpoints, models, capabilities
-- User clicks **Submit**
-- Entry is created with:
-  - Tag: `"candidate"`
-  - Origin: `"discovery"`
-  - Review State: `"needs_review"`
-  - Status: `"draft"`
-- Entry appears in the **Register tab** of the Candidate page
+Every policy must:
 
-#### Stage 2: Register (Admin Task)
+- Compile without errors
+- Be versioned
+- Be documented
+- Map to governance category
+- Define deny-by-default behavior
 
-**Who:** Admin only
-**Where:** Candidate → Register tab
-**Admin review checklist:**
-- Verify entry name and display name are correct
-- Review description for accuracy
-- Check entry type (provider, model, agent, etc.)
-- Verify origin and source URL
-- Double-tap name to open full edit card if modifications needed
-
-**Action:** Click **Register**
-**What happens:**
-- Tag changes from `"candidate"` to `"registered"`
-- Entry is approved (`reviewState` → `"approved"`)
-- Register button replaced by green "Registered" badge
-- Entry appears in the **Validate tab**
-- Original entry stays in Register tab as history
-
-#### Stage 3: Validate (Admin Task)
-
-**Who:** Admin only
-**Where:** Candidate → Validate tab
-**Admin review checklist:**
-- Verify configuration is complete
-- Check classification and tags
-- Confirm readiness for publication
-
-**Action:** Click **Validate**
-**What happens:**
-- Tag changes from `"registered"` to `"validated"`
-- Validate button replaced by green "Validated" badge
-- Entry appears in the **Publish tab**
-- Original entry stays in Validate tab as history
-
-#### Stage 4: Publish (Admin Task)
-
-**Who:** Admin only
-**Where:** Candidate → Publish tab
-**Admin review checklist:**
-- Final review before going live
-- Confirm entry should be available to all platform users
-
-**Action:** Click **Publish**
-**What happens:**
-- Tag changes from `"validated"` to `"published"`
-- Entry is activated (`status` → `"active"`)
-- Publish button replaced by green "Published" badge
-- Entry appears in **Manage Catalogue → Catalog tab**
-- Entry is now available for use across the platform
-
-### History & Audit Trail
-
-Each tab shows **current entries + all entries that have already progressed past that stage**. Progressed entries display a status badge instead of an action button. This gives Admin full visibility of what passed through each stage and when.
-
-### Pipeline Rules
-
-1. **No bypass** — entries cannot skip stages
-2. **No direct catalog entry** — the Catalog tab's only source is published entries from the Candidate pipeline
-3. **Tag-based tracking** — pipeline stage is tracked via entry tags (`candidate` → `registered` → `validated` → `published`)
-4. **Admin approval required** — each stage requires explicit Admin action
-5. **Traceability** — entry config stores `sourceEntryId` and `pipelineStage` for audit trail
+**Implicit allow is forbidden.**
 
 ---
 
-## 5. Agent Governance
+## 5. Role-Based Access Control (RBAC)
 
-### Agent Lifecycle
+### 5.1 Roles
 
-Agents follow a three-state lifecycle:
+Minimum required roles:
 
-```
-Draft → Sandbox → Governed
-```
+- Admin
+- Governance Reviewer
+- Operator
+- Developer
+- User
+- System
 
-| State | Description | Capabilities |
-|---|---|---|
-| **Draft** | Partial spec, autosaved, no execution | Editing only |
-| **Sandbox** | Full testing environment, isolated | Testing, no production access |
-| **Governed** | Production-ready with cryptographic proofs | Full execution |
+### 5.2 Enforcement Rules
 
-### Governance Status
-
-| Status | Meaning |
-|---|---|
-| `SANDBOX` | Testing mode, no policy enforcement |
-| `GOVERNED_VALID` | Compliant with current policy |
-| `GOVERNED_RESTRICTED` | Policy violation, limited functionality |
-| `GOVERNED_INVALIDATED` | Critical drift, execution blocked |
-
-### Agent Creation (7 Modes)
-
-1. **From Template** — deploy pre-built agents (Research Assistant, Code Helper, etc.)
-2. **From Scratch** — manual configuration with full control
-3. **Clone Existing** — fork an existing agent
-4. **From Workflow** — automation-first approach
-5. **From Conversation** — intent extraction from chat
-6. **From Event Trigger** — event-driven agents
-7. **Import Spec** — upload JSON/YAML agent definitions
-
-Each mode opens the **WizardShell** with 6 steps:
-Identity → Role → LLM → Capabilities → Limits → Review
-
-### Promotion Workflow
-
-**Path:** Agents → Approvals
-
-1. User requests promotion from sandbox to governed status
-2. System evaluates agent against active policy (OPA/rule-based)
-3. If compliant:
-   - Spec is signed (HMAC-SHA256)
-   - Proof bundle generated and stored
-   - Agent status → `GOVERNED_VALID`
-4. If non-compliant:
-   - Denial reasons returned to UI
-   - Agent remains in sandbox
-5. 24-hour SLA for approval decisions
-6. Multi-approver support with comment threads
-7. Incident freeze mechanism blocks promotions during outages
-
-### Admission Control (7 Checks)
-
-When a governed agent is started, the Interceptor Chain runs 7 sequential checks (fail-closed — any deny blocks execution):
-
-| # | Check | What It Validates |
-|---|---|---|
-| 1 | Sandbox Expiry | Sandbox agent hasn't expired |
-| 2 | Sandbox Containment | No `external_calls` or `persistent_writes` |
-| 3 | Proof Presence | Governed agent has proof bundle |
-| 4 | Spec Hash Verification | Spec hasn't been tampered after signing |
-| 5 | Policy Hash Binding | Policy hasn't changed since promotion |
-| 6 | Signer Revocation | Signing authority isn't revoked |
-| 7 | Signature Verification | HMAC-SHA256 signature is valid |
-
-### Admission Control Error Codes
-
-| Code | Reason | Severity |
-|---|---|---|
-| `SANDBOX_EXPIRED` | Sandbox agent has expired | DENY |
-| `CONTAINMENT_VIOLATION` | Sandbox has external_calls or persistent_writes | DENY |
-| `PROOF_MISSING` | Governed agent missing proof bundle | DENY |
-| `SPEC_HASH_MISMATCH` | Spec tampered after signing | DENY |
-| `POLICY_HASH_MISMATCH` | Policy changed since promotion | RESTRICT |
-| `SIGNER_REVOKED` | Signing authority is revoked | DENY |
-| `SIGNATURE_INVALID` | HMAC signature verification failed | DENY |
-| `INTERCEPTOR_ERROR` | Interceptor chain execution error | DENY |
-
-### Cryptographic Proofs
-
-Every governed agent has a proof bundle:
-
-```json
-{
-  "specHash": "sha256:abc123...",
-  "policyHash": "sha256:def456...",
-  "signature": "HMAC-SHA256 signature...",
-  "timestamp": "2026-01-03T12:00:00Z"
-}
-```
-
-Hash computation uses canonical JSON (sorted keys) with SHA-256.
+- Role validation must occur before execution.
+- Privilege escalation must be logged.
+- Admin actions require audit record.
+- No role may bypass policy evaluation.
 
 ---
 
-## 6. Policy Management
+## 6. Lifecycle Governance Model
 
-### Policy Engine
+All entries pass through lifecycle stages:
 
-The platform supports two policy evaluation modes:
+1. **Submit**
+2. **Register**
+3. **Validate**
+4. **Publish**
+5. **Catalog**
 
-| Mode | Engine | Use Case |
-|---|---|---|
-| **MVP (Current)** | Rule-based scoring | Development, simple policies |
-| **Production** | Open Policy Agent (OPA) + Rego | Enterprise, complex policies |
+Each transition requires:
 
-### Policy Gate
+- Explicit approval
+- Audit log
+- Policy compliance check
+- Security validation
 
-**File:** `server/services/policyGate.ts`
-
-Centralized `evaluatePolicy()` function for sensitive operations:
-- **Production mode:** Fail-closed (deny if rules unavailable)
-- **Development mode:** Configurable fail-open with logging
-
-### Policy Rules (6 Built-in)
-
-| Rule | What It Checks |
-|---|---|
-| `user_is_admin` | Actor must be admin |
-| `anatomy_complete` | Minimum Viable Agent (MVA) validation |
-| `sandbox_contained` | No external calls / persistent writes |
-| `capabilities_valid` | Capabilities in whitelist |
-| `temp_ok` | Temperature within role-based limits |
-| `budget_ok` | Monthly budget within org limit |
-
-### Promotion Policy Deny Codes
-
-| Code | Reason |
-|---|---|
-| `PERMISSION_DENIED` | Actor not admin |
-| `ANATOMY_INCOMPLETE` | Agent anatomy missing required fields |
-| `CONTAINMENT_VIOLATION` | Sandbox not contained |
-| `INVALID_CAPABILITIES` | Capabilities not in whitelist |
-| `TEMPERATURE_VIOLATION` | Temperature exceeds role limit |
-| `BUDGET_EXCEEDED` | Monthly budget exceeds org limit |
-
-### OPA Policy Structure (Rego)
-
-```rego
-package agent_governance
-
-# Main evaluation rule
-evaluate[result] {
-    result := {
-        "allowed": is_compliant,
-        "violations": get_violations,
-        "score": calculate_score,
-    }
-}
-
-# Compliance check
-is_compliant {
-    check_temperature
-    check_capabilities
-    check_document_access
-    check_tool_access
-}
-
-# Default deny
-default is_compliant = false
-```
-
-### Policy Hot Reload
-
-1. Admin uploads new policy
-2. System computes new policy hash
-3. Policy stored in PolicyRegistry and persisted to DB
-4. RevalidationWorkflow triggers:
-   - All governed agents re-evaluated against new policy
-   - Violating agents marked as `GOVERNED_INVALIDATED`
-   - Invalidated agents quarantined (cannot start)
-5. Invalidation events emitted and logged
-
-### Policy Best Practices
-
-1. **Keep policies simple** — start with basic rules, add complexity gradually
-2. **Use descriptive names** — make rule names self-documenting
-3. **Test thoroughly** — test policies against existing agents before deployment
-4. **Version control** — track all policy changes in version control
-5. **Document rules** — add comments explaining complex logic
-6. **Gradual rollout** — test in staging before production
-7. **Monitor violations** — track which agents fail policy checks
-8. **Regular reviews** — review and update policies on a regular cadence
+**Automatic promotion is prohibited.**
 
 ---
 
-## 7. Drift Detection & Remediation
+## 7. Agent Governance Framework
 
-### Drift Detection
+### 7.1 Agent Requirements
 
-**Path:** Agents → Drift Detection
-**Frequency:** Runs every 10 minutes
+Each agent must define:
 
-Detects three types of drift:
+- Purpose
+- Scope
+- Permissions
+- External dependencies
+- Policy mapping
+- Execution boundaries
 
-| Drift Type | What It Means | Severity |
-|---|---|---|
-| **Policy Change** | Agent no longer complies with updated policy | Variable |
-| **Spec Tampering** | Hash mismatch — unauthorized spec modification | Critical |
-| **Expired** | Agent past its expiry date | High |
+### 7.2 Agent Restrictions
 
-### Drift Detection Dashboard
+Agents may NOT:
 
-- Real-time drift summary (total, by type, by severity)
-- 7-day trend chart (drifted vs compliant agents)
-- Severity distribution bar chart
-- One-click auto-remediation for safe violations
-
-### Autonomous Remediation
-
-**Path:** Drift Detection Dashboard → Auto-Remediate button
-
-**Auto-remediation can fix:**
-- Budget adjustments — reduce limits to comply with policy
-- Capability removal — strip forbidden capabilities
-
-**Auto-remediation is BLOCKED for:**
-- Spec tampering (critical security violation — requires human investigation)
-- Expiry (requires manual renewal)
-- Critical policy violations (requires human review)
-
-### Remediation Best Practices
-
-1. Review auto-remediation logs regularly
-2. Investigate repeated drift patterns
-3. Update policies to prevent recurring violations
-4. Escalate critical drift to security team immediately
-5. Document all manual remediation actions
+- Access secrets directly
+- Bypass provider abstraction
+- Execute dynamic unvalidated code
+- Escalate privileges
 
 ---
 
-## 8. Compliance & Audit
+## 8. Workflow Governance
 
-### Audit System
+### 8.1 Workflow Controls
 
-Two audit loggers operate in the platform:
+Workflows must:
 
-| Logger | File | Purpose |
-|---|---|---|
-| **Governance Logger** | `server/services/governanceLogger.ts` | Agent governance events (admission, promotion, policy reload) |
-| **Audit Logger** | `server/services/auditLogger.ts` | General operations (provider, secret, policy, auth events) |
+- Declare execution nodes
+- Declare data flow
+- Declare permission boundaries
+- Log execution steps
+- Enforce node-level policy
 
-Both persist to `governance_audit_logs` table with structured envelope containing:
-- Event type
-- Actor (who performed the action)
+### 8.2 Prohibited Patterns
+
+- Dynamic eval
+- Silent fallback
+- Unlogged branching
+- Runtime privilege mutation
+
+---
+
+## 9. Provider Governance
+
+Providers must:
+
+- Use externalized credentials
+- Support secure transport (HTTPS/TLS)
+- Declare authentication method
+- Be isolated via provider abstraction layer
+
+**Hardcoded endpoints are prohibited unless declared and reviewed.**
+
+---
+
+## 10. Secret & Key Lifecycle Management
+
+### 10.1 Secret Rules
+
+- No secrets in source control
+- No plaintext credentials in config
+- All secrets via environment variables
+- Encryption at rest required
+- Logging of secrets prohibited
+
+### 10.2 Key Rotation Requirements
+
+- Rotation-compatible storage
+- Rotation plan documented
+- Backward compatibility tested
+- Key versioning enforced
+
+**Static long-term secrets without rotation plan are forbidden.**
+
+---
+
+## 11. Deployment Governance
+
+Deployment must:
+
+- Document required environment variables
+- Avoid unsafe defaults
+- Prevent debug mode in production
+- Enforce secure configuration
+- Validate policy engine availability at startup
+
+**Startup must fail if governance engine unavailable.**
+
+---
+
+## 12. Audit & Traceability
+
+All critical actions must be logged:
+
+- Role
 - Timestamp
-- Payload (structured details)
-- Catalog entry ID (if applicable)
+- Action
+- Target
+- Result
 
-### Audit Event Types
+Lifecycle transitions must be immutable in audit history.
 
-| Category | Events |
-|---|---|
-| **Agent** | `agent.started`, `agent.stopped`, `agent.error`, `agent.status_changed` |
-| **Policy** | `policy.updated`, `policy.reloaded` |
-| **Governance** | `governance.violation`, `governance.approved` |
-| **Catalog** | `catalog.entry.created`, `catalog.entry.updated`, `catalog.entry.approved`, `catalog.entry.rejected`, `catalog.entry.activated`, `catalog.entry.validated`, `catalog.entry.deleted` |
-| **Publishing** | `catalog.entry.published`, `catalog.bundle.recalled` |
-
-### Compliance Export
-
-**Path:** Agents → Compliance Export
-
-Generate attestation reports for:
-
-| Framework | Focus |
-|---|---|
-| **SOC 2 Type II** | Trust Services Criteria |
-| **ISO 27001** | Information Security Management |
-| **HIPAA** | Healthcare data protection |
-| **GDPR** | EU data privacy |
-
-**Report contents:**
-- Agent governance events (creation, promotion, deletion)
-- Policy version history with change tracking
-- Drift detection results and remediation actions
-- Cryptographic proofs (spec hashes, policy hashes, signatures)
-- Complete audit trail with actor attribution
-
-**Export formats:** JSON (machine-readable), CSV (human-readable)
-
-### Compliance Best Practices
-
-1. Export reports monthly for audit trail
-2. Store reports in immutable storage (S3 with versioning)
-3. Include reports in compliance documentation
-4. Review attestations before external audits
-5. Maintain continuous compliance posture — don't wait for audit season
+Logs must not expose sensitive information.
 
 ---
 
-## 9. Security Controls
+## 13. Documentation Governance
 
-### SSRF Protection
+Every component must:
 
-**File:** `server/routers/ssrf-guard.ts`
+- Be documented
+- Match architecture model
+- Not contradict governance rules
+- Define security considerations
+- Define policy mappings
 
-All outbound requests are validated:
-- DNS resolution check
-- IP classification (blocks private/internal IPs)
-- Redirect validation (prevents redirect-based SSRF)
-- HTTPS enforced in production
-
-### Rate Limiting
-
-| Environment | Implementation |
-|---|---|
-| Development | In-memory rate limiting |
-| Production | Redis-backed rate limiting (multi-instance safe) |
-
-Specific limits:
-- Discovery requests: 10 per minute per user
-- Discovery cache: 60-second TTL per domain
-
-### Encryption
-
-| What | How |
-|---|---|
-| Provider secrets | AES-256 encryption via `ENCRYPTION_KEY` |
-| Data in transit | TLS/SSL for all external communications |
-| Database | Encryption at rest (PostgreSQL level) |
-| Sensitive logs | Automatic data redaction |
-
-### Input Validation
-
-- **All tRPC inputs** validated with Zod schemas
-- **No raw SQL** — all queries through Drizzle ORM (parameterized)
-- **File uploads** validated for type and size
-- **URLs** validated before outbound requests
-
-### Security Principles
-
-1. **Principle of Least Privilege** — agents get minimal capabilities needed
-2. **Fail-Closed** — production policy gate denies if rules unavailable
-3. **Defense in Depth** — multiple layers (auth, validation, encryption, audit)
-4. **No Trust by Default** — server owns validation, client data never trusted
-5. **Immutability** — published bundles are immutable snapshots
+**Undocumented behavior is non-compliant.**
 
 ---
 
-## 10. Secret Management & Key Rotation
+## 14. PR & Change Governance
 
-### Architecture
+All changes must:
 
-```
-Frontend (KeyRotationPage)
-    ↓ tRPC Calls (Type-safe)
-tRPC Router (keyRotation.ts)
-    ↓ 4 Sub-routers, 20+ procedures
-Backend Services (30+ DB operations)
-    ↓ Zod validation, error handling
-Database (6 tables, full audit trail)
-```
+- Follow PR template
+- Include security impact analysis
+- Include governance impact declaration
+- Be reviewed before merge
+- Not bypass protected branch rules
 
-### Key Rotation Features
-
-- **Certificate management** — upload, track, renew TLS certificates
-- **API key rotation** — rotate provider API keys with zero downtime
-- **Automatic scheduling** — schedule key rotation on custom cadence
-- **Audit trail** — every rotation event logged with actor attribution
-- **Data redaction** — sensitive values automatically masked in logs and responses
-- **Rollback** — ability to revert to previous key version
-
-### Key Rotation Best Practices
-
-1. Rotate API keys every 90 days minimum
-2. Rotate immediately if a key is suspected compromised
-3. Use automatic scheduling for routine rotations
-4. Verify service connectivity after rotation
-5. Monitor for authentication failures post-rotation
-6. Keep at least one previous key version for rollback
+**Direct commits to main are prohibited.**
 
 ---
 
-## 11. Workflow Automation Governance
+## 15. UI Governance
 
-### Current Maturity
+UI must:
 
-The Workflow Builder is in **MVP/Early Development** stage. While basic CRUD and UI work, critical governance gaps exist.
+- Not expose privileged operations without role validation
+- Not allow bypass of workflow lifecycle
+- Not allow hidden state transitions
+- Respect component promotion rules
 
-### Governance Status
-
-| Check | Status |
-|---|---|
-| Data model versioning | Not implemented |
-| Validation prevents invalid publish | Basic only (empty check) |
-| Published versions immutable | Not implemented |
-| Secrets handling | Relies on env vars |
-| Permissions enforced | User ownership only |
-| Run observability | In-memory only |
-
-### Required Governance Controls (Roadmap)
-
-1. **Schema versioning** — add `schemaVersion` field, implement migrations
-2. **Validation system** — trigger existence, connectivity checks, cycle detection
-3. **Publish/draft separation** — immutable published snapshots with rollback
-4. **Permissions model** — who can edit, publish, execute workflows
-5. **Audit logging** — log all create/edit/publish/execute/delete actions
-6. **Dangerous node allowlist** — require approval for risky node types
-7. **Execution persistence** — persist all run data to database (not just memory)
-
-### Workflow Security Rules
-
-1. Workflows must have at least one trigger node
-2. No disconnected nodes allowed in published workflows
-3. No cycles (infinite loops) in production workflows
-4. Secrets must never be stored in workflow node config
-5. All workflow executions must be logged with run ID and timestamps
+**UI cannot override backend governance.**
 
 ---
 
-## 12. Catalog Import & Discovery Governance
+## 16. Architecture Compliance
 
-### Core Principles
+All new features must:
 
-1. **Discovery is separate from creation** — preview data is never directly persisted
-2. **No auto-activation** — all imported entries are draft and require review
-3. **Server owns validation** — client-side data is never trusted for final persistence
-4. **Import sessions** — every preview is stored server-side in an auditable session
-5. **Asynchronous processing** — long-running imports are queued
-6. **Security by default** — input validation, domain allowlisting, rate limiting
-7. **Partial success** — failures in bulk creation do not roll back successful entries
+- Fit into existing layered architecture
+- Respect orchestrator boundary
+- Respect policy boundary
+- Respect secret isolation
+- Maintain audit compatibility
 
-### Discovery Flow
-
-```
-User enters URL → Server probes URL → Results previewed → User submits
-→ Entry created as draft with tag "candidate" → Enters pipeline
-```
-
-### Import Security Controls
-
-| Control | Implementation |
-|---|---|
-| Rate limiting | 10 requests/minute per user |
-| Response caching | 60-second TTL per domain |
-| URL validation | SSRF guard validates all outbound requests |
-| Input sanitization | Zod schemas on all inputs |
-| Origin tracking | Every entry records its origin (`discovery`, `admin`, `api`) |
+**Architecture drift must be documented.**
 
 ---
 
-## 13. Monitoring & Observability
+## 17. Compliance Review Criteria
 
-### Metrics Collected
+An entry is compliant only if:
 
-- API response times
-- Error rates by endpoint
-- Agent status changes
-- Policy evaluation results (pass/fail/score)
-- Event processing times
-- Drift detection results
-- Promotion attempts and denials
+- Policy enforced
+- RBAC enforced
+- Secrets externalized
+- Lifecycle respected
+- Audit logging enabled
+- Architecture aligned
+- Documentation consistent
+- Deployment secure
+- Workflow validated
+- No bypass patterns exist
 
-### Governance-Specific Metrics
-
-| Metric | Type |
-|---|---|
-| `agent_starts_allowed_total` | Counter |
-| `agent_starts_denied_total` (by reason) | Counter |
-| `agent_invalidation_events_total` | Counter |
-| `policy_reload_success_total` | Counter |
-| `policy_reload_failure_total` | Counter |
-| `promotion_attempts_total` | Counter |
-| `promotion_denies_total` | Counter |
-
-### Logging
-
-- Structured logging with context (actor, resource, action)
-- Multiple log levels: `debug`, `info`, `warn`, `error`, `fatal`
-- Sensitive data automatically masked in logs
-- Log aggregation support
-
-### Health Checks
-
-| Endpoint | What It Checks |
-|---|---|
-| Application health | Server is running, DB connected |
-| Orchestrator health | External orchestrator reachable |
-| OPA health | Policy engine responsive |
-| Database health | Connection pool healthy |
-
-### Event System
-
-Events flow through the platform providing real-time updates and audit trails:
-
-| Event | When |
-|---|---|
-| `agent.started` | Agent started on orchestrator |
-| `agent.stopped` | Agent stopped |
-| `agent.error` | Agent encountered error |
-| `agent.status_changed` | Agent status changed |
-| `policy.updated` | Policy was updated |
-| `policy.reloaded` | Policy was hot-reloaded |
-| `governance.violation` | Agent failed policy check |
-| `governance.approved` | Agent passed policy check |
+**Failure in any dimension blocks publication.**
 
 ---
 
-## 14. Backup & Disaster Recovery
+## 18. Governance Drift Control
 
-### Backup Features
+Periodic review must:
 
-- Create backups of agents, policies, and configurations
-- Restore from backups with selective options
-- Schedule automatic backups with retention policies
-- Verify backup integrity before restoration
-
-### Backup Best Practices
-
-1. Schedule daily automated backups
-2. Store backups in separate storage from production
-3. Test restore procedures monthly
-4. Keep at least 30 days of backup history
-5. Encrypt backups at rest
-6. Document and test disaster recovery runbooks
+- Compare runtime to governance spec
+- Validate OPA enforcement still active
+- Validate secret rotation compatibility
+- Validate workflow integrity
+- Detect unauthorized role expansion
 
 ---
 
-## 15. Environment Profiles & Deployment
+## 19. Non-Negotiable Rules
 
-### Environment Profiles
+- No bypass of policy engine.
+- No hardcoded secrets.
+- No silent privilege escalation.
+- No undocumented endpoints.
+- No lifecycle skipping.
+- No dynamic code execution without governance.
+- No production without audit.
 
-| Profile | `NODE_ENV` | Behavior |
+---
+
+## 20. Governance Authority
+
+This document is:
+
+- The primary governance reference
+- The review baseline for admin
+- The enforcement criteria for Validate stage
+- The publication gate for Publish stage
+
+**Archived governance docs remain historical reference only.**
+
+---
+---
+
+# Governance Bible CGT v2
+
+## Ultra-Authoritative Governance & Security Standard
+
+This consolidates:
+
+- The architectural rigor and domain granularity of Version 1
+- The enterprise governance maturity, CI/CD enforcement, and risk modeling of Version 2
+- Explicit publication gate logic
+- Explicit triple-validation model
+- Explicit deny-by-default philosophy
+- Domain-specific compliance matrices
+- Risk classification model
+- Machine-enforceable governance spec
+
+**Status:** Canonical Governance Authority
+**Supersedes:** Governance Bible CGT v1 + Archived Governance Docs
+**Scope:** Architecture - Policy - RBAC - Agents - Providers - Workflows - Lifecycle - Secrets - CI/CD - Deployment - Audit - Publication
+
+---
+
+## SECTION I — Governance Foundations
+
+### 1. Governance Philosophy
+
+The platform enforces:
+
+- Deny-by-default
+- Policy-first enforcement
+- Strict layer isolation
+- No execution without governance
+- No publication without validation
+- Full audit traceability
+- Least privilege enforcement
+- Deterministic lifecycle progression
+
+No component may bypass:
+
+- Orchestrator boundary
+- Policy engine
+- RBAC validation
+- Audit logging
+- Lifecycle controls
+
+---
+
+## SECTION II — Unified Compliance Design Matrix
+
+### 1. Core Governance Enforcement Matrix
+
+| Domain | Control Category | Requirement | Enforcement Point | Evidence Required | Failure Result |
+|---|---|---|---|---|---|
+| Policy | Policy Engine | All privileged decisions via OPA | Middleware + Workflow Engine | Policy ID + Hook | Block Publish |
+| Policy | Default Deny | No implicit allow | OPA | Deny fallback rule | Block Validate |
+| Architecture | Layer Isolation | No cross-layer bypass | Code + Orchestrator | Invocation Map | Reject |
+| Architecture | Orchestrator Gate | No direct provider invocation | Static Scan | Call Graph | Reject |
+| RBAC | Role Validation | Role validated pre-execution | Middleware | Access Log | Block Publish |
+| RBAC | Escalation Logging | Escalations logged | Audit Layer | Escalation Record | Block Publish |
+| Lifecycle | Stage Integrity | No stage skipping | Orchestrator | Transition Log | Reject |
+| Lifecycle | Manual Approval | Explicit approval per stage | Admin UI | Approval Log | Reject |
+| Secrets | Externalization | No hardcoded secrets | CI Scan | Scan Report | Block Validate |
+| Secrets | Rotation | Key rotation compatible | Secret Store | Rotation Metadata | Block Publish |
+| Workflow | Node Policy | All nodes declare permissions | Workflow Engine | Node Mapping | Block Validate |
+| Workflow | Execution Logging | All steps logged | Audit | Execution Trace | Block Publish |
+| Agent | Scope Control | Scope + permissions declared | Agent Spec | Scope Doc | Block Validate |
+| Provider | Secure Transport | HTTPS required | Runtime Config | Endpoint Check | Reject |
+| Deployment | Secure Defaults | No debug in prod | Config Validator | Env Review | Block Publish |
+| Audit | Action Logging | Privileged actions logged | Audit Layer | Immutable Log | Reject |
+| CI/CD | PR Governance | Protected branches + review | Git Config | Branch Rules | Reject |
+| Documentation | Consistency | Docs align with implementation | Manual Review | Cross-Check | Block Publish |
+
+---
+
+## SECTION III — Domain-Specific Compliance Matrices
+
+### A. Agent Governance Matrix
+
+| Requirement | Enforcement | Verification | Failure |
+|---|---|---|---|
+| Purpose Declared | Schema validation | Metadata check | Block Validate |
+| Permission Scope Defined | Policy mapping | OPA mapping | Block Validate |
+| No Direct Secret Access | Static scan | Code review | Reject |
+| Execution Boundary Wrapped | Runtime wrapper | Wrapper presence | Reject |
+| Policy ID Bound | OPA integration | Policy reference | Block Validate |
+
+### B. Workflow Governance Matrix
+
+| Requirement | Enforcement | Verification | Failure |
+|---|---|---|---|
+| Node Declaration | Schema validation | JSON validation | Block Validate |
+| Node-Level Policy | OPA per node | Decision log | Block Validate |
+| Execution Logging | Audit wrapper | Execution trace | Block Publish |
+| No Dynamic Eval | Static analysis | Build scan | Reject |
+| No Privilege Mutation | Policy check | Escalation log | Reject |
+
+### C. Provider Governance Matrix
+
+| Requirement | Enforcement | Verification | Failure |
+|---|---|---|---|
+| Auth Method Declared | Schema validation | Config check | Block Validate |
+| HTTPS Only | URL validation | Regex | Reject |
+| Secret Externalized | CI scan | Secret scan | Block Validate |
+| Rotation Compatible | Secret metadata | Version check | Block Publish |
+
+### D. Architecture Boundary Matrix
+
+| Requirement | Enforcement | Verification | Failure |
+|---|---|---|---|
+| Orchestrator Mandatory | Code scan | Call graph | Reject |
+| No Cross-Layer Invocation | Static mapping | Dependency graph | Reject |
+| Policy Engine Required | Startup check | Boot validation | Block Publish |
+
+---
+
+## SECTION IV — Risk Classification Matrix
+
+| Severity | Trigger | Action |
 |---|---|---|
-| **Development** | `development` | Vite HMR, DEV_MODE allowed, HTTP allowed, fail-open policy |
-| **Production** | `production` | Static serving, DEV_MODE blocked, HTTPS enforced, fail-closed policy |
+| **Critical** | Policy bypass, hardcoded secret, lifecycle skip, direct provider call | Immediate rejection |
+| **High** | Missing enforcement hook, undocumented endpoint, missing RBAC validation | Block Validate |
+| **Medium** | Incomplete documentation, missing mapping | Block Publish |
+| **Low** | Formatting / non-security issues | Fix before merge |
 
-### Critical Environment Variables
-
-| Variable | Required In | Purpose |
-|---|---|---|
-| `DATABASE_URL` | All | PostgreSQL connection string |
-| `ENCRYPTION_KEY` | Production | AES-256 key for secret encryption |
-| `REDIS_URL` | Production (recommended) | Rate limiting backend |
-| `VITE_APP_ID` | Production | OAuth application ID |
-| `OAUTH_SERVER_URL` | Production | OAuth authentication server |
-| `JWT_SECRET` | Production | JWT token signing key |
-
-### Production Deployment Checklist
-
-- [ ] `NODE_ENV=production` set
-- [ ] `DEV_MODE` is NOT set to `true`
-- [ ] `ENCRYPTION_KEY` configured (AES-256)
-- [ ] `DATABASE_URL` points to production database
-- [ ] `REDIS_URL` configured for rate limiting
-- [ ] OAuth configured (`VITE_APP_ID`, `OAUTH_SERVER_URL`)
-- [ ] `JWT_SECRET` set to strong random value
-- [ ] TLS/SSL certificate configured
-- [ ] Database backups scheduled
-- [ ] Monitoring alerts configured
-- [ ] Audit log retention policy defined
+**All Critical & High findings block lifecycle progression.**
 
 ---
 
-## 16. Admin Best Practices
+## SECTION V — Machine-Checkable YAML Enforcement Spec
 
-### Daily Operations
+```yaml
+governance_bible_cgt:
+  version: 2.0
+  enforcement_mode: strict
+  default_deny: true
+  publication_gate:
+    block_if_any_violation: true
 
-1. **Check Candidate Pipeline** — process new submissions in Register → Validate → Publish
-2. **Review Drift Detection** — investigate any drifted agents
-3. **Monitor Audit Logs** — look for anomalies or unauthorized actions
-4. **Check System Health** — verify all services are healthy
+  lifecycle:
+    stages: [submit, register, validate, publish, catalog]
+    require_manual_approval: true
+    prohibit_stage_skipping: true
+    audit_required: true
 
-### Security Hygiene
+  policy_engine:
+    required: true
+    engine: OPA
+    deny_if_missing_policy: true
+    require_versioning: true
+    enforcement_points:
+      - api_middleware
+      - workflow_engine
+      - agent_invocation
+      - provider_invocation
+      - lifecycle_transition
 
-1. **Rotate API keys** every 90 days
-2. **Review access** — audit who has admin privileges quarterly
-3. **Update policies** — keep governance policies current with business requirements
-4. **Patch promptly** — apply security updates without delay
-5. **Test backups** — verify restore procedures monthly
+  rbac:
+    required: true
+    roles:
+      - admin
+      - governance_reviewer
+      - operator
+      - developer
+      - user
+      - system
+    require_role_validation: true
+    require_escalation_logging: true
+    prohibit_silent_escalation: true
 
-### Agent Management
+  secrets:
+    prohibit_hardcoded: true
+    require_env_externalization: true
+    encryption_at_rest: required
+    prohibit_sensitive_logging: true
+    rotation:
+      required: true
+      versioning_required: true
+      compatibility_required: true
 
-1. **Set expiry dates** for temporary agents
-2. **Minimal capabilities** — principle of least privilege
-3. **Document purpose** — describe expected behavior in agent spec
-4. **Test in sandbox** thoroughly before promotion
-5. **Review drift patterns** — investigate recurring violations
+  architecture:
+    enforce_layer_isolation: true
+    require_orchestrator_boundary: true
+    prohibit_direct_provider_calls: true
 
-### Catalog Management
+  workflow:
+    require_node_permission_declaration: true
+    require_execution_logging: true
+    prohibit_dynamic_eval: true
+    prohibit_privilege_mutation: true
 
-1. **Review all submissions** — never auto-approve
-2. **Verify provider URLs** — ensure they point to legitimate services
-3. **Check descriptions** — ensure accuracy before publishing
-4. **Monitor published entries** — track usage and issues
-5. **Recall if needed** — unpublish entries that become problematic
+  deployment:
+    require_secure_defaults: true
+    prohibit_debug_in_production: true
+    fail_if_policy_engine_unavailable: true
 
-### Incident Response
+  audit:
+    require_action_logging: true
+    immutable_logs: true
+    log_fields:
+      - role
+      - timestamp
+      - action
+      - target
+      - result
 
-1. **Activate incident freeze** — blocks promotions during outages
-2. **Investigate immediately** — spec tampering is a critical security event
-3. **Quarantine affected agents** — invalidate and stop compromised agents
-4. **Document findings** — create incident report with timeline
-5. **Update policies** — prevent recurrence through policy changes
-6. **Export compliance report** — document the incident for audit trail
+  ci_cd:
+    require_pr_review: true
+    require_branch_protection: true
+    prohibit_direct_main_commit: true
+```
 
 ---
 
-## 17. Glossary
+## SECTION VI — Admin Review Checklist (Operational)
 
-| Term | Definition |
-|---|---|
-| **Admission Control** | The 7-check interceptor chain that validates agents before execution |
-| **Candidate** | An entry submitted to the pipeline awaiting Admin registration |
-| **Candidate Pipeline** | The 4-stage approval workflow for onboarding catalog entries |
-| **Drift** | When a governed agent deviates from its approved state |
-| **Fail-Closed** | Security posture where access is denied if rules are unavailable |
-| **Governed Agent** | An agent that has passed promotion and has a valid proof bundle |
-| **Hot Reload** | Updating policies without restarting the system |
-| **Interceptor Chain** | Sequential security checks that run before agent execution |
-| **MVA** | Minimum Viable Agent — the minimum spec required for promotion |
-| **OPA** | Open Policy Agent — external policy evaluation engine |
-| **Proof Bundle** | Cryptographic proof of an agent's spec integrity and policy compliance |
-| **Published** | A catalog entry that has completed the full pipeline and is active |
-| **Rego** | The policy language used by OPA |
-| **Remediation** | Fixing a drifted agent to restore compliance |
-| **Review State** | The approval status of a catalog entry (`needs_review`, `approved`, `rejected`) |
-| **Sandbox** | Isolated testing environment for agents before production |
-| **SSRF** | Server-Side Request Forgery — an attack where the server is tricked into making unintended requests |
-| **Tag** | A label on a catalog entry indicating its pipeline stage (`candidate`, `registered`, `validated`, `published`) |
-| **tRPC** | End-to-end type-safe RPC framework used for client-server communication |
+### Stage 1 — Submit
+
+- [ ] Entry type declared
+- [ ] Governance scope declared
+- [ ] Architecture layer identified
+- [ ] Policy mapping declared
+- [ ] Secrets declared (if any)
+- [ ] No embedded credentials
+
+**Fail → Do Not Register**
 
 ---
 
-**Document maintained by:** Platform Admin Team
-**Review cadence:** Quarterly or after significant platform changes
+### Stage 2 — Register
+
+- [ ] Governance classification correct
+- [ ] No architecture bypass
+- [ ] RBAC mapping defined
+- [ ] Documentation exists
+- [ ] API surface documented
+- [ ] No direct provider calls
+
+**Fail → Reject**
+
+---
+
+### Stage 3 — Validate
+
+- [ ] OPA policy exists
+- [ ] Policy compiles
+- [ ] Deny-by-default implemented
+- [ ] Enforcement hooks present
+- [ ] Secrets externalized
+- [ ] Rotation compatible
+- [ ] Workflow node permissions declared
+- [ ] Workflow execution logged
+- [ ] No dynamic eval
+- [ ] No privilege mutation
+- [ ] Audit logging functional
+- [ ] Deployment config secure
+
+**Fail → Block Publish**
+
+---
+
+### Stage 4 — Publish
+
+- [ ] Cross-document consistency
+- [ ] Lifecycle logs present
+- [ ] CI protections active
+- [ ] Branch protection active
+- [ ] PR reviewed
+- [ ] No Critical or High risk findings
+
+**If all pass → Publish**
+
+---
+
+### Stage 5 — Post-Publish Monitoring
+
+- [ ] Policy drift detection
+- [ ] Secret rotation operational
+- [ ] Workflow integrity maintained
+- [ ] Role expansion reviewed
+- [ ] Audit logs consistent
+
+---
+
+## SECTION VII — Triple Validation Rule
+
+An entry is publishable only if:
+
+1. **Compliance Matrix** = PASS
+2. **YAML Enforcement Spec** = PASS
+3. **Admin Checklist** = COMPLETE
+4. **Risk Severity** ≤ Medium
+
+**Failure at any layer halts progression.**
