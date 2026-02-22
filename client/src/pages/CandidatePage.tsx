@@ -444,9 +444,13 @@ export default function CandidatePage() {
 
   // Pipeline stage filters — each tab shows entries tagged with its stage
   // Also includes entries that have already progressed (for history)
+  // Entries with NO lifecycle tags are treated as fresh submissions (candidate)
+  const LIFECYCLE_TAGS = ["candidate", "registered", "validated", "published", "catalog"];
   const registerEntries = entries.filter((e: any) => {
     const tags = e.tags || [];
-    return tags.includes("candidate") || tags.includes("registered") || tags.includes("validated") || tags.includes("published");
+    const hasLifecycleTag = LIFECYCLE_TAGS.some((lt) => tags.includes(lt));
+    // Show if it has a pipeline tag OR if it has no lifecycle tag at all (fresh entry)
+    return !hasLifecycleTag || tags.includes("candidate") || tags.includes("registered") || tags.includes("validated") || tags.includes("published");
   });
   const validateEntries = entries.filter((e: any) => {
     const tags = e.tags || [];
@@ -643,13 +647,15 @@ export default function CandidatePage() {
         providerId,
       });
     } else {
+      // Auto-inject "candidate" tag for new entries so they enter the pipeline
+      const createTags = tags.includes("candidate") ? tags : ["candidate", ...tags];
       createMutation.mutate({
         name: formName,
         displayName: formDisplayName || undefined,
         description: formDescription || undefined,
         entryType: formEntryType,
         config: fullConfig,
-        tags,
+        tags: createTags,
         providerId,
         capabilities: formCapabilities.length > 0 ? formCapabilities : undefined,
       });
