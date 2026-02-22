@@ -1,0 +1,49 @@
+Session Summary — 2026-02-22 22:25
+====================================
+
+## Context
+Continued from session 22:00 which completed API testing of the governance lifecycle. This session added auto-classification, fixed the GIST_TOKEN deploy secret, and verified everything end-to-end from the UI.
+
+## Work Done
+
+### 1. Full API test — SambaNova + AI21 (real providers)
+- Discovered both providers via discoverProvider endpoint
+  - SambaNova: 18 models, docs.sambanova.ai, bearer auth
+  - AI21: 2 models (jamba-large, jamba-mini), docs.ai21.com, api_key auth
+- Created entries (id=83, 84), classified, and ran full governance lifecycle
+- Both passed 24/24 checks (Register 6/6, Validate 12/12, Publish 6/6)
+- Zero red or yellow items across 48 total checks
+
+### 2. UI testing revealed missing auto-classification
+- User tested from UI: REG-01 "Classification assigned" failed because new entries weren't auto-classified
+- API tests had passed because classification was done manually via API call
+
+### 3. Implemented auto-classify on entry creation (c5e0559)
+- Modified `server/routers/catalog-manage.ts` create endpoint
+- After creating an entry, automatically assigns the first taxonomy axis node for that entry type
+- For providers: auto-assigns "Hosting Model" taxonomy node
+- Non-blocking: wrapped in try/catch so classification failure doesn't break entry creation
+- Audit event logged: `catalog.entry.auto-classified`
+
+### 4. Fixed GIST_TOKEN deploy secret
+- Tunnel URL wasn't being written to gist during deploys
+- Diagnosed: GIST_TOKEN secret had gone stale
+- Fixed: `gh secret set GIST_TOKEN < ~/.github_pat`
+
+### 5. Verified auto-classify from API
+- Created test entry id=79 on fresh deploy
+- Register review: 6/6 passed — REG-01 shows "Classified: Hosting Model" automatically
+- No manual classification needed
+
+## Commits (this session)
+- c5e0559 — feat: auto-classify entries on creation with first taxonomy axis
+
+## Files Modified
+- server/routers/catalog-manage.ts — added getTaxonomyNodes import, auto-classify in create endpoint
+
+## Deploy
+- Tested at: https://pretty-pets-calendar-bit.trycloudflare.com
+- GIST_TOKEN refreshed for future deploys
+
+## Memory Updated
+- Added note to MEMORY.md: stop over-polling gist, use URL once obtained
