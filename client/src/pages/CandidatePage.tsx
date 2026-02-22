@@ -121,12 +121,12 @@ const ORIGIN_COLORS: Record<string, string> = {
   api: "bg-cyan-600/20 text-cyan-400 border-cyan-600/30",
 };
 
-/** Get per-stage review state from entry's stageReviews JSON, falling back to legacy reviewState */
+/** Get per-stage review state from entry's stageReviews JSON — each stage tracked independently */
 function getStageReviewState(entry: any, stage: string): string {
   const stageReviews = entry.stageReviews || {};
+  // Only trust explicit per-stage tracking — no legacy fallback
   if (stageReviews[stage]) return stageReviews[stage];
-  // Fallback: if legacy reviewState is approved and entry is at/past this stage, show approved
-  if (stage === "register" && entry.reviewState === "approved") return "approved";
+  // If no explicit state and entry has no stageReviews at all, show pending (not needs_review)
   return "needs_review";
 }
 

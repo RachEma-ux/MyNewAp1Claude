@@ -522,8 +522,10 @@ export const catalogManageRouter = router({
         }
       }
 
-      // Also set legacy reviewState to approved (for backward compatibility)
-      await approveCatalogEntry(input.id, 1);
+      // Only set legacy reviewState to approved when the final stage (publish) passes
+      if (stage === "publish") {
+        await approveCatalogEntry(input.id, 1);
+      }
       await updateCatalogEntry(input.id, { stageReviews: updatedStageReviews } as any, 1);
 
       if (input.activateNow) {
