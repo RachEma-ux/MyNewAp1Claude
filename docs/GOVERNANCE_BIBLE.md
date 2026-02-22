@@ -661,3 +661,194 @@ An entry is publishable only if:
 4. **Risk Severity** ≤ Medium
 
 **Failure at any layer halts progression.**
+
+---
+
+## SECTION VIII — Production Lockdown Assurance Framework
+
+Ensures that "ALL RULES SATISFIED" is provably true in production, not just by the governance engine.
+
+---
+
+### 1. Coverage Enforcement — Entrypoints Cannot Be Bypassed
+
+**1.1 Entry-Point Coverage (Hard Requirement)**
+
+Every lifecycle transition MUST pass through the Governance Scorecard gate:
+
+- **Admin Pipeline**
+  Register → Validate → Publish buttons MUST call
+  `POST /governance/scorecards` (or internal equivalent) and block on HTTP 409.
+
+- **Backend Pipeline**
+  Any server-side publish endpoint MUST call the same scorecard gate.
+
+- **Background Jobs**
+  Migration/sync/import/batch create jobs MUST call the governance gate before setting ACTIVE/PUBLISHED.
+
+- **CLI/Maintenance Scripts**
+  All lifecycle mutations must require an attached passing scorecard.
+
+**Deliverable:** *Gate Coverage Map* — list of all functions, endpoints, scripts that can change lifecycle state and their associated governance gate enforcement calls.
+
+---
+
+**1.2 Subject Coverage (Type-Agnostic Reality Check)**
+
+Governance must apply identically to all subject types: **provider, llm, model, agent, bot**.
+
+- Base pack MUST always run.
+- `${type}` pack MUST exist and run.
+- Pack resolver MUST fail closed on unknown subject types.
+
+**Deliverable:** `packs.coverage.json` — engine output listing all subject types and active controls.
+
+---
+
+### 2. Evidence Integrity — Prevent Fake PASS
+
+**2.1 Content-Addressed Evidence**
+
+- Artifact paths MUST be of form: `sha256/<hash>/artifact.json`.
+- Scorecard MUST store the hash and size.
+- On read/display, the hash MUST be re-verified.
+
+**2.2 Tamper-Evident Scorecard Record**
+
+Scorecards must include:
+- `repo`, `commit`, `runner_version`, `generated_at`
+- `artifacts[]` with `sha256`
+
+(Optionally in the future: `scorecard_signature`).
+
+**Deliverable:** `evidence.verify()` + test ensuring artifact modification is detected.
+
+---
+
+### 3. Gate Semantics — Single Source of Truth
+
+**3.1 Central Verdict Field**
+
+Add:
+
+```
+overall.gate_verdict: ALLOW | DENY
+```
+
+Transition code MUST check only this field.
+
+**3.2 Stage-Specific Verdict**
+
+Must include:
+
+```
+gates.register
+gates.validate
+gates.publish
+```
+
+Publish transition requires `gates.publish == PASS`.
+
+**Deliverable:** helper `requireGate(stage, scorecard)` used everywhere.
+
+---
+
+### 4. Frozen Subjects — Three-Layer Enforcement
+
+Freeze state MUST be enforced at:
+
+1. **Database constraint** (cannot progress)
+2. **Service middleware** (blocks transitions)
+3. **UI gating** (disables action buttons)
+
+**Frozen reason enum:**
+- `incident_lock`
+- `policy_drift`
+- `critical_violation_unresolved`
+- `security_hold`
+
+**Deliverable:** fields `freeze_reason`, `frozen_at`, `frozen_by`, and related audit log event.
+
+---
+
+### 5. Control Catalog Quality
+
+**5.1 Required Metadata**
+
+Every control MUST have:
+- `severity`
+- `stage_gate`
+- `pack`
+- `applies_to`
+- `runner`
+- `evidence_required`
+- `remediation`
+
+Missing fields → lint failure.
+
+**5.2 Coverage Requirements**
+
+For each subject type:
+- ≥8 controls in validate pack
+- ≥2 critical controls in base pack
+- ≥2 critical controls in type pack
+
+**Deliverable:** `catalog.lint` that fails if coverage thresholds are unmet.
+
+---
+
+### 6. Drift Detection — Continuous Compliance
+
+Drift checks MUST include:
+- Deployed policy bundle vs repo baseline
+- Config drift (env vars/flags)
+- Missing audit events
+- Secrets rotation overdue
+- New direct provider calls
+
+If drift severity is Critical/High:
+- Auto-freeze subject
+- Generate drift scorecard
+- File incident event
+
+**Deliverable:** scheduled drift job + auto-freeze hook + alert stub.
+
+---
+
+### 7. Minimal Acceptance Tests ("Done Means Done")
+
+Acceptance tests MUST cover:
+
+1. Missing base pack → validate denied
+2. Missing type pack → validate denied
+3. Critical violation → validate denied
+4. High violation → publish denied
+5. Evidence missing → publish denied
+6. Evidence tampered → display fails verification
+7. UI publish without gate → backend blocks
+8. Background import sets published → blocked
+9. Unknown subject type → denied
+10. Frozen subject → all transitions denied + audit logged
+
+**Deliverable:** `governance.e2e.test.ts` or equivalent.
+
+---
+
+### 8. Production Compliance Declaration
+
+The system may declare **ALL RULES SATISFIED** only if:
+
+- Gate Coverage Map produced
+- packs.coverage.json verified
+- Evidence integrity enforcement present
+- Centralized gate semantics enforced
+- Frozen subjects enforced
+- Catalog lint passing
+- Drift job active
+- Acceptance tests passing
+
+Failure in any area invalidates the claim.
+
+---
+
+*This section is binding under Governance Bible CGT v2 and supersedes informal validation claims.*
