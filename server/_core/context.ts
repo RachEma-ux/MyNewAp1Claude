@@ -23,7 +23,7 @@ export async function createContext(
       name: "Dev User",
       email: "dev@example.com",
       loginMethod: "dev-mode",
-      role: "user" as const,
+      role: "admin" as const,
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),
