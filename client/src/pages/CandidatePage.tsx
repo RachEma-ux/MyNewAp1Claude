@@ -158,8 +158,7 @@ function ClassificationBadges({ entryId }: { entryId: number }) {
 
 export default function CandidatePage() {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"catalog" | "audit" | "discovery-ops">("catalog");
-  const [discoveringEntryId, setDiscoveringEntryId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"catalog" | "validation" | "publishing" | "audit" | "discovery-ops">("catalog");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | EntryType>("all");
 
@@ -374,44 +373,6 @@ export default function CandidatePage() {
     },
   });
 
-  // Discover provider from catalog card — runs discovery and updates entry config
-  const entryDiscoverMutation = trpc.catalogManage.discoverProvider.useMutation();
-  async function handleDiscoverEntry(entry: any) {
-    const config = entry.config || {};
-    // Derive website URL from baseUrl domain, or fall back to entry name
-    let websiteUrl = "";
-    if (config.baseUrl) {
-      try { websiteUrl = new URL(config.baseUrl).origin; } catch { websiteUrl = config.baseUrl; }
-    } else {
-      // Use entry name as domain guess (e.g. "anthropic" → "https://anthropic.com")
-      const slug = (entry.name || "").replace(/[^a-z0-9.-]/gi, "").toLowerCase();
-      if (slug) websiteUrl = `https://${slug}.com`;
-    }
-    if (!websiteUrl) { toast.error("No URL available for discovery"); return; }
-    setDiscoveringEntryId(entry.id);
-    try {
-      const result = await entryDiscoverMutation.mutateAsync({ websiteUrl });
-      if (result.status === "failed") {
-        toast.error(`Discovery failed for ${entry.displayName || entry.name}`);
-        return;
-      }
-      // Merge discovered data into entry config
-      const cfg = { ...config };
-      if (result.api?.bestUrl) cfg.baseUrl = result.api.bestUrl;
-      if (result.docsUrl) cfg.docsUrl = result.docsUrl;
-      if (result.techDocs?.authMethod) cfg.authMethod = result.techDocs.authMethod;
-      if (result.techDocs?.rateLimits) cfg.rateLimits = result.techDocs.rateLimits;
-      if (result.techDocs?.httpsOnly !== undefined) cfg.httpsOnly = result.techDocs.httpsOnly;
-      if (result.authType && !cfg.authMethod) cfg.authMethod = result.authType;
-      updateMutation.mutate({ id: entry.id, config: cfg });
-      toast.success(`Discovered ${result.name || entry.name}: ${result.api?.modelCount ?? 0} models, docs: ${result.docsUrl || "none"}`);
-    } catch (e: any) {
-      toast.error(`Discovery error: ${e.message}`);
-    } finally {
-      setDiscoveringEntryId(null);
-    }
-  }
-
   // Governance: stage transition mutation
   const stageTransitionMutation = trpc.governance.stageTransition.useMutation({
     onSuccess: (data, variables) => {
@@ -530,6 +491,15 @@ export default function CandidatePage() {
     // Show if it has a pipeline tag OR if it has no lifecycle tag at all (fresh entry)
     return !hasLifecycleTag || tags.includes("candidate") || tags.includes("registered") || tags.includes("validated") || tags.includes("published");
   });
+  const validateEntries = entries.filter((e: any) => {
+    const tags = e.tags || [];
+    return tags.includes("registered") || tags.includes("validated") || tags.includes("published");
+  });
+  const publishEntries = entries.filter((e: any) => {
+    const tags = e.tags || [];
+    return tags.includes("validated") || tags.includes("published");
+  });
+
   // Filter Register tab entries by search
   const filteredEntries = registerEntries.filter((e: any) => {
     if (!search) return true;
@@ -779,7 +749,9 @@ export default function CandidatePage() {
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <div className="overflow-x-auto">
           <TabsList>
-            <TabsTrigger value="catalog">Catalog</TabsTrigger>
+            <TabsTrigger value="catalog">Register</TabsTrigger>
+            <TabsTrigger value="validation">Validate</TabsTrigger>
+            <TabsTrigger value="publishing">Publish</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
             <TabsTrigger value="discovery-ops">Discovery</TabsTrigger>
           </TabsList>
@@ -854,21 +826,19 @@ export default function CandidatePage() {
                           Registered
                         </Badge>
                         )}
-                        {entry.entryType === "provider" && (
+                        {entry.entryType === "provider" && (entry.config?.docsUrl || entry.config?.baseUrl) && (
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => handleDiscoverEntry(entry)}
-                          disabled={discoveringEntryId === entry.id}
-                          title="Discover provider API & docs"
-                          className="text-xs"
+                          onClick={() => refreshDocsMutation.mutate({ entryId: entry.id })}
+                          disabled={refreshDocsMutation.isPending}
+                          title="Refresh tech docs metadata"
                         >
-                          {discoveringEntryId === entry.id ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          {refreshDocsMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Globe className="h-4 w-4 mr-1" />
+                            <FileText className="h-4 w-4" />
                           )}
-                          Discover
                         </Button>
                         )}
                         <Button variant="ghost" size="sm" onClick={() => openEditDialog(entry)} title="Edit">
@@ -974,6 +944,453 @@ export default function CandidatePage() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="validation" className="mt-4">
+          {/* Test prompt toggle */}
+          <div className="flex items-center gap-3 mb-4 p-3 rounded-md border bg-muted/30">
+            <Switch checked={runTestPrompt} onCheckedChange={setRunTestPrompt} />
+            <div>
+              <p className="text-sm font-medium">Run Test Prompt</p>
+              <p className="text-xs text-muted-foreground">Send a test prompt to verify model inference works</p>
+            </div>
+          </div>
+
+          {validateEntries.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Activity className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium">No entries to validate</p>
+              <p className="text-sm mt-1">Register entries first, then they appear here for validation</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {validateEntries.map((entry: any) => {
+                const result = validationResults[entry.id];
+                const isRunning = validatingId === entry.id;
+
+                return (
+                  <Card key={entry.id}>
+                    <CardHeader className="pb-3">
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-base break-words cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>{entry.displayName || entry.name}</CardTitle>
+                          <div className="flex gap-1 shrink-0">
+                          {(entry.tags || []).includes("registered") && !(entry.tags || []).includes("validated") ? (
+                          <Button
+                            size="sm"
+                            onClick={() => governedTransition(entry, "validate")}
+                            disabled={stageTransitionMutation.isPending || updateMutation.isPending}
+                          >
+                            {stageTransitionMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                            )}
+                            Validate
+                          </Button>
+                          ) : (
+                          <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Validated
+                          </Badge>
+                          )}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
+                            <Badge variant="outline" className="text-xs">
+                              <Icon className="h-3 w-3 mr-1" />
+                              {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
+                            </Badge>
+                          ); })()}
+                          <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
+                          <Badge
+                            className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "validate")] || ""}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openReviewDialog(entry, "validate");
+                            }}
+                            title="Click to review validation criteria"
+                          >
+                            {getStageReviewState(entry, "validate") === "approved" ? (
+                              <ShieldCheck className="h-3 w-3 mr-1" />
+                            ) : (
+                              <Shield className="h-3 w-3 mr-1" />
+                            )}
+                            {getStageReviewState(entry, "validate") === "approved" ? "Reviewed" : "Review"}
+                          </Badge>
+                          {entry.validationStatus && (
+                            <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
+                              {entry.validationStatus === "passed" ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                              {entry.validationStatus}
+                            </Badge>
+                          )}
+                        </div>
+                        {entry.description && (
+                          <p className="text-xs text-muted-foreground">{entry.description}</p>
+                        )}
+                      </div>
+                      {entry.lastValidatedAt && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                          <Clock className="h-3 w-3" />
+                          Last validated: {new Date(entry.lastValidatedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
+                          {entry.origin}
+                        </Badge>
+                        <ClassificationBadges entryId={entry.id} />
+                        {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
+                          <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+                        ))}
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          Updated {new Date(entry.updatedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </CardContent>
+
+                    {/* Governance Stage Review Checklist (Validate tab) */}
+                    {stageReviewResults[entry.id] && (
+                      <CardContent className="pt-0">
+                        <Collapsible open={openChecklists.has(entry.id)} onOpenChange={() => toggleChecklist(entry.id)}>
+                          <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full">
+                            <Shield className="h-3 w-3" />
+                            <span>Stage Review: {stageReviewResults[entry.id].passed ? "PASSED" : "BLOCKED"}</span>
+                            <Badge className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}>
+                              {stageReviewResults[entry.id].score}%
+                            </Badge>
+                            <ChevronDown className="h-3 w-3 ml-auto" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-2">
+                            {!stageReviewResults[entry.id].passed && (
+                              <div className="mb-2 p-2 rounded-md bg-orange-950/20 border border-orange-900/30">
+                                <p className="text-xs font-medium text-orange-400">Governance gate blocked this transition</p>
+                              </div>
+                            )}
+                            <div className="space-y-1">
+                              {stageReviewResults[entry.id].items.map((item: any) => (
+                                <div key={item.itemId} className="flex items-start gap-2 text-xs">
+                                  {item.passed ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                                  ) : (
+                                    <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+                                  )}
+                                  <div className="min-w-0">
+                                    <span className="font-medium">{item.name}</span>
+                                    <Badge variant="outline" className="text-[9px] ml-1 px-1 py-0">{item.category}</Badge>
+                                    <p className="text-muted-foreground">{item.details}</p>
+                                    {item.remediation && (
+                                      <p className="text-orange-400/80 italic">{item.remediation}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </CardContent>
+                    )}
+
+                    {result && (
+                      <CardContent className="pt-0">
+                        <Separator className="mb-3" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {/* Health */}
+                          <div className="border rounded-md p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Activity className="h-4 w-4" />
+                              <span className="text-sm font-medium">Health</span>
+                              {result.results.health.passed
+                                ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                                : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{result.results.health.message}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{result.results.health.latencyMs}ms</p>
+                          </div>
+
+                          {/* Capabilities */}
+                          <div className="border rounded-md p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Cpu className="h-4 w-4" />
+                              <span className="text-sm font-medium">Capabilities</span>
+                              {result.results.capabilities.passed
+                                ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                                : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{result.results.capabilities.message}</p>
+                          </div>
+
+                          {/* Models */}
+                          <div className="border rounded-md p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Layers className="h-4 w-4" />
+                              <span className="text-sm font-medium">Models</span>
+                              {result.results.models.passed
+                                ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                                : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{result.results.models.message}</p>
+                            {result.results.models.models.length > 0 && (
+                              <div className="flex gap-1 flex-wrap mt-1">
+                                {result.results.models.models.slice(0, 5).map((m: string, i: number) => (
+                                  <Badge key={i} variant="secondary" className="text-xs">{m}</Badge>
+                                ))}
+                                {result.results.models.models.length > 5 && (
+                                  <span className="text-xs text-muted-foreground">+{result.results.models.models.length - 5} more</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Test Prompt */}
+                          {result.results.testPrompt && (
+                            <div className="border rounded-md p-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <MessageSquare className="h-4 w-4" />
+                                <span className="text-sm font-medium">Test Prompt</span>
+                                {result.results.testPrompt.passed
+                                  ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                                  : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
+                              </div>
+                              <p className="text-xs text-muted-foreground">{result.results.testPrompt.message}</p>
+                              {result.results.testPrompt.response && (
+                                <p className="text-xs font-mono bg-muted/50 rounded p-1.5 mt-1 truncate">
+                                  {result.results.testPrompt.response}
+                                </p>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-1">{result.results.testPrompt.latencyMs}ms</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Errors */}
+                        {result.errors && result.errors.length > 0 && (
+                          <div className="mt-3 p-2 rounded-md bg-red-950/20 border border-red-900/30">
+                            <p className="text-xs font-medium text-red-400 mb-1">Errors:</p>
+                            {result.errors.map((err: string, i: number) => (
+                              <p key={i} className="text-xs text-red-400/80">- {err}</p>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="publishing" className="mt-4">
+          {/* Ready to Publish */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3">Ready to Publish</h3>
+            {(() => {
+              if (publishEntries.length === 0) return (
+                <div className="text-center py-8 text-muted-foreground border rounded-md">
+                  <p className="text-sm">No validated entries ready for publishing</p>
+                  <p className="text-xs mt-1">Validate entries first, then they appear here</p>
+                </div>
+              );
+              return (
+                <div className="space-y-4">
+                  {publishEntries.map((entry: any) => (
+                    <Card key={entry.id}>
+                      <CardHeader className="pb-3">
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="text-base break-words cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>{entry.displayName || entry.name}</CardTitle>
+                            <div className="flex gap-1 shrink-0">
+                            {(entry.tags || []).includes("validated") && !(entry.tags || []).includes("published") ? (
+                            <Button size="sm" onClick={() => {
+                              governedTransition(entry, "publish");
+                              activateMutation.mutate({ id: entry.id });
+                            }} disabled={stageTransitionMutation.isPending || updateMutation.isPending}>
+                              {stageTransitionMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Rocket className="h-4 w-4 mr-1" />
+                              )}
+                              Publish
+                            </Button>
+                            ) : (
+                            <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                              <Rocket className="h-3 w-3 mr-1" />
+                              Published
+                            </Badge>
+                            )}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
+                              <Badge variant="outline" className="text-xs">
+                                <Icon className="h-3 w-3 mr-1" />
+                                {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
+                              </Badge>
+                            ); })()}
+                            <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
+                            <Badge
+                              className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "publish")] || ""}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openReviewDialog(entry, "publish");
+                              }}
+                              title="Click to review publication criteria"
+                            >
+                              {getStageReviewState(entry, "publish") === "approved" ? <ShieldCheck className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
+                              {getStageReviewState(entry, "publish") === "approved" ? "Reviewed" : "Review"}
+                            </Badge>
+                            {entry.validationStatus && (
+                              <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
+                                {entry.validationStatus === "passed" ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                                {entry.validationStatus}
+                              </Badge>
+                            )}
+                          </div>
+                          {entry.description && (
+                            <p className="text-xs text-muted-foreground">{entry.description}</p>
+                          )}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
+                            {entry.origin}
+                          </Badge>
+                          <ClassificationBadges entryId={entry.id} />
+                          {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
+                            <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+                          ))}
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            Updated {new Date(entry.updatedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </CardContent>
+
+                      {/* Governance Stage Review Checklist (Publish tab) */}
+                      {stageReviewResults[entry.id] && (
+                        <CardContent className="pt-0">
+                          <Collapsible open={openChecklists.has(entry.id)} onOpenChange={() => toggleChecklist(entry.id)}>
+                            <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full">
+                              <Shield className="h-3 w-3" />
+                              <span>Stage Review: {stageReviewResults[entry.id].passed ? "PASSED" : "BLOCKED"}</span>
+                              <Badge className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}>
+                                {stageReviewResults[entry.id].score}%
+                              </Badge>
+                              <ChevronDown className="h-3 w-3 ml-auto" />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-2">
+                              {!stageReviewResults[entry.id].passed && (
+                                <div className="mb-2 p-2 rounded-md bg-orange-950/20 border border-orange-900/30">
+                                  <p className="text-xs font-medium text-orange-400">Governance gate blocked this transition</p>
+                                </div>
+                              )}
+                              <div className="space-y-1">
+                                {stageReviewResults[entry.id].items.map((item: any) => (
+                                  <div key={item.itemId} className="flex items-start gap-2 text-xs">
+                                    {item.passed ? (
+                                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                                    ) : (
+                                      <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+                                    )}
+                                    <div className="min-w-0">
+                                      <span className="font-medium">{item.name}</span>
+                                      <Badge variant="outline" className="text-[9px] ml-1 px-1 py-0">{item.category}</Badge>
+                                      <p className="text-muted-foreground">{item.details}</p>
+                                      {item.remediation && (
+                                        <p className="text-orange-400/80 italic">{item.remediation}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </CardContent>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+
+          <Separator className="my-6" />
+
+          {/* Published Bundles */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3">Published Bundles</h3>
+            {bundles.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground border rounded-md">
+                <p className="text-sm">No published bundles yet</p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Entry</TableHead>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Hash</TableHead>
+                      <TableHead>Published</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bundles.map((bundle: any) => {
+                      const snap = bundle.snapshot as any;
+                      return (
+                        <TableRow key={bundle.id}>
+                          <TableCell>
+                            <span className="font-medium text-sm">{snap?.displayName || snap?.name || `Entry #${bundle.catalogEntryId}`}</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs font-mono">{bundle.versionLabel}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`text-xs ${
+                              bundle.status === "active" ? "bg-green-600/20 text-green-400 border-green-600/30" :
+                              bundle.status === "recalled" ? "bg-red-600/20 text-red-400 border-red-600/30" :
+                              "bg-gray-600/20 text-gray-400 border-gray-600/30"
+                            }`}>
+                              {bundle.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs font-mono text-muted-foreground">
+                              {bundle.snapshotHash?.substring(0, 12)}...
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(bundle.publishedAt).toLocaleString()}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {bundle.status === "active" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => recallMutation.mutate({ bundleId: bundle.id })}
+                                disabled={recallMutation.isPending}
+                              >
+                                Recall
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="audit" className="mt-4">
