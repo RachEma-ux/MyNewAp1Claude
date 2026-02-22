@@ -15,6 +15,16 @@
 import { getAuditLogger } from "../services/auditLogger";
 import { type RiskFinding, createFinding, blocksStage } from "./risk-classifier";
 
+// Lazy import to avoid circular dependency (scorecard → lifecycle-guard → scorecard)
+function checkFrozen(subjectId: number): boolean {
+  try {
+    const { isFrozen } = require("./scorecard");
+    return isFrozen(subjectId);
+  } catch {
+    return false;
+  }
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -76,6 +86,19 @@ function stageIndex(stage: LifecycleStage): number {
  *   4. Audit logging of every attempt
  */
 export function validateTransition(req: TransitionRequest): TransitionResult {
+  // Rule 0: Check frozen status — frozen subjects cannot transition
+  if (checkFrozen(req.entryId)) {
+    const reason = `Subject #${req.entryId} "${req.entryName}" is FROZEN — all lifecycle transitions blocked until unfrozen`;
+    logTransition(req, false, reason);
+    return { allowed: false, reason };
+  }
+  // Also check system-wide freeze (subject ID 0)
+  if (checkFrozen(0)) {
+    const reason = `System-wide governance FREEZE active — all transitions blocked. Resolve drift violations first.`;
+    logTransition(req, false, reason);
+    return { allowed: false, reason };
+  }
+
   const fromIdx = stageIndex(req.fromStage);
   const toIdx = stageIndex(req.toStage);
 
@@ -220,7 +243,7 @@ function logTransition(req: TransitionRequest, allowed: boolean, reason: string)
   const audit = getAuditLogger();
   const event = audit.log({
     actor_id: req.actorId,
-    action_type: "POLICY_UPDATE" as any,
+    action_type: "LIFECYCLE_TRANSITION",
     target_type: "lifecycle_transition",
     target_id: String(req.entryId),
     decision_result: allowed ? "success" : "denied",

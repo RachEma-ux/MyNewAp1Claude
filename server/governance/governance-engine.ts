@@ -127,8 +127,33 @@ class GovernanceEngine {
 
   /**
    * Validate and enforce a lifecycle transition.
+   * Checks frozen status, validates transition rules, and optionally runs scorecard.
    */
   enforceLifecycleTransition(req: TransitionRequest) {
+    // Check frozen status (lifecycle-guard also checks, but defense-in-depth)
+    try {
+      const { isFrozen } = require("./scorecard");
+      if (isFrozen(req.entryId)) {
+        const reason = `Subject #${req.entryId} is FROZEN — transition blocked`;
+        getGovernanceMetrics().inc("lifecycle_denials_total");
+        if (isStrictMode()) {
+          throw new Error(`[Governance] ${reason}`);
+        }
+        return { allowed: false, reason };
+      }
+      if (isFrozen(0)) {
+        const reason = "System-wide governance FREEZE — all transitions blocked";
+        getGovernanceMetrics().inc("lifecycle_denials_total");
+        if (isStrictMode()) {
+          throw new Error(`[Governance] ${reason}`);
+        }
+        return { allowed: false, reason };
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("[Governance]")) throw e;
+      // Scorecard module not available — continue with standard validation
+    }
+
     const result = validateTransition(req);
 
     if (!result.allowed) {
@@ -142,6 +167,42 @@ class GovernanceEngine {
     }
 
     return result;
+  }
+
+  /**
+   * Run scorecard for a subject and enforce gate.
+   * Returns scorecard result or throws on blocked transition (strict mode).
+   */
+  enforceScorecard(params: {
+    stage: string;
+    subject?: { id: number; name: string; type: string; tags: string[]; description?: string; config?: any };
+    actorId: string;
+    actorRole: string;
+  }) {
+    try {
+      const { runScorecard, isFrozen } = require("./scorecard");
+
+      // Check freeze before scoring
+      if (params.subject && isFrozen(params.subject.id)) {
+        throw new Error(`[Governance] Subject #${params.subject.id} is FROZEN — scorecard blocked`);
+      }
+
+      const result = runScorecard({
+        stage: params.stage,
+        entry: params.subject,
+        actor: { id: params.actorId, role: params.actorRole },
+      });
+
+      if (result.blocked && isStrictMode()) {
+        throw new Error(`[Governance] Scorecard gate FAIL: ${result.scorecard.gateStatus.reason}`);
+      }
+
+      return result;
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("[Governance]")) throw e;
+      console.warn("[Governance] Scorecard engine unavailable:", e);
+      return null;
+    }
   }
 
   /**

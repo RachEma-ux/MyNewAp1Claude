@@ -72,26 +72,54 @@ export { governanceRouter } from "./router";
 
 // Scorecard Engine (CGT v2)
 export {
+  // Engine
   runScorecard,
   getLatestScorecard,
   getScorecardHistory,
+  // Control Catalog
   CONTROL_CATALOG,
   getActiveControls,
   getControlsForStage,
   getControlsByDomain,
+  getControlsByPack,
   getControlById,
+  // Runners
   getAllRunners,
+  // Evidence
   verifyBundleIntegrity,
   formatBundleSummary,
+  // Drift Detection + Freeze Management
   detectDrift,
   startDriftDetection,
   stopDriftDetection,
   isDriftDetectionActive,
+  getFrozenSubjects,
+  unfreezeSubject,
+  isFrozen,
+  freezeSubject,
+  getFreezeDetails,
+  // GovernedSubject
+  SUBJECT_TYPES,
+  validateSubject,
+  isValidSubjectType,
+  // Pack Resolver
+  resolvePacks,
+  hasTypePack,
+  getAvailablePacks,
+  // Types
   type ScorecardRequest,
   type ScorecardResult,
   type ControlDefinition,
   type ControlDomain,
+  type PackType,
   type ControlResult,
   type EvidenceBundle,
   type DriftReport,
+  type DriftConfig,
+  type FrozenSubject,
+  type GovernedSubject,
+  type SubjectType,
+  type SubjectValidationResult,
+  type PackId,
+  type PackResolution,
 } from "./scorecard";
