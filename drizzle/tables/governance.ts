@@ -24,11 +24,7 @@ import {
   json,
   pgTable,
   index,
-  uniqueIndex,
-  check,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
-import { catalogEntries } from "./catalog";
 
 // ============================================================================
 // Governance Scorecards — Immutable scorecard persistence
@@ -101,53 +97,5 @@ export const governanceScorecards = pgTable("governance_scorecards", {
 export type GovernanceScorecard = typeof governanceScorecards.$inferSelect;
 export type InsertGovernanceScorecard = typeof governanceScorecards.$inferInsert;
 
-// ============================================================================
-// Governance Audit Logs — Append-only, immutable
-// ============================================================================
-
-export const governanceAuditLogs = pgTable("governance_audit_logs", {
-  id: serial("id").primaryKey(),
-
-  // Event classification
-  eventType: varchar("event_type", { length: 100 }).notNull(),
-
-  // Actor
-  actorId: varchar("actor_id", { length: 255 }),
-  actorRole: varchar("actor_role", { length: 50 }),
-
-  // Target
-  targetType: varchar("target_type", { length: 100 }),
-  targetId: varchar("target_id", { length: 255 }),
-  targetName: varchar("target_name", { length: 255 }),
-
-  // Decision
-  decision: varchar("decision", { length: 50 }).notNull(),
-
-  // Context
-  stage: varchar("stage", { length: 50 }),
-  scorecardId: integer("scorecard_id"),
-
-  // Reason / details
-  reason: text("reason"),
-  metadata: json("metadata").$type<Record<string, any>>(),
-
-  // Evidence reference
-  evidenceBundleId: varchar("evidence_bundle_id", { length: 100 }),
-
-  // Integrity — SHA-256 of the log entry (tamper detection)
-  entryHash: varchar("entry_hash", { length: 64 }),
-
-  // Immutable timestamp
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  eventTypeIdx: index("idx_gov_audit_event_type").on(table.eventType),
-  actorIdx: index("idx_gov_audit_actor").on(table.actorId),
-  targetIdx: index("idx_gov_audit_target").on(table.targetType, table.targetId),
-  decisionIdx: index("idx_gov_audit_decision").on(table.decision),
-  stageIdx: index("idx_gov_audit_stage").on(table.stage),
-  createdIdx: index("idx_gov_audit_created").on(table.createdAt),
-  scorecardIdx: index("idx_gov_audit_scorecard").on(table.scorecardId),
-}));
-
-export type GovernanceAuditLog = typeof governanceAuditLogs.$inferSelect;
-export type InsertGovernanceAuditLog = typeof governanceAuditLogs.$inferInsert;
+// NOTE: governanceAuditLogs table is defined in drizzle/tables/agents.ts
+// to avoid duplicate exports through schema.ts barrel.
