@@ -187,6 +187,10 @@ async function startServer() {
   initializeGovernance();
 
   const app = express();
+
+  // Phase 10 — Production Hardening: disable x-powered-by header
+  app.disable("x-powered-by");
+
   const server = createServer(app);
 
   // CORS — restrict origins in production, allow localhost in dev
@@ -299,6 +303,26 @@ async function startServer() {
 
     timestamps.push(now);
     importRateMap.set(key, timestamps);
+    next();
+  });
+
+  // Stricter rate limiting for governance endpoints (Phase 10 hardening)
+  const governanceRateMap = new Map<string, number[]>();
+  const GOVERNANCE_RATE_LIMIT = 30; // max requests per minute per IP
+  app.use("/api/trpc/governance", (req, res, next) => {
+    const key = req.ip || "unknown";
+    const now = Date.now();
+
+    let timestamps = governanceRateMap.get(key) || [];
+    timestamps = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+
+    if (timestamps.length >= GOVERNANCE_RATE_LIMIT) {
+      res.status(429).json({ error: "Governance rate limit exceeded. Try again later." });
+      return;
+    }
+
+    timestamps.push(now);
+    governanceRateMap.set(key, timestamps);
     next();
   });
 

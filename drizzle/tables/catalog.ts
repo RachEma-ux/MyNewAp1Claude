@@ -46,6 +46,12 @@ export const catalogEntries = pgTable("catalog_entries", {
   validationStatus: varchar("validationStatus", { length: 50 }),
   validationErrors: json("validationErrors").$type<string[]>(),
 
+  // Governance freeze columns (Phase 1 — Production Lockdown)
+  frozen: boolean("frozen").default(false).notNull(),
+  freezeReason: text("freeze_reason"),
+  frozenAt: timestamp("frozen_at"),
+  frozenBy: varchar("frozen_by", { length: 255 }),
+
   // Metadata
   createdBy: integer("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

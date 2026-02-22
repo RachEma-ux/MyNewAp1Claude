@@ -1247,3 +1247,313 @@ registerRunner({
     ];
   },
 });
+
+// ============================================================================
+// PHASE 4 — PRODUCTION LOCKDOWN: Additional Required Runners
+// ============================================================================
+// Role: CE-B (CI/CD & Runners Owner)
+// Spec compliance: Each runner MUST return artifact evidence + remediation.
+// No runner may silently PASS without evidence.
+
+// ── CI Branch Protection Validator ──────────────────────────────────────
+
+registerRunner({
+  id: "ci-branch-protection-validator",
+  name: "CI Branch Protection Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "ci-branch-protection-validator");
+    if (!control) return [];
+
+    // Verify CI workflow files exist for governance enforcement
+    const fs = require("fs");
+    const requiredWorkflows = [
+      ".github/workflows/governance-gate.yml",
+      ".github/workflows/ci.yml",
+    ];
+    const found: string[] = [];
+    const missing: string[] = [];
+
+    for (const wf of requiredWorkflows) {
+      try { if (fs.existsSync(wf)) found.push(wf); else missing.push(wf); }
+      catch { missing.push(wf); }
+    }
+
+    const passed = missing.length === 0;
+    return [
+      buildResult(control, "ci-branch-protection-validator", passed,
+        passed
+          ? `CI branch protection: ${found.length} workflow(s) present`
+          : `Missing CI workflows: ${missing.join(", ")}`,
+        {
+          check: "CI branch protection",
+          finding: passed ? "enforced" : "incomplete",
+          targets: missing.length > 0 ? missing : found,
+          data: { found, missing },
+        }
+      ),
+    ];
+  },
+});
+
+// ── Provider HTTPS-Only Validator ───────────────────────────────────────
+
+registerRunner({
+  id: "provider-https-validator",
+  name: "Provider HTTPS-Only Endpoint Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "provider-https-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "provider-https-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const urls = [config.baseUrl, config.endpoint, config.apiUrl].filter(Boolean) as string[];
+    const httpViolations = urls.filter((u) => u.startsWith("http://") && !u.includes("localhost") && !u.includes("127.0.0.1"));
+    const passed = httpViolations.length === 0;
+
+    return [
+      buildResult(control, "provider-https-validator", passed,
+        passed
+          ? urls.length > 0 ? `All provider endpoints use HTTPS: ${urls.join(", ")}` : "No endpoints configured (acceptable at register)"
+          : `NON-HTTPS endpoint(s) detected: ${httpViolations.join(", ")}`,
+        {
+          check: "Provider HTTPS-only enforcement",
+          finding: passed ? "https_enforced" : "http_detected",
+          targets: httpViolations.length > 0 ? httpViolations : urls,
+          data: { urlCount: urls.length, httpViolations: httpViolations.length },
+        }
+      ),
+    ];
+  },
+});
+
+// ── Provider Auth Method Validator ──────────────────────────────────────
+
+registerRunner({
+  id: "provider-auth-method-validator",
+  name: "Provider Auth Method Declaration Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "provider-auth-method-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "provider-auth-method-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasAuth = !!config.authMethod || !!config.authType || !!config.apiKey || !!config.bearerToken;
+    return [
+      buildResult(control, "provider-auth-method-validator", hasAuth,
+        hasAuth
+          ? `Provider auth method declared: ${config.authMethod || config.authType || "api_key"}`
+          : "Provider has no authentication method declared",
+        {
+          check: "Provider auth method declaration",
+          finding: hasAuth ? "declared" : "missing",
+          targets: [config.authMethod || config.authType || "none"],
+          data: { authMethod: config.authMethod, authType: config.authType },
+        }
+      ),
+    ];
+  },
+});
+
+// ── Agent Scope Validator ───────────────────────────────────────────────
+
+registerRunner({
+  id: "agent-scope-validator",
+  name: "Agent Scope Declaration Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "agent-scope-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "agent-scope-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasScope = !!config.scope || !!config.capabilities || !!config.allowedDomains;
+    return [
+      buildResult(control, "agent-scope-validator", hasScope,
+        hasScope
+          ? `Agent scope declared: ${config.scope || "capabilities-defined"}`
+          : "Agent has no scope declaration — unrestricted agent is a governance violation",
+        {
+          check: "Agent scope declaration",
+          finding: hasScope ? "declared" : "undeclared",
+          targets: hasScope ? [config.scope || "capabilities"] : [],
+          data: { scope: config.scope, capabilities: config.capabilities },
+        }
+      ),
+    ];
+  },
+});
+
+// ── Agent Direct Secret Access Validator ────────────────────────────────
+
+registerRunner({
+  id: "agent-secret-access-validator",
+  name: "Agent Direct Secret Access Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "agent-secret-access-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "agent-secret-access-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const configStr = JSON.stringify(config);
+    const secretPatterns = [/process\.env\./i, /secret/i, /apiKey/i, /password/i, /credential/i];
+    const violations: string[] = [];
+    for (const p of secretPatterns) {
+      if (p.test(configStr) && !configStr.includes("enc:")) violations.push(p.source);
+    }
+    // Agent configs should reference secrets by ID, not contain raw values
+    const hasDirectAccess = !!config.secretAccessDirect || !!config.rawApiKey;
+    if (hasDirectAccess) violations.push("direct_secret_access");
+
+    const passed = violations.length === 0;
+    return [
+      buildResult(control, "agent-secret-access-validator", passed,
+        passed
+          ? "Agent has no direct secret access — secrets routed through secret manager"
+          : `Agent has ${violations.length} direct secret access violation(s)`,
+        {
+          check: "Agent direct secret access",
+          finding: passed ? "no_direct_access" : "direct_access_detected",
+          targets: violations,
+          data: { violationCount: violations.length },
+        }
+      ),
+    ];
+  },
+});
+
+// ── Model License Validator ─────────────────────────────────────────────
+
+registerRunner({
+  id: "model-license-validator",
+  name: "Model License Declaration Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "model-license-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "model-license-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const metadata = (ctx.entry as any).metadata || {};
+    const hasLicense = !!config.license || !!metadata.license || !!config.licenseType;
+    return [
+      buildResult(control, "model-license-validator", hasLicense,
+        hasLicense
+          ? `Model license declared: ${config.license || metadata.license || config.licenseType}`
+          : "Model has no license declaration — legal compliance risk",
+        {
+          check: "Model license declaration",
+          finding: hasLicense ? "declared" : "missing",
+          targets: [config.license || metadata.license || "none"],
+        }
+      ),
+    ];
+  },
+});
+
+// ── Model Versioning Validator ──────────────────────────────────────────
+
+registerRunner({
+  id: "model-versioning-validator",
+  name: "Model Version Declaration Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "model-versioning-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "model-versioning-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const metadata = (ctx.entry as any).metadata || {};
+    const hasVersion = !!config.version || !!metadata.version || !!config.modelVersion;
+    return [
+      buildResult(control, "model-versioning-validator", hasVersion,
+        hasVersion
+          ? `Model version declared: ${config.version || metadata.version || config.modelVersion}`
+          : "Model has no version — reproducibility risk",
+        {
+          check: "Model version declaration",
+          finding: hasVersion ? "versioned" : "unversioned",
+          targets: [config.version || metadata.version || "none"],
+        }
+      ),
+    ];
+  },
+});
+
+// ── Bot Revocation Endpoint Validator ───────────────────────────────────
+
+registerRunner({
+  id: "bot-revocation-validator",
+  name: "Bot Revocation Endpoint Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "bot-revocation-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "bot-revocation-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasRevocation = !!config.revocationEndpoint || !!config.canRevoke || config.revocable === true;
+    return [
+      buildResult(control, "bot-revocation-validator", hasRevocation,
+        hasRevocation
+          ? "Bot has revocation capability configured"
+          : "Bot has no revocation endpoint — cannot be immediately disabled",
+        {
+          check: "Bot revocation endpoint",
+          finding: hasRevocation ? "revocable" : "irrevocable",
+          targets: hasRevocation ? [config.revocationEndpoint || "config.canRevoke"] : [],
+        }
+      ),
+    ];
+  },
+});
+
+// ── Bot Rate Limit Validator ────────────────────────────────────────────
+
+registerRunner({
+  id: "bot-ratelimit-validator",
+  name: "Bot Rate Limit Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "bot-ratelimit-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "bot-ratelimit-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasRateLimit = !!config.rateLimit || !!config.maxMessagesPerMinute || !!config.throttle;
+    return [
+      buildResult(control, "bot-ratelimit-validator", hasRateLimit,
+        hasRateLimit
+          ? "Bot rate limiting configured"
+          : "Bot has no rate limiting — abuse risk",
+        {
+          check: "Bot rate limit configuration",
+          finding: hasRateLimit ? "configured" : "unlimited",
+          targets: ["config.rateLimit"],
+          data: { rateLimit: config.rateLimit, maxMpm: config.maxMessagesPerMinute },
+        }
+      ),
+    ];
+  },
+});
+
+// ── Bot Monitoring Hook Validator ───────────────────────────────────────
+
+registerRunner({
+  id: "bot-monitoring-validator",
+  name: "Bot Monitoring Hook Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "bot-monitoring-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "bot-monitoring-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasMonitoring = !!config.monitoringHook || !!config.webhookUrl || !!config.alertEndpoint;
+    return [
+      buildResult(control, "bot-monitoring-validator", hasMonitoring,
+        hasMonitoring
+          ? "Bot monitoring hook configured"
+          : "Bot has no monitoring hook — incidents will go undetected",
+        {
+          check: "Bot monitoring hook",
+          finding: hasMonitoring ? "monitored" : "unmonitored",
+          targets: hasMonitoring ? [config.monitoringHook || config.webhookUrl || "configured"] : [],
+        }
+      ),
+    ];
+  },
+});

@@ -62,6 +62,8 @@ export interface RiskBreakdown {
 export interface AggregatedScorecard {
   score: ScoreBreakdown;
   gateStatus: GateEvaluation;
+  /** Overall gate verdict: ALLOW or DENY (non-negotiable) */
+  gateVerdict: "ALLOW" | "DENY";
   riskBreakdown: RiskBreakdown;
   controlResults: ControlResult[];
   passCount: number;
@@ -163,6 +165,7 @@ export function aggregateResults(
       domainScores,
     },
     gateStatus,
+    gateVerdict: gateStatus.passed ? "ALLOW" as const : "DENY" as const,
     riskBreakdown,
     controlResults: results,
     passCount,

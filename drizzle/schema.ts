@@ -14,3 +14,4 @@ export * from './tables/providers';
 export * from './tables/system';
 export * from './tables/llm';
 export * from './tables/catalog';
+export * from './tables/governance';

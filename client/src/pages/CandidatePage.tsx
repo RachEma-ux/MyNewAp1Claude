@@ -379,6 +379,52 @@ export default function CandidatePage() {
     });
   }
 
+  // Stage review preview query (read-only, for checklist display)
+  const stageReviewPreview = trpc.governance.stageReview.useQuery(
+    // Input is set dynamically via refetch; disabled by default
+    { entryId: 0, entryName: "", entryType: "provider", tags: [], targetStage: "register" },
+    { enabled: false }
+  );
+
+  /** Preview the governance checklist for an entry at a given stage (read-only) */
+  function previewStageReview(entry: any, targetStage: string) {
+    // Determine which stage to preview based on current tags
+    const tags = entry.tags || [];
+    let stage = targetStage;
+    if (!stage) {
+      if (tags.includes("validated")) stage = "publish";
+      else if (tags.includes("registered")) stage = "validate";
+      else stage = "register";
+    }
+
+    // Use the stageReview query via trpcUtils.fetch (one-shot)
+    trpcUtils.governance.stageReview
+      .fetch({
+        entryId: entry.id,
+        entryName: entry.displayName || entry.name,
+        entryType: entry.entryType,
+        tags: entry.tags || [],
+        description: entry.description || undefined,
+        config: entry.config || undefined,
+        reviewState: entry.reviewState || undefined,
+        status: entry.status || undefined,
+        validationStatus: entry.validationStatus || undefined,
+        capabilities: entry.capabilities || undefined,
+        targetStage: stage as any,
+      })
+      .then((result) => {
+        setStageReviewResults((prev) => ({ ...prev, [entry.id]: result }));
+        setOpenChecklists((prev) => {
+          const next = new Set(prev);
+          next.add(entry.id);
+          return next;
+        });
+      })
+      .catch((err) => {
+        toast.error(`Stage review failed: ${err.message}`);
+      });
+  }
+
   /** Trigger a governed stage transition for an entry */
   function governedTransition(entry: any, targetStage: string) {
     stageTransitionMutation.mutate({
@@ -717,7 +763,19 @@ export default function CandidatePage() {
                           </Badge>
                         ); })()}
                         <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
-                        <Badge className={`text-xs ${REVIEW_COLORS[entry.reviewState] || ""}`}>
+                        <Badge
+                          className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Determine target stage based on current tags
+                            const tags = entry.tags || [];
+                            let targetStage = "register";
+                            if (tags.includes("validated")) targetStage = "publish";
+                            else if (tags.includes("registered")) targetStage = "validate";
+                            previewStageReview(entry, targetStage);
+                          }}
+                          title="Click to view governance checklist"
+                        >
                           {entry.reviewState === "needs_review" ? (
                             <Shield className="h-3 w-3 mr-1" />
                           ) : entry.reviewState === "approved" ? (
@@ -868,7 +926,18 @@ export default function CandidatePage() {
                             </Badge>
                           ); })()}
                           <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
-                          <Badge className={`text-xs ${REVIEW_COLORS[entry.reviewState] || ""}`}>
+                          <Badge
+                            className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const tags = entry.tags || [];
+                              let targetStage = "validate";
+                              if (tags.includes("validated")) targetStage = "publish";
+                              else if (tags.includes("registered")) targetStage = "validate";
+                              previewStageReview(entry, targetStage);
+                            }}
+                            title="Click to view governance checklist"
+                          >
                             {entry.reviewState === "needs_review" ? (
                               <Shield className="h-3 w-3 mr-1" />
                             ) : entry.reviewState === "approved" ? (
@@ -1090,7 +1159,14 @@ export default function CandidatePage() {
                               </Badge>
                             ); })()}
                             <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
-                            <Badge className={`text-xs ${REVIEW_COLORS[entry.reviewState] || ""}`}>
+                            <Badge
+                              className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                previewStageReview(entry, "publish");
+                              }}
+                              title="Click to view governance checklist"
+                            >
                               {entry.reviewState === "approved" ? <ShieldCheck className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
                               {entry.reviewState}
                             </Badge>

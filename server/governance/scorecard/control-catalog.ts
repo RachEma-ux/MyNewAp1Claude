@@ -385,6 +385,24 @@ const BASE_CONTROLS: ControlDefinition[] = [
 // TYPE PACKS — provider, llm, model, agent, bot
 // ============================================================================
 
+// ── Phase 4 additions — CI Branch Protection ─────────────────────────
+const PHASE4_BASE_CONTROLS: ControlDefinition[] = [
+  {
+    id: "GOV-006",
+    name: "CI branch protection enforced",
+    domain: "governance",
+    pack: "base",
+    riskCategory: "missing_enforcement_hook",
+    severity: "critical",
+    blocksStages: ["validate", "publish"],
+    weight: 10,
+    runnerId: "ci-branch-protection-validator",
+    remediation: "Ensure governance-gate.yml and ci.yml workflows exist and enforce merge blocking.",
+    rationale: "CGT v2 Section X: CI must block merge on governance violations.",
+    enabled: true,
+  },
+];
+
 const PROVIDER_CONTROLS: ControlDefinition[] = [
   {
     id: "TYPE-P001",
@@ -416,13 +434,41 @@ const PROVIDER_CONTROLS: ControlDefinition[] = [
   },
   {
     id: "TYPE-P003",
+    name: "Provider HTTPS-only endpoints",
+    domain: "type_specific",
+    pack: "provider",
+    riskCategory: "missing_encryption",
+    severity: "critical",
+    blocksStages: ["validate", "publish"],
+    weight: 10,
+    runnerId: "provider-https-validator",
+    remediation: "All provider endpoints must use HTTPS. HTTP is only allowed for localhost/development.",
+    rationale: "CGT v2: HTTPS endpoints only — plaintext transport is Critical.",
+    enabled: true,
+  },
+  {
+    id: "TYPE-P004",
+    name: "Provider auth method declared",
+    domain: "type_specific",
+    pack: "provider",
+    riskCategory: "missing_enforcement_hook",
+    severity: "high",
+    blocksStages: ["validate", "publish"],
+    weight: 7,
+    runnerId: "provider-auth-method-validator",
+    remediation: "Provider must declare its authentication method (API key, bearer token, OAuth, etc.).",
+    rationale: "Undeclared auth methods prevent governance from verifying credential management.",
+    enabled: true,
+  },
+  {
+    id: "TYPE-P005",
     name: "Provider rate limit configured",
     domain: "type_specific",
     pack: "provider",
     riskCategory: "missing_enforcement_hook",
-    severity: "medium",
-    blocksStages: ["publish"],
-    weight: 5,
+    severity: "high",
+    blocksStages: ["validate", "publish"],
+    weight: 6,
     runnerId: "provider-ratelimit-validator",
     remediation: "Provider must have rate limiting configuration before publication.",
     rationale: "Unconstrained providers can exhaust API quotas or budgets.",
@@ -506,6 +552,38 @@ const MODEL_CONTROLS: ControlDefinition[] = [
   },
 ];
 
+// ── Phase 4 additions — Model Pack ────────────────────────────────────
+const PHASE4_MODEL_CONTROLS: ControlDefinition[] = [
+  {
+    id: "TYPE-M003",
+    name: "Model license declared",
+    domain: "type_specific",
+    pack: "model",
+    riskCategory: "incomplete_documentation",
+    severity: "critical",
+    blocksStages: ["validate", "publish"],
+    weight: 9,
+    runnerId: "model-license-validator",
+    remediation: "Model must declare its license (MIT, Apache-2.0, LLAMA, etc.) before validation.",
+    rationale: "CGT v2: License declared is mandatory — legal compliance requires provenance.",
+    enabled: true,
+  },
+  {
+    id: "TYPE-M004",
+    name: "Model version required",
+    domain: "type_specific",
+    pack: "model",
+    riskCategory: "architecture_drift",
+    severity: "high",
+    blocksStages: ["validate", "publish"],
+    weight: 7,
+    runnerId: "model-versioning-validator",
+    remediation: "Model must declare a version for reproducibility and rollback capability.",
+    rationale: "Unversioned models cannot be audited or rolled back.",
+    enabled: true,
+  },
+];
+
 const AGENT_CONTROLS: ControlDefinition[] = [
   {
     id: "TYPE-A001",
@@ -551,6 +629,38 @@ const AGENT_CONTROLS: ControlDefinition[] = [
   },
 ];
 
+// ── Phase 4 additions — Agent Pack ────────────────────────────────────
+const PHASE4_AGENT_CONTROLS: ControlDefinition[] = [
+  {
+    id: "TYPE-A004",
+    name: "Agent scope declared",
+    domain: "type_specific",
+    pack: "agent",
+    riskCategory: "missing_policy_mapping",
+    severity: "critical",
+    blocksStages: ["register", "validate", "publish"],
+    weight: 10,
+    runnerId: "agent-scope-validator",
+    remediation: "Agent must declare its operational scope (domains, capabilities, boundaries).",
+    rationale: "CGT v2: Scope declared is mandatory — unbounded agents are Critical violations.",
+    enabled: true,
+  },
+  {
+    id: "TYPE-A005",
+    name: "No direct secret access",
+    domain: "type_specific",
+    pack: "agent",
+    riskCategory: "hardcoded_secret",
+    severity: "critical",
+    blocksStages: ["register", "validate", "publish"],
+    weight: 10,
+    runnerId: "agent-secret-access-validator",
+    remediation: "Agent must not access secrets directly. Use secret manager references only.",
+    rationale: "CGT v2: No direct secret access — agents route through secret service.",
+    enabled: true,
+  },
+];
+
 const BOT_CONTROLS: ControlDefinition[] = [
   {
     id: "TYPE-B001",
@@ -586,13 +696,63 @@ const BOT_CONTROLS: ControlDefinition[] = [
 // FULL CATALOG
 // ============================================================================
 
+// ── Phase 4 additions — Bot Pack ──────────────────────────────────────
+const PHASE4_BOT_CONTROLS: ControlDefinition[] = [
+  {
+    id: "TYPE-B003",
+    name: "Bot revocation endpoint exists",
+    domain: "type_specific",
+    pack: "bot",
+    riskCategory: "missing_enforcement_hook",
+    severity: "critical",
+    blocksStages: ["validate", "publish"],
+    weight: 10,
+    runnerId: "bot-revocation-validator",
+    remediation: "Bot must have a revocation endpoint for immediate disablement.",
+    rationale: "CGT v2: Revocable immediately — bots without revocation are Critical.",
+    enabled: true,
+  },
+  {
+    id: "TYPE-B004",
+    name: "Bot rate limit configured",
+    domain: "type_specific",
+    pack: "bot",
+    riskCategory: "missing_enforcement_hook",
+    severity: "high",
+    blocksStages: ["validate", "publish"],
+    weight: 7,
+    runnerId: "bot-ratelimit-validator",
+    remediation: "Bot must have rate limiting to prevent abuse and resource exhaustion.",
+    rationale: "Unlimited bots can overwhelm systems and users.",
+    enabled: true,
+  },
+  {
+    id: "TYPE-B005",
+    name: "Bot monitoring hook present",
+    domain: "type_specific",
+    pack: "bot",
+    riskCategory: "missing_audit",
+    severity: "high",
+    blocksStages: ["publish"],
+    weight: 7,
+    runnerId: "bot-monitoring-validator",
+    remediation: "Bot must have a monitoring/alerting hook before publication.",
+    rationale: "CGT v2: Monitoring hooks present — unmonitored bots are governance blind spots.",
+    enabled: true,
+  },
+];
+
 export const CONTROL_CATALOG: ControlDefinition[] = [
   ...BASE_CONTROLS,
+  ...PHASE4_BASE_CONTROLS,
   ...PROVIDER_CONTROLS,
   ...LLM_CONTROLS,
   ...MODEL_CONTROLS,
+  ...PHASE4_MODEL_CONTROLS,
   ...AGENT_CONTROLS,
+  ...PHASE4_AGENT_CONTROLS,
   ...BOT_CONTROLS,
+  ...PHASE4_BOT_CONTROLS,
 ];
 
 // ============================================================================

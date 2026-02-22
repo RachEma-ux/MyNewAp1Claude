@@ -135,3 +135,47 @@ export {
   type PackId,
   type PackResolution,
 } from "./scorecard";
+
+// Gate Enforcement (Phase 3 — Production Lockdown)
+export {
+  requireGate,
+  canPassGate,
+  type GateVerdict,
+  type GateResult,
+} from "./requireGate";
+
+// Artifact Storage (Phase 2 — Production Lockdown)
+export {
+  type ArtifactStore,
+  type StoredArtifact,
+  getArtifactStore,
+  computeSha256,
+  verifyIntegrity,
+  FSStore,
+  S3Store,
+} from "./artifact-store";
+
+// Catalog Lint (Phase 8 — Production Lockdown)
+export {
+  lintCatalog,
+  formatLintReport,
+  type LintReport,
+  type LintViolation,
+} from "./catalog-lint";
+
+// Gate Coverage (Phase 6 — Production Lockdown)
+export {
+  generateGateCoverage,
+  writeGateCoverageReport,
+  validateGateCoverage,
+  type GateCoverageReport,
+  type GateCoverageEntry,
+} from "./gate-coverage";
+
+// Production Hardening (Phase 10 — Production Lockdown)
+export {
+  runHardeningCheck,
+  formatHardeningReport,
+  type HardeningReport,
+  type HardeningCheck,
+} from "./production-hardening";

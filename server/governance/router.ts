@@ -44,6 +44,9 @@ import {
   normalizeRole,
   type PermissionAction,
 } from "./rbac-model";
+import { lintCatalog } from "./catalog-lint";
+import { generateGateCoverage } from "./gate-coverage";
+import { runHardeningCheck } from "./production-hardening";
 import {
   buildRiskReport,
   createFinding,
@@ -655,4 +658,27 @@ export const governanceRouter = router({
     .query(async ({ input }) => {
       return { frozen: isFrozen(input.subjectId), subjectId: input.subjectId };
     }),
+
+  // ── Production Lockdown Endpoints (Phase 8–10) ─────────────────────
+
+  /**
+   * Run catalog lint — validates control catalog quality.
+   */
+  catalogLint: adminProcedure.query(async () => {
+    return lintCatalog();
+  }),
+
+  /**
+   * Generate gate coverage map — scans routers for enforcement gaps.
+   */
+  gateCoverage: adminProcedure.query(async () => {
+    return generateGateCoverage();
+  }),
+
+  /**
+   * Run production hardening check — validates security controls.
+   */
+  hardeningCheck: adminProcedure.query(async () => {
+    return runHardeningCheck();
+  }),
 });

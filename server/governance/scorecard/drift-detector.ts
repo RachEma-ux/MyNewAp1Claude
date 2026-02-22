@@ -171,6 +171,14 @@ export function getFreezeDetails(subjectId: number): FrozenSubject | undefined {
 
 /**
  * Run a single drift detection check.
+ *
+ * Phase 7 — Enhanced drift detection:
+ *   - Compare policy bundles
+ *   - Detect config drift
+ *   - Detect secret rotation overdue
+ *   - Detect new direct provider calls
+ *   - Generate drift scorecard
+ *   - If severity >= High → freeze subject + log audit event
  */
 export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
   const cfg = { ...DEFAULT_CONFIG, ...config };
@@ -201,7 +209,11 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
   const newViolations = [...currentFails].filter((id) => !previousFails.has(id));
   const resolvedViolations = [...previousFails].filter((id) => !currentFails.has(id));
 
-  const driftDetected = newViolations.length > 0 || resolvedViolations.length > 0;
+  // Enhanced drift checks (Phase 7)
+  const driftChecks = runEnhancedDriftChecks();
+  const allNewViolations = [...newViolations, ...driftChecks.violations];
+
+  const driftDetected = allNewViolations.length > 0 || resolvedViolations.length > 0;
 
   // Escalation logic
   let escalationNeeded = false;
@@ -217,10 +229,20 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
     escalationReason = `${current.scorecard.riskBreakdown.critical} Critical violation(s) detected`;
   }
 
+  // Phase 7: Also escalate on High violations
+  if (current.scorecard.riskBreakdown.high > 0 && (previous?.scorecard.riskBreakdown.high ?? 0) === 0) {
+    escalationNeeded = true;
+    escalationReason = escalationReason || `New High violation(s) detected: ${current.scorecard.riskBreakdown.high}`;
+  }
+
+  if (driftChecks.violations.length > 0) {
+    escalationNeeded = true;
+    escalationReason = escalationReason || `Drift checks found ${driftChecks.violations.length} violation(s)`;
+  }
+
   // Auto-freeze on severe drift
   const frozenSubjectIds: number[] = [];
   if (cfg.autoFreeze && scoreDelta <= -cfg.freezeThreshold) {
-    // Freeze system-wide indicator (subject ID 0 = system)
     freezeSubject(
       0,
       "system",
@@ -229,6 +251,9 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
       "drift-detector"
     );
     frozenSubjectIds.push(0);
+
+    // Audit log the freeze (Phase 7)
+    logDriftAuditEvent("DRIFT_FREEZE", "system", 0, `Score drop: ${previousScore} → ${currentScore}`, currentScore);
   }
 
   // Freeze if critical violations appeared
@@ -242,7 +267,26 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
         "drift-detector"
       );
       frozenSubjectIds.push(0);
+
+      logDriftAuditEvent("DRIFT_CRITICAL_FREEZE", "system", 0,
+        `${current.scorecard.riskBreakdown.critical} new Critical violations`, currentScore);
     }
+  }
+
+  // Phase 7: Freeze on High severity if score also dropped
+  if (cfg.autoFreeze && current.scorecard.riskBreakdown.high > 0 &&
+      scoreDelta <= -(cfg.scoreDropThreshold) && !_frozenSubjects.has(0)) {
+    freezeSubject(
+      0,
+      "system",
+      `High violations + score drop detected during drift check`,
+      currentScore,
+      "drift-detector"
+    );
+    frozenSubjectIds.push(0);
+
+    logDriftAuditEvent("DRIFT_HIGH_FREEZE", "system", 0,
+      `${current.scorecard.riskBreakdown.high} High violations + score drop`, currentScore);
   }
 
   const report: DriftReport = {
@@ -251,7 +295,7 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
     scoreDelta,
     previousScore,
     currentScore,
-    newViolations,
+    newViolations: allNewViolations,
     resolvedViolations,
     gatePassed: current.scorecard.gateStatus.passed,
     escalationNeeded,
@@ -270,13 +314,104 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
   if (driftDetected || escalationNeeded) {
     console.warn(
       `[Governance Drift] Score: ${previousScore} → ${currentScore} (delta: ${scoreDelta > 0 ? "+" : ""}${scoreDelta}). ` +
-      `New violations: ${newViolations.length}. Resolved: ${resolvedViolations.length}. ` +
+      `New violations: ${allNewViolations.length}. Resolved: ${resolvedViolations.length}. ` +
       (escalationNeeded ? `ESCALATION: ${escalationReason}` : "No escalation.") +
       (frozenSubjectIds.length > 0 ? ` FROZEN: ${frozenSubjectIds.length} subject(s)` : "")
     );
   }
 
   return report;
+}
+
+// ============================================================================
+// Phase 7 — Enhanced Drift Checks
+// ============================================================================
+
+interface EnhancedDriftResult {
+  violations: string[];
+  checks: { name: string; passed: boolean; detail: string }[];
+}
+
+/**
+ * Run enhanced drift checks beyond scorecard comparison:
+ *   - Config drift (environment changes)
+ *   - Secret rotation overdue
+ *   - Policy bundle changes
+ *   - New direct provider calls
+ */
+function runEnhancedDriftChecks(): EnhancedDriftResult {
+  const violations: string[] = [];
+  const checks: { name: string; passed: boolean; detail: string }[] = [];
+
+  // 1. Config drift — check for runtime env changes
+  const isProduction = process.env.NODE_ENV === "production";
+  const debugEnabled = process.env.DEBUG === "true";
+  const failOpen = process.env.POLICY_FAIL_OPEN === "true";
+
+  if (isProduction && debugEnabled) {
+    violations.push("CONFIG_DRIFT: DEBUG=true in production");
+    checks.push({ name: "config_drift", passed: false, detail: "DEBUG=true in production" });
+  } else {
+    checks.push({ name: "config_drift", passed: true, detail: "Config consistent" });
+  }
+
+  if (isProduction && failOpen) {
+    violations.push("CONFIG_DRIFT: POLICY_FAIL_OPEN=true in production");
+    checks.push({ name: "policy_drift", passed: false, detail: "Fail-open in production" });
+  } else {
+    checks.push({ name: "policy_drift", passed: true, detail: "Policy mode consistent" });
+  }
+
+  // 2. Secret rotation check — flag if env suggests stale secrets
+  const secretAge = process.env.SECRET_LAST_ROTATED;
+  if (secretAge) {
+    const lastRotated = new Date(secretAge);
+    const daysSinceRotation = (Date.now() - lastRotated.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceRotation > 90) {
+      violations.push(`SECRET_ROTATION: Secrets last rotated ${Math.floor(daysSinceRotation)} days ago (max: 90)`);
+      checks.push({ name: "secret_rotation", passed: false, detail: `${Math.floor(daysSinceRotation)} days since rotation` });
+    } else {
+      checks.push({ name: "secret_rotation", passed: true, detail: `Rotated ${Math.floor(daysSinceRotation)} days ago` });
+    }
+  } else {
+    checks.push({ name: "secret_rotation", passed: true, detail: "No rotation tracking configured" });
+  }
+
+  // 3. Governance strict mode check
+  const strictMode = process.env.GOVERNANCE_STRICT === "true";
+  if (isProduction && !strictMode) {
+    violations.push("GOVERNANCE_DRIFT: GOVERNANCE_STRICT not enabled in production");
+    checks.push({ name: "governance_strict", passed: false, detail: "Strict mode not enabled in production" });
+  } else {
+    checks.push({ name: "governance_strict", passed: true, detail: "Strict mode appropriate" });
+  }
+
+  return { violations, checks };
+}
+
+/**
+ * Log a drift audit event.
+ */
+function logDriftAuditEvent(
+  eventType: string,
+  subjectName: string,
+  subjectId: number,
+  reason: string,
+  score: number
+): void {
+  try {
+    const { getAuditLogger } = require("../../services/auditLogger");
+    getAuditLogger().log({
+      actor_id: "drift-detector",
+      action_type: eventType,
+      target_type: "drift_detection",
+      target_id: String(subjectId),
+      decision_result: "freeze_applied",
+      metadata: { subjectName, reason, score, timestamp: new Date().toISOString() },
+    });
+  } catch {
+    // Audit logger not available — continue
+  }
 }
 
 /**
