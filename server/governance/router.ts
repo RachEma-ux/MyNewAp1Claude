@@ -33,6 +33,10 @@ import {
   LIFECYCLE_STAGES,
 } from "./lifecycle-guard";
 import {
+  evaluateStageReview,
+  executeStageTransition,
+} from "./stage-review";
+import {
   hasPermission,
   getPermissions,
   GOVERNANCE_ROLES,
@@ -473,6 +477,98 @@ export const governanceRouter = router({
           severity: c.severity,
           domain: c.domain,
         })),
+      };
+    }),
+
+  // ── Stage Review (Per-Stage Checklist) ──────────────────────────────
+
+  /**
+   * Preview stage review checklist status for a catalog entry.
+   * Read-only — no side effects. Returns all checklist items with pass/fail.
+   */
+  stageReview: protectedProcedure
+    .input(
+      z.object({
+        entryId: z.number(),
+        entryName: z.string(),
+        entryType: z.string(),
+        tags: z.array(z.string()),
+        description: z.string().optional(),
+        config: z.any().optional(),
+        reviewState: z.string().optional(),
+        status: z.string().optional(),
+        validationStatus: z.string().optional(),
+        capabilities: z.array(z.string()).optional(),
+        targetStage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const { targetStage, ...entry } = input;
+      return evaluateStageReview(
+        entry,
+        targetStage,
+        { id: String(ctx.user.id), role: ctx.user.role || "user" }
+      );
+    }),
+
+  /**
+   * Execute a governed stage transition.
+   * Runs stage review + lifecycle guard + publication gate (for publish).
+   * Returns 409 CONFLICT if blocked. On success, returns new tags.
+   */
+  stageTransition: adminProcedure
+    .input(
+      z.object({
+        entryId: z.number(),
+        entryName: z.string(),
+        entryType: z.string(),
+        tags: z.array(z.string()),
+        description: z.string().optional(),
+        config: z.any().optional(),
+        reviewState: z.string().optional(),
+        status: z.string().optional(),
+        validationStatus: z.string().optional(),
+        capabilities: z.array(z.string()).optional(),
+        targetStage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { targetStage, ...entry } = input;
+      const actor = { id: String(ctx.user.id), role: ctx.user.role || "admin" };
+
+      // Check freeze status
+      if (isFrozen(entry.entryId)) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Subject #${entry.entryId} is FROZEN — all transitions blocked until unfrozen.`,
+        });
+      }
+      if (isFrozen(0)) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "System-wide governance FREEZE active — all transitions blocked.",
+        });
+      }
+
+      const result = executeStageTransition(entry, targetStage, actor);
+
+      if (!result.allowed) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: result.reason,
+          cause: {
+            stageReview: result.stageReview,
+            transitionResult: result.transitionResult,
+            publicationDecision: result.publicationDecision,
+          },
+        });
+      }
+
+      return {
+        allowed: true,
+        newTags: result.newTags,
+        stageReview: result.stageReview,
+        reason: result.reason,
       };
     }),
 

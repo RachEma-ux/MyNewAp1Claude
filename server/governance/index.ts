@@ -70,6 +70,18 @@ export {
 } from "./self-check";
 export { governanceRouter } from "./router";
 
+// Stage Review (CGT v2, Section VI)
+export {
+  evaluateStageReview,
+  executeStageTransition,
+  getChecklistForStage,
+  type ReviewCheckItem,
+  type CheckResult,
+  type StageReviewResult,
+  type ReviewContext,
+  type CheckCategory,
+} from "./stage-review";
+
 // Scorecard Engine (CGT v2)
 export {
   // Engine

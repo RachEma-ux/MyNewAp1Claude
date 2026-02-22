@@ -330,10 +330,24 @@ export default function CatalogManagePage() {
     onSuccess: () => refetchBundles(),
   });
   const approveMutation = trpc.catalogManage.approve.useMutation({
-    onSuccess: () => refetch(),
+    onSuccess: () => { refetch(); toast.success("Entry approved — governance gate passed"); },
+    onError: (error) => {
+      if (error.message.includes("gate FAIL")) {
+        toast.error(`Governance blocked: ${error.message}`);
+      } else {
+        toast.error(error.message);
+      }
+    },
   });
   const activateMutation = trpc.catalogManage.activate.useMutation({
-    onSuccess: () => refetch(),
+    onSuccess: () => { refetch(); toast.success("Entry activated — governance gate passed"); },
+    onError: (error) => {
+      if (error.message.includes("gate FAIL")) {
+        toast.error(`Governance blocked: ${error.message}`);
+      } else {
+        toast.error(error.message);
+      }
+    },
   });
   const classifyMutation = trpc.catalogManage.classify.useMutation();
 
@@ -744,10 +758,14 @@ export default function CatalogManagePage() {
                               size="sm"
                               onClick={() => approveMutation.mutate({ id: entry.id, activateNow: false })}
                               disabled={approveMutation.isPending}
-                              title="Approve"
+                              title="Approve (governance-gated)"
                               className="text-emerald-400 hover:text-emerald-300"
                             >
-                              <ShieldCheck className="h-4 w-4" />
+                              {approveMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ShieldCheck className="h-4 w-4" />
+                              )}
                             </Button>
                           )}
                           {entry.status === "draft" && entry.reviewState === "approved" && (
@@ -756,10 +774,14 @@ export default function CatalogManagePage() {
                               size="sm"
                               onClick={() => activateMutation.mutate({ id: entry.id })}
                               disabled={activateMutation.isPending}
-                              title="Activate"
+                              title="Activate (governance-gated)"
                               className="text-green-400 hover:text-green-300"
                             >
-                              <Zap className="h-4 w-4" />
+                              {activateMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Zap className="h-4 w-4" />
+                              )}
                             </Button>
                           )}
                           <Button variant="ghost" size="sm" onClick={() => openVersions(entry.id)} title="Version history">

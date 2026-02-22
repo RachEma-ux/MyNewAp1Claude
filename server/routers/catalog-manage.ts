@@ -45,6 +45,8 @@ function audit(eventType: string, catalogEntryId: number | null, payload: any, b
 import { getProviderRegistry } from "../providers/registry";
 import * as providerDb from "../providers/db";
 import { discoverProvider } from "./discover-provider";
+import { TRPCError } from "@trpc/server";
+import { evaluateStageReview } from "../governance/stage-review";
 
 // ── Rate Limiting & Caching ─────────────────────────────────────────
 const _rateLimitBuckets = new Map<string, { windowStart: number; count: number }>();
@@ -474,9 +476,32 @@ export const catalogManageRouter = router({
       id: z.number().int().positive(),
       activateNow: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const entry = await getCatalogEntryById(input.id);
       if (!entry) throw new Error(`Catalog entry ${input.id} not found`);
+
+      // Governance gate: run Register stage review
+      const review = evaluateStageReview(
+        {
+          id: entry.id,
+          name: entry.name,
+          entryType: entry.entryType,
+          tags: (entry.tags as string[]) || [],
+          description: entry.description || undefined,
+          config: entry.config,
+          reviewState: entry.reviewState || undefined,
+          status: entry.status,
+        },
+        "register",
+        { id: String(ctx.user.id), role: ctx.user.role || "admin" }
+      );
+      if (!review.passed) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Registration gate FAIL: ${review.blockers.map((b) => b.name).join(", ")}`,
+          cause: review,
+        });
+      }
 
       const approved = await approveCatalogEntry(input.id, 1);
 
@@ -520,12 +545,36 @@ export const catalogManageRouter = router({
     .input(z.object({
       id: z.number().int().positive(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const entry = await getCatalogEntryById(input.id);
       if (!entry) throw new Error(`Catalog entry ${input.id} not found`);
 
       if (entry.reviewState !== "approved") {
         throw new Error(`Entry must be approved before activation (current reviewState: ${entry.reviewState})`);
+      }
+
+      // Governance gate: run Validate stage review
+      const review = evaluateStageReview(
+        {
+          id: entry.id,
+          name: entry.name,
+          entryType: entry.entryType,
+          tags: (entry.tags as string[]) || [],
+          description: entry.description || undefined,
+          config: entry.config,
+          reviewState: entry.reviewState || undefined,
+          status: entry.status,
+          validationStatus: (entry as any).validationStatus || undefined,
+        },
+        "validate",
+        { id: String(ctx.user.id), role: ctx.user.role || "admin" }
+      );
+      if (!review.passed) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Validation gate FAIL: ${review.blockers.map((b) => b.name).join(", ")}`,
+          cause: review,
+        });
       }
 
       await updateCatalogEntry(input.id, { status: "active" }, 1);
@@ -564,7 +613,7 @@ export const catalogManageRouter = router({
       versionLabel: z.string().min(1).max(50),
       changeNotes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const entry = await getCatalogEntryById(input.catalogEntryId);
       if (!entry) throw new Error(`Catalog entry ${input.catalogEntryId} not found`);
 
@@ -574,6 +623,30 @@ export const catalogManageRouter = router({
 
       if (entry.reviewState !== "approved") {
         throw new Error(`Entry must be approved before publishing (current reviewState: ${entry.reviewState})`);
+      }
+
+      // Governance gate: run Publish stage review (Triple Validation)
+      const review = evaluateStageReview(
+        {
+          id: entry.id,
+          name: entry.name,
+          entryType: entry.entryType,
+          tags: (entry.tags as string[]) || [],
+          description: entry.description || undefined,
+          config: entry.config,
+          reviewState: entry.reviewState || undefined,
+          status: entry.status,
+          validationStatus: (entry as any).validationStatus || undefined,
+        },
+        "publish",
+        { id: String(ctx.user.id), role: ctx.user.role || "admin" }
+      );
+      if (!review.passed) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Publication gate FAIL: ${review.blockers.map((b) => b.name).join(", ")}`,
+          cause: review,
+        });
       }
 
       // Mark entry as publishing (transient)

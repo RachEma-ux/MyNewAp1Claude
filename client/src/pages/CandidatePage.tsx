@@ -314,15 +314,9 @@ export default function CandidatePage() {
       setValidationResults((prev) => ({ ...prev, [variables.id]: data }));
       setValidatingId(null);
       refetch();
-      // On success, update tag from "registered" to "validated"
+      // Validation results displayed — stage transition is handled by the governed Validate button
       if (data.success) {
-        const source = entries.find((e: any) => e.id === variables.id);
-        if (source) {
-          const tags = (source.tags || []).filter((t: string) => t !== "registered");
-          tags.push("validated");
-          updateMutation.mutate({ id: source.id, tags });
-          toast.success(`${source.displayName || source.name} validated — sent to Publish`);
-        }
+        toast.success("Orchestrator validation passed — click Validate to advance to next stage");
       }
     },
     onError: () => setValidatingId(null),
@@ -344,6 +338,63 @@ export default function CandidatePage() {
     onSuccess: () => refetch(),
   });
   const classifyMutation = trpc.catalogManage.classify.useMutation();
+
+  // Governance: stage transition mutation
+  const stageTransitionMutation = trpc.governance.stageTransition.useMutation({
+    onSuccess: (data, variables) => {
+      // Update tags on the entry via updateMutation
+      updateMutation.mutate({ id: variables.entryId, tags: data.newTags });
+      const stageName = variables.targetStage;
+      toast.success(`Stage transition to ${stageName} approved — all governance checks passed`);
+      // Store review result for display
+      setStageReviewResults((prev) => ({
+        ...prev,
+        [variables.entryId]: data.stageReview,
+      }));
+    },
+    onError: (error) => {
+      toast.error(error.message);
+      // Extract review data from error if available
+      const cause = (error as any)?.data?.cause;
+      if (cause?.stageReview) {
+        setStageReviewResults((prev) => ({
+          ...prev,
+          [cause.stageReview.stage]: cause.stageReview,
+        }));
+      }
+    },
+  });
+
+  // Stage review results for UI display
+  const [stageReviewResults, setStageReviewResults] = useState<Record<number, any>>({});
+  // Track which entries have their checklist panel open
+  const [openChecklists, setOpenChecklists] = useState<Set<number>>(new Set());
+
+  function toggleChecklist(entryId: number) {
+    setOpenChecklists((prev) => {
+      const next = new Set(prev);
+      if (next.has(entryId)) next.delete(entryId);
+      else next.add(entryId);
+      return next;
+    });
+  }
+
+  /** Trigger a governed stage transition for an entry */
+  function governedTransition(entry: any, targetStage: string) {
+    stageTransitionMutation.mutate({
+      entryId: entry.id,
+      entryName: entry.displayName || entry.name,
+      entryType: entry.entryType,
+      tags: entry.tags || [],
+      description: entry.description || undefined,
+      config: entry.config || undefined,
+      reviewState: entry.reviewState || undefined,
+      status: entry.status || undefined,
+      validationStatus: entry.validationStatus || undefined,
+      capabilities: entry.capabilities || undefined,
+      targetStage: targetStage as any,
+    });
+  }
 
   // Pipeline stage filters — each tab shows entries tagged with its stage
   // Also includes entries that have already progressed (for history)
@@ -682,17 +733,18 @@ export default function CandidatePage() {
                         <Button
                           size="sm"
                           onClick={() => {
-                            const tags = (entry.tags || []).filter((t: string) => t !== "candidate");
-                            tags.push("registered");
-                            updateMutation.mutate({ id: entry.id, tags });
+                            governedTransition(entry, "register");
                             // Also approve so entry can be activated later in Publish step
                             approveMutation.mutate({ id: entry.id, activateNow: false });
-                            toast.success(`${entry.displayName || entry.name} registered — sent to Validate`);
                           }}
-                          disabled={updateMutation.isPending}
+                          disabled={stageTransitionMutation.isPending || updateMutation.isPending}
                           className="text-xs"
                         >
-                          <ShieldCheck className="h-4 w-4 mr-1" />
+                          {stageTransitionMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <ShieldCheck className="h-4 w-4 mr-1" />
+                          )}
                           Register
                         </Button>
                         ) : (
@@ -733,6 +785,48 @@ export default function CandidatePage() {
                       </span>
                     </div>
                   </CardContent>
+
+                  {/* Governance Stage Review Checklist */}
+                  {stageReviewResults[entry.id] && (
+                    <CardContent className="pt-0">
+                      <Collapsible open={openChecklists.has(entry.id)} onOpenChange={() => toggleChecklist(entry.id)}>
+                        <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full">
+                          <Shield className="h-3 w-3" />
+                          <span>Stage Review: {stageReviewResults[entry.id].passed ? "PASSED" : "BLOCKED"}</span>
+                          <Badge className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}>
+                            {stageReviewResults[entry.id].score}%
+                          </Badge>
+                          <ChevronDown className="h-3 w-3 ml-auto" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-2">
+                          {!stageReviewResults[entry.id].passed && (
+                            <div className="mb-2 p-2 rounded-md bg-orange-950/20 border border-orange-900/30">
+                              <p className="text-xs font-medium text-orange-400">Governance gate blocked this transition</p>
+                            </div>
+                          )}
+                          <div className="space-y-1">
+                            {stageReviewResults[entry.id].items.map((item: any) => (
+                              <div key={item.itemId} className="flex items-start gap-2 text-xs">
+                                {item.passed ? (
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                                ) : (
+                                  <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+                                )}
+                                <div className="min-w-0">
+                                  <span className="font-medium">{item.name}</span>
+                                  <Badge variant="outline" className="text-[9px] ml-1 px-1 py-0">{item.category}</Badge>
+                                  <p className="text-muted-foreground">{item.details}</p>
+                                  {item.remediation && (
+                                    <p className="text-orange-400/80 italic">{item.remediation}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </CardContent>
+                  )}
                 </Card>
               ))}
             </div>
@@ -795,15 +889,14 @@ export default function CandidatePage() {
                         {(entry.tags || []).includes("registered") && !(entry.tags || []).includes("validated") ? (
                         <Button
                           size="sm"
-                          onClick={() => {
-                            const tags = (entry.tags || []).filter((t: string) => t !== "registered");
-                            tags.push("validated");
-                            updateMutation.mutate({ id: entry.id, tags });
-                            toast.success(`${entry.displayName || entry.name} validated — sent to Publish`);
-                          }}
-                          disabled={updateMutation.isPending}
+                          onClick={() => governedTransition(entry, "validate")}
+                          disabled={stageTransitionMutation.isPending || updateMutation.isPending}
                         >
-                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          {stageTransitionMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-4 w-4 mr-1" />
+                          )}
                           Validate
                         </Button>
                         ) : (
@@ -838,6 +931,48 @@ export default function CandidatePage() {
                         </span>
                       </div>
                     </CardContent>
+
+                    {/* Governance Stage Review Checklist (Validate tab) */}
+                    {stageReviewResults[entry.id] && (
+                      <CardContent className="pt-0">
+                        <Collapsible open={openChecklists.has(entry.id)} onOpenChange={() => toggleChecklist(entry.id)}>
+                          <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full">
+                            <Shield className="h-3 w-3" />
+                            <span>Stage Review: {stageReviewResults[entry.id].passed ? "PASSED" : "BLOCKED"}</span>
+                            <Badge className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}>
+                              {stageReviewResults[entry.id].score}%
+                            </Badge>
+                            <ChevronDown className="h-3 w-3 ml-auto" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-2">
+                            {!stageReviewResults[entry.id].passed && (
+                              <div className="mb-2 p-2 rounded-md bg-orange-950/20 border border-orange-900/30">
+                                <p className="text-xs font-medium text-orange-400">Governance gate blocked this transition</p>
+                              </div>
+                            )}
+                            <div className="space-y-1">
+                              {stageReviewResults[entry.id].items.map((item: any) => (
+                                <div key={item.itemId} className="flex items-start gap-2 text-xs">
+                                  {item.passed ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                                  ) : (
+                                    <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+                                  )}
+                                  <div className="min-w-0">
+                                    <span className="font-medium">{item.name}</span>
+                                    <Badge variant="outline" className="text-[9px] ml-1 px-1 py-0">{item.category}</Badge>
+                                    <p className="text-muted-foreground">{item.details}</p>
+                                    {item.remediation && (
+                                      <p className="text-orange-400/80 italic">{item.remediation}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </CardContent>
+                    )}
 
                     {result && (
                       <CardContent className="pt-0">
@@ -969,13 +1104,14 @@ export default function CandidatePage() {
                           <div className="flex gap-1 shrink-0">
                           {(entry.tags || []).includes("validated") && !(entry.tags || []).includes("published") ? (
                           <Button size="sm" onClick={() => {
-                            const tags = (entry.tags || []).filter((t: string) => t !== "validated");
-                            tags.push("published");
-                            updateMutation.mutate({ id: entry.id, tags });
+                            governedTransition(entry, "publish");
                             activateMutation.mutate({ id: entry.id });
-                            toast.success(`${entry.displayName || entry.name} published — available in Catalog`);
-                          }} disabled={updateMutation.isPending}>
-                            <Rocket className="h-4 w-4 mr-1" />
+                          }} disabled={stageTransitionMutation.isPending || updateMutation.isPending}>
+                            {stageTransitionMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <Rocket className="h-4 w-4 mr-1" />
+                            )}
                             Publish
                           </Button>
                           ) : (
@@ -1004,6 +1140,48 @@ export default function CandidatePage() {
                           </span>
                         </div>
                       </CardContent>
+
+                      {/* Governance Stage Review Checklist (Publish tab) */}
+                      {stageReviewResults[entry.id] && (
+                        <CardContent className="pt-0">
+                          <Collapsible open={openChecklists.has(entry.id)} onOpenChange={() => toggleChecklist(entry.id)}>
+                            <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full">
+                              <Shield className="h-3 w-3" />
+                              <span>Stage Review: {stageReviewResults[entry.id].passed ? "PASSED" : "BLOCKED"}</span>
+                              <Badge className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}>
+                                {stageReviewResults[entry.id].score}%
+                              </Badge>
+                              <ChevronDown className="h-3 w-3 ml-auto" />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-2">
+                              {!stageReviewResults[entry.id].passed && (
+                                <div className="mb-2 p-2 rounded-md bg-orange-950/20 border border-orange-900/30">
+                                  <p className="text-xs font-medium text-orange-400">Governance gate blocked this transition</p>
+                                </div>
+                              )}
+                              <div className="space-y-1">
+                                {stageReviewResults[entry.id].items.map((item: any) => (
+                                  <div key={item.itemId} className="flex items-start gap-2 text-xs">
+                                    {item.passed ? (
+                                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                                    ) : (
+                                      <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+                                    )}
+                                    <div className="min-w-0">
+                                      <span className="font-medium">{item.name}</span>
+                                      <Badge variant="outline" className="text-[9px] ml-1 px-1 py-0">{item.category}</Badge>
+                                      <p className="text-muted-foreground">{item.details}</p>
+                                      {item.remediation && (
+                                        <p className="text-orange-400/80 italic">{item.remediation}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </CardContent>
+                      )}
                     </Card>
                   ))}
                 </div>
