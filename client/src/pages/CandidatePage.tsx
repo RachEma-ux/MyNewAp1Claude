@@ -882,8 +882,32 @@ export default function CandidatePage() {
                         </Button>
                       </div>
                     </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
+                        <Badge variant="outline" className="text-xs">
+                          <Icon className="h-3 w-3 mr-1" />
+                          {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
+                        </Badge>
+                      ); })()}
+                      <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
+                      <Badge
+                        className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "register")] || ""}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openReviewDialog(entry, "register");
+                        }}
+                        title="Click to review registration criteria"
+                      >
+                        {getStageReviewState(entry, "register") === "approved" ? (
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                        ) : (
+                          <Shield className="h-3 w-3 mr-1" />
+                        )}
+                        {getStageReviewState(entry, "register") === "approved" ? "Reviewed" : "Review"}
+                      </Badge>
+                    </div>
                     {entry.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>
+                      <p className="text-xs text-muted-foreground">{entry.description}</p>
                     )}
                     </div>
                   </CardHeader>
