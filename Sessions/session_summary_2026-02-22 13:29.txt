@@ -1,0 +1,76 @@
+Session Summary — 2026-02-22 13:29
+
+## What Was Done
+
+### 1. Fixed Bulk Page Opener
+- Replaced popup-based `window.open()` approach with a categorized link grid
+- Both `open-all-tunnel.html` and `open-all-local.html` rewritten with 6 sections (Core, LLM & Models, Agents & Automation, Documents & Knowledge, Governance & Ops, Dev Tools)
+- 29 pages listed as tappable cards — no popup blocker issues
+- Note: JS-generated links didn't render on tunnel (just text); direct `termux-open-url` used instead
+
+### 2. Candidate Page — Full Implementation
+- Replaced "Coming Soon" placeholder with full catalogue management view (2700+ lines from CatalogManagePage)
+- Title: "Candidate Pipeline", back button to Manage Catalogue
+- Removed "+ New Entry" button and create flow (candidates come from Manage page Import wizard)
+- Renamed "Catalog" tab to "Register"
+
+### 3. Double-Tap to Open Entry Card
+- Added `onDoubleClick` handler on Name cell in Catalog table
+- Applied to both CatalogManagePage and CandidatePage
+- Shows pointer cursor to hint interactivity
+
+### 4. Import Wizard — Submit Flow
+- Renamed all "Register" buttons to "Submit" / "Submit All"
+- "Registered" badges → "Submitted"
+- After submitting a discovered provider, wizard closes and navigates to `/llm/catalogue/candidate`
+- Submitted entries tagged with `"candidate"` for pipeline separation
+
+### 5. Candidate Pipeline Stages (Major Feature)
+Implemented full pipeline: Register → Validate → Publish → Catalog
+
+**Register tab** (Candidate page):
+- Shows entries with `reviewState === "needs_review"` + tag "candidate"
+- Admin clicks "Register" button → approves entry, moves to Validate
+
+**Validate tab** (Candidate page):
+- Shows entries with `reviewState === "approved"` + not yet validated
+- Admin runs validation
+
+**Publish tab** (Candidate page):
+- Shows validated entries (`validationStatus === "passed"`) not yet active
+- Admin publishes
+
+**Catalog tab** (Manage page):
+- ONLY shows entries tagged "candidate" AND `status === "active"`
+- Empty state directs to Candidate pipeline
+- No direct creation — only source is published entries from Candidate
+
+### 6. Termux `/tmp` Sandbox Issues
+- `termux-open-url` and `gh` commands intermittently fail with `EACCES: permission denied, mkdir '/tmp/...'`
+- Workaround: prefix with `env TMPDIR=/data/data/com.termux/files/usr/tmp HOME=/data/data/com.termux/files/home`
+- Even with workaround, failures are intermittent when running many parallel calls
+
+## Commits
+- `81db6b0` — fix: replace popup-based bulk page opener with link grid
+- `8d8995b` — feat: replace Candidate coming-soon page with full catalogue management view
+- `cd11c96` — feat: double-tap on catalog entry name opens edit card
+- `e3261db` — fix: rename Catalog tab to Register on Candidate page
+- `ca25edd` — feat: replace table with card layout in Register tab, rename Validate button to Register
+- `22b3d34` — feat: rename Import wizard Register to Submit, navigate to Candidate page on submit
+- `7872040` — feat: separate Candidate and Catalog pipelines
+- `9b2a127` — feat: implement candidate pipeline stages
+
+## Files Modified
+- client/public/open-all-tunnel.html (rewritten)
+- client/public/open-all-local.html (rewritten)
+- client/src/pages/CandidatePage.tsx (replaced coming-soon with full pipeline)
+- client/src/pages/CatalogManagePage.tsx (catalog filtered to published only)
+- client/src/components/CatalogImportWizard.tsx (Submit flow + candidate tag + navigate)
+
+## Architecture: Candidate Pipeline
+```
+Import/Create → Submit (tagged "candidate") → Register tab (needs_review)
+  → Admin Register → Validate tab (approved, not validated)
+    → Run Validation → Publish tab (validated, not active)
+      → Publish → Catalog tab (active) — available in app
+```
