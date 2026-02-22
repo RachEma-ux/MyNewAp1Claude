@@ -483,6 +483,16 @@ export const catalogManageRouter = router({
 
       const stage = input.stage;
 
+      // Prevent duplicate stage approval — each stage can only be approved once
+      const currentStageState = ((entry as any).stageReviews || {})[stage];
+      if (currentStageState === "approved") {
+        const stageLabel = stage === "register" ? "Registration" : stage === "validate" ? "Validation" : "Publication";
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `${stageLabel} already approved — each stage can only be approved once`,
+        });
+      }
+
       // Governance gate: run stage-specific review
       const review = evaluateStageReview(
         {
@@ -662,6 +672,15 @@ export const catalogManageRouter = router({
 
       if (entry.status !== "active") {
         throw new Error(`Entry must be active before publishing (current status: ${entry.status})`);
+      }
+
+      // Prevent duplicate publishing — check if already published via tags
+      const entryTags: string[] = (entry.tags as string[]) || [];
+      if (entryTags.includes("published")) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Entry already published — each entry can only be published once per version",
+        });
       }
 
       const stageReviews = (entry as any).stageReviews || {};
