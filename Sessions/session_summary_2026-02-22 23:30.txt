@@ -1,0 +1,88 @@
+Session Summary — 2026-02-22 23:30
+===================================
+
+## Task
+Completed Phases 4-6 of the Governance Scorecard Engine (CGT v2) — pack-aware enforcement with 409 HTTP semantics, freeze capability, and CI validation.
+
+This session continued from a context-compacted conversation that had completed Phases 1-3.
+
+## What Was Done
+
+### Phase 4: CI Enforcement (Pack-Aware)
+- Updated `.github/workflows/governance-gate.yml`:
+  - Added new "Validate governance pack system" step
+  - Verifies GovernedSubject contract file exists
+  - Verifies pack-resolver file exists
+  - Validates control catalog has pack assignments (base ≥10, type ≥5)
+  - Checks type-specific runners exist (provider-key, llm-binding, model-integrity, agent-permission, bot-binding)
+  - Evidence artifact version bumped to 2.0 with packSystem metadata
+  - PR comment includes pack system status row and 409 semantics note
+  - Summary output shows pack breakdown
+
+### Phase 5: Control Plane Service (Router + 409 Semantics)
+- Rewrote `server/governance/router.ts`:
+  - `scorecardRun`: Now throws TRPCError CONFLICT (409) on blocked transitions
+  - `scorecardRun`: Checks freeze status (subject-level and system-wide) before scoring
+  - `scorecardRun`: Accepts both `subject` (GovernedSubject) and legacy `entry` formats
+  - NEW `scorecardPreview`: Read-only endpoint (no 409 throw) for UI display
+  - NEW `controlsByPack`: Get controls filtered by pack ID
+  - NEW `validateSubject`: Validate GovernedSubject contract
+  - NEW `resolvePacks`: Resolve packs for a subject type
+  - `controlCatalog`: Now returns `subjectTypes` and `availablePacks`
+  - `driftStatus`: Now returns `frozenSubjects` and `frozenCount`
+  - `driftToggle`: Accepts `autoFreeze` parameter
+  - NEW `frozenSubjects`: List all frozen subjects
+  - NEW `unfreezeSubject`: Admin-only unfreeze mutation
+  - NEW `isFrozen`: Check freeze status for a subject
+
+### Phase 6: Drift Detection with Freeze
+- Rewrote `server/governance/scorecard/drift-detector.ts`:
+  - Added `FrozenSubject` interface with full metadata
+  - Added freeze management: `freezeSubject()`, `unfreezeSubject()`, `isFrozen()`, `getFrozenSubjects()`, `getFreezeDetails()`
+  - `DriftConfig` gains `autoFreeze` (default: true) and `freezeThreshold` (default: 20 points)
+  - `DriftReport` gains `frozenSubjectIds` field
+  - Auto-freeze on score drop ≥ freezeThreshold
+  - Auto-freeze on new Critical violations (when previously none)
+  - System-wide freeze uses subject ID 0
+
+### Barrel Exports Updated
+- `server/governance/scorecard/index.ts`: Added exports for governed-subject, pack-resolver, freeze functions
+- `server/governance/index.ts`: Added exports for getControlsByPack, freeze management, GovernedSubject, pack resolver, all new types
+
+### Admin UI Updated
+- `client/src/pages/GovernanceScorecard.tsx`:
+  - Uses `scorecardPreview` (no 409 throw) instead of `scorecardRun`
+  - Shows freeze banner (red) when frozen subjects exist
+  - Shows 409 blocked banner (orange) when gate FAIL
+  - Gate status shows "409 Conflict" indicator when blocked
+  - NEW Pack Resolution card: shows loaded/missing packs with color-coded badges
+  - NEW Subject Validation card: shows GovernedSubject contract status
+  - Control catalog shows pack badges (color-coded per type)
+  - Pack summary row shows control counts per pack
+  - Runner count displayed with score
+
+## Files Changed
+- `.github/workflows/governance-gate.yml` — pack system validation step
+- `client/src/pages/GovernanceScorecard.tsx` — pack display, 409 indicator, freeze UI
+- `server/governance/router.ts` — 409 semantics, pack endpoints, freeze management
+- `server/governance/scorecard/drift-detector.ts` — freeze capability
+- `server/governance/scorecard/index.ts` — new exports
+- `server/governance/index.ts` — new exports
+- `server/governance/scorecard/control-catalog.ts` — type packs (already done in P1-3)
+- `server/governance/scorecard/engine.ts` — pack-aware (already done in P1-3)
+- `server/governance/scorecard/runner.ts` — type runners (already done in P1-3)
+- `server/governance/scorecard/governed-subject.ts` — NEW file
+- `server/governance/scorecard/pack-resolver.ts` — NEW file
+
+## Commit
+15a0397 feat: complete Governance Scorecard Engine Phases 1-6 — pack-aware enforcement with 409 semantics
+
+## Architecture Summary
+- 33 controls across 6 packs (base:20, provider:3, llm:3, model:2, agent:3, bot:2)
+- 34 runners (20 base + 14 type-specific)
+- GovernedSubject contract validation gate
+- Pack resolver with FAIL semantics (missing base = FAIL, missing type = FAIL validate)
+- HTTP 409 Conflict on blocked stage transitions
+- Auto-freeze on critical drift (score drop ≥20 or new Critical violations)
+- Immutable evidence bundles with SHA-256 integrity
+- CI validates pack system integrity
