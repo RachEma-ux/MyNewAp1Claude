@@ -468,19 +468,22 @@ export const catalogManageRouter = router({
   // ============================================================================
 
   /**
-   * Approve a catalog entry — sets reviewState to "approved"
-   * Optionally activates the entry in the same call
+   * Approve a catalog entry for a specific lifecycle stage.
+   * Each stage (register, validate, publish) is reviewed independently.
    */
   approve: adminProcedure
     .input(z.object({
       id: z.number().int().positive(),
+      stage: z.enum(["register", "validate", "publish"]).default("register"),
       activateNow: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const entry = await getCatalogEntryById(input.id);
       if (!entry) throw new Error(`Catalog entry ${input.id} not found`);
 
-      // Governance gate: run Register stage review
+      const stage = input.stage;
+
+      // Governance gate: run stage-specific review
       const review = evaluateStageReview(
         {
           id: entry.id,
@@ -491,19 +494,37 @@ export const catalogManageRouter = router({
           config: entry.config,
           reviewState: entry.reviewState || undefined,
           status: entry.status,
+          validationStatus: (entry as any).validationStatus || undefined,
         },
-        "register",
+        stage,
         { id: String(ctx.user.id), role: ctx.user.role || "admin" }
       );
       if (!review.passed) {
+        const stageLabel = stage === "register" ? "Registration" : stage === "validate" ? "Validation" : "Publication";
         throw new TRPCError({
           code: "CONFLICT",
-          message: `Registration gate FAIL: ${review.blockers.map((b) => b.name).join(", ")}`,
+          message: `${stageLabel} gate FAIL: ${review.blockers.map((b) => b.name).join(", ")}`,
           cause: review,
         });
       }
 
-      const approved = await approveCatalogEntry(input.id, 1);
+      // Update per-stage review tracking
+      const currentStageReviews = (entry as any).stageReviews || {};
+      const updatedStageReviews = { ...currentStageReviews, [stage]: "approved" };
+
+      // Set next stage to needs_review if not already set
+      const stageOrder = ["register", "validate", "publish"];
+      const currentIdx = stageOrder.indexOf(stage);
+      if (currentIdx < stageOrder.length - 1) {
+        const nextStage = stageOrder[currentIdx + 1];
+        if (!updatedStageReviews[nextStage]) {
+          updatedStageReviews[nextStage] = "needs_review";
+        }
+      }
+
+      // Also set legacy reviewState to approved (for backward compatibility)
+      await approveCatalogEntry(input.id, 1);
+      await updateCatalogEntry(input.id, { stageReviews: updatedStageReviews } as any, 1);
 
       if (input.activateNow) {
         await updateCatalogEntry(input.id, { status: "active" }, 1);
@@ -511,6 +532,7 @@ export const catalogManageRouter = router({
 
       audit("catalog.entry.approved", input.id, {
         name: entry.name,
+        stage,
         activateNow: input.activateNow ?? false,
       });
 

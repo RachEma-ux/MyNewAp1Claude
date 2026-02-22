@@ -121,6 +121,15 @@ const ORIGIN_COLORS: Record<string, string> = {
   api: "bg-cyan-600/20 text-cyan-400 border-cyan-600/30",
 };
 
+/** Get per-stage review state from entry's stageReviews JSON, falling back to legacy reviewState */
+function getStageReviewState(entry: any, stage: string): string {
+  const stageReviews = entry.stageReviews || {};
+  if (stageReviews[stage]) return stageReviews[stage];
+  // Fallback: if legacy reviewState is approved and entry is at/past this stage, show approved
+  if (stage === "register" && entry.reviewState === "approved") return "approved";
+  return "needs_review";
+}
+
 /** Inline component to show classification badges for a table row */
 function ClassificationBadges({ entryId }: { entryId: number }) {
   const { data: nodes } = trpc.catalogManage.getClassifications.useQuery(
@@ -818,21 +827,19 @@ export default function CandidatePage() {
                         ); })()}
                         <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
                         <Badge
-                          className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
+                          className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "register")] || ""}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             openReviewDialog(entry, "register");
                           }}
                           title="Click to review registration criteria"
                         >
-                          {entry.reviewState === "needs_review" ? (
-                            <Shield className="h-3 w-3 mr-1" />
-                          ) : entry.reviewState === "approved" ? (
+                          {getStageReviewState(entry, "register") === "approved" ? (
                             <ShieldCheck className="h-3 w-3 mr-1" />
                           ) : (
-                            <ShieldX className="h-3 w-3 mr-1" />
+                            <Shield className="h-3 w-3 mr-1" />
                           )}
-                          {entry.reviewState === "needs_review" ? "Review" : entry.reviewState === "approved" ? "Reviewed" : entry.reviewState}
+                          {getStageReviewState(entry, "register") === "approved" ? "Reviewed" : "Review"}
                         </Badge>
                       </div>
                       <div className="flex gap-1 shrink-0">
@@ -841,8 +848,8 @@ export default function CandidatePage() {
                           size="sm"
                           onClick={() => {
                             governedTransition(entry, "register");
-                            // Also approve so entry can be activated later in Publish step
-                            approveMutation.mutate({ id: entry.id, activateNow: false });
+                            // Approve the register stage specifically
+                            approveMutation.mutate({ id: entry.id, stage: "register", activateNow: false });
                           }}
                           disabled={stageTransitionMutation.isPending || updateMutation.isPending}
                           className="text-xs"
@@ -976,21 +983,19 @@ export default function CandidatePage() {
                           ); })()}
                           <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
                           <Badge
-                            className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
+                            className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "validate")] || ""}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               openReviewDialog(entry, "validate");
                             }}
                             title="Click to review validation criteria"
                           >
-                            {entry.reviewState === "needs_review" ? (
-                              <Shield className="h-3 w-3 mr-1" />
-                            ) : entry.reviewState === "approved" ? (
+                            {getStageReviewState(entry, "validate") === "approved" ? (
                               <ShieldCheck className="h-3 w-3 mr-1" />
                             ) : (
-                              <ShieldX className="h-3 w-3 mr-1" />
+                              <Shield className="h-3 w-3 mr-1" />
                             )}
-                            {entry.reviewState === "needs_review" ? "Review" : entry.reviewState === "approved" ? "Reviewed" : entry.reviewState}
+                            {getStageReviewState(entry, "validate") === "approved" ? "Reviewed" : "Review"}
                           </Badge>
                           {entry.validationStatus && (
                             <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
@@ -1205,15 +1210,15 @@ export default function CandidatePage() {
                             ); })()}
                             <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
                             <Badge
-                              className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
+                              className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "publish")] || ""}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openReviewDialog(entry, "publish");
                               }}
-                              title="Click to view governance checklist"
+                              title="Click to review publication criteria"
                             >
-                              {entry.reviewState === "approved" ? <ShieldCheck className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
-                              {entry.reviewState === "needs_review" ? "Review" : entry.reviewState === "approved" ? "Reviewed" : entry.reviewState}
+                              {getStageReviewState(entry, "publish") === "approved" ? <ShieldCheck className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
+                              {getStageReviewState(entry, "publish") === "approved" ? "Reviewed" : "Review"}
                             </Badge>
                             {entry.validationStatus && (
                               <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
@@ -2842,9 +2847,9 @@ export default function CandidatePage() {
             <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
               Close
             </Button>
-            {reviewEntry?.reviewState === "needs_review" && (
+            {reviewEntry && getStageReviewState(reviewEntry, reviewStage) !== "approved" && (
               <Button
-                onClick={() => approveMutation.mutate({ id: reviewEntry.id, activateNow: false })}
+                onClick={() => approveMutation.mutate({ id: reviewEntry.id, stage: reviewStage as any, activateNow: false })}
                 disabled={approveMutation.isPending}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >
@@ -2856,7 +2861,7 @@ export default function CandidatePage() {
                 {reviewStage === "register" ? "Approve Registration" : reviewStage === "validate" ? "Approve Validation" : reviewStage === "publish" ? "Approve Publication" : "Approve"}
               </Button>
             )}
-            {reviewEntry?.reviewState === "approved" && (
+            {reviewEntry && getStageReviewState(reviewEntry, reviewStage) === "approved" && (
               <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30 px-3 py-1.5">
                 <ShieldCheck className="h-4 w-4 mr-1" />
                 Reviewed

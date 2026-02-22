@@ -19,6 +19,7 @@ export interface StaticCatalogEntry {
   config: Record<string, any>;
   tags: string[];
   reviewState: string;
+  stageReviews?: Record<string, string>;
 }
 
 interface ProviderDef {
