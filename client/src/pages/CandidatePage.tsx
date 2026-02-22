@@ -795,11 +795,16 @@ export default function CandidatePage() {
                         {(entry.tags || []).includes("registered") && !(entry.tags || []).includes("validated") ? (
                         <Button
                           size="sm"
-                          onClick={() => runValidation(entry.id)}
-                          disabled={isRunning}
+                          onClick={() => {
+                            const tags = (entry.tags || []).filter((t: string) => t !== "registered");
+                            tags.push("validated");
+                            updateMutation.mutate({ id: entry.id, tags });
+                            toast.success(`${entry.displayName || entry.name} validated — sent to Publish`);
+                          }}
+                          disabled={updateMutation.isPending}
                         >
-                          {isRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                          {isRunning ? "Validating..." : "Validate"}
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Validate
                         </Button>
                         ) : (
                         <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
