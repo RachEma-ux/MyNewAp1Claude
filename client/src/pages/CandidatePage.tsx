@@ -825,33 +825,10 @@ export default function CandidatePage() {
               {filteredEntries.map((entry: any) => (
                 <Card key={entry.id}>
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-wrap min-w-0 cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>
-                        <CardTitle className="text-base truncate">{entry.displayName || entry.name}</CardTitle>
-                        {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
-                          <Badge variant="outline" className="text-xs">
-                            <Icon className="h-3 w-3 mr-1" />
-                            {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
-                          </Badge>
-                        ); })()}
-                        <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
-                        <Badge
-                          className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "register")] || ""}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openReviewDialog(entry, "register");
-                          }}
-                          title="Click to review registration criteria"
-                        >
-                          {getStageReviewState(entry, "register") === "approved" ? (
-                            <ShieldCheck className="h-3 w-3 mr-1" />
-                          ) : (
-                            <Shield className="h-3 w-3 mr-1" />
-                          )}
-                          {getStageReviewState(entry, "register") === "approved" ? "Reviewed" : "Review"}
-                        </Badge>
-                      </div>
-                      <div className="flex gap-1 shrink-0">
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-base break-words cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>{entry.displayName || entry.name}</CardTitle>
+                        <div className="flex gap-1 shrink-0">
                         {(entry.tags || []).includes("candidate") && !(entry.tags || []).includes("registered") ? (
                         <Button
                           size="sm"
@@ -908,6 +885,7 @@ export default function CandidatePage() {
                     {entry.description && (
                       <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>
                     )}
+                    </div>
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -996,9 +974,32 @@ export default function CandidatePage() {
                 return (
                   <Card key={entry.id}>
                     <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap min-w-0 cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>
-                          <CardTitle className="text-base truncate">{entry.displayName || entry.name}</CardTitle>
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-base break-words cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>{entry.displayName || entry.name}</CardTitle>
+                          <div className="flex gap-1 shrink-0">
+                          {(entry.tags || []).includes("registered") && !(entry.tags || []).includes("validated") ? (
+                          <Button
+                            size="sm"
+                            onClick={() => governedTransition(entry, "validate")}
+                            disabled={stageTransitionMutation.isPending || updateMutation.isPending}
+                          >
+                            {stageTransitionMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                            )}
+                            Validate
+                          </Button>
+                          ) : (
+                          <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Validated
+                          </Badge>
+                          )}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
                           {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
                             <Badge variant="outline" className="text-xs">
                               <Icon className="h-3 w-3 mr-1" />
@@ -1028,31 +1029,10 @@ export default function CandidatePage() {
                             </Badge>
                           )}
                         </div>
-                        <div className="flex gap-1 shrink-0">
-                        {(entry.tags || []).includes("registered") && !(entry.tags || []).includes("validated") ? (
-                        <Button
-                          size="sm"
-                          onClick={() => governedTransition(entry, "validate")}
-                          disabled={stageTransitionMutation.isPending || updateMutation.isPending}
-                        >
-                          {stageTransitionMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <CheckCircle2 className="h-4 w-4 mr-1" />
-                          )}
-                          Validate
-                        </Button>
-                        ) : (
-                        <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Validated
-                        </Badge>
+                        {entry.description && (
+                          <p className="text-xs text-muted-foreground">{entry.description}</p>
                         )}
-                        </div>
                       </div>
-                      {entry.description && (
-                        <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>
-                      )}
                       {entry.lastValidatedAt && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                           <Clock className="h-3 w-3" />
@@ -1223,9 +1203,31 @@ export default function CandidatePage() {
                   {publishEntries.map((entry: any) => (
                     <Card key={entry.id}>
                       <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 flex-wrap min-w-0 cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>
-                            <CardTitle className="text-base truncate">{entry.displayName || entry.name}</CardTitle>
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="text-base break-words cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>{entry.displayName || entry.name}</CardTitle>
+                            <div className="flex gap-1 shrink-0">
+                            {(entry.tags || []).includes("validated") && !(entry.tags || []).includes("published") ? (
+                            <Button size="sm" onClick={() => {
+                              governedTransition(entry, "publish");
+                              activateMutation.mutate({ id: entry.id });
+                            }} disabled={stageTransitionMutation.isPending || updateMutation.isPending}>
+                              {stageTransitionMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Rocket className="h-4 w-4 mr-1" />
+                              )}
+                              Publish
+                            </Button>
+                            ) : (
+                            <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                              <Rocket className="h-3 w-3 mr-1" />
+                              Published
+                            </Badge>
+                            )}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
                             {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
                               <Badge variant="outline" className="text-xs">
                                 <Icon className="h-3 w-3 mr-1" />
@@ -1251,30 +1253,10 @@ export default function CandidatePage() {
                               </Badge>
                             )}
                           </div>
-                          <div className="flex gap-1 shrink-0">
-                          {(entry.tags || []).includes("validated") && !(entry.tags || []).includes("published") ? (
-                          <Button size="sm" onClick={() => {
-                            governedTransition(entry, "publish");
-                            activateMutation.mutate({ id: entry.id });
-                          }} disabled={stageTransitionMutation.isPending || updateMutation.isPending}>
-                            {stageTransitionMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            ) : (
-                              <Rocket className="h-4 w-4 mr-1" />
-                            )}
-                            Publish
-                          </Button>
-                          ) : (
-                          <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
-                            <Rocket className="h-3 w-3 mr-1" />
-                            Published
-                          </Badge>
+                          {entry.description && (
+                            <p className="text-xs text-muted-foreground">{entry.description}</p>
                           )}
-                          </div>
                         </div>
-                        {entry.description && (
-                          <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>
-                        )}
                       </CardHeader>
                       <CardContent className="pt-0">
                         <div className="flex flex-wrap items-center gap-2">
