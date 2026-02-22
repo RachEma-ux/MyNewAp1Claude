@@ -671,7 +671,10 @@ export default function CatalogManagePage() {
                 <TableBody>
                   {filteredEntries.map((entry: any) => (
                     <TableRow key={entry.id}>
-                      <TableCell>
+                      <TableCell
+                        onDoubleClick={() => openEditDialog(entry)}
+                        className="cursor-pointer"
+                      >
                         <div className="min-w-0">
                           <div className="font-medium truncate">{entry.displayName || entry.name}</div>
                           {entry.description && (
