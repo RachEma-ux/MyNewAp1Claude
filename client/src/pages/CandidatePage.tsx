@@ -314,22 +314,13 @@ export default function CandidatePage() {
       setValidationResults((prev) => ({ ...prev, [variables.id]: data }));
       setValidatingId(null);
       refetch();
-      // On success, clone entry with tag "validated" → appears in Publish tab
+      // On success, update tag from "registered" to "validated"
       if (data.success) {
         const source = entries.find((e: any) => e.id === variables.id);
         if (source) {
           const tags = (source.tags || []).filter((t: string) => t !== "registered");
           tags.push("validated");
-          createMutation.mutate({
-            name: source.name,
-            displayName: source.displayName || source.name,
-            description: source.description || undefined,
-            entryType: source.entryType,
-            config: { ...source.config, sourceEntryId: source.id, pipelineStage: "validated" },
-            tags,
-            origin: "admin",
-            capabilities: source.capabilities || undefined,
-          });
+          updateMutation.mutate({ id: source.id, tags });
           toast.success(`${source.displayName || source.name} validated — sent to Publish`);
         }
       }
@@ -355,15 +346,19 @@ export default function CandidatePage() {
   const classifyMutation = trpc.catalogManage.classify.useMutation();
 
   // Pipeline stage filters — each tab shows entries tagged with its stage
-  const registerEntries = entries.filter((e: any) =>
-    (e.tags || []).includes("candidate")
-  );
-  const validateEntries = entries.filter((e: any) =>
-    (e.tags || []).includes("registered")
-  );
-  const publishEntries = entries.filter((e: any) =>
-    (e.tags || []).includes("validated")
-  );
+  // Also includes entries that have already progressed (for history)
+  const registerEntries = entries.filter((e: any) => {
+    const tags = e.tags || [];
+    return tags.includes("candidate") || tags.includes("registered") || tags.includes("validated") || tags.includes("published");
+  });
+  const validateEntries = entries.filter((e: any) => {
+    const tags = e.tags || [];
+    return tags.includes("registered") || tags.includes("validated") || tags.includes("published");
+  });
+  const publishEntries = entries.filter((e: any) => {
+    const tags = e.tags || [];
+    return tags.includes("validated") || tags.includes("published");
+  });
 
   // Filter Register tab entries by search
   const filteredEntries = registerEntries.filter((e: any) => {
@@ -683,29 +678,29 @@ export default function CandidatePage() {
                         </Badge>
                       </div>
                       <div className="flex gap-1 shrink-0">
+                        {(entry.tags || []).includes("candidate") && !(entry.tags || []).includes("registered") ? (
                         <Button
                           size="sm"
                           onClick={() => {
                             const tags = (entry.tags || []).filter((t: string) => t !== "candidate");
                             tags.push("registered");
-                            createMutation.mutate({
-                              name: entry.name,
-                              displayName: entry.displayName || entry.name,
-                              description: entry.description || undefined,
-                              entryType: entry.entryType,
-                              config: { ...entry.config, sourceEntryId: entry.id, pipelineStage: "registered" },
-                              tags,
-                              origin: "admin",
-                              capabilities: entry.capabilities || undefined,
-                            });
+                            updateMutation.mutate({ id: entry.id, tags });
+                            // Also approve so entry can be activated later in Publish step
+                            approveMutation.mutate({ id: entry.id, activateNow: false });
                             toast.success(`${entry.displayName || entry.name} registered — sent to Validate`);
                           }}
-                          disabled={createMutation.isPending}
+                          disabled={updateMutation.isPending}
                           className="text-xs"
                         >
                           <ShieldCheck className="h-4 w-4 mr-1" />
                           Register
                         </Button>
+                        ) : (
+                        <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                          Registered
+                        </Badge>
+                        )}
                         <Button variant="ghost" size="sm" onClick={() => openEditDialog(entry)} title="Edit">
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -786,6 +781,7 @@ export default function CandidatePage() {
                             </Badge>
                           )}
                         </div>
+                        {(entry.tags || []).includes("registered") && !(entry.tags || []).includes("validated") ? (
                         <Button
                           size="sm"
                           onClick={() => runValidation(entry.id)}
@@ -794,6 +790,12 @@ export default function CandidatePage() {
                           {isRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
                           {isRunning ? "Validating..." : "Validate"}
                         </Button>
+                        ) : (
+                        <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Validated
+                        </Badge>
+                        )}
                       </div>
                       {entry.lastValidatedAt && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
@@ -918,29 +920,23 @@ export default function CandidatePage() {
                         <span className="font-medium text-sm">{entry.displayName || entry.name}</span>
                         <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
                       </div>
+                      {(entry.tags || []).includes("validated") && !(entry.tags || []).includes("published") ? (
                       <Button size="sm" onClick={() => {
                         const tags = (entry.tags || []).filter((t: string) => t !== "validated");
                         tags.push("published");
-                        createMutation.mutate({
-                          name: entry.name,
-                          displayName: entry.displayName || entry.name,
-                          description: entry.description || undefined,
-                          entryType: entry.entryType,
-                          config: { ...entry.config, sourceEntryId: entry.id, pipelineStage: "published" },
-                          tags,
-                          origin: "admin",
-                          capabilities: entry.capabilities || undefined,
-                        }, {
-                          onSuccess: (created: any) => {
-                            // Activate the published entry so it appears in Catalog
-                            activateMutation.mutate({ id: created.id });
-                            toast.success(`${entry.displayName || entry.name} published — available in Catalog`);
-                          },
-                        });
-                      }} disabled={createMutation.isPending}>
+                        updateMutation.mutate({ id: entry.id, tags });
+                        activateMutation.mutate({ id: entry.id });
+                        toast.success(`${entry.displayName || entry.name} published — available in Catalog`);
+                      }} disabled={updateMutation.isPending}>
                         <Rocket className="h-4 w-4 mr-1" />
                         Publish
                       </Button>
+                      ) : (
+                      <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                        <Rocket className="h-3 w-3 mr-1" />
+                        Published
+                      </Badge>
+                      )}
                     </div>
                   ))}
                 </div>
