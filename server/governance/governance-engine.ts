@@ -16,6 +16,7 @@
  *   Development → permissive (warn, fail-open unless GOVERNANCE_STRICT=true)
  */
 
+import { TRPCError } from "@trpc/server";
 import { hasPermission, normalizeRole, type PermissionAction, type GovernanceRole } from "./rbac-model";
 import { validateTransition, getStageFromTags, type TransitionRequest } from "./lifecycle-guard";
 import { evaluatePublication, type PublicationRequest } from "./publication-gate";
@@ -115,7 +116,7 @@ class GovernanceEngine {
       getGovernanceMetrics().inc("rbac_denials_total");
 
       if (isStrictMode()) {
-        throw new Error(`[Governance] ${msg}`);
+        throw new TRPCError({ code: "FORBIDDEN", message: `[Governance] ${msg}` });
       } else {
         console.warn(`[Governance] ${msg} (permissive mode — allowing)`);
         return true; // Allow in permissive mode but log

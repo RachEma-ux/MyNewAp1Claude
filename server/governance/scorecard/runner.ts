@@ -12,6 +12,7 @@
  *   - Must produce evidence for every PASS and FAIL
  */
 
+import * as fs from "fs";
 import type { RiskSeverity } from "../risk-classifier";
 import type { ControlDefinition } from "./control-catalog";
 
@@ -716,7 +717,6 @@ registerRunner({
     if (!control) return [];
 
     // Check that policy .rego files exist (runtime: check if loadable)
-    const fs = require("fs");
     const policyPaths = [
       "server/policies/agent_governance.rego",
       "policies/agent_governance.rego",
@@ -795,7 +795,6 @@ registerRunner({
     const control = controls.find((c) => c.runnerId === "governance-docs-validator");
     if (!control) return [];
 
-    const fs = require("fs");
     const requiredDocs = ["docs/GOVERNANCE_BIBLE.md", "ARCHITECTURE.md"];
     const found: string[] = [];
     const missing: string[] = [];
@@ -1265,7 +1264,6 @@ registerRunner({
     if (!control) return [];
 
     // Verify CI workflow files exist for governance enforcement
-    const fs = require("fs");
     const requiredWorkflows = [
       ".github/workflows/governance-gate.yml",
       ".github/workflows/ci.yml",

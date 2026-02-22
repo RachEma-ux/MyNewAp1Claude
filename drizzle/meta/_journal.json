@@ -71,6 +71,13 @@
       "when": 1771804800000,
       "tag": "0009_discovery_ops",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1771891200000,
+      "tag": "0010_governance_freeze",
+      "breakpoints": true
     }
   ]
 }
