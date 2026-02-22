@@ -14,6 +14,8 @@ import {
   TrendingDown,
   TrendingUp,
   Activity,
+  Lock,
+  Unlock,
 } from "lucide-react";
 
 type Stage = "submit" | "register" | "validate" | "publish" | "catalog";
@@ -29,6 +31,13 @@ export default function GovernanceScorecard() {
   const catalogQuery = trpc.governance.controlCatalog.useQuery();
   const driftQuery = trpc.governance.driftLatest.useQuery();
   const driftStatusQuery = trpc.governance.driftStatus.useQuery();
+  const frozenQuery = trpc.governance.frozenSubjects.useQuery();
+  const unfreezeMutation = trpc.governance.unfreezeSubject.useMutation({
+    onSuccess: () => {
+      frozenQuery.refetch();
+      driftStatusQuery.refetch();
+    },
+  });
 
   const scorecard = scorecardQuery.data;
   const catalog = catalogQuery.data;
@@ -242,6 +251,11 @@ export default function GovernanceScorecard() {
           </CardTitle>
           <CardDescription>
             {driftStatusQuery.data?.active ? "Active" : "Inactive"} — monitors governance posture changes
+            {(driftStatusQuery.data?.frozenCount ?? 0) > 0 && (
+              <span className="text-red-400 ml-2">
+                ({driftStatusQuery.data?.frozenCount} frozen subject{driftStatusQuery.data?.frozenCount !== 1 ? "s" : ""})
+              </span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -270,6 +284,68 @@ export default function GovernanceScorecard() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No drift data yet. Run a scorecard first.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Frozen Subjects */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Lock className="h-4 w-4" />
+            Frozen Subjects
+            {(frozenQuery.data?.length ?? 0) > 0 && (
+              <Badge variant="destructive" className="ml-1">
+                {frozenQuery.data?.length}
+              </Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Frozen subjects have all lifecycle transitions blocked until explicitly unfrozen
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(frozenQuery.data?.length ?? 0) === 0 ? (
+            <p className="text-sm text-muted-foreground">No frozen subjects. Governance posture is clean.</p>
+          ) : (
+            <div className="space-y-2">
+              {frozenQuery.data?.map((subject: any) => (
+                <div
+                  key={subject.subjectId}
+                  className="flex items-start gap-3 p-3 rounded-lg border border-red-500/30 bg-red-500/5"
+                >
+                  <Lock className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm">
+                        {subject.subjectId === 0 ? "System-wide freeze" : `#${subject.subjectId}`}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {subject.subjectName}
+                      </span>
+                      <Badge variant="outline" className="text-xs bg-red-500/10 text-red-400 border-red-500/30">
+                        Score: {subject.scoreAtFreeze}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{subject.reason}</p>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                      <span>Frozen by: {subject.frozenBy}</span>
+                      <span>At: {new Date(subject.frozenAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 border-red-500/30 hover:bg-red-500/10"
+                    disabled={unfreezeMutation.isPending}
+                    onClick={() => unfreezeMutation.mutate({ subjectId: subject.subjectId })}
+                  >
+                    <Unlock className="h-3 w-3 mr-1" />
+                    Unfreeze
+                  </Button>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
