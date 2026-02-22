@@ -522,13 +522,30 @@ export const catalogManageRouter = router({
         }
       }
 
+      // Propagate lifecycle tags — each approved stage adds its tag so the next stage's
+      // audit trail check can verify the entry passed through prior stages
+      const STAGE_TAGS: Record<string, string> = {
+        register: "registered",
+        validate: "validated",
+        publish: "published",
+      };
+      const currentTags: string[] = (entry.tags as string[]) || [];
+      const stageTag = STAGE_TAGS[stage];
+      const updatedTags = stageTag && !currentTags.includes(stageTag)
+        ? [...currentTags, stageTag]
+        : currentTags;
+
       // Only set legacy reviewState to approved when the final stage (publish) passes
       if (stage === "publish") {
         await approveCatalogEntry(input.id, 1);
       }
-      await updateCatalogEntry(input.id, { stageReviews: updatedStageReviews } as any, 1);
+      await updateCatalogEntry(input.id, {
+        stageReviews: updatedStageReviews,
+        tags: updatedTags,
+      } as any, 1);
 
-      if (input.activateNow) {
+      // Auto-activate on validate approval if not already active
+      if (input.activateNow || stage === "validate") {
         await updateCatalogEntry(input.id, { status: "active" }, 1);
       }
 
