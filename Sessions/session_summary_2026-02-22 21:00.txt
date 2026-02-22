@@ -1,0 +1,33 @@
+Session Summary — 2026-02-22 21:00
+====================================
+
+## Task
+Implement the Automated Governance Scorecard Engine per the Governance Bible CGT v2 specification.
+
+## What Was Built
+
+### New Files (7)
+- `server/governance/scorecard/control-catalog.ts` — 20 governance controls with stable IDs (SEC-001 to SEC-005, ARCH-001 to ARCH-004, LIFE-001 to LIFE-004, GOV-001 to GOV-005, DOC-001 to DOC-003), severity classification, stage gate mapping, scoring weights, and remediation text
+- `server/governance/scorecard/runner.ts` — Plugin-based runner framework with 20 built-in runners covering secret scanning, eval detection, provider call detection, environment validation, secret externalization, escalation detection, architecture boundary validation, policy engine validation, orchestrator validation, lifecycle sequence validation, approval validation, separation of duty, publication gate validation, deny-default validation, RBAC enforcement, audit logging, policy file integrity, policy bypass detection, governance docs, entry docs, endpoint docs
+- `server/governance/scorecard/aggregator.ts` — Weighted scoring model (0-100), per-domain breakdown, stage-specific gate evaluation with configurable thresholds per stage
+- `server/governance/scorecard/evidence.ts` — Immutable evidence bundle with SHA-256 hash, commit ref, timestamp, verification function, and PR comment formatter
+- `server/governance/scorecard/engine.ts` — Central scorecard orchestrator: selects controls, builds context, executes runners, aggregates results, generates evidence, maintains history
+- `server/governance/scorecard/drift-detector.ts` — Scheduled drift detection with score delta tracking, new/resolved violation diffing, escalation thresholds, start/stop/status API
+- `server/governance/scorecard/index.ts` — Public API barrel export
+- `client/src/pages/GovernanceScorecard.tsx` — Admin UI page with score display, gate status, risk breakdown, domain scores, control results table, drift monitoring, evidence bundle viewer
+
+### Modified Files (4)
+- `server/governance/router.ts` — Added 10 new tRPC endpoints: scorecardRun, scorecardLatest, scorecardHistory, controlCatalog, verifyEvidence, driftDetect, driftLatest, driftHistory, driftStatus, driftToggle
+- `server/governance/index.ts` — Added scorecard exports to governance module public API
+- `client/src/App.tsx` — Added /governance/scorecard route
+- `.github/workflows/governance-gate.yml` — Enhanced with evidence artifact upload, PR comment with scorecard summary table, direct provider invocation detection step, step output tracking for all checks
+
+## Architecture Decisions
+- Scorecard engine is pure-functional (stateless runners, no side effects beyond reporting)
+- Evidence bundles use SHA-256 for integrity verification
+- In-memory scorecard history (max 50 entries) for quick access; CI artifacts for persistent storage
+- Stage gate thresholds: Register (no Critical), Validate (no Critical/High, score>=50), Publish (no Critical/High/Medium, score>=80), Catalog (score=100)
+- Drift detection runs on configurable interval (default 15 min) with score drop threshold escalation
+
+## Commit
+3fbabb3 feat: implement Automated Governance Scorecard Engine (CGT v2)
