@@ -765,7 +765,7 @@ export default function CandidatePage() {
                   <Card key={entry.id}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap min-w-0 cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>
                           <CardTitle className="text-base truncate">{entry.displayName || entry.name}</CardTitle>
                           {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
                             <Badge variant="outline" className="text-xs">
@@ -774,6 +774,16 @@ export default function CandidatePage() {
                             </Badge>
                           ); })()}
                           <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
+                          <Badge className={`text-xs ${REVIEW_COLORS[entry.reviewState] || ""}`}>
+                            {entry.reviewState === "needs_review" ? (
+                              <Shield className="h-3 w-3 mr-1" />
+                            ) : entry.reviewState === "approved" ? (
+                              <ShieldCheck className="h-3 w-3 mr-1" />
+                            ) : (
+                              <ShieldX className="h-3 w-3 mr-1" />
+                            )}
+                            {entry.reviewState}
+                          </Badge>
                           {entry.validationStatus && (
                             <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
                               {entry.validationStatus === "passed" ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
@@ -781,6 +791,7 @@ export default function CandidatePage() {
                             </Badge>
                           )}
                         </div>
+                        <div className="flex gap-1 shrink-0">
                         {(entry.tags || []).includes("registered") && !(entry.tags || []).includes("validated") ? (
                         <Button
                           size="sm"
@@ -796,7 +807,11 @@ export default function CandidatePage() {
                           Validated
                         </Badge>
                         )}
+                        </div>
                       </div>
+                      {entry.description && (
+                        <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>
+                      )}
                       {entry.lastValidatedAt && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                           <Clock className="h-3 w-3" />
@@ -804,6 +819,20 @@ export default function CandidatePage() {
                         </p>
                       )}
                     </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
+                          {entry.origin}
+                        </Badge>
+                        <ClassificationBadges entryId={entry.id} />
+                        {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
+                          <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+                        ))}
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          Updated {new Date(entry.updatedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </CardContent>
 
                     {result && (
                       <CardContent className="pt-0">
@@ -907,37 +936,70 @@ export default function CandidatePage() {
                 </div>
               );
               return (
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {publishEntries.map((entry: any) => (
-                    <div key={entry.id} className="flex items-center justify-between p-3 border rounded-md">
-                      <div className="flex items-center gap-3">
-                        {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
-                          <Badge variant="outline" className="text-xs">
-                            <Icon className="h-3 w-3 mr-1" />
-                            {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
+                    <Card key={entry.id}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap min-w-0 cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>
+                            <CardTitle className="text-base truncate">{entry.displayName || entry.name}</CardTitle>
+                            {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
+                              <Badge variant="outline" className="text-xs">
+                                <Icon className="h-3 w-3 mr-1" />
+                                {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
+                              </Badge>
+                            ); })()}
+                            <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
+                            <Badge className={`text-xs ${REVIEW_COLORS[entry.reviewState] || ""}`}>
+                              {entry.reviewState === "approved" ? <ShieldCheck className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
+                              {entry.reviewState}
+                            </Badge>
+                            {entry.validationStatus && (
+                              <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
+                                {entry.validationStatus === "passed" ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                                {entry.validationStatus}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                          {(entry.tags || []).includes("validated") && !(entry.tags || []).includes("published") ? (
+                          <Button size="sm" onClick={() => {
+                            const tags = (entry.tags || []).filter((t: string) => t !== "validated");
+                            tags.push("published");
+                            updateMutation.mutate({ id: entry.id, tags });
+                            activateMutation.mutate({ id: entry.id });
+                            toast.success(`${entry.displayName || entry.name} published — available in Catalog`);
+                          }} disabled={updateMutation.isPending}>
+                            <Rocket className="h-4 w-4 mr-1" />
+                            Publish
+                          </Button>
+                          ) : (
+                          <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                            <Rocket className="h-3 w-3 mr-1" />
+                            Published
                           </Badge>
-                        ); })()}
-                        <span className="font-medium text-sm">{entry.displayName || entry.name}</span>
-                        <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
-                      </div>
-                      {(entry.tags || []).includes("validated") && !(entry.tags || []).includes("published") ? (
-                      <Button size="sm" onClick={() => {
-                        const tags = (entry.tags || []).filter((t: string) => t !== "validated");
-                        tags.push("published");
-                        updateMutation.mutate({ id: entry.id, tags });
-                        activateMutation.mutate({ id: entry.id });
-                        toast.success(`${entry.displayName || entry.name} published — available in Catalog`);
-                      }} disabled={updateMutation.isPending}>
-                        <Rocket className="h-4 w-4 mr-1" />
-                        Publish
-                      </Button>
-                      ) : (
-                      <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
-                        <Rocket className="h-3 w-3 mr-1" />
-                        Published
-                      </Badge>
-                      )}
-                    </div>
+                          )}
+                          </div>
+                        </div>
+                        {entry.description && (
+                          <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>
+                        )}
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
+                            {entry.origin}
+                          </Badge>
+                          <ClassificationBadges entryId={entry.id} />
+                          {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
+                            <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+                          ))}
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            Updated {new Date(entry.updatedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               );
