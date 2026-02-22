@@ -1,0 +1,48 @@
+Session Summary — 2026-02-22 16:30
+
+## What Was Done
+
+### Candidate Pipeline — Tag-Based Stage Progression (Major Feature)
+Implemented a complete pipeline where entries flow through stages via tag updates:
+
+**Flow:** Submit → Register → Validate → Publish → Catalog
+
+1. **Import/Submit** — entry gets tag `"candidate"`, `origin: "discovery"` → appears in Register tab
+2. **Register** (admin approval) — tag changes `"candidate"` → `"registered"` + entry approved → appears in Validate tab
+3. **Validate** (admin approval) — tag changes `"registered"` → `"validated"` → appears in Publish tab
+4. **Publish** (admin approval) — tag changes `"validated"` → `"published"` + entry activated → appears in Catalog
+
+### Key Design Decisions
+- **No cloning** — same entry moves through pipeline via tag updates (not duplicated)
+- **History in each tab** — each tab shows entries at its stage AND all later stages (e.g., Register shows candidate + registered + validated + published)
+- **Processed entries show badges** — once an entry is progressed, the action button is replaced with a status badge (e.g., "Registered", "Validated", "Published") preventing duplicate clicks
+- **Validate is admin approval** — not a technical probe (provider doesn't exist yet during pipeline)
+- **Rich cards in all tabs** — Validate and Publish tabs show full entry details (description, origin, reviewState, tags, classification badges, updated date) matching Register tab layout
+- **Catalog page** filters by tag `"published"` (not `"candidate" + active`)
+
+### Origin Fix for Register Tab
+- Fixed `origin: "discovery"` on both single-entry and batch submit in CatalogImportWizard
+- Server sets `reviewState = "needs_review"` for non-admin origins → entries land in Register tab correctly
+
+## Commits
+- `2f81918` — fix: set origin to discovery for all import wizard submissions
+- `4fa6a0f` — feat: implement tag-based pipeline with history at each stage
+- `12175f8` — fix: pipeline updates tags in-place with history in each tab
+- `6d89aac` — fix: enrich Validate and Publish tab cards with full entry details
+- `5fb53d2` — fix: Validate button updates tag instead of running technical validation
+
+## Files Modified
+- `client/src/components/CatalogImportWizard.tsx` — origin: "discovery" for both submit paths
+- `client/src/pages/CandidatePage.tsx` — tag-based filters, in-place tag updates, rich cards, admin approval buttons
+- `client/src/pages/CatalogManagePage.tsx` — filter by tag "published"
+
+## Architecture: Final Pipeline
+```
+Import/Create → Submit (tag: "candidate", origin: "discovery")
+  → Register tab: admin clicks Register → tag: "registered" + approved
+    → Validate tab: admin clicks Validate → tag: "validated"
+      → Publish tab: admin clicks Publish → tag: "published" + activated
+        → Catalog page: available in app
+```
+
+Each tab shows current + progressed entries (history). Processed entries show badge instead of button.
