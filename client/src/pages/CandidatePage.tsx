@@ -276,6 +276,7 @@ export default function CandidatePage() {
   const [reviewEntry, setReviewEntry] = useState<any>(null);
   const [reviewChecklist, setReviewChecklist] = useState<any>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewStage, setReviewStage] = useState<string>("register");
 
   // Publishing wizard state
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
@@ -342,7 +343,8 @@ export default function CandidatePage() {
       refetch();
       setReviewDialogOpen(false);
       setReviewEntry(null);
-      toast.success("Entry approved — ready for registration");
+      const stageMsg = reviewStage === "register" ? "registration" : reviewStage === "validate" ? "validation" : reviewStage === "publish" ? "publication" : "review";
+      toast.success(`Entry approved — ${stageMsg} criteria met`);
     },
     onError: (error) => {
       toast.error(`Approval failed: ${error.message}`);
@@ -439,17 +441,13 @@ export default function CandidatePage() {
       });
   }
 
-  /** Open governance review dialog for an entry */
-  function openReviewDialog(entry: any) {
+  /** Open governance review dialog for an entry at a specific lifecycle stage */
+  function openReviewDialog(entry: any, stage: string) {
     setReviewEntry(entry);
     setReviewChecklist(null);
     setReviewLoading(true);
+    setReviewStage(stage);
     setReviewDialogOpen(true);
-
-    const tags = entry.tags || [];
-    let stage = "register";
-    if (tags.includes("validated")) stage = "publish";
-    else if (tags.includes("registered")) stage = "validate";
 
     trpcUtils.governance.stageReview
       .fetch({
@@ -823,9 +821,9 @@ export default function CandidatePage() {
                           className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            openReviewDialog(entry);
+                            openReviewDialog(entry, "register");
                           }}
-                          title="Click to review governance criteria"
+                          title="Click to review registration criteria"
                         >
                           {entry.reviewState === "needs_review" ? (
                             <Shield className="h-3 w-3 mr-1" />
@@ -981,9 +979,9 @@ export default function CandidatePage() {
                             className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              openReviewDialog(entry);
+                              openReviewDialog(entry, "validate");
                             }}
-                            title="Click to review governance criteria"
+                            title="Click to review validation criteria"
                           >
                             {entry.reviewState === "needs_review" ? (
                               <Shield className="h-3 w-3 mr-1" />
@@ -1210,12 +1208,12 @@ export default function CandidatePage() {
                               className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                previewStageReview(entry, "publish");
+                                openReviewDialog(entry, "publish");
                               }}
                               title="Click to view governance checklist"
                             >
                               {entry.reviewState === "approved" ? <ShieldCheck className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
-                              {entry.reviewState}
+                              {entry.reviewState === "needs_review" ? "Review" : entry.reviewState === "approved" ? "Reviewed" : entry.reviewState}
                             </Badge>
                             {entry.validationStatus && (
                               <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
@@ -2777,11 +2775,16 @@ export default function CandidatePage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              Governance Review
+              {reviewStage === "register" ? "Registration Review" : reviewStage === "validate" ? "Validation Review" : reviewStage === "publish" ? "Publication Review" : "Governance Review"}
             </DialogTitle>
             <DialogDescription>
               {reviewEntry && (
-                <span>Review governance criteria for <strong>{reviewEntry.displayName || reviewEntry.name}</strong> ({reviewEntry.entryType})</span>
+                <span>
+                  {reviewStage === "register" && "Verify this entry meets registration requirements before catalog admission."}
+                  {reviewStage === "validate" && "Verify security policies, secrets management, and operational compliance."}
+                  {reviewStage === "publish" && "Final review — cross-doc consistency, CI protections, and no blocking findings."}
+                  {" "}<strong>{reviewEntry.displayName || reviewEntry.name}</strong> ({reviewEntry.entryType})
+                </span>
               )}
             </DialogDescription>
           </DialogHeader>
@@ -2850,7 +2853,7 @@ export default function CandidatePage() {
                 ) : (
                   <ShieldCheck className="h-4 w-4 mr-1" />
                 )}
-                Approve
+                {reviewStage === "register" ? "Approve Registration" : reviewStage === "validate" ? "Approve Validation" : reviewStage === "publish" ? "Approve Publication" : "Approve"}
               </Button>
             )}
             {reviewEntry?.reviewState === "approved" && (
