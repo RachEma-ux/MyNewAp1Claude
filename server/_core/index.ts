@@ -22,6 +22,7 @@ import { providers as providersTable } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { encrypt } from "./encryption";
 import { sdk } from "./sdk";
+import { initializeGovernance } from "../governance/governance-engine";
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -181,6 +182,9 @@ async function startServer() {
 
   // Start import session cleanup interval
   startCleanupInterval();
+
+  // Initialize Governance Engine (CGT v2)
+  initializeGovernance();
 
   const app = express();
   const server = createServer(app);
@@ -348,10 +352,11 @@ async function startServer() {
 
   // Health check endpoint
   app.get("/api/health", async (req, res) => {
-    const health = {
+    const health: any = {
       status: "ok",
       timestamp: new Date().toISOString(),
       database: "unknown",
+      governance: "unknown",
       env: {
         NODE_ENV: process.env.NODE_ENV,
         DATABASE_URL_SET: !!process.env.DATABASE_URL,
@@ -361,7 +366,6 @@ async function startServer() {
     try {
       const db = getDb();
       if (db) {
-        // Test database connection
         await db.execute(sql`SELECT 1 as test`);
         health.database = "connected";
       } else {
@@ -371,6 +375,17 @@ async function startServer() {
     } catch (error: any) {
       health.database = `error: ${error.message}`;
       health.status = "degraded";
+    }
+
+    // Governance self-check (lightweight)
+    try {
+      const { getGovernanceEngine } = require("../governance/governance-engine");
+      const engine = getGovernanceEngine();
+      const engineStatus = engine.getStatus();
+      health.governance = engineStatus.initialized ? "active" : "not_initialized";
+      health.governanceMode = engineStatus.strictMode ? "strict" : "permissive";
+    } catch {
+      health.governance = "unavailable";
     }
 
     res.json(health);

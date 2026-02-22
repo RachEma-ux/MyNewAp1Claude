@@ -14,6 +14,8 @@
 
 import type { PolicyDecision } from "./policyEvaluation";
 import { getGovernanceLogger } from "./governanceLogger";
+import { hasPermission, normalizeRole, type PermissionAction } from "../governance/rbac-model";
+import { getGovernanceMetrics } from "./governanceMetrics";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,14 +70,34 @@ export function evaluatePolicy(
   const timestamp = new Date();
 
   try {
-    // Default allow — when canonical policies are stored in the DB,
-    // this is where they would be loaded and evaluated via
-    // evaluateAgentCompliance / resolveConflicts.
+    // CGT v2: Check RBAC permissions if action maps to a governance permission
+    const rbacAction = mapToRbacAction(action);
+    const actorRole = context?.role || "user";
+
+    if (rbacAction) {
+      const role = normalizeRole(actorRole);
+      const allowed = hasPermission(role, rbacAction);
+
+      if (!allowed) {
+        getGovernanceMetrics().inc("policy_gate_rbac_denials_total");
+        const decision: PolicyDecision = {
+          decision: "deny",
+          policy_id: "rbac",
+          rule_id: "permission_denied",
+          reason: `Role '${role}' lacks permission for '${rbacAction}'`,
+          timestamp,
+        };
+        logDecision({ action, actor, target, context }, decision);
+        return decision;
+      }
+    }
+
+    // Allow — RBAC passed (or action has no RBAC mapping)
     const decision: PolicyDecision = {
       decision: "allow",
-      policy_id: "default",
-      rule_id: "pass_through",
-      reason: "No deny policies matched",
+      policy_id: "rbac_gate",
+      rule_id: rbacAction ? "rbac_pass" : "no_mapping",
+      reason: rbacAction ? `RBAC check passed for ${rbacAction}` : "No deny policies matched",
       timestamp,
     };
 
@@ -147,4 +169,48 @@ export function enforcePolicyOrThrow(
     });
   }
   return decision;
+}
+
+// ---------------------------------------------------------------------------
+// RBAC Action Mapping (CGT v2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps policy gate action strings to RBAC permission actions.
+ * Returns null if no mapping exists (legacy actions pass through).
+ */
+function mapToRbacAction(action: string): PermissionAction | null {
+  const map: Record<string, PermissionAction> = {
+    "provider.create": "provider.create",
+    "provider.update": "provider.update",
+    "provider.delete": "provider.delete",
+    "provider.connect": "provider.connect",
+    "agent.create": "agent.create",
+    "agent.promote": "agent.promote",
+    "agent.execute": "agent.execute",
+    "agent.delete": "agent.delete",
+    "workflow.create": "workflow.create",
+    "workflow.execute": "workflow.execute",
+    "workflow.publish": "workflow.publish",
+    "workflow.delete": "workflow.delete",
+    "policy.create": "policy.create",
+    "policy.update": "policy.update",
+    "policy.delete": "policy.delete",
+    "policy.activate": "policy.activate",
+    "secret.create": "secret.create",
+    "secret.read": "secret.read",
+    "secret.update": "secret.update",
+    "secret.delete": "secret.delete",
+    "lifecycle.submit": "lifecycle.submit",
+    "lifecycle.register": "lifecycle.register",
+    "lifecycle.validate": "lifecycle.validate",
+    "lifecycle.publish": "lifecycle.publish",
+    "lifecycle.recall": "lifecycle.recall",
+    "governance.review": "governance.review",
+    "governance.override": "governance.override",
+    "audit.read": "audit.read",
+    "audit.export": "audit.export",
+  };
+
+  return map[action] || null;
 }

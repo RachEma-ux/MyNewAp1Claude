@@ -21,7 +21,15 @@ export type AuditActionType =
   | "POLICY_UPDATE"
   | "POLICY_DELETE"
   | "AUTH_SESSION_CREATE"
-  | "ADMIN_ROLE_CHANGE";
+  | "ADMIN_ROLE_CHANGE"
+  // CGT v2 — Lifecycle & Governance
+  | "LIFECYCLE_TRANSITION"
+  | "PUBLICATION_GATE"
+  | "RBAC_DENIAL"
+  | "GOVERNANCE_SELF_CHECK"
+  | "ARCHITECTURE_VALIDATION"
+  | "DRIFT_DETECTION"
+  | "RISK_CLASSIFICATION";
 
 export interface AuditEvent {
   event_id: string;

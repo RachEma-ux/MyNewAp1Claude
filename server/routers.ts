@@ -39,6 +39,7 @@ import { catalogRegistryRouter } from "./routers/catalog-registry";
 import { catalogImportRouter } from "./catalog-import/router";
 import { providerConnectionsRouter } from "./provider-connections/router";
 import { discoveryOpsRouter } from "./routers/discovery-ops";
+import { governanceRouter } from "./governance/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -75,6 +76,7 @@ export const appRouter = router({
   catalogImport: catalogImportRouter, // Catalog Import & Discovery
   providerConnections: providerConnectionsRouter, // Provider PAT Authentication (Governed)
   discoveryOps: discoveryOpsRouter, // Discovery Ops: monitoring, promotion, audit
+  governance: governanceRouter, // Governance Engine (CGT v2)
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

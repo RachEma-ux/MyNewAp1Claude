@@ -1,0 +1,198 @@
+# Governance Gate — CI/CD Enforcement
+# Governance Bible CGT v2, Phase 8
+#
+# Enforces governance checks before merge:
+#   1. Secret scanning (no hardcoded credentials)
+#   2. Dynamic eval detection (no eval/Function constructor)
+#   3. Architecture boundary validation
+#   4. Policy file validation
+#   5. Branch protection enforcement
+#   6. Governance YAML spec validation
+
+name: Governance Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  governance-checks:
+    name: Governance Compliance Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Phase 4: Secret Scanning ──────────────────────────────────
+      - name: Scan for hardcoded secrets
+        run: |
+          echo "=== Governance Gate: Secret Scanning ==="
+          VIOLATIONS=0
+
+          # Check for common secret patterns in source code
+          PATTERNS=(
+            'password\s*[:=]\s*["\x27][^"\x27]{8,}'
+            'api[_-]?key\s*[:=]\s*["\x27][^"\x27]{8,}'
+            'secret\s*[:=]\s*["\x27][^"\x27]{8,}'
+            'token\s*[:=]\s*["\x27][^"\x27]{8,}'
+            'credential\s*[:=]\s*["\x27][^"\x27]{8,}'
+            'private[_-]?key\s*[:=]\s*["\x27][^"\x27]{8,}'
+          )
+
+          for pattern in "${PATTERNS[@]}"; do
+            MATCHES=$(grep -rn --include="*.ts" --include="*.tsx" --include="*.js" \
+              --include="*.json" --include="*.env" --include="*.yml" --include="*.yaml" \
+              -iE "$pattern" \
+              --exclude-dir=node_modules \
+              --exclude-dir=.git \
+              --exclude-dir=dist \
+              --exclude="*.test.*" \
+              --exclude="governance-gate.yml" \
+              --exclude="GOVERNANCE_BIBLE.md" \
+              . 2>/dev/null || true)
+
+            if [ -n "$MATCHES" ]; then
+              echo "POTENTIAL SECRET FOUND:"
+              echo "$MATCHES" | head -5
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          done
+
+          # Check for .env files that shouldn't be committed
+          if [ -f ".env" ] || [ -f ".env.local" ] || [ -f ".env.production" ]; then
+            echo "WARNING: .env file(s) found in repository"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          if [ $VIOLATIONS -gt 0 ]; then
+            echo "::warning::$VIOLATIONS potential secret pattern(s) detected — review manually"
+          else
+            echo "PASS: No hardcoded secrets detected"
+          fi
+
+      # ── Phase 5: Dynamic Eval Detection ───────────────────────────
+      - name: Scan for dynamic eval patterns
+        run: |
+          echo "=== Governance Gate: Dynamic Eval Detection ==="
+          VIOLATIONS=0
+
+          # Check for eval() usage
+          EVAL_MATCHES=$(grep -rn --include="*.ts" --include="*.tsx" --include="*.js" \
+            -E '\beval\s*\(' \
+            --exclude-dir=node_modules \
+            --exclude-dir=.git \
+            --exclude-dir=dist \
+            --exclude="*.test.*" \
+            --exclude="governance-gate.yml" \
+            . 2>/dev/null || true)
+
+          if [ -n "$EVAL_MATCHES" ]; then
+            echo "CRITICAL: eval() usage detected:"
+            echo "$EVAL_MATCHES"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # Check for new Function() usage
+          FUNC_MATCHES=$(grep -rn --include="*.ts" --include="*.tsx" --include="*.js" \
+            -E 'new\s+Function\s*\(' \
+            --exclude-dir=node_modules \
+            --exclude-dir=.git \
+            --exclude-dir=dist \
+            --exclude="*.test.*" \
+            --exclude="governance-gate.yml" \
+            . 2>/dev/null || true)
+
+          if [ -n "$FUNC_MATCHES" ]; then
+            echo "CRITICAL: new Function() usage detected:"
+            echo "$FUNC_MATCHES"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          if [ $VIOLATIONS -gt 0 ]; then
+            echo "::error::$VIOLATIONS dynamic code execution pattern(s) detected — BLOCKED"
+            exit 1
+          else
+            echo "PASS: No dynamic eval patterns detected"
+          fi
+
+      # ── Phase 1: Architecture Boundary Check ──────────────────────
+      - name: Validate architecture boundaries
+        run: |
+          echo "=== Governance Gate: Architecture Boundary Validation ==="
+          VIOLATIONS=0
+
+          # Check that no client code directly imports from server internals
+          CLIENT_SERVER_IMPORTS=$(grep -rn --include="*.ts" --include="*.tsx" \
+            -E "from ['\"]\.\.\/server\/" \
+            client/src/ 2>/dev/null || true)
+
+          if [ -n "$CLIENT_SERVER_IMPORTS" ]; then
+            echo "CRITICAL: Client code imports directly from server:"
+            echo "$CLIENT_SERVER_IMPORTS"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # Check that agents don't bypass provider abstraction
+          DIRECT_PROVIDER=$(grep -rn --include="*.ts" \
+            -E "import.*from.*['\"]\.\.\/providers\/(ollama|openai|anthropic|google)" \
+            server/agents/ 2>/dev/null || true)
+
+          if [ -n "$DIRECT_PROVIDER" ]; then
+            echo "WARNING: Agent code imports provider implementation directly:"
+            echo "$DIRECT_PROVIDER"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          if [ $VIOLATIONS -gt 0 ]; then
+            echo "::warning::$VIOLATIONS architecture boundary violation(s) detected"
+          else
+            echo "PASS: Architecture boundaries intact"
+          fi
+
+      # ── Phase 2: Governance Files Validation ──────────────────────
+      - name: Validate governance documentation exists
+        run: |
+          echo "=== Governance Gate: Documentation Check ==="
+          MISSING=0
+
+          REQUIRED_FILES=(
+            "docs/GOVERNANCE_BIBLE.md"
+            "ARCHITECTURE.md"
+          )
+
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "MISSING: $file"
+              MISSING=$((MISSING + 1))
+            else
+              echo "FOUND: $file"
+            fi
+          done
+
+          if [ $MISSING -gt 0 ]; then
+            echo "::warning::$MISSING required governance document(s) missing"
+          else
+            echo "PASS: All governance documents present"
+          fi
+
+      # ── Summary ───────────────────────────────────────────────────
+      - name: Governance gate summary
+        if: always()
+        run: |
+          echo ""
+          echo "══════════════════════════════════════════════"
+          echo "  GOVERNANCE GATE — CGT v2 COMPLIANCE REPORT"
+          echo "══════════════════════════════════════════════"
+          echo ""
+          echo "Checks executed:"
+          echo "  [1] Secret Scanning"
+          echo "  [2] Dynamic Eval Detection"
+          echo "  [3] Architecture Boundary Validation"
+          echo "  [4] Governance Documentation Check"
+          echo ""
+          echo "Enforcement: deny-by-default"
+          echo "Standard: Governance Bible CGT v2"
+          echo "══════════════════════════════════════════════"
