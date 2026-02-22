@@ -149,7 +149,8 @@ function ClassificationBadges({ entryId }: { entryId: number }) {
 
 export default function CatalogManagePage() {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"catalog" | "validation" | "publishing" | "audit" | "discovery-ops">("catalog");
+  const [activeTab, setActiveTab] = useState<"catalog" | "audit" | "discovery-ops">("catalog");
+  const [discoveringEntryId, setDiscoveringEntryId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | EntryType>("all");
 
@@ -350,6 +351,41 @@ export default function CatalogManagePage() {
     },
   });
   const classifyMutation = trpc.catalogManage.classify.useMutation();
+
+  // Discover provider from catalog table — runs discovery and updates entry config
+  const entryDiscoverMutation = trpc.catalogManage.discoverProvider.useMutation();
+  async function handleDiscoverEntry(entry: any) {
+    const config = entry.config || {};
+    let websiteUrl = "";
+    if (config.baseUrl) {
+      try { websiteUrl = new URL(config.baseUrl).origin; } catch { websiteUrl = config.baseUrl; }
+    } else {
+      const slug = (entry.name || "").replace(/[^a-z0-9.-]/gi, "").toLowerCase();
+      if (slug) websiteUrl = `https://${slug}.com`;
+    }
+    if (!websiteUrl) { toast.error("No URL available for discovery"); return; }
+    setDiscoveringEntryId(entry.id);
+    try {
+      const result = await entryDiscoverMutation.mutateAsync({ websiteUrl });
+      if (result.status === "failed") {
+        toast.error(`Discovery failed for ${entry.displayName || entry.name}`);
+        return;
+      }
+      const cfg = { ...config };
+      if (result.api?.bestUrl) cfg.baseUrl = result.api.bestUrl;
+      if (result.docsUrl) cfg.docsUrl = result.docsUrl;
+      if (result.techDocs?.authMethod) cfg.authMethod = result.techDocs.authMethod;
+      if (result.techDocs?.rateLimits) cfg.rateLimits = result.techDocs.rateLimits;
+      if (result.techDocs?.httpsOnly !== undefined) cfg.httpsOnly = result.techDocs.httpsOnly;
+      if (result.authType && !cfg.authMethod) cfg.authMethod = result.authType;
+      updateMutation.mutate({ id: entry.id, config: cfg });
+      toast.success(`Discovered ${result.name || entry.name}: ${result.api?.modelCount ?? 0} models, docs: ${result.docsUrl || "none"}`);
+    } catch (e: any) {
+      toast.error(`Discovery error: ${e.message}`);
+    } finally {
+      setDiscoveringEntryId(null);
+    }
+  }
 
   // Catalog only shows entries published from the Candidate pipeline
   const publishedEntries = entries.filter((e: any) =>
@@ -625,8 +661,6 @@ export default function CatalogManagePage() {
         <div className="overflow-x-auto">
           <TabsList>
             <TabsTrigger value="catalog">Catalog</TabsTrigger>
-            <TabsTrigger value="validation">Validate</TabsTrigger>
-            <TabsTrigger value="publishing">Publish</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
             <TabsTrigger value="discovery-ops">Discovery</TabsTrigger>
           </TabsList>
@@ -784,6 +818,21 @@ export default function CatalogManagePage() {
                               )}
                             </Button>
                           )}
+                          {entry.entryType === "provider" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDiscoverEntry(entry)}
+                              disabled={discoveringEntryId === entry.id}
+                              title="Discover provider API & docs"
+                            >
+                              {discoveringEntryId === entry.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Globe className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
                           <Button variant="ghost" size="sm" onClick={() => openVersions(entry.id)} title="Version history">
                             <History className="h-4 w-4" />
                           </Button>
@@ -808,267 +857,6 @@ export default function CatalogManagePage() {
             </div>
           )}
         </TabsContent>
-
-        <TabsContent value="validation" className="mt-4">
-          {/* Test prompt toggle */}
-          <div className="flex items-center gap-3 mb-4 p-3 rounded-md border bg-muted/30">
-            <Switch checked={runTestPrompt} onCheckedChange={setRunTestPrompt} />
-            <div>
-              <p className="text-sm font-medium">Run Test Prompt</p>
-              <p className="text-xs text-muted-foreground">Send a test prompt to verify model inference works</p>
-            </div>
-          </div>
-
-          {entries.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Activity className="h-10 w-10 mx-auto mb-3 opacity-50" />
-              <p className="text-lg font-medium">No entries to validate</p>
-              <p className="text-sm mt-1">Create catalog entries in the Catalog tab first</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {entries.map((entry: any) => {
-                const result = validationResults[entry.id];
-                const isRunning = validatingId === entry.id;
-
-                return (
-                  <Card key={entry.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap min-w-0">
-                          <CardTitle className="text-base truncate">{entry.displayName || entry.name}</CardTitle>
-                          {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
-                            <Badge variant="outline" className="text-xs">
-                              <Icon className="h-3 w-3 mr-1" />
-                              {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
-                            </Badge>
-                          ); })()}
-                          <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
-                          {entry.validationStatus && (
-                            <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
-                              {entry.validationStatus === "passed" ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
-                              {entry.validationStatus}
-                            </Badge>
-                          )}
-                        </div>
-                        <Button
-                          size="sm"
-                          onClick={() => runValidation(entry.id)}
-                          disabled={isRunning}
-                        >
-                          {isRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                          {isRunning ? "Validating..." : "Validate"}
-                        </Button>
-                      </div>
-                      {entry.lastValidatedAt && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                          <Clock className="h-3 w-3" />
-                          Last validated: {new Date(entry.lastValidatedAt).toLocaleString()}
-                        </p>
-                      )}
-                    </CardHeader>
-
-                    {result && (
-                      <CardContent className="pt-0">
-                        <Separator className="mb-3" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {/* Health */}
-                          <div className="border rounded-md p-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Activity className="h-4 w-4" />
-                              <span className="text-sm font-medium">Health</span>
-                              {result.results.health.passed
-                                ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
-                                : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{result.results.health.message}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{result.results.health.latencyMs}ms</p>
-                          </div>
-
-                          {/* Capabilities */}
-                          <div className="border rounded-md p-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Cpu className="h-4 w-4" />
-                              <span className="text-sm font-medium">Capabilities</span>
-                              {result.results.capabilities.passed
-                                ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
-                                : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{result.results.capabilities.message}</p>
-                          </div>
-
-                          {/* Models */}
-                          <div className="border rounded-md p-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Layers className="h-4 w-4" />
-                              <span className="text-sm font-medium">Models</span>
-                              {result.results.models.passed
-                                ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
-                                : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{result.results.models.message}</p>
-                            {result.results.models.models.length > 0 && (
-                              <div className="flex gap-1 flex-wrap mt-1">
-                                {result.results.models.models.slice(0, 5).map((m: string, i: number) => (
-                                  <Badge key={i} variant="secondary" className="text-xs">{m}</Badge>
-                                ))}
-                                {result.results.models.models.length > 5 && (
-                                  <span className="text-xs text-muted-foreground">+{result.results.models.models.length - 5} more</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Test Prompt */}
-                          {result.results.testPrompt && (
-                            <div className="border rounded-md p-3">
-                              <div className="flex items-center gap-2 mb-1">
-                                <MessageSquare className="h-4 w-4" />
-                                <span className="text-sm font-medium">Test Prompt</span>
-                                {result.results.testPrompt.passed
-                                  ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
-                                  : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
-                              </div>
-                              <p className="text-xs text-muted-foreground">{result.results.testPrompt.message}</p>
-                              {result.results.testPrompt.response && (
-                                <p className="text-xs font-mono bg-muted/50 rounded p-1.5 mt-1 truncate">
-                                  {result.results.testPrompt.response}
-                                </p>
-                              )}
-                              <p className="text-xs text-muted-foreground mt-1">{result.results.testPrompt.latencyMs}ms</p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Errors */}
-                        {result.errors && result.errors.length > 0 && (
-                          <div className="mt-3 p-2 rounded-md bg-red-950/20 border border-red-900/30">
-                            <p className="text-xs font-medium text-red-400 mb-1">Errors:</p>
-                            {result.errors.map((err: string, i: number) => (
-                              <p key={i} className="text-xs text-red-400/80">- {err}</p>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    )}
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="publishing" className="mt-4">
-          {/* Ready to Publish */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Ready to Publish</h3>
-            {(() => {
-              const publishable = entries.filter((e: any) => e.status === "active");
-              if (publishable.length === 0) return (
-                <div className="text-center py-8 text-muted-foreground border rounded-md">
-                  <p className="text-sm">No active entries ready for publishing</p>
-                  <p className="text-xs mt-1">Approve and activate entries first</p>
-                </div>
-              );
-              return (
-                <div className="space-y-2">
-                  {publishable.map((entry: any) => (
-                    <div key={entry.id} className="flex items-center justify-between p-3 border rounded-md">
-                      <div className="flex items-center gap-3">
-                        {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
-                          <Badge variant="outline" className="text-xs">
-                            <Icon className="h-3 w-3 mr-1" />
-                            {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
-                          </Badge>
-                        ); })()}
-                        <span className="font-medium text-sm">{entry.displayName || entry.name}</span>
-                        <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
-                      </div>
-                      <Button size="sm" onClick={() => openPublishWizard(entry)}>
-                        Publish
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
-
-          <Separator className="my-6" />
-
-          {/* Published Bundles */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Published Bundles</h3>
-            {bundles.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground border rounded-md">
-                <p className="text-sm">No published bundles yet</p>
-              </div>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Entry</TableHead>
-                      <TableHead>Version</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Hash</TableHead>
-                      <TableHead>Published</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bundles.map((bundle: any) => {
-                      const snap = bundle.snapshot as any;
-                      return (
-                        <TableRow key={bundle.id}>
-                          <TableCell>
-                            <span className="font-medium text-sm">{snap?.displayName || snap?.name || `Entry #${bundle.catalogEntryId}`}</span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs font-mono">{bundle.versionLabel}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={`text-xs ${
-                              bundle.status === "active" ? "bg-green-600/20 text-green-400 border-green-600/30" :
-                              bundle.status === "recalled" ? "bg-red-600/20 text-red-400 border-red-600/30" :
-                              "bg-gray-600/20 text-gray-400 border-gray-600/30"
-                            }`}>
-                              {bundle.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs font-mono text-muted-foreground">
-                              {bundle.snapshotHash?.substring(0, 12)}...
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(bundle.publishedAt).toLocaleString()}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {bundle.status === "active" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => recallMutation.mutate({ bundleId: bundle.id })}
-                                disabled={recallMutation.isPending}
-                              >
-                                Recall
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
         <TabsContent value="audit" className="mt-4">
           {auditEvents.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground border rounded-md">
