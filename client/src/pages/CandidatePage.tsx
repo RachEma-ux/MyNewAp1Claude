@@ -335,13 +335,27 @@ export default function CandidatePage() {
   });
   const classifyMutation = trpc.catalogManage.classify.useMutation();
 
-  // Only show entries tagged as "candidate"
+  // Only entries tagged as "candidate"
   const candidateEntries = entries.filter((e: any) =>
     (e.tags || []).includes("candidate")
   );
 
-  // Filter candidate entries by search
-  const filteredEntries = candidateEntries.filter((e: any) => {
+  // Pipeline stage filters
+  // Register: new entries awaiting admin registration (needs_review)
+  const registerEntries = candidateEntries.filter((e: any) =>
+    e.reviewState === "needs_review"
+  );
+  // Validate: registered/approved entries not yet validated
+  const validateEntries = candidateEntries.filter((e: any) =>
+    e.reviewState === "approved" && e.validationStatus !== "passed"
+  );
+  // Publish: validated entries not yet published (not active)
+  const publishEntries = candidateEntries.filter((e: any) =>
+    e.validationStatus === "passed" && e.status !== "active"
+  );
+
+  // Filter Register tab entries by search
+  const filteredEntries = registerEntries.filter((e: any) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -658,32 +672,14 @@ export default function CandidatePage() {
                         </Badge>
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        {entry.reviewState === "needs_review" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => approveMutation.mutate({ id: entry.id, activateNow: false })}
-                            disabled={approveMutation.isPending}
-                            title="Approve"
-                            className="text-emerald-400 hover:text-emerald-300"
-                          >
-                            <ShieldCheck className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {entry.status === "draft" && entry.reviewState === "approved" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => activateMutation.mutate({ id: entry.id })}
-                            disabled={activateMutation.isPending}
-                            title="Activate"
-                            className="text-green-400 hover:text-green-300"
-                          >
-                            <Zap className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => openVersions(entry.id)} title="Version history">
-                          <History className="h-4 w-4" />
+                        <Button
+                          size="sm"
+                          onClick={() => approveMutation.mutate({ id: entry.id, activateNow: false })}
+                          disabled={approveMutation.isPending}
+                          className="text-xs"
+                        >
+                          <ShieldCheck className="h-4 w-4 mr-1" />
+                          Register
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => openEditDialog(entry)} title="Edit">
                           <Pencil className="h-4 w-4" />
@@ -733,15 +729,15 @@ export default function CandidatePage() {
             </div>
           </div>
 
-          {candidateEntries.length === 0 ? (
+          {validateEntries.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Activity className="h-10 w-10 mx-auto mb-3 opacity-50" />
               <p className="text-lg font-medium">No entries to validate</p>
-              <p className="text-sm mt-1">Submit entries in the Register tab first</p>
+              <p className="text-sm mt-1">Register entries first, then they appear here for validation</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {candidateEntries.map((entry: any) => {
+              {validateEntries.map((entry: any) => {
                 const result = validationResults[entry.id];
                 const isRunning = validatingId === entry.id;
 
@@ -877,16 +873,15 @@ export default function CandidatePage() {
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3">Ready to Publish</h3>
             {(() => {
-              const publishable = candidateEntries.filter((e: any) => e.status === "active");
-              if (publishable.length === 0) return (
+              if (publishEntries.length === 0) return (
                 <div className="text-center py-8 text-muted-foreground border rounded-md">
-                  <p className="text-sm">No active entries ready for publishing</p>
-                  <p className="text-xs mt-1">Approve and activate entries first</p>
+                  <p className="text-sm">No validated entries ready for publishing</p>
+                  <p className="text-xs mt-1">Validate entries first, then they appear here</p>
                 </div>
               );
               return (
                 <div className="space-y-2">
-                  {publishable.map((entry: any) => (
+                  {publishEntries.map((entry: any) => (
                     <div key={entry.id} className="flex items-center justify-between p-3 border rounded-md">
                       <div className="flex items-center gap-3">
                         {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
