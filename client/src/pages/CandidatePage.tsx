@@ -271,6 +271,12 @@ export default function CandidatePage() {
   const [validationResults, setValidationResults] = useState<Record<number, any>>({});
   const [runTestPrompt, setRunTestPrompt] = useState(false);
 
+  // Governance review dialog state
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewEntry, setReviewEntry] = useState<any>(null);
+  const [reviewChecklist, setReviewChecklist] = useState<any>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+
   // Publishing wizard state
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [publishEntry, setPublishEntry] = useState<any>(null);
@@ -332,7 +338,15 @@ export default function CandidatePage() {
     onSuccess: () => refetchBundles(),
   });
   const approveMutation = trpc.catalogManage.approve.useMutation({
-    onSuccess: () => refetch(),
+    onSuccess: () => {
+      refetch();
+      setReviewDialogOpen(false);
+      setReviewEntry(null);
+      toast.success("Entry approved — ready for registration");
+    },
+    onError: (error) => {
+      toast.error(`Approval failed: ${error.message}`);
+    },
   });
   const activateMutation = trpc.catalogManage.activate.useMutation({
     onSuccess: () => refetch(),
@@ -422,6 +436,42 @@ export default function CandidatePage() {
       })
       .catch((err) => {
         toast.error(`Stage review failed: ${err.message}`);
+      });
+  }
+
+  /** Open governance review dialog for an entry */
+  function openReviewDialog(entry: any) {
+    setReviewEntry(entry);
+    setReviewChecklist(null);
+    setReviewLoading(true);
+    setReviewDialogOpen(true);
+
+    const tags = entry.tags || [];
+    let stage = "register";
+    if (tags.includes("validated")) stage = "publish";
+    else if (tags.includes("registered")) stage = "validate";
+
+    trpcUtils.governance.stageReview
+      .fetch({
+        entryId: entry.id,
+        entryName: entry.displayName || entry.name,
+        entryType: entry.entryType,
+        tags: entry.tags || [],
+        description: entry.description || undefined,
+        config: entry.config || undefined,
+        reviewState: entry.reviewState || undefined,
+        status: entry.status || undefined,
+        validationStatus: entry.validationStatus || undefined,
+        capabilities: entry.capabilities || undefined,
+        targetStage: stage as any,
+      })
+      .then((result) => {
+        setReviewChecklist(result);
+        setReviewLoading(false);
+      })
+      .catch((err) => {
+        toast.error(`Review failed: ${err.message}`);
+        setReviewLoading(false);
       });
   }
 
@@ -773,14 +823,9 @@ export default function CandidatePage() {
                           className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            // Determine target stage based on current tags
-                            const tags = entry.tags || [];
-                            let targetStage = "register";
-                            if (tags.includes("validated")) targetStage = "publish";
-                            else if (tags.includes("registered")) targetStage = "validate";
-                            previewStageReview(entry, targetStage);
+                            openReviewDialog(entry);
                           }}
-                          title="Click to view governance checklist"
+                          title="Click to review governance criteria"
                         >
                           {entry.reviewState === "needs_review" ? (
                             <Shield className="h-3 w-3 mr-1" />
@@ -789,7 +834,7 @@ export default function CandidatePage() {
                           ) : (
                             <ShieldX className="h-3 w-3 mr-1" />
                           )}
-                          {entry.reviewState}
+                          {entry.reviewState === "needs_review" ? "Review" : entry.reviewState === "approved" ? "Reviewed" : entry.reviewState}
                         </Badge>
                       </div>
                       <div className="flex gap-1 shrink-0">
@@ -936,13 +981,9 @@ export default function CandidatePage() {
                             className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[entry.reviewState] || ""}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              const tags = entry.tags || [];
-                              let targetStage = "validate";
-                              if (tags.includes("validated")) targetStage = "publish";
-                              else if (tags.includes("registered")) targetStage = "validate";
-                              previewStageReview(entry, targetStage);
+                              openReviewDialog(entry);
                             }}
-                            title="Click to view governance checklist"
+                            title="Click to review governance criteria"
                           >
                             {entry.reviewState === "needs_review" ? (
                               <Shield className="h-3 w-3 mr-1" />
@@ -951,7 +992,7 @@ export default function CandidatePage() {
                             ) : (
                               <ShieldX className="h-3 w-3 mr-1" />
                             )}
-                            {entry.reviewState}
+                            {entry.reviewState === "needs_review" ? "Review" : entry.reviewState === "approved" ? "Reviewed" : entry.reviewState}
                           </Badge>
                           {entry.validationStatus && (
                             <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
@@ -2729,6 +2770,98 @@ export default function CandidatePage() {
         onOpenChange={setConnectModalOpen}
         onComplete={() => refetch()}
       />
+
+      {/* Governance Review Dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Governance Review
+            </DialogTitle>
+            <DialogDescription>
+              {reviewEntry && (
+                <span>Review governance criteria for <strong>{reviewEntry.displayName || reviewEntry.name}</strong> ({reviewEntry.entryType})</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-3 py-2">
+            {reviewLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading governance criteria...</span>
+              </div>
+            ) : reviewChecklist ? (
+              <>
+                {/* Score summary */}
+                <div className={`p-3 rounded-md border ${reviewChecklist.passed ? "bg-emerald-950/20 border-emerald-900/30" : "bg-orange-950/20 border-orange-900/30"}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {reviewChecklist.passed ? "All checks passed" : "Some checks need attention"}
+                    </span>
+                    <Badge className={`text-xs ${reviewChecklist.passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}>
+                      {reviewChecklist.score}%
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Stage: {reviewChecklist.stage} — {reviewChecklist.items?.length || 0} criteria evaluated
+                  </p>
+                </div>
+
+                {/* Criteria list */}
+                <div className="space-y-2">
+                  {(reviewChecklist.items || []).map((item: any) => (
+                    <div key={item.itemId} className="flex items-start gap-2 p-2 rounded-md bg-muted/30">
+                      {item.passed ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-medium">{item.name}</span>
+                          <Badge variant="outline" className="text-[9px] px-1 py-0">{item.category}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{item.details}</p>
+                        {!item.passed && item.remediation && (
+                          <p className="text-xs text-orange-400/80 italic mt-0.5">{item.remediation}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          <DialogFooter className="pt-2 border-t">
+            <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
+              Close
+            </Button>
+            {reviewEntry?.reviewState === "needs_review" && (
+              <Button
+                onClick={() => approveMutation.mutate({ id: reviewEntry.id, activateNow: false })}
+                disabled={approveMutation.isPending}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {approveMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4 mr-1" />
+                )}
+                Approve
+              </Button>
+            )}
+            {reviewEntry?.reviewState === "approved" && (
+              <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30 px-3 py-1.5">
+                <ShieldCheck className="h-4 w-4 mr-1" />
+                Reviewed
+              </Badge>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
