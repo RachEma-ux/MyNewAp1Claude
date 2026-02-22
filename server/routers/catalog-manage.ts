@@ -25,6 +25,7 @@ import {
   createCatalogAuditEvent,
   approveCatalogEntry,
   getTaxonomyTree,
+  getTaxonomyNodes,
   getEntryClassifications,
   setEntryClassifications,
   seedTaxonomy,
@@ -211,6 +212,18 @@ export const catalogManageRouter = router({
         createdBy: 1,
       });
       audit("catalog.entry.created", entry.id, { name: entry.name, entryType: entry.entryType, origin, reviewState });
+
+      // Auto-classify: assign the first axis node for this entry type
+      try {
+        const axisNodes = await getTaxonomyNodes({ entryType: input.entryType, level: "axis" });
+        if (axisNodes.length > 0) {
+          await setEntryClassifications(entry.id, [axisNodes[0].id]);
+          audit("catalog.entry.auto-classified", entry.id, { nodeIds: [axisNodes[0].id], label: axisNodes[0].label });
+        }
+      } catch (e: any) {
+        console.warn(`[CatalogManage] Auto-classify failed for entry ${entry.id}:`, e.message);
+      }
+
       return entry;
     }),
 
