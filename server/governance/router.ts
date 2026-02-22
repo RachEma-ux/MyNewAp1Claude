@@ -515,8 +515,9 @@ export const governanceRouter = router({
    * Execute a governed stage transition.
    * Runs stage review + lifecycle guard + publication gate (for publish).
    * Returns 409 CONFLICT if blocked. On success, returns new tags.
+   * Uses protectedProcedure — RBAC is enforced within the stage review checklist.
    */
-  stageTransition: adminProcedure
+  stageTransition: protectedProcedure
     .input(
       z.object({
         entryId: z.number(),

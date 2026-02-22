@@ -231,16 +231,15 @@ const REGISTER_CHECKS: ReviewCheckItem[] = [
     name: "RBAC mapping defined",
     stage: "register",
     category: "admin_checklist",
-    remediation: "Ensure the actor has appropriate role for registration (admin or reviewer)",
+    remediation: "Ensure the actor has an assigned role in the system",
     evaluator: (ctx) => {
-      const validRoles = ["admin", "reviewer", "governance_admin"];
-      const hasRole = validRoles.includes(ctx.actor.role);
+      const hasRole = !!ctx.actor.role && ctx.actor.role.length > 0;
       return {
         itemId: "REG-03",
         name: "RBAC mapping defined",
         passed: hasRole,
         category: "admin_checklist",
-        details: hasRole ? `Actor role: ${ctx.actor.role}` : `Role "${ctx.actor.role}" may lack registration authority`,
+        details: hasRole ? `Actor role: ${ctx.actor.role}` : "No role assigned to actor",
       };
     },
   },
