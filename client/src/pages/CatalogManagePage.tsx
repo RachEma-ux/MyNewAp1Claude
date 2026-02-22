@@ -339,7 +339,7 @@ export default function CatalogManagePage() {
 
   // Catalog only shows entries published from the Candidate pipeline
   const publishedEntries = entries.filter((e: any) =>
-    (e.tags || []).includes("candidate") && e.status === "active"
+    (e.tags || []).includes("published")
   );
 
   // Filter published entries by search

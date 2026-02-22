@@ -314,6 +314,25 @@ export default function CandidatePage() {
       setValidationResults((prev) => ({ ...prev, [variables.id]: data }));
       setValidatingId(null);
       refetch();
+      // On success, clone entry with tag "validated" → appears in Publish tab
+      if (data.success) {
+        const source = entries.find((e: any) => e.id === variables.id);
+        if (source) {
+          const tags = (source.tags || []).filter((t: string) => t !== "registered");
+          tags.push("validated");
+          createMutation.mutate({
+            name: source.name,
+            displayName: source.displayName || source.name,
+            description: source.description || undefined,
+            entryType: source.entryType,
+            config: { ...source.config, sourceEntryId: source.id, pipelineStage: "validated" },
+            tags,
+            origin: "admin",
+            capabilities: source.capabilities || undefined,
+          });
+          toast.success(`${source.displayName || source.name} validated — sent to Publish`);
+        }
+      }
     },
     onError: () => setValidatingId(null),
   });
@@ -335,23 +354,15 @@ export default function CandidatePage() {
   });
   const classifyMutation = trpc.catalogManage.classify.useMutation();
 
-  // Only entries tagged as "candidate"
-  const candidateEntries = entries.filter((e: any) =>
+  // Pipeline stage filters — each tab shows entries tagged with its stage
+  const registerEntries = entries.filter((e: any) =>
     (e.tags || []).includes("candidate")
   );
-
-  // Pipeline stage filters
-  // Register: new entries awaiting admin registration (needs_review)
-  const registerEntries = candidateEntries.filter((e: any) =>
-    e.reviewState === "needs_review"
+  const validateEntries = entries.filter((e: any) =>
+    (e.tags || []).includes("registered")
   );
-  // Validate: registered/approved entries not yet validated
-  const validateEntries = candidateEntries.filter((e: any) =>
-    e.reviewState === "approved" && e.validationStatus !== "passed"
-  );
-  // Publish: validated entries not yet published (not active)
-  const publishEntries = candidateEntries.filter((e: any) =>
-    e.validationStatus === "passed" && e.status !== "active"
+  const publishEntries = entries.filter((e: any) =>
+    (e.tags || []).includes("validated")
   );
 
   // Filter Register tab entries by search
@@ -674,8 +685,22 @@ export default function CandidatePage() {
                       <div className="flex gap-1 shrink-0">
                         <Button
                           size="sm"
-                          onClick={() => approveMutation.mutate({ id: entry.id, activateNow: false })}
-                          disabled={approveMutation.isPending}
+                          onClick={() => {
+                            const tags = (entry.tags || []).filter((t: string) => t !== "candidate");
+                            tags.push("registered");
+                            createMutation.mutate({
+                              name: entry.name,
+                              displayName: entry.displayName || entry.name,
+                              description: entry.description || undefined,
+                              entryType: entry.entryType,
+                              config: { ...entry.config, sourceEntryId: entry.id, pipelineStage: "registered" },
+                              tags,
+                              origin: "admin",
+                              capabilities: entry.capabilities || undefined,
+                            });
+                            toast.success(`${entry.displayName || entry.name} registered — sent to Validate`);
+                          }}
+                          disabled={createMutation.isPending}
                           className="text-xs"
                         >
                           <ShieldCheck className="h-4 w-4 mr-1" />
@@ -767,7 +792,7 @@ export default function CandidatePage() {
                           disabled={isRunning}
                         >
                           {isRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                          {isRunning ? "Registering..." : "Register"}
+                          {isRunning ? "Validating..." : "Validate"}
                         </Button>
                       </div>
                       {entry.lastValidatedAt && (
@@ -893,7 +918,27 @@ export default function CandidatePage() {
                         <span className="font-medium text-sm">{entry.displayName || entry.name}</span>
                         <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
                       </div>
-                      <Button size="sm" onClick={() => openPublishWizard(entry)}>
+                      <Button size="sm" onClick={() => {
+                        const tags = (entry.tags || []).filter((t: string) => t !== "validated");
+                        tags.push("published");
+                        createMutation.mutate({
+                          name: entry.name,
+                          displayName: entry.displayName || entry.name,
+                          description: entry.description || undefined,
+                          entryType: entry.entryType,
+                          config: { ...entry.config, sourceEntryId: entry.id, pipelineStage: "published" },
+                          tags,
+                          origin: "admin",
+                          capabilities: entry.capabilities || undefined,
+                        }, {
+                          onSuccess: (created: any) => {
+                            // Activate the published entry so it appears in Catalog
+                            activateMutation.mutate({ id: created.id });
+                            toast.success(`${entry.displayName || entry.name} published — available in Catalog`);
+                          },
+                        });
+                      }} disabled={createMutation.isPending}>
+                        <Rocket className="h-4 w-4 mr-1" />
                         Publish
                       </Button>
                     </div>
