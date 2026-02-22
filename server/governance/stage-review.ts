@@ -72,6 +72,7 @@ export interface ReviewContext {
     status?: string;
     validationStatus?: string;
     capabilities?: string[];
+    stageReviews?: Record<string, string>;
   };
   actor: {
     id: string;
@@ -596,17 +597,21 @@ const PUBLISH_CHECKS: ReviewCheckItem[] = [
     name: "Review approved",
     stage: "publish",
     category: "admin_checklist",
-    remediation: "Entry must have reviewState = 'approved' before publishing",
+    remediation: "All prior stages (register, validate) must be approved before publishing",
     evaluator: (ctx) => {
-      const approved = ctx.entry.reviewState === "approved";
+      const stageReviews = ctx.entry.stageReviews || {};
+      const registerApproved = stageReviews.register === "approved";
+      const validateApproved = stageReviews.validate === "approved";
+      // Accept legacy reviewState OR per-stage tracking
+      const approved = (registerApproved && validateApproved) || ctx.entry.reviewState === "approved";
       return {
         itemId: "PUB-05",
         name: "Review approved",
         passed: approved,
         category: "admin_checklist",
         details: approved
-          ? "Entry review is approved"
-          : `Review state: ${ctx.entry.reviewState || "unknown"} (expected: approved)`,
+          ? "All prior stage reviews approved"
+          : `Prior stages: register=${stageReviews.register || "pending"}, validate=${stageReviews.validate || "pending"}`,
       };
     },
   },

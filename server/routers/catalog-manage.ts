@@ -495,6 +495,7 @@ export const catalogManageRouter = router({
           reviewState: entry.reviewState || undefined,
           status: entry.status,
           validationStatus: (entry as any).validationStatus || undefined,
+          stageReviews: (entry as any).stageReviews || {},
         },
         stage,
         { id: String(ctx.user.id), role: ctx.user.role || "admin" }
@@ -606,6 +607,7 @@ export const catalogManageRouter = router({
           reviewState: entry.reviewState || undefined,
           status: entry.status,
           validationStatus: (entry as any).validationStatus || undefined,
+          stageReviews: (entry as any).stageReviews || {},
         },
         "validate",
         { id: String(ctx.user.id), role: ctx.user.role || "admin" }
@@ -662,8 +664,10 @@ export const catalogManageRouter = router({
         throw new Error(`Entry must be active before publishing (current status: ${entry.status})`);
       }
 
-      if (entry.reviewState !== "approved") {
-        throw new Error(`Entry must be approved before publishing (current reviewState: ${entry.reviewState})`);
+      const stageReviews = (entry as any).stageReviews || {};
+      const allPriorStagesApproved = stageReviews.register === "approved" && stageReviews.validate === "approved";
+      if (entry.reviewState !== "approved" && !allPriorStagesApproved) {
+        throw new Error(`Entry must have all prior stages approved before publishing`);
       }
 
       // Governance gate: run Publish stage review (Triple Validation)
@@ -678,6 +682,7 @@ export const catalogManageRouter = router({
           reviewState: entry.reviewState || undefined,
           status: entry.status,
           validationStatus: (entry as any).validationStatus || undefined,
+          stageReviews,
         },
         "publish",
         { id: String(ctx.user.id), role: ctx.user.role || "admin" }
