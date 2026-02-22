@@ -1,0 +1,54 @@
+Session Summary — 2026-02-23 00:50
+====================================
+
+## Context
+Continued from session 22:25. This session focused on two tasks:
+1. UI changes to Manage Catalogue page (add Discover button, remove Validate/Publish tabs)
+2. Execute full governance pipeline for all 78 catalog entries
+
+## Work Done
+
+### 1. Manage Catalogue page changes (CatalogManagePage.tsx)
+- Added "Discover" button (Globe icon) to Provider-type entries in the Catalog tab
+- Removed Validate and Publish tabs — page now has 3 tabs: Catalog, Audit, Discovery
+- Discover button runs `catalogManage.discoverProvider` and updates entry config with docs, auth, rate limits
+- Committed as a4e3fc7
+
+### 2. Candidate Pipeline restoration (CandidatePage.tsx)
+- Initially modified wrong file (CandidatePage instead of CatalogManagePage)
+- Fully restored CandidatePage.tsx from git history (7ba82c5)
+- All 5 tabs restored: Register, Validate, Publish, Audit, Discovery
+- Committed as 71ac200
+
+### 3. Full governance pipeline execution — 78 entries
+- Wrote Python script (`scripts/governance-pipeline.py`) to process all entries via tRPC API
+- Pipeline stages: Classify → Register → Approve → Validate → Approve → Publish → Approve
+- Classification: providers → node 1 ("Hosting Model"), models → node 55 ("Quantization")
+- Results:
+  | Stage            | Result           |
+  |------------------|------------------|
+  | Classify         | 78/78            |
+  | Register         | 78 ok, 0 fail    |
+  | Approve Register | 78/78            |
+  | Validate         | 78 ok, 0 fail    |
+  | Approve Validate | 78/78            |
+  | Publish          | 78 ok, 0 fail    |
+  | Approve Publish  | 78/78            |
+- Final state: all 78 entries status=active, stageReviews all approved, tags include registered+validated+published
+
+### 4. Entries processed (78 total: 16 providers + 62 models)
+Providers: anthropic, openai, google, meta, mistral, microsoft, qwen, xai, cohere, butterfly, moonshot, palantir, perplexity, deepseek, ollama
+Models: claude-opus-4-6, claude-sonnet-4-5, claude-haiku-4-5, claude-opus-4-5, claude-sonnet-4, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, o3, o4-mini, gpt-4o, gpt-4o-mini, gemini-3-pro, gemini-3-flash, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash, llama-4-scout, llama-4-maverick, llama-3.3-70b, llama-3.2-3b, llama-guard-4, mistral-large, mistral-small, codestral, mistral-nemo, phi-4, phi-4-mini, phi-4-multimodal, qwen3-235b, qwen3-32b, qwen3-8b, qwen2.5-coder, grok, grok-1.5, command, command-r, command-r-plus, embed, rerank, manus, kimi, palantir-api, gotham, foundry, apollo, perplexity-pro, perplexity-standard, deepseek-r1, deepseek-v3, deepseek-chat, llama2, llama2:13b, llama2:70b, qwen3, gemma3, phi, neural-chat, starling-lm, orca-mini, vicuna, llama2-uncensored
+
+## Commits (this session)
+- e439ac3 — feat: add Discover button to Provider entries, remove Validate/Publish tabs (CandidatePage — wrong file)
+- a4e3fc7 — feat: add Discover button and remove Validate/Publish tabs from Manage Catalogue
+- 71ac200 — fix: restore Validate/Publish tabs in Candidate Pipeline
+
+## Files Modified
+- client/src/pages/CatalogManagePage.tsx — Discover button, removed Validate/Publish tabs
+- client/src/pages/CandidatePage.tsx — restored to original (5 tabs)
+- scripts/governance-pipeline.py — new: bulk governance lifecycle script
+
+## Deploy
+- Tested at: https://government-yesterday-read-mortality.trycloudflare.com
