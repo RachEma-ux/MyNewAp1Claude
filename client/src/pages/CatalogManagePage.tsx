@@ -2453,6 +2453,7 @@ export default function CatalogManagePage() {
         open={importWizardOpen}
         onOpenChange={setImportWizardOpen}
         onComplete={() => refetch()}
+        navigateToCandidate
       />
 
       {/* Connect Provider Modal */}

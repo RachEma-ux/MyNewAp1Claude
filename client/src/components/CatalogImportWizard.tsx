@@ -2,6 +2,7 @@
  * CatalogImportWizard — 4-step modal for importing catalog entries via API discovery
  */
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { CatalogSelect } from "@/components/CatalogSelect";
 import {
@@ -50,6 +51,8 @@ interface CatalogImportWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onComplete?: () => void;
+  /** When true, submitted entries navigate to Candidate page instead of staying */
+  navigateToCandidate?: boolean;
 }
 
 type WizardStep = 1 | 2 | 3 | 4;
@@ -102,7 +105,9 @@ export function CatalogImportWizard({
   open,
   onOpenChange,
   onComplete,
+  navigateToCandidate,
 }: CatalogImportWizardProps) {
+  const [, navigate] = useLocation();
   const [step, setStep] = useState<WizardStep>(1);
   const [method, setMethod] = useState<string>("api_discovery");
   const [baseUrl, setBaseUrl] = useState("");
@@ -210,7 +215,11 @@ export function CatalogImportWizard({
       const updated = [...batchResults];
       updated[index] = { ...entry, registered: true };
       setBatchResults(updated);
-      toast.success(`Registered: ${result.name}`);
+      toast.success(`Submitted: ${result.name}`);
+      if (navigateToCandidate) {
+        onOpenChange(false);
+        navigate("/llm/catalogue/candidate");
+      }
     } catch (e: any) {
       toast.error(`Failed to register ${result.name}: ${e.message}`);
     }
@@ -530,11 +539,19 @@ export function CatalogImportWizard({
                         websiteUrl: normalizeUrl(websiteUrl),
                       },
                       tags: [result.domain],
+                    }, {
+                      onSuccess: () => {
+                        toast.success(`Submitted: ${result.name || slug}`);
+                        if (navigateToCandidate) {
+                          onOpenChange(false);
+                          navigate("/llm/catalogue/candidate");
+                        }
+                      },
                     });
                   }}
                 >
                   {registerMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
-                  Register
+                  Submit
                 </Button>
                 )}
               </div>
@@ -843,7 +860,7 @@ export function CatalogImportWizard({
           <DialogDescription>
             {batchDiscovering
               ? `Discovering ${batchResults.length} providers...`
-              : `${batchResults.filter((r) => r.status === "found").length} found, ${batchResults.filter((r) => r.status === "failed").length} failed, ${batchRegisteredCount} registered`
+              : `${batchResults.filter((r) => r.status === "found").length} found, ${batchResults.filter((r) => r.status === "failed").length} failed, ${batchRegisteredCount} submitted`
             }
           </DialogDescription>
         </DialogHeader>
@@ -905,7 +922,7 @@ export function CatalogImportWizard({
                 {/* Register button */}
                 <div className="shrink-0">
                   {entry.registered ? (
-                    <Badge variant="outline" className="text-green-400 border-green-600/30">Registered</Badge>
+                    <Badge variant="outline" className="text-green-400 border-green-600/30">Submitted</Badge>
                   ) : entry.status === "found" && d?.name && isAlreadyRegistered(d) ? (
                     <Badge variant="outline" className="text-muted-foreground border-muted">Exists</Badge>
                   ) : entry.status === "found" && d?.name ? (
@@ -916,7 +933,7 @@ export function CatalogImportWizard({
                       onClick={() => registerOne(i)}
                     >
                       <Plus className="h-3 w-3 mr-1" />
-                      Register
+                      Submit
                     </Button>
                   ) : null}
                 </div>
@@ -932,7 +949,7 @@ export function CatalogImportWizard({
           {batchFoundCount > 0 && (
             <Button size="sm" onClick={registerAll}>
               <Plus className="h-4 w-4 mr-1" />
-              Register All ({batchFoundCount})
+              Submit All ({batchFoundCount})
             </Button>
           )}
         </DialogFooter>
