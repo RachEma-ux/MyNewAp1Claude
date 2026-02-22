@@ -477,15 +477,6 @@ export default function CandidatePage() {
   function governedTransition(entry: any, targetStage: string) {
     stageTransitionMutation.mutate({
       entryId: entry.id,
-      entryName: entry.displayName || entry.name,
-      entryType: entry.entryType,
-      tags: entry.tags || [],
-      description: entry.description || undefined,
-      config: entry.config || undefined,
-      reviewState: entry.reviewState || undefined,
-      status: entry.status || undefined,
-      validationStatus: entry.validationStatus || undefined,
-      capabilities: entry.capabilities || undefined,
       targetStage: targetStage as any,
     });
   }

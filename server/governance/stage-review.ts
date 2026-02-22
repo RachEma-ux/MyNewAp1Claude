@@ -73,6 +73,7 @@ export interface ReviewContext {
     validationStatus?: string;
     capabilities?: string[];
     stageReviews?: Record<string, string>;
+    classifications?: string[];
   };
   actor: {
     id: string;
@@ -198,14 +199,16 @@ const REGISTER_CHECKS: ReviewCheckItem[] = [
     category: "compliance_matrix",
     remediation: "Assign a category/classification to the entry before registration",
     evaluator: (ctx) => {
-      const tags = ctx.entry.tags || [];
-      const hasCat = tags.length > 1; // More than just "candidate" tag
+      const classifications = ctx.entry.classifications || [];
+      const hasClassification = classifications.length > 0;
       return {
         itemId: "REG-01",
         name: "Classification assigned",
-        passed: hasCat,
+        passed: hasClassification,
         category: "compliance_matrix",
-        details: hasCat ? `${tags.length} tags assigned` : "Only lifecycle tag present — needs classification",
+        details: hasClassification
+          ? `Classified: ${classifications.join(", ")}`
+          : "No classification assigned — assign taxonomy nodes before registration",
       };
     },
   },

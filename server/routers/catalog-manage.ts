@@ -493,7 +493,8 @@ export const catalogManageRouter = router({
         });
       }
 
-      // Governance gate: run stage-specific review
+      // Governance gate: run stage-specific review (fetch fresh classifications from DB)
+      const classifications = await getEntryClassifications(input.id);
       const review = evaluateStageReview(
         {
           id: entry.id,
@@ -506,6 +507,7 @@ export const catalogManageRouter = router({
           status: entry.status,
           validationStatus: (entry as any).validationStatus || undefined,
           stageReviews: (entry as any).stageReviews || {},
+          classifications: classifications.map(c => c.label),
         },
         stage,
         { id: String(ctx.user.id), role: ctx.user.role || "admin" }

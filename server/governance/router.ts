@@ -22,7 +22,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
-import { getCatalogEntryById } from "../db/catalog";
+import { getCatalogEntryById, getEntryClassifications } from "../db/catalog";
 import { getGovernanceEngine } from "./governance-engine";
 import { runSelfCheck } from "./self-check";
 import { validateArchitecture } from "./architecture-validator";
@@ -499,11 +499,12 @@ export const governanceRouter = router({
     )
     .query(async ({ input, ctx }) => {
       const { targetStage, entryId } = input;
-      // Always fetch fresh entry from DB to avoid stale client cache issues
+      // Always fetch fresh entry + classifications from DB to avoid stale client cache
       const entry = await getCatalogEntryById(entryId);
       if (!entry) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Entry not found" });
       }
+      const classifications = await getEntryClassifications(entryId);
       return evaluateStageReview(
         {
           id: entry.id,
@@ -515,6 +516,7 @@ export const governanceRouter = router({
           reviewState: (entry as any).reviewState || undefined,
           status: entry.status || undefined,
           validationStatus: (entry as any).validationStatus || undefined,
+          classifications: classifications.map(c => c.label),
         },
         targetStage,
         { id: String(ctx.user.id), role: ctx.user.role || "user" }
@@ -531,21 +533,29 @@ export const governanceRouter = router({
     .input(
       z.object({
         entryId: z.number(),
-        entryName: z.string(),
-        entryType: z.string(),
-        tags: z.array(z.string()),
-        description: z.string().optional(),
-        config: z.any().optional(),
-        reviewState: z.string().optional(),
-        status: z.string().optional(),
-        validationStatus: z.string().optional(),
-        capabilities: z.array(z.string()).optional(),
         targetStage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { targetStage, entryId, entryName, ...rest } = input;
-      const entry = { id: entryId, name: entryName, ...rest };
+      const { targetStage, entryId } = input;
+      // Always fetch fresh entry + classifications from DB
+      const dbEntry = await getCatalogEntryById(entryId);
+      if (!dbEntry) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Entry not found" });
+      }
+      const classifications = await getEntryClassifications(entryId);
+      const entry = {
+        id: dbEntry.id,
+        name: dbEntry.name,
+        entryType: dbEntry.entryType,
+        tags: (dbEntry.tags as string[]) || [],
+        description: dbEntry.description || undefined,
+        config: dbEntry.config || undefined,
+        reviewState: (dbEntry as any).reviewState || undefined,
+        status: dbEntry.status || undefined,
+        validationStatus: (dbEntry as any).validationStatus || undefined,
+        classifications: classifications.map(c => c.label),
+      };
       const actor = { id: String(ctx.user.id), role: ctx.user.role || "admin" };
 
       // Check freeze status
