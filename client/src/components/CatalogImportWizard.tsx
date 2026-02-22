@@ -210,7 +210,7 @@ export function CatalogImportWizard({
           registryId: result.registrySlug || undefined,
           websiteUrl: entry.url,
         },
-        tags: [result.domain],
+        tags: navigateToCandidate ? [result.domain, "candidate"] : [result.domain],
       });
       const updated = [...batchResults];
       updated[index] = { ...entry, registered: true };
@@ -538,7 +538,7 @@ export function CatalogImportWizard({
                         registryId: result.registrySlug || undefined,
                         websiteUrl: normalizeUrl(websiteUrl),
                       },
-                      tags: [result.domain],
+                      tags: navigateToCandidate ? [result.domain, "candidate"] : [result.domain],
                     }, {
                       onSuccess: () => {
                         toast.success(`Submitted: ${result.name || slug}`);

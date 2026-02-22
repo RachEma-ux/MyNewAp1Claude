@@ -337,8 +337,13 @@ export default function CatalogManagePage() {
   });
   const classifyMutation = trpc.catalogManage.classify.useMutation();
 
-  // Filter entries by search
-  const filteredEntries = entries.filter((e: any) => {
+  // Catalog only shows entries published from the Candidate pipeline
+  const publishedEntries = entries.filter((e: any) =>
+    (e.tags || []).includes("candidate") && e.status === "active"
+  );
+
+  // Filter published entries by search
+  const filteredEntries = publishedEntries.filter((e: any) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -646,10 +651,10 @@ export default function CatalogManagePage() {
           ) : filteredEntries.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-10 w-10 mx-auto mb-3 opacity-50" />
-              <p className="text-lg font-medium">No catalog entries yet</p>
-              <p className="text-sm mt-1">Create your first entry to get started</p>
-              <Button className="mt-4" onClick={openCreateDialog}>
-                <Plus className="h-4 w-4 mr-2" />Create Entry
+              <p className="text-lg font-medium">No published entries yet</p>
+              <p className="text-sm mt-1">Submit and publish entries through the Candidate pipeline</p>
+              <Button className="mt-4" variant="outline" onClick={() => navigate("/llm/catalogue/candidate")}>
+                <UserCheck className="h-4 w-4 mr-2" />Go to Candidate
               </Button>
             </div>
           ) : (

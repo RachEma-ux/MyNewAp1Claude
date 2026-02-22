@@ -335,8 +335,13 @@ export default function CandidatePage() {
   });
   const classifyMutation = trpc.catalogManage.classify.useMutation();
 
-  // Filter entries by search
-  const filteredEntries = entries.filter((e: any) => {
+  // Only show entries tagged as "candidate"
+  const candidateEntries = entries.filter((e: any) =>
+    (e.tags || []).includes("candidate")
+  );
+
+  // Filter candidate entries by search
+  const filteredEntries = candidateEntries.filter((e: any) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -728,15 +733,15 @@ export default function CandidatePage() {
             </div>
           </div>
 
-          {entries.length === 0 ? (
+          {candidateEntries.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Activity className="h-10 w-10 mx-auto mb-3 opacity-50" />
               <p className="text-lg font-medium">No entries to validate</p>
-              <p className="text-sm mt-1">Create catalog entries in the Catalog tab first</p>
+              <p className="text-sm mt-1">Submit entries in the Register tab first</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {entries.map((entry: any) => {
+              {candidateEntries.map((entry: any) => {
                 const result = validationResults[entry.id];
                 const isRunning = validatingId === entry.id;
 
@@ -872,7 +877,7 @@ export default function CandidatePage() {
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3">Ready to Publish</h3>
             {(() => {
-              const publishable = entries.filter((e: any) => e.status === "active");
+              const publishable = candidateEntries.filter((e: any) => e.status === "active");
               if (publishable.length === 0) return (
                 <div className="text-center py-8 text-muted-foreground border rounded-md">
                   <p className="text-sm">No active entries ready for publishing</p>
