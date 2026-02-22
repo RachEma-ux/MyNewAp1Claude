@@ -615,7 +615,7 @@ export default function CandidatePage() {
             </Select>
           </div>
 
-          {/* Table */}
+          {/* Cards */}
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -627,54 +627,20 @@ export default function CandidatePage() {
               <p className="text-sm mt-1">Entries submitted for review will appear here</p>
             </div>
           ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[180px]">Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Classification</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Review</TableHead>
-                    <TableHead>Origin</TableHead>
-                    <TableHead>Tags</TableHead>
-                    <TableHead>Updated</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredEntries.map((entry: any) => (
-                    <TableRow key={entry.id}>
-                      <TableCell
-                        onDoubleClick={() => openEditDialog(entry)}
-                        className="cursor-pointer"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{entry.displayName || entry.name}</div>
-                          {entry.description && (
-                            <div className="text-xs text-muted-foreground truncate max-w-[300px]" title={entry.description}>
-                              {entry.description}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
+            <div className="space-y-4">
+              {filteredEntries.map((entry: any) => (
+                <Card key={entry.id}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0 cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>
+                        <CardTitle className="text-base truncate">{entry.displayName || entry.name}</CardTitle>
                         {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
                           <Badge variant="outline" className="text-xs">
                             <Icon className="h-3 w-3 mr-1" />
                             {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
                           </Badge>
                         ); })()}
-                      </TableCell>
-                      <TableCell>
-                        <ClassificationBadges entryId={entry.id} />
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>
-                          {entry.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
+                        <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
                         <Badge className={`text-xs ${REVIEW_COLORS[entry.reviewState] || ""}`}>
                           {entry.reviewState === "needs_review" ? (
                             <Shield className="h-3 w-3 mr-1" />
@@ -685,73 +651,69 @@ export default function CandidatePage() {
                           )}
                           {entry.reviewState}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
-                          {entry.origin}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1 flex-wrap">
-                          {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
-                            <Badge key={i} variant="secondary" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(entry.updatedAt).toLocaleDateString()}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-1 justify-end">
-                          {entry.reviewState === "needs_review" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => approveMutation.mutate({ id: entry.id, activateNow: false })}
-                              disabled={approveMutation.isPending}
-                              title="Approve"
-                              className="text-emerald-400 hover:text-emerald-300"
-                            >
-                              <ShieldCheck className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {entry.status === "draft" && entry.reviewState === "approved" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => activateMutation.mutate({ id: entry.id })}
-                              disabled={activateMutation.isPending}
-                              title="Activate"
-                              className="text-green-400 hover:text-green-300"
-                            >
-                              <Zap className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="sm" onClick={() => openVersions(entry.id)} title="Version history">
-                            <History className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(entry)} title="Edit">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {entry.reviewState === "needs_review" && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => { setDeletingEntry(entry); setDeleteDialogOpen(true); }}
-                            title="Delete"
-                            className="text-destructive hover:text-destructive"
+                            onClick={() => approveMutation.mutate({ id: entry.id, activateNow: false })}
+                            disabled={approveMutation.isPending}
+                            title="Approve"
+                            className="text-emerald-400 hover:text-emerald-300"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <ShieldCheck className="h-4 w-4" />
                           </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        )}
+                        {entry.status === "draft" && entry.reviewState === "approved" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => activateMutation.mutate({ id: entry.id })}
+                            disabled={activateMutation.isPending}
+                            title="Activate"
+                            className="text-green-400 hover:text-green-300"
+                          >
+                            <Zap className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => openVersions(entry.id)} title="Version history">
+                          <History className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(entry)} title="Edit">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setDeletingEntry(entry); setDeleteDialogOpen(true); }}
+                          title="Delete"
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    {entry.description && (
+                      <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>
+                    )}
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
+                        {entry.origin}
+                      </Badge>
+                      <ClassificationBadges entryId={entry.id} />
+                      {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
+                        <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+                      ))}
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        Updated {new Date(entry.updatedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </TabsContent>
@@ -804,7 +766,7 @@ export default function CandidatePage() {
                           disabled={isRunning}
                         >
                           {isRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                          {isRunning ? "Validating..." : "Validate"}
+                          {isRunning ? "Registering..." : "Register"}
                         </Button>
                       </div>
                       {entry.lastValidatedAt && (
