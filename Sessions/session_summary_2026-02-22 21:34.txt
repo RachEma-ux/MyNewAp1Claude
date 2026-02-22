@@ -1,0 +1,55 @@
+Session Summary — 2026-02-22 21:34
+====================================
+
+## Context
+Continued from previous session that implemented the "Auto-Discover Tech Docs During Provider Discovery" feature across 6 files. This session focused on deploying, testing, and fixing governance bugs found during live testing.
+
+## Work Done
+
+### 1. Deployed and tested tech docs auto-discovery on ai21.com
+- Discovery successfully found: docsUrl (https://docs.ai21.com/docs), authMethod (api_key), httpsOnly (true), 9 API endpoints, 2 models (jamba-large, jamba-mini)
+- Full governance lifecycle (Register → Validate → Publish) passed with auto-discovered data
+- Refresh Docs endpoint tested and working
+
+### 2. Fixed: governance.stageReview field name mismatch (ed3b29b)
+- Bug: The governance router's stageReview query and stageTransition mutation passed `entryId`/`entryName` from tRPC input directly to `evaluateStageReview()`, which expects `id`/`name`
+- Symptom: PUB-01 "Cross-doc consistency" showed "Missing: name" in the UI preview even when entry had a name
+- Fix: Map `entryId` → `id` and `entryName` → `name` in both the query and mutation handlers in `server/governance/router.ts`
+
+### 3. Fixed: stage review badges turning all green on Register approve (abb9eef)
+- Bug: `approveCatalogEntry()` was called for every stage, setting legacy `reviewState: "approved"` even on Register-only approval. The UI fallback treated this as all stages approved.
+- Fix (client): Removed legacy `reviewState` fallback from `getStageReviewState()` — each stage badge only shows "Reviewed" from explicit `stageReviews` JSON
+- Fix (server): Only set legacy `reviewState: "approved"` when the publish stage passes
+
+### 4. Fixed: auto-propagate lifecycle tags on stage approval (1959273)
+- Bug: Approving Register didn't add `registered` tag, so Validate's VAL-11 "Audit trail complete" check failed
+- Fix: The approve endpoint now automatically adds lifecycle tags (`registered`, `validated`, `published`) when each stage is approved
+- Also auto-activates entries on Validate approval
+
+### 5. Fixed: PUB-05 circular dependency with legacy reviewState (45695e4)
+- Bug: PUB-05 required `reviewState === "approved"` but we deferred setting it until publish — creating a chicken-and-egg problem
+- Fix: PUB-05 now checks `stageReviews.register === "approved" && stageReviews.validate === "approved"`, with legacy `reviewState` as fallback
+- Added `stageReviews` to `ReviewContext` interface and passed it in all `evaluateStageReview()` calls
+- Updated publish endpoint to accept stageReviews-based approval check
+
+## Commits (this session)
+- ed3b29b — fix: map entryId/entryName to id/name in governance router
+- abb9eef — fix: stage review badges now track each stage independently
+- 1959273 — fix: auto-propagate lifecycle tags on stage approval
+- 45695e4 — fix: PUB-05 uses stageReviews instead of legacy reviewState
+
+## Files Modified
+- server/governance/router.ts — field name mapping for stageReview query + stageTransition mutation
+- server/governance/stage-review.ts — ReviewContext interface (added stageReviews), PUB-05 evaluator updated
+- server/routers/catalog-manage.ts — lifecycle tag propagation, stageReviews passed to evaluators, publish guard updated
+- client/src/pages/CandidatePage.tsx — getStageReviewState() removed legacy fallback
+
+## Final Verified State
+Full zero-touch governance lifecycle working:
+1. Create entry with auto-discovered tech docs → config populated with docsUrl, authMethod, httpsOnly
+2. Classify → assign taxonomy nodes
+3. Approve Register → auto-adds "registered" tag, only Register badge turns green
+4. Approve Validate → auto-adds "validated" tag, auto-activates, only Validate badge turns green
+5. Publish → passes PUB-01 (docsUrl), PUB-02 (validated tag), PUB-05 (prior stages approved), PUB-06 (no findings)
+
+Deployed and tested at: https://winston-commands-toolbox-payday.trycloudflare.com
