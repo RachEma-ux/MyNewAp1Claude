@@ -1,0 +1,52 @@
+Session Summary — 2026-02-22 22:00
+====================================
+
+## Context
+Continued from previous session that fixed card layout, missing badges, and multiple governance bugs (stale client data, classification check, PUB-05 tags). This session focused on comprehensive API testing of the full governance lifecycle with real providers.
+
+## Work Done
+
+### 1. Full API test — synthetic entry (id=80)
+- Created test entry "test-full-gov" with config (baseUrl, docsUrl, authMethod, httpsOnly)
+- Classified with taxonomy node 1 ("Hosting Model")
+- Register review: 6/6 passed (100%) — REG-01 correctly shows "Classified: Hosting Model" from DB
+- Approve Register → auto-added "registered" tag
+- Validate review: 12/12 passed (100%) — VAL-11 confirms registered tag trail
+- Approve Validate → auto-added "validated" tag, status set to "active"
+- Publish review: 6/6 passed (100%) — PUB-01 shows docsUrl, PUB-05 confirms both prior tags
+- Approve Publish → auto-added "published" tag, approvedBy/approvedAt set
+- **24/24 checks passed, zero red/yellow items**
+
+### 2. Full API test — SambaNova (id=83)
+- Discovery: api.sambanova.ai/v1, 18 models (DeepSeek-R1, Llama-4-Maverick, Qwen3-235B, etc.), docs: docs.sambanova.ai/docs, auth: bearer, HTTPS: true
+- Full lifecycle: Register 6/6 → Validate 12/12 → Publish 6/6 — all passed
+- Final state: tags=[candidate, registered, validated, published], all stageReviews approved
+
+### 3. Full API test — AI21 (id=84)
+- Discovery: api.ai21.com/studio/v1, 2 models (jamba-large, jamba-mini), docs: docs.ai21.com/docs, auth: api_key, HTTPS: true
+- Full lifecycle: Register 6/6 → Validate 12/12 → Publish 6/6 — all passed
+- Final state: tags=[candidate, registered, validated, published], all stageReviews approved
+
+## Commits (previous part of this session, before context reset)
+- b26a4f4 — fix: card layout — show full entry name, badges on separate row
+- 3a46fd6 — fix: restore type/status/review badges to Register card section
+- 510389e — fix: PUB-05 checks tags instead of stageReviews for prior stage approval
+- 1c092cd — fix: stageReview fetches fresh entry from DB instead of client cache
+- 19413b2 — fix: all governance checks fetch fresh data from DB, fix classification check
+
+## Files Modified (previous part of session)
+- client/src/pages/CandidatePage.tsx — card layout, simplified API calls
+- server/governance/router.ts — stageReview + stageTransition fetch from DB with classifications
+- server/governance/stage-review.ts — REG-01 classification fix, PUB-05 tags fix, ReviewContext.classifications
+- server/routers/catalog-manage.ts — approve endpoint fetches classifications
+
+## Test Results Summary
+- 3 entries tested (synthetic + 2 real providers)
+- 72/72 total governance checks passed
+- Zero red or yellow items across all stages
+- Discovery auto-populates docsUrl, authMethod, httpsOnly correctly
+- Lifecycle tags auto-propagate on each stage approval
+- Server fetches fresh data from DB — no more stale client cache bugs
+
+## Deployed and tested at
+https://knowledgestorm-mounting-scholarship-metals.trycloudflare.com
