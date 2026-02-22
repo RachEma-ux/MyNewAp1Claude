@@ -205,6 +205,7 @@ export function CatalogImportWizard({
         displayName: result.name || slug,
         description: result.description || undefined,
         entryType: "provider",
+        origin: navigateToCandidate ? "discovery" : undefined,
         config: {
           baseUrl: result.api?.bestUrl || undefined,
           registryId: result.registrySlug || undefined,
@@ -533,6 +534,7 @@ export function CatalogImportWizard({
                       displayName: result.name || slug,
                       description: result.description || undefined,
                       entryType: "provider",
+                      origin: navigateToCandidate ? "discovery" : undefined,
                       config: {
                         baseUrl: result.api?.bestUrl || undefined,
                         registryId: result.registrySlug || undefined,
