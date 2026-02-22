@@ -523,20 +523,23 @@ const PUBLISH_CHECKS: ReviewCheckItem[] = [
     name: "Cross-doc consistency",
     stage: "publish",
     category: "compliance_matrix",
-    remediation: "Ensure entry name, type, and description are consistent across all fields",
+    remediation: "Ensure entry name, type, and description (or docsUrl) are consistent across all fields",
     evaluator: (ctx) => {
       const hasName = !!ctx.entry.name;
       const hasType = !!ctx.entry.entryType;
       const hasDesc = !!ctx.entry.description;
-      const consistent = hasName && hasType && hasDesc;
+      const config = ctx.entry.config || {};
+      const hasDocsUrl = !!config.docsUrl;
+      // docsUrl counts as documentation evidence even without a description
+      const consistent = hasName && hasType && (hasDesc || hasDocsUrl);
       return {
         itemId: "PUB-01",
         name: "Cross-doc consistency",
         passed: consistent,
         category: "compliance_matrix",
         details: consistent
-          ? "Name, type, and description are all present"
-          : `Missing: ${[!hasName && "name", !hasType && "type", !hasDesc && "description"].filter(Boolean).join(", ")}`,
+          ? `Name, type, and documentation present${hasDocsUrl ? ` (docs: ${config.docsUrl})` : ""}`
+          : `Missing: ${[!hasName && "name", !hasType && "type", !hasDesc && !hasDocsUrl && "description or docsUrl"].filter(Boolean).join(", ")}`,
       };
     },
   },

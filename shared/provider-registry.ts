@@ -17,6 +17,7 @@ export interface KnownProvider {
   authType: "api_key" | "pat" | "oauth" | "none";
   isLocal: boolean;
   defaultLocalUrl?: string;
+  docsUrl?: string;
   modelsListProbe: {
     method: "GET" | "HEAD";
     path: string;
@@ -40,6 +41,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "openai",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://platform.openai.com/docs",
     modelsListProbe: { method: "GET", path: "/v1/models" },
   },
   {
@@ -51,6 +53,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "anthropic",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://docs.anthropic.com",
     modelsListProbe: {
       method: "GET",
       path: "/v1/models",
@@ -66,6 +69,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "custom",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://ai.google.dev/docs",
     modelsListProbe: { method: "GET", path: "/v1beta/models" },
   },
   {
@@ -77,6 +81,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "openai",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://docs.mistral.ai",
     modelsListProbe: { method: "GET", path: "/v1/models" },
   },
   {
@@ -110,6 +115,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "custom",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://docs.cohere.com/reference",
     modelsListProbe: { method: "GET", path: "/v1/models" },
   },
   {
@@ -121,6 +127,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "openai",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://platform.deepseek.com/api-docs",
     modelsListProbe: { method: "GET", path: "/v1/models" },
   },
   {
@@ -143,6 +150,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "openai",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://console.groq.com/docs",
     modelsListProbe: { method: "GET", path: "/v1/models" },
   },
   {
@@ -154,6 +162,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "openai",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://docs.fireworks.ai",
     modelsListProbe: { method: "GET", path: "/v1/models" },
   },
   {
@@ -165,6 +174,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "openai",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://docs.together.ai",
     modelsListProbe: { method: "GET", path: "/v1/models" },
   },
   {
@@ -176,6 +186,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "openai",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://openrouter.ai/docs",
     modelsListProbe: { method: "GET", path: "/v1/models" },
   },
   {
@@ -222,6 +233,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "custom",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://platform.stability.ai/docs",
     modelsListProbe: { method: "GET", path: "/v1/engines/list" },
   },
   {
@@ -255,6 +267,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     compatibility: "custom",
     authType: "api_key",
     isLocal: false,
+    docsUrl: "https://replicate.com/docs",
     modelsListProbe: { method: "GET", path: "/v1/models" },
   },
   {

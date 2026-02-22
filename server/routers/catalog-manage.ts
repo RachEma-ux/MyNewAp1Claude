@@ -44,7 +44,7 @@ function audit(eventType: string, catalogEntryId: number | null, payload: any, b
 }
 import { getProviderRegistry } from "../providers/registry";
 import * as providerDb from "../providers/db";
-import { discoverProvider } from "./discover-provider";
+import { discoverProvider, discoverDocsUrl, extractDocMetadata } from "./discover-provider";
 import { TRPCError } from "@trpc/server";
 import { evaluateStageReview } from "../governance/stage-review";
 
@@ -922,6 +922,53 @@ export const catalogManageRouter = router({
       await setEntryClassifications(input.catalogEntryId, input.nodeIds);
       audit("catalog.entry.classified", input.catalogEntryId, { nodeIds: input.nodeIds });
       return { success: true };
+    }),
+
+  /**
+   * Refresh tech docs metadata for a catalog entry.
+   * Re-runs doc discovery from the entry's domain/baseUrl and updates config.
+   */
+  refreshDocs: adminProcedure
+    .input(z.object({ entryId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const entry = await getCatalogEntryById(input.entryId);
+      if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: `Entry ${input.entryId} not found` });
+
+      const config = (entry.config as Record<string, any>) || {};
+      // Determine domain from baseUrl or entry name
+      let domain: string | null = null;
+      if (config.baseUrl) {
+        try { domain = new URL(config.baseUrl).hostname.replace(/^www\./, ""); } catch {}
+      }
+      if (!domain && config.docsUrl) {
+        try { domain = new URL(config.docsUrl).hostname.replace(/^www\./, ""); } catch {}
+      }
+      if (!domain) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot determine domain for doc discovery" });
+      }
+
+      const isDev = process.env.NODE_ENV === "development";
+      const docsUrl = await discoverDocsUrl(domain, undefined, isDev);
+      let techDocs = null;
+      if (docsUrl) {
+        techDocs = await extractDocMetadata(docsUrl, isDev);
+      }
+
+      // Merge into config
+      const updatedConfig = {
+        ...config,
+        docsUrl: docsUrl || config.docsUrl || null,
+        ...(techDocs?.authMethod && { authMethod: techDocs.authMethod }),
+        ...(techDocs?.rateLimits && { rateLimits: techDocs.rateLimits }),
+        ...(techDocs?.httpsOnly !== undefined && { httpsOnly: techDocs.httpsOnly }),
+        lastDocsRefreshedAt: new Date().toISOString(),
+      };
+
+      await updateCatalogEntry(input.entryId, { config: updatedConfig }, 1);
+      audit("catalog.entry.docs_refreshed", input.entryId, { docsUrl, techDocs });
+
+      const updated = await getCatalogEntryById(input.entryId);
+      return updated!;
     }),
 
 });

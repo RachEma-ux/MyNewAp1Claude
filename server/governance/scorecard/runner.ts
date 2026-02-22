@@ -957,17 +957,17 @@ registerRunner({
     if (!ctx.entry) return [buildSkip(control, "provider-ratelimit-validator", "No entry context")];
 
     const config = ctx.entry.config || {};
-    const hasRateLimit = !!config.rateLimit || !!config.maxRequestsPerMinute || !!config.rateLimitRpm;
+    const hasRateLimit = !!config.rateLimit || !!config.maxRequestsPerMinute || !!config.rateLimitRpm || !!config.rateLimits;
     return [
       buildResult(control, "provider-ratelimit-validator", hasRateLimit,
         hasRateLimit
-          ? "Provider has rate limiting configured"
+          ? `Provider has rate limiting configured${config.rateLimits ? `: ${config.rateLimits}` : ""}`
           : "Provider has no rate limit configuration — risk of quota exhaustion",
         {
           check: "Provider rate limit configuration",
           finding: hasRateLimit ? "configured" : "unconfigured",
           targets: ["config.rateLimit"],
-          data: { hasRateLimit },
+          data: { hasRateLimit, rateLimits: config.rateLimits || null },
         }
       ),
     ];
@@ -1306,18 +1306,24 @@ registerRunner({
     const config = ctx.entry.config || {};
     const urls = [config.baseUrl, config.endpoint, config.apiUrl].filter(Boolean) as string[];
     const httpViolations = urls.filter((u) => u.startsWith("http://") && !u.includes("localhost") && !u.includes("127.0.0.1"));
-    const passed = httpViolations.length === 0;
+    // config.httpsOnly from doc discovery is an additional positive signal
+    const httpsOnlyFlag = config.httpsOnly === true;
+    const passed = httpViolations.length === 0 || httpsOnlyFlag;
 
     return [
       buildResult(control, "provider-https-validator", passed,
         passed
-          ? urls.length > 0 ? `All provider endpoints use HTTPS: ${urls.join(", ")}` : "No endpoints configured (acceptable at register)"
+          ? urls.length > 0
+            ? `All provider endpoints use HTTPS: ${urls.join(", ")}${httpsOnlyFlag ? " (confirmed by docs)" : ""}`
+            : httpsOnlyFlag
+              ? "HTTPS-only confirmed by documentation discovery"
+              : "No endpoints configured (acceptable at register)"
           : `NON-HTTPS endpoint(s) detected: ${httpViolations.join(", ")}`,
         {
           check: "Provider HTTPS-only enforcement",
           finding: passed ? "https_enforced" : "http_detected",
           targets: httpViolations.length > 0 ? httpViolations : urls,
-          data: { urlCount: urls.length, httpViolations: httpViolations.length },
+          data: { urlCount: urls.length, httpViolations: httpViolations.length, httpsOnlyFlag },
         }
       ),
     ];

@@ -30,6 +30,13 @@ export type DiscoveryFailureReason =
 
 // ── Types ────────────────────────────────────────────────────────────
 
+export interface TechDocsMeta {
+  authMethod: string | null;
+  rateLimits: string | null;
+  endpoints: string[];
+  httpsOnly: boolean;
+}
+
 export interface DiscoverResult {
   name: string | null;
   description: string | null;
@@ -43,6 +50,10 @@ export interface DiscoverResult {
   authType?: string;
   compatibility?: string;
   isLocal?: boolean;
+
+  // Tech docs discovery
+  docsUrl: string | null;
+  techDocs: TechDocsMeta | null;
 
   // Structured exception handling
   status: "ok" | "partial" | "failed";
@@ -60,6 +71,7 @@ export interface DiscoverResult {
       fetch?: number;
       parse?: number;
       probe?: number;
+      docs?: number;
     };
   };
 }
@@ -252,6 +264,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       api: { bestUrl: null, candidates: [] },
       source: "website",
       domain,
+      docsUrl: null,
+      techDocs: null,
       status: "failed",
       failureReason: reason,
       warnings: [warning],
@@ -268,6 +282,24 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
   const knownProvider = findKnownProvider(domain);
   if (knownProvider && knownProvider.apiUrl) {
     console.log(`[Discovery] Registry hit: ${knownProvider.slug}`);
+    // Fetch doc metadata in background (best-effort, don't block)
+    const registryDocsUrl = knownProvider.docsUrl || null;
+    let techDocs: TechDocsMeta | null = null;
+    if (registryDocsUrl) {
+      try {
+        techDocs = await extractDocMetadata(registryDocsUrl, isDev);
+      } catch { /* best-effort */ }
+    }
+    // If registry knows the authType, populate techDocs
+    if (!techDocs && knownProvider.authType) {
+      techDocs = {
+        authMethod: knownProvider.authType,
+        rateLimits: null,
+        endpoints: knownProvider.apiUrl ? [knownProvider.apiUrl] : [],
+        httpsOnly: knownProvider.apiUrl ? knownProvider.apiUrl.startsWith("https://") : true,
+      };
+    }
+    debug.timingsMs.total = elapsed(totalStart);
     const r: DiscoverResult = {
       name: knownProvider.name,
       description: knownProvider.description,
@@ -289,6 +321,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       authType: knownProvider.authType,
       compatibility: knownProvider.compatibility,
       isLocal: knownProvider.isLocal,
+      docsUrl: registryDocsUrl,
+      techDocs,
       status: "ok",
       warnings,
       debug: { ...debug, timingsMs: { ...debug.timingsMs, total: elapsed(totalStart) } },
@@ -323,6 +357,10 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       authType: knownProvider.authType,
       compatibility: knownProvider.compatibility,
       isLocal: knownProvider.isLocal,
+      docsUrl: knownProvider.docsUrl || null,
+      techDocs: knownProvider.authType
+        ? { authMethod: knownProvider.authType, rateLimits: null, endpoints: [], httpsOnly: true }
+        : null,
       status: "ok",
       warnings,
       debug: { ...debug, timingsMs: { ...debug.timingsMs, total: elapsed(totalStart) } },
@@ -366,6 +404,15 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
         apiName = domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1);
       }
 
+      // Discover docs URL (best-effort)
+      const docsStart = performance.now();
+      const docsUrl = await discoverDocsUrl(domain, undefined, isDev);
+      let techDocs: TechDocsMeta | null = null;
+      if (docsUrl) {
+        techDocs = await extractDocMetadata(docsUrl, isDev);
+      }
+      debug.timingsMs.docs = elapsed(docsStart);
+
       debug.timingsMs.total = elapsed(totalStart);
       const r: DiscoverResult = {
         name: apiName,
@@ -373,6 +420,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
         api: { bestUrl, candidates: apiProbeCandidates },
         source: "website",
         domain,
+        docsUrl,
+        techDocs,
         status: "ok",
         warnings,
         debug,
@@ -421,6 +470,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       api: { bestUrl, candidates: heuristicCandidates },
       source: "website",
       domain,
+      docsUrl: null,
+      techDocs: null,
       status: hasUsableData ? "partial" : "failed",
       failureReason,
       warnings,
@@ -448,6 +499,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
       api: { bestUrl: null, candidates: [] },
       source: "website",
       domain,
+      docsUrl: null,
+      techDocs: null,
       status: "partial",
       failureReason: "PARSE_FAILED",
       warnings,
@@ -612,6 +665,15 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
     // Candidates exist but none pass bestUrl gate
   }
 
+  // 9. Discover tech docs
+  const docsStart = performance.now();
+  const docsUrl = await discoverDocsUrl(domain, $, isDev);
+  let techDocs: TechDocsMeta | null = null;
+  if (docsUrl) {
+    techDocs = await extractDocMetadata(docsUrl, isDev);
+  }
+  debug.timingsMs.docs = elapsed(docsStart);
+
   debug.timingsMs.total = elapsed(totalStart);
 
   const result: DiscoverResult = {
@@ -620,6 +682,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
     api: { bestUrl, candidates: viableCandidates },
     source: "website",
     domain,
+    docsUrl,
+    techDocs,
     status,
     failureReason,
     warnings,
@@ -779,6 +843,149 @@ async function probeHeuristicCandidates(
     .sort((a, b) => b.confidence - a.confidence);
 }
 
+// ── Tech Docs Discovery ─────────────────────────────────────────────
+
+const COMMON_DOC_PATHS = [
+  "/docs",
+  "/reference",
+  "/api-reference",
+  "/api/docs",
+  "/developer",
+  "/documentation",
+  "/api",
+];
+
+/**
+ * Discover the best documentation URL for a provider domain.
+ * Probes common doc paths and returns the first that responds with HTML.
+ */
+export async function discoverDocsUrl(
+  domain: string,
+  $?: cheerio.CheerioAPI,
+  isDev = false
+): Promise<string | null> {
+  // 1. Scan HTML links for doc URLs (if cheerio instance available)
+  const docLinkCandidates: string[] = [];
+  if ($) {
+    $("a[href]").each((_, el) => {
+      const href = $(el).attr("href");
+      if (!href || !href.startsWith("http")) return;
+      try {
+        const linkUrl = new URL(href);
+        const path = linkUrl.pathname.toLowerCase();
+        if (
+          path.includes("/docs") ||
+          path.includes("/reference") ||
+          path.includes("/api-reference") ||
+          path.includes("/documentation") ||
+          path.includes("/developer")
+        ) {
+          docLinkCandidates.push(href);
+        }
+      } catch { /* invalid URL */ }
+    });
+  }
+
+  // Deduplicate and prioritize found links
+  if (docLinkCandidates.length > 0) {
+    const unique = [...new Set(docLinkCandidates)];
+    // Prefer links with /docs or /reference in path
+    const best = unique.find((u) => /\/docs|\/reference|\/api-reference/i.test(u)) || unique[0];
+    return best;
+  }
+
+  // 2. Probe common doc paths on the domain
+  const subdomains = [`docs.${domain}`, domain];
+  for (const sub of subdomains) {
+    for (const docPath of COMMON_DOC_PATHS) {
+      const url = `https://${sub}${docPath}`;
+      try {
+        const validation = await validateExternalUrl(url, { allowHttp: isDev });
+        if (!validation.safe) continue;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(url, {
+          method: "HEAD",
+          headers: { "User-Agent": "MyNewApp/1.0 DocDiscovery" },
+          signal: controller.signal,
+          redirect: "follow",
+        });
+        clearTimeout(timeout);
+
+        if (res.ok) {
+          const ct = res.headers.get("content-type") || "";
+          if (ct.includes("text/html") || ct.includes("application/json")) {
+            return url;
+          }
+        }
+      } catch { /* probe failed — try next */ }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract technical metadata from a docs page.
+ * Best-effort: failure returns null.
+ */
+export async function extractDocMetadata(
+  docsUrl: string,
+  isDev = false
+): Promise<TechDocsMeta | null> {
+  try {
+    const fetchResult = await safeFetch(docsUrl, {
+      allowHttp: isDev,
+      maxBodyBytes: 512 * 1024,
+      totalTimeoutMs: 5000,
+    });
+    if (!fetchResult.ok) return null;
+
+    const body = fetchResult.body;
+
+    // Auth method detection
+    let authMethod: string | null = null;
+    if (/bearer\s+token|authorization:\s*bearer/i.test(body)) {
+      authMethod = "bearer";
+    } else if (/api[_-]?key|x-api-key/i.test(body)) {
+      authMethod = "api_key";
+    } else if (/oauth\s*2|oauth2|authorization_code/i.test(body)) {
+      authMethod = "oauth";
+    }
+
+    // Rate limits detection
+    let rateLimits: string | null = null;
+    const rlMatch = body.match(
+      /(\d+[\s,]*(?:requests?|calls?|req))\s*(?:per|\/)\s*(?:minute|min|second|sec|hour|hr|day)/i
+    );
+    if (rlMatch) {
+      rateLimits = rlMatch[0].trim();
+    } else {
+      const rpmMatch = body.match(/(\d+)\s*(?:RPM|TPM|RPS|QPM)/i);
+      if (rpmMatch) rateLimits = rpmMatch[0].trim();
+    }
+
+    // Endpoints detection
+    const endpoints: string[] = [];
+    const endpointRegex = /https?:\/\/[^\s"'<>]+\/v\d+\/[^\s"'<>)}\]]+/g;
+    const epMatches = body.match(endpointRegex);
+    if (epMatches) {
+      const unique = [...new Set(epMatches.map((u) => u.replace(/[.,;:]+$/, "")))];
+      endpoints.push(...unique.slice(0, 10));
+    }
+
+    // HTTPS-only: check if all discovered endpoints use https
+    const httpsOnly =
+      endpoints.length === 0 ||
+      endpoints.every((ep) => ep.startsWith("https://"));
+
+    return { authMethod, rateLimits, endpoints, httpsOnly };
+  } catch {
+    return null;
+  }
+}
+
 // ── BestUrl Selection Gate ───────────────────────────────────────────
 
 function selectBestUrl(candidates: ApiCandidate[]): string | null {
@@ -820,6 +1027,8 @@ function makeFailedResult(
     api: { bestUrl: null, candidates: [] },
     source: "website",
     domain: extractDomain(normalizedUrl),
+    docsUrl: null,
+    techDocs: null,
     status: "failed",
     failureReason: reason,
     warnings: [warning],

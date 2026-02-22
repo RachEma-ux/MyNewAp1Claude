@@ -363,6 +363,15 @@ export default function CandidatePage() {
     onSuccess: () => refetch(),
   });
   const classifyMutation = trpc.catalogManage.classify.useMutation();
+  const refreshDocsMutation = trpc.catalogManage.refreshDocs.useMutation({
+    onSuccess: () => {
+      refetch();
+      toast.success("Tech docs refreshed — governance metadata updated");
+    },
+    onError: (error) => {
+      toast.error(`Docs refresh failed: ${error.message}`);
+    },
+  });
 
   // Governance: stage transition mutation
   const stageTransitionMutation = trpc.governance.stageTransition.useMutation({
@@ -866,6 +875,21 @@ export default function CandidatePage() {
                           <ShieldCheck className="h-3 w-3 mr-1" />
                           Registered
                         </Badge>
+                        )}
+                        {entry.entryType === "provider" && (entry.config?.docsUrl || entry.config?.baseUrl) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => refreshDocsMutation.mutate({ entryId: entry.id })}
+                          disabled={refreshDocsMutation.isPending}
+                          title="Refresh tech docs metadata"
+                        >
+                          {refreshDocsMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <FileText className="h-4 w-4" />
+                          )}
+                        </Button>
                         )}
                         <Button variant="ghost" size="sm" onClick={() => openEditDialog(entry)} title="Edit">
                           <Pencil className="h-4 w-4" />
@@ -1602,9 +1626,24 @@ export default function CandidatePage() {
                     const existing = JSON.parse(formConfig || "{}");
                     existing.baseUrl = result.api.bestUrl;
                     if (result.registrySlug) existing.registrySlug = result.registrySlug;
+                    // Store tech docs metadata from discovery
+                    if (result.docsUrl) existing.docsUrl = result.docsUrl;
+                    if (result.techDocs) {
+                      if (result.techDocs.authMethod) existing.authMethod = result.techDocs.authMethod;
+                      if (result.techDocs.rateLimits) existing.rateLimits = result.techDocs.rateLimits;
+                      if (result.techDocs.httpsOnly !== undefined) existing.httpsOnly = result.techDocs.httpsOnly;
+                    }
+                    // Also use top-level authType from registry
+                    if (result.authType && !existing.authMethod) existing.authMethod = result.authType;
                     setFormConfig(JSON.stringify(existing, null, 2));
                   } catch {
-                    setFormConfig(JSON.stringify({ baseUrl: result.api.bestUrl }, null, 2));
+                    const cfg: Record<string, any> = { baseUrl: result.api.bestUrl };
+                    if (result.docsUrl) cfg.docsUrl = result.docsUrl;
+                    if (result.techDocs?.authMethod) cfg.authMethod = result.techDocs.authMethod;
+                    if (result.techDocs?.rateLimits) cfg.rateLimits = result.techDocs.rateLimits;
+                    if (result.techDocs?.httpsOnly !== undefined) cfg.httpsOnly = result.techDocs.httpsOnly;
+                    if (result.authType) cfg.authMethod = cfg.authMethod || result.authType;
+                    setFormConfig(JSON.stringify(cfg, null, 2));
                   }
                   const currentTags = formTags ? formTags.split(",").map((t: string) => t.trim()) : [];
                   if (!currentTags.includes(result.domain)) currentTags.push(result.domain);
