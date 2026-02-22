@@ -728,12 +728,30 @@ export default function CatalogManagePage() {
                         onDoubleClick={() => openEditDialog(entry)}
                         className="cursor-pointer"
                       >
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{entry.displayName || entry.name}</div>
-                          {entry.description && (
-                            <div className="text-xs text-muted-foreground truncate max-w-[300px]" title={entry.description}>
-                              {entry.description}
-                            </div>
+                        <div className="min-w-0 flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{entry.displayName || entry.name}</div>
+                            {entry.description && (
+                              <div className="text-xs text-muted-foreground truncate max-w-[300px]" title={entry.description}>
+                                {entry.description}
+                              </div>
+                            )}
+                          </div>
+                          {entry.entryType === "provider" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); handleDiscoverEntry(entry); }}
+                              disabled={discoveringEntryId === entry.id}
+                              title="Discover provider API & docs"
+                              className="shrink-0"
+                            >
+                              {discoveringEntryId === entry.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Globe className="h-4 w-4" />
+                              )}
+                            </Button>
                           )}
                         </div>
                       </TableCell>
@@ -815,21 +833,6 @@ export default function CatalogManagePage() {
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <Zap className="h-4 w-4" />
-                              )}
-                            </Button>
-                          )}
-                          {entry.entryType === "provider" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDiscoverEntry(entry)}
-                              disabled={discoveringEntryId === entry.id}
-                              title="Discover provider API & docs"
-                            >
-                              {discoveringEntryId === entry.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Globe className="h-4 w-4" />
                               )}
                             </Button>
                           )}
