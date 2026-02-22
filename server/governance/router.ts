@@ -9,12 +9,18 @@
  *   - Lifecycle transition validation
  *   - RBAC info
  *   - Governance metrics
- *   - Scorecard engine (run, latest, history, catalog)
- *   - Drift detection (detect, status, toggle, history)
+ *   - Scorecard engine (run, latest, history, catalog, packs)
+ *   - GovernedSubject validation
+ *   - Drift detection (detect, status, toggle, history, freeze)
  *   - Evidence verification
+ *
+ * HTTP Semantics:
+ *   - 200: scorecard passed, transition allowed
+ *   - 409: scorecard blocked, transition denied (gate FAIL)
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
 import { getGovernanceEngine } from "./governance-engine";
 import { runSelfCheck } from "./self-check";
@@ -49,6 +55,7 @@ import {
   getScorecardHistory,
   CONTROL_CATALOG,
   getActiveControls,
+  getControlsByPack,
   getAllRunners,
   verifyBundleIntegrity,
   detectDrift,
@@ -57,6 +64,13 @@ import {
   isDriftDetectionActive,
   startDriftDetection,
   stopDriftDetection,
+  getFrozenSubjects,
+  unfreezeSubject,
+  isFrozen,
+  validateSubject,
+  SUBJECT_TYPES,
+  resolvePacks,
+  getAvailablePacks,
 } from "./scorecard";
 
 export const governanceRouter = router({
@@ -266,11 +280,94 @@ export const governanceRouter = router({
   /**
    * Run the governance scorecard for a given lifecycle stage.
    * Returns score (0–100), gate status, risk breakdown, control results, and evidence bundle.
+   *
+   * HTTP semantics:
+   *   - Returns result with httpStatus 200 on pass
+   *   - Throws TRPC CONFLICT (409) on blocked transition
+   *
+   * Accepts either legacy `entry` format or new `subject` (GovernedSubject) format.
    */
   scorecardRun: adminProcedure
     .input(
       z.object({
         stage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+        subject: z.object({
+          id: z.number(),
+          name: z.string(),
+          type: z.enum(["provider", "llm", "model", "agent", "bot"]),
+          tags: z.array(z.string()),
+          description: z.string().optional(),
+          config: z.any().optional(),
+          metadata: z.record(z.any()).optional(),
+        }).optional(),
+        entry: z.object({
+          id: z.number(),
+          name: z.string(),
+          type: z.string(),
+          tags: z.array(z.string()),
+          description: z.string().optional(),
+          config: z.any().optional(),
+        }).optional(),
+        stageOnly: z.boolean().optional(),
+        commitRef: z.string().optional(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      // Check freeze status
+      const subjectId = input.subject?.id ?? input.entry?.id;
+      if (subjectId != null && isFrozen(subjectId)) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Subject #${subjectId} is FROZEN — all transitions blocked until unfrozen. Run drift detection or contact governance admin.`,
+        });
+      }
+
+      // Check system-wide freeze
+      if (isFrozen(0)) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "System-wide governance FREEZE active — all transitions blocked. Resolve drift violations first.",
+        });
+      }
+
+      const result = runScorecard({
+        stage: input.stage,
+        subject: input.subject as any,
+        entry: input.entry,
+        actor: { id: String(ctx.user.id), role: ctx.user.role || "admin" },
+        stageOnly: input.stageOnly,
+        commitRef: input.commitRef,
+      });
+
+      // 409 semantics: throw CONFLICT on blocked transition
+      if (result.blocked) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Stage gate FAIL for ${input.stage}: ${result.scorecard.gateStatus.reason}`,
+          cause: result,
+        });
+      }
+
+      return result;
+    }),
+
+  /**
+   * Run scorecard without 409 enforcement (read-only mode for UI display).
+   * Always returns the full result regardless of gate status.
+   */
+  scorecardPreview: protectedProcedure
+    .input(
+      z.object({
+        stage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+        subject: z.object({
+          id: z.number(),
+          name: z.string(),
+          type: z.enum(["provider", "llm", "model", "agent", "bot"]),
+          tags: z.array(z.string()),
+          description: z.string().optional(),
+          config: z.any().optional(),
+          metadata: z.record(z.any()).optional(),
+        }).optional(),
         entry: z.object({
           id: z.number(),
           name: z.string(),
@@ -285,8 +382,9 @@ export const governanceRouter = router({
     .query(async ({ input, ctx }) => {
       return runScorecard({
         stage: input.stage,
+        subject: input.subject as any,
         entry: input.entry,
-        actor: { id: String(ctx.user.id), role: ctx.user.role || "admin" },
+        actor: { id: String(ctx.user.id), role: ctx.user.role || "user" },
         stageOnly: input.stageOnly,
       });
     }),
@@ -313,8 +411,19 @@ export const governanceRouter = router({
       controls: CONTROL_CATALOG,
       activeControls: getActiveControls(),
       runners: getAllRunners().map((r) => ({ id: r.id, name: r.name })),
+      subjectTypes: [...SUBJECT_TYPES],
+      availablePacks: getAvailablePacks(),
     };
   }),
+
+  /**
+   * Get controls for a specific pack.
+   */
+  controlsByPack: protectedProcedure
+    .input(z.object({ pack: z.string() }))
+    .query(async ({ input }) => {
+      return getControlsByPack(input.pack as any);
+    }),
 
   /**
    * Verify evidence bundle integrity.
@@ -324,6 +433,47 @@ export const governanceRouter = router({
     .query(async ({ input }) => {
       const valid = verifyBundleIntegrity(input.bundle);
       return { valid, bundleId: input.bundle?.bundleId };
+    }),
+
+  // ── GovernedSubject Validation ────────────────────────────────────────
+
+  /**
+   * Validate a GovernedSubject contract before scorecard evaluation.
+   */
+  validateSubject: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string(),
+      type: z.string(),
+      tags: z.array(z.string()),
+      description: z.string().optional(),
+      config: z.any().optional(),
+      metadata: z.record(z.any()).optional(),
+    }))
+    .query(async ({ input }) => {
+      return validateSubject(input);
+    }),
+
+  /**
+   * Resolve packs for a subject type.
+   */
+  resolvePacks: protectedProcedure
+    .input(z.object({
+      subjectType: z.enum(["provider", "llm", "model", "agent", "bot"]),
+      stage: z.enum(["submit", "register", "validate", "publish", "catalog"]).optional(),
+    }))
+    .query(async ({ input }) => {
+      const resolution = resolvePacks(input.subjectType, input.stage);
+      return {
+        ...resolution,
+        controls: resolution.controls.map((c) => ({
+          id: c.id,
+          name: c.name,
+          pack: c.pack,
+          severity: c.severity,
+          domain: c.domain,
+        })),
+      };
     }),
 
   // ── Drift Detection ──────────────────────────────────────────────────
@@ -353,20 +503,59 @@ export const governanceRouter = router({
    * Get drift detection status.
    */
   driftStatus: protectedProcedure.query(async () => {
-    return { active: isDriftDetectionActive() };
+    return {
+      active: isDriftDetectionActive(),
+      frozenSubjects: getFrozenSubjects(),
+      frozenCount: getFrozenSubjects().length,
+    };
   }),
 
   /**
    * Start/stop drift detection.
    */
   driftToggle: adminProcedure
-    .input(z.object({ active: z.boolean(), intervalMs: z.number().optional() }))
+    .input(z.object({
+      active: z.boolean(),
+      intervalMs: z.number().optional(),
+      autoFreeze: z.boolean().optional(),
+    }))
     .mutation(async ({ input }) => {
       if (input.active) {
-        startDriftDetection({ intervalMs: input.intervalMs });
+        startDriftDetection({
+          intervalMs: input.intervalMs,
+          autoFreeze: input.autoFreeze,
+        });
       } else {
         stopDriftDetection();
       }
       return { active: isDriftDetectionActive() };
+    }),
+
+  // ── Freeze Management ──────────────────────────────────────────────
+
+  /**
+   * Get all frozen subjects.
+   */
+  frozenSubjects: protectedProcedure.query(async () => {
+    return getFrozenSubjects();
+  }),
+
+  /**
+   * Unfreeze a subject (admin only).
+   */
+  unfreezeSubject: adminProcedure
+    .input(z.object({ subjectId: z.number() }))
+    .mutation(async ({ input }) => {
+      const unfrozen = unfreezeSubject(input.subjectId);
+      return { unfrozen, subjectId: input.subjectId };
+    }),
+
+  /**
+   * Check if a specific subject is frozen.
+   */
+  isFrozen: protectedProcedure
+    .input(z.object({ subjectId: z.number() }))
+    .query(async ({ input }) => {
+      return { frozen: isFrozen(input.subjectId), subjectId: input.subjectId };
     }),
 });

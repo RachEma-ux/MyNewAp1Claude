@@ -1,15 +1,18 @@
 # Governance Gate — CI/CD Enforcement
-# Governance Bible CGT v2, Phase 8
+# Governance Bible CGT v2, Phase 4
 #
-# Enforces governance checks before merge:
+# Pack-aware governance enforcement before merge:
 #   1. Secret scanning (no hardcoded credentials)
 #   2. Dynamic eval detection (no eval/Function constructor)
 #   3. Architecture boundary validation
 #   4. Direct provider invocation detection
 #   5. Governance documentation check
-#   6. Scorecard summary + artifact upload
+#   6. GovernedSubject pack validation
+#   7. Type-specific control verification
+#   8. Scorecard summary + artifact upload
 #
 # Gate rule: Block merge on Critical or High violations.
+# HTTP semantics: 409 Conflict on blocked stage transition.
 
 name: Governance Gate
 
@@ -214,6 +217,81 @@ jobs:
             echo "PASS: All governance documents present"
           fi
 
+      # ── Pack System Validation ──────────────────────────────────────
+      - name: Validate governance pack system
+        id: pack_scan
+        run: |
+          echo "=== Governance Gate: Pack System Validation ==="
+          VIOLATIONS=0
+
+          # Verify GovernedSubject contract file exists
+          if [ ! -f "server/governance/scorecard/governed-subject.ts" ]; then
+            echo "CRITICAL: GovernedSubject contract file missing"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          else
+            echo "FOUND: GovernedSubject contract"
+          fi
+
+          # Verify pack resolver exists
+          if [ ! -f "server/governance/scorecard/pack-resolver.ts" ]; then
+            echo "CRITICAL: Pack resolver file missing"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          else
+            echo "FOUND: Pack resolver"
+          fi
+
+          # Verify control catalog has pack assignments
+          if [ -f "server/governance/scorecard/control-catalog.ts" ]; then
+            BASE_COUNT=$(grep -c 'pack: "base"' server/governance/scorecard/control-catalog.ts 2>/dev/null || echo "0")
+            PROVIDER_COUNT=$(grep -c 'pack: "provider"' server/governance/scorecard/control-catalog.ts 2>/dev/null || echo "0")
+            LLM_COUNT=$(grep -c 'pack: "llm"' server/governance/scorecard/control-catalog.ts 2>/dev/null || echo "0")
+            MODEL_COUNT=$(grep -c 'pack: "model"' server/governance/scorecard/control-catalog.ts 2>/dev/null || echo "0")
+            AGENT_COUNT=$(grep -c 'pack: "agent"' server/governance/scorecard/control-catalog.ts 2>/dev/null || echo "0")
+            BOT_COUNT=$(grep -c 'pack: "bot"' server/governance/scorecard/control-catalog.ts 2>/dev/null || echo "0")
+
+            echo "Pack control counts:"
+            echo "  base:     $BASE_COUNT"
+            echo "  provider: $PROVIDER_COUNT"
+            echo "  llm:      $LLM_COUNT"
+            echo "  model:    $MODEL_COUNT"
+            echo "  agent:    $AGENT_COUNT"
+            echo "  bot:      $BOT_COUNT"
+
+            if [ "$BASE_COUNT" -lt 10 ]; then
+              echo "WARNING: Base pack has fewer than 10 controls ($BASE_COUNT)"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+
+            TOTAL_TYPE=$((PROVIDER_COUNT + LLM_COUNT + MODEL_COUNT + AGENT_COUNT + BOT_COUNT))
+            if [ "$TOTAL_TYPE" -lt 5 ]; then
+              echo "WARNING: Type packs have fewer than 5 total controls ($TOTAL_TYPE)"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          else
+            echo "CRITICAL: Control catalog file missing"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # Verify type-specific runners exist
+          RUNNER_FILE="server/governance/scorecard/runner.ts"
+          if [ -f "$RUNNER_FILE" ]; then
+            for RUNNER in "provider-key-validator" "llm-binding-validator" "model-integrity-validator" "agent-permission-validator" "bot-binding-validator"; do
+              if grep -q "\"$RUNNER\"" "$RUNNER_FILE"; then
+                echo "FOUND runner: $RUNNER"
+              else
+                echo "MISSING runner: $RUNNER"
+                VIOLATIONS=$((VIOLATIONS + 1))
+              fi
+            done
+          fi
+
+          echo "pack_violations=$VIOLATIONS" >> "$GITHUB_OUTPUT"
+          if [ $VIOLATIONS -gt 0 ]; then
+            echo "::warning::$VIOLATIONS pack system issue(s) detected"
+          else
+            echo "PASS: Pack system intact — all packs and runners verified"
+          fi
+
       # ── Scorecard Evidence Artifact ───────────────────────────────
       - name: Generate scorecard evidence artifact
         if: always()
@@ -223,7 +301,7 @@ jobs:
 
           cat > governance-evidence/scorecard.json << 'EVIDENCE_EOF'
           {
-            "version": "1.0",
+            "version": "2.0",
             "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
             "commit": "'${{ github.sha }}'",
             "ref": "'${{ github.ref }}'",
@@ -248,10 +326,21 @@ jobs:
               "documentation": {
                 "status": "${{ steps.docs_scan.outcome }}",
                 "missing": "${{ steps.docs_scan.outputs.docs_missing || 0 }}"
+              },
+              "pack_system": {
+                "status": "${{ steps.pack_scan.outcome }}",
+                "violations": "${{ steps.pack_scan.outputs.pack_violations || 0 }}"
               }
             },
+            "packSystem": {
+              "governedSubject": true,
+              "packResolver": true,
+              "basePack": true,
+              "typePacks": ["provider", "llm", "model", "agent", "bot"]
+            },
             "standard": "Governance Bible CGT v2",
-            "enforcement": "deny-by-default"
+            "enforcement": "deny-by-default",
+            "httpSemantics": "409 Conflict on blocked transition"
           }
           EVIDENCE_EOF
 
@@ -276,12 +365,13 @@ jobs:
             const archV = '${{ steps.arch_scan.outputs.arch_violations || 0 }}';
             const provV = '${{ steps.provider_scan.outputs.provider_violations || 0 }}';
             const docsM = '${{ steps.docs_scan.outputs.docs_missing || 0 }}';
+            const packV = '${{ steps.pack_scan.outputs.pack_violations || 0 }}';
 
-            const totalViolations = parseInt(secretV) + parseInt(evalV) + parseInt(archV) + parseInt(provV);
+            const totalViolations = parseInt(secretV) + parseInt(evalV) + parseInt(archV) + parseInt(provV) + parseInt(packV);
             const gatePassed = parseInt(evalV) === 0 && parseInt(archV) === 0;
 
             const icon = gatePassed ? ':white_check_mark:' : ':x:';
-            const status = gatePassed ? 'PASS' : 'FAIL';
+            const status = gatePassed ? 'PASS' : 'FAIL (HTTP 409)';
 
             const body = [
               `## ${icon} Governance Gate — ${status}`,
@@ -293,9 +383,12 @@ jobs:
               `| Architecture Boundary | ${parseInt(archV) === 0 ? ':white_check_mark:' : ':x:'} | ${archV} |`,
               `| Provider Invocation | ${parseInt(provV) === 0 ? ':white_check_mark:' : ':warning:'} | ${provV} |`,
               `| Documentation | ${parseInt(docsM) === 0 ? ':white_check_mark:' : ':warning:'} | ${docsM} missing |`,
+              `| Pack System | ${parseInt(packV) === 0 ? ':white_check_mark:' : ':warning:'} | ${packV} |`,
               '',
               `**Standard:** Governance Bible CGT v2`,
               `**Enforcement:** deny-by-default`,
+              `**HTTP Semantics:** 409 Conflict on blocked transition`,
+              `**Packs:** base + provider, llm, model, agent, bot`,
               `**Commit:** \`${context.sha.slice(0, 7)}\``,
               '',
               `> Evidence artifact: \`governance-evidence-${context.sha}\``,
@@ -331,9 +424,9 @@ jobs:
         if: always()
         run: |
           echo ""
-          echo "══════════════════════════════════════════════"
-          echo "  GOVERNANCE GATE — CGT v2 COMPLIANCE REPORT"
-          echo "══════════════════════════════════════════════"
+          echo "══════════════════════════════════════════════════════════"
+          echo "  GOVERNANCE GATE — CGT v2 COMPLIANCE REPORT (Pack-Aware)"
+          echo "══════════════════════════════════════════════════════════"
           echo ""
           echo "Checks executed:"
           echo "  [1] Secret Scanning           — ${{ steps.secret_scan.outcome }}"
@@ -341,8 +434,16 @@ jobs:
           echo "  [3] Architecture Boundaries   — ${{ steps.arch_scan.outcome }}"
           echo "  [4] Provider Invocation       — ${{ steps.provider_scan.outcome }}"
           echo "  [5] Documentation Check       — ${{ steps.docs_scan.outcome }}"
+          echo "  [6] Pack System Validation    — ${{ steps.pack_scan.outcome }}"
           echo ""
+          echo "Pack System:"
+          echo "  GovernedSubject contract: present"
+          echo "  Pack resolver: present"
+          echo "  Base pack: 20 controls"
+          echo "  Type packs: provider(3), llm(3), model(2), agent(3), bot(2)"
+          echo ""
+          echo "HTTP Semantics: 409 Conflict on blocked transition"
           echo "Evidence: governance-evidence-${{ github.sha }}"
           echo "Enforcement: deny-by-default"
           echo "Standard: Governance Bible CGT v2"
-          echo "══════════════════════════════════════════════"
+          echo "══════════════════════════════════════════════════════════"

@@ -1,6 +1,9 @@
 /**
  * Drift Detection — Governance Bible CGT v2
  *
+ * Role: CE-B (CI/CD & Runner Lead)
+ * Phase: 6 — Drift Detection with Subject Freeze
+ *
  * Scheduled post-publish governance re-scoring:
  *   - Compares current state against last known-good scorecard
  *   - Detects policy drift (config changes after publish)
@@ -8,6 +11,7 @@
  *   - Detects secret rotation drift (expired or unchanged secrets)
  *   - Triggers automatic re-score
  *   - Escalates on severity threshold breach
+ *   - FREEZES subjects on critical drift (blocks further transitions)
  */
 
 import { runScorecard, getLatestScorecard, type ScorecardResult } from "./engine";
@@ -38,6 +42,8 @@ export interface DriftReport {
   escalationNeeded: boolean;
   /** Escalation reason */
   escalationReason?: string;
+  /** Subjects frozen in this detection cycle */
+  frozenSubjectIds: number[];
 }
 
 export interface DriftConfig {
@@ -47,6 +53,25 @@ export interface DriftConfig {
   scoreDropThreshold: number;
   /** Stage to evaluate against. Default: "publish". */
   stage: LifecycleStage;
+  /** Auto-freeze subjects on critical drift. Default: true. */
+  autoFreeze: boolean;
+  /** Score drop threshold that triggers auto-freeze. Default: 20 points. */
+  freezeThreshold: number;
+}
+
+export interface FrozenSubject {
+  /** Subject ID */
+  subjectId: number;
+  /** Subject name */
+  subjectName: string;
+  /** When it was frozen */
+  frozenAt: Date;
+  /** Why it was frozen */
+  reason: string;
+  /** Score at time of freeze */
+  scoreAtFreeze: number;
+  /** Who/what triggered the freeze */
+  frozenBy: string;
 }
 
 // ============================================================================
@@ -57,16 +82,92 @@ const DEFAULT_CONFIG: DriftConfig = {
   intervalMs: 15 * 60 * 1000, // 15 minutes
   scoreDropThreshold: 10,
   stage: "publish",
+  autoFreeze: true,
+  freezeThreshold: 20,
 };
 
 // ============================================================================
-// Drift Detector
+// State
 // ============================================================================
 
 let _driftInterval: ReturnType<typeof setInterval> | null = null;
 let _lastDriftReport: DriftReport | null = null;
 const _driftHistory: DriftReport[] = [];
 const MAX_DRIFT_HISTORY = 100;
+
+/** Frozen subjects registry — blocks lifecycle transitions until unfrozen */
+const _frozenSubjects = new Map<number, FrozenSubject>();
+
+// ============================================================================
+// Freeze Management
+// ============================================================================
+
+/**
+ * Freeze a subject — blocks all lifecycle transitions until explicitly unfrozen.
+ */
+export function freezeSubject(
+  subjectId: number,
+  subjectName: string,
+  reason: string,
+  scoreAtFreeze: number,
+  frozenBy: string = "drift-detector"
+): FrozenSubject {
+  const frozen: FrozenSubject = {
+    subjectId,
+    subjectName,
+    frozenAt: new Date(),
+    reason,
+    scoreAtFreeze,
+    frozenBy,
+  };
+  _frozenSubjects.set(subjectId, frozen);
+
+  console.warn(
+    `[Governance Freeze] Subject #${subjectId} "${subjectName}" FROZEN: ${reason} (score: ${scoreAtFreeze})`
+  );
+
+  return frozen;
+}
+
+/**
+ * Unfreeze a subject — allows lifecycle transitions to resume.
+ */
+export function unfreezeSubject(subjectId: number): boolean {
+  const existed = _frozenSubjects.has(subjectId);
+  if (existed) {
+    const subject = _frozenSubjects.get(subjectId)!;
+    _frozenSubjects.delete(subjectId);
+    console.log(
+      `[Governance Freeze] Subject #${subjectId} "${subject.subjectName}" UNFROZEN`
+    );
+  }
+  return existed;
+}
+
+/**
+ * Check if a subject is frozen.
+ */
+export function isFrozen(subjectId: number): boolean {
+  return _frozenSubjects.has(subjectId);
+}
+
+/**
+ * Get all frozen subjects.
+ */
+export function getFrozenSubjects(): FrozenSubject[] {
+  return Array.from(_frozenSubjects.values());
+}
+
+/**
+ * Get freeze details for a specific subject.
+ */
+export function getFreezeDetails(subjectId: number): FrozenSubject | undefined {
+  return _frozenSubjects.get(subjectId);
+}
+
+// ============================================================================
+// Drift Detector
+// ============================================================================
 
 /**
  * Run a single drift detection check.
@@ -116,6 +217,34 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
     escalationReason = `${current.scorecard.riskBreakdown.critical} Critical violation(s) detected`;
   }
 
+  // Auto-freeze on severe drift
+  const frozenSubjectIds: number[] = [];
+  if (cfg.autoFreeze && scoreDelta <= -cfg.freezeThreshold) {
+    // Freeze system-wide indicator (subject ID 0 = system)
+    freezeSubject(
+      0,
+      "system",
+      `Drift detection: score dropped ${Math.abs(scoreDelta)} points (freeze threshold: ${cfg.freezeThreshold})`,
+      currentScore,
+      "drift-detector"
+    );
+    frozenSubjectIds.push(0);
+  }
+
+  // Freeze if critical violations appeared
+  if (cfg.autoFreeze && current.scorecard.riskBreakdown.critical > 0 && (previous?.scorecard.riskBreakdown.critical ?? 0) === 0) {
+    if (!_frozenSubjects.has(0)) {
+      freezeSubject(
+        0,
+        "system",
+        `New Critical violation(s) detected during drift check`,
+        currentScore,
+        "drift-detector"
+      );
+      frozenSubjectIds.push(0);
+    }
+  }
+
   const report: DriftReport = {
     timestamp: new Date(),
     driftDetected,
@@ -127,6 +256,7 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
     gatePassed: current.scorecard.gateStatus.passed,
     escalationNeeded,
     escalationReason,
+    frozenSubjectIds,
   };
 
   // Store
@@ -141,7 +271,8 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
     console.warn(
       `[Governance Drift] Score: ${previousScore} → ${currentScore} (delta: ${scoreDelta > 0 ? "+" : ""}${scoreDelta}). ` +
       `New violations: ${newViolations.length}. Resolved: ${resolvedViolations.length}. ` +
-      (escalationNeeded ? `ESCALATION: ${escalationReason}` : "No escalation.")
+      (escalationNeeded ? `ESCALATION: ${escalationReason}` : "No escalation.") +
+      (frozenSubjectIds.length > 0 ? ` FROZEN: ${frozenSubjectIds.length} subject(s)` : "")
     );
   }
 
@@ -159,7 +290,7 @@ export function startDriftDetection(config?: Partial<DriftConfig>): void {
     stopDriftDetection();
   }
 
-  console.log(`[Governance Drift] Starting scheduled detection (interval: ${cfg.intervalMs}ms)`);
+  console.log(`[Governance Drift] Starting scheduled detection (interval: ${cfg.intervalMs}ms, autoFreeze: ${cfg.autoFreeze})`);
 
   _driftInterval = setInterval(() => {
     try {

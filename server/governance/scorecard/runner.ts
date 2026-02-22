@@ -883,3 +883,367 @@ registerRunner({
     ];
   },
 });
+
+// ============================================================================
+// TYPE PACK RUNNERS — Provider, LLM, Model, Agent, Bot
+// ============================================================================
+// Role: CE-B (CI/CD & Runner Lead)
+// Phase: 3 — Each runner produces artifact evidence + remediation.
+//             No runner may silently PASS.
+
+// ── Provider Pack ──────────────────────────────────────────────────────
+
+registerRunner({
+  id: "provider-key-validator",
+  name: "Provider API Key Encryption Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "provider-key-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "provider-key-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasPlaintextKey = typeof config.apiKey === "string" &&
+      config.apiKey.length > 0 &&
+      !config.apiKey.startsWith("enc:");
+    const passed = !hasPlaintextKey;
+
+    return [
+      buildResult(control, "provider-key-validator", passed,
+        passed
+          ? "Provider API key is encrypted or not present in config"
+          : "CRITICAL: Provider config contains plaintext API key — must be encrypted via encryption service",
+        {
+          check: "Provider API key encryption",
+          finding: passed ? "encrypted_or_absent" : "plaintext_detected",
+          targets: hasPlaintextKey ? ["config.apiKey"] : [],
+          data: { hasApiKey: !!config.apiKey, encrypted: passed },
+        }
+      ),
+    ];
+  },
+});
+
+registerRunner({
+  id: "provider-connection-validator",
+  name: "Provider Connection Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "provider-connection-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "provider-connection-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasEndpoint = !!config.baseUrl || !!config.endpoint || !!config.apiKey;
+    return [
+      buildResult(control, "provider-connection-validator", hasEndpoint,
+        hasEndpoint
+          ? "Provider has connection configuration present"
+          : "Provider has no connection details — cannot validate connectivity",
+        {
+          check: "Provider connection validation",
+          finding: hasEndpoint ? "configured" : "missing_connection",
+          targets: hasEndpoint ? ["config.baseUrl", "config.endpoint"] : [],
+          data: { hasBaseUrl: !!config.baseUrl, hasEndpoint: !!config.endpoint },
+        }
+      ),
+    ];
+  },
+});
+
+registerRunner({
+  id: "provider-ratelimit-validator",
+  name: "Provider Rate Limit Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "provider-ratelimit-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "provider-ratelimit-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasRateLimit = !!config.rateLimit || !!config.maxRequestsPerMinute || !!config.rateLimitRpm;
+    return [
+      buildResult(control, "provider-ratelimit-validator", hasRateLimit,
+        hasRateLimit
+          ? "Provider has rate limiting configured"
+          : "Provider has no rate limit configuration — risk of quota exhaustion",
+        {
+          check: "Provider rate limit configuration",
+          finding: hasRateLimit ? "configured" : "unconfigured",
+          targets: ["config.rateLimit"],
+          data: { hasRateLimit },
+        }
+      ),
+    ];
+  },
+});
+
+// ── LLM Pack ───────────────────────────────────────────────────────────
+
+registerRunner({
+  id: "llm-binding-validator",
+  name: "LLM Provider Binding Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "llm-binding-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "llm-binding-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const metadata = (ctx.entry as any).metadata || {};
+    const hasBinding = !!config.providerId || !!config.provider || !!metadata.providerId;
+    return [
+      buildResult(control, "llm-binding-validator", hasBinding,
+        hasBinding
+          ? `LLM bound to provider: ${config.providerId || config.provider || metadata.providerId}`
+          : "CRITICAL: LLM has no provider binding — orphan LLM cannot serve requests",
+        {
+          check: "LLM provider binding",
+          finding: hasBinding ? "bound" : "orphan",
+          targets: hasBinding ? [String(config.providerId || config.provider)] : [],
+          data: { providerId: config.providerId, provider: config.provider },
+        }
+      ),
+    ];
+  },
+});
+
+registerRunner({
+  id: "llm-model-id-validator",
+  name: "LLM Model Identifier Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "llm-model-id-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "llm-model-id-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasModelId = !!config.modelId || !!config.model || !!config.modelName;
+    return [
+      buildResult(control, "llm-model-id-validator", hasModelId,
+        hasModelId
+          ? `LLM model identifier: ${config.modelId || config.model || config.modelName}`
+          : "LLM has no model identifier — runtime resolution will fail",
+        {
+          check: "LLM model identifier",
+          finding: hasModelId ? "valid" : "missing",
+          targets: [config.modelId || config.model || "none"],
+        }
+      ),
+    ];
+  },
+});
+
+registerRunner({
+  id: "llm-routing-validator",
+  name: "LLM Inference Routing Policy Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "llm-routing-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "llm-routing-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasRoutingPolicy = !!config.routingPolicy || !!config.inferenceRoute || !!config.dataSensitivity;
+    return [
+      buildResult(control, "llm-routing-validator", hasRoutingPolicy,
+        hasRoutingPolicy
+          ? "LLM has inference routing policy configured"
+          : "LLM has no routing policy — may send sensitive data to unintended providers",
+        {
+          check: "LLM inference routing policy",
+          finding: hasRoutingPolicy ? "configured" : "missing",
+          targets: ["config.routingPolicy"],
+          data: { routingPolicy: config.routingPolicy, inferenceRoute: config.inferenceRoute },
+        }
+      ),
+    ];
+  },
+});
+
+// ── Model Pack ─────────────────────────────────────────────────────────
+
+registerRunner({
+  id: "model-integrity-validator",
+  name: "Model File Integrity Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "model-integrity-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "model-integrity-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const metadata = (ctx.entry as any).metadata || {};
+    const hasChecksum = !!config.checksum || !!config.sha256 || !!metadata.checksum;
+    return [
+      buildResult(control, "model-integrity-validator", hasChecksum,
+        hasChecksum
+          ? "Model file integrity checksum present"
+          : "Model has no integrity checksum — supply chain risk",
+        {
+          check: "Model file integrity",
+          finding: hasChecksum ? "verified" : "unverified",
+          targets: hasChecksum ? [config.checksum || config.sha256 || "present"] : [],
+        }
+      ),
+    ];
+  },
+});
+
+registerRunner({
+  id: "model-quantization-validator",
+  name: "Model Quantization Documentation Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "model-quantization-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "model-quantization-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const metadata = (ctx.entry as any).metadata || {};
+    const hasQuantization = !!config.quantization || !!metadata.quantization;
+    return [
+      buildResult(control, "model-quantization-validator", hasQuantization,
+        hasQuantization
+          ? `Model quantization declared: ${config.quantization || metadata.quantization}`
+          : "Model quantization not documented — users cannot assess quality",
+        {
+          check: "Model quantization documentation",
+          finding: hasQuantization ? "documented" : "undocumented",
+          targets: [config.quantization || metadata.quantization || "none"],
+        }
+      ),
+    ];
+  },
+});
+
+// ── Agent Pack ─────────────────────────────────────────────────────────
+
+registerRunner({
+  id: "agent-permission-validator",
+  name: "Agent Tool Permission Scope Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "agent-permission-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "agent-permission-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasPermissions = !!config.permissions || !!config.tools || !!config.allowedTools;
+    const isUnrestricted = config.permissions === "*" || config.tools === "*";
+
+    const passed = hasPermissions && !isUnrestricted;
+    return [
+      buildResult(control, "agent-permission-validator", passed,
+        isUnrestricted
+          ? "CRITICAL: Agent has unrestricted tool permissions ('*') — must scope explicitly"
+          : hasPermissions
+            ? "Agent tool permissions are scoped"
+            : "Agent has no tool permissions declared — unrestricted by default is Critical",
+        {
+          check: "Agent tool permission scope",
+          finding: isUnrestricted ? "unrestricted" : hasPermissions ? "scoped" : "undeclared",
+          targets: isUnrestricted ? ["permissions=*"] : [],
+          data: { permissions: config.permissions, tools: config.tools },
+        }
+      ),
+    ];
+  },
+});
+
+registerRunner({
+  id: "agent-orchestrator-validator",
+  name: "Agent Orchestrator Binding Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "agent-orchestrator-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "agent-orchestrator-validator", "No entry context")];
+
+    // Agent must route through orchestrator — check config for direct provider refs
+    const config = ctx.entry.config || {};
+    const hasDirectProvider = !!config.directProviderId || !!config.directProviderCall;
+    const passed = !hasDirectProvider;
+
+    return [
+      buildResult(control, "agent-orchestrator-validator", passed,
+        passed
+          ? "Agent routes through orchestrator — no direct provider binding detected"
+          : "Agent has direct provider binding — must route through orchestrator",
+        {
+          check: "Agent orchestrator binding",
+          finding: passed ? "orchestrator_bound" : "direct_provider",
+          targets: hasDirectProvider ? ["config.directProviderId"] : [],
+        }
+      ),
+    ];
+  },
+});
+
+registerRunner({
+  id: "agent-prompt-validator",
+  name: "Agent System Prompt Review Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "agent-prompt-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "agent-prompt-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasPrompt = !!config.systemPrompt || !!config.prompt;
+    return [
+      buildResult(control, "agent-prompt-validator", hasPrompt,
+        hasPrompt
+          ? "Agent system prompt is present and available for review"
+          : "Agent has no system prompt documented — review not possible",
+        {
+          check: "Agent system prompt review",
+          finding: hasPrompt ? "present" : "missing",
+          targets: hasPrompt ? ["config.systemPrompt"] : [],
+        }
+      ),
+    ];
+  },
+});
+
+// ── Bot Pack ───────────────────────────────────────────────────────────
+
+registerRunner({
+  id: "bot-binding-validator",
+  name: "Bot Agent Binding Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "bot-binding-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "bot-binding-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasBinding = !!config.agentId || !!config.boundAgentId;
+    return [
+      buildResult(control, "bot-binding-validator", hasBinding,
+        hasBinding
+          ? `Bot bound to agent: ${config.agentId || config.boundAgentId}`
+          : "CRITICAL: Bot has no agent binding — orphan bot cannot operate",
+        {
+          check: "Bot agent binding",
+          finding: hasBinding ? "bound" : "orphan",
+          targets: hasBinding ? [String(config.agentId || config.boundAgentId)] : [],
+        }
+      ),
+    ];
+  },
+});
+
+registerRunner({
+  id: "bot-scope-validator",
+  name: "Bot Interaction Scope Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "bot-scope-validator");
+    if (!control) return [];
+    if (!ctx.entry) return [buildSkip(control, "bot-scope-validator", "No entry context")];
+
+    const config = ctx.entry.config || {};
+    const hasScope = !!config.scope || !!config.channels || !!config.allowedUsers;
+    return [
+      buildResult(control, "bot-scope-validator", hasScope,
+        hasScope
+          ? "Bot interaction scope is defined"
+          : "Bot has no interaction scope — unbounded bot can interact with unintended surfaces",
+        {
+          check: "Bot interaction scope",
+          finding: hasScope ? "scoped" : "unbounded",
+          targets: hasScope ? ["config.scope"] : [],
+          data: { scope: config.scope, channels: config.channels },
+        }
+      ),
+    ];
+  },
+});

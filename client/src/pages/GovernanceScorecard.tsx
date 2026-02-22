@@ -11,11 +11,11 @@ import {
   AlertTriangle,
   RefreshCw,
   FileText,
-  TrendingDown,
-  TrendingUp,
   Activity,
   Lock,
   Unlock,
+  Package,
+  Ban,
 } from "lucide-react";
 
 type Stage = "submit" | "register" | "validate" | "publish" | "catalog";
@@ -23,7 +23,8 @@ type Stage = "submit" | "register" | "validate" | "publish" | "catalog";
 export default function GovernanceScorecard() {
   const [selectedStage, setSelectedStage] = useState<Stage>("validate");
 
-  const scorecardQuery = trpc.governance.scorecardRun.useQuery(
+  // Use preview endpoint (no 409 throws) for UI display
+  const scorecardQuery = trpc.governance.scorecardPreview.useQuery(
     { stage: selectedStage },
     { refetchOnWindowFocus: false }
   );
@@ -47,6 +48,9 @@ export default function GovernanceScorecard() {
   const risk = scorecard?.scorecard?.riskBreakdown ?? { critical: 0, high: 0, medium: 0, low: 0, total: 0 };
   const results = scorecard?.scorecard?.controlResults ?? [];
   const evidence = scorecard?.evidence;
+  const packResolution = scorecard?.packResolution;
+  const subjectValidation = scorecard?.subjectValidation;
+  const isBlocked = scorecard?.blocked ?? false;
 
   const getScoreColor = (s: number) => {
     if (s >= 90) return "text-green-400";
@@ -65,6 +69,18 @@ export default function GovernanceScorecard() {
     return variants[severity] || "bg-gray-500 text-white";
   };
 
+  const getPackBadge = (pack: string) => {
+    const variants: Record<string, string> = {
+      base: "bg-slate-600 text-white",
+      provider: "bg-purple-600 text-white",
+      llm: "bg-blue-600 text-white",
+      model: "bg-green-600 text-white",
+      agent: "bg-amber-600 text-white",
+      bot: "bg-pink-600 text-white",
+    };
+    return variants[pack] || "bg-gray-500 text-white";
+  };
+
   return (
     <div className="space-y-6 p-4 max-w-7xl mx-auto">
       {/* Header */}
@@ -74,7 +90,7 @@ export default function GovernanceScorecard() {
           <div>
             <h1 className="text-2xl font-bold">Governance Scorecard</h1>
             <p className="text-sm text-muted-foreground">
-              CGT v2 Automated Compliance Engine
+              CGT v2 Automated Compliance Engine — Pack-Aware
             </p>
           </div>
         </div>
@@ -102,6 +118,36 @@ export default function GovernanceScorecard() {
         </div>
       </div>
 
+      {/* Freeze Banner */}
+      {(frozenQuery.data?.length ?? 0) > 0 && (
+        <Card className="border-red-600 bg-red-950/20">
+          <CardContent className="py-3 flex items-center gap-3">
+            <Lock className="h-5 w-5 text-red-400" />
+            <div>
+              <span className="text-red-400 font-bold">GOVERNANCE FREEZE ACTIVE</span>
+              <span className="text-sm text-muted-foreground ml-2">
+                {frozenQuery.data?.length} subject(s) frozen — transitions blocked
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 409 Blocked Banner */}
+      {isBlocked && (
+        <Card className="border-orange-600 bg-orange-950/20">
+          <CardContent className="py-3 flex items-center gap-3">
+            <Ban className="h-5 w-5 text-orange-400" />
+            <div>
+              <span className="text-orange-400 font-bold">HTTP 409 — TRANSITION BLOCKED</span>
+              <span className="text-sm text-muted-foreground ml-2">
+                {scorecard?.scorecard?.gateStatus?.reason}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Score + Gate + Risk Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Overall Score */}
@@ -116,6 +162,7 @@ export default function GovernanceScorecard() {
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {scorecard?.controlsEvaluated ?? 0} controls evaluated
+              {scorecard?.runnersInvoked && ` via ${scorecard.runnersInvoked.length} runners`}
             </p>
           </CardContent>
         </Card>
@@ -134,9 +181,14 @@ export default function GovernanceScorecard() {
               ) : (
                 <XCircle className="h-10 w-10 text-red-400" />
               )}
-              <span className={`text-3xl font-bold ${gatePassed ? "text-green-400" : "text-red-400"}`}>
-                {scorecardQuery.isLoading ? "..." : gatePassed ? "PASS" : "FAIL"}
-              </span>
+              <div>
+                <span className={`text-3xl font-bold ${gatePassed ? "text-green-400" : "text-red-400"}`}>
+                  {scorecardQuery.isLoading ? "..." : gatePassed ? "PASS" : "FAIL"}
+                </span>
+                {isBlocked && (
+                  <span className="text-xs text-orange-400 block">409 Conflict</span>
+                )}
+              </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {scorecard?.scorecard?.gateStatus?.reason || "Loading..."}
@@ -171,6 +223,94 @@ export default function GovernanceScorecard() {
             <p className="text-xs text-muted-foreground mt-2 text-center">
               {results.filter((r: any) => r.status === "pass").length} passed / {results.filter((r: any) => r.status === "fail").length} failed / {results.filter((r: any) => r.status === "skip").length} skipped
             </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Pack Resolution + Subject Validation Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Pack Resolution */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Pack Resolution
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {packResolution ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {packResolution.resolved ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-400" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-400" />
+                  )}
+                  <span className="text-sm">
+                    {packResolution.resolved ? "Packs resolved" : "Pack resolution FAILED"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {(packResolution.loadedPacks ?? []).map((pack: string) => (
+                    <span key={pack} className={`text-xs px-1.5 py-0.5 rounded ${getPackBadge(pack)}`}>
+                      {pack}
+                    </span>
+                  ))}
+                </div>
+                {(packResolution.missingPacks ?? []).length > 0 && (
+                  <div className="text-xs text-red-400">
+                    Missing: {(packResolution.missingPacks as string[]).join(", ")}
+                  </div>
+                )}
+                {packResolution.error && (
+                  <div className="text-xs text-red-400 mt-1">{packResolution.error}</div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No subject — base pack only</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Subject Validation */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Subject Validation
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {subjectValidation ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {subjectValidation.valid ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-400" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-400" />
+                  )}
+                  <span className="text-sm">
+                    {subjectValidation.valid ? "GovernedSubject contract valid" : "Contract validation FAILED"}
+                  </span>
+                </div>
+                {(subjectValidation.errors ?? []).length > 0 && (
+                  <div className="text-xs text-red-400 space-y-1">
+                    {(subjectValidation.errors as string[]).map((e: string, i: number) => (
+                      <div key={i}>- {e}</div>
+                    ))}
+                  </div>
+                )}
+                {(subjectValidation.warnings ?? []).length > 0 && (
+                  <div className="text-xs text-yellow-400 space-y-1">
+                    {(subjectValidation.warnings as string[]).map((w: string, i: number) => (
+                      <div key={i}>- {w}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No subject — system-wide check</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -253,7 +393,7 @@ export default function GovernanceScorecard() {
             {driftStatusQuery.data?.active ? "Active" : "Inactive"} — monitors governance posture changes
             {(driftStatusQuery.data?.frozenCount ?? 0) > 0 && (
               <span className="text-red-400 ml-2">
-                ({driftStatusQuery.data?.frozenCount} frozen subject{driftStatusQuery.data?.frozenCount !== 1 ? "s" : ""})
+                ({driftStatusQuery.data?.frozenCount} frozen)
               </span>
             )}
           </CardDescription>
@@ -380,27 +520,43 @@ export default function GovernanceScorecard() {
         </Card>
       )}
 
-      {/* Control Catalog Summary */}
+      {/* Control Catalog with Pack Badges */}
       {catalog && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Control Catalog</CardTitle>
             <CardDescription>
-              {catalog.activeControls?.length ?? 0} active controls, {catalog.runners?.length ?? 0} runners registered
+              {catalog.activeControls?.length ?? 0} active controls across {catalog.availablePacks?.length ?? 0} packs,{" "}
+              {catalog.runners?.length ?? 0} runners
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-              {(catalog.activeControls ?? []).map((control: any) => (
-                <div key={control.id} className="flex items-center gap-2 p-2 rounded border">
-                  <code className="text-xs font-mono bg-muted px-1 rounded">{control.id}</code>
-                  <span className={`text-xs px-1 rounded ${getSeverityBadge(control.severity)}`}>
-                    {control.severity}
+            <div className="space-y-3">
+              {/* Pack summary */}
+              <div className="flex flex-wrap gap-2">
+                {(catalog.availablePacks ?? []).map((pack: string) => (
+                  <span key={pack} className={`text-xs px-2 py-1 rounded ${getPackBadge(pack)}`}>
+                    {pack}: {(catalog.activeControls ?? []).filter((c: any) => c.pack === pack).length}
                   </span>
-                  <span className="text-xs truncate">{control.name}</span>
-                  <span className="text-xs text-muted-foreground ml-auto">w:{control.weight}</span>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              {/* Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                {(catalog.activeControls ?? []).map((control: any) => (
+                  <div key={control.id} className="flex items-center gap-2 p-2 rounded border">
+                    <code className="text-xs font-mono bg-muted px-1 rounded">{control.id}</code>
+                    <span className={`text-xs px-1 rounded ${getPackBadge(control.pack)}`}>
+                      {control.pack}
+                    </span>
+                    <span className={`text-xs px-1 rounded ${getSeverityBadge(control.severity)}`}>
+                      {control.severity}
+                    </span>
+                    <span className="text-xs truncate">{control.name}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">w:{control.weight}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
