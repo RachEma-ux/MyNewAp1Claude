@@ -582,7 +582,7 @@ export default function CandidatePage() {
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <div className="overflow-x-auto">
           <TabsList>
-            <TabsTrigger value="catalog">Catalog</TabsTrigger>
+            <TabsTrigger value="catalog">Register</TabsTrigger>
             <TabsTrigger value="validation">Validate</TabsTrigger>
             <TabsTrigger value="publishing">Publish</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
