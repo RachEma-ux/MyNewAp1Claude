@@ -69,3 +69,29 @@ export {
   type GovernanceSelfCheckReport,
 } from "./self-check";
 export { governanceRouter } from "./router";
+
+// Scorecard Engine (CGT v2)
+export {
+  runScorecard,
+  getLatestScorecard,
+  getScorecardHistory,
+  CONTROL_CATALOG,
+  getActiveControls,
+  getControlsForStage,
+  getControlsByDomain,
+  getControlById,
+  getAllRunners,
+  verifyBundleIntegrity,
+  formatBundleSummary,
+  detectDrift,
+  startDriftDetection,
+  stopDriftDetection,
+  isDriftDetectionActive,
+  type ScorecardRequest,
+  type ScorecardResult,
+  type ControlDefinition,
+  type ControlDomain,
+  type ControlResult,
+  type EvidenceBundle,
+  type DriftReport,
+} from "./scorecard";

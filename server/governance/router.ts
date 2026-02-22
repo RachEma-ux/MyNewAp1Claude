@@ -8,8 +8,10 @@
  *   - Publication gate evaluation
  *   - Lifecycle transition validation
  *   - RBAC info
- *   - Drift detection trigger
  *   - Governance metrics
+ *   - Scorecard engine (run, latest, history, catalog)
+ *   - Drift detection (detect, status, toggle, history)
+ *   - Evidence verification
  */
 
 import { z } from "zod";
@@ -41,6 +43,21 @@ import {
 import { getGovernanceMetrics } from "../services/governanceMetrics";
 import { getGovernanceLogger } from "../services/governanceLogger";
 import { getAuditLogger } from "../services/auditLogger";
+import {
+  runScorecard,
+  getLatestScorecard,
+  getScorecardHistory,
+  CONTROL_CATALOG,
+  getActiveControls,
+  getAllRunners,
+  verifyBundleIntegrity,
+  detectDrift,
+  getLastDriftReport,
+  getDriftHistory,
+  isDriftDetectionActive,
+  startDriftDetection,
+  stopDriftDetection,
+} from "./scorecard";
 
 export const governanceRouter = router({
   // ── Self-Check ──────────────────────────────────────────────────────
@@ -242,5 +259,114 @@ export const governanceRouter = router({
 
       const auditLogger = getAuditLogger();
       return auditLogger.getRecent(input.limit || 50);
+    }),
+
+  // ── Scorecard Engine ──────────────────────────────────────────────────
+
+  /**
+   * Run the governance scorecard for a given lifecycle stage.
+   * Returns score (0–100), gate status, risk breakdown, control results, and evidence bundle.
+   */
+  scorecardRun: adminProcedure
+    .input(
+      z.object({
+        stage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+        entry: z.object({
+          id: z.number(),
+          name: z.string(),
+          type: z.string(),
+          tags: z.array(z.string()),
+          description: z.string().optional(),
+          config: z.any().optional(),
+        }).optional(),
+        stageOnly: z.boolean().optional(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      return runScorecard({
+        stage: input.stage,
+        entry: input.entry,
+        actor: { id: String(ctx.user.id), role: ctx.user.role || "admin" },
+        stageOnly: input.stageOnly,
+      });
+    }),
+
+  /**
+   * Get the latest scorecard result (cached).
+   */
+  scorecardLatest: protectedProcedure.query(async () => {
+    return getLatestScorecard();
+  }),
+
+  /**
+   * Get scorecard history.
+   */
+  scorecardHistory: protectedProcedure.query(async () => {
+    return getScorecardHistory();
+  }),
+
+  /**
+   * Get the control catalog (all defined controls).
+   */
+  controlCatalog: protectedProcedure.query(async () => {
+    return {
+      controls: CONTROL_CATALOG,
+      activeControls: getActiveControls(),
+      runners: getAllRunners().map((r) => ({ id: r.id, name: r.name })),
+    };
+  }),
+
+  /**
+   * Verify evidence bundle integrity.
+   */
+  verifyEvidence: protectedProcedure
+    .input(z.object({ bundle: z.any() }))
+    .query(async ({ input }) => {
+      const valid = verifyBundleIntegrity(input.bundle);
+      return { valid, bundleId: input.bundle?.bundleId };
+    }),
+
+  // ── Drift Detection ──────────────────────────────────────────────────
+
+  /**
+   * Trigger a manual drift detection check.
+   */
+  driftDetect: adminProcedure.query(async () => {
+    return detectDrift();
+  }),
+
+  /**
+   * Get the latest drift report.
+   */
+  driftLatest: protectedProcedure.query(async () => {
+    return getLastDriftReport();
+  }),
+
+  /**
+   * Get drift detection history.
+   */
+  driftHistory: protectedProcedure.query(async () => {
+    return getDriftHistory();
+  }),
+
+  /**
+   * Get drift detection status.
+   */
+  driftStatus: protectedProcedure.query(async () => {
+    return { active: isDriftDetectionActive() };
+  }),
+
+  /**
+   * Start/stop drift detection.
+   */
+  driftToggle: adminProcedure
+    .input(z.object({ active: z.boolean(), intervalMs: z.number().optional() }))
+    .mutation(async ({ input }) => {
+      if (input.active) {
+        startDriftDetection({ intervalMs: input.intervalMs });
+      } else {
+        stopDriftDetection();
+      }
+      return { active: isDriftDetectionActive() };
     }),
 });

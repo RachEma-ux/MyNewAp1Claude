@@ -5,9 +5,11 @@
 #   1. Secret scanning (no hardcoded credentials)
 #   2. Dynamic eval detection (no eval/Function constructor)
 #   3. Architecture boundary validation
-#   4. Policy file validation
-#   5. Branch protection enforcement
-#   6. Governance YAML spec validation
+#   4. Direct provider invocation detection
+#   5. Governance documentation check
+#   6. Scorecard summary + artifact upload
+#
+# Gate rule: Block merge on Critical or High violations.
 
 name: Governance Gate
 
@@ -28,6 +30,7 @@ jobs:
 
       # ── Phase 4: Secret Scanning ──────────────────────────────────
       - name: Scan for hardcoded secrets
+        id: secret_scan
         run: |
           echo "=== Governance Gate: Secret Scanning ==="
           VIOLATIONS=0
@@ -67,6 +70,7 @@ jobs:
             VIOLATIONS=$((VIOLATIONS + 1))
           fi
 
+          echo "secret_violations=$VIOLATIONS" >> "$GITHUB_OUTPUT"
           if [ $VIOLATIONS -gt 0 ]; then
             echo "::warning::$VIOLATIONS potential secret pattern(s) detected — review manually"
           else
@@ -75,6 +79,7 @@ jobs:
 
       # ── Phase 5: Dynamic Eval Detection ───────────────────────────
       - name: Scan for dynamic eval patterns
+        id: eval_scan
         run: |
           echo "=== Governance Gate: Dynamic Eval Detection ==="
           VIOLATIONS=0
@@ -111,6 +116,7 @@ jobs:
             VIOLATIONS=$((VIOLATIONS + 1))
           fi
 
+          echo "eval_violations=$VIOLATIONS" >> "$GITHUB_OUTPUT"
           if [ $VIOLATIONS -gt 0 ]; then
             echo "::error::$VIOLATIONS dynamic code execution pattern(s) detected — BLOCKED"
             exit 1
@@ -120,6 +126,7 @@ jobs:
 
       # ── Phase 1: Architecture Boundary Check ──────────────────────
       - name: Validate architecture boundaries
+        id: arch_scan
         run: |
           echo "=== Governance Gate: Architecture Boundary Validation ==="
           VIOLATIONS=0
@@ -141,19 +148,47 @@ jobs:
             server/agents/ 2>/dev/null || true)
 
           if [ -n "$DIRECT_PROVIDER" ]; then
-            echo "WARNING: Agent code imports provider implementation directly:"
+            echo "CRITICAL: Agent code imports provider implementation directly:"
             echo "$DIRECT_PROVIDER"
             VIOLATIONS=$((VIOLATIONS + 1))
           fi
 
+          echo "arch_violations=$VIOLATIONS" >> "$GITHUB_OUTPUT"
           if [ $VIOLATIONS -gt 0 ]; then
-            echo "::warning::$VIOLATIONS architecture boundary violation(s) detected"
+            echo "::error::$VIOLATIONS architecture boundary violation(s) detected — BLOCKED"
+            exit 1
           else
             echo "PASS: Architecture boundaries intact"
           fi
 
+      # ── Direct Provider Invocation Detection ──────────────────────
+      - name: Detect direct provider invocations
+        id: provider_scan
+        run: |
+          echo "=== Governance Gate: Direct Provider Invocation Detection ==="
+          VIOLATIONS=0
+
+          # Agents/workflows must not import provider SDK clients directly
+          DIRECT_SDK=$(grep -rn --include="*.ts" \
+            -E "import.*from.*['\"]openai['\"]|import.*from.*['\"]@anthropic-ai|import.*from.*['\"]@google-ai" \
+            server/agents/ server/automation/ 2>/dev/null || true)
+
+          if [ -n "$DIRECT_SDK" ]; then
+            echo "CRITICAL: Direct provider SDK import in agent/automation layer:"
+            echo "$DIRECT_SDK"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          echo "provider_violations=$VIOLATIONS" >> "$GITHUB_OUTPUT"
+          if [ $VIOLATIONS -gt 0 ]; then
+            echo "::warning::$VIOLATIONS direct provider invocation(s) detected"
+          else
+            echo "PASS: No direct provider invocations outside provider layer"
+          fi
+
       # ── Phase 2: Governance Files Validation ──────────────────────
       - name: Validate governance documentation exists
+        id: docs_scan
         run: |
           echo "=== Governance Gate: Documentation Check ==="
           MISSING=0
@@ -172,11 +207,124 @@ jobs:
             fi
           done
 
+          echo "docs_missing=$MISSING" >> "$GITHUB_OUTPUT"
           if [ $MISSING -gt 0 ]; then
             echo "::warning::$MISSING required governance document(s) missing"
           else
             echo "PASS: All governance documents present"
           fi
+
+      # ── Scorecard Evidence Artifact ───────────────────────────────
+      - name: Generate scorecard evidence artifact
+        if: always()
+        run: |
+          echo "=== Governance Gate: Generating Evidence Artifact ==="
+          mkdir -p governance-evidence
+
+          cat > governance-evidence/scorecard.json << 'EVIDENCE_EOF'
+          {
+            "version": "1.0",
+            "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+            "commit": "'${{ github.sha }}'",
+            "ref": "'${{ github.ref }}'",
+            "pr": "'${{ github.event.pull_request.number || 'N/A' }}'",
+            "checks": {
+              "secret_scan": {
+                "status": "${{ steps.secret_scan.outcome }}",
+                "violations": "${{ steps.secret_scan.outputs.secret_violations || 0 }}"
+              },
+              "eval_scan": {
+                "status": "${{ steps.eval_scan.outcome }}",
+                "violations": "${{ steps.eval_scan.outputs.eval_violations || 0 }}"
+              },
+              "architecture": {
+                "status": "${{ steps.arch_scan.outcome }}",
+                "violations": "${{ steps.arch_scan.outputs.arch_violations || 0 }}"
+              },
+              "provider_invocation": {
+                "status": "${{ steps.provider_scan.outcome }}",
+                "violations": "${{ steps.provider_scan.outputs.provider_violations || 0 }}"
+              },
+              "documentation": {
+                "status": "${{ steps.docs_scan.outcome }}",
+                "missing": "${{ steps.docs_scan.outputs.docs_missing || 0 }}"
+              }
+            },
+            "standard": "Governance Bible CGT v2",
+            "enforcement": "deny-by-default"
+          }
+          EVIDENCE_EOF
+
+          echo "Evidence artifact generated at governance-evidence/scorecard.json"
+
+      - name: Upload governance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-evidence-${{ github.sha }}
+          path: governance-evidence/
+          retention-days: 90
+
+      # ── PR Comment ────────────────────────────────────────────────
+      - name: Comment scorecard on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const secretV = '${{ steps.secret_scan.outputs.secret_violations || 0 }}';
+            const evalV = '${{ steps.eval_scan.outputs.eval_violations || 0 }}';
+            const archV = '${{ steps.arch_scan.outputs.arch_violations || 0 }}';
+            const provV = '${{ steps.provider_scan.outputs.provider_violations || 0 }}';
+            const docsM = '${{ steps.docs_scan.outputs.docs_missing || 0 }}';
+
+            const totalViolations = parseInt(secretV) + parseInt(evalV) + parseInt(archV) + parseInt(provV);
+            const gatePassed = parseInt(evalV) === 0 && parseInt(archV) === 0;
+
+            const icon = gatePassed ? ':white_check_mark:' : ':x:';
+            const status = gatePassed ? 'PASS' : 'FAIL';
+
+            const body = [
+              `## ${icon} Governance Gate — ${status}`,
+              '',
+              '| Check | Status | Violations |',
+              '|-------|--------|------------|',
+              `| Secret Scanning | ${parseInt(secretV) === 0 ? ':white_check_mark:' : ':warning:'} | ${secretV} |`,
+              `| Dynamic Eval | ${parseInt(evalV) === 0 ? ':white_check_mark:' : ':x:'} | ${evalV} |`,
+              `| Architecture Boundary | ${parseInt(archV) === 0 ? ':white_check_mark:' : ':x:'} | ${archV} |`,
+              `| Provider Invocation | ${parseInt(provV) === 0 ? ':white_check_mark:' : ':warning:'} | ${provV} |`,
+              `| Documentation | ${parseInt(docsM) === 0 ? ':white_check_mark:' : ':warning:'} | ${docsM} missing |`,
+              '',
+              `**Standard:** Governance Bible CGT v2`,
+              `**Enforcement:** deny-by-default`,
+              `**Commit:** \`${context.sha.slice(0, 7)}\``,
+              '',
+              `> Evidence artifact: \`governance-evidence-${context.sha}\``,
+            ].join('\n');
+
+            // Find and update existing comment or create new
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body?.includes('Governance Gate'));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
 
       # ── Summary ───────────────────────────────────────────────────
       - name: Governance gate summary
@@ -188,11 +336,13 @@ jobs:
           echo "══════════════════════════════════════════════"
           echo ""
           echo "Checks executed:"
-          echo "  [1] Secret Scanning"
-          echo "  [2] Dynamic Eval Detection"
-          echo "  [3] Architecture Boundary Validation"
-          echo "  [4] Governance Documentation Check"
+          echo "  [1] Secret Scanning           — ${{ steps.secret_scan.outcome }}"
+          echo "  [2] Dynamic Eval Detection    — ${{ steps.eval_scan.outcome }}"
+          echo "  [3] Architecture Boundaries   — ${{ steps.arch_scan.outcome }}"
+          echo "  [4] Provider Invocation       — ${{ steps.provider_scan.outcome }}"
+          echo "  [5] Documentation Check       — ${{ steps.docs_scan.outcome }}"
           echo ""
+          echo "Evidence: governance-evidence-${{ github.sha }}"
           echo "Enforcement: deny-by-default"
           echo "Standard: Governance Bible CGT v2"
           echo "══════════════════════════════════════════════"
