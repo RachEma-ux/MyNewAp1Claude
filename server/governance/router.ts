@@ -506,9 +506,9 @@ export const governanceRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      const { targetStage, ...entry } = input;
+      const { targetStage, entryId, entryName, ...rest } = input;
       return evaluateStageReview(
-        entry,
+        { id: entryId, name: entryName, ...rest },
         targetStage,
         { id: String(ctx.user.id), role: ctx.user.role || "user" }
       );
@@ -537,14 +537,15 @@ export const governanceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { targetStage, ...entry } = input;
+      const { targetStage, entryId, entryName, ...rest } = input;
+      const entry = { id: entryId, name: entryName, ...rest };
       const actor = { id: String(ctx.user.id), role: ctx.user.role || "admin" };
 
       // Check freeze status
-      if (isFrozen(entry.entryId)) {
+      if (isFrozen(entryId)) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: `Subject #${entry.entryId} is FROZEN — all transitions blocked until unfrozen.`,
+          message: `Subject #${entryId} is FROZEN — all transitions blocked until unfrozen.`,
         });
       }
       if (isFrozen(0)) {
