@@ -14,11 +14,13 @@ import { Bot, Plus, Settings, Trash2, MessageSquare, Wrench, Sparkles } from "lu
 import { AGENT_TEMPLATES, type AgentTemplate } from "@/lib/agentTemplates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Agent, AgentMode, GovernanceStatus, AgentRoleClass } from "@shared/types";
-// Toast functionality - using console for now
+import { PageShell, EmptyState } from "@/components/app";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 export default function Agents() {
   const [, setLocation] = useLocation();
   const toast = (msg: any) => console.log(msg.title, msg.description);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<number | null>(null);
 
@@ -101,14 +103,11 @@ export default function Agents() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Agents</h1>
-          <p className="text-muted-foreground mt-2">
-            Create and manage AI agents with custom capabilities
-          </p>
-        </div>
+    <PageShell
+      title="Agents"
+      subtitle="Create and manage AI agents with custom capabilities"
+      icon={Bot}
+      actions={
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -292,7 +291,8 @@ export default function Agents() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      }
+    >
 
       {/* Workspace Selector */}
       <div className="flex items-center gap-4">
@@ -316,31 +316,19 @@ export default function Agents() {
 
       {/* Agents List */}
       {!selectedWorkspace ? (
-        <Card className="border-dashed">
-          <CardHeader className="text-center py-12">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
-              <Bot className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <CardTitle>Select a Workspace</CardTitle>
-            <CardDescription className="max-w-md mx-auto">
-              Choose a workspace from the dropdown above to view and manage its agents
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState
+          icon={Bot}
+          title="Select a Workspace"
+          description="Choose a workspace from the dropdown above to view and manage its agents"
+        />
       ) : agentsQuery.isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading agents...</div>
       ) : agentsQuery.data && agentsQuery.data.length === 0 ? (
-        <Card className="border-dashed">
-          <CardHeader className="text-center py-12">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
-              <Bot className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <CardTitle>No Agents Yet</CardTitle>
-            <CardDescription className="max-w-md mx-auto">
-              Create your first AI agent to get started with automated conversations and tool execution
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState
+          icon={Bot}
+          title="No Agents Yet"
+          description="Create your first AI agent to get started with automated conversations and tool execution"
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {agentsQuery.data?.map((agent) => (
@@ -391,11 +379,12 @@ export default function Agents() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        if (confirm(`Delete agent "${agent.name}"?`)) {
-                          deleteAgentMutation.mutate({ id: agent.id });
-                        }
-                      }}
+                      onClick={() =>
+                        confirm(
+                          () => deleteAgentMutation.mutate({ id: agent.id }),
+                          { title: `Delete agent "${agent.name}"?`, description: "This action cannot be undone." },
+                        )
+                      }
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -406,6 +395,7 @@ export default function Agents() {
           ))}
         </div>
       )}
-    </div>
+      <ConfirmDialog />
+    </PageShell>
   );
 }

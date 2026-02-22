@@ -7,11 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { PageShell, EmptyState } from "@/components/app";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { Upload, Plus, Edit, Trash2, FileText, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ProtocolsPage() {
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -100,9 +103,13 @@ export default function ProtocolsPage() {
   };
 
   const handleDelete = (id: number) => {
-    if (confirm("Are you sure you want to delete this protocol?")) {
-      deleteMutation.mutate({ id });
-    }
+    confirm(
+      () => deleteMutation.mutate({ id }),
+      {
+        title: "Delete protocol?",
+        description: "This action cannot be undone. The protocol will be permanently removed.",
+      },
+    );
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,13 +142,10 @@ export default function ProtocolsPage() {
   };
 
   return (
-    <div className="container py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Agent Protocols</h1>
-          <p className="text-muted-foreground">Upload and manage markdown protocol files for your agents</p>
-        </div>
+    <PageShell
+      title="Agent Protocols"
+      subtitle="Upload and manage markdown protocol files for your agents"
+      actions={
         <div className="flex gap-2">
           <label htmlFor="file-upload">
             <Button variant="outline" size="sm" asChild>
@@ -202,7 +206,9 @@ export default function ProtocolsPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </div>
+      }
+      className="container py-8"
+    >
 
       {/* Search */}
       <div className="mb-6">
@@ -257,17 +263,17 @@ export default function ProtocolsPage() {
           ))}
         </div>
       ) : (
-        <Card className="p-12 text-center">
-          <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">No protocols found</h3>
-          <p className="text-muted-foreground mb-4">
-            Upload a .md file or create a new protocol to get started
-          </p>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create First Protocol
-          </Button>
-        </Card>
+        <EmptyState
+          icon={FileText}
+          title="No protocols found"
+          description="Upload a .md file or create a new protocol to get started"
+          action={
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create First Protocol
+            </Button>
+          }
+        />
       )}
 
       {/* Edit Dialog */}
@@ -307,6 +313,8 @@ export default function ProtocolsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <ConfirmDialog />
+    </PageShell>
   );
 }

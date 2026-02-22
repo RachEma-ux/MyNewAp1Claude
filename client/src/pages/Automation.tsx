@@ -1,18 +1,17 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Zap, Plus, Play, Trash2, Edit, Clock, ArrowLeft, Home, ArrowRight, Mail, Database, Webhook, Timer, Zap as ZapIcon, GitBranch } from "lucide-react";
+import { Zap, Plus, Play, Trash2, Edit, Clock, Home, ArrowRight, Mail, Database, Webhook, Timer, Zap as ZapIcon, GitBranch } from "lucide-react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { PageShell, EmptyState, StatusPill } from "@/components/app";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 export default function Automation() {
   const [, setLocation] = useLocation();
-  
-  const handleBack = () => {
-    setLocation("/");
-  };
+  const { confirm, ConfirmDialog } = useConfirmDialog();
+
   const utils = trpc.useUtils();
 
   // Fetch workflows from database
@@ -43,9 +42,10 @@ export default function Automation() {
   };
 
   const handleDeleteWorkflow = (workflowId: number, workflowName: string) => {
-    if (confirm(`Are you sure you want to delete "${workflowName}"?`)) {
-      deleteMutation.mutate({ id: workflowId });
-    }
+    confirm(
+      () => deleteMutation.mutate({ id: workflowId }),
+      { title: `Delete "${workflowName}"?`, description: "This action cannot be undone." },
+    );
   };
 
   const handleTestWorkflow = (workflow: any) => {
@@ -53,16 +53,12 @@ export default function Automation() {
     setLocation("/automation/executions");
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusPillVariant = (status: string) => {
     switch (status) {
-      case "active":
-        return "bg-green-500/10 text-green-500 border-green-500/20";
-      case "paused":
-        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
-      case "draft":
-        return "bg-gray-500/10 text-gray-500 border-gray-500/20";
-      default:
-        return "bg-gray-500/10 text-gray-500 border-gray-500/20";
+      case "active": return "active" as const;
+      case "paused": return "pending" as const;
+      case "draft": return "draft" as const;
+      default: return "disabled" as const;
     }
   };
 
@@ -112,23 +108,13 @@ export default function Automation() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb Navigation */}
-      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-        <Button variant="ghost" size="sm" onClick={handleBack} className="-ml-2">
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back to Dashboard
-        </Button>
-      </div>
-      
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Automation</h1>
-          <p className="text-muted-foreground mt-2">
-            Create workflows with triggers and automated actions
-          </p>
-        </div>
-        <div className="flex gap-2">
+    <PageShell
+      title="Automation"
+      subtitle="Create workflows with triggers and automated actions"
+      icon={Zap}
+      backHref="/"
+      actions={
+        <>
           <Button variant="outline" onClick={() => setLocation("/automation/executions")}>
             Executions
             <ArrowRight className="ml-2 h-4 w-4" />
@@ -137,8 +123,9 @@ export default function Automation() {
             <Plus className="mr-2 h-4 w-4" />
             Create Workflow
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       {workflows && workflows.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -156,9 +143,7 @@ export default function Automation() {
                         {workflow.description || "No description"}
                       </CardDescription>
                     </div>
-                    <Badge className={getStatusColor(workflow.status)}>
-                      {workflow.status}
-                    </Badge>
+                    <StatusPill status={getStatusPillVariant(workflow.status)} label={workflow.status} />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -183,20 +168,18 @@ export default function Automation() {
 
                     {/* Last Run Status */}
                     {workflow.lastRunAt && (
-                      <div className="text-sm">
+                      <div className="text-sm flex items-center gap-2">
                         <span className="text-muted-foreground">Last run: </span>
-                        <Badge
-                          variant="outline"
-                          className={
+                        <StatusPill
+                          status={
                             workflow.lastRunStatus === "success"
-                              ? "bg-green-500/10 text-green-500"
+                              ? "success"
                               : workflow.lastRunStatus === "error"
-                              ? "bg-red-500/10 text-red-500"
-                              : "bg-blue-500/10 text-blue-500"
+                              ? "error"
+                              : "active"
                           }
-                        >
-                          {workflow.lastRunStatus}
-                        </Badge>
+                          label={workflow.lastRunStatus}
+                        />
                       </div>
                     )}
 
@@ -236,17 +219,17 @@ export default function Automation() {
           })}
         </div>
       ) : (
-        <Card className="border-dashed">
-          <CardHeader className="text-center py-12">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
-              <Zap className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <CardTitle>Get Started with Automation</CardTitle>
-            <CardDescription className="max-w-md mx-auto">
-              Click "Create Workflow" to build your first automated workflow with triggers and actions
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState
+          icon={Zap}
+          title="Get Started with Automation"
+          description='Click "Create Workflow" to build your first automated workflow with triggers and actions'
+          action={
+            <Button onClick={handleCreateWorkflow}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Workflow
+            </Button>
+          }
+        />
       )}
 
       {/* Templates Section */}
@@ -285,6 +268,7 @@ export default function Automation() {
           })}
         </div>
       </div>
-    </div>
+      <ConfirmDialog />
+    </PageShell>
   );
 }

@@ -86,6 +86,7 @@ const DeployPage = lazy(() => import("@/pages/DeployPage"));
 const CatalogManagePage = lazy(() => import("@/pages/CatalogManagePage"));
 const CandidatePage = lazy(() => import("@/pages/CandidatePage"));
 const ProviderConnectionsPage = lazy(() => import("@/pages/ProviderConnectionsPage"));
+const UIShowcasePage = lazy(() => import("@/pages/UIShowcasePage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -209,6 +210,8 @@ function Router() {
       {/* Deploy Page */}
       <Route path="/deploy" component={() => <ProtectedRoute component={DeployPage} />} />
       <Route path="/llm/:id" component={() => <ProtectedRoute component={LLMDetailPage} />} />
+      {/* UI Showcase — living documentation for shared components */}
+      <Route path="/ui-showcase" component={() => <ProtectedRoute component={UIShowcasePage} />} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

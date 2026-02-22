@@ -20,9 +20,12 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
+import { PageShell, EmptyState } from "@/components/app";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 export default function DocumentsDashboard() {
   const [, setLocation] = useLocation();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterCollection, setFilterCollection] = useState<string>("all");
@@ -64,11 +67,11 @@ export default function DocumentsDashboard() {
 
   const emptyDocuments: any[] = [];
 
-  const handleDeleteDocument = async (documentId: number) => {
-    if (!confirm("Are you sure you want to delete this document? This will also remove all associated vectors.")) {
-      return;
-    }
-    await deleteDocumentMutation.mutateAsync({ id: documentId });
+  const handleDeleteDocument = (documentId: number) => {
+    confirm(
+      () => deleteDocumentMutation.mutateAsync({ id: documentId }),
+      { title: "Delete this document?", description: "This will also remove all associated vectors." },
+    );
   };
 
   const handleToggleSelect = (documentId: number) => {
@@ -89,11 +92,11 @@ export default function DocumentsDashboard() {
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedIds.size} documents? This will also remove all associated vectors.`)) {
-      return;
-    }
-    await bulkDeleteMutation.mutateAsync({ documentIds: Array.from(selectedIds) });
+  const handleBulkDelete = () => {
+    confirm(
+      () => bulkDeleteMutation.mutateAsync({ documentIds: Array.from(selectedIds) }),
+      { title: `Delete ${selectedIds.size} documents?`, description: "This will also remove all associated vectors." },
+    );
   };
 
   const [previewDocumentId, setPreviewDocumentId] = useState<number | null>(null);
@@ -170,16 +173,11 @@ export default function DocumentsDashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Document Management</h1>
-          <p className="text-muted-foreground mt-1">
-            View and manage all uploaded documents and their processing status
-          </p>
-        </div>
-        <div className="flex gap-2">
+    <PageShell
+      title="Document Management"
+      subtitle="View and manage all uploaded documents and their processing status"
+      actions={
+        <>
           <Button
             variant={bulkActionMode ? "default" : "outline"}
             onClick={() => {
@@ -202,8 +200,9 @@ export default function DocumentsDashboard() {
             <Upload className="h-4 w-4" />
             Upload Document
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       {/* Bulk Action Toolbar */}
       {bulkActionMode && (
@@ -335,20 +334,20 @@ export default function DocumentsDashboard() {
           </CardContent>
         </Card>
       ) : filteredDocuments.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No documents found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchQuery || filterStatus !== "all" || filterCollection !== "all"
-                ? "Try adjusting your search or filters"
-                : "Upload your first document to get started"}
-            </p>
+        <EmptyState
+          icon={FileText}
+          title="No documents found"
+          description={
+            searchQuery || filterStatus !== "all" || filterCollection !== "all"
+              ? "Try adjusting your search or filters"
+              : "Upload your first document to get started"
+          }
+          action={
             <Button onClick={() => setLocation("/documents/upload")}>
               Upload Document
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <div className="grid gap-4">
           {filteredDocuments.map((document) => (
@@ -518,6 +517,7 @@ export default function DocumentsDashboard() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      <ConfirmDialog />
+    </PageShell>
   );
 }

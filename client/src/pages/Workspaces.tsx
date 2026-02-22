@@ -20,6 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageShell, EmptyState } from "@/components/app";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { trpc } from "@/lib/trpc";
 import { Plus, FolderOpen, Settings, Trash2, Loader2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
@@ -32,6 +34,7 @@ export default function Workspaces() {
   const [description, setDescription] = useState("");
   const [embeddingModel, setEmbeddingModel] = useState("bge-small-en-v1.5");
   const [chunkingStrategy, setChunkingStrategy] = useState<"semantic" | "fixed" | "recursive">("semantic");
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const utils = trpc.useUtils();
   const { data: workspaces, isLoading } = trpc.workspaces.list.useQuery();
@@ -74,9 +77,13 @@ export default function Workspaces() {
   };
 
   const handleDelete = (id: number, workspaceName: string) => {
-    if (confirm(`Are you sure you want to delete "${workspaceName}"? This action cannot be undone.`)) {
-      deleteMutation.mutate({ id });
-    }
+    confirm(
+      () => deleteMutation.mutate({ id }),
+      {
+        title: `Delete "${workspaceName}"?`,
+        description: "This action cannot be undone. All documents and agents in this workspace will be removed.",
+      },
+    );
   };
 
   if (isLoading) {
@@ -88,15 +95,10 @@ export default function Workspaces() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Workspaces</h1>
-          <p className="text-muted-foreground mt-2">
-            Organize your AI projects with isolated workspaces
-          </p>
-        </div>
+    <PageShell
+      title="Workspaces"
+      subtitle="Organize your AI projects with isolated workspaces"
+      actions={
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -169,21 +171,16 @@ export default function Workspaces() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      }
+    >
 
       {/* Workspaces Grid */}
       {!workspaces || workspaces.length === 0 ? (
-        <Card className="border-dashed">
-          <CardHeader className="text-center py-12">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
-              <FolderOpen className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <CardTitle>No workspaces yet</CardTitle>
-            <CardDescription className="max-w-md mx-auto">
-              Create your first workspace to start organizing your AI projects, documents, and agents
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState
+          icon={FolderOpen}
+          title="No workspaces yet"
+          description="Create your first workspace to start organizing your AI projects, documents, and agents"
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {workspaces.map((workspace) => (
@@ -244,6 +241,8 @@ export default function Workspaces() {
           ))}
         </div>
       )}
-    </div>
+
+      <ConfirmDialog />
+    </PageShell>
   );
 }

@@ -13,10 +13,13 @@ import { trpc } from "@/lib/trpc";
 import { Database, Upload, Loader2, File, Trash2, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import FileUpload from "@/components/FileUpload";
+import { PageShell, EmptyState } from "@/components/app";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 export default function Documents() {
   const [selectedWorkspace, setSelectedWorkspace] = useState<number | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const { data: workspaces } = trpc.workspaces.list.useQuery();
   const { data: documents, isLoading } = trpc.documents.list.useQuery(
@@ -79,9 +82,10 @@ export default function Documents() {
   };
 
   const handleDelete = (id: number, filename: string) => {
-    if (confirm(`Are you sure you want to delete "${filename}"?`)) {
-      deleteMutation.mutate({ id });
-    }
+    confirm(
+      () => deleteMutation.mutate({ id }),
+      { title: `Delete "${filename}"?`, description: "This action cannot be undone." },
+    );
   };
 
   const getStatusIcon = (status: string | null) => {
@@ -122,16 +126,12 @@ export default function Documents() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
-          <p className="text-muted-foreground mt-2">
-            Upload and manage documents for RAG and knowledge bases
-          </p>
-        </div>
-        <div className="flex gap-2">
+    <PageShell
+      title="Documents"
+      subtitle="Upload and manage documents for RAG and knowledge bases"
+      icon={Database}
+      actions={
+        <>
           <Select
             value={selectedWorkspace?.toString() || ""}
             onValueChange={(value) => setSelectedWorkspace(Number(value))}
@@ -154,8 +154,9 @@ export default function Documents() {
             <Upload className="mr-2 h-4 w-4" />
             Upload Documents
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       {/* Upload Section */}
       {showUpload && selectedWorkspace && (
@@ -164,33 +165,21 @@ export default function Documents() {
 
       {/* Documents List */}
       {!selectedWorkspace ? (
-        <Card className="border-dashed">
-          <CardHeader className="text-center py-12">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
-              <Database className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <CardTitle>Select a Workspace</CardTitle>
-            <CardDescription className="max-w-md mx-auto">
-              Choose a workspace from the dropdown above to view and manage its documents
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState
+          icon={Database}
+          title="Select a Workspace"
+          description="Choose a workspace from the dropdown above to view and manage its documents"
+        />
       ) : isLoading ? (
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : !documents || documents.length === 0 ? (
-        <Card className="border-dashed">
-          <CardHeader className="text-center py-12">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
-              <File className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <CardTitle>No documents yet</CardTitle>
-            <CardDescription className="max-w-md mx-auto">
-              Upload documents to this workspace to start building your knowledge base
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState
+          icon={File}
+          title="No documents yet"
+          description="Upload documents to this workspace to start building your knowledge base"
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {documents.map((doc) => (
@@ -262,6 +251,7 @@ export default function Documents() {
           ))}
         </div>
       )}
-    </div>
+      <ConfirmDialog />
+    </PageShell>
   );
 }

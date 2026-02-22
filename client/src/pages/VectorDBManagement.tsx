@@ -7,9 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Search, Database } from "lucide-react";
+import { PageShell } from "@/components/app";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 export default function VectorDBManagement() {
   const [newCollectionName, setNewCollectionName] = useState("");
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchCollection, setSearchCollection] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -33,14 +36,17 @@ export default function VectorDBManagement() {
     }
   };
 
-  const handleDeleteCollection = async (name: string) => {
-    if (!confirm(`Delete collection "${name}"?`)) return;
-
-    try {
-      await deleteCollectionMutation.mutateAsync({ name });
-    } catch (error) {
-      console.error("Failed to delete collection:", error);
-    }
+  const handleDeleteCollection = (name: string) => {
+    confirm(
+      async () => {
+        try {
+          await deleteCollectionMutation.mutateAsync({ name });
+        } catch (error) {
+          console.error("Failed to delete collection:", error);
+        }
+      },
+      { title: `Delete collection "${name}"?`, description: "This action cannot be undone." },
+    );
   };
 
   const handleSearch = async () => {
@@ -57,14 +63,7 @@ export default function VectorDBManagement() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Vector Database Management</h1>
-        <p className="text-muted-foreground">
-          Manage Qdrant collections and perform semantic search
-        </p>
-      </div>
-
+    <PageShell title="Vector Database Management" subtitle="Manage Qdrant collections and perform semantic search" icon={Database}>
       <div className="grid gap-6 md:grid-cols-2">
         {/* Create Collection */}
         <Card>
@@ -207,6 +206,7 @@ export default function VectorDBManagement() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      <ConfirmDialog />
+    </PageShell>
   );
 }

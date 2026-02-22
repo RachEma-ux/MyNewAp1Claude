@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageShell, EmptyState } from "@/components/app";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -34,6 +36,7 @@ interface PolicyDiff {
 
 export default function PolicyManagement() {
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [policies, setPolicies] = useState<PolicyFile[]>([
     {
       id: "1",
@@ -174,8 +177,13 @@ export default function PolicyManagement() {
       return;
     }
 
-    setPolicies(policies.filter((p) => p.id !== policyId));
-    toast({ title: "Success", description: "Policy deleted successfully" });
+    confirm(
+      () => {
+        setPolicies(policies.filter((p) => p.id !== policyId));
+        toast({ title: "Success", description: "Policy deleted successfully" });
+      },
+      { title: "Delete policy?", description: "This action cannot be undone. The policy will be permanently removed." },
+    );
   };
 
   const handleHotReload = async () => {
@@ -206,15 +214,10 @@ export default function PolicyManagement() {
   };
 
   return (
-    <div className="container py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Policy Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Upload, manage, and apply governance policies to agents
-          </p>
-        </div>
+    <PageShell
+      title="Policy Management"
+      subtitle="Upload, manage, and apply governance policies to agents"
+      actions={
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleHotReload} disabled={isReloading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${isReloading ? "animate-spin" : ""}`} />
@@ -225,7 +228,9 @@ export default function PolicyManagement() {
             Upload Policy
           </Button>
         </div>
-      </div>
+      }
+      className="container py-8"
+    >
 
       {/* Active Policy Section */}
       {policies.find((p) => p.isActive) && (
@@ -252,17 +257,17 @@ export default function PolicyManagement() {
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">All Policies</h2>
         {policies.length === 0 ? (
-          <Card className="p-12 text-center">
-            <FileJson className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No policies found</h3>
-            <p className="text-muted-foreground mb-4">
-              Upload your first governance policy to get started
-            </p>
-            <Button onClick={() => setUploadDialogOpen(true)}>
-              <Upload className="w-4 h-4 mr-2" />
-              Upload Policy
-            </Button>
-          </Card>
+          <EmptyState
+            icon={FileJson}
+            title="No policies found"
+            description="Upload your first governance policy to get started"
+            action={
+              <Button onClick={() => setUploadDialogOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Upload Policy
+              </Button>
+            }
+          />
         ) : (
           policies.map((policy) => (
             <Card key={policy.id} className="p-6">
@@ -439,6 +444,7 @@ export default function PolicyManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      <ConfirmDialog />
+    </PageShell>
   );
 }

@@ -3,15 +3,16 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { 
-  MessageSquare, Search, Filter, Calendar, User, 
-  ArrowRight, Trash2, Clock, CheckCircle, XCircle 
+import {
+  MessageSquare, Search, Filter, Calendar, User,
+  ArrowRight, Trash2, Clock
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
+import { PageShell, EmptyState, StatusPill } from "@/components/app";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 export default function Conversations() {
   const [, setLocation] = useLocation();
@@ -20,6 +21,7 @@ export default function Conversations() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkActionMode, setBulkActionMode] = useState(false);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   // Fetch conversations (placeholder - will be replaced with real data)
   const { data: conversations, isLoading } = trpc.chat.listConversations.useQuery();
@@ -47,11 +49,11 @@ export default function Conversations() {
     setLocation(`/chat/${conversationId}`);
   };
 
-  const handleDeleteConversation = async (conversationId: number) => {
-    if (!confirm("Are you sure you want to delete this conversation?")) {
-      return;
-    }
-    await deleteConversationMutation.mutateAsync({ conversationId });
+  const handleDeleteConversation = (conversationId: number) => {
+    confirm(
+      () => deleteConversationMutation.mutateAsync({ conversationId }),
+      { title: "Delete this conversation?", description: "This action cannot be undone." },
+    );
   };
 
   const handleToggleSelect = (conversationId: number) => {
@@ -72,11 +74,14 @@ export default function Conversations() {
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedIds.size} conversations?`)) {
-      return;
-    }
-    await bulkDeleteMutation.mutateAsync({ conversationIds: Array.from(selectedIds) });
+  const handleBulkDelete = () => {
+    confirm(
+      () => bulkDeleteMutation.mutateAsync({ conversationIds: Array.from(selectedIds) }),
+      {
+        title: `Delete ${selectedIds.size} conversations?`,
+        description: "This action cannot be undone.",
+      },
+    );
   };
 
   // Filter conversations
@@ -91,45 +96,22 @@ export default function Conversations() {
     return matchesSearch && matchesAgent && matchesStatus;
   }) || [];
 
-  const getStatusBadge = (status: string) => {
+  const getStatusPillVariant = (status: string) => {
     switch (status) {
-      case "active":
-        return (
-          <Badge variant="default" className="gap-1">
-            <CheckCircle className="h-3 w-3" />
-            Active
-          </Badge>
-        );
-      case "completed":
-        return (
-          <Badge variant="secondary" className="gap-1">
-            <CheckCircle className="h-3 w-3" />
-            Completed
-          </Badge>
-        );
-      case "error":
-        return (
-          <Badge variant="destructive" className="gap-1">
-            <XCircle className="h-3 w-3" />
-            Error
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+      case "active": return "active" as const;
+      case "completed": return "success" as const;
+      case "error": return "error" as const;
+      default: return "disabled" as const;
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Conversations</h1>
-          <p className="text-muted-foreground mt-1">
-            View and manage all your agent conversations
-          </p>
-        </div>
-        <div className="flex gap-2">
+    <PageShell
+      title="Conversations"
+      subtitle="View and manage all your agent conversations"
+      icon={MessageSquare}
+      actions={
+        <>
           <Button
             variant={bulkActionMode ? "default" : "outline"}
             onClick={() => {
@@ -148,8 +130,9 @@ export default function Conversations() {
               Delete {selectedIds.size} Selected
             </Button>
           )}
-        </div>
-      </div>
+        </>
+      }
+    >
 
       {/* Bulk Action Toolbar */}
       {bulkActionMode && (
@@ -226,20 +209,20 @@ export default function Conversations() {
           </CardContent>
         </Card>
       ) : filteredConversations.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No conversations found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchQuery || filterAgent !== "all" || filterStatus !== "all"
-                ? "Try adjusting your search or filters"
-                : "Start a conversation with an agent to see it here"}
-            </p>
-            <Button onClick={() => setLocation("/agents")}>
-              Browse Agents
-            </Button>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={MessageSquare}
+          title="No conversations found"
+          description={
+            searchQuery || filterAgent !== "all" || filterStatus !== "all"
+              ? "Try adjusting your search or filters"
+              : "Start a conversation with an agent to see it here"
+          }
+          action={
+            !(searchQuery || filterAgent !== "all" || filterStatus !== "all") ? (
+              <Button onClick={() => setLocation("/agents")}>Browse Agents</Button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="grid gap-4">
           {filteredConversations.map((conversation: any) => (
@@ -259,7 +242,7 @@ export default function Conversations() {
                     <div className="flex items-center gap-3">
                       <MessageSquare className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                       <h3 className="text-lg font-semibold">{conversation.title}</h3>
-                      {getStatusBadge(conversation.status)}
+                      <StatusPill status={getStatusPillVariant(conversation.status)} label={conversation.status} />
                     </div>
 
                     {/* Metadata */}
@@ -316,6 +299,7 @@ export default function Conversations() {
           ))}
         </div>
       )}
-    </div>
+      <ConfirmDialog />
+    </PageShell>
   );
 }

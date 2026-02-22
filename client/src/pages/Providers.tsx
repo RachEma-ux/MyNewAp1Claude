@@ -13,12 +13,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Settings, Trash2, CheckCircle, XCircle, Loader2, Cloud, Server, Zap, DollarSign, Activity, RefreshCw, Route, ClipboardList, ChevronDown } from "lucide-react";
+import { Plus, Settings, Trash2, CheckCircle, Loader2, Cloud, Server, Zap, DollarSign, Activity, RefreshCw, Route, ClipboardList, ChevronDown } from "lucide-react";
 import { TestProviderButton } from "@/components/TestProviderButton";
 import { RoutingAuditViewer } from "@/components/RoutingAuditViewer";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CatalogSelect } from "@/components/CatalogSelect";
 import { useCatalogEntries } from "@/hooks/useCatalogEntries";
+import { PageShell, EmptyState, StatusPill } from "@/components/app";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 type ProviderType = "openai" | "anthropic" | "google" | "groq" | "local-llamacpp" | "local-ollama" | "custom";
 
@@ -80,6 +82,7 @@ const providerTypeInfo: Record<ProviderType, { label: string; icon: React.ReactN
 
 export default function Providers() {
   const [, navigate] = useLocation();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<ProviderType>("openai");
   const [selectedMultiChatProvider, setSelectedMultiChatProvider] = useState<string>("");
@@ -211,25 +214,18 @@ export default function Providers() {
   };
 
   const handleDelete = (id: number) => {
-    if (confirm("Are you sure you want to delete this provider?")) {
-      deleteProvider.mutate({ id });
-    }
+    confirm(
+      () => deleteProvider.mutate({ id }),
+      { title: "Delete this provider?", description: "This action cannot be undone." },
+    );
   };
 
   const cloudProviders = providers?.filter(p => ["openai", "anthropic", "google", "groq", "custom"].includes(p.type)) || [];
   const localProviders = providers?.filter(p => ["local-llamacpp", "local-ollama"].includes(p.type)) || [];
 
   return (
-    <div className="space-y-6 overflow-x-hidden">
-      {/* Header */}
-      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Providers</h1>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            Manage Providers
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <PageShell title="Providers" subtitle="Manage Providers" className="overflow-x-hidden" actions={
+        <>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -455,8 +451,8 @@ export default function Providers() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+        </>
+      }>
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -528,19 +524,17 @@ export default function Providers() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : providers?.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Settings className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Providers Configured</h3>
-                <p className="text-muted-foreground text-center mb-4">
-                  Add your first LLM provider to start using inference
-                </p>
+            <EmptyState
+              icon={Settings}
+              title="No Providers Configured"
+              description="Add your first LLM provider to start using inference"
+              action={
                 <Button onClick={() => setIsCreateOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Provider
                 </Button>
-              </CardContent>
-            </Card>
+              }
+            />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {providers?.map((provider) => {
@@ -558,19 +552,7 @@ export default function Providers() {
                             <CardDescription>{typeInfo.label}</CardDescription>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {provider.enabled ? (
-                            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Active
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-gray-500/10 text-gray-400 border-gray-500/20">
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Disabled
-                            </Badge>
-                          )}
-                        </div>
+                        <StatusPill status={provider.enabled ? "active" : "disabled"} label={provider.enabled ? "Active" : "Disabled"} dot />
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -623,19 +605,17 @@ export default function Providers() {
 
         <TabsContent value="cloud" className="space-y-4">
           {cloudProviders.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Cloud className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Cloud Providers</h3>
-                <p className="text-muted-foreground text-center mb-4">
-                  Add OpenAI, Anthropic, or Google AI providers
-                </p>
+            <EmptyState
+              icon={Cloud}
+              title="No Cloud Providers"
+              description="Add OpenAI, Anthropic, or Google AI providers"
+              action={
                 <Button onClick={() => setIsCreateOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Cloud Provider
                 </Button>
-              </CardContent>
-            </Card>
+              }
+            />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {cloudProviders.map((provider) => {
@@ -689,19 +669,17 @@ export default function Providers() {
 
         <TabsContent value="local" className="space-y-4">
           {localProviders.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Server className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Local Providers</h3>
-                <p className="text-muted-foreground text-center mb-4">
-                  Add a local provider to run models with Ollama or llama.cpp
-                </p>
+            <EmptyState
+              icon={Server}
+              title="No Local Providers"
+              description="Add a local provider to run models with Ollama or llama.cpp"
+              action={
                 <Button onClick={() => setIsCreateOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Local Provider
                 </Button>
-              </CardContent>
-            </Card>
+              }
+            />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {localProviders.map((provider) => {
@@ -770,6 +748,7 @@ export default function Providers() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      <ConfirmDialog />
+    </PageShell>
   );
 }

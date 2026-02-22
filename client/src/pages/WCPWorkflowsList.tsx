@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PageShell, EmptyState, StatusPill } from "@/components/app";
 import { Plus, Clock, Play, Edit, Trash2, ArrowRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -43,48 +44,40 @@ export default function WCPWorkflowsList() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container py-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">WCP Workflows</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Create and manage WCP-compliant workflows
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setLocation("/wcp/executions")}
-            >
-              Executions
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-            <Button onClick={() => setLocation("/wcp/workflows/builder")}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Workflow
-            </Button>
-          </div>
+    <PageShell
+      title="WCP Workflows"
+      subtitle="Create and manage WCP-compliant workflows"
+      actions={
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => setLocation("/wcp/executions")}
+          >
+            Executions
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+          <Button onClick={() => setLocation("/wcp/workflows/builder")}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Workflow
+          </Button>
         </div>
+      }
+      className="min-h-screen bg-background container py-6"
+    >
 
         {/* Workflows Grid */}
         {workflows.length === 0 ? (
-          <Card className="p-12 text-center">
-            <div className="max-w-md mx-auto">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <Plus className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">No workflows yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Create your first WCP workflow to get started
-              </p>
+          <EmptyState
+            icon={Plus}
+            title="No workflows yet"
+            description="Create your first WCP workflow to get started"
+            action={
               <Button onClick={() => setLocation("/wcp/workflows/builder")}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create Workflow
               </Button>
-            </div>
-          </Card>
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {workflows.map((workflow: any) => {
@@ -100,15 +93,7 @@ export default function WCPWorkflowsList() {
                         {workflow.description || "No description"}
                       </p>
                     </div>
-                    <div
-                      className={`px-2 py-1 rounded text-xs font-medium ${
-                        workflow.status === "active"
-                          ? "bg-green-500/10 text-green-500"
-                          : "bg-gray-500/10 text-gray-500"
-                      }`}
-                    >
-                      {workflow.status}
-                    </div>
+                    <StatusPill status={workflow.status === "active" ? "active" : "disabled"} label={workflow.status} />
                   </div>
 
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
@@ -182,7 +167,6 @@ export default function WCPWorkflowsList() {
             })}
           </div>
         )}
-      </div>
-    </div>
+    </PageShell>
   );
 }
