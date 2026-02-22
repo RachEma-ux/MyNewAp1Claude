@@ -1,0 +1,106 @@
+Session Summary — 2026-02-22 18:30
+
+## What Was Done
+
+### Governance Bible CGT v2 — Full Implementation (Major Feature)
+Implemented the complete Governance Bible CGT v2 enforcement layer across all 10 phases:
+
+**Phase 1 — Architecture Enforcement**
+- Architecture validator with layer isolation checks (8 layers defined)
+- Allowed invocation map enforcing cross-layer boundary rules
+- Startup condition validation (DB, secrets, auth config)
+
+**Phase 2 — Policy Engine Enforcement**
+- Upgraded policyGate.ts from default-allow to RBAC-integrated deny-by-default
+- Action-to-permission mapping for all governance domains
+- Fail-closed in production, configurable in development
+
+**Phase 3 — RBAC Enforcement**
+- Extended 6-role model: admin, governance_reviewer, operator, developer, user, system
+- 33 permission actions across 8 domains (lifecycle, provider, agent, workflow, policy, secret, audit, governance)
+- Separation of duty constraints (submit ≠ validate ≠ publish)
+- Role normalization with deny-by-default for unknown roles
+
+**Phase 4 — Secret & Key Control**
+- CI secret scanner detecting password/api_key/token patterns in source
+- Runtime hardcoded secret pattern detection
+- .env file detection in CI
+
+**Phase 5 — Workflow Governance**
+- Dynamic eval() and new Function() detection in CI pipeline
+- Architecture boundary validation (client↔server isolation, agent↔provider isolation)
+
+**Phase 6 — Deployment Hardening**
+- Governance engine initialization at server startup
+- Health endpoint (`/api/health`) includes governance status and mode
+- Debug mode detection in production environments
+
+**Phase 7 — Audit & Traceability**
+- Extended audit action types: LIFECYCLE_TRANSITION, PUBLICATION_GATE, RBAC_DENIAL, GOVERNANCE_SELF_CHECK, ARCHITECTURE_VALIDATION, DRIFT_DETECTION, RISK_CLASSIFICATION
+- All governance decisions audit-logged with full context
+- Governance metrics integration (Prometheus-style counters)
+
+**Phase 8 — CI/CD Governance**
+- GitHub Actions governance-gate.yml workflow (runs on PR + push to main)
+- 4 enforcement checks: secret scanning, eval detection, architecture boundaries, documentation
+- Governance compliance report in CI summary
+
+**Phase 9 — Risk Classification & Publication Gate**
+- 4-tier severity model: Critical (immediate rejection), High (block validate), Medium (block publish), Low (advisory)
+- 16 risk categories with auto-classification
+- Triple Validation Rule: compliance matrix + YAML spec + admin checklist
+- Publication blocked on any Critical or High findings
+
+**Phase 10 — Drift Detection**
+- Architecture validation integrated with governance self-check
+- Runtime self-check endpoint with full compliance report
+- 12 governance health checks covering all CGT v2 domains
+
+### Governance Bible Document Update
+- Replaced docs/GOVERNANCE_BIBLE.md with full CGT v2 content (v1 + v2 merged)
+- Includes YAML enforcement spec, compliance matrices, admin checklists, risk classification
+
+## Commits
+- `0c26f99` — docs: add Governance Bible
+- `02f5f81` — docs: replace Governance Bible with CGT v2
+- `ce3eaba` — feat: implement Governance Bible CGT v2 — full governance enforcement layer
+
+## New Files Created (10)
+- `server/governance/governance-engine.ts` — Central enforcement engine (singleton, strict/permissive modes)
+- `server/governance/rbac-model.ts` — Extended RBAC with 6 roles, 33 permissions, separation of duty
+- `server/governance/risk-classifier.ts` — 4-tier severity, 16 risk categories, auto-classification
+- `server/governance/lifecycle-guard.ts` — Lifecycle stage enforcement (submit→register→validate→publish→catalog)
+- `server/governance/publication-gate.ts` — Triple validation publication gate
+- `server/governance/architecture-validator.ts` — Layer isolation, boundary checks, startup validation
+- `server/governance/self-check.ts` — Runtime governance health check (12 checks)
+- `server/governance/router.ts` — tRPC governance API endpoints
+- `server/governance/index.ts` — Public API barrel file
+- `.github/workflows/governance-gate.yml` — CI governance enforcement (4 checks)
+
+## Files Modified (4)
+- `server/_core/index.ts` — Added governance initialization + health check governance status
+- `server/routers.ts` — Registered governance router
+- `server/services/policyGate.ts` — RBAC-integrated deny-by-default enforcement
+- `server/services/auditLogger.ts` — Extended audit action types for CGT v2
+
+## Architecture: Governance Layer
+```
+Server Startup → initializeGovernance() → Validates startup conditions + architecture
+                                         → Logs findings, sets strict/permissive mode
+
+API Request → tRPC middleware → protectedProcedure/adminProcedure (existing RBAC)
+            → Policy Gate (enhanced) → RBAC permission check → Allow/Deny
+            → Governance Router → Self-check, publication gate, lifecycle guard, metrics
+
+Lifecycle Transition → Lifecycle Guard → Stage validation → Audit log → Allow/Block
+Publication Request → Publication Gate → Triple validation → Risk report → Allow/Block
+
+CI/CD → governance-gate.yml → Secret scan + Eval detection + Architecture check + Docs check
+```
+
+## Key Design Decisions
+- Governance engine runs in strict mode (fail-closed) in production, permissive (fail-open) in development
+- Policy gate upgraded from default-allow to RBAC-checked — backward compatible (unmapped actions still pass through)
+- Separation of duty: submitter cannot validate or publish their own entry
+- 6 governance roles extend the existing admin/user model without breaking backward compatibility
+- Self-check endpoint provides monitoring-ready compliance report with recommendations
