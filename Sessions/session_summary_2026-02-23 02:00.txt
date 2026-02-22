@@ -1,0 +1,66 @@
+Session Summary — 2026-02-23 02:00
+===================================
+
+Task: Governance Scorecard Engine — Production Lockdown (CGT v2)
+Commit: 09eda28
+
+Completed all 10 phases of the Production Lockdown:
+
+Phase 1 — DB Foundation
+  - Created drizzle/tables/governance.ts (governance_scorecards + governance_audit_logs tables)
+  - Added freeze columns (frozen, freeze_reason, frozen_at, frozen_by) to catalog_entries
+
+Phase 2 — Artifact Storage
+  - Created server/governance/artifact-store.ts
+  - FSStore (content-addressed SHA-256, write-once) + S3Store (MinIO-compatible)
+  - computeSha256(), verifyIntegrity() helpers
+
+Phase 3 — Gate Enforcement
+  - Created server/governance/requireGate.ts
+  - requireGate() — deny-by-default lifecycle gate enforcement
+  - canPassGate() — quick-check for UI
+  - Added gateVerdict: "ALLOW" | "DENY" to AggregatedScorecard (aggregator.ts)
+
+Phase 4 — Real Control Runners
+  - Added 11 new runners to runner.ts (CI protection, HTTPS-only, auth method, agent scope/secrets, model license/versioning, bot revocation/ratelimit/monitoring)
+  - Added 11 new controls to control-catalog.ts
+  - Total: 41 controls across all packs (base + provider + llm + model + agent + bot)
+
+Phase 5 — Middleware Enforcement
+  - Created server/middleware/governance.ts
+  - Express: blockIfFrozen(), requireGateMiddleware(), auditLifecycleChange(), validateRole()
+  - tRPC: enforceTRPCGate(), enforceTRPCFreezeCheck()
+  - Phase 10: detectPrivilegeEscalation()
+
+Phase 6 — Gate Coverage Map
+  - Created server/governance/gate-coverage.ts
+  - Scans router files for lifecycle endpoints, verifies requireGate attachment
+  - generateGateCoverage(), writeGateCoverageReport(), validateGateCoverage()
+
+Phase 7 — Enhanced Drift Detection
+  - Enhanced drift-detector.ts with runEnhancedDriftChecks()
+  - Config drift, secret rotation (90-day), policy drift, governance strict mode
+  - High severity + score drop auto-freeze logic
+  - logDriftAuditEvent() audit trail
+
+Phase 8 — Catalog Lint
+  - Created server/governance/catalog-lint.ts
+  - Thresholds: base>=15, type>=2, >=2 critical/base, >=1 critical/type
+  - Metadata validation, runner registration, duplicate ID check
+
+Phase 9 — Acceptance Tests
+  - Created server/governance/governance.e2e.test.ts
+  - 15 test cases covering all 10 acceptance criteria plus 5 additional
+
+Phase 10 — Production Hardening
+  - Disabled x-powered-by in server entry
+  - Added governance-specific rate limiting (30/min)
+  - Added privilege escalation detection + audit logging
+  - Created server/governance/production-hardening.ts
+  - 10 runtime security checks + reverse proxy advisory checklist
+  - Added catalogLint, gateCoverage, hardeningCheck endpoints to router
+  - Updated governance/index.ts barrel exports
+
+Files changed: 18 files, +3004/-10 lines
+New files: 8 (governance.ts tables, artifact-store, requireGate, catalog-lint, gate-coverage, production-hardening, governance.e2e.test, middleware/governance)
+Modified: 10 (schema, catalog table, index.ts, router.ts, aggregator, control-catalog, drift-detector, runner, server entry, CandidatePage)
