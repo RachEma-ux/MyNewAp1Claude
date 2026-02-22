@@ -22,6 +22,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
+import { getCatalogEntryById } from "../db/catalog";
 import { getGovernanceEngine } from "./governance-engine";
 import { runSelfCheck } from "./self-check";
 import { validateArchitecture } from "./architecture-validator";
@@ -493,22 +494,28 @@ export const governanceRouter = router({
     .input(
       z.object({
         entryId: z.number(),
-        entryName: z.string(),
-        entryType: z.string(),
-        tags: z.array(z.string()),
-        description: z.string().optional(),
-        config: z.any().optional(),
-        reviewState: z.string().optional(),
-        status: z.string().optional(),
-        validationStatus: z.string().optional(),
-        capabilities: z.array(z.string()).optional(),
         targetStage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
       })
     )
     .query(async ({ input, ctx }) => {
-      const { targetStage, entryId, entryName, ...rest } = input;
+      const { targetStage, entryId } = input;
+      // Always fetch fresh entry from DB to avoid stale client cache issues
+      const entry = await getCatalogEntryById(entryId);
+      if (!entry) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Entry not found" });
+      }
       return evaluateStageReview(
-        { id: entryId, name: entryName, ...rest },
+        {
+          id: entry.id,
+          name: entry.name,
+          entryType: entry.entryType,
+          tags: (entry.tags as string[]) || [],
+          description: entry.description || undefined,
+          config: entry.config || undefined,
+          reviewState: (entry as any).reviewState || undefined,
+          status: entry.status || undefined,
+          validationStatus: (entry as any).validationStatus || undefined,
+        },
         targetStage,
         { id: String(ctx.user.id), role: ctx.user.role || "user" }
       );

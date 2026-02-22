@@ -416,7 +416,7 @@ export default function CandidatePage() {
   // Stage review preview query (read-only, for checklist display)
   const stageReviewPreview = trpc.governance.stageReview.useQuery(
     // Input is set dynamically via refetch; disabled by default
-    { entryId: 0, entryName: "", entryType: "provider", tags: [], targetStage: "register" },
+    { entryId: 0, targetStage: "register" },
     { enabled: false }
   );
 
@@ -431,19 +431,10 @@ export default function CandidatePage() {
       else stage = "register";
     }
 
-    // Use the stageReview query via trpcUtils.fetch (one-shot)
+    // Use the stageReview query via trpcUtils.fetch (one-shot) — server fetches fresh entry from DB
     trpcUtils.governance.stageReview
       .fetch({
         entryId: entry.id,
-        entryName: entry.displayName || entry.name,
-        entryType: entry.entryType,
-        tags: entry.tags || [],
-        description: entry.description || undefined,
-        config: entry.config || undefined,
-        reviewState: entry.reviewState || undefined,
-        status: entry.status || undefined,
-        validationStatus: entry.validationStatus || undefined,
-        capabilities: entry.capabilities || undefined,
         targetStage: stage as any,
       })
       .then((result) => {
@@ -470,15 +461,6 @@ export default function CandidatePage() {
     trpcUtils.governance.stageReview
       .fetch({
         entryId: entry.id,
-        entryName: entry.displayName || entry.name,
-        entryType: entry.entryType,
-        tags: entry.tags || [],
-        description: entry.description || undefined,
-        config: entry.config || undefined,
-        reviewState: entry.reviewState || undefined,
-        status: entry.status || undefined,
-        validationStatus: entry.validationStatus || undefined,
-        capabilities: entry.capabilities || undefined,
         targetStage: stage as any,
       })
       .then((result) => {
