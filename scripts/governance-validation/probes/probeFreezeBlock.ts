@@ -24,7 +24,8 @@ export function probeFreezeBlock(rootDir: string): ProbeResult {
 
     // Find isFrozen(0) in requireGovernance
     const freezeLineIdx = lines.findIndex((l) => l.includes("isFrozen(0)"));
-    const gateLineIdx = lines.findIndex((l) => l.includes("requireGate("));
+    // Find actual requireGate() call (not the import statement)
+    const gateLineIdx = lines.findIndex((l) => l.includes("requireGate(") && !l.trimStart().startsWith("import"));
 
     if (freezeLineIdx < 0) {
       findings.push({
@@ -92,7 +93,9 @@ export function probeFreezeBlock(rootDir: string): ProbeResult {
   const driftPath = path.join(rootDir, "server/governance/scorecard/drift-detector.ts");
   if (fs.existsSync(driftPath)) {
     const driftContent = fs.readFileSync(driftPath, "utf-8");
-    if (driftContent.includes("new Map<number, FrozenSubject>()")) {
+    const hasDbPersist = driftContent.includes("db.insert(subjectFreezes)") || driftContent.includes("subjectFreezes");
+    const hasHydrate = driftContent.includes("hydrateFreezeCache");
+    if (driftContent.includes("new Map<number, FrozenSubject>()") && !hasDbPersist) {
       findings.push({
         severity: "high",
         title: "Freeze state is in-memory only (Map)",
@@ -102,6 +105,15 @@ export function probeFreezeBlock(rootDir: string): ProbeResult {
         attack: "Trigger server restart → all freezes cleared → mutations proceed",
         expected: "Freeze survives restart",
         actual: "Empty Map on startup",
+      });
+    }
+    if (hasDbPersist && !hasHydrate) {
+      findings.push({
+        severity: "high",
+        title: "Freeze persists to DB but missing hydration on startup",
+        file: "server/governance/scorecard/drift-detector.ts",
+        line: 0,
+        detail: "DB persistence found but no hydrateFreezeCache function to restore state on restart",
       });
     }
   }

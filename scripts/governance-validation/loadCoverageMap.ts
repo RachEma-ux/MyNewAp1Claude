@@ -50,8 +50,8 @@ export function scanMutations(rootDir: string): CoverageEntry[] {
     for (let i = 0; i < lines.length; i++) {
       if (!lines[i].includes(".mutation(")) continue;
 
-      // Look backwards (up to 10 lines) for procedure type
-      const context = lines.slice(Math.max(0, i - 10), i + 1).join("\n");
+      // Look backwards (up to 15 lines) for procedure type — matches coverage-map.ts
+      const context = lines.slice(Math.max(0, i - 15), i + 1).join("\n");
       let procedureType: CoverageEntry["procedureType"] = "unknown";
 
       if (context.includes("governedAdminProcedure")) procedureType = "governedAdminProcedure";
