@@ -50,6 +50,7 @@ import {
   Wand2,
   List,
   Plug,
+  Building2,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -70,6 +71,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [headerActions, setHeaderActions] = useState<ReactNode>(null);
   const [automationMenuOpen, setAutomationMenuOpen] = useState(false);
+  const [digitalHQMenuOpen, setDigitalHQMenuOpen] = useState(false);
   const [infrastructureMenuOpen, setInfrastructureMenuOpen] = useState(false);
   const [hardwareMenuOpen, setHardwareMenuOpen] = useState(false);
   const [softwareMenuOpen, setSoftwareMenuOpen] = useState(false);
@@ -135,6 +137,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
         },
         { label: "Bots", icon: <MessageSquare className="w-4 h-4" />, href: "/ai-types/bots" },
         { label: "Other", icon: <Activity className="w-4 h-4" />, href: "/ai-types/other" },
+      ]
+    },
+    {
+      label: "Digital HQ",
+      icon: <Building2 className="w-5 h-5" />,
+      children: [
+        { label: "Item 1", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-1" },
+        { label: "Item 2", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-2" },
+        { label: "Item 3", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-3" },
+        { label: "Item 4", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-4" },
+        { label: "Item 5", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-5" },
+        { label: "Item 6", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-6" },
+        { label: "Item 7", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-7" },
+        { label: "Item 8", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-8" },
       ]
     },
     { label: "Analytics", icon: <BarChart3 className="w-5 h-5" />, href: "/analytics" },
@@ -236,6 +252,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setInfrastructureMenuOpen(!infrastructureMenuOpen);
                       } else if (item.label === "AI Types") {
                         setAiTypesMenuOpen(!aiTypesMenuOpen);
+                      } else if (item.label === "Digital HQ") {
+                        setDigitalHQMenuOpen(!digitalHQMenuOpen);
                       }
                     }}
                     className="flex w-full items-center justify-between space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -244,10 +262,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
-                  {/* Automation menu (2-level) */}
-                  {(item.label === "Automation" && automationMenuOpen) && (
+                  {/* Automation / Digital HQ menus (2-level) */}
+                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>
