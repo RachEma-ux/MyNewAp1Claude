@@ -51,6 +51,7 @@ import {
   List,
   Plug,
   Building2,
+  ShieldCheck,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -72,6 +73,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [headerActions, setHeaderActions] = useState<ReactNode>(null);
   const [automationMenuOpen, setAutomationMenuOpen] = useState(false);
   const [digitalHQMenuOpen, setDigitalHQMenuOpen] = useState(false);
+  const [governanceCenterMenuOpen, setGovernanceCenterMenuOpen] = useState(false);
   const [infrastructureMenuOpen, setInfrastructureMenuOpen] = useState(false);
   const [hardwareMenuOpen, setHardwareMenuOpen] = useState(false);
   const [softwareMenuOpen, setSoftwareMenuOpen] = useState(false);
@@ -151,6 +153,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Item 6", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-6" },
         { label: "Item 7", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-7" },
         { label: "Item 8", icon: <Activity className="w-4 h-4" />, href: "/digital-hq/item-8" },
+      ]
+    },
+    {
+      label: "Governance Center",
+      icon: <ShieldCheck className="w-5 h-5" />,
+      children: [
+        { label: "Gov Item 1", icon: <Activity className="w-4 h-4" />, href: "/governance-center/item-1" },
+        { label: "Gov Item 2", icon: <Activity className="w-4 h-4" />, href: "/governance-center/item-2" },
+        { label: "Gov Item 3", icon: <Activity className="w-4 h-4" />, href: "/governance-center/item-3" },
+        { label: "Gov Item 4", icon: <Activity className="w-4 h-4" />, href: "/governance-center/item-4" },
+        { label: "Gov Item 5", icon: <Activity className="w-4 h-4" />, href: "/governance-center/item-5" },
+        { label: "Gov Item 6", icon: <Activity className="w-4 h-4" />, href: "/governance-center/item-6" },
+        { label: "Gov Item 7", icon: <Activity className="w-4 h-4" />, href: "/governance-center/item-7" },
+        { label: "Gov Item 8", icon: <Activity className="w-4 h-4" />, href: "/governance-center/item-8" },
       ]
     },
     { label: "Analytics", icon: <BarChart3 className="w-5 h-5" />, href: "/analytics" },
@@ -254,6 +270,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setAiTypesMenuOpen(!aiTypesMenuOpen);
                       } else if (item.label === "Digital HQ") {
                         setDigitalHQMenuOpen(!digitalHQMenuOpen);
+                      } else if (item.label === "Governance Center") {
+                        setGovernanceCenterMenuOpen(!governanceCenterMenuOpen);
                       }
                     }}
                     className="flex w-full items-center justify-between space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -262,10 +280,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* Automation / Digital HQ menus (2-level) */}
-                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen)) && (
+                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>

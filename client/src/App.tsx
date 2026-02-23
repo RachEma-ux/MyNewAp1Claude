@@ -90,6 +90,7 @@ const UIShowcasePage = lazy(() => import("@/pages/UIShowcasePage"));
 const GovernanceScorecard = lazy(() => import("@/pages/GovernanceScorecard"));
 const AITypesPage = lazy(() => import("@/pages/AITypesPage"));
 const DigitalHQPage = lazy(() => import("@/pages/DigitalHQPage"));
+const GovernanceCenterPage = lazy(() => import("@/pages/GovernanceCenterPage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -219,6 +220,8 @@ function Router() {
       <Route path="/ai-types/:type" component={() => <ProtectedRoute component={AITypesPage} />} />
       {/* Digital HQ — coming soon pages */}
       <Route path="/digital-hq/:item" component={() => <ProtectedRoute component={DigitalHQPage} />} />
+      {/* Governance Center — coming soon pages */}
+      <Route path="/governance-center/:item" component={() => <ProtectedRoute component={GovernanceCenterPage} />} />
       {/* UI Showcase — living documentation for shared components */}
       <Route path="/ui-showcase" component={() => <ProtectedRoute component={UIShowcasePage} />} />
       <Route path="/404" component={NotFound} />
