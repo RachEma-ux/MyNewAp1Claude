@@ -1,0 +1,51 @@
+Session Summary — 2026-02-23 01:25
+====================================
+
+## Context
+Continued from session 00:50. This session focused on UI changes to Manage Catalogue, running the governance pipeline on deploys, and ultimately baking governance state into the seed code so pipeline is no longer needed.
+
+## Work Done
+
+### 1. Moved Discover button next to entry name (15f2d37)
+- Relocated the Discover (Globe) button from the Actions column to inline next to the entry name
+- Only shows for Provider-type entries
+- Uses stopPropagation to avoid triggering double-click edit
+
+### 2. Governance pipeline execution on fresh deploy
+- Ran governance-pipeline.py against new tunnel (celtic-members-charge-greatest)
+- Result: 77/79 fully published, 2 entries (orca-mini, qwen2.5-coder) stuck due to tunnel timeouts
+- Confirmed entries are active with stageReviews all approved
+
+### 3. Baked governance state into seed code (94379fe) — KEY CHANGE
+- Modified `server/routers/catalog-manage.ts` → `syncRegistryOnStartup()`
+  - Entries now created with `stageReviews: { register: "approved", validate: "approved", publish: "approved" }`
+  - Tags include governance markers: `candidate`, `registered`, `validated`, `published`
+  - `approvedBy` and `approvedAt` set on creation
+  - Auto-classifies entries with taxonomy nodes after creation
+- Modified `shared/static-catalog.ts`
+  - Static fallback entries also include `stageReviews` and governance tags
+- **Result: No more need to run governance pipeline after each deploy**
+
+### 4. Verified on fresh deploy (olive-forgot-ser-volvo)
+- Deployed with new code → all 78 entries pre-approved out of the box
+- Publish approved: 78/78, Active: 78/78, Published tag: 78/78
+- Zero pipeline execution needed
+
+### 5. Ollama started
+- Started ollama serve on device (v0.16.1, port 11434)
+- 3 models available: tinyllama (637MB), phi3 (2.2GB), nomic-embed-text (274MB)
+
+## Commits (this session)
+- 80839eb — feat: add governance pipeline script and session summary
+- 15f2d37 — feat: move Discover button next to entry name in Manage Catalogue
+- 94379fe — feat: seed catalog entries with pre-approved governance state
+
+## Files Modified
+- server/routers/catalog-manage.ts — syncRegistryOnStartup with governance state + auto-classify
+- shared/static-catalog.ts — static entries with stageReviews and governance tags
+- client/src/pages/CatalogManagePage.tsx — Discover button moved to name column
+- scripts/governance-pipeline.py — new: bulk pipeline script (for manual runs if needed)
+
+## Deploys
+- celtic-members-charge-greatest.trycloudflare.com (pipeline run)
+- olive-forgot-ser-volvo.trycloudflare.com (pre-approved seed verified)
