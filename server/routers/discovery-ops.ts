@@ -12,7 +12,7 @@
 
 import { z } from "zod";
 import { eq, desc, sql, and, gte } from "drizzle-orm";
-import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
+import { protectedProcedure, adminProcedure, governedAdminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   providerDiscoveryEvents,
@@ -456,7 +456,7 @@ export const discoveryOpsRouter = router({
   /**
    * Transition candidate to IN_REVIEW.
    */
-  markInReview: adminProcedure
+  markInReview: governedAdminProcedure
     .input(z.object({ domain: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -477,7 +477,7 @@ export const discoveryOpsRouter = router({
   /**
    * Reject a promotion candidate.
    */
-  reject: adminProcedure
+  reject: governedAdminProcedure
     .input(z.object({
       domain: z.string(),
       category: z.string(),
@@ -509,7 +509,7 @@ export const discoveryOpsRouter = router({
   /**
    * Accept a promotion candidate — creates a patch artifact.
    */
-  accept: adminProcedure
+  accept: governedAdminProcedure
     .input(z.object({
       domain: z.string(),
       draftRegistryEntry: z.record(z.string(), z.unknown()),
@@ -667,7 +667,7 @@ export const discoveryOpsRouter = router({
   /**
    * Trigger retention cleanup (admin only).
    */
-  cleanup: adminProcedure
+  cleanup: governedAdminProcedure
     .input(z.object({ retentionDays: z.number().int().min(1).max(365).default(30) }).optional())
     .mutation(async ({ input }) => {
       const count = await cleanupOldDiscoveryEvents(input?.retentionDays ?? 30);

@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
+import { router, publicProcedure, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { agents, agentProofs, agentHistory } from "../../drizzle/schema";
@@ -206,7 +206,7 @@ export const agentsControlPlaneRouter = router({
   /**
    * POST /agents/:id/sandbox - Transition draft → sandbox
    */
-  admitToSandbox: protectedProcedure
+  admitToSandbox: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -338,7 +338,7 @@ export const agentsControlPlaneRouter = router({
   /**
    * POST /agents/:id/promote - Direct promote (if approvals disabled)
    */
-  promote: protectedProcedure
+  promote: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const flags = getFeatureFlags();
@@ -439,7 +439,7 @@ export const agentsControlPlaneRouter = router({
   /**
    * POST /agents/:id/disable - Disable agent (terminal state)
    */
-  disable: protectedProcedure
+  disable: governedProcedure
     .input(z.object({ id: z.number(), reason: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();

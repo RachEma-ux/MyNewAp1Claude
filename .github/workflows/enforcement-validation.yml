@@ -45,6 +45,7 @@ jobs:
         run: npx tsx scripts/governance/validate-controls.ts
 
       # ── Generate Coverage Map ───────────────────────────────────
+      # Coverage threshold must only increase. Decreasing requires architectural review.
       - name: Generate governance coverage map
         run: npx tsx scripts/governance/coverage-map.ts
 

@@ -10,7 +10,8 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const THRESHOLD = 20; // minimum % governed
+// Coverage threshold must only increase. Decreasing requires architectural review.
+const THRESHOLD = 30; // minimum % governed
 const SERVER_DIR = path.resolve(__dirname, "../../server");
 
 interface FileReport {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import {
   createSecret,
   getSecretById,
@@ -13,7 +13,7 @@ export const secretsRouter = router({
   /**
    * Create a new secret
    */
-  create: protectedProcedure
+  create: governedProcedure
     .input(
       z.object({
         key: z.string().min(1).max(255).regex(/^[a-zA-Z0-9_-]+$/, "Key must contain only letters, numbers, underscores, and hyphens"),
@@ -58,7 +58,7 @@ export const secretsRouter = router({
   /**
    * Update a secret
    */
-  update: protectedProcedure
+  update: governedProcedure
     .input(
       z.object({
         id: z.number(),
@@ -84,7 +84,7 @@ export const secretsRouter = router({
   /**
    * Delete a secret
    */
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       await deleteSecret(input.id, ctx.user.id);

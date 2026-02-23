@@ -293,6 +293,7 @@ jobs:
           fi
 
       # ── Governance Coverage Map ─────────────────────────────────
+      # Coverage threshold must only increase. Decreasing requires architectural review.
       - name: Check governance coverage
         run: npx tsx scripts/governance/coverage-map.ts
 
