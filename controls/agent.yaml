@@ -1,0 +1,61 @@
+pack: agent
+controls:
+  - id: TYPE-A001
+    name: Agent tool permissions scoped
+    domain: type_specific
+    riskCategory: silent_escalation
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: agent-permission-validator
+    remediation: "Agent must declare its tool permissions explicitly. Unrestricted agents are Critical violations."
+    rationale: "Agents with unrestricted tool access can escalate privileges or exfiltrate data."
+    enabled: true
+
+  - id: TYPE-A002
+    name: Agent orchestrator binding
+    domain: type_specific
+    riskCategory: direct_provider_call
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 8
+    runnerId: agent-orchestrator-validator
+    remediation: "Agent must route through the orchestrator for all provider calls. Direct invocation is prohibited."
+    rationale: "CGT v2 Section III-D: agents without orchestrator binding bypass governance."
+    enabled: true
+
+  - id: TYPE-A003
+    name: Agent system prompt reviewed
+    domain: type_specific
+    riskCategory: missing_policy_mapping
+    severity: medium
+    blocksStages: [publish]
+    weight: 5
+    runnerId: agent-prompt-validator
+    remediation: "Agent system prompt must be reviewed and documented before publication."
+    rationale: "Unreviewed prompts may contain injection vectors or policy violations."
+    enabled: true
+
+  - id: TYPE-A004
+    name: Agent scope declared
+    domain: type_specific
+    riskCategory: missing_policy_mapping
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: agent-scope-validator
+    remediation: "Agent must declare its operational scope (domains, capabilities, boundaries)."
+    rationale: "CGT v2: Scope declared is mandatory — unbounded agents are Critical violations."
+    enabled: true
+
+  - id: TYPE-A005
+    name: No direct secret access
+    domain: type_specific
+    riskCategory: hardcoded_secret
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: agent-secret-access-validator
+    remediation: "Agent must not access secrets directly. Use secret manager references only."
+    rationale: "CGT v2: No direct secret access — agents route through secret service."
+    enabled: true

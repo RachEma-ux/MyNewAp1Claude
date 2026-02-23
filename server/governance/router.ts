@@ -48,6 +48,7 @@ import {
 import { lintCatalog } from "./catalog-lint";
 import { generateGateCoverage } from "./gate-coverage";
 import { runHardeningCheck } from "./production-hardening";
+import { getArtifactStore } from "./artifact-store";
 import {
   buildRiskReport,
   createFinding,
@@ -637,7 +638,7 @@ export const governanceRouter = router({
       intervalMs: z.number().optional(),
       autoFreeze: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       if (input.active) {
         startDriftDetection({
           intervalMs: input.intervalMs,
@@ -646,6 +647,17 @@ export const governanceRouter = router({
       } else {
         stopDriftDetection();
       }
+
+      const audit = getAuditLogger();
+      audit.log({
+        actor_id: String(ctx.user.id),
+        action_type: "DRIFT_DETECTION",
+        target_type: "drift_toggle",
+        target_id: "system",
+        decision_result: "success",
+        metadata: { active: input.active, intervalMs: input.intervalMs, autoFreeze: input.autoFreeze },
+      });
+
       return { active: isDriftDetectionActive() };
     }),
 
@@ -663,8 +675,19 @@ export const governanceRouter = router({
    */
   unfreezeSubject: adminProcedure
     .input(z.object({ subjectId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const unfrozen = unfreezeSubject(input.subjectId);
+
+      const audit = getAuditLogger();
+      audit.log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "unfreeze",
+        target_id: String(input.subjectId),
+        decision_result: unfrozen ? "success" : "failure",
+        metadata: { subjectId: input.subjectId },
+      });
+
       return { unfrozen, subjectId: input.subjectId };
     }),
 
@@ -699,4 +722,76 @@ export const governanceRouter = router({
   hardeningCheck: adminProcedure.query(async () => {
     return runHardeningCheck();
   }),
+
+  // ── Unified Audit Trail ────────────────────────────────────────────
+
+  /**
+   * Query unified audit trail with optional filters.
+   */
+  auditTrail: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(500).optional(),
+      actionType: z.string().optional(),
+      targetType: z.string().optional(),
+    }).optional())
+    .query(async ({ input, ctx }) => {
+      const engine = getGovernanceEngine();
+      engine.enforcePermission(
+        ctx.user.role || "user",
+        "audit.read",
+        { actorId: String(ctx.user.id) }
+      );
+
+      const auditLogger = getAuditLogger();
+      let events = auditLogger.getRecent(input?.limit || 100);
+
+      if (input?.actionType) {
+        events = events.filter(e => e.action_type === input.actionType);
+      }
+      if (input?.targetType) {
+        events = events.filter(e => e.target_type === input.targetType);
+      }
+
+      return { events, total: events.length };
+    }),
+
+  // ── Evidence Vault ─────────────────────────────────────────────────
+
+  /**
+   * List all stored evidence artifacts.
+   */
+  artifactList: protectedProcedure.query(async ({ ctx }) => {
+    const engine = getGovernanceEngine();
+    engine.enforcePermission(ctx.user.role || "user", "audit.read", { actorId: String(ctx.user.id) });
+    const store = getArtifactStore();
+    const hashes = await store.list();
+    return { artifacts: hashes, count: hashes.length };
+  }),
+
+  /**
+   * Verify integrity of a stored artifact by SHA-256 hash.
+   */
+  artifactVerify: protectedProcedure
+    .input(z.object({ sha256: z.string().length(64) }))
+    .query(async ({ input, ctx }) => {
+      const engine = getGovernanceEngine();
+      engine.enforcePermission(ctx.user.role || "user", "audit.read", { actorId: String(ctx.user.id) });
+      const store = getArtifactStore();
+      const valid = await store.verify(input.sha256);
+      const exists = await store.exists(input.sha256);
+      return { sha256: input.sha256, exists, valid };
+    }),
+
+  /**
+   * Get metadata for a stored artifact by SHA-256 hash.
+   */
+  artifactMetadata: protectedProcedure
+    .input(z.object({ sha256: z.string().length(64) }))
+    .query(async ({ input, ctx }) => {
+      const engine = getGovernanceEngine();
+      engine.enforcePermission(ctx.user.role || "user", "audit.read", { actorId: String(ctx.user.id) });
+      const store = getArtifactStore();
+      const exists = await store.exists(input.sha256);
+      return { sha256: input.sha256, exists };
+    }),
 });

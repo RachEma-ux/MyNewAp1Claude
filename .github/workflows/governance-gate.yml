@@ -292,6 +292,14 @@ jobs:
             echo "PASS: Pack system intact — all packs and runners verified"
           fi
 
+      # ── Governance Coverage Map ─────────────────────────────────
+      - name: Check governance coverage
+        run: npx tsx scripts/governance/coverage-map.ts
+
+      # ── YAML Control Validation ─────────────────────────────────
+      - name: Validate control catalog
+        run: npx tsx scripts/governance/validate-controls.ts
+
       # ── Scorecard Evidence Artifact ───────────────────────────────
       - name: Generate scorecard evidence artifact
         if: always()

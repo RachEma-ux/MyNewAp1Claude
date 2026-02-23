@@ -1,0 +1,265 @@
+pack: base
+controls:
+  - id: SEC-001
+    name: No hardcoded secrets
+    domain: security
+    riskCategory: hardcoded_secret
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: secret-scanner
+    remediation: "Move all secrets to environment variables or a secret manager. Remove plaintext credentials from source code, config files, and YAML."
+    rationale: "Hardcoded secrets are the #1 source of credential leaks. CGT v2 Section IV mandates externalization."
+    enabled: true
+
+  - id: SEC-002
+    name: No dynamic eval execution
+    domain: security
+    riskCategory: dynamic_eval
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: eval-detector
+    remediation: "Replace eval(), new Function(), and setTimeout/setInterval with string arguments with safe alternatives."
+    rationale: "Dynamic code execution enables arbitrary code injection. CGT v2 classifies this as Critical."
+    enabled: true
+
+  - id: SEC-003
+    name: No debug mode in production
+    domain: security
+    riskCategory: debug_in_production
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 7
+    runnerId: environment-validator
+    remediation: "Ensure DEBUG=true is not set in production. Remove verbose logging and debug endpoints before deployment."
+    rationale: "Debug mode exposes internal state. CGT v2 Section III requires production hardening."
+    enabled: true
+
+  - id: SEC-004
+    name: Secrets externalized
+    domain: security
+    riskCategory: missing_encryption
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 8
+    runnerId: secret-externalization-validator
+    remediation: "All credentials must come from environment variables, secret manager, or encrypted config."
+    rationale: "CGT v2 Section IV: no inline keys in source, runtime, or config."
+    enabled: true
+
+  - id: SEC-005
+    name: No silent privilege escalation
+    domain: security
+    riskCategory: silent_escalation
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: escalation-detector
+    remediation: "All role changes must go through RBAC enforcement. No direct role assignment without governance engine validation."
+    rationale: "CGT v2 Section V: silent escalation is a Critical finding."
+    enabled: true
+
+  - id: ARCH-001
+    name: No direct provider invocation
+    domain: architecture
+    riskCategory: direct_provider_call
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: provider-call-detector
+    remediation: "All provider calls must go through the orchestrator layer. Agents and workflows must not import provider implementations directly."
+    rationale: "CGT v2 Section III-D: orchestrator boundary is mandatory for auditability and policy enforcement."
+    enabled: true
+
+  - id: ARCH-002
+    name: Architecture layer isolation
+    domain: architecture
+    riskCategory: architecture_drift
+    severity: medium
+    blocksStages: [publish]
+    weight: 6
+    runnerId: architecture-boundary-validator
+    remediation: "Ensure layer boundaries are respected: UI -> Orchestrator -> Agent/Workflow -> Provider."
+    rationale: "CGT v2 Section III: layer isolation prevents unauthorized data flow."
+    enabled: true
+
+  - id: ARCH-003
+    name: Policy engine available
+    domain: architecture
+    riskCategory: policy_bypass
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 8
+    runnerId: policy-engine-validator
+    remediation: "Ensure OPA_URL is configured or local policy engine is operational."
+    rationale: "CGT v2 Section II: policy enforcement is mandatory infrastructure."
+    enabled: true
+
+  - id: ARCH-004
+    name: Orchestrator mandatory for multi-agent
+    domain: architecture
+    riskCategory: missing_enforcement_hook
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 7
+    runnerId: orchestrator-validator
+    remediation: "Multi-agent tasks must route through the orchestrator. Direct agent-to-agent calls are prohibited."
+    rationale: "CGT v2 Section III-D: multi-agent orchestration requires central governance."
+    enabled: true
+
+  - id: LIFE-001
+    name: No stage skipping
+    domain: lifecycle
+    riskCategory: lifecycle_skip
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: lifecycle-sequence-validator
+    remediation: "Entries must follow Submit -> Register -> Validate -> Publish -> Catalog. No stage may be skipped."
+    rationale: "CGT v2 Section VI: sequential lifecycle is the foundation of governance integrity."
+    enabled: true
+
+  - id: LIFE-002
+    name: Manual approval required
+    domain: lifecycle
+    riskCategory: lifecycle_skip
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 8
+    runnerId: approval-validator
+    remediation: "Automatic promotion is prohibited. Each lifecycle transition requires explicit human approval with actor ID recorded."
+    rationale: "CGT v2 Section VI: no auto-promotion, every transition requires human accountability."
+    enabled: true
+
+  - id: LIFE-003
+    name: Separation of duty enforced
+    domain: lifecycle
+    riskCategory: silent_escalation
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 8
+    runnerId: separation-of-duty-validator
+    remediation: "The actor who submits an entry must not be the same actor who validates or publishes it."
+    rationale: "CGT v2 Section V: separation of duty prevents single-actor fraud."
+    enabled: true
+
+  - id: LIFE-004
+    name: Publication gate triple validation
+    domain: lifecycle
+    riskCategory: policy_bypass
+    severity: critical
+    blocksStages: [publish]
+    weight: 10
+    runnerId: publication-gate-validator
+    remediation: "Publication requires: (1) Compliance Matrix PASS, (2) YAML Enforcement Spec PASS, (3) Admin Checklist COMPLETE, (4) No Critical/High violations."
+    rationale: "CGT v2 Section VII: triple validation is the final gate before production exposure."
+    enabled: true
+
+  - id: GOV-001
+    name: Deny-by-default enforced
+    domain: governance
+    riskCategory: policy_bypass
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: deny-default-validator
+    remediation: "Policy gate must operate in deny-by-default mode. In production, fail-closed is mandatory."
+    rationale: "CGT v2 foundational principle: deny-by-default is non-negotiable."
+    enabled: true
+
+  - id: GOV-002
+    name: RBAC enforcement active
+    domain: governance
+    riskCategory: missing_rbac
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 8
+    runnerId: rbac-enforcement-validator
+    remediation: "Role-based access control must be active on all tRPC procedures."
+    rationale: "CGT v2 Section V: every action requires role-checked authorization."
+    enabled: true
+
+  - id: GOV-003
+    name: Audit logging operational
+    domain: governance
+    riskCategory: missing_audit
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 8
+    runnerId: audit-logging-validator
+    remediation: "Governance audit logger and unified audit logger must both be operational."
+    rationale: "CGT v2 Section VIII: every decision must be logged for auditability."
+    enabled: true
+
+  - id: GOV-004
+    name: Policy file integrity
+    domain: governance
+    riskCategory: missing_policy_mapping
+    severity: medium
+    blocksStages: [publish]
+    weight: 5
+    runnerId: policy-file-validator
+    remediation: "OPA .rego policy files must be present and syntactically valid."
+    rationale: "CGT v2 Section II: policy-as-code requires valid, present policy files."
+    enabled: true
+
+  - id: GOV-005
+    name: No policy bypass
+    domain: governance
+    riskCategory: policy_bypass
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: policy-bypass-detector
+    remediation: "No code path may skip policy evaluation. All sensitive operations must call evaluatePolicy()."
+    rationale: "CGT v2 Section II: every sensitive operation must pass through the policy gate."
+    enabled: true
+
+  - id: GOV-006
+    name: CI branch protection enforced
+    domain: governance
+    riskCategory: missing_enforcement_hook
+    severity: critical
+    blocksStages: [validate, publish]
+    weight: 10
+    runnerId: ci-branch-protection-validator
+    remediation: "Ensure governance-gate.yml and ci.yml workflows exist and enforce merge blocking."
+    rationale: "CGT v2 Section X: CI must block merge on governance violations."
+    enabled: true
+
+  - id: DOC-001
+    name: Governance documentation present
+    domain: documentation
+    riskCategory: incomplete_documentation
+    severity: medium
+    blocksStages: [publish]
+    weight: 4
+    runnerId: governance-docs-validator
+    remediation: "GOVERNANCE_BIBLE.md and ARCHITECTURE.md must exist in the repository."
+    rationale: "CGT v2 Section I: governance standard must be documented and accessible."
+    enabled: true
+
+  - id: DOC-002
+    name: Entry documentation complete
+    domain: documentation
+    riskCategory: incomplete_documentation
+    severity: medium
+    blocksStages: [publish]
+    weight: 4
+    runnerId: entry-docs-validator
+    remediation: "Each catalog entry must have a name, type, and description before publication."
+    rationale: "CGT v2 Section VI: incomplete entries cannot be published."
+    enabled: true
+
+  - id: DOC-003
+    name: Undocumented endpoints absent
+    domain: documentation
+    riskCategory: undocumented_endpoint
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 6
+    runnerId: endpoint-docs-validator
+    remediation: "All API endpoints must be documented."
+    rationale: "CGT v2 Section III: undocumented endpoints are security blind spots."
+    enabled: true

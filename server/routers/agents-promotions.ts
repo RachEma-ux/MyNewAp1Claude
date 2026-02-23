@@ -11,6 +11,7 @@ import { getDb } from "../db";
 import { agents, promotionRequests, agentHistory } from "../../drizzle/schema";
 import { eq, and, desc, or } from "drizzle-orm";
 import { getFeatureFlags } from "../../features/agents-create/utils/feature-flags";
+import { getAuditLogger } from "../services/auditLogger";
 
 export const agentsPromotionsRouter = router({
   /**
@@ -222,6 +223,15 @@ export const agentsPromotionsRouter = router({
         metadata: { requestId: input.id },
       });
 
+      getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "agent_promotion",
+        target_id: String(request.agentId),
+        decision_result: "success",
+        metadata: { requestId: input.id, action: "approved" },
+      });
+
       return { success: true };
     }),
 
@@ -291,6 +301,15 @@ export const agentsPromotionsRouter = router({
         actorId: ctx.user.id,
         description: input.reason,
         metadata: { requestId: input.id },
+      });
+
+      getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "agent_promotion",
+        target_id: String(request.agentId),
+        decision_result: "denied",
+        metadata: { requestId: input.id, action: "rejected", reason: input.reason },
       });
 
       return { success: true };

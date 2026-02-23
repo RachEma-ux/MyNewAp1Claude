@@ -1,0 +1,63 @@
+# JSON Schema for validating YAML control catalog files
+# Usage: Validate controls/*.yaml against this schema
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Governance Control Catalog Pack"
+type: object
+required: [pack, controls]
+properties:
+  pack:
+    type: string
+    enum: [base, provider, llm, model, agent, bot]
+    description: "Pack identifier — matches SubjectType or 'base'"
+  controls:
+    type: array
+    items:
+      type: object
+      required: [id, name, domain, riskCategory, severity, blocksStages, weight, runnerId, remediation, rationale, enabled]
+      properties:
+        id:
+          type: string
+          pattern: "^(SEC|ARCH|LIFE|GOV|DOC|TYPE)-[A-Z]?[0-9]{3,4}$"
+          description: "Stable control ID — never reused"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: "Human-readable control name"
+        domain:
+          type: string
+          enum: [security, architecture, lifecycle, governance, documentation, type_specific]
+        riskCategory:
+          type: string
+          description: "Risk category for finding classification"
+        severity:
+          type: string
+          enum: [critical, high, medium, low, info]
+        blocksStages:
+          type: array
+          items:
+            type: string
+            enum: [submit, register, validate, publish, catalog]
+          minItems: 1
+          description: "Lifecycle stages where this control blocks progression"
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 10
+          description: "Weight for scoring (0-10)"
+        runnerId:
+          type: string
+          minLength: 1
+          description: "Runner ID — links to the ControlRunner that evaluates this"
+        remediation:
+          type: string
+          minLength: 1
+          description: "Human-readable remediation instructions"
+        rationale:
+          type: string
+          minLength: 1
+          description: "Why this control exists"
+        enabled:
+          type: boolean
+          description: "Whether this control is active"
+      additionalProperties: false

@@ -1,18 +1,35 @@
 import { useRoute } from "wouter";
-import { Building2 } from "lucide-react";
+import OverviewPanel from "./hq/OverviewPanel";
+import TeamPanel from "./hq/TeamPanel";
+import ProjectsPanel from "./hq/ProjectsPanel";
+import OperationsPanel from "./hq/OperationsPanel";
+import IncidentsPanel from "./hq/IncidentsPanel";
+import ChangesPanel from "./hq/ChangesPanel";
+import MonitoringPanel from "./hq/MonitoringPanel";
+import ActivityPanel from "./hq/ActivityPanel";
 
 export default function DigitalHQPage() {
   const [, params] = useRoute("/digital-hq/:item");
-  const item = params?.item || "item-1";
-  const label = item.replace("-", " ").replace(/\b\w/g, c => c.toUpperCase());
+  const item = params?.item || "overview";
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
-      <div className="flex items-center justify-center h-20 w-20 rounded-2xl bg-primary/10">
-        <Building2 className="h-8 w-8 text-primary" />
-      </div>
-      <h1 className="text-2xl font-semibold tracking-tight">Digital HQ — {label}</h1>
-      <p className="text-muted-foreground text-lg">Coming soon</p>
-    </div>
-  );
+  switch (item) {
+    case "overview":
+      return <OverviewPanel />;
+    case "team":
+      return <TeamPanel />;
+    case "projects":
+      return <ProjectsPanel />;
+    case "operations":
+      return <OperationsPanel />;
+    case "incidents":
+      return <IncidentsPanel />;
+    case "changes":
+      return <ChangesPanel />;
+    case "monitoring":
+      return <MonitoringPanel />;
+    case "activity":
+      return <ActivityPanel />;
+    default:
+      return <OverviewPanel />;
+  }
 }

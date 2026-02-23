@@ -2,7 +2,7 @@
  * Catalog Import Router — tRPC endpoints for import wizard
  */
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import {
   createSession,
   getSession,
@@ -21,7 +21,7 @@ export const catalogImportRouter = router({
   /**
    * Discover models from a provider API endpoint
    */
-  discoverFromApi: protectedProcedure
+  discoverFromApi: governedProcedure
     .input(
       z.object({
         baseUrl: z.string().transform((v) => /^https?:\/\//i.test(v) ? v : `https://${v}`).pipe(z.string().url()),
@@ -108,7 +108,7 @@ export const catalogImportRouter = router({
   /**
    * Parse an uploaded file (stub for Phase 2)
    */
-  parseFile: protectedProcedure
+  parseFile: governedProcedure
     .input(z.object({ fileId: z.string() }))
     .mutation(async () => {
       throw new Error("File import is not yet implemented (Phase 2)");
@@ -148,7 +148,7 @@ export const catalogImportRouter = router({
   /**
    * Bulk-create catalog entries from selected preview rows
    */
-  bulkCreate: protectedProcedure
+  bulkCreate: governedProcedure
     .input(
       z.object({
         sessionId: z.string(),

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { policies, policyTemplates } from "../../drizzle/schema";
 import { eq, and, ne } from "drizzle-orm";
@@ -55,7 +55,7 @@ export const policiesRouter = router({
     }),
 
   // Create new policy
-  create: protectedProcedure
+  create: governedProcedure
     .input(
       z.object({
         name: z.string().min(1).max(255),
@@ -106,7 +106,7 @@ export const policiesRouter = router({
     }),
 
   // Update policy
-  update: protectedProcedure
+  update: governedProcedure
     .input(
       z.object({
         id: z.number(),
@@ -162,7 +162,7 @@ export const policiesRouter = router({
     }),
 
   // Delete policy
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -200,7 +200,7 @@ export const policiesRouter = router({
     }),
 
   // Activate policy
-  activate: protectedProcedure
+  activate: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -297,7 +297,7 @@ export const policiesRouter = router({
     }),
 
   // Create policy from template
-  createFromTemplate: protectedProcedure
+  createFromTemplate: governedProcedure
     .input(
       z.object({
         templateId: z.number(),

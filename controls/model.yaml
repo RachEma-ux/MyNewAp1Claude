@@ -1,0 +1,49 @@
+pack: model
+controls:
+  - id: TYPE-M001
+    name: Model file integrity verified
+    domain: type_specific
+    riskCategory: architecture_drift
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 8
+    runnerId: model-integrity-validator
+    remediation: "Downloaded model files must have verified checksums. Corrupted models cannot be published."
+    rationale: "Tampered model files are a supply-chain risk."
+    enabled: true
+
+  - id: TYPE-M002
+    name: Model quantization documented
+    domain: type_specific
+    riskCategory: incomplete_documentation
+    severity: medium
+    blocksStages: [publish]
+    weight: 4
+    runnerId: model-quantization-validator
+    remediation: "Model must declare its quantization level (fp16, q4, q8, etc.) before publication."
+    rationale: "Undeclared quantization misleads users about model quality."
+    enabled: true
+
+  - id: TYPE-M003
+    name: Model license declared
+    domain: type_specific
+    riskCategory: incomplete_documentation
+    severity: critical
+    blocksStages: [validate, publish]
+    weight: 9
+    runnerId: model-license-validator
+    remediation: "Model must declare its license (MIT, Apache-2.0, LLAMA, etc.) before validation."
+    rationale: "CGT v2: License declared is mandatory — legal compliance requires provenance."
+    enabled: true
+
+  - id: TYPE-M004
+    name: Model version required
+    domain: type_specific
+    riskCategory: architecture_drift
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 7
+    runnerId: model-versioning-validator
+    remediation: "Model must declare a version for reproducibility and rollback capability."
+    rationale: "Unversioned models cannot be audited or rolled back."
+    enabled: true

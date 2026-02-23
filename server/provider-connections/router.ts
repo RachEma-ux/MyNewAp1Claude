@@ -15,7 +15,7 @@
  *   - delete: remove connection + cascade secrets
  */
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import {
   testConnection,
   createProviderConnection,
@@ -35,7 +35,7 @@ export const providerConnectionsRouter = router({
    * Test a provider endpoint without storing anything.
    * PAT is used in-memory only and discarded.
    */
-  test: protectedProcedure
+  test: governedProcedure
     .input(
       z.object({
         baseUrl: z.string().url(),
@@ -49,7 +49,7 @@ export const providerConnectionsRouter = router({
   /**
    * Create a new connection in DRAFT state (no PAT stored).
    */
-  create: protectedProcedure
+  create: governedProcedure
     .input(
       z.object({
         providerId: z.number().int(),
@@ -71,7 +71,7 @@ export const providerConnectionsRouter = router({
    * Test PAT → encrypt → store secret → transition to VALIDATED.
    * PAT is never stored before successful validation.
    */
-  validateAndStore: protectedProcedure
+  validateAndStore: governedProcedure
     .input(
       z.object({
         connectionId: z.number().int(),
@@ -89,7 +89,7 @@ export const providerConnectionsRouter = router({
   /**
    * Activate a VALIDATED connection → ACTIVE.
    */
-  activate: protectedProcedure
+  activate: governedProcedure
     .input(z.object({ connectionId: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       await activateConnection(input.connectionId, ctx.user?.id ?? 1);
@@ -99,7 +99,7 @@ export const providerConnectionsRouter = router({
   /**
    * Disable an ACTIVE or FAILED connection.
    */
-  disable: protectedProcedure
+  disable: governedProcedure
     .input(z.object({ connectionId: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       await disableConnection(input.connectionId, ctx.user?.id ?? 1);
@@ -109,7 +109,7 @@ export const providerConnectionsRouter = router({
   /**
    * Run a health check against an active connection.
    */
-  healthCheck: protectedProcedure
+  healthCheck: governedProcedure
     .input(z.object({ connectionId: z.number().int() }))
     .mutation(async ({ input }) => {
       return healthCheck(input.connectionId);
@@ -118,7 +118,7 @@ export const providerConnectionsRouter = router({
   /**
    * Rotate PAT: test new PAT → encrypt → store → re-activate.
    */
-  rotate: protectedProcedure
+  rotate: governedProcedure
     .input(
       z.object({
         connectionId: z.number().int(),
@@ -200,7 +200,7 @@ export const providerConnectionsRouter = router({
   /**
    * Delete a connection and cascade-delete its secrets.
    */
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({ connectionId: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       await deleteConnection(input.connectionId);

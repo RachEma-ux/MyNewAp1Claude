@@ -742,7 +742,12 @@ const PHASE4_BOT_CONTROLS: ControlDefinition[] = [
   },
 ];
 
-export const CONTROL_CATALOG: ControlDefinition[] = [
+import { loadControlsFromYaml } from "./yaml-loader";
+
+// Try YAML first, fall back to hardcoded
+const yamlControls = loadControlsFromYaml();
+
+export const CONTROL_CATALOG: ControlDefinition[] = yamlControls || [
   ...BASE_CONTROLS,
   ...PHASE4_BASE_CONTROLS,
   ...PROVIDER_CONTROLS,

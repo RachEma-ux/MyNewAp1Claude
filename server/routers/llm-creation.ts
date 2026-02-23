@@ -10,6 +10,7 @@ import { z } from "zod";
 import { protectedProcedure } from "../_core/trpc";
 import { createLLM } from "../db";
 import { jobQueue } from "../services/job-queue";
+import { getAuditLogger } from "../services/auditLogger";
 
 /**
  * Procedure map for LLM creation & training routes.
@@ -121,6 +122,15 @@ export const llmCreationProcedures = {
       } catch (e) {
         console.warn("[LLM Create] Audit event insert failed:", e);
       }
+
+      getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "llm_creation_project",
+        target_id: String(project.id),
+        decision_result: "success",
+        metadata: { name: input.name, path: input.path },
+      });
 
       // Auto-register LLM identity in the registry
       try {

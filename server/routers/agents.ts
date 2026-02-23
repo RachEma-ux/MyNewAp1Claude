@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { agents, policies } from "../../drizzle/schema";
 import { eq, and, ne } from "drizzle-orm";
@@ -56,7 +56,7 @@ export const agentsRouter = router({
     }),
 
   // Create new agent
-  create: protectedProcedure
+  create: governedProcedure
     .input(z.object({
       name: z.string().min(1).max(255),
       description: z.string().optional(),
@@ -91,7 +91,7 @@ export const agentsRouter = router({
     }),
 
   // Update agent
-  update: protectedProcedure
+  update: governedProcedure
     .input(z.object({
       id: z.number(),
       name: z.string().optional(),
@@ -146,7 +146,7 @@ export const agentsRouter = router({
     }),
 
   // Delete agent
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -282,7 +282,7 @@ export const agentsRouter = router({
   }),
 
   // Run drift detection for specific agent
-  runDriftDetection: protectedProcedure
+  runDriftDetection: governedProcedure
     .input(z.object({ agentId: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -373,7 +373,7 @@ export const agentsRouter = router({
     }),
 
   // Export compliance report
-  exportCompliance: protectedProcedure
+  exportCompliance: governedProcedure
     .input(z.object({ format: z.enum(["pdf", "csv", "json"]).optional() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -416,7 +416,7 @@ export const agentsRouter = router({
     }),
 
   // Auto-remediate policy violations
-  autoRemediate: protectedProcedure
+  autoRemediate: governedProcedure
     .input(z.object({
       agentId: z.number(),
       violationType: z.string().optional(),
@@ -473,7 +473,7 @@ export const agentsRouter = router({
   }),
 
   // Deploy agent template
-  deployTemplate: protectedProcedure
+  deployTemplate: governedProcedure
     .input(z.object({
       templateId: z.string(),
       name: z.string(),
@@ -506,7 +506,7 @@ export const agentsRouter = router({
     }),
 
   // Promote agent from draft/sandbox to governed with policy evaluation
-  promote: protectedProcedure
+  promote: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();

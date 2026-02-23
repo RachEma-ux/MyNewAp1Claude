@@ -10,7 +10,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import * as keyRotationService from "../services/keyRotationService";
 
 // ============================================================================
@@ -75,7 +75,7 @@ const serviceCertificatesRouter = router({
   /**
    * Create a new service certificate
    */
-  create: protectedProcedure
+  create: governedProcedure
     .input(createServiceCertificateSchema)
     .mutation(async ({ input }) => {
       try {
@@ -150,7 +150,7 @@ const serviceCertificatesRouter = router({
   /**
    * Activate a certificate
    */
-  activate: protectedProcedure
+  activate: governedProcedure
     .input(z.object({ certificateId: z.number() }))
     .mutation(async ({ input }) => {
       try {
@@ -167,7 +167,7 @@ const serviceCertificatesRouter = router({
   /**
    * Revoke a certificate
    */
-  revoke: protectedProcedure
+  revoke: governedProcedure
     .input(z.object({ certificateId: z.number() }))
     .mutation(async ({ input }) => {
       try {
@@ -190,7 +190,7 @@ const attestationKeysRouter = router({
   /**
    * Create a new attestation key
    */
-  create: protectedProcedure
+  create: governedProcedure
     .input(createAttestationKeySchema)
     .mutation(async ({ input }) => {
       try {
@@ -261,7 +261,7 @@ const attestationKeysRouter = router({
   /**
    * Activate an attestation key
    */
-  activate: protectedProcedure
+  activate: governedProcedure
     .input(z.object({ keyId: z.number() }))
     .mutation(async ({ input }) => {
       try {
@@ -278,7 +278,7 @@ const attestationKeysRouter = router({
   /**
    * Deprecate an attestation key
    */
-  deprecate: protectedProcedure
+  deprecate: governedProcedure
     .input(z.object({ keyId: z.number() }))
     .mutation(async ({ input }) => {
       try {
@@ -301,7 +301,7 @@ const rotationsRouter = router({
   /**
    * Create a new key rotation event
    */
-  create: protectedProcedure
+  create: governedProcedure
     .input(createKeyRotationSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -392,7 +392,7 @@ const rotationsRouter = router({
   /**
    * Complete a rotation
    */
-  complete: protectedProcedure
+  complete: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       try {
@@ -414,7 +414,7 @@ const rotationsRouter = router({
   /**
    * Fail a rotation
    */
-  fail: protectedProcedure
+  fail: governedProcedure
     .input(z.object({ id: z.number(), error: z.string() }))
     .mutation(async ({ ctx, input }) => {
       try {
@@ -436,7 +436,7 @@ const rotationsRouter = router({
   /**
    * Rollback a rotation
    */
-  rollback: protectedProcedure
+  rollback: governedProcedure
     .input(z.object({ id: z.number(), reason: z.string() }))
     .mutation(async ({ ctx, input }) => {
       try {
@@ -463,7 +463,7 @@ const rotationsRouter = router({
 const policiesRouter = router({
   /**
    * Create a rotation policy
-    create: protectedProcedure
+    create: governedProcedure
     .input(createRotationPolicySchema)
     .mutation(async ({ input }) => {
       try {
@@ -512,7 +512,7 @@ const policiesRouter = router({
   /**
    * Activate a policy
    */
-  activate: protectedProcedure
+  activate: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       try {
@@ -529,7 +529,7 @@ const policiesRouter = router({
   /**
    * Deactivate a policy
    */
-  deactivate: protectedProcedure
+  deactivate: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       try {

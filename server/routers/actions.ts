@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { actionRegistry } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -365,15 +365,9 @@ export const actionsRouter = router({
     }),
 
   // Approve action (admin only)
-  approve: protectedProcedure
+  approve: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Only admins can approve actions",
-        });
-      }
 
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
@@ -391,15 +385,9 @@ export const actionsRouter = router({
     }),
 
   // Reject action (admin only)
-  reject: protectedProcedure
+  reject: adminProcedure
     .input(z.object({ id: z.number(), reason: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Only admins can reject actions",
-        });
-      }
 
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });

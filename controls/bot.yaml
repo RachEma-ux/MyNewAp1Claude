@@ -1,0 +1,61 @@
+pack: bot
+controls:
+  - id: TYPE-B001
+    name: Bot agent binding exists
+    domain: type_specific
+    riskCategory: missing_enforcement_hook
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: bot-binding-validator
+    remediation: "Bot must be bound to a registered, validated agent. Orphan bots are not allowed."
+    rationale: "A bot without an agent cannot operate and represents a governance gap."
+    enabled: true
+
+  - id: TYPE-B002
+    name: Bot interaction scope defined
+    domain: type_specific
+    riskCategory: missing_policy_mapping
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 7
+    runnerId: bot-scope-validator
+    remediation: "Bot must define its interaction scope (channels, users, permissions) before validation."
+    rationale: "Unbounded bots can interact with unintended surfaces."
+    enabled: true
+
+  - id: TYPE-B003
+    name: Bot revocation endpoint exists
+    domain: type_specific
+    riskCategory: missing_enforcement_hook
+    severity: critical
+    blocksStages: [validate, publish]
+    weight: 10
+    runnerId: bot-revocation-validator
+    remediation: "Bot must have a revocation endpoint for immediate disablement."
+    rationale: "CGT v2: Revocable immediately — bots without revocation are Critical."
+    enabled: true
+
+  - id: TYPE-B004
+    name: Bot rate limit configured
+    domain: type_specific
+    riskCategory: missing_enforcement_hook
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 7
+    runnerId: bot-ratelimit-validator
+    remediation: "Bot must have rate limiting to prevent abuse and resource exhaustion."
+    rationale: "Unlimited bots can overwhelm systems and users."
+    enabled: true
+
+  - id: TYPE-B005
+    name: Bot monitoring hook present
+    domain: type_specific
+    riskCategory: missing_audit
+    severity: high
+    blocksStages: [publish]
+    weight: 7
+    runnerId: bot-monitoring-validator
+    remediation: "Bot must have a monitoring/alerting hook before publication."
+    rationale: "CGT v2: Monitoring hooks present — unmonitored bots are governance blind spots."
+    enabled: true

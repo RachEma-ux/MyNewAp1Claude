@@ -11,7 +11,7 @@
  */
 
 import { z } from "zod";
-import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, adminProcedure, router } from "../_core/trpc";
 import {
   getCatalogEntries,
   getCatalogEntryById,
@@ -33,16 +33,27 @@ import {
 import { createHash } from "crypto";
 
 /** Helper to emit audit events without blocking the response */
-function audit(eventType: string, catalogEntryId: number | null, payload: any, bundleId?: number) {
+function audit(eventType: string, catalogEntryId: number | null, payload: any, bundleId?: number, actor: number = 1) {
+  // Legacy DB audit
   createCatalogAuditEvent({
     eventType,
     catalogEntryId,
     publishBundleId: bundleId ?? null,
-    actor: 1,
+    actor,
     actorType: "user",
     payload,
   }).catch((e) => console.warn(`[CatalogAudit] Failed to log ${eventType}:`, e.message));
+
+  // Unified audit logger
+  getAuditLogger().log({
+    action_type: eventType.startsWith("catalog.bundle") ? "PUBLICATION_GATE" : "LIFECYCLE_TRANSITION",
+    target_type: "catalog_entry",
+    target_id: catalogEntryId ? String(catalogEntryId) : null,
+    decision_result: "success",
+    metadata: { eventType, ...payload, bundleId },
+  });
 }
+import { getAuditLogger } from "../services/auditLogger";
 import { getProviderRegistry } from "../providers/registry";
 import * as providerDb from "../providers/db";
 import { discoverProvider, discoverDocsUrl, extractDocMetadata } from "./discover-provider";
@@ -128,7 +139,7 @@ export const catalogManageRouter = router({
    *
    * Rate limited: 10 req/min per user. Cached: 60s per domain.
    */
-  discoverProvider: protectedProcedure
+  discoverProvider: governedProcedure
     .input(z.object({ websiteUrl: z.string().url() }))
     .mutation(async ({ input, ctx }) => {
       // Rate limit: 10 requests per minute per user
@@ -188,9 +199,9 @@ export const catalogManageRouter = router({
    * Create a new catalog entry
    * Non-admin origins get reviewState = "needs_review"
    */
-  create: protectedProcedure
+  create: governedProcedure
     .input(createEntrySchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const origin = input.origin ?? "admin";
       const reviewState = origin !== "admin" ? "needs_review" : "approved";
 
@@ -209,7 +220,7 @@ export const catalogManageRouter = router({
         category: input.category ?? null,
         subCategory: input.subCategory ?? null,
         capabilities: input.capabilities ?? null,
-        createdBy: 1,
+        createdBy: ctx.user.id,
       });
       audit("catalog.entry.created", entry.id, { name: entry.name, entryType: entry.entryType, origin, reviewState });
 
@@ -230,12 +241,12 @@ export const catalogManageRouter = router({
   /**
    * Update an existing catalog entry (authoring fields only — not status/authority)
    */
-  update: protectedProcedure
+  update: governedProcedure
     .input(updateEntrySchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
 
-      const entry = await updateCatalogEntry(id, data, 1);
+      const entry = await updateCatalogEntry(id, data, ctx.user.id);
       audit("catalog.entry.updated", id, { changes: Object.keys(data) });
       return entry;
     }),
@@ -243,7 +254,7 @@ export const catalogManageRouter = router({
   /**
    * Delete a catalog entry and all its versions
    */
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       const entry = await getCatalogEntryById(input.id);
@@ -265,7 +276,7 @@ export const catalogManageRouter = router({
    * Validate a catalog entry via orchestrator handshake
    * Allowed on draft and active entries. Restores previous status on completion.
    */
-  validate: protectedProcedure
+  validate: governedProcedure
     .input(z.object({
       id: z.number().int().positive(),
       runTestPrompt: z.boolean().optional(),
@@ -783,7 +794,7 @@ export const catalogManageRouter = router({
    * Sync providers — auto-creates catalog entries for providers that don't have one.
    * Returns the number of entries created.
    */
-  syncProviders: protectedProcedure
+  syncProviders: governedProcedure
     .mutation(async () => {
       const allProviders = await providerDb.getAllProviders();
       const existingEntries = await getCatalogEntries({ entryType: "provider" });
@@ -839,7 +850,7 @@ export const catalogManageRouter = router({
    * Seeds catalog entries for each provider AND each of their models.
    * Skips entries that already exist (matched by name).
    */
-  syncRegistry: protectedProcedure
+  syncRegistry: governedProcedure
     .mutation(async () => {
       const { PROVIDERS } = await import("../llm/providers");
       const existingEntries = await getCatalogEntries({});
@@ -971,7 +982,7 @@ export const catalogManageRouter = router({
    * Set multi-axis classifications for a catalog entry.
    * Replaces all existing classifications with the provided node IDs.
    */
-  classify: protectedProcedure
+  classify: governedProcedure
     .input(z.object({
       catalogEntryId: z.number().int().positive(),
       nodeIds: z.array(z.number().int().positive()),

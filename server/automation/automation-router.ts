@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { WorkflowExecutionEngine } from "./execution-engine";
 import { validateWorkflow, formatValidationResult } from "./validation";
 import {
@@ -28,7 +28,7 @@ export const automationRouter = router({
   /**
    * Create a new workflow
    */
-  createWorkflow: protectedProcedure
+  createWorkflow: governedProcedure
     .input(
       z.object({
         name: z.string().min(1).max(255),
@@ -100,7 +100,7 @@ export const automationRouter = router({
   /**
    * Update an existing workflow
    */
-  updateWorkflow: protectedProcedure
+  updateWorkflow: governedProcedure
     .input(
       z.object({
         id: z.number(),
@@ -134,7 +134,7 @@ export const automationRouter = router({
   /**
    * Delete a workflow
    */
-  deleteWorkflow: protectedProcedure
+  deleteWorkflow: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       return await db.deleteWorkflow(input.id, ctx.user.id);
@@ -143,7 +143,7 @@ export const automationRouter = router({
   /**
    * Publish a workflow (creates immutable version snapshot)
    */
-  publishWorkflow: protectedProcedure
+  publishWorkflow: governedProcedure
     .input(
       z.object({
         workflowId: z.number(),
@@ -170,7 +170,7 @@ export const automationRouter = router({
   /**
    * Rollback workflow to a specific version
    */
-  rollbackToVersion: protectedProcedure
+  rollbackToVersion: governedProcedure
     .input(
       z.object({
         workflowId: z.number(),
@@ -188,7 +188,7 @@ export const automationRouter = router({
   /**
    * Execute a workflow (with database persistence)
    */
-  executeWorkflow: protectedProcedure
+  executeWorkflow: governedProcedure
     .input(
       z.object({
         workflowId: z.number(),
@@ -361,7 +361,7 @@ export const automationRouter = router({
   /**
    * Cancel execution
    */
-  cancelExecution: protectedProcedure
+  cancelExecution: governedProcedure
     .input(z.object({ executionId: z.string() }))
     .mutation(async ({ input }) => {
       await executionEngine.cancelExecution(input.executionId);

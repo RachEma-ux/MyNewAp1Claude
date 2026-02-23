@@ -1,0 +1,61 @@
+pack: provider
+controls:
+  - id: TYPE-P001
+    name: Provider API key encrypted
+    domain: type_specific
+    riskCategory: hardcoded_secret
+    severity: critical
+    blocksStages: [register, validate, publish]
+    weight: 10
+    runnerId: provider-key-validator
+    remediation: "Provider API keys must be stored encrypted via the encryption service, never in plaintext config."
+    rationale: "Provider keys grant access to external APIs — plaintext storage is Critical."
+    enabled: true
+
+  - id: TYPE-P002
+    name: Provider connection validated
+    domain: type_specific
+    riskCategory: missing_enforcement_hook
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 7
+    runnerId: provider-connection-validator
+    remediation: "Provider must demonstrate successful connection before validation. Dead providers cannot be published."
+    rationale: "Publishing unreachable providers degrades platform reliability."
+    enabled: true
+
+  - id: TYPE-P003
+    name: Provider HTTPS-only endpoints
+    domain: type_specific
+    riskCategory: missing_encryption
+    severity: critical
+    blocksStages: [validate, publish]
+    weight: 10
+    runnerId: provider-https-validator
+    remediation: "All provider endpoints must use HTTPS. HTTP is only allowed for localhost/development."
+    rationale: "CGT v2: HTTPS endpoints only — plaintext transport is Critical."
+    enabled: true
+
+  - id: TYPE-P004
+    name: Provider auth method declared
+    domain: type_specific
+    riskCategory: missing_enforcement_hook
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 7
+    runnerId: provider-auth-method-validator
+    remediation: "Provider must declare its authentication method (API key, bearer token, OAuth, etc.)."
+    rationale: "Undeclared auth methods prevent governance from verifying credential management."
+    enabled: true
+
+  - id: TYPE-P005
+    name: Provider rate limit configured
+    domain: type_specific
+    riskCategory: missing_enforcement_hook
+    severity: high
+    blocksStages: [validate, publish]
+    weight: 6
+    runnerId: provider-ratelimit-validator
+    remediation: "Provider must have rate limiting configuration before publication."
+    rationale: "Unconstrained providers can exhaust API quotas or budgets."
+    enabled: true

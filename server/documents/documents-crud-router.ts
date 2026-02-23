@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
 
 /**
@@ -33,7 +33,7 @@ export const documentsCrudRouter = router({
       return document;
     }),
 
-  create: protectedProcedure
+  create: governedProcedure
     .input(
       z.object({
         workspaceId: z.number(),
@@ -56,7 +56,7 @@ export const documentsCrudRouter = router({
       });
     }),
 
-  update: protectedProcedure
+  update: governedProcedure
     .input(
       z.object({
         id: z.number(),
@@ -80,7 +80,7 @@ export const documentsCrudRouter = router({
       return { success: true };
     }),
 
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const document = await db.getDocumentById(input.id);
@@ -95,7 +95,7 @@ export const documentsCrudRouter = router({
       return { success: true };
     }),
 
-  upload: protectedProcedure
+  upload: governedProcedure
     .input(
       z.object({
         workspaceId: z.number(),
@@ -114,7 +114,7 @@ export const documentsCrudRouter = router({
       return await processDocumentUpload(input, ctx.user.id);
     }),
 
-  bulkDelete: protectedProcedure
+  bulkDelete: governedProcedure
     .input(z.object({ documentIds: z.array(z.number()) }))
     .mutation(async ({ input }) => {
       const { bulkDeleteDocuments } = await import("../db");

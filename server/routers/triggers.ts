@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { triggerRegistry, type InsertTriggerRegistryEntry } from "../../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -365,7 +365,7 @@ export const triggersRouter = router({
     }),
   
   // Approve trigger (admin only)
-  approve: protectedProcedure
+  approve: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -380,12 +380,12 @@ export const triggersRouter = router({
     }),
   
   // Reject trigger (admin only)
-  reject: protectedProcedure
+  reject: adminProcedure
     .input(z.object({ id: z.number(), reason: z.string() }))
     .mutation(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
+
       await db
         .update(triggerRegistry)
         .set({

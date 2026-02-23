@@ -84,7 +84,7 @@ export class FSStore implements ArtifactStore {
   private metadataPath: string;
 
   constructor(basePath?: string) {
-    this.basePath = basePath || path.resolve(process.cwd(), "governance-artifacts");
+    this.basePath = basePath || path.resolve(process.cwd(), "artifacts/governance");
     this.metadataPath = path.join(this.basePath, ".metadata");
     this.ensureDirectories();
   }
