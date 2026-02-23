@@ -12,6 +12,7 @@
  */
 
 import * as path from "path";
+import { fileURLToPath } from "url";
 import { loadCoverageMap, type CoverageEntry } from "./loadCoverageMap";
 import { probeMutationGovernance } from "./probes/probeMutationGovernance";
 import { probeFreezeBlock } from "./probes/probeFreezeBlock";
@@ -24,6 +25,8 @@ import { probePlaceholderLogic } from "./probes/probePlaceholderLogic";
 import { jsonReporter } from "./reporters/jsonReporter";
 import { mdReporter } from "./reporters/mdReporter";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, "../..");
 
 export interface ProbeResult {
