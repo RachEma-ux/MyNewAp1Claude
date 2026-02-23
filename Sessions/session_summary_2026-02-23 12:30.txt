@@ -1,0 +1,73 @@
+Session Summary — 2026-02-23 12:30
+====================================
+
+## Context
+Continued from session 01:25. This session focused on hamburger menu restructuring — consolidating navigation under a new "AI Types" section, adding "Digital HQ", and fixing the bulk test page.
+
+## Work Done
+
+### 1. Fixed open-all-tunnel.html (190d204)
+- Replaced JavaScript-generated links with static HTML links
+- JS wasn't executing on tunnel due to inline script blocking
+- Page now works reliably without JS
+
+### 2. Added AI Types menu with coming-soon sub-pages (3fd6c0b)
+- New "AI Types" hamburger menu item with sub-items: Providers, LLMs, Models, Agents, Bots, Other
+- Created AITypesPage.tsx — dynamic coming-soon page using route param
+- Added route /ai-types/:type in App.tsx
+- Added AI Types section to open-all-tunnel.html (f3be22e)
+
+### 3. Moved Providers under AI Types (6e64f18)
+- Removed standalone "Providers" top-level menu
+- Nested Manage/Connections/Settings under AI Types > Providers as 3-level sub-menu
+
+### 4. Consolidated LLM, Agents, Models under AI Types (55e7626) — KEY CHANGE
+- Removed standalone Agents, LLM, and Models top-level menu items
+- Nested all their sub-pages under AI Types:
+  - Providers > Manage, Connections, Settings
+  - LLMs > Dashboard, Control Plane, Wizard, Catalogue
+  - Models > Browse
+  - Agents > Manage, Approvals, Dashboard, Drift Detection, Compliance Export, Auto-Remediation, Tools Mgmt, Protocols, Policies
+  - Bots > coming soon
+  - Other > coming soon
+- Used generic `aiTypesSubMenus` state (Record<string, boolean>) instead of individual state vars
+- Cleaned up old state variables (llmMenuOpen, providersMenuOpen, agentsMenuOpen, createMenuOpen)
+
+### 5. Added Digital HQ menu (64a515b)
+- New "Digital HQ" hamburger menu item with 8 sub-items (Item 1–8)
+- Created DigitalHQPage.tsx — coming-soon page with dynamic label from route param
+- Added route /digital-hq/:item in App.tsx
+
+### 6. Tooling notes
+- `xdg-open` works for opening URLs (updated MEMORY.md)
+- `am start -a android.intent.action.VIEW -d <url>` also works as fallback
+- Sandbox /tmp issues intermittently block tool calls
+
+## Commits (this session)
+- 190d204 — fix: use static HTML links in open-all-tunnel page instead of JS
+- 3fd6c0b — feat: add AI Types menu with coming-soon sub-pages
+- f3be22e — feat: add AI Types pages to test page
+- 6e64f18 — feat: move Providers sub-pages under AI Types > Providers
+- 55e7626 — feat: consolidate LLM, Agents, Models under AI Types menu
+- 64a515b — feat: add Digital HQ menu with 8 coming-soon sub-pages
+
+## Files Modified
+- client/src/components/MainLayout.tsx — menu restructuring (AI Types consolidation + Digital HQ)
+- client/src/App.tsx — added routes for /ai-types/:type and /digital-hq/:item
+- client/src/pages/AITypesPage.tsx — new: coming-soon page for AI Types
+- client/src/pages/DigitalHQPage.tsx — new: coming-soon page for Digital HQ
+- client/public/open-all-tunnel.html — static HTML links + AI Types section
+
+## Current Menu Structure
+- Dashboard
+- Chat
+- Conversations
+- Workspaces
+- Documents
+- AI Types (Providers, LLMs, Models, Agents, Bots, Other)
+- Digital HQ (Item 1–8)
+- Analytics
+- Automation
+- Infrastructure (Hardware, Software)
+- Resources
+- Wiki
