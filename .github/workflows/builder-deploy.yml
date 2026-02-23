@@ -373,6 +373,7 @@ jobs:
 
           gh release create "v${VERSION}" \
             --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
             --title "MyNewAp1Claude v${VERSION}" \
             --notes "$(cat <<EOF
           ## MyNewAp1Claude v${VERSION}
