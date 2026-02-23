@@ -130,7 +130,7 @@ class GovernanceEngine {
    * Validate and enforce a lifecycle transition.
    * Checks frozen status, validates transition rules, and optionally runs scorecard.
    */
-  enforceLifecycleTransition(req: TransitionRequest) {
+  async enforceLifecycleTransition(req: TransitionRequest) {
     // Check frozen status (lifecycle-guard also checks, but defense-in-depth)
     try {
       const { isFrozen } = require("./scorecard");
@@ -155,7 +155,7 @@ class GovernanceEngine {
       // Scorecard module not available — continue with standard validation
     }
 
-    const result = validateTransition(req);
+    const result = await validateTransition(req);
 
     if (!result.allowed) {
       getGovernanceMetrics().inc("lifecycle_denials_total");
@@ -174,7 +174,7 @@ class GovernanceEngine {
    * Run scorecard for a subject and enforce gate.
    * Returns scorecard result or throws on blocked transition (strict mode).
    */
-  enforceScorecard(params: {
+  async enforceScorecard(params: {
     stage: string;
     subject?: { id: number; name: string; type: string; tags: string[]; description?: string; config?: any };
     actorId: string;
@@ -188,7 +188,7 @@ class GovernanceEngine {
         throw new Error(`[Governance] Subject #${params.subject.id} is FROZEN — scorecard blocked`);
       }
 
-      const result = runScorecard({
+      const result = await runScorecard({
         stage: params.stage,
         entry: params.subject,
         actor: { id: params.actorId, role: params.actorRole },
@@ -209,8 +209,8 @@ class GovernanceEngine {
   /**
    * Evaluate publication gate.
    */
-  evaluatePublicationGate(req: PublicationRequest) {
-    const decision = evaluatePublication(req);
+  async evaluatePublicationGate(req: PublicationRequest) {
+    const decision = await evaluatePublication(req);
 
     if (!decision.allowed) {
       getGovernanceMetrics().inc("publication_denials_total");

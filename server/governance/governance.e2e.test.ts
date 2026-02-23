@@ -107,7 +107,7 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
   });
 
   // ── Test 3: Critical violation → validate denied ──────────────────
-  it("3. Critical violation blocks validate", () => {
+  it("3. Critical violation blocks validate", async () => {
     // Subject with hardcoded secrets → SEC-001 critical fail
     const subject = makeSubject({
       config: {
@@ -116,7 +116,7 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
       },
     });
 
-    const result = runScorecard({
+    const result = await runScorecard({
       stage: "validate" as LifecycleStage,
       entry: {
         id: subject.id,
@@ -140,8 +140,8 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
   });
 
   // ── Test 4: High violation → publish denied ───────────────────────
-  it("4. High violation blocks publish", () => {
-    const result = runScorecard({
+  it("4. High violation blocks publish", async () => {
+    const result = await runScorecard({
       stage: "publish" as LifecycleStage,
       entry: {
         id: 200,
@@ -162,8 +162,8 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
   });
 
   // ── Test 5: Evidence missing → verification fails ─────────────────
-  it("5. Evidence bundle has integrity hash", () => {
-    const result = runScorecard({
+  it("5. Evidence bundle has integrity hash", async () => {
+    const result = await runScorecard({
       stage: "validate" as LifecycleStage,
       entry: {
         id: 300,
@@ -184,8 +184,8 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
   });
 
   // ── Test 6: Evidence tampered → verification fails ────────────────
-  it("6. Tampered evidence bundle fails verification", () => {
-    const result = runScorecard({
+  it("6. Tampered evidence bundle fails verification", async () => {
+    const result = await runScorecard({
       stage: "validate" as LifecycleStage,
       entry: {
         id: 400,
@@ -328,8 +328,8 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
   });
 
   // ── Test 15: Gate verdict is ALLOW or DENY ────────────────────────
-  it("15. Gate verdict is structurally ALLOW or DENY", () => {
-    const result = runScorecard({
+  it("15. Gate verdict is structurally ALLOW or DENY", async () => {
+    const result = await runScorecard({
       stage: "register" as LifecycleStage,
       entry: {
         id: 1000,

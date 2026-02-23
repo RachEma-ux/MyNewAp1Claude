@@ -86,7 +86,7 @@ export interface ControlRunner {
   /** Human-readable name */
   name: string;
   /** Execute this runner against the given context */
-  run(ctx: RunnerContext, controls: ControlDefinition[]): ControlResult[];
+  run(ctx: RunnerContext, controls: ControlDefinition[]): Promise<ControlResult[]>;
 }
 
 // ============================================================================
@@ -165,7 +165,7 @@ const SECRET_PATTERNS = [
 registerRunner({
   id: "secret-scanner",
   name: "Hardcoded Secret Scanner",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "secret-scanner");
     if (!control) return [];
 
@@ -209,7 +209,7 @@ registerRunner({
 registerRunner({
   id: "eval-detector",
   name: "Dynamic Eval Detector",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "eval-detector");
     if (!control) return [];
 
@@ -237,7 +237,7 @@ registerRunner({
 registerRunner({
   id: "provider-call-detector",
   name: "Direct Provider Call Detector",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "provider-call-detector");
     if (!control) return [];
 
@@ -262,7 +262,7 @@ registerRunner({
 registerRunner({
   id: "environment-validator",
   name: "Environment Configuration Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "environment-validator");
     if (!control) return [];
 
@@ -291,7 +291,7 @@ registerRunner({
 registerRunner({
   id: "secret-externalization-validator",
   name: "Secret Externalization Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "secret-externalization-validator");
     if (!control) return [];
 
@@ -320,7 +320,7 @@ registerRunner({
 registerRunner({
   id: "escalation-detector",
   name: "Silent Privilege Escalation Detector",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "escalation-detector");
     if (!control) return [];
 
@@ -344,7 +344,7 @@ registerRunner({
 registerRunner({
   id: "architecture-boundary-validator",
   name: "Architecture Boundary Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "architecture-boundary-validator");
     if (!control) return [];
 
@@ -383,7 +383,7 @@ registerRunner({
 registerRunner({
   id: "policy-engine-validator",
   name: "Policy Engine Availability Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "policy-engine-validator");
     if (!control) return [];
 
@@ -413,7 +413,7 @@ registerRunner({
 registerRunner({
   id: "orchestrator-validator",
   name: "Orchestrator Boundary Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "orchestrator-validator");
     if (!control) return [];
 
@@ -435,7 +435,7 @@ registerRunner({
 registerRunner({
   id: "lifecycle-sequence-validator",
   name: "Lifecycle Sequence Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "lifecycle-sequence-validator");
     if (!control) return [];
 
@@ -478,7 +478,7 @@ registerRunner({
 registerRunner({
   id: "approval-validator",
   name: "Manual Approval Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "approval-validator");
     if (!control) return [];
 
@@ -504,7 +504,7 @@ registerRunner({
 registerRunner({
   id: "separation-of-duty-validator",
   name: "Separation of Duty Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "separation-of-duty-validator");
     if (!control) return [];
 
@@ -542,7 +542,7 @@ registerRunner({
 registerRunner({
   id: "publication-gate-validator",
   name: "Publication Gate Triple Validation Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "publication-gate-validator");
     if (!control) return [];
 
@@ -552,7 +552,7 @@ registerRunner({
 
     try {
       const { evaluatePublication } = require("../publication-gate");
-      const decision = evaluatePublication({
+      const decision = await evaluatePublication({
         entryId: ctx.entry.id,
         entryName: ctx.entry.name,
         entryType: ctx.entry.type,
@@ -600,7 +600,7 @@ registerRunner({
 registerRunner({
   id: "deny-default-validator",
   name: "Deny-by-Default Policy Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "deny-default-validator");
     if (!control) return [];
 
@@ -629,7 +629,7 @@ registerRunner({
 registerRunner({
   id: "rbac-enforcement-validator",
   name: "RBAC Enforcement Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "rbac-enforcement-validator");
     if (!control) return [];
 
@@ -669,7 +669,7 @@ registerRunner({
 registerRunner({
   id: "audit-logging-validator",
   name: "Audit Logging Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "audit-logging-validator");
     if (!control) return [];
 
@@ -712,7 +712,7 @@ registerRunner({
 registerRunner({
   id: "policy-file-validator",
   name: "Policy File Integrity Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "policy-file-validator");
     if (!control) return [];
 
@@ -750,7 +750,7 @@ registerRunner({
 registerRunner({
   id: "policy-bypass-detector",
   name: "Policy Bypass Detector",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "policy-bypass-detector");
     if (!control) return [];
 
@@ -791,7 +791,7 @@ registerRunner({
 registerRunner({
   id: "governance-docs-validator",
   name: "Governance Documentation Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "governance-docs-validator");
     if (!control) return [];
 
@@ -829,7 +829,7 @@ registerRunner({
 registerRunner({
   id: "entry-docs-validator",
   name: "Entry Documentation Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "entry-docs-validator");
     if (!control) return [];
 
@@ -864,7 +864,7 @@ registerRunner({
 registerRunner({
   id: "endpoint-docs-validator",
   name: "Endpoint Documentation Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "endpoint-docs-validator");
     if (!control) return [];
 
@@ -895,7 +895,7 @@ registerRunner({
 registerRunner({
   id: "provider-key-validator",
   name: "Provider API Key Encryption Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "provider-key-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "provider-key-validator", "No entry context")];
@@ -925,7 +925,7 @@ registerRunner({
 registerRunner({
   id: "provider-connection-validator",
   name: "Provider Connection Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "provider-connection-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "provider-connection-validator", "No entry context")];
@@ -951,7 +951,7 @@ registerRunner({
 registerRunner({
   id: "provider-ratelimit-validator",
   name: "Provider Rate Limit Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "provider-ratelimit-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "provider-ratelimit-validator", "No entry context")];
@@ -979,7 +979,7 @@ registerRunner({
 registerRunner({
   id: "llm-binding-validator",
   name: "LLM Provider Binding Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "llm-binding-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "llm-binding-validator", "No entry context")];
@@ -1006,7 +1006,7 @@ registerRunner({
 registerRunner({
   id: "llm-model-id-validator",
   name: "LLM Model Identifier Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "llm-model-id-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "llm-model-id-validator", "No entry context")];
@@ -1031,7 +1031,7 @@ registerRunner({
 registerRunner({
   id: "llm-routing-validator",
   name: "LLM Inference Routing Policy Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "llm-routing-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "llm-routing-validator", "No entry context")];
@@ -1059,7 +1059,7 @@ registerRunner({
 registerRunner({
   id: "model-integrity-validator",
   name: "Model File Integrity Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "model-integrity-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "model-integrity-validator", "No entry context")];
@@ -1085,7 +1085,7 @@ registerRunner({
 registerRunner({
   id: "model-quantization-validator",
   name: "Model Quantization Documentation Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "model-quantization-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "model-quantization-validator", "No entry context")];
@@ -1113,7 +1113,7 @@ registerRunner({
 registerRunner({
   id: "agent-permission-validator",
   name: "Agent Tool Permission Scope Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "agent-permission-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "agent-permission-validator", "No entry context")];
@@ -1144,7 +1144,7 @@ registerRunner({
 registerRunner({
   id: "agent-orchestrator-validator",
   name: "Agent Orchestrator Binding Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "agent-orchestrator-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "agent-orchestrator-validator", "No entry context")];
@@ -1172,7 +1172,7 @@ registerRunner({
 registerRunner({
   id: "agent-prompt-validator",
   name: "Agent System Prompt Review Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "agent-prompt-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "agent-prompt-validator", "No entry context")];
@@ -1199,7 +1199,7 @@ registerRunner({
 registerRunner({
   id: "bot-binding-validator",
   name: "Bot Agent Binding Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "bot-binding-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "bot-binding-validator", "No entry context")];
@@ -1224,7 +1224,7 @@ registerRunner({
 registerRunner({
   id: "bot-scope-validator",
   name: "Bot Interaction Scope Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "bot-scope-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "bot-scope-validator", "No entry context")];
@@ -1259,7 +1259,7 @@ registerRunner({
 registerRunner({
   id: "ci-branch-protection-validator",
   name: "CI Branch Protection Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "ci-branch-protection-validator");
     if (!control) return [];
 
@@ -1298,7 +1298,7 @@ registerRunner({
 registerRunner({
   id: "provider-https-validator",
   name: "Provider HTTPS-Only Endpoint Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "provider-https-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "provider-https-validator", "No entry context")];
@@ -1335,7 +1335,7 @@ registerRunner({
 registerRunner({
   id: "provider-auth-method-validator",
   name: "Provider Auth Method Declaration Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "provider-auth-method-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "provider-auth-method-validator", "No entry context")];
@@ -1363,7 +1363,7 @@ registerRunner({
 registerRunner({
   id: "agent-scope-validator",
   name: "Agent Scope Declaration Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "agent-scope-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "agent-scope-validator", "No entry context")];
@@ -1391,7 +1391,7 @@ registerRunner({
 registerRunner({
   id: "agent-secret-access-validator",
   name: "Agent Direct Secret Access Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "agent-secret-access-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "agent-secret-access-validator", "No entry context")];
@@ -1429,7 +1429,7 @@ registerRunner({
 registerRunner({
   id: "model-license-validator",
   name: "Model License Declaration Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "model-license-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "model-license-validator", "No entry context")];
@@ -1457,7 +1457,7 @@ registerRunner({
 registerRunner({
   id: "model-versioning-validator",
   name: "Model Version Declaration Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "model-versioning-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "model-versioning-validator", "No entry context")];
@@ -1485,7 +1485,7 @@ registerRunner({
 registerRunner({
   id: "bot-revocation-validator",
   name: "Bot Revocation Endpoint Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "bot-revocation-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "bot-revocation-validator", "No entry context")];
@@ -1512,7 +1512,7 @@ registerRunner({
 registerRunner({
   id: "bot-ratelimit-validator",
   name: "Bot Rate Limit Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "bot-ratelimit-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "bot-ratelimit-validator", "No entry context")];
@@ -1540,7 +1540,7 @@ registerRunner({
 registerRunner({
   id: "bot-monitoring-validator",
   name: "Bot Monitoring Hook Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "bot-monitoring-validator");
     if (!control) return [];
     if (!ctx.entry) return [buildSkip(control, "bot-monitoring-validator", "No entry context")];
@@ -1571,7 +1571,7 @@ registerRunner({
 registerRunner({
   id: "rbac-checker",
   name: "RBAC Principal Checker",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "rbac-checker");
     if (!control) return [];
 
@@ -1600,7 +1600,7 @@ registerRunner({
 registerRunner({
   id: "principal-validator",
   name: "Principal Attribution Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "principal-validator");
     if (!control) return [];
 
@@ -1629,7 +1629,7 @@ registerRunner({
 registerRunner({
   id: "change-audit-validator",
   name: "Change Audit Logger Validator",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "change-audit-validator");
     if (!control) return [];
 
@@ -1674,7 +1674,7 @@ const RATE_LIMIT_MAX = 120;
 registerRunner({
   id: "rate-limiter",
   name: "Mutation Rate Limiter",
-  run(ctx, controls) {
+  async run(ctx, controls) {
     const control = controls.find((c) => c.runnerId === "rate-limiter");
     if (!control) return [];
 

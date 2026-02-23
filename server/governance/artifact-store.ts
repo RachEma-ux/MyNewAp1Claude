@@ -236,7 +236,7 @@ export class S3Store implements ArtifactStore {
     try {
       const response = await fetch(url, {
         method: "PUT",
-        body: buf,
+        body: buf as unknown as BodyInit,
         headers: {
           "Content-Type": metadata?.contentType || "application/octet-stream",
           "x-amz-meta-sha256": sha256,

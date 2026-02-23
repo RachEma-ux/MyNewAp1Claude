@@ -118,7 +118,7 @@ export async function requireGate(
   }
 
   // ── Check 2: Run scorecard ───────────────────────────────────────────
-  const scorecardResult = runScorecard({
+  const scorecardResult = await runScorecard({
     stage,
     entry: subject,
     actor,

@@ -110,7 +110,7 @@ export function getLatestScorecard(): ScorecardResult | null {
  *   8. Determine HTTP status (200 or 409)
  *   9. Store in history
  */
-export function runScorecard(request: ScorecardRequest): ScorecardResult {
+export async function runScorecard(request: ScorecardRequest): Promise<ScorecardResult> {
   // 1. Normalize subject
   const subject = request.subject || (request.entry ? entryToSubject(request.entry) : undefined);
   let packResolution: PackResolution | null = null;
@@ -244,7 +244,7 @@ export function runScorecard(request: ScorecardRequest): ScorecardResult {
     }
 
     try {
-      const runnerResults = runner.run(ctx, runnerControls);
+      const runnerResults = await runner.run(ctx, runnerControls);
       results.push(...runnerResults);
       runnersInvoked.add(runnerId);
     } catch (err) {

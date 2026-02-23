@@ -207,7 +207,7 @@ function runAdminChecklist(req: PublicationRequest): ComplianceCheck[] {
  *   3. Admin checklist complete
  *   4. No Critical or High risk findings
  */
-export function evaluatePublication(req: PublicationRequest): PublicationDecision {
+export async function evaluatePublication(req: PublicationRequest): Promise<PublicationDecision> {
   // Run all check categories
   const complianceChecks = runComplianceMatrix(req);
   const yamlChecks = runYamlSpecChecks(req);
@@ -244,7 +244,7 @@ export function evaluatePublication(req: PublicationRequest): PublicationDecisio
   let transitionResult: TransitionResult | undefined;
 
   if (stage === "validate") {
-    transitionResult = validateTransition({
+    transitionResult = await validateTransition({
       entryId: req.entryId,
       entryName: req.entryName,
       fromStage: "validate",

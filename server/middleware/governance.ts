@@ -159,7 +159,7 @@ export function requireGateMiddleware(stage: LifecycleStage) {
 
       // Attach gate result to request for downstream handlers
       (req as any)._governanceGate = result;
-      next();
+      return next();
     } catch (err) {
       // Fail closed: any error in governance = DENY
       return res.status(409).json({
@@ -232,7 +232,7 @@ export function validateRole(requiredPermission: PermissionAction) {
       });
     }
 
-    next();
+    return next();
   };
 }
 

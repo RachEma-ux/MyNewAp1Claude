@@ -133,7 +133,7 @@ export const governanceRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      return evaluatePublication({
+      return await evaluatePublication({
         ...input,
         actorId: String(ctx.user.id),
         actorRole: ctx.user.role || "admin",
@@ -154,7 +154,7 @@ export const governanceRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      return validateTransition({
+      return await validateTransition({
         ...input,
         actorId: String(ctx.user.id),
         actorRole: ctx.user.role || "user",
@@ -307,7 +307,7 @@ export const governanceRouter = router({
           tags: z.array(z.string()),
           description: z.string().optional(),
           config: z.any().optional(),
-          metadata: z.record(z.any()).optional(),
+          metadata: z.record(z.string(), z.any()).optional(),
         }).optional(),
         entry: z.object({
           id: z.number(),
@@ -339,7 +339,7 @@ export const governanceRouter = router({
         });
       }
 
-      const result = runScorecard({
+      const result = await runScorecard({
         stage: input.stage,
         subject: input.subject as any,
         entry: input.entry,
@@ -375,7 +375,7 @@ export const governanceRouter = router({
           tags: z.array(z.string()),
           description: z.string().optional(),
           config: z.any().optional(),
-          metadata: z.record(z.any()).optional(),
+          metadata: z.record(z.string(), z.any()).optional(),
         }).optional(),
         entry: z.object({
           id: z.number(),
@@ -389,7 +389,7 @@ export const governanceRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      return runScorecard({
+      return await runScorecard({
         stage: input.stage,
         subject: input.subject as any,
         entry: input.entry,
@@ -457,7 +457,7 @@ export const governanceRouter = router({
       tags: z.array(z.string()),
       description: z.string().optional(),
       config: z.any().optional(),
-      metadata: z.record(z.any()).optional(),
+      metadata: z.record(z.string(), z.any()).optional(),
     }))
     .query(async ({ input }) => {
       return validateSubject(input);
@@ -573,7 +573,7 @@ export const governanceRouter = router({
         });
       }
 
-      const result = executeStageTransition(entry, targetStage, actor);
+      const result = await executeStageTransition(entry, targetStage, actor);
 
       if (!result.allowed) {
         throw new TRPCError({

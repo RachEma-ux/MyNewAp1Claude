@@ -50,7 +50,8 @@ export const adminProcedure = t.procedure.use(
 // No bypass path: explicit lifecycle subjects use their own stage, all other
 // mutations are checked as system subjects at the "mutate" stage.
 const requireGovernance = t.middleware(async (opts) => {
-  const { ctx, next, rawInput } = opts;
+  const { ctx, next } = opts;
+  const rawInput = await (opts as any).getRawInput?.() ?? (opts as any).rawInput;
 
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });

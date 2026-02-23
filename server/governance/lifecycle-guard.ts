@@ -86,17 +86,17 @@ function stageIndex(stage: LifecycleStage): number {
  *   3. Risk findings don't block the target stage
  *   4. Audit logging of every attempt
  */
-export function validateTransition(req: TransitionRequest): TransitionResult {
+export async function validateTransition(req: TransitionRequest): Promise<TransitionResult> {
   // Rule 0: Check frozen status — frozen subjects cannot transition
   if (checkFrozen(req.entryId)) {
     const reason = `Subject #${req.entryId} "${req.entryName}" is FROZEN — all lifecycle transitions blocked until unfrozen`;
-    logTransition(req, false, reason);
+    await logTransition(req, false, reason);
     return { allowed: false, reason };
   }
   // Also check system-wide freeze (subject ID 0)
   if (checkFrozen(0)) {
     const reason = `System-wide governance FREEZE active — all transitions blocked. Resolve drift violations first.`;
-    logTransition(req, false, reason);
+    await logTransition(req, false, reason);
     return { allowed: false, reason };
   }
 
@@ -110,7 +110,7 @@ export function validateTransition(req: TransitionRequest): TransitionResult {
         ? `Backward transition not allowed: ${req.fromStage} → ${req.toStage}`
         : `Stage skipping prohibited: ${req.fromStage} → ${req.toStage} (must go through ${LIFECYCLE_STAGES[fromIdx + 1]})`;
 
-    logTransition(req, false, reason);
+    await logTransition(req, false, reason);
     return { allowed: false, reason };
   }
 
@@ -122,14 +122,14 @@ export function validateTransition(req: TransitionRequest): TransitionResult {
 
     if (blocking.length > 0) {
       const reason = `${blocking.length} risk finding(s) block transition to ${req.toStage}: ${blocking.map((f) => `[${f.severity.toUpperCase()}] ${f.title}`).join("; ")}`;
-      logTransition(req, false, reason);
+      await logTransition(req, false, reason);
       return { allowed: false, reason, blockedByFindings: blocking };
     }
   }
 
   // Transition allowed
   const reason = `Transition approved: ${req.fromStage} → ${req.toStage}`;
-  const auditId = logTransition(req, true, reason);
+  const auditId = await logTransition(req, true, reason);
   return { allowed: true, reason, auditId };
 }
 
@@ -240,9 +240,9 @@ export function validateStageRequirements(
 // Audit Logging
 // ============================================================================
 
-function logTransition(req: TransitionRequest, allowed: boolean, reason: string): string {
+async function logTransition(req: TransitionRequest, allowed: boolean, reason: string): Promise<string> {
   const audit = getAuditLogger();
-  const event = audit.log({
+  const event = await audit.log({
     actor_id: req.actorId,
     action_type: "LIFECYCLE_TRANSITION",
     target_type: "lifecycle_transition",

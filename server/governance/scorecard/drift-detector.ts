@@ -247,7 +247,7 @@ export async function detectDrift(config?: Partial<DriftConfig>): Promise<DriftR
   const previous = getLatestScorecard();
 
   // Run a fresh scorecard
-  const current = runScorecard({
+  const current = await runScorecard({
     stage: cfg.stage,
     actor: { id: "drift-detector", role: "system" },
   });

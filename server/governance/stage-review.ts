@@ -806,24 +806,24 @@ export function evaluateStageReview(
  * Returns the combined result. Throws-equivalent: returns blocked=true
  * with details when any check fails.
  */
-export function executeStageTransition(
+export async function executeStageTransition(
   entry: ReviewContext["entry"] & { tags: string[] },
   targetStage: LifecycleStage,
   actor: ReviewContext["actor"]
-): {
+): Promise<{
   allowed: boolean;
   stageReview: StageReviewResult;
   transitionResult?: { allowed: boolean; reason: string };
   publicationDecision?: { allowed: boolean; reason: string; checks: any[] };
   newTags: string[];
   reason: string;
-} {
+}> {
   // 1. Run stage review checklist
   const stageReview = evaluateStageReview(entry, targetStage, actor);
 
   // 2. Run lifecycle guard transition validation
   const currentStage = getStageFromTags(entry.tags);
-  const transitionResult = validateTransition({
+  const transitionResult = await validateTransition({
     entryId: entry.id,
     entryName: entry.name,
     fromStage: currentStage,
@@ -835,7 +835,7 @@ export function executeStageTransition(
   // 3. For publish stage, also run publication gate
   let publicationDecision: { allowed: boolean; reason: string; checks: any[] } | undefined;
   if (targetStage === "publish") {
-    const pubResult = evaluatePublication({
+    const pubResult = await evaluatePublication({
       entryId: entry.id,
       entryName: entry.name,
       entryType: entry.entryType,
