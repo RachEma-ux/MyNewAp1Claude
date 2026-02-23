@@ -71,6 +71,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [headerActions, setHeaderActions] = useState<ReactNode>(null);
   const [llmMenuOpen, setLlmMenuOpen] = useState(false);
   const [providersMenuOpen, setProvidersMenuOpen] = useState(false);
+  const [aiTypesProvidersMenuOpen, setAiTypesProvidersMenuOpen] = useState(false);
   const [automationMenuOpen, setAutomationMenuOpen] = useState(false);
   const [infrastructureMenuOpen, setInfrastructureMenuOpen] = useState(false);
   const [agentsMenuOpen, setAgentsMenuOpen] = useState(false);
@@ -129,21 +130,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Catalogue", icon: <List className="w-4 h-4" />, href: "/llm/catalogue" },
       ]
     },
-    {
-      label: "Providers",
-      icon: <Cloud className="w-5 h-5" />,
-      children: [
-        { label: "Manage", icon: <Cloud className="w-4 h-4" />, href: "/providers" },
-        { label: "Connections", icon: <Plug className="w-4 h-4" />, href: "/providers/connections" },
-        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/settings" },
-      ]
-    },
     { label: "Models", icon: <Package className="w-5 h-5" />, href: "/models" },
     {
       label: "AI Types",
       icon: <Database className="w-5 h-5" />,
       children: [
-        { label: "Providers", icon: <Cloud className="w-4 h-4" />, href: "/ai-types/providers" },
+        {
+          label: "Providers",
+          icon: <Cloud className="w-4 h-4" />,
+          children: [
+            { label: "Manage", icon: <Cloud className="w-3 h-3" />, href: "/providers" },
+            { label: "Connections", icon: <Plug className="w-3 h-3" />, href: "/providers/connections" },
+            { label: "Settings", icon: <Settings className="w-3 h-3" />, href: "/settings" },
+          ]
+        },
         { label: "LLMs", icon: <Database className="w-4 h-4" />, href: "/ai-types/llms" },
         { label: "Models", icon: <Package className="w-4 h-4" />, href: "/ai-types/models" },
         { label: "Agents", icon: <Bot className="w-4 h-4" />, href: "/ai-types/agents" },
@@ -267,7 +267,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     {(item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "Agents" && agentsMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* LLM, Providers and Automation menus (2-level) */}
-                  {((item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen)) && (
+                  {((item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>
@@ -309,6 +309,60 @@ export default function MainLayout({ children }: MainLayoutProps) {
                                     <a
                                       onClick={() => setSidebarOpen(false)}
                                       className={`flex items-center space-x-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                                        isActive(grandchild.href!)
+                                          ? "bg-primary text-primary-foreground"
+                                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                                      }`}
+                                    >
+                                      {grandchild.icon}
+                                      <span>{grandchild.label}</span>
+                                    </a>
+                                  </Link>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <Link key={child.href} href={child.href!}>
+                            <a
+                              onClick={() => setSidebarOpen(false)}
+                              className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                                isActive(child.href!)
+                                  ? "bg-primary text-primary-foreground"
+                                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                              }`}
+                            >
+                              {child.icon}
+                              <span>{child.label}</span>
+                            </a>
+                          </Link>
+                        )
+                      ))}
+                    </div>
+                  )}
+                  {/* AI Types menu (3-level with Providers submenu) */}
+                  {item.label === "AI Types" && aiTypesMenuOpen && (
+                    <div className="ml-4 mt-1 space-y-1">
+                      {item.children.map((child) => (
+                        child.children ? (
+                          <div key={child.label}>
+                            <button
+                              onClick={() => setAiTypesProvidersMenuOpen(!aiTypesProvidersMenuOpen)}
+                              className="flex w-full items-center justify-between space-x-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            >
+                              <div className="flex items-center space-x-2">
+                                {child.icon}
+                                <span>{child.label}</span>
+                              </div>
+                              {aiTypesProvidersMenuOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                            </button>
+                            {aiTypesProvidersMenuOpen && child.children && (
+                              <div className="ml-4 mt-1 space-y-1">
+                                {child.children.map((grandchild) => (
+                                  <Link key={grandchild.href} href={grandchild.href!}>
+                                    <a
+                                      onClick={() => setSidebarOpen(false)}
+                                      className={`flex items-center space-x-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                                         isActive(grandchild.href!)
                                           ? "bg-primary text-primary-foreground"
                                           : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
