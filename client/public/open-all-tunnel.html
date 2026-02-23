@@ -21,79 +21,67 @@
 
 <div class="section">
   <h3>Core</h3>
-  <div class="grid" id="core"></div>
-</div>
-<div class="section">
-  <h3>LLM & Models</h3>
-  <div class="grid" id="llm"></div>
-</div>
-<div class="section">
-  <h3>Agents & Automation</h3>
-  <div class="grid" id="agents"></div>
-</div>
-<div class="section">
-  <h3>Documents & Knowledge</h3>
-  <div class="grid" id="docs"></div>
-</div>
-<div class="section">
-  <h3>Governance & Ops</h3>
-  <div class="grid" id="gov"></div>
-</div>
-<div class="section">
-  <h3>Dev Tools</h3>
-  <div class="grid" id="dev"></div>
+  <div class="grid">
+    <a href="/" target="_blank">Home <small style="color:#64748b">/</small></a>
+    <a href="/chat" target="_blank">Chat <small style="color:#64748b">/chat</small></a>
+    <a href="/settings" target="_blank">Settings <small style="color:#64748b">/settings</small></a>
+    <a href="/analytics" target="_blank">Analytics <small style="color:#64748b">/analytics</small></a>
+  </div>
 </div>
 
-<script>
-const sections = {
-  core: [
-    ["/", "Home"],
-    ["/chat", "Chat"],
-    ["/settings", "Settings"],
-    ["/analytics", "Analytics"],
-  ],
-  llm: [
-    ["/providers", "Providers"],
-    ["/llm", "LLM Overview"],
-    ["/llm/catalogue", "Catalogue"],
-    ["/llm/catalogue/manage", "Manage Catalogue"],
-    ["/llm/control-plane", "Control Plane"],
-    ["/llm/promotions", "Promotions"],
-    ["/models", "Models"],
-    ["/embeddings", "Embeddings"],
-    ["/vectordb", "Vector DB"],
-  ],
-  agents: [
-    ["/agents", "Agents"],
-    ["/agents/dashboard", "Agents Dashboard"],
-    ["/automation", "Automation"],
-    ["/conversations", "Conversations"],
-    ["/wcp/workflows", "WCP Workflows"],
-  ],
-  docs: [
-    ["/documents", "Documents"],
-    ["/wiki", "Wiki"],
-    ["/resources", "Resources"],
-  ],
-  gov: [
-    ["/policies", "Policies"],
-    ["/governance/agents", "Governance Agents"],
-    ["/protocols", "Protocols"],
-    ["/tools-management", "Tools Mgmt"],
-    ["/compliance-export", "Compliance Export"],
-    ["/drift-detection", "Drift Detection"],
-    ["/deploy", "Deploy"],
-  ],
-  dev: [
-    ["/ui-showcase", "UI Showcase"],
-  ],
-};
-const base = window.location.origin;
-Object.entries(sections).forEach(([id, pages]) => {
-  const el = document.getElementById(id);
-  el.innerHTML = pages.map(([path, label]) =>
-    '<a href="' + base + path + '" target="_blank">' + label + ' <small style="color:#64748b">' + path + '</small></a>'
-  ).join("");
-});
-</script>
+<div class="section">
+  <h3>LLM & Models</h3>
+  <div class="grid">
+    <a href="/providers" target="_blank">Providers <small style="color:#64748b">/providers</small></a>
+    <a href="/llm" target="_blank">LLM Overview <small style="color:#64748b">/llm</small></a>
+    <a href="/llm/catalogue" target="_blank">Catalogue <small style="color:#64748b">/llm/catalogue</small></a>
+    <a href="/llm/catalogue/manage" target="_blank">Manage Catalogue <small style="color:#64748b">/llm/catalogue/manage</small></a>
+    <a href="/llm/control-plane" target="_blank">Control Plane <small style="color:#64748b">/llm/control-plane</small></a>
+    <a href="/llm/promotions" target="_blank">Promotions <small style="color:#64748b">/llm/promotions</small></a>
+    <a href="/models" target="_blank">Models <small style="color:#64748b">/models</small></a>
+    <a href="/embeddings" target="_blank">Embeddings <small style="color:#64748b">/embeddings</small></a>
+    <a href="/vectordb" target="_blank">Vector DB <small style="color:#64748b">/vectordb</small></a>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Agents & Automation</h3>
+  <div class="grid">
+    <a href="/agents" target="_blank">Agents <small style="color:#64748b">/agents</small></a>
+    <a href="/agents/dashboard" target="_blank">Agents Dashboard <small style="color:#64748b">/agents/dashboard</small></a>
+    <a href="/automation" target="_blank">Automation <small style="color:#64748b">/automation</small></a>
+    <a href="/conversations" target="_blank">Conversations <small style="color:#64748b">/conversations</small></a>
+    <a href="/wcp/workflows" target="_blank">WCP Workflows <small style="color:#64748b">/wcp/workflows</small></a>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Documents & Knowledge</h3>
+  <div class="grid">
+    <a href="/documents" target="_blank">Documents <small style="color:#64748b">/documents</small></a>
+    <a href="/wiki" target="_blank">Wiki <small style="color:#64748b">/wiki</small></a>
+    <a href="/resources" target="_blank">Resources <small style="color:#64748b">/resources</small></a>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Governance & Ops</h3>
+  <div class="grid">
+    <a href="/policies" target="_blank">Policies <small style="color:#64748b">/policies</small></a>
+    <a href="/governance/agents" target="_blank">Governance Agents <small style="color:#64748b">/governance/agents</small></a>
+    <a href="/protocols" target="_blank">Protocols <small style="color:#64748b">/protocols</small></a>
+    <a href="/tools-management" target="_blank">Tools Mgmt <small style="color:#64748b">/tools-management</small></a>
+    <a href="/compliance-export" target="_blank">Compliance Export <small style="color:#64748b">/compliance-export</small></a>
+    <a href="/drift-detection" target="_blank">Drift Detection <small style="color:#64748b">/drift-detection</small></a>
+    <a href="/deploy" target="_blank">Deploy <small style="color:#64748b">/deploy</small></a>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Dev Tools</h3>
+  <div class="grid">
+    <a href="/ui-showcase" target="_blank">UI Showcase <small style="color:#64748b">/ui-showcase</small></a>
+  </div>
+</div>
+
 </body></html>
