@@ -70,15 +70,15 @@ const testActor = { id: "test-user-1", role: "admin" };
 describe("Governance Scorecard Engine — Acceptance Tests", () => {
   beforeEach(() => {
     // Clean up frozen state
-    for (const f of getFrozenSubjects()) {
-      unfreezeSubject(f.subjectId);
+    for (const f of await getFrozenSubjects()) {
+      await unfreezeSubject(f.subjectId, "test-cleanup");
     }
   });
 
   afterEach(() => {
     // Clean up frozen state
-    for (const f of getFrozenSubjects()) {
-      unfreezeSubject(f.subjectId);
+    for (const f of await getFrozenSubjects()) {
+      await unfreezeSubject(f.subjectId, "test-cleanup");
     }
   });
 
@@ -217,7 +217,7 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
       config: { password: "hardcoded123" }, // Critical violation
     };
 
-    const gateResult = requireGate("validate" as LifecycleStage, subject, testActor);
+    const gateResult = await requireGate("validate" as LifecycleStage, subject, testActor);
 
     // Gate should DENY — critical violation present
     expect(gateResult.verdict).toBe("DENY");
@@ -237,7 +237,7 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
       config: {}, // Missing required bot configs
     };
 
-    const gateResult = requireGate("publish" as LifecycleStage, subject, systemActor);
+    const gateResult = await requireGate("publish" as LifecycleStage, subject, systemActor);
 
     // Even system actor must pass governance checks
     // Missing bot configs should fail type pack controls
@@ -261,12 +261,12 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
   // ── Test 10: Frozen subject → transition denied + audited ─────────
   it("10. Frozen subject is blocked from transitions", () => {
     // Freeze the subject
-    freezeSubject(800, "frozen-test", "Critical drift detected", 30, "drift-detector");
+    await freezeSubject(800, "frozen-test", "Critical drift detected", 30, "drift-detector");
 
     expect(isFrozen(800)).toBe(true);
 
     // Try to pass gate
-    const gateResult = requireGate(
+    const gateResult = await requireGate(
       "validate" as LifecycleStage,
       { id: 800, name: "frozen-test", type: "agent", tags: ["registered"] },
       testActor
@@ -277,7 +277,7 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
     expect(gateResult.auditId).toBeTruthy();
 
     // Clean up
-    unfreezeSubject(800);
+    await unfreezeSubject(800, "test-cleanup");
     expect(isFrozen(800)).toBe(false);
   });
 
@@ -313,9 +313,9 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
 
   // ── Test 14: System-wide freeze blocks everything ─────────────────
   it("14. System-wide freeze blocks all transitions", () => {
-    freezeSubject(0, "system", "Global drift freeze", 50, "drift-detector");
+    await freezeSubject(0, "system", "Global drift freeze", 50, "drift-detector");
 
-    const gateResult = requireGate(
+    const gateResult = await requireGate(
       "validate" as LifecycleStage,
       { id: 900, name: "any-subject", type: "provider", tags: ["registered"] },
       testActor
@@ -324,7 +324,7 @@ describe("Governance Scorecard Engine — Acceptance Tests", () => {
     expect(gateResult.verdict).toBe("DENY");
     expect(gateResult.frozen).toBe(true);
 
-    unfreezeSubject(0);
+    await unfreezeSubject(0, "test-cleanup");
   });
 
   // ── Test 15: Gate verdict is ALLOW or DENY ────────────────────────

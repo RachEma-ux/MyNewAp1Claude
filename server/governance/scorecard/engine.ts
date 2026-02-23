@@ -221,7 +221,7 @@ export function runScorecard(request: ScorecardRequest): ScorecardResult {
   }
 
   // Execute each runner
-  for (const [runnerId, runnerControls] of controlsByRunner) {
+  for (const [runnerId, runnerControls] of Array.from(controlsByRunner)) {
     const runner = getRunner(runnerId);
     if (!runner) {
       for (const control of runnerControls) {

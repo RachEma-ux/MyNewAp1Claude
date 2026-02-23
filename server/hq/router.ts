@@ -8,7 +8,6 @@ import {
   isDriftDetectionActive,
   getLastDriftReport,
   isFrozen,
-  runSelfCheck,
   getActiveControls,
 } from "../governance/scorecard";
 
@@ -16,7 +15,7 @@ export const hqRouter = router({
   // 1. Org Authority — workspace owner, system config, governance freeze status
   orgAuthority: protectedProcedure.query(async ({ ctx }) => {
     const providers = await providerDb.getAllProviders();
-    const frozen = getFrozenSubjects();
+    const frozen = await getFrozenSubjects();
     const systemFrozen = isFrozen(0);
 
     return {
@@ -92,7 +91,8 @@ export const hqRouter = router({
   agentOrchestration: protectedProcedure.query(async () => {
     let agents: any[] = [];
     try {
-      agents = await db.getAllAgents();
+      const allModels = await db.getAllModels();
+      agents = allModels.filter((m: any) => m.type === "agent");
     } catch { /* agents table may not exist */ }
 
     return {
@@ -133,7 +133,7 @@ export const hqRouter = router({
   notifications: protectedProcedure.query(async () => {
     const audit = getAuditLogger();
     const events = audit.getRecent(50);
-    const frozen = getFrozenSubjects();
+    const frozen = await getFrozenSubjects();
     const driftReport = getLastDriftReport();
 
     return {

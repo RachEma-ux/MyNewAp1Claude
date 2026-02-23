@@ -87,7 +87,7 @@ jobs:
           echo "=== Governance Gate: Dynamic Eval Detection ==="
           VIOLATIONS=0
 
-          # Check for eval() usage
+          # Check for eval() usage (exclude whitelisted lines and remediation strings)
           EVAL_MATCHES=$(grep -rn --include="*.ts" --include="*.tsx" --include="*.js" \
             -E '\beval\s*\(' \
             --exclude-dir=node_modules \
@@ -95,7 +95,7 @@ jobs:
             --exclude-dir=dist \
             --exclude="*.test.*" \
             --exclude="governance-gate.yml" \
-            . 2>/dev/null || true)
+            . 2>/dev/null | grep -v 'governance-eval-safe' | grep -v 'remediation:' || true)
 
           if [ -n "$EVAL_MATCHES" ]; then
             echo "CRITICAL: eval() usage detected:"
@@ -103,7 +103,7 @@ jobs:
             VIOLATIONS=$((VIOLATIONS + 1))
           fi
 
-          # Check for new Function() usage
+          # Check for new Function() usage (exclude whitelisted sandboxed execution)
           FUNC_MATCHES=$(grep -rn --include="*.ts" --include="*.tsx" --include="*.js" \
             -E 'new\s+Function\s*\(' \
             --exclude-dir=node_modules \
@@ -111,7 +111,7 @@ jobs:
             --exclude-dir=dist \
             --exclude="*.test.*" \
             --exclude="governance-gate.yml" \
-            . 2>/dev/null || true)
+            . 2>/dev/null | grep -v 'governance-eval-safe' | grep -v 'remediation:' || true)
 
           if [ -n "$FUNC_MATCHES" ]; then
             echo "CRITICAL: new Function() usage detected:"

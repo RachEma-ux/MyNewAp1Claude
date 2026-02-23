@@ -69,7 +69,7 @@ export interface HardeningReport {
 /**
  * Run production hardening verification.
  */
-export function runHardeningCheck(): HardeningReport {
+export async function runHardeningCheck(): Promise<HardeningReport> {
   const checks: HardeningCheck[] = [];
   const isProduction = process.env.NODE_ENV === "production";
   const env = process.env.NODE_ENV || "development";
@@ -167,7 +167,7 @@ export function runHardeningCheck(): HardeningReport {
   });
 
   // 9. No system-wide freeze (informational)
-  const frozenSubjects = getFrozenSubjects();
+  const frozenSubjects = await getFrozenSubjects();
   const systemFrozen = frozenSubjects.some((f) => f.subjectId === 0);
   checks.push({
     name: "no_system_freeze",

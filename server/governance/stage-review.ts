@@ -728,6 +728,7 @@ const STAGE_CHECKS: Record<LifecycleStage, ReviewCheckItem[]> = {
   validate: VALIDATE_CHECKS,
   publish: PUBLISH_CHECKS,
   catalog: POST_PUBLISH_CHECKS,
+  mutate: [],
 };
 
 /** Get all checklist items for a specific stage */

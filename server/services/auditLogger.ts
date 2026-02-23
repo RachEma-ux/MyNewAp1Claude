@@ -24,8 +24,12 @@ export type AuditActionType =
   | "ADMIN_ROLE_CHANGE"
   // CGT v2 — Lifecycle & Governance
   | "LIFECYCLE_TRANSITION"
+  | "LIFECYCLE_CHANGE"
   | "PUBLICATION_GATE"
   | "RBAC_DENIAL"
+  | "GATE_CHECK"
+  | "FREEZE_BLOCK"
+  | "PRIVILEGE_ESCALATION_ATTEMPT"
   | "GOVERNANCE_SELF_CHECK"
   | "ARCHITECTURE_VALIDATION"
   | "DRIFT_DETECTION"
@@ -39,7 +43,7 @@ export interface AuditEvent {
   action_type: AuditActionType;
   target_type: string;
   target_id: string | null;
-  decision_result: "success" | "failure" | "denied";
+  decision_result: "success" | "failure" | "denied" | "attempted" | "blocked";
   metadata?: Record<string, unknown>;
 }
 
@@ -56,7 +60,7 @@ class AuditLogger {
     action_type: AuditActionType;
     target_type: string;
     target_id?: string | null;
-    decision_result: "success" | "failure" | "denied";
+    decision_result: "success" | "failure" | "denied" | "attempted" | "blocked";
     metadata?: Record<string, unknown>;
   }): Promise<AuditEvent> {
     const event: AuditEvent = {

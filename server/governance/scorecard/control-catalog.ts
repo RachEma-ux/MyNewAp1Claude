@@ -796,5 +796,5 @@ export function getMaxScore(): number {
 
 /** Get all unique runner IDs needed */
 export function getRequiredRunnerIds(): string[] {
-  return [...new Set(getActiveControls().map((c) => c.runnerId))];
+  return Array.from(new Set(getActiveControls().map((c) => c.runnerId)));
 }

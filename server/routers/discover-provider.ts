@@ -888,7 +888,7 @@ export async function discoverDocsUrl(
 
   // Deduplicate and prioritize found links
   if (docLinkCandidates.length > 0) {
-    const unique = [...new Set(docLinkCandidates)];
+    const unique = Array.from(new Set(docLinkCandidates));
     // Prefer links with /docs or /reference in path
     const best = unique.find((u) => /\/docs|\/reference|\/api-reference/i.test(u)) || unique[0];
     return best;
@@ -971,7 +971,7 @@ export async function extractDocMetadata(
     const endpointRegex = /https?:\/\/[^\s"'<>]+\/v\d+\/[^\s"'<>)}\]]+/g;
     const epMatches = body.match(endpointRegex);
     if (epMatches) {
-      const unique = [...new Set(epMatches.map((u) => u.replace(/[.,;:]+$/, "")))];
+      const unique = Array.from(new Set(epMatches.map((u) => u.replace(/[.,;:]+$/, ""))));
       endpoints.push(...unique.slice(0, 10));
     }
 

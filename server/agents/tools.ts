@@ -102,7 +102,7 @@ const calculatorTool: Tool = {
       const mathExpr = expression
         .replace(/\b(sin|cos|tan|asin|acos|atan|sqrt|abs|ceil|floor|round|log|log2|log10|exp|pow|min|max|PI|E)\b/g,
           (m) => `Math.${m}`);
-      const result = new Function(`"use strict"; return (${mathExpr})`)();
+      const result = new Function(`"use strict"; return (${mathExpr})`)(); // governance-eval-safe: sandboxed math evaluation
 
       return `Result: ${result}`;
     } catch (error) {

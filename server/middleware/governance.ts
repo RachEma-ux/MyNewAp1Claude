@@ -116,7 +116,7 @@ export function blockIfFrozen() {
  *   app.post("/api/catalog/:id/publish", requireGateMiddleware("publish"), handler);
  */
 export function requireGateMiddleware(stage: LifecycleStage) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const subject = extractSubject(req);
       if (!subject) {
@@ -131,7 +131,14 @@ export function requireGateMiddleware(stage: LifecycleStage) {
         role: extractActorRole(req),
       };
 
-      const result = requireGate(stage, subject, actor);
+      const result = await requireGate(stage, {
+        id: subject.subjectId,
+        name: subject.subjectName,
+        type: subject.subjectType,
+        tags: subject.tags,
+        description: subject.description,
+        config: subject.config,
+      }, actor);
 
       if (result.denied) {
         return res.status(409).json({
@@ -237,7 +244,7 @@ export function validateRole(requiredPermission: PermissionAction) {
  * Run gate check inside a tRPC procedure.
  * Throws TRPCError on DENY.
  */
-export function enforceTRPCGate(
+export async function enforceTRPCGate(
   stage: LifecycleStage,
   subject: {
     id: number;
@@ -250,7 +257,7 @@ export function enforceTRPCGate(
   actor: { id: string; role: string }
 ) {
   const { TRPCError } = require("@trpc/server");
-  const result = requireGate(stage, subject, actor);
+  const result = await requireGate(stage, subject, actor);
 
   if (result.denied) {
     throw new TRPCError({

@@ -213,7 +213,7 @@ export const agentsRouter = router({
       .limit(1);
 
     const currentPolicyHash = activePolicy[0]
-      ? createHash("sha256").update(activePolicy[0].content || "").digest("hex").slice(0, 16)
+      ? createHash("sha256").update(String(activePolicy[0].content || "")).digest("hex").slice(0, 16)
       : null;
 
     const driftResults = agentList.map((agent) => {
@@ -326,7 +326,7 @@ export const agentsRouter = router({
         .limit(1);
 
       const currentPolicyHash = activePolicy[0]
-        ? createHash("sha256").update(activePolicy[0].content || "").digest("hex").slice(0, 16)
+        ? createHash("sha256").update(String(activePolicy[0].content || "")).digest("hex").slice(0, 16)
         : null;
 
       if (a.status === "governed" && currentPolicyHash && a.policyDigest !== currentPolicyHash) {

@@ -268,8 +268,8 @@ export async function detectDrift(config?: Partial<DriftConfig>): Promise<DriftR
       .map((r) => r.controlId)
   );
 
-  const newViolations = [...currentFails].filter((id) => !previousFails.has(id));
-  const resolvedViolations = [...previousFails].filter((id) => !currentFails.has(id));
+  const newViolations = Array.from(currentFails).filter((id) => !previousFails.has(id));
+  const resolvedViolations = Array.from(previousFails).filter((id) => !currentFails.has(id));
 
   // Enhanced drift checks (Phase 7)
   const driftChecks = runEnhancedDriftChecks();
@@ -480,11 +480,11 @@ async function logDriftAuditEvent(
   const audit = getAuditLogger();
   await audit.log({
     actor_id: "drift-detector",
-    action_type: eventType as any,
+    action_type: "DRIFT_DETECTION",
     target_type: "drift_detection",
     target_id: String(subjectId),
     decision_result: "success",
-    metadata: { subjectName, reason, score, timestamp: new Date().toISOString() },
+    metadata: { eventType, subjectName, reason, score, timestamp: new Date().toISOString() },
   });
 }
 
@@ -526,9 +526,9 @@ export function startDriftDetection(config?: Partial<DriftConfig>): void {
 
   console.log(`[Governance Drift] Starting scheduled detection (interval: ${cfg.intervalMs}ms, autoFreeze: ${cfg.autoFreeze})`);
 
-  _driftInterval = setInterval(() => {
+  _driftInterval = setInterval(async () => {
     try {
-      detectDrift(cfg);
+      await detectDrift(cfg);
     } catch (err) {
       console.error("[Governance Drift] Detection failed:", err);
     }

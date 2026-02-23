@@ -93,7 +93,7 @@ const requireGovernance = t.middleware(async (opts) => {
   }
 
   // 3. Always run requireGate
-  const result = requireGate(
+  const result = await requireGate(
     stage as any,
     subject,
     {

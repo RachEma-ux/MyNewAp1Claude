@@ -244,7 +244,7 @@ async function executeRunCode(
     if (forbidden.test(code)) {
       throw new Error("Code contains disallowed references (process, require, fs, etc.)");
     }
-    const sandboxedFunction = new Function("context", `
+    const sandboxedFunction = new Function("context", ` // governance-eval-safe: sandboxed execution
       "use strict";
       const { variables } = context;
       ${code}

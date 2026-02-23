@@ -622,10 +622,11 @@ export const governanceRouter = router({
    * Get drift detection status.
    */
   driftStatus: protectedProcedure.query(async () => {
+    const frozen = await getFrozenSubjects();
     return {
       active: isDriftDetectionActive(),
-      frozenSubjects: getFrozenSubjects(),
-      frozenCount: getFrozenSubjects().length,
+      frozenSubjects: frozen,
+      frozenCount: frozen.length,
     };
   }),
 
@@ -676,18 +677,7 @@ export const governanceRouter = router({
   unfreezeSubject: adminProcedure
     .input(z.object({ subjectId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      const unfrozen = unfreezeSubject(input.subjectId);
-
-      const audit = getAuditLogger();
-      audit.log({
-        actor_id: String(ctx.user.id),
-        action_type: "LIFECYCLE_TRANSITION",
-        target_type: "unfreeze",
-        target_id: String(input.subjectId),
-        decision_result: unfrozen ? "success" : "failure",
-        metadata: { subjectId: input.subjectId },
-      });
-
+      const unfrozen = await unfreezeSubject(input.subjectId, String(ctx.user.id));
       return { unfrozen, subjectId: input.subjectId };
     }),
 

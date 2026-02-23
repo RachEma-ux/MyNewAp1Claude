@@ -77,7 +77,7 @@ export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
 const ROLE_PERMISSIONS: Record<GovernanceRole, Set<PermissionAction>> = {
   admin: new Set(PERMISSION_ACTIONS), // Admin has all permissions
 
-  governance_reviewer: new Set([
+  governance_reviewer: new Set<PermissionAction>([
     "lifecycle.validate",
     "lifecycle.publish",
     "lifecycle.recall",
@@ -91,7 +91,7 @@ const ROLE_PERMISSIONS: Record<GovernanceRole, Set<PermissionAction>> = {
     "policy.activate",
   ]),
 
-  operator: new Set([
+  operator: new Set<PermissionAction>([
     "lifecycle.submit",
     "lifecycle.register",
     "provider.create",
@@ -108,7 +108,7 @@ const ROLE_PERMISSIONS: Record<GovernanceRole, Set<PermissionAction>> = {
     "governance.drift.read",
   ]),
 
-  developer: new Set([
+  developer: new Set<PermissionAction>([
     "lifecycle.submit",
     "provider.create",
     "agent.create",
@@ -120,13 +120,13 @@ const ROLE_PERMISSIONS: Record<GovernanceRole, Set<PermissionAction>> = {
     "audit.read",
   ]),
 
-  user: new Set([
+  user: new Set<PermissionAction>([
     "agent.execute",
     "workflow.execute",
     "audit.read",
   ]),
 
-  system: new Set([
+  system: new Set<PermissionAction>([
     "lifecycle.submit",
     "lifecycle.register",
     "lifecycle.validate",
