@@ -124,8 +124,9 @@ export function getStaticCatalogEntries(): StaticCatalogEntry[] {
       status: "active",
       origin: "static",
       config: { providerId: p.id },
-      tags: [p.id],
+      tags: [p.id, "candidate", "registered", "validated", "published"],
       reviewState: "approved",
+      stageReviews: { register: "approved", validate: "approved", publish: "approved" },
     });
 
     // Model entries
@@ -142,8 +143,9 @@ export function getStaticCatalogEntries(): StaticCatalogEntry[] {
         status: "active",
         origin: "static",
         config: { providerId: p.id, contextLength: m.contextLength },
-        tags: [p.id],
+        tags: [p.id, "candidate", "registered", "validated", "published"],
         reviewState: "approved",
+        stageReviews: { register: "approved", validate: "approved", publish: "approved" },
       });
     }
   }
