@@ -69,16 +69,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
   // Start closed on mobile, open on desktop
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [headerActions, setHeaderActions] = useState<ReactNode>(null);
-  const [llmMenuOpen, setLlmMenuOpen] = useState(false);
-  const [providersMenuOpen, setProvidersMenuOpen] = useState(false);
-  const [aiTypesProvidersMenuOpen, setAiTypesProvidersMenuOpen] = useState(false);
   const [automationMenuOpen, setAutomationMenuOpen] = useState(false);
   const [infrastructureMenuOpen, setInfrastructureMenuOpen] = useState(false);
-  const [agentsMenuOpen, setAgentsMenuOpen] = useState(false);
-  const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [hardwareMenuOpen, setHardwareMenuOpen] = useState(false);
   const [softwareMenuOpen, setSoftwareMenuOpen] = useState(false);
   const [aiTypesMenuOpen, setAiTypesMenuOpen] = useState(false);
+  const [aiTypesSubMenus, setAiTypesSubMenus] = useState<Record<string, boolean>>({});
   const logoutMutation = trpc.auth.logout.useMutation();
 
   const handleLogout = async () => {
@@ -92,45 +88,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { label: "Conversations", icon: <MessagesSquare className="w-5 h-5" />, href: "/conversations" },
     { label: "Workspaces", icon: <FolderOpen className="w-5 h-5" />, href: "/workspaces" },
     { label: "Documents", icon: <FileText className="w-5 h-5" />, href: "/documents/dashboard" },
-    { 
-      label: "Agents", 
-      icon: <Bot className="w-5 h-5" />,
-      children: [
-        { 
-          label: "Create", 
-          icon: <Bot className="w-4 h-4" />,
-          children: [
-            { label: "From Template", icon: <Bot className="w-3 h-3" />, href: "/agents/create?mode=template" },
-            { label: "From Scratch", icon: <Bot className="w-3 h-3" />, href: "/agents/create?mode=scratch" },
-            { label: "Clone Existing", icon: <Bot className="w-3 h-3" />, href: "/agents/create?mode=clone" },
-            { label: "From Workflow", icon: <Bot className="w-3 h-3" />, href: "/agents/create?mode=workflow" },
-            { label: "From Conversation", icon: <Bot className="w-3 h-3" />, href: "/agents/create?mode=conversation" },
-            { label: "From Event Trigger", icon: <Bot className="w-3 h-3" />, href: "/agents/create?mode=event" },
-            { label: "Import Spec", icon: <Bot className="w-3 h-3" />, href: "/agents/create?mode=import" },
-          ]
-        },
-        { label: "Manage", icon: <Settings className="w-4 h-4" />, href: "/agents" },
-        { label: "Approvals", icon: <Activity className="w-4 h-4" />, href: "/promotion-requests" },
-        { label: "Dashboard", icon: <BarChart3 className="w-4 h-4" />, href: "/agent-dashboard" },
-        { label: "Drift Detection", icon: <Activity className="w-4 h-4" />, href: "/drift-detection" },
-        { label: "Compliance Export", icon: <FileText className="w-4 h-4" />, href: "/compliance-export" },
-        { label: "Auto-Remediation", icon: <Zap className="w-4 h-4" />, href: "/auto-remediation" },
-        { label: "Tools Management", icon: <Package className="w-4 h-4" />, href: "/tools-management" },
-        { label: "Protocols", icon: <FileText className="w-4 h-4" />, href: "/protocols" },
-        { label: "Policies", icon: <Key className="w-4 h-4" />, href: "/policies" },
-      ]
-    },
-    {
-      label: "LLM",
-      icon: <Database className="w-5 h-5" />,
-      children: [
-        { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/llm" },
-        { label: "Control Plane", icon: <Settings className="w-4 h-4" />, href: "/llm/control-plane" },
-        { label: "Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/llm/create" },
-        { label: "Catalogue", icon: <List className="w-4 h-4" />, href: "/llm/catalogue" },
-      ]
-    },
-    { label: "Models", icon: <Package className="w-5 h-5" />, href: "/models" },
     {
       label: "AI Types",
       icon: <Database className="w-5 h-5" />,
@@ -144,9 +101,38 @@ export default function MainLayout({ children }: MainLayoutProps) {
             { label: "Settings", icon: <Settings className="w-3 h-3" />, href: "/settings" },
           ]
         },
-        { label: "LLMs", icon: <Database className="w-4 h-4" />, href: "/ai-types/llms" },
-        { label: "Models", icon: <Package className="w-4 h-4" />, href: "/ai-types/models" },
-        { label: "Agents", icon: <Bot className="w-4 h-4" />, href: "/ai-types/agents" },
+        {
+          label: "LLMs",
+          icon: <Database className="w-4 h-4" />,
+          children: [
+            { label: "Dashboard", icon: <LayoutDashboard className="w-3 h-3" />, href: "/llm" },
+            { label: "Control Plane", icon: <Settings className="w-3 h-3" />, href: "/llm/control-plane" },
+            { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/llm/create" },
+            { label: "Catalogue", icon: <List className="w-3 h-3" />, href: "/llm/catalogue" },
+          ]
+        },
+        {
+          label: "Models",
+          icon: <Package className="w-4 h-4" />,
+          children: [
+            { label: "Browse", icon: <Package className="w-3 h-3" />, href: "/models" },
+          ]
+        },
+        {
+          label: "Agents",
+          icon: <Bot className="w-4 h-4" />,
+          children: [
+            { label: "Manage", icon: <Settings className="w-3 h-3" />, href: "/agents" },
+            { label: "Approvals", icon: <Activity className="w-3 h-3" />, href: "/promotion-requests" },
+            { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/agent-dashboard" },
+            { label: "Drift Detection", icon: <Activity className="w-3 h-3" />, href: "/drift-detection" },
+            { label: "Compliance Export", icon: <FileText className="w-3 h-3" />, href: "/compliance-export" },
+            { label: "Auto-Remediation", icon: <Zap className="w-3 h-3" />, href: "/auto-remediation" },
+            { label: "Tools Management", icon: <Package className="w-3 h-3" />, href: "/tools-management" },
+            { label: "Protocols", icon: <FileText className="w-3 h-3" />, href: "/protocols" },
+            { label: "Policies", icon: <Key className="w-3 h-3" />, href: "/policies" },
+          ]
+        },
         { label: "Bots", icon: <MessageSquare className="w-4 h-4" />, href: "/ai-types/bots" },
         { label: "Other", icon: <Activity className="w-4 h-4" />, href: "/ai-types/other" },
       ]
@@ -244,16 +230,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 <div key={item.label}>
                   <button
                     onClick={() => {
-                      if (item.label === "LLM") {
-                        setLlmMenuOpen(!llmMenuOpen);
-                      } else if (item.label === "Providers") {
-                        setProvidersMenuOpen(!providersMenuOpen);
-                      } else if (item.label === "Automation") {
+                      if (item.label === "Automation") {
                         setAutomationMenuOpen(!automationMenuOpen);
                       } else if (item.label === "Infrastructure") {
                         setInfrastructureMenuOpen(!infrastructureMenuOpen);
-                      } else if (item.label === "Agents") {
-                        setAgentsMenuOpen(!agentsMenuOpen);
                       } else if (item.label === "AI Types") {
                         setAiTypesMenuOpen(!aiTypesMenuOpen);
                       }
@@ -264,10 +244,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "Agents" && agentsMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
-                  {/* LLM, Providers and Automation menus (2-level) */}
-                  {((item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen)) && (
+                  {/* Automation menu (2-level) */}
+                  {(item.label === "Automation" && automationMenuOpen) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>
@@ -286,77 +266,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       ))}
                     </div>
                   )}
-                  {/* Agents menu (3-level with Create submenu) */}
-                  {item.label === "Agents" && agentsMenuOpen && (
-                    <div className="ml-4 mt-1 space-y-1">
-                      {item.children.map((child) => (
-                        child.children ? (
-                          <div key={child.label}>
-                            <button
-                              onClick={() => setCreateMenuOpen(!createMenuOpen)}
-                              className="flex w-full items-center justify-between space-x-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                            >
-                              <div className="flex items-center space-x-2">
-                                {child.icon}
-                                <span>{child.label}</span>
-                              </div>
-                              {createMenuOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                            </button>
-                            {createMenuOpen && (
-                              <div className="ml-4 mt-1 space-y-1">
-                                {child.children.map((grandchild) => (
-                                  <Link key={grandchild.href} href={grandchild.href!}>
-                                    <a
-                                      onClick={() => setSidebarOpen(false)}
-                                      className={`flex items-center space-x-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-                                        isActive(grandchild.href!)
-                                          ? "bg-primary text-primary-foreground"
-                                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                      }`}
-                                    >
-                                      {grandchild.icon}
-                                      <span>{grandchild.label}</span>
-                                    </a>
-                                  </Link>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <Link key={child.href} href={child.href!}>
-                            <a
-                              onClick={() => setSidebarOpen(false)}
-                              className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                                isActive(child.href!)
-                                  ? "bg-primary text-primary-foreground"
-                                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                              }`}
-                            >
-                              {child.icon}
-                              <span>{child.label}</span>
-                            </a>
-                          </Link>
-                        )
-                      ))}
-                    </div>
-                  )}
-                  {/* AI Types menu (3-level with Providers submenu) */}
+                  {/* AI Types menu (3-level with dynamic sub-menus) */}
                   {item.label === "AI Types" && aiTypesMenuOpen && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         child.children ? (
                           <div key={child.label}>
                             <button
-                              onClick={() => setAiTypesProvidersMenuOpen(!aiTypesProvidersMenuOpen)}
+                              onClick={() => setAiTypesSubMenus(prev => ({ ...prev, [child.label]: !prev[child.label] }))}
                               className="flex w-full items-center justify-between space-x-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                             >
                               <div className="flex items-center space-x-2">
                                 {child.icon}
                                 <span>{child.label}</span>
                               </div>
-                              {aiTypesProvidersMenuOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                              {aiTypesSubMenus[child.label] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                             </button>
-                            {aiTypesProvidersMenuOpen && child.children && (
+                            {aiTypesSubMenus[child.label] && child.children && (
                               <div className="ml-4 mt-1 space-y-1">
                                 {child.children.map((grandchild) => (
                                   <Link key={grandchild.href} href={grandchild.href!}>
