@@ -15,3 +15,4 @@ export * from './tables/system';
 export * from './tables/llm';
 export * from './tables/catalog';
 export * from './tables/governance';
+export * from './tables/enforcement';

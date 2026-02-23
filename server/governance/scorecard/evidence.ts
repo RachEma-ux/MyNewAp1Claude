@@ -10,6 +10,8 @@
 
 import { createHash } from "crypto";
 import type { AggregatedScorecard } from "./aggregator";
+import { getDb } from "../../db";
+import { evidenceBundles } from "../../../drizzle/schema";
 
 // ============================================================================
 // Types
@@ -142,6 +144,28 @@ export function verifyBundleIntegrity(bundle: EvidenceBundle): boolean {
 function computeHash(data: any): string {
   const json = JSON.stringify(data, null, 0); // deterministic serialization
   return createHash("sha256").update(json).digest("hex");
+}
+
+/**
+ * Persist an evidence bundle to the database (content-addressed).
+ * Blocking write — failure propagates to caller.
+ */
+export async function persistEvidenceBundle(bundle: EvidenceBundle): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+
+  await db.insert(evidenceBundles).values({
+    bundleId: bundle.bundleId,
+    version: bundle.version,
+    stage: bundle.stage,
+    score: bundle.score,
+    gatePassed: bundle.gatePassed,
+    gateReason: bundle.gateReason,
+    triggeredBy: bundle.triggeredBy,
+    commitRef: bundle.commitRef,
+    integrityHash: bundle.integrityHash,
+    bundleData: bundle as unknown as Record<string, unknown>,
+  });
 }
 
 /**

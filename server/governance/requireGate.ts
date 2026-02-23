@@ -22,6 +22,7 @@
 
 import { createHash } from "crypto";
 import { runScorecard, isFrozen, getFreezeDetails, type ScorecardResult } from "./scorecard";
+import { persistEvidenceBundle } from "./scorecard/evidence";
 import { getAuditLogger } from "../services/auditLogger";
 import type { LifecycleStage } from "./lifecycle-guard";
 
@@ -62,12 +63,15 @@ export interface GateResult {
  *
  * Checks (in order):
  *   1. Subject frozen? → DENY
- *   2. System-wide freeze? → DENY
- *   3. Run scorecard → evaluate gate
+ *   2. Run scorecard → evaluate gate
+ *   3. Persist evidence bundle
  *   4. Gate FAIL → DENY (409)
  *   5. Gate PASS → ALLOW (200)
+ *
+ * Note: System-wide freeze is handled by the requireFreeze middleware
+ * in trpc.ts, which runs BEFORE this function.
  */
-export function requireGate(
+export async function requireGate(
   stage: LifecycleStage,
   subject: {
     id: number;
@@ -81,7 +85,7 @@ export function requireGate(
     id: string;
     role: string;
   }
-): GateResult {
+): Promise<GateResult> {
   const audit = getAuditLogger();
 
   // ── Check 1: Subject frozen ──────────────────────────────────────────
@@ -89,7 +93,7 @@ export function requireGate(
     const details = getFreezeDetails(subject.id);
     const reason = `Subject #${subject.id} "${subject.name}" is FROZEN: ${details?.reason || "governance freeze active"}`;
 
-    const event = audit.log({
+    const event = await audit.log({
       actor_id: actor.id,
       action_type: "GATE_CHECK",
       target_type: "lifecycle_gate",
@@ -113,48 +117,22 @@ export function requireGate(
     };
   }
 
-  // ── Check 2: System-wide freeze ──────────────────────────────────────
-  if (isFrozen(0)) {
-    const details = getFreezeDetails(0);
-    const reason = `System-wide governance FREEZE active: ${details?.reason || "resolve drift violations first"}`;
-
-    const event = audit.log({
-      actor_id: actor.id,
-      action_type: "GATE_CHECK",
-      target_type: "lifecycle_gate",
-      target_id: "system",
-      decision_result: "denied",
-      metadata: { stage, verdict: "DENY", reason, frozen: true, systemWide: true },
-    });
-
-    return {
-      verdict: "DENY",
-      denied: true,
-      reason,
-      httpStatus: 409,
-      auditId: event.event_id,
-      frozen: true,
-      freezeDetails: details ? {
-        reason: details.reason,
-        frozenAt: details.frozenAt,
-        frozenBy: details.frozenBy,
-      } : undefined,
-    };
-  }
-
-  // ── Check 3: Run scorecard ───────────────────────────────────────────
+  // ── Check 2: Run scorecard ───────────────────────────────────────────
   const scorecardResult = runScorecard({
     stage,
     entry: subject,
     actor,
   });
 
+  // ── Persist evidence bundle ──────────────────────────────────────────
+  await persistEvidenceBundle(scorecardResult.evidence);
+
   const gatePassed = scorecardResult.scorecard.gateStatus.passed;
   const verdict: GateVerdict = gatePassed ? "ALLOW" : "DENY";
   const reason = scorecardResult.scorecard.gateStatus.reason;
 
-  // ── Audit log ────────────────────────────────────────────────────────
-  const event = audit.log({
+  // ── Audit log (blocking) ─────────────────────────────────────────────
+  const event = await audit.log({
     actor_id: actor.id,
     action_type: "GATE_CHECK",
     target_type: "lifecycle_gate",

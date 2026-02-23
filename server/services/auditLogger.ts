@@ -47,9 +47,10 @@ class AuditLogger {
   private buffer: AuditEvent[] = [];
 
   /**
-   * Record an audit event. Persists to DB asynchronously.
+   * Record an audit event. Persists to DB with blocking write.
+   * Failure to persist throws — callers must handle or propagate.
    */
-  log(params: {
+  async log(params: {
     actor_id?: string | null;
     workspace_id?: string | null;
     action_type: AuditActionType;
@@ -57,7 +58,7 @@ class AuditLogger {
     target_id?: string | null;
     decision_result: "success" | "failure" | "denied";
     metadata?: Record<string, unknown>;
-  }): AuditEvent {
+  }): Promise<AuditEvent> {
     const event: AuditEvent = {
       event_id: randomUUID(),
       timestamp: new Date(),
@@ -78,10 +79,8 @@ class AuditLogger {
 
     console.log(`[Audit] ${event.action_type} ${event.target_type}:${event.target_id ?? "?"} → ${event.decision_result}`);
 
-    // Persist (fire-and-forget)
-    this.persistToDb(event).catch((err) => {
-      console.error("[AuditLogger] Failed to persist:", err.message);
-    });
+    // Blocking persist — failure propagates to caller
+    await this.persistToDb(event);
 
     return event;
   }

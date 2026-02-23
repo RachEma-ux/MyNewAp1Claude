@@ -16,6 +16,10 @@
 
 import { runScorecard, getLatestScorecard, type ScorecardResult } from "./engine";
 import type { LifecycleStage } from "../lifecycle-guard";
+import { getDb } from "../../db";
+import { subjectFreezes, driftEvents } from "../../../drizzle/schema";
+import { eq } from "drizzle-orm";
+import { getAuditLogger } from "../../services/auditLogger";
 
 // ============================================================================
 // Types
@@ -104,14 +108,15 @@ const _frozenSubjects = new Map<number, FrozenSubject>();
 
 /**
  * Freeze a subject — blocks all lifecycle transitions until explicitly unfrozen.
+ * Writes to DB (primary store) + in-memory cache (fast reads).
  */
-export function freezeSubject(
+export async function freezeSubject(
   subjectId: number,
   subjectName: string,
   reason: string,
   scoreAtFreeze: number,
   frozenBy: string = "drift-detector"
-): FrozenSubject {
+): Promise<FrozenSubject> {
   const frozen: FrozenSubject = {
     subjectId,
     subjectName,
@@ -120,6 +125,23 @@ export function freezeSubject(
     scoreAtFreeze,
     frozenBy,
   };
+
+  // Write to DB (primary store)
+  const db = getDb();
+  if (db) {
+    // Upsert: delete existing freeze for this subject, then insert
+    await db.delete(subjectFreezes).where(eq(subjectFreezes.subjectId, subjectId));
+    await db.insert(subjectFreezes).values({
+      subjectId,
+      subjectName,
+      reason,
+      scoreAtFreeze,
+      frozenBy,
+      frozenAt: frozen.frozenAt,
+    });
+  }
+
+  // Write to cache
   _frozenSubjects.set(subjectId, frozen);
 
   console.warn(
@@ -131,14 +153,41 @@ export function freezeSubject(
 
 /**
  * Unfreeze a subject — allows lifecycle transitions to resume.
+ * Requires actorId for audit trail. Deletes from DB + cache.
  */
-export function unfreezeSubject(subjectId: number): boolean {
+export async function unfreezeSubject(subjectId: number, actorId: string): Promise<boolean> {
   const existed = _frozenSubjects.has(subjectId);
   if (existed) {
     const subject = _frozenSubjects.get(subjectId)!;
+
+    // Delete from DB
+    const db = getDb();
+    if (db) {
+      await db.delete(subjectFreezes).where(eq(subjectFreezes.subjectId, subjectId));
+    }
+
+    // Delete from cache
     _frozenSubjects.delete(subjectId);
+
+    // Audit log the unfreeze
+    const audit = getAuditLogger();
+    await audit.log({
+      actor_id: actorId,
+      action_type: "DRIFT_DETECTION",
+      target_type: "subject_unfreeze",
+      target_id: String(subjectId),
+      decision_result: "success",
+      metadata: {
+        subjectName: subject.subjectName,
+        scoreAtFreeze: subject.scoreAtFreeze,
+        frozenAt: subject.frozenAt.toISOString(),
+        frozenBy: subject.frozenBy,
+        unfrozenBy: actorId,
+      },
+    });
+
     console.log(
-      `[Governance Freeze] Subject #${subjectId} "${subject.subjectName}" UNFROZEN`
+      `[Governance Freeze] Subject #${subjectId} "${subject.subjectName}" UNFROZEN by ${actorId}`
     );
   }
   return existed;
@@ -152,9 +201,22 @@ export function isFrozen(subjectId: number): boolean {
 }
 
 /**
- * Get all frozen subjects.
+ * Get all frozen subjects from DB (authoritative source).
+ * Falls back to in-memory cache if DB is unavailable.
  */
-export function getFrozenSubjects(): FrozenSubject[] {
+export async function getFrozenSubjects(): Promise<FrozenSubject[]> {
+  const db = getDb();
+  if (db) {
+    const rows = await db.select().from(subjectFreezes);
+    return rows.map((r) => ({
+      subjectId: r.subjectId,
+      subjectName: r.subjectName,
+      frozenAt: r.frozenAt,
+      reason: r.reason,
+      scoreAtFreeze: r.scoreAtFreeze,
+      frozenBy: r.frozenBy,
+    }));
+  }
   return Array.from(_frozenSubjects.values());
 }
 
@@ -180,7 +242,7 @@ export function getFreezeDetails(subjectId: number): FrozenSubject | undefined {
  *   - Generate drift scorecard
  *   - If severity >= High → freeze subject + log audit event
  */
-export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
+export async function detectDrift(config?: Partial<DriftConfig>): Promise<DriftReport> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   const previous = getLatestScorecard();
 
@@ -243,7 +305,7 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
   // Auto-freeze on severe drift
   const frozenSubjectIds: number[] = [];
   if (cfg.autoFreeze && scoreDelta <= -cfg.freezeThreshold) {
-    freezeSubject(
+    await freezeSubject(
       0,
       "system",
       `Drift detection: score dropped ${Math.abs(scoreDelta)} points (freeze threshold: ${cfg.freezeThreshold})`,
@@ -252,14 +314,13 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
     );
     frozenSubjectIds.push(0);
 
-    // Audit log the freeze (Phase 7)
-    logDriftAuditEvent("DRIFT_FREEZE", "system", 0, `Score drop: ${previousScore} → ${currentScore}`, currentScore);
+    await logDriftAuditEvent("DRIFT_FREEZE", "system", 0, `Score drop: ${previousScore} → ${currentScore}`, currentScore);
   }
 
   // Freeze if critical violations appeared
   if (cfg.autoFreeze && current.scorecard.riskBreakdown.critical > 0 && (previous?.scorecard.riskBreakdown.critical ?? 0) === 0) {
     if (!_frozenSubjects.has(0)) {
-      freezeSubject(
+      await freezeSubject(
         0,
         "system",
         `New Critical violation(s) detected during drift check`,
@@ -268,7 +329,7 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
       );
       frozenSubjectIds.push(0);
 
-      logDriftAuditEvent("DRIFT_CRITICAL_FREEZE", "system", 0,
+      await logDriftAuditEvent("DRIFT_CRITICAL_FREEZE", "system", 0,
         `${current.scorecard.riskBreakdown.critical} new Critical violations`, currentScore);
     }
   }
@@ -276,7 +337,7 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
   // Phase 7: Freeze on High severity if score also dropped
   if (cfg.autoFreeze && current.scorecard.riskBreakdown.high > 0 &&
       scoreDelta <= -(cfg.scoreDropThreshold) && !_frozenSubjects.has(0)) {
-    freezeSubject(
+    await freezeSubject(
       0,
       "system",
       `High violations + score drop detected during drift check`,
@@ -285,7 +346,7 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
     );
     frozenSubjectIds.push(0);
 
-    logDriftAuditEvent("DRIFT_HIGH_FREEZE", "system", 0,
+    await logDriftAuditEvent("DRIFT_HIGH_FREEZE", "system", 0,
       `${current.scorecard.riskBreakdown.high} High violations + score drop`, currentScore);
   }
 
@@ -303,7 +364,24 @@ export function detectDrift(config?: Partial<DriftConfig>): DriftReport {
     frozenSubjectIds,
   };
 
-  // Store
+  // Persist drift event to DB
+  const db = getDb();
+  if (db) {
+    await db.insert(driftEvents).values({
+      driftDetected: report.driftDetected,
+      scoreDelta: report.scoreDelta,
+      previousScore: report.previousScore,
+      currentScore: report.currentScore,
+      newViolations: report.newViolations,
+      resolvedViolations: report.resolvedViolations,
+      gatePassed: report.gatePassed,
+      escalationNeeded: report.escalationNeeded,
+      escalationReason: report.escalationReason ?? null,
+      frozenSubjectIds: report.frozenSubjectIds,
+    });
+  }
+
+  // In-memory buffer (for fast reads)
   _lastDriftReport = report;
   _driftHistory.push(report);
   if (_driftHistory.length > MAX_DRIFT_HISTORY) {
@@ -390,27 +468,48 @@ function runEnhancedDriftChecks(): EnhancedDriftResult {
 }
 
 /**
- * Log a drift audit event.
+ * Log a drift audit event (blocking write).
  */
-function logDriftAuditEvent(
+async function logDriftAuditEvent(
   eventType: string,
   subjectName: string,
   subjectId: number,
   reason: string,
   score: number
-): void {
-  try {
-    const { getAuditLogger } = require("../../services/auditLogger");
-    getAuditLogger().log({
-      actor_id: "drift-detector",
-      action_type: eventType,
-      target_type: "drift_detection",
-      target_id: String(subjectId),
-      decision_result: "freeze_applied",
-      metadata: { subjectName, reason, score, timestamp: new Date().toISOString() },
+): Promise<void> {
+  const audit = getAuditLogger();
+  await audit.log({
+    actor_id: "drift-detector",
+    action_type: eventType as any,
+    target_type: "drift_detection",
+    target_id: String(subjectId),
+    decision_result: "success",
+    metadata: { subjectName, reason, score, timestamp: new Date().toISOString() },
+  });
+}
+
+/**
+ * Hydrate the in-memory freeze cache from DB on startup.
+ * Must be called once during server boot.
+ */
+export async function hydrateFreezeCache(): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+
+  const rows = await db.select().from(subjectFreezes);
+  for (const row of rows) {
+    _frozenSubjects.set(row.subjectId, {
+      subjectId: row.subjectId,
+      subjectName: row.subjectName,
+      frozenAt: row.frozenAt,
+      reason: row.reason,
+      scoreAtFreeze: row.scoreAtFreeze,
+      frozenBy: row.frozenBy,
     });
-  } catch {
-    // Audit logger not available — continue
+  }
+
+  if (rows.length > 0) {
+    console.log(`[Governance Freeze] Hydrated ${rows.length} frozen subject(s) from DB`);
   }
 }
 
