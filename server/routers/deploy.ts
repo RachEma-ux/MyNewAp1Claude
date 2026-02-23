@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 
 // GitHub API configuration
@@ -128,7 +128,7 @@ export const deployRouter = router({
   }),
 
   // Trigger a new deployment
-  trigger: protectedProcedure
+  trigger: governedProcedure
     .input(triggerDeploySchema)
     .mutation(async ({ input }) => {
       const { repo } = getGitHubConfig();
@@ -433,7 +433,7 @@ export const deployRouter = router({
     }),
 
   // Cancel a running deployment
-  cancel: protectedProcedure
+  cancel: governedProcedure
     .input(z.object({ runId: z.number() }))
     .mutation(async ({ input }) => {
       const { repo } = getGitHubConfig();
@@ -453,7 +453,7 @@ export const deployRouter = router({
     }),
 
   // Re-run a failed deployment
-  rerun: protectedProcedure
+  rerun: governedProcedure
     .input(z.object({ runId: z.number() }))
     .mutation(async ({ input }) => {
       const { repo } = getGitHubConfig();

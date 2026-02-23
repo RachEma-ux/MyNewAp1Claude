@@ -39,7 +39,7 @@ function scanFile(filePath: string): FileReport | null {
     if (line.includes(".mutation(")) {
       report.totalMutations++;
       // Look backwards for procedure type
-      const context = lines.slice(Math.max(0, i - 5), i + 1).join("\n");
+      const context = lines.slice(Math.max(0, i - 15), i + 1).join("\n");
       if (
         context.includes("governedProcedure") ||
         context.includes("governedAdminProcedure")

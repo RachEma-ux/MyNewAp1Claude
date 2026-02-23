@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure, adminProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, governedProcedure, governedAdminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { triggerRegistry, type InsertTriggerRegistryEntry } from "../../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -143,7 +143,7 @@ function validateTriggerHardRules(data: z.infer<typeof triggerCreateSchema>) {
 
 export const triggersRouter = router({
   // Create new trigger type
-  create: protectedProcedure
+  create: governedProcedure
     .input(triggerCreateSchema)
     .mutation(async ({ input }) => {
       // Validate hard rules
@@ -365,7 +365,7 @@ export const triggersRouter = router({
     }),
   
   // Approve trigger (admin only)
-  approve: adminProcedure
+  approve: governedAdminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -380,7 +380,7 @@ export const triggersRouter = router({
     }),
   
   // Reject trigger (admin only)
-  reject: adminProcedure
+  reject: governedAdminProcedure
     .input(z.object({ id: z.number(), reason: z.string() }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -398,16 +398,16 @@ export const triggersRouter = router({
     }),
   
   // Delete trigger (admin only)
-  delete: protectedProcedure
+  delete: governedAdminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
+
       await db
         .delete(triggerRegistry)
         .where(eq(triggerRegistry.id, input.id));
-      
+
       return { success: true };
     }),
 });

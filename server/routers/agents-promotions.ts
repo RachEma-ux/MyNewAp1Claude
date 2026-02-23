@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { agents, promotionRequests, agentHistory } from "../../drizzle/schema";
@@ -17,7 +17,7 @@ export const agentsPromotionsRouter = router({
   /**
    * POST /promotions/requests - Create promotion request
    */
-  createRequest: protectedProcedure
+  createRequest: governedProcedure
     .input(
       z.object({
         agentId: z.number(),
@@ -158,7 +158,7 @@ export const agentsPromotionsRouter = router({
   /**
    * POST /promotions/requests/:id/approve - Approve promotion request
    */
-  approve: protectedProcedure
+  approve: governedProcedure
     .input(
       z.object({
         id: z.number(),
@@ -238,7 +238,7 @@ export const agentsPromotionsRouter = router({
   /**
    * POST /promotions/requests/:id/reject - Reject promotion request
    */
-  reject: protectedProcedure
+  reject: governedProcedure
     .input(
       z.object({
         id: z.number(),
@@ -318,7 +318,7 @@ export const agentsPromotionsRouter = router({
   /**
    * POST /promotions/requests/:id/execute - Execute approved promotion
    */
-  execute: protectedProcedure
+  execute: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();

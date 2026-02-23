@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure, adminProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, governedProcedure, governedAdminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { actionRegistry } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -264,7 +264,7 @@ const actionCreateSchema = z.object({
 
 export const actionsRouter = router({
   // Create new action (admin only)
-  create: protectedProcedure
+  create: governedProcedure
     .input(actionCreateSchema)
     .mutation(async ({ input, ctx }) => {
       // Check if user is admin
@@ -365,7 +365,7 @@ export const actionsRouter = router({
     }),
 
   // Approve action (admin only)
-  approve: adminProcedure
+  approve: governedAdminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
 
@@ -385,7 +385,7 @@ export const actionsRouter = router({
     }),
 
   // Reject action (admin only)
-  reject: adminProcedure
+  reject: governedAdminProcedure
     .input(z.object({ id: z.number(), reason: z.string() }))
     .mutation(async ({ input, ctx }) => {
 
@@ -404,7 +404,7 @@ export const actionsRouter = router({
     }),
 
   // Delete action (admin only)
-  delete: protectedProcedure
+  delete: governedAdminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== "admin") {
