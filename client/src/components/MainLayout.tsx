@@ -77,6 +77,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [hardwareMenuOpen, setHardwareMenuOpen] = useState(false);
   const [softwareMenuOpen, setSoftwareMenuOpen] = useState(false);
+  const [aiTypesMenuOpen, setAiTypesMenuOpen] = useState(false);
   const logoutMutation = trpc.auth.logout.useMutation();
 
   const handleLogout = async () => {
@@ -138,6 +139,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
       ]
     },
     { label: "Models", icon: <Package className="w-5 h-5" />, href: "/models" },
+    {
+      label: "AI Types",
+      icon: <Database className="w-5 h-5" />,
+      children: [
+        { label: "Providers", icon: <Cloud className="w-4 h-4" />, href: "/ai-types/providers" },
+        { label: "LLMs", icon: <Database className="w-4 h-4" />, href: "/ai-types/llms" },
+        { label: "Models", icon: <Package className="w-4 h-4" />, href: "/ai-types/models" },
+        { label: "Agents", icon: <Bot className="w-4 h-4" />, href: "/ai-types/agents" },
+        { label: "Bots", icon: <MessageSquare className="w-4 h-4" />, href: "/ai-types/bots" },
+        { label: "Other", icon: <Activity className="w-4 h-4" />, href: "/ai-types/other" },
+      ]
+    },
     { label: "Analytics", icon: <BarChart3 className="w-5 h-5" />, href: "/analytics" },
     {
       label: "Automation", 
@@ -241,6 +254,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setInfrastructureMenuOpen(!infrastructureMenuOpen);
                       } else if (item.label === "Agents") {
                         setAgentsMenuOpen(!agentsMenuOpen);
+                      } else if (item.label === "AI Types") {
+                        setAiTypesMenuOpen(!aiTypesMenuOpen);
                       }
                     }}
                     className="flex w-full items-center justify-between space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -249,10 +264,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "Agents" && agentsMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "Agents" && agentsMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* LLM, Providers and Automation menus (2-level) */}
-                  {((item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen)) && (
+                  {((item.label === "LLM" && llmMenuOpen) || (item.label === "Providers" && providersMenuOpen) || (item.label === "Automation" && automationMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>

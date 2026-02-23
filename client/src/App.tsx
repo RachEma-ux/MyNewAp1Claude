@@ -88,6 +88,7 @@ const CandidatePage = lazy(() => import("@/pages/CandidatePage"));
 const ProviderConnectionsPage = lazy(() => import("@/pages/ProviderConnectionsPage"));
 const UIShowcasePage = lazy(() => import("@/pages/UIShowcasePage"));
 const GovernanceScorecard = lazy(() => import("@/pages/GovernanceScorecard"));
+const AITypesPage = lazy(() => import("@/pages/AITypesPage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -213,6 +214,8 @@ function Router() {
       <Route path="/llm/:id" component={() => <ProtectedRoute component={LLMDetailPage} />} />
       {/* Governance Scorecard — CGT v2 automated compliance engine */}
       <Route path="/governance/scorecard" component={() => <ProtectedRoute component={GovernanceScorecard} />} />
+      {/* AI Types — coming soon pages */}
+      <Route path="/ai-types/:type" component={() => <ProtectedRoute component={AITypesPage} />} />
       {/* UI Showcase — living documentation for shared components */}
       <Route path="/ui-showcase" component={() => <ProtectedRoute component={UIShowcasePage} />} />
       <Route path="/404" component={NotFound} />
