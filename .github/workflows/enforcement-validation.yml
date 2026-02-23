@@ -1,0 +1,146 @@
+# Governance Enforcement Validation — Automated Harness
+# Runs the deterministic enforcement validation harness on every push/PR.
+# Proves non-bypassable governance enforcement and catches regressions.
+#
+# Probes:
+#   P01 — Contract Route Integrity (8 HQ + 8 Governance pages)
+#   P02 — Mutation Governance Coverage (all mutations must use governedProcedure)
+#   P03 — Freeze Block Enforcement (system-wide + per-subject freeze checks)
+#   P04 — Transport-Level Deny (TRPCError, not soft deny)
+#   P05 — Audit Trail Integrity (actor attribution, event fields)
+#   P06 — Evidence Vault Integrity (SHA-256, verify-on-read)
+#   P07 — Principal Attribution (no hardcoded actor IDs)
+#   P08 — Placeholder Logic Detection (no Math.random, system type, mutate stage)
+#
+# Exit code non-zero on any FAIL probe.
+
+name: Enforcement Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  enforcement-validation:
+    name: Governance Enforcement Harness
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      # ── Validate YAML Controls ──────────────────────────────────
+      - name: Validate YAML control catalog
+        run: npx tsx scripts/governance/validate-controls.ts
+
+      # ── Generate Coverage Map ───────────────────────────────────
+      - name: Generate governance coverage map
+        run: npx tsx scripts/governance/coverage-map.ts
+
+      # ── Run Enforcement Validation Harness ──────────────────────
+      - name: Run enforcement validation harness
+        id: harness
+        run: npx tsx scripts/governance-validation/index.ts --ci
+
+      # ── Upload Validation Artifacts ─────────────────────────────
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: enforcement-validation-${{ github.sha }}
+          path: artifacts/governance/reports/validation/
+          retention-days: 90
+
+      # ── PR Comment ──────────────────────────────────────────────
+      - name: Comment validation results on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'artifacts/governance/reports/validation/validation-report.json';
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
+            } catch {
+              return; // No report generated
+            }
+
+            const icon = report.verdict === 'PASS' ? ':white_check_mark:' : ':x:';
+            const probeLines = report.probes.map(p => {
+              const pi = p.status === 'PASS' ? ':white_check_mark:' : p.status === 'FAIL' ? ':x:' : ':warning:';
+              return `| ${pi} | ${p.probeId} | ${p.probeName} | ${p.status} | ${p.findings.length} |`;
+            }).join('\n');
+
+            const body = [
+              `## ${icon} Enforcement Validation — ${report.verdict}`,
+              '',
+              `| | ID | Probe | Status | Findings |`,
+              `|---|-----|-------|--------|----------|`,
+              probeLines,
+              '',
+              `**Critical:** ${report.summary.criticalFindings} | **High:** ${report.summary.highFindings}`,
+              `**Probes:** ${report.summary.passed} passed, ${report.summary.failed} failed, ${report.summary.warned} warned`,
+              '',
+              `> Artifact: \`enforcement-validation-${context.sha}\``,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body?.includes('Enforcement Validation'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      # ── Summary ─────────────────────────────────────────────────
+      - name: Enforcement validation summary
+        if: always()
+        run: |
+          echo ""
+          echo "══════════════════════════════════════════════════════════"
+          echo "  ENFORCEMENT VALIDATION HARNESS — RESULTS"
+          echo "══════════════════════════════════════════════════════════"
+          echo ""
+          if [ -f "artifacts/governance/reports/validation/validation-report.json" ]; then
+            cat artifacts/governance/reports/validation/validation-report.json | python3 -c "
+          import json, sys
+          r = json.load(sys.stdin)
+          print(f'  Verdict: {r[\"verdict\"]}')
+          print(f'  Probes: {r[\"summary\"][\"passed\"]} passed, {r[\"summary\"][\"failed\"]} failed')
+          print(f'  Critical: {r[\"summary\"][\"criticalFindings\"]} | High: {r[\"summary\"][\"highFindings\"]}')
+          for p in r['probes']:
+              icon = 'OK' if p['status'] == 'PASS' else 'FAIL' if p['status'] == 'FAIL' else 'WARN'
+              print(f'  [{icon}] {p[\"probeId\"]}: {p[\"probeName\"]}')
+          " 2>/dev/null || echo "  (report parsing failed — check artifacts)"
+          else
+            echo "  No validation report generated"
+          fi
+          echo ""
+          echo "══════════════════════════════════════════════════════════"

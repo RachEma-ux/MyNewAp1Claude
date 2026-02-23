@@ -80,7 +80,8 @@ export function generateEvidenceBundle(
   stage: string
 ): EvidenceBundle {
   const timestamp = new Date().toISOString();
-  const bundleId = `EVB-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const hash = createHash("sha256").update(`${timestamp}-${stage}-${triggeredBy}`).digest("hex").slice(0, 8);
+  const bundleId = `EVB-${Date.now()}-${hash}`;
 
   // Build control results for bundle
   const controls = scorecard.controlResults.map((r) => ({

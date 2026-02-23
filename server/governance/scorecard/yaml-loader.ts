@@ -23,7 +23,7 @@ export function loadControlsFromYaml(): ControlDefinition[] | null {
   const controlsDir = path.resolve(process.cwd(), "controls");
   if (!fs.existsSync(controlsDir)) return null;
 
-  const packFiles = ["base", "provider", "llm", "model", "agent", "bot"];
+  const packFiles = ["base", "provider", "llm", "model", "agent", "bot", "system"];
   const controls: ControlDefinition[] = [];
 
   for (const pack of packFiles) {

@@ -29,6 +29,7 @@ export const SUBJECT_TYPES = [
   "model",
   "agent",
   "bot",
+  "system",
 ] as const;
 
 export type SubjectType = (typeof SUBJECT_TYPES)[number];
@@ -82,7 +83,7 @@ export function validateSubject(subject: unknown): SubjectValidationResult {
 
   const s = subject as Record<string, any>;
 
-  // Required: id
+  // Required: id (0 is valid for system subjects)
   if (s.id == null || typeof s.id !== "number") {
     errors.push("Missing or invalid 'id' (must be a number)");
   }

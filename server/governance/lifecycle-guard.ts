@@ -35,6 +35,7 @@ export const LIFECYCLE_STAGES = [
   "validate",
   "publish",
   "catalog",
+  "mutate",
 ] as const;
 
 export type LifecycleStage = (typeof LIFECYCLE_STAGES)[number];

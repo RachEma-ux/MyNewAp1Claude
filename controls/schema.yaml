@@ -7,7 +7,7 @@ required: [pack, controls]
 properties:
   pack:
     type: string
-    enum: [base, provider, llm, model, agent, bot]
+    enum: [base, provider, llm, model, agent, bot, system]
     description: "Pack identifier — matches SubjectType or 'base'"
   controls:
     type: array
@@ -37,7 +37,7 @@ properties:
           type: array
           items:
             type: string
-            enum: [submit, register, validate, publish, catalog]
+            enum: [submit, register, validate, publish, catalog, mutate]
           minItems: 1
           description: "Lifecycle stages where this control blocks progression"
         weight:

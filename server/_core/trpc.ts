@@ -46,7 +46,9 @@ export const adminProcedure = t.procedure.use(
   }),
 );
 
-// Governance middleware — checks system freeze + requireGate() for lifecycle mutations
+// Governance middleware — always runs requireGate() for every governed mutation.
+// No bypass path: explicit lifecycle subjects use their own stage, all other
+// mutations are checked as system subjects at the "mutate" stage.
 const requireGovernance = t.middleware(async (opts) => {
   const { ctx, next, rawInput } = opts;
 
@@ -54,7 +56,7 @@ const requireGovernance = t.middleware(async (opts) => {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
-  // Check system-wide freeze
+  // 1. Always check system-wide freeze
   if (isFrozen(0)) {
     throw new TRPCError({
       code: "CONFLICT",
@@ -62,41 +64,57 @@ const requireGovernance = t.middleware(async (opts) => {
     });
   }
 
-  // If input includes governance metadata, run gate check
-  let gateResult = null;
+  // 2. Derive subject from input OR create system subject
   const input = rawInput as Record<string, any> | undefined;
-  if (input?.subjectId && input?.stage) {
-    const result = requireGate(
-      input.stage,
-      {
-        id: input.subjectId,
-        name: input.subjectName || `Subject #${input.subjectId}`,
-        type: input.subjectType || "unknown",
-        tags: input.tags || [],
-        description: input.description,
-        config: input.config,
-      },
-      {
-        id: String(ctx.user.id),
-        role: ctx.user.role || "user",
-      }
-    );
+  let subject: { id: number; name: string; type: string; tags: string[]; description?: string; config?: any };
+  let stage: string;
 
-    if (result.denied) {
-      throw new TRPCError({
-        code: "CONFLICT",
-        message: result.reason,
-        cause: result,
-      });
+  if (input?.subjectId && input?.stage) {
+    // Explicit subject — lifecycle mutation
+    subject = {
+      id: input.subjectId,
+      name: input.subjectName || `Subject #${input.subjectId}`,
+      type: input.subjectType || "unknown",
+      tags: input.tags || [],
+      description: input.description,
+      config: input.config,
+    };
+    stage = input.stage;
+  } else {
+    // System subject — non-lifecycle mutation
+    const procedureName = opts.path || "system-mutation";
+    subject = {
+      id: 0,
+      name: procedureName,
+      type: "system",
+      tags: [],
+    };
+    stage = "mutate";
+  }
+
+  // 3. Always run requireGate
+  const result = requireGate(
+    stage as any,
+    subject,
+    {
+      id: String(ctx.user.id),
+      role: ctx.user.role || "user",
     }
-    gateResult = result;
+  );
+
+  if (result.denied) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: result.reason,
+      cause: result,
+    });
   }
 
   return next({
     ctx: {
       ...ctx,
       user: ctx.user,
-      gateResult,
+      gateResult: result,
     },
   });
 });

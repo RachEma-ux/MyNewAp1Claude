@@ -1,35 +1,35 @@
 import { useRoute } from "wouter";
-import OverviewPanel from "./hq/OverviewPanel";
-import TeamPanel from "./hq/TeamPanel";
-import ProjectsPanel from "./hq/ProjectsPanel";
-import OperationsPanel from "./hq/OperationsPanel";
-import IncidentsPanel from "./hq/IncidentsPanel";
-import ChangesPanel from "./hq/ChangesPanel";
-import MonitoringPanel from "./hq/MonitoringPanel";
-import ActivityPanel from "./hq/ActivityPanel";
+import OrgAuthorityPanel from "./hq/OrgAuthorityPanel";
+import RolesMembershipPanel from "./hq/RolesMembershipPanel";
+import WorkspaceDirectoryPanel from "./hq/WorkspaceDirectoryPanel";
+import AgentOrchestrationPanel from "./hq/AgentOrchestrationPanel";
+import DiscoverabilityPanel from "./hq/DiscoverabilityPanel";
+import NotificationsPanel from "./hq/NotificationsPanel";
+import RiskBaselinesPanel from "./hq/RiskBaselinesPanel";
+import CollaborationIntelPanel from "./hq/CollaborationIntelPanel";
 
 export default function DigitalHQPage() {
-  const [, params] = useRoute("/digital-hq/:item");
-  const item = params?.item || "overview";
+  const [, params] = useRoute("/hq/:item");
+  const item = params?.item || "org-authority";
 
   switch (item) {
-    case "overview":
-      return <OverviewPanel />;
-    case "team":
-      return <TeamPanel />;
-    case "projects":
-      return <ProjectsPanel />;
-    case "operations":
-      return <OperationsPanel />;
-    case "incidents":
-      return <IncidentsPanel />;
-    case "changes":
-      return <ChangesPanel />;
-    case "monitoring":
-      return <MonitoringPanel />;
-    case "activity":
-      return <ActivityPanel />;
+    case "org-authority":
+      return <OrgAuthorityPanel />;
+    case "roles":
+      return <RolesMembershipPanel />;
+    case "workspaces":
+      return <WorkspaceDirectoryPanel />;
+    case "agents":
+      return <AgentOrchestrationPanel />;
+    case "discover":
+      return <DiscoverabilityPanel />;
+    case "notifications":
+      return <NotificationsPanel />;
+    case "risk-baselines":
+      return <RiskBaselinesPanel />;
+    case "collaboration":
+      return <CollaborationIntelPanel />;
     default:
-      return <OverviewPanel />;
+      return <OrgAuthorityPanel />;
   }
 }

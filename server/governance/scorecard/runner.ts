@@ -1561,3 +1561,157 @@ registerRunner({
     ];
   },
 });
+
+// ============================================================================
+// SYSTEM PACK RUNNERS — Non-lifecycle mutation enforcement
+// ============================================================================
+
+// ── RBAC Checker ────────────────────────────────────────────────────────
+
+registerRunner({
+  id: "rbac-checker",
+  name: "RBAC Principal Checker",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "rbac-checker");
+    if (!control) return [];
+
+    const hasActor = !!ctx.actor?.id;
+    const hasRole = !!ctx.actor?.role && ctx.actor.role !== "unknown";
+    const passed = hasActor && hasRole;
+
+    return [
+      buildResult(control, "rbac-checker", passed,
+        passed
+          ? `Principal verified: actor=${ctx.actor!.id}, role=${ctx.actor!.role}`
+          : `Principal verification failed: actor=${ctx.actor?.id || "missing"}, role=${ctx.actor?.role || "missing"}`,
+        {
+          check: "RBAC principal verification",
+          finding: passed ? "verified" : "unverified",
+          targets: [ctx.actor?.id || "none"],
+          data: { actorId: ctx.actor?.id, role: ctx.actor?.role },
+        }
+      ),
+    ];
+  },
+});
+
+// ── Principal Validator ─────────────────────────────────────────────────
+
+registerRunner({
+  id: "principal-validator",
+  name: "Principal Attribution Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "principal-validator");
+    if (!control) return [];
+
+    const actorId = ctx.actor?.id;
+    const isPlaceholder = !actorId || actorId === "" || actorId === "1";
+    const passed = !isPlaceholder;
+
+    return [
+      buildResult(control, "principal-validator", passed,
+        passed
+          ? `Principal attribution valid: actor=${actorId}`
+          : `Invalid principal attribution: actor=${actorId || "empty"} — real identity required`,
+        {
+          check: "Principal attribution",
+          finding: passed ? "valid" : "placeholder",
+          targets: [actorId || "empty"],
+          data: { actorId, isPlaceholder },
+        }
+      ),
+    ];
+  },
+});
+
+// ── Change Audit Validator ──────────────────────────────────────────────
+
+registerRunner({
+  id: "change-audit-validator",
+  name: "Change Audit Logger Validator",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "change-audit-validator");
+    if (!control) return [];
+
+    try {
+      const { getAuditLogger } = require("../../services/auditLogger");
+      const auditLogger = getAuditLogger();
+      const passed = !!auditLogger;
+
+      return [
+        buildResult(control, "change-audit-validator", passed,
+          passed
+            ? "Audit logger operational — mutations will be logged"
+            : "Audit logger unavailable — mutations would be unaccountable",
+          {
+            check: "Change audit logging",
+            finding: passed ? "operational" : "unavailable",
+            targets: ["auditLogger"],
+          }
+        ),
+      ];
+    } catch {
+      return [
+        buildResult(control, "change-audit-validator", false,
+          "Audit logger module failed to load",
+          {
+            check: "Change audit logging",
+            finding: "module_error",
+            targets: ["server/services/auditLogger.ts"],
+          }
+        ),
+      ];
+    }
+  },
+});
+
+// ── Rate Limiter ────────────────────────────────────────────────────────
+
+const _mutationCounts = new Map<string, { count: number; windowStart: number }>();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 120;
+
+registerRunner({
+  id: "rate-limiter",
+  name: "Mutation Rate Limiter",
+  run(ctx, controls) {
+    const control = controls.find((c) => c.runnerId === "rate-limiter");
+    if (!control) return [];
+
+    const actorId = ctx.actor?.id || "anonymous";
+    const now = Date.now();
+    const record = _mutationCounts.get(actorId);
+
+    if (!record || now - record.windowStart > RATE_LIMIT_WINDOW_MS) {
+      _mutationCounts.set(actorId, { count: 1, windowStart: now });
+      return [
+        buildResult(control, "rate-limiter", true,
+          `Rate limit check passed: 1/${RATE_LIMIT_MAX} mutations in window`,
+          {
+            check: "Mutation rate limit",
+            finding: "within_limit",
+            targets: [actorId],
+            data: { count: 1, max: RATE_LIMIT_MAX, windowMs: RATE_LIMIT_WINDOW_MS },
+          }
+        ),
+      ];
+    }
+
+    record.count++;
+    const passed = record.count <= RATE_LIMIT_MAX;
+
+    return [
+      buildResult(control, "rate-limiter", passed,
+        passed
+          ? `Rate limit check passed: ${record.count}/${RATE_LIMIT_MAX} mutations in window`
+          : `Rate limit EXCEEDED: ${record.count}/${RATE_LIMIT_MAX} mutations in window — throttling required`,
+        {
+          check: "Mutation rate limit",
+          finding: passed ? "within_limit" : "exceeded",
+          targets: [actorId],
+          data: { count: record.count, max: RATE_LIMIT_MAX, windowMs: RATE_LIMIT_WINDOW_MS },
+        }
+      ),
+    ];
+  },
+});

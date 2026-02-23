@@ -149,8 +149,8 @@ export const governanceRouter = router({
       z.object({
         entryId: z.number(),
         entryName: z.string(),
-        fromStage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
-        toStage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+        fromStage: z.enum(["submit", "register", "validate", "publish", "catalog", "mutate"]),
+        toStage: z.enum(["submit", "register", "validate", "publish", "catalog", "mutate"]),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -178,7 +178,7 @@ export const governanceRouter = router({
     .input(
       z.object({
         tags: z.array(z.string()),
-        targetStage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+        targetStage: z.enum(["submit", "register", "validate", "publish", "catalog", "mutate"]),
       })
     )
     .query(async ({ input }) => {
@@ -299,11 +299,11 @@ export const governanceRouter = router({
   scorecardRun: adminProcedure
     .input(
       z.object({
-        stage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+        stage: z.enum(["submit", "register", "validate", "publish", "catalog", "mutate"]),
         subject: z.object({
           id: z.number(),
           name: z.string(),
-          type: z.enum(["provider", "llm", "model", "agent", "bot"]),
+          type: z.enum(["provider", "llm", "model", "agent", "bot", "system"]),
           tags: z.array(z.string()),
           description: z.string().optional(),
           config: z.any().optional(),
@@ -367,11 +367,11 @@ export const governanceRouter = router({
   scorecardPreview: protectedProcedure
     .input(
       z.object({
-        stage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+        stage: z.enum(["submit", "register", "validate", "publish", "catalog", "mutate"]),
         subject: z.object({
           id: z.number(),
           name: z.string(),
-          type: z.enum(["provider", "llm", "model", "agent", "bot"]),
+          type: z.enum(["provider", "llm", "model", "agent", "bot", "system"]),
           tags: z.array(z.string()),
           description: z.string().optional(),
           config: z.any().optional(),
@@ -468,8 +468,8 @@ export const governanceRouter = router({
    */
   resolvePacks: protectedProcedure
     .input(z.object({
-      subjectType: z.enum(["provider", "llm", "model", "agent", "bot"]),
-      stage: z.enum(["submit", "register", "validate", "publish", "catalog"]).optional(),
+      subjectType: z.enum(["provider", "llm", "model", "agent", "bot", "system"]),
+      stage: z.enum(["submit", "register", "validate", "publish", "catalog", "mutate"]).optional(),
     }))
     .query(async ({ input }) => {
       const resolution = resolvePacks(input.subjectType, input.stage);
@@ -495,7 +495,7 @@ export const governanceRouter = router({
     .input(
       z.object({
         entryId: z.number(),
-        targetStage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+        targetStage: z.enum(["submit", "register", "validate", "publish", "catalog", "mutate"]),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -534,7 +534,7 @@ export const governanceRouter = router({
     .input(
       z.object({
         entryId: z.number(),
-        targetStage: z.enum(["submit", "register", "validate", "publish", "catalog"]),
+        targetStage: z.enum(["submit", "register", "validate", "publish", "catalog", "mutate"]),
       })
     )
     .mutation(async ({ input, ctx }) => {

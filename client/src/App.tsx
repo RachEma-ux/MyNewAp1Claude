@@ -216,12 +216,15 @@ function Router() {
       <Route path="/llm/:id" component={() => <ProtectedRoute component={LLMDetailPage} />} />
       {/* Governance Scorecard — CGT v2 automated compliance engine */}
       <Route path="/governance/scorecard" component={() => <ProtectedRoute component={GovernanceScorecard} />} />
-      {/* AI Types — coming soon pages */}
+      {/* AI Types — stub pages */}
       <Route path="/ai-types/:type" component={() => <ProtectedRoute component={AITypesPage} />} />
-      {/* Digital HQ — coming soon pages */}
-      <Route path="/digital-hq/:item" component={() => <ProtectedRoute component={DigitalHQPage} />} />
-      {/* Governance Center — coming soon pages */}
-      <Route path="/governance-center/:item" component={() => <ProtectedRoute component={GovernanceCenterPage} />} />
+      {/* Backward-compatibility redirects for old namespaces */}
+      <Route path="/digital-hq/:item">{(params) => <Redirect to={`/hq/${params.item}`} />}</Route>
+      <Route path="/governance-center/:item">{(params) => <Redirect to={`/governance/${params.item}`} />}</Route>
+      {/* Digital HQ — collaboration & authority pages */}
+      <Route path="/hq/:item" component={() => <ProtectedRoute component={DigitalHQPage} />} />
+      {/* Governance Center — governance enforcement pages */}
+      <Route path="/governance/:item" component={() => <ProtectedRoute component={GovernanceCenterPage} />} />
       {/* UI Showcase — living documentation for shared components */}
       <Route path="/ui-showcase" component={() => <ProtectedRoute component={UIShowcasePage} />} />
       <Route path="/404" component={NotFound} />

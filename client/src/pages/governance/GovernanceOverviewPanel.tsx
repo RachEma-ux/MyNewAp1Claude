@@ -1,36 +1,37 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { ShieldCheck, Snowflake, Activity, BarChart3 } from "lucide-react";
+import { Loader2, ShieldCheck, Snowflake, Activity, BarChart3, Gauge } from "lucide-react";
 
-export default function GovernanceDashboardPanel() {
+export default function GovernanceOverviewPanel() {
+  const { data: selfCheck, isLoading: scLoading } = trpc.governance.selfCheck.useQuery();
   const { data: drift, isLoading: driftLoading } = trpc.governance.driftStatus.useQuery();
   const { data: scorecard, isLoading: scorecardLoading } = trpc.governance.scorecardLatest.useQuery();
-  const { data: frozen, isLoading: frozenLoading } = trpc.governance.frozenSubjects.useQuery();
+  const { data: metrics, isLoading: metricsLoading } = trpc.governance.metrics.useQuery();
 
-  const isLoading = driftLoading || scorecardLoading || frozenLoading;
+  const isLoading = scLoading || driftLoading || scorecardLoading || metricsLoading;
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading governance dashboard...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  const frozenCount = frozen?.length ?? drift?.frozenCount ?? 0;
+  const frozenCount = drift?.frozenCount ?? 0;
   const driftActive = drift?.active ?? false;
   const score = scorecard?.scorecard?.score ?? null;
   const gateStatus = scorecard?.scorecard?.gateStatus?.status ?? "unknown";
+  const compliant = selfCheck?.compliant ?? false;
+  const metricsJson = metrics?.json as Record<string, any> | undefined;
 
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Governance Dashboard</h1>
+        <h1 className="text-3xl font-bold">Governance Overview</h1>
         <p className="text-muted-foreground mt-2">
-          Overview of governance health, drift status, and compliance score
+          Governance health, compliance score, drift status, and enforcement metrics
         </p>
       </div>
 
@@ -38,32 +39,17 @@ export default function GovernanceDashboardPanel() {
         <Card>
           <CardHeader className="pb-3">
             <CardDescription className="flex items-center gap-2">
-              <Activity className="w-4 h-4" />
-              Drift Detection
+              <ShieldCheck className="w-4 h-4" />
+              Compliance
             </CardDescription>
             <CardTitle className="text-2xl">
-              {driftActive ? "Active" : "Inactive"}
+              {compliant ? "Compliant" : "Non-Compliant"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge variant={driftActive ? "default" : "secondary"}>
-              {driftActive ? "Monitoring" : "Stopped"}
+            <Badge variant={compliant ? "default" : "destructive"}>
+              {compliant ? "PASS" : "FAIL"}
             </Badge>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription className="flex items-center gap-2">
-              <Snowflake className="w-4 h-4" />
-              Frozen Subjects
-            </CardDescription>
-            <CardTitle className="text-2xl">{frozenCount}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">
-              {frozenCount === 0 ? "No subjects frozen" : "Transitions blocked"}
-            </p>
           </CardContent>
         </Card>
 
@@ -91,30 +77,64 @@ export default function GovernanceDashboardPanel() {
         <Card>
           <CardHeader className="pb-3">
             <CardDescription className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4" />
-              Gate Status
+              <Activity className="w-4 h-4" />
+              Drift Detection
             </CardDescription>
-            <CardTitle className="text-2xl capitalize">{gateStatus}</CardTitle>
+            <CardTitle className="text-2xl">{driftActive ? "Active" : "Inactive"}</CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge
-              variant={
-                gateStatus === "PASS" ? "default" :
-                gateStatus === "FAIL" ? "destructive" : "secondary"
-              }
-            >
-              {gateStatus}
+            <Badge variant={driftActive ? "default" : "secondary"}>
+              {driftActive ? "Monitoring" : "Stopped"}
             </Badge>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardDescription className="flex items-center gap-2">
+              <Snowflake className="w-4 h-4" />
+              Frozen Subjects
+            </CardDescription>
+            <CardTitle className="text-2xl">{frozenCount}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              {frozenCount === 0 ? "No subjects frozen" : "Transitions blocked"}
+            </p>
+          </CardContent>
+        </Card>
       </div>
+
+      {metricsJson && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gauge className="w-5 h-5" />
+              Governance Metrics
+            </CardTitle>
+            <CardDescription>Engine telemetry and counters</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(metricsJson).map(([key, value]) => (
+                <div key={key} className="text-center p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground font-mono">{key}</p>
+                  <p className="text-lg font-bold mt-1">
+                    {typeof value === "number" ? value.toLocaleString() : String(value)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {scorecard && (
         <Card>
           <CardHeader>
             <CardTitle>Latest Scorecard Summary</CardTitle>
             <CardDescription>
-              Stage: {scorecard.stage ?? "—"} | Run at: {scorecard.timestamp ? new Date(scorecard.timestamp).toLocaleString() : "—"}
+              Stage: {scorecard.stage ?? "—"} | Gate: {gateStatus} | Run: {scorecard.timestamp ? new Date(scorecard.timestamp).toLocaleString() : "—"}
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -24,13 +24,13 @@ const VALID_DOMAINS = [
   "documentation",
   "type_specific",
 ];
-const VALID_STAGES = ["submit", "register", "validate", "publish", "catalog"];
+const VALID_STAGES = ["submit", "register", "validate", "publish", "catalog", "mutate"];
 
 let errors = 0;
 let warnings = 0;
 const allIds = new Set<string>();
 
-const packFiles = ["base", "provider", "llm", "model", "agent", "bot"];
+const packFiles = ["base", "provider", "llm", "model", "agent", "bot", "system"];
 
 for (const pack of packFiles) {
   const filePath = path.join(CONTROLS_DIR, `${pack}.yaml`);

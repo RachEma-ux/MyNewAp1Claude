@@ -1,0 +1,61 @@
+pack: system
+controls:
+  - id: SYS-001
+    name: Auth/RBAC principal verified
+    domain: security
+    riskCategory: missing_rbac
+    severity: critical
+    blocksStages: [mutate]
+    weight: 10
+    runnerId: rbac-checker
+    remediation: "Principal must be authenticated and have a valid RBAC role before any mutation."
+    rationale: "Every mutation requires verified identity and role. Unauthenticated mutations are Critical."
+    enabled: true
+
+  - id: SYS-002
+    name: Principal attribution non-empty
+    domain: governance
+    riskCategory: missing_audit
+    severity: critical
+    blocksStages: [mutate]
+    weight: 10
+    runnerId: principal-validator
+    remediation: "Actor ID must be non-empty and not the default placeholder '1'. Real principal attribution is required."
+    rationale: "Audit trail integrity requires real actor IDs. Placeholder IDs compromise accountability."
+    enabled: true
+
+  - id: SYS-003
+    name: No plaintext secrets in mutation input
+    domain: security
+    riskCategory: hardcoded_secret
+    severity: critical
+    blocksStages: [mutate]
+    weight: 10
+    runnerId: secret-scanner
+    remediation: "Mutation input must not contain plaintext secrets. Use secret references or encrypted values."
+    rationale: "Plaintext secrets in mutation input can leak to logs and audit trail."
+    enabled: true
+
+  - id: SYS-004
+    name: Change audit logging operational
+    domain: governance
+    riskCategory: missing_audit
+    severity: high
+    blocksStages: [mutate]
+    weight: 8
+    runnerId: change-audit-validator
+    remediation: "Audit logger must be operational before mutations are allowed. Verify logger initialization."
+    rationale: "Mutations without audit logging create unaccountable state changes."
+    enabled: true
+
+  - id: SYS-005
+    name: Mutation rate limit enforced
+    domain: security
+    riskCategory: missing_enforcement_hook
+    severity: high
+    blocksStages: [mutate]
+    weight: 7
+    runnerId: rate-limiter
+    remediation: "Same actor cannot exceed mutation rate limit. Implement rate limiting per actor."
+    rationale: "Unlimited mutation rate enables abuse and denial-of-service against governance."
+    enabled: true

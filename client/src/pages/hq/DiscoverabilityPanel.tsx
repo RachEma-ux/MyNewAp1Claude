@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Server, Box, Bot, Layers } from "lucide-react";
+import { Loader2, Database, Cloud, Box, Layers } from "lucide-react";
 
-export default function OverviewPanel() {
-  const { data, isLoading, error } = trpc.hq.overview.useQuery();
+export default function DiscoverabilityPanel() {
+  const { data, isLoading, error } = trpc.hq.discoverability.useQuery();
 
   if (isLoading) {
     return (
@@ -16,24 +16,24 @@ export default function OverviewPanel() {
   if (error) {
     return (
       <div className="text-destructive text-center py-12">
-        Failed to load overview: {error.message}
+        Failed to load discoverability data: {error.message}
       </div>
     );
   }
 
   const stats = [
-    { label: "Providers", value: data?.providerCount ?? 0, icon: Server },
+    { label: "Catalog Entries", value: data?.catalogEntries ?? 0, icon: Database },
+    { label: "Providers", value: data?.providerCount ?? 0, icon: Cloud },
     { label: "Models", value: data?.modelCount ?? 0, icon: Box },
-    { label: "Agents", value: data?.agentCount ?? 0, icon: Bot },
-    { label: "Workspaces", value: data?.workspaceCount ?? 0, icon: Layers },
+    { label: "Total Items", value: data?.totalItems ?? 0, icon: Layers },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">HQ Overview</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Discoverability</h1>
         <p className="text-muted-foreground mt-1">
-          Platform resource summary at a glance
+          Platform catalog entries, providers, and models
         </p>
       </div>
 
