@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { useParams, Route, Switch, Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Shield, Menu, Home } from "lucide-react";
+import { Loader2, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -146,21 +146,6 @@ export default function WorkspaceShell() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href="/workspaces">
-            <Button variant="ghost" size="sm" className="h-7 text-xs">
-              <Home className="h-3.5 w-3.5 mr-1" />
-              All Workspaces
-            </Button>
-          </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setOversightOpen(true)}
-          >
-            <Shield className="h-3.5 w-3.5 mr-1" />
-            Oversight
-          </Button>
         </div>
       </header>
 
@@ -173,6 +158,7 @@ export default function WorkspaceShell() {
           enabledModules={enabledModules}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onOversightOpen={() => setOversightOpen(true)}
         />
 
         {/* Main Content Area */}

@@ -20,6 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
+  Home,
+  Shield,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -28,6 +30,7 @@ interface SidebarProps {
   enabledModules: Set<string>;
   collapsed: boolean;
   onToggle: () => void;
+  onOversightOpen: () => void;
 }
 
 interface NavEntry {
@@ -45,6 +48,7 @@ export function WorkspaceSidebar({
   enabledModules,
   collapsed,
   onToggle,
+  onOversightOpen,
 }: SidebarProps) {
   const [location] = useLocation();
   const base = `/w/${workspaceId}`;
@@ -147,6 +151,21 @@ export function WorkspaceSidebar({
         </Button>
       </div>
 
+      {/* All Workspaces link */}
+      <div className="px-2 pt-2 pb-1">
+        <Link href="/workspaces">
+          <button
+            className={cn(
+              "flex items-center gap-2 w-full px-3 py-1.5 text-sm rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <Home className="h-4 w-4" />
+            {!collapsed && <span>All Workspaces</span>}
+          </button>
+        </Link>
+      </div>
+
       {/* Nav items */}
       <nav className="flex-1 overflow-y-auto py-2 space-y-0.5">
         {visible.map((entry) => {
@@ -204,8 +223,18 @@ export function WorkspaceSidebar({
         })}
       </nav>
 
-      {/* Settings link */}
-      <div className="border-t p-2">
+      {/* Bottom actions */}
+      <div className="border-t p-2 space-y-0.5">
+        <button
+          onClick={onOversightOpen}
+          className={cn(
+            "flex items-center gap-2 w-full px-3 py-1.5 text-sm rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+            collapsed && "justify-center px-0"
+          )}
+        >
+          <Shield className="h-4 w-4" />
+          {!collapsed && <span>Oversight</span>}
+        </button>
         <Link href={`${base}/settings`}>
           <button
             className={cn(
