@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yourdomain.com/schemas/discovery-artifact.schema.json",
+  "title": "DiscoveryArtifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_version",
+    "source_url",
+    "fetched_at",
+    "raw_hash",
+    "raw_content_ref",
+    "extracted",
+    "confidence_score",
+    "extraction_method",
+    "requires_admin_review",
+    "stage"
+  ],
+  "properties": {
+    "artifact_version": {
+      "type": "string",
+      "pattern": "^1\\.0\\.0$"
+    },
+    "stage": {
+      "type": "string",
+      "enum": ["ingest", "submit", "validate", "approve", "publish"]
+    },
+    "source_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "fetched_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "raw_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "raw_content_ref": {
+      "type": "string",
+      "minLength": 10
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "extraction_method": {
+      "type": "string",
+      "enum": ["html_scrape", "api", "llm_parse"]
+    },
+    "requires_admin_review": {
+      "type": "boolean",
+      "const": true
+    },
+    "extracted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "api_url": {
+          "type": ["string", "null"],
+          "format": "uri"
+        },
+        "auth_type": {
+          "type": ["string", "null"],
+          "enum": ["oauth", "api_key", "none", null]
+        },
+        "features": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "terms_url": {
+          "type": ["string", "null"],
+          "format": "uri"
+        },
+        "privacy_url": {
+          "type": ["string", "null"],
+          "format": "uri"
+        }
+      }
+    }
+  }
+}

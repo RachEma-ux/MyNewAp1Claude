@@ -30,9 +30,11 @@ function checkFrozen(subjectId: number): boolean {
 // ============================================================================
 
 export const LIFECYCLE_STAGES = [
+  "ingest",
   "submit",
   "register",
   "validate",
+  "approve",
   "publish",
   "catalog",
   "mutate",
@@ -42,9 +44,11 @@ export type LifecycleStage = (typeof LIFECYCLE_STAGES)[number];
 
 /** Maps pipeline tags to lifecycle stages */
 const TAG_TO_STAGE: Record<string, LifecycleStage> = {
+  ingested: "ingest",
   candidate: "submit",
   registered: "register",
   validated: "validate",
+  approved_stage: "approve",
   published: "publish",
 };
 
@@ -139,9 +143,11 @@ export async function validateTransition(req: TransitionRequest): Promise<Transi
 export function getStageFromTags(tags: string[]): LifecycleStage {
   // Check tags in reverse priority (latest stage wins)
   if (tags.includes("published")) return "publish";
+  if (tags.includes("approved_stage")) return "approve";
   if (tags.includes("validated")) return "validate";
   if (tags.includes("registered")) return "register";
   if (tags.includes("candidate")) return "submit";
+  if (tags.includes("ingested")) return "ingest";
   return "submit"; // Default: untagged entries are at submit stage
 }
 
@@ -150,12 +156,16 @@ export function getStageFromTags(tags: string[]): LifecycleStage {
  */
 export function getTagForStage(stage: LifecycleStage): string | null {
   switch (stage) {
+    case "ingest":
+      return "ingested";
     case "submit":
       return "candidate";
     case "register":
       return "registered";
     case "validate":
       return "validated";
+    case "approve":
+      return "approved_stage";
     case "publish":
       return "published";
     case "catalog":

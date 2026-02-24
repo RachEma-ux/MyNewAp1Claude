@@ -182,10 +182,10 @@ export const catalogManageRouter = router({
           decision_result: result.status === "ok" ? "success" : "partial",
           metadata: {
             sourceUrl: input.websiteUrl,
-            rawSnapshotHash: artifact.rawSnapshotHash,
-            extractionMethod: artifact.extractionMethod,
-            confidenceScore: artifact.confidenceScore,
-            artifactId: artifact.artifactId,
+            rawHash: artifact.raw_hash,
+            extractionMethod: artifact.extraction_method,
+            confidenceScore: artifact.confidence_score,
+            stage: artifact.stage,
             domain: result.domain,
             registrySlug: result.registrySlug,
             bestUrl: result.api.bestUrl,
@@ -242,7 +242,12 @@ export const catalogManageRouter = router({
         status: "draft",
         origin: "discovery",
         reviewState: "needs_review",
-        config: { ...input.config, discoveryArtifactId: input.discoveryArtifactId },
+        config: {
+          ...input.config,
+          discoveryArtifactId: input.discoveryArtifactId,
+          artifact_version: "1.0.0",
+          artifact_stage: "submit",
+        },
         tags: input.tags,
         createdBy: ctx.user.id,
       });
@@ -251,6 +256,7 @@ export const catalogManageRouter = router({
         name: entry.name,
         artifactId: input.discoveryArtifactId,
         stage: "submit",
+        artifact_version: "1.0.0",
       });
 
       return entry;

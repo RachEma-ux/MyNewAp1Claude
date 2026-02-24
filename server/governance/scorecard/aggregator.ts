@@ -77,10 +77,12 @@ export interface AggregatedScorecard {
 // ============================================================================
 
 const STAGE_THRESHOLDS: Record<string, { minScore: number; maxSeverityAllowed: string }> = {
+  ingest:    { minScore: 0,   maxSeverityAllowed: "critical" }, // Raw capture — no scorecard evaluation
   submit:    { minScore: 0,   maxSeverityAllowed: "critical" }, // Allow all — entry point
   mutate:    { minScore: 0,   maxSeverityAllowed: "critical" }, // Allow all — system mutations (freeze-only gate)
   register:  { minScore: 0,   maxSeverityAllowed: "high" },    // No Critical
   validate:  { minScore: 50,  maxSeverityAllowed: "medium" },  // No Critical/High
+  approve:   { minScore: 70,  maxSeverityAllowed: "high" },    // Strict — no Critical/High
   publish:   { minScore: 80,  maxSeverityAllowed: "low" },     // No Critical/High/Medium
   catalog:   { minScore: 100, maxSeverityAllowed: "low" },     // All pass
 };

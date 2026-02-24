@@ -33,7 +33,9 @@ export type AuditActionType =
   | "GOVERNANCE_SELF_CHECK"
   | "ARCHITECTURE_VALIDATION"
   | "DRIFT_DETECTION"
-  | "RISK_CLASSIFICATION";
+  | "RISK_CLASSIFICATION"
+  // Discovery Artifact Governance v1
+  | "DISCOVERY_ATTEMPT";
 
 export interface AuditEvent {
   event_id: string;
