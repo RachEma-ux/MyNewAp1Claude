@@ -62,13 +62,13 @@ export default function WorkspaceShell() {
     { enabled: workspaceId > 0 }
   );
 
-  const { data: modules, isLoading: modsLoading } = trpc.modules.manage.list.useQuery(
+  const { data: modules, isLoading: modsLoading, error: modsError } = trpc.modules.manage.list.useQuery(
     { workspaceId },
-    { enabled: workspaceId > 0, retry: 2 }
+    { enabled: workspaceId > 0, retry: 1 }
   );
 
-  // Loading state — only block on workspace, not modules
-  if (wsLoading) {
+  // Loading state
+  if (wsLoading || modsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -90,13 +90,20 @@ export default function WorkspaceShell() {
     );
   }
 
-  // If modules data isn't available yet, show all modules (assume enabled)
-  const ALL_MODULE_KEYS = ["pmt", "knowledge", "agents", "collaboration", "reporting"];
-  const enabledModules = modules
-    ? new Set((modules as any[]).filter((m: any) => m.enabled).map((m: any) => m.moduleKey))
-    : new Set(ALL_MODULE_KEYS);
+  const enabledModules = new Set(
+    (modules || []).filter((m: any) => m.enabled).map((m: any) => m.moduleKey)
+  );
   const enabledCount = enabledModules.size;
   const basePath = `/w/${workspaceId}`;
+
+  // Debug banner for module loading issues (temporary)
+  const _modsDebug = modsError
+    ? `Error: ${modsError.message}`
+    : !modsLoading && !modules
+    ? `No data (wsId=${workspaceId})`
+    : modules
+    ? `OK: ${modules.length} modules, ${enabledCount} enabled`
+    : null;
 
   /** Module gate — renders ModuleDisabled if module is not enabled */
   function ModuleGate({
@@ -124,6 +131,13 @@ export default function WorkspaceShell() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
+      {/* Debug banner — remove after testing */}
+      {_modsDebug && (
+        <div className="bg-yellow-900/50 text-yellow-200 text-xs px-4 py-1 shrink-0">
+          Modules: {_modsDebug}
+        </div>
+      )}
+
       {/* ─── Top App Bar ─── */}
       <header className="flex items-center justify-between border-b bg-card px-4 h-12 shrink-0">
         <div className="flex items-center gap-3">
