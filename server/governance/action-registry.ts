@@ -88,7 +88,7 @@ let _registry: PlatformActionRegistry | null = null;
  * Fail-fast: throws on missing file, invalid YAML, or Zod validation failure.
  */
 export function loadActionRegistry(rootDir?: string): PlatformActionRegistry {
-  const root = rootDir || path.resolve(__dirname, "../..");
+  const root = rootDir || process.cwd();
   const filePath = path.join(root, "config/governance/platform_action_registry.yaml");
 
   if (!fs.existsSync(filePath)) {
