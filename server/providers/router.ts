@@ -330,7 +330,7 @@ export const providerRouter = router({
       }),
 
     // Assign provider to workspace
-    assign: protectedProcedure
+    assign: governedProcedure
       .input(z.object({
         workspaceId: z.number(),
         providerId: z.number(),
@@ -343,7 +343,7 @@ export const providerRouter = router({
       }),
 
       // Update workspace provider assignment
-      update: protectedProcedure
+      update: governedProcedure
         .input(z.object({
           id: z.number(),
           enabled: z.boolean().optional(),
@@ -357,7 +357,7 @@ export const providerRouter = router({
       }),
 
     // Remove provider from workspace
-    remove: protectedProcedure
+    remove: governedProcedure
       .input(z.object({
         id: z.number(),
       }))
@@ -405,7 +405,7 @@ export const providerRouter = router({
     }),
 
     // Cancel batch job
-    cancelJob: protectedProcedure
+    cancelJob: governedProcedure
       .input(z.object({ jobId: z.string() }))
       .mutation(({ input }) => {
         const success = batchService.cancelJob(input.jobId);
@@ -547,7 +547,7 @@ export const providerRouter = router({
   // Provider capabilities and policy management
   capabilities: router({
     // Update provider capabilities
-    update: protectedProcedure
+    update: governedProcedure
       .input(z.object({
         id: z.number(),
         capabilities: z.array(z.enum(['chat', 'embeddings', 'tools', 'vision', 'json_mode', 'streaming'])).optional(),
@@ -587,7 +587,7 @@ export const providerRouter = router({
   // Test provider with comprehensive checks
   test: router({
     // Full provider test (health + sample completion + streaming + capabilities)
-    runFullTest: protectedProcedure
+    runFullTest: governedProcedure
       .input(z.object({
         providerId: z.number(),
         testOptions: z.object({

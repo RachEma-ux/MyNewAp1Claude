@@ -32,7 +32,7 @@ export const agentsControlPlaneRouter = router({
    * POST /agents/draft - Create or update draft agent
    * Autosave endpoint for wizard
    */
-  createOrUpdateDraft: protectedProcedure
+  createOrUpdateDraft: governedProcedure
     .input(
       z.object({
         id: z.number().optional(),
@@ -125,7 +125,7 @@ export const agentsControlPlaneRouter = router({
    * POST /agents/validate - Validate agent against schema + policy
    * Called on step exit, review open, create attempt
    */
-  validate: protectedProcedure
+  validate: governedProcedure
     .input(
       z.object({
         agent: z.any(), // Partial or full agent
@@ -284,7 +284,7 @@ export const agentsControlPlaneRouter = router({
   /**
    * POST /agents/:id/fork - Fork governed agent → draft
    */
-  fork: protectedProcedure
+  fork: governedProcedure
     .input(z.object({ id: z.number(), newName: z.string().optional() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();

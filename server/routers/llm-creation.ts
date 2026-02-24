@@ -21,7 +21,7 @@ export const llmCreationProcedures = {
   // LLM Creation & Training Pipeline
   // ============================================================================
 
-  createCreationProject: protectedProcedure
+  createCreationProject: governedProcedure
     .input(
       z.object({
         name: z.string().min(1).max(255),
@@ -271,7 +271,7 @@ export const llmCreationProcedures = {
       };
     }),
 
-  updateCreationProject: protectedProcedure
+  updateCreationProject: governedProcedure
     .input(
       z.object({
         projectId: z.number(),
@@ -308,7 +308,7 @@ export const llmCreationProcedures = {
       return updated;
     }),
 
-  createDataset: protectedProcedure
+  createDataset: governedProcedure
     .input(
       z.object({
         projectId: z.number(),
@@ -349,7 +349,7 @@ export const llmCreationProcedures = {
       return dataset;
     }),
 
-  updateDataset: protectedProcedure
+  updateDataset: governedProcedure
     .input(
       z.object({
         datasetId: z.number(),
@@ -447,7 +447,7 @@ export const llmCreationProcedures = {
       return { ...trainingRun, jobId: job.id };
     }),
 
-  updateTrainingRun: protectedProcedure
+  updateTrainingRun: governedProcedure
     .input(
       z.object({
         trainingRunId: z.number(),
@@ -487,7 +487,7 @@ export const llmCreationProcedures = {
       return updated;
     }),
 
-  createEvaluation: protectedProcedure
+  createEvaluation: governedProcedure
     .input(
       z.object({
         projectId: z.number(),
@@ -542,7 +542,7 @@ export const llmCreationProcedures = {
       return { ...evaluation, jobId: job.id };
     }),
 
-  updateEvaluation: protectedProcedure
+  updateEvaluation: governedProcedure
     .input(
       z.object({
         evaluationId: z.number(),
@@ -644,7 +644,7 @@ export const llmCreationProcedures = {
       return { ...quantization, jobId: job.id };
     }),
 
-  updateQuantization: protectedProcedure
+  updateQuantization: governedProcedure
     .input(
       z.object({
         quantizationId: z.number(),
@@ -727,7 +727,7 @@ export const llmCreationProcedures = {
       return jobs;
     }),
 
-  cancelJob: protectedProcedure
+  cancelJob: governedProcedure
     .input(z.object({ jobId: z.string() }))
     .mutation(async ({ input }) => {
       const job = await jobQueue.cancelJob(input.jobId);
@@ -738,7 +738,7 @@ export const llmCreationProcedures = {
     return jobQueue.getStats();
   }),
 
-  pauseTraining: protectedProcedure
+  pauseTraining: governedProcedure
     .input(z.object({ trainingRunId: z.number() }))
     .mutation(async ({ input }) => {
       const jobs = jobQueue.getJobs({ type: "training", status: "running" });

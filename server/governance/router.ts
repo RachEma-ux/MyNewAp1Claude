@@ -22,6 +22,8 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, adminProcedure, governedProcedure, governedAdminProcedure } from "../_core/trpc";
+import { preflightCheck } from "./requireGovernedAction";
+import { getAllActionKeys } from "./action-registry";
 import { getCatalogEntryById, getEntryClassifications } from "../db/catalog";
 import { getGovernanceEngine } from "./governance-engine";
 import { runSelfCheck } from "./self-check";
@@ -685,7 +687,7 @@ export const governanceRouter = router({
   /**
    * Unfreeze a subject (admin only).
    */
-  unfreezeSubject: adminProcedure
+  unfreezeSubject: governedAdminProcedure
     .input(z.object({ subjectId: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const unfrozen = await unfreezeSubject(input.subjectId, String(ctx.user.id));
@@ -795,4 +797,58 @@ export const governanceRouter = router({
       const exists = await store.exists(input.sha256);
       return { sha256: input.sha256, exists };
     }),
+
+  // ── Governance Preflight (Unified Governance v1) ─────────────────────
+  /**
+   * Pre-flight check: returns governance requirements for an action
+   * without executing the pipeline. Used for UI previews.
+   *
+   * Returns: risk, required approvals, evidence requirements,
+   * potential denial reason.
+   */
+  preflight: protectedProcedure
+    .input(z.object({
+      actionKey: z.string().min(1),
+    }))
+    .query(async ({ input }) => {
+      try {
+        const result = preflightCheck(input.actionKey);
+        return {
+          actionKey: input.actionKey,
+          ...result,
+          denied: false,
+          denialReason: null,
+        };
+      } catch (err: any) {
+        return {
+          actionKey: input.actionKey,
+          risk: null,
+          aboveThreshold: false,
+          approvalRequired: false,
+          approvalRule: "none",
+          evidenceRequired: false,
+          evidenceTypes: [],
+          capability: null,
+          domain: null,
+          denied: true,
+          denialReason: err.message,
+        };
+      }
+    }),
+
+  /**
+   * List all registered action keys with their risk levels.
+   */
+  actionRegistry: protectedProcedure.query(async () => {
+    try {
+      const keys = getAllActionKeys();
+      const actions = keys.map((key) => {
+        const info = preflightCheck(key);
+        return { actionKey: key, ...info };
+      });
+      return { actions, total: actions.length };
+    } catch (err: any) {
+      return { actions: [], total: 0, error: err.message };
+    }
+  }),
 });

@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, governedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { providerRouter } from "./providers/router";
 import { providerAnalyticsRouter } from "./providers/analytics-router";
@@ -99,7 +99,7 @@ export const appRouter = router({
       return await db.getUserWorkspaces(ctx.user.id);
     }),
 
-    create: protectedProcedure
+    create: governedProcedure
       .input(
         z.object({
           name: z.string().min(1).max(255),
@@ -128,7 +128,7 @@ export const appRouter = router({
         return await db.getWorkspaceById(input.id);
       }),
 
-    update: protectedProcedure
+    update: governedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -168,7 +168,7 @@ export const appRouter = router({
       }),
 
     // Update workspace routing profile
-    updateRoutingProfile: protectedProcedure
+    updateRoutingProfile: governedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -195,7 +195,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: governedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const workspace = await db.getWorkspaceById(input.id);
@@ -227,7 +227,7 @@ export const appRouter = router({
         return await db.getModelById(input.id);
       }),
 
-    create: protectedProcedure
+    create: governedProcedure
       .input(
         z.object({
           name: z.string(),
@@ -246,7 +246,7 @@ export const appRouter = router({
         return await db.createModel(input);
       }),
 
-    update: protectedProcedure
+    update: governedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -263,7 +263,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: governedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await db.deleteModel(input.id);
@@ -271,7 +271,7 @@ export const appRouter = router({
       }),
 
     // Start model download
-    startDownload: protectedProcedure
+    startDownload: governedProcedure
       .input(
         z.object({
           huggingFaceId: z.string(),

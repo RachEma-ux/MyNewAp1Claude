@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { agents } from "../../drizzle/schema";
@@ -16,7 +16,7 @@ export const agentsDiffRouter = router({
   /**
    * POST /agents/diff - Generate diff between two agent versions
    */
-  generate: protectedProcedure
+  generate: governedProcedure
     .input(
       z.object({
         baseId: z.string(),

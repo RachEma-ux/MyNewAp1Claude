@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
+import { router, publicProcedure, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { workflowTemplates, workflows } from "../../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
@@ -49,7 +49,7 @@ export const templatesRouter = router({
     }),
 
   // Create workflow from template
-  useTemplate: protectedProcedure
+  useTemplate: governedProcedure
     .input(z.object({
       templateId: z.number(),
       workflowName: z.string().optional(),
@@ -92,7 +92,7 @@ export const templatesRouter = router({
     }),
 
   // Create new template (admin only)
-  create: protectedProcedure
+  create: governedProcedure
     .input(z.object({
       name: z.string(),
       description: z.string().optional(),
@@ -114,7 +114,7 @@ export const templatesRouter = router({
     }),
 
   // Update template
-  update: protectedProcedure
+  update: governedProcedure
     .input(z.object({
       id: z.number(),
       name: z.string().optional(),
@@ -155,7 +155,7 @@ export const templatesRouter = router({
     }),
 
   // Delete template
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();

@@ -179,3 +179,33 @@ export {
   type HardeningReport,
   type HardeningCheck,
 } from "./production-hardening";
+
+// Unified Platform Governance v1 — Risk-Adaptive Action Governance
+export {
+  requireGovernedAction,
+  preflightCheck,
+  type GovernedActionInput,
+  type GovernanceReceipt,
+} from "./requireGovernedAction";
+
+// Action Registry — Platform-wide action key definitions
+export {
+  loadActionRegistry,
+  getActionRegistry,
+  getActionDef,
+  getRiskLevel,
+  isAboveThreshold,
+  getGovernanceThreshold,
+  getAllActionKeys,
+  getActionsByDomain,
+  getActionsByRisk,
+  resetActionRegistry,
+  type RiskLevel,
+  type ApprovalRule,
+  type EvidenceType,
+  type ActionDef,
+  type PlatformActionRegistry,
+} from "./action-registry";
+
+// Action Key Map — tRPC path → registry key resolution
+export { ACTION_KEY_MAP, resolveActionKey } from "./action-key-map";

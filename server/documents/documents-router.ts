@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { chunkDocument } from "./chunking-service";
 import { ingestFromBuffer, retrieveRelevantChunks } from "./rag-pipeline";
 import { qdrantService } from "../vectordb/qdrant-service";
@@ -12,7 +12,7 @@ export const documentsRouter = router({
   /**
    * Upload and process a document file
    */
-  uploadFile: protectedProcedure
+  uploadFile: governedProcedure
     .input(
       z.object({
         filename: z.string(),
@@ -58,7 +58,7 @@ export const documentsRouter = router({
   /**
    * Ingest a document into the RAG system
    */
-  ingest: protectedProcedure
+  ingest: governedProcedure
     .input(
       z.object({
         content: z.string(),

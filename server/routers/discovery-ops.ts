@@ -12,7 +12,7 @@
 
 import { z } from "zod";
 import { eq, desc, sql, and, gte } from "drizzle-orm";
-import { protectedProcedure, adminProcedure, governedAdminProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, adminProcedure, governedAdminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   providerDiscoveryEvents,

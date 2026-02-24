@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { getProviderRegistry } from "../providers/registry";
 import type { Message } from "../providers/types";
 import { trackProviderUsage } from "../providers/usage";
@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 
 export const chatRouter = router({
   // Send a message and get a response from the selected provider
-  sendMessage: protectedProcedure
+  sendMessage: governedProcedure
     .input(z.object({
       providerId: z.number(),
       messages: z.array(z.object({
@@ -127,7 +127,7 @@ export const chatRouter = router({
     }),
 
   // Delete a conversation
-  deleteConversation: protectedProcedure
+  deleteConversation: governedProcedure
     .input(z.object({
       conversationId: z.number(),
     }))
@@ -138,7 +138,7 @@ export const chatRouter = router({
     }),
 
   // Bulk delete conversations
-  bulkDeleteConversations: protectedProcedure
+  bulkDeleteConversations: governedProcedure
     .input(z.object({
       conversationIds: z.array(z.number()),
     }))
@@ -163,7 +163,7 @@ export const chatRouter = router({
     }),
 
   // Send a message with streaming response (returns async generator)
-  sendMessageStream: protectedProcedure
+  sendMessageStream: governedProcedure
     .input(z.object({
       providerId: z.number(),
       messages: z.array(z.object({
@@ -249,7 +249,7 @@ export const chatRouter = router({
     }),
 
   // Save a full conversation (title + messages) to the database
-  saveConversation: protectedProcedure
+  saveConversation: governedProcedure
     .input(z.object({
       title: z.string().min(1).max(500),
       messages: z.array(z.object({
@@ -293,7 +293,7 @@ export const chatRouter = router({
     }),
 
   // Test provider connection
-  testProvider: protectedProcedure
+  testProvider: governedProcedure
     .input(z.object({
       providerId: z.number(),
     }))

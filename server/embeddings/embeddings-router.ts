@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { embeddingEngine } from "./embedding-engine";
 
 /**
@@ -10,7 +10,7 @@ export const embeddingsRouter = router({
   /**
    * Generate embeddings for texts
    */
-  generate: protectedProcedure
+  generate: governedProcedure
     .input(
       z.object({
         texts: z.array(z.string()),
@@ -43,7 +43,7 @@ export const embeddingsRouter = router({
   /**
    * Clear embedding cache
    */
-  clearCache: protectedProcedure.mutation(async () => {
+  clearCache: governedProcedure.mutation(async () => {
     embeddingEngine.clearCache();
     return { success: true };
   }),

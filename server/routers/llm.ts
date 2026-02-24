@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import {
   createLLM,
   updateLLM,
@@ -102,7 +102,7 @@ export const llmRouter = router({
   // LLM Identity Management
   // ============================================================================
 
-  create: protectedProcedure
+  create: governedProcedure
     .input(createLLMSchema)
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user?.id) {
@@ -126,7 +126,7 @@ export const llmRouter = router({
       return llm;
     }),
 
-  update: protectedProcedure
+  update: governedProcedure
     .input(updateLLMSchema)
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user?.id) {
@@ -180,7 +180,7 @@ export const llmRouter = router({
       };
     }),
 
-  archive: protectedProcedure
+  archive: governedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       await archiveLLM(input.id, ctx.user.id);
@@ -191,7 +191,7 @@ export const llmRouter = router({
   // LLM Version Management
   // ============================================================================
 
-  createVersion: protectedProcedure
+  createVersion: governedProcedure
     .input(createVersionSchema)
     .mutation(async ({ ctx, input }) => {
       const version = await createLLMVersion({
@@ -223,7 +223,7 @@ export const llmRouter = router({
       return version;
     }),
 
-  updateCallable: protectedProcedure
+  updateCallable: governedProcedure
     .input(
       z.object({
         versionId: z.number().int().positive(),
@@ -240,7 +240,7 @@ export const llmRouter = router({
   // Promotion Workflow
   // ============================================================================
 
-  createPromotion: protectedProcedure
+  createPromotion: governedProcedure
     .input(createPromotionSchema)
     .mutation(async ({ ctx, input }) => {
       const validPaths = [
@@ -278,7 +278,7 @@ export const llmRouter = router({
       return promotions;
     }),
 
-  approvePromotion: protectedProcedure
+  approvePromotion: governedProcedure
     .input(
       z.object({
         promotionId: z.number().int().positive(),
@@ -290,7 +290,7 @@ export const llmRouter = router({
       return { success: true };
     }),
 
-  rejectPromotion: protectedProcedure
+  rejectPromotion: governedProcedure
     .input(
       z.object({
         promotionId: z.number().int().positive(),
@@ -302,7 +302,7 @@ export const llmRouter = router({
       return { success: true };
     }),
 
-  executePromotion: protectedProcedure
+  executePromotion: governedProcedure
     .input(z.object({ promotionId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const [promotion] = await getPromotions({ llmVersionId: input.promotionId });

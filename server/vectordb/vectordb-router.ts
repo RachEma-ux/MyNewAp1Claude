@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { qdrantService } from "./qdrant-service";
 
 /**
@@ -10,7 +10,7 @@ export const vectordbRouter = router({
   /**
    * Create a collection
    */
-  createCollection: protectedProcedure
+  createCollection: governedProcedure
     .input(
       z.object({
         name: z.string(),
@@ -31,7 +31,7 @@ export const vectordbRouter = router({
   /**
    * Delete a collection
    */
-  deleteCollection: protectedProcedure
+  deleteCollection: governedProcedure
     .input(z.object({ name: z.string() }))
     .mutation(async ({ input }) => {
       await qdrantService.deleteCollection(input.name);
@@ -48,7 +48,7 @@ export const vectordbRouter = router({
   /**
    * Insert vectors
    */
-  insert: protectedProcedure
+  insert: governedProcedure
     .input(
       z.object({
         collection: z.string(),

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { protocols } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -59,7 +59,7 @@ export const protocolsRouter = router({
     }),
 
   // Create new protocol
-  create: protectedProcedure
+  create: governedProcedure
     .input(z.object({
       workspaceId: z.number().optional(),
       name: z.string().min(1),
@@ -90,7 +90,7 @@ export const protocolsRouter = router({
     }),
 
   // Update protocol
-  update: protectedProcedure
+  update: governedProcedure
     .input(z.object({
       id: z.number(),
       name: z.string().optional(),
@@ -129,7 +129,7 @@ export const protocolsRouter = router({
     }),
 
   // Delete protocol
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -153,7 +153,7 @@ export const protocolsRouter = router({
     }),
 
   // Upload protocol from file
-  uploadFromFile: protectedProcedure
+  uploadFromFile: governedProcedure
     .input(z.object({
       workspaceId: z.number().optional(),
       name: z.string().min(1),

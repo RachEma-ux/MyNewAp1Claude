@@ -1,0 +1,1955 @@
+# Platform Action Registry — Unified Governance v1
+# Global risk-adaptive governance: every mutation in the system mapped here.
+# Unknown action keys → deny-by-default at runtime.
+
+version: 1
+
+# ─── Risk Model ─────────────────────────────────────────────────────────────
+# R1 – Local reversible (no governance evaluation)
+# R2 – Scoped impact (no governance evaluation)
+# R3 – Cross-boundary / partial irreversible (GovernanceCenter.evaluate)
+# R4 – External boundary / privilege escalation (evaluate + approval)
+# R5 – Platform integrity (evaluate + dual_control + evidence)
+
+governance_threshold: R3
+
+# ─── Approval Rules ─────────────────────────────────────────────────────────
+# none          – no approval needed
+# role_any      – any user with required capability
+# role_all      – all users with required capability must approve
+# dual_control  – two distinct principals must approve
+# conditional   – approval required only when conditions met
+
+# ─── Evidence Types ─────────────────────────────────────────────────────────
+# diff, reason, sources, plan, tool_intents, payload_hash,
+# probe_results, tests_passed, signed_commit
+
+# ─── Actions ────────────────────────────────────────────────────────────────
+
+actions:
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # AUTH
+  # ═══════════════════════════════════════════════════════════════════════════
+  auth.logout:
+    domain: auth
+    risk: R1
+    capability: auth.session
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # WORKSPACE
+  # ═══════════════════════════════════════════════════════════════════════════
+  workspace.create:
+    domain: workspace
+    risk: R1
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.update:
+    domain: workspace
+    risk: R1
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.updateRoutingProfile:
+    domain: workspace
+    risk: R2
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.delete:
+    domain: workspace
+    risk: R3
+    capability: workspace.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MODEL REGISTRY
+  # ═══════════════════════════════════════════════════════════════════════════
+  model.create:
+    domain: model
+    risk: R1
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  model.update:
+    domain: model
+    risk: R1
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  model.delete:
+    domain: model
+    risk: R2
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  model.startDownload:
+    domain: model
+    risk: R2
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PROVIDER ENGINE
+  # ═══════════════════════════════════════════════════════════════════════════
+  provider.create:
+    domain: provider
+    risk: R3
+    capability: provider.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  provider.update:
+    domain: provider
+    risk: R2
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  provider.delete:
+    domain: provider
+    risk: R3
+    capability: provider.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  provider.testConnection:
+    domain: provider
+    risk: R1
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  provider.enableModel:
+    domain: provider
+    risk: R2
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  provider.disableModel:
+    domain: provider
+    risk: R2
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  provider.setDefault:
+    domain: provider
+    risk: R2
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  provider.updateModelConfig:
+    domain: provider
+    risk: R2
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  provider.updateRateLimits:
+    domain: provider
+    risk: R2
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  provider.resetStats:
+    domain: provider
+    risk: R1
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  provider.refreshModels:
+    domain: provider
+    risk: R1
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  provider.batchToggle:
+    domain: provider
+    risk: R2
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PROVIDER CONNECTIONS (PAT Auth)
+  # ═══════════════════════════════════════════════════════════════════════════
+  providerConnection.test:
+    domain: provider
+    risk: R1
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  providerConnection.create:
+    domain: provider
+    risk: R3
+    capability: provider.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  providerConnection.validateAndStore:
+    domain: provider
+    risk: R3
+    capability: provider.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  providerConnection.activate:
+    domain: provider
+    risk: R3
+    capability: provider.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: false }
+
+  providerConnection.disable:
+    domain: provider
+    risk: R2
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  providerConnection.healthCheck:
+    domain: provider
+    risk: R1
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  providerConnection.rotate:
+    domain: provider
+    risk: R4
+    capability: provider.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, payload_hash] }
+
+  providerConnection.delete:
+    domain: provider
+    risk: R3
+    capability: provider.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CHAT
+  # ═══════════════════════════════════════════════════════════════════════════
+  chat.send:
+    domain: chat
+    risk: R1
+    capability: chat.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  chat.createConversation:
+    domain: chat
+    risk: R1
+    capability: chat.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  chat.clearConversation:
+    domain: chat
+    risk: R1
+    capability: chat.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  chat.deleteConversation:
+    domain: chat
+    risk: R1
+    capability: chat.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  chat.updateSettings:
+    domain: chat
+    risk: R1
+    capability: chat.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  chat.generateTitle:
+    domain: chat
+    risk: R1
+    capability: chat.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CONVERSATIONS
+  # ═══════════════════════════════════════════════════════════════════════════
+  conversation.create:
+    domain: conversation
+    risk: R1
+    capability: chat.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  conversation.update:
+    domain: conversation
+    risk: R1
+    capability: chat.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  conversation.delete:
+    domain: conversation
+    risk: R1
+    capability: chat.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # AGENTS (Control Plane + Promotions)
+  # ═══════════════════════════════════════════════════════════════════════════
+  agent.create:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agent.update:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agent.delete:
+    domain: agent
+    risk: R3
+    capability: agent.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  agent.runDriftDetection:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agent.exportCompliance:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agent.autoRemediate:
+    domain: agent
+    risk: R3
+    capability: agent.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, plan] }
+
+  agent.deployTemplate:
+    domain: agent
+    risk: R3
+    capability: agent.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  agent.promote:
+    domain: agent
+    risk: R4
+    capability: agent.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, diff] }
+
+  agent.register:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agent.updateConfig:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agent.admitToSandbox:
+    domain: agent
+    risk: R3
+    capability: agent.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  agent.controlPlane.promote:
+    domain: agent
+    risk: R4
+    capability: agent.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason, diff, tests_passed] }
+
+  agent.disable:
+    domain: agent
+    risk: R3
+    capability: agent.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  agent.invoke:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agent.diff:
+    domain: agent
+    risk: R1
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # Agent Promotions
+  agentPromotion.createRequest:
+    domain: agent
+    risk: R3
+    capability: agent.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, plan] }
+
+  agentPromotion.approve:
+    domain: agent
+    risk: R4
+    capability: agent.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason] }
+
+  agentPromotion.reject:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: true, types: [reason] }
+
+  agentPromotion.execute:
+    domain: agent
+    risk: R4
+    capability: agent.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, tests_passed] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DOCUMENTS
+  # ═══════════════════════════════════════════════════════════════════════════
+  document.create:
+    domain: document
+    risk: R1
+    capability: document.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  document.update:
+    domain: document
+    risk: R1
+    capability: document.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  document.delete:
+    domain: document
+    risk: R2
+    capability: document.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  document.upload:
+    domain: document
+    risk: R2
+    capability: document.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  document.bulkDelete:
+    domain: document
+    risk: R3
+    capability: document.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  document.process:
+    domain: document
+    risk: R2
+    capability: document.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  document.reprocess:
+    domain: document
+    risk: R2
+    capability: document.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # AUTOMATION / WORKFLOWS
+  # ═══════════════════════════════════════════════════════════════════════════
+  workflow.create:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workflow.update:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workflow.delete:
+    domain: automation
+    risk: R3
+    capability: workflow.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  workflow.publish:
+    domain: automation
+    risk: R3
+    capability: workflow.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  workflow.rollback:
+    domain: automation
+    risk: R3
+    capability: workflow.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  workflow.execute:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workflow.cancel:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SECRETS
+  # ═══════════════════════════════════════════════════════════════════════════
+  secret.create:
+    domain: secret
+    risk: R3
+    capability: secret.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  secret.update:
+    domain: secret
+    risk: R3
+    capability: secret.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  secret.delete:
+    domain: secret
+    risk: R3
+    capability: secret.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # KEY ROTATION
+  # ═══════════════════════════════════════════════════════════════════════════
+  keyRotation.createKey:
+    domain: keyRotation
+    risk: R3
+    capability: secret.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  keyRotation.activateKey:
+    domain: keyRotation
+    risk: R4
+    capability: secret.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason, payload_hash] }
+
+  keyRotation.revokeKey:
+    domain: keyRotation
+    risk: R4
+    capability: secret.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason] }
+
+  keyRotation.createVersion:
+    domain: keyRotation
+    risk: R3
+    capability: secret.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  keyRotation.activateVersion:
+    domain: keyRotation
+    risk: R4
+    capability: secret.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason] }
+
+  keyRotation.deprecateVersion:
+    domain: keyRotation
+    risk: R3
+    capability: secret.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  keyRotation.createRotation:
+    domain: keyRotation
+    risk: R4
+    capability: secret.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason, plan] }
+
+  keyRotation.completeRotation:
+    domain: keyRotation
+    risk: R4
+    capability: secret.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, tests_passed] }
+
+  keyRotation.failRotation:
+    domain: keyRotation
+    risk: R3
+    capability: secret.manage
+    stage: mutate
+    approval: none
+    evidence: { required: true, types: [reason] }
+
+  keyRotation.rollbackRotation:
+    domain: keyRotation
+    risk: R4
+    capability: secret.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason] }
+
+  keyRotation.createPolicy:
+    domain: keyRotation
+    risk: R3
+    capability: secret.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  keyRotation.activatePolicy:
+    domain: keyRotation
+    risk: R3
+    capability: secret.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: false }
+
+  keyRotation.deactivatePolicy:
+    domain: keyRotation
+    risk: R3
+    capability: secret.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # TRIGGERS & ACTIONS
+  # ═══════════════════════════════════════════════════════════════════════════
+  trigger.create:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  trigger.approve:
+    domain: automation
+    risk: R3
+    capability: workflow.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  trigger.reject:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: true, types: [reason] }
+
+  trigger.delete:
+    domain: automation
+    risk: R3
+    capability: workflow.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  action.create:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  action.approve:
+    domain: automation
+    risk: R3
+    capability: workflow.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  action.reject:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: true, types: [reason] }
+
+  action.delete:
+    domain: automation
+    risk: R3
+    capability: workflow.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # TEMPLATES
+  # ═══════════════════════════════════════════════════════════════════════════
+  template.create:
+    domain: automation
+    risk: R1
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  template.update:
+    domain: automation
+    risk: R1
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  template.delete:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  template.duplicate:
+    domain: automation
+    risk: R1
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PROTOCOLS
+  # ═══════════════════════════════════════════════════════════════════════════
+  protocol.create:
+    domain: protocol
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  protocol.update:
+    domain: protocol
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  protocol.delete:
+    domain: protocol
+    risk: R3
+    capability: workflow.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  protocol.activate:
+    domain: protocol
+    risk: R3
+    capability: workflow.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # WCP WORKFLOWS
+  # ═══════════════════════════════════════════════════════════════════════════
+  wcpWorkflow.create:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  wcpWorkflow.update:
+    domain: automation
+    risk: R2
+    capability: workflow.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  wcpWorkflow.delete:
+    domain: automation
+    risk: R3
+    capability: workflow.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # POLICIES
+  # ═══════════════════════════════════════════════════════════════════════════
+  policy.create:
+    domain: policy
+    risk: R3
+    capability: policy.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  policy.update:
+    domain: policy
+    risk: R3
+    capability: policy.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, diff] }
+
+  policy.delete:
+    domain: policy
+    risk: R3
+    capability: policy.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  policy.activate:
+    domain: policy
+    risk: R3
+    capability: policy.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  policy.createFromTemplate:
+    domain: policy
+    risk: R3
+    capability: policy.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # WIKI / KNOWLEDGE BASE
+  # ═══════════════════════════════════════════════════════════════════════════
+  wiki.create:
+    domain: wiki
+    risk: R1
+    capability: wiki.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  wiki.update:
+    domain: wiki
+    risk: R1
+    capability: wiki.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  wiki.delete:
+    domain: wiki
+    risk: R2
+    capability: wiki.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  wiki.reorder:
+    domain: wiki
+    risk: R1
+    capability: wiki.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  wiki.move:
+    domain: wiki
+    risk: R1
+    capability: wiki.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  wiki.addTag:
+    domain: wiki
+    risk: R1
+    capability: wiki.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # LLM ENGINE
+  # ═══════════════════════════════════════════════════════════════════════════
+  llm.create:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llm.update:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llm.delete:
+    domain: llm
+    risk: R3
+    capability: llm.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  llm.activate:
+    domain: llm
+    risk: R3
+    capability: llm.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: false }
+
+  llm.benchmark:
+    domain: llm
+    risk: R1
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llm.updateCapabilities:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llm.updatePricing:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llm.setDefault:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llm.configureRouting:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # LLM PROVIDERS
+  # ═══════════════════════════════════════════════════════════════════════════
+  llmProvider.register:
+    domain: llm
+    risk: R3
+    capability: llm.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  llmProvider.configureProvider:
+    domain: llm
+    risk: R3
+    capability: llm.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  llmProvider.deleteCredentials:
+    domain: llm
+    risk: R3
+    capability: llm.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  llmProvider.updateStatus:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llmProvider.test:
+    domain: llm
+    risk: R1
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llmProvider.sync:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # LLM CREATION (Training, Fine-tuning, Quantization)
+  # ═══════════════════════════════════════════════════════════════════════════
+  llmCreation.create:
+    domain: llm
+    risk: R3
+    capability: llm.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, plan] }
+
+  llmCreation.update:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llmCreation.delete:
+    domain: llm
+    risk: R3
+    capability: llm.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  llmCreation.startTraining:
+    domain: llm
+    risk: R4
+    capability: llm.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, plan, sources] }
+
+  llmCreation.cancelTraining:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: true, types: [reason] }
+
+  llmCreation.startQuantization:
+    domain: llm
+    risk: R3
+    capability: llm.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  llmCreation.updateDataset:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llmCreation.deleteDataset:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llmCreation.uploadDataset:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llmCreation.createEvaluation:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llmCreation.deleteEvaluation:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llmCreation.addCheckpoint:
+    domain: llm
+    risk: R1
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llmCreation.removeCheckpoint:
+    domain: llm
+    risk: R1
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DEPLOY
+  # ═══════════════════════════════════════════════════════════════════════════
+  deploy.trigger:
+    domain: deploy
+    risk: R4
+    capability: deploy.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, signed_commit] }
+
+  deploy.cancel:
+    domain: deploy
+    risk: R3
+    capability: deploy.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  deploy.rerun:
+    domain: deploy
+    risk: R4
+    capability: deploy.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATALOG MANAGEMENT
+  # ═══════════════════════════════════════════════════════════════════════════
+  catalog.discover:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  catalog.submitFromDiscovery:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  catalog.create:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  catalog.update:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  catalog.delete:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  catalog.validate:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: validate
+    approval: role_any
+    evidence: { required: true, types: [probe_results] }
+
+  catalog.approve:
+    domain: catalog
+    risk: R4
+    capability: catalog.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason] }
+
+  catalog.reject:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: true, types: [reason] }
+
+  catalog.activate:
+    domain: catalog
+    risk: R4
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, tests_passed] }
+
+  catalog.publish:
+    domain: catalog
+    risk: R5
+    capability: catalog.manage
+    stage: publish
+    approval: dual_control
+    evidence: { required: true, types: [reason, diff, tests_passed, signed_commit] }
+
+  catalog.syncProviders:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: false }
+
+  catalog.syncRegistry:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: false }
+
+  catalog.recall:
+    domain: catalog
+    risk: R5
+    capability: catalog.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason] }
+
+  catalog.classify:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  catalog.autoClassify:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  catalog.bulkAutoClassify:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATALOG IMPORT / DISCOVERY
+  # ═══════════════════════════════════════════════════════════════════════════
+  catalogImport.importUrl:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [sources] }
+
+  catalogImport.retryAll:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  catalogImport.resolveConflict:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DISCOVERY OPS
+  # ═══════════════════════════════════════════════════════════════════════════
+  discoveryOps.markInReview:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  discoveryOps.reject:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  discoveryOps.accept:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  discoveryOps.batchAutoPromote:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: false }
+
+  discoveryOps.cleanup:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # EMBEDDINGS
+  # ═══════════════════════════════════════════════════════════════════════════
+  embedding.generate:
+    domain: embedding
+    risk: R1
+    capability: embedding.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  embedding.clearCache:
+    domain: embedding
+    risk: R1
+    capability: embedding.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # VECTOR DB
+  # ═══════════════════════════════════════════════════════════════════════════
+  vectordb.createCollection:
+    domain: vectordb
+    risk: R2
+    capability: vectordb.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  vectordb.deleteCollection:
+    domain: vectordb
+    risk: R3
+    capability: vectordb.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  vectordb.upsertPoints:
+    domain: vectordb
+    risk: R2
+    capability: vectordb.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # INFERENCE
+  # ═══════════════════════════════════════════════════════════════════════════
+  inference.run:
+    domain: inference
+    risk: R1
+    capability: inference.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  inference.batch:
+    domain: inference
+    risk: R2
+    capability: inference.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  inference.hybrid:
+    domain: inference
+    risk: R2
+    capability: inference.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MODEL DOWNLOADS
+  # ═══════════════════════════════════════════════════════════════════════════
+  modelDownload.start:
+    domain: model
+    risk: R2
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  modelDownload.cancel:
+    domain: model
+    risk: R1
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  modelDownload.pause:
+    domain: model
+    risk: R1
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  modelDownload.resume:
+    domain: model
+    risk: R1
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  modelDownload.retry:
+    domain: model
+    risk: R1
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  modelDownload.delete:
+    domain: model
+    risk: R2
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  modelDownload.cleanup:
+    domain: model
+    risk: R2
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  modelDownload.convert:
+    domain: model
+    risk: R2
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MODEL BENCHMARKS
+  # ═══════════════════════════════════════════════════════════════════════════
+  modelBenchmark.run:
+    domain: model
+    risk: R1
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MODEL VERSIONS
+  # ═══════════════════════════════════════════════════════════════════════════
+  modelVersion.create:
+    domain: model
+    risk: R2
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  modelVersion.activate:
+    domain: model
+    risk: R3
+    capability: model.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  modelVersion.archive:
+    domain: model
+    risk: R2
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  modelVersion.delete:
+    domain: model
+    risk: R2
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  modelVersion.rollback:
+    domain: model
+    risk: R3
+    capability: model.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # HARDWARE
+  # ═══════════════════════════════════════════════════════════════════════════
+  hardware.clearCache:
+    domain: hardware
+    risk: R1
+    capability: system.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SYSTEM
+  # ═══════════════════════════════════════════════════════════════════════════
+  system.updateSetting:
+    domain: system
+    risk: R2
+    capability: system.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # GOVERNANCE
+  # ═══════════════════════════════════════════════════════════════════════════
+  governance.stageTransition:
+    domain: governance
+    risk: R4
+    capability: governance.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  governance.driftToggle:
+    domain: governance
+    risk: R3
+    capability: governance.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: false }
+
+  governance.unfreezeSubject:
+    domain: governance
+    risk: R4
+    capability: governance.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason] }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PLATFORM ENGINES — PMT
+  # ═══════════════════════════════════════════════════════════════════════════
+  pmt.project.create:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.project.update:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.project.delete:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.task.create:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.task.update:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.task.delete:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.member.add:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.member.remove:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PLATFORM ENGINES — KNOWLEDGE
+  # ═══════════════════════════════════════════════════════════════════════════
+  knowledge.document.create:
+    domain: knowledge
+    risk: R1
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  knowledge.document.update:
+    domain: knowledge
+    risk: R1
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  knowledge.document.delete:
+    domain: knowledge
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  knowledge.chunk.create:
+    domain: knowledge
+    risk: R1
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  knowledge.chunk.update:
+    domain: knowledge
+    risk: R1
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PLATFORM ENGINES — AGENT ORCHESTRATION
+  # ═══════════════════════════════════════════════════════════════════════════
+  agents.workspace.create:
+    domain: agents
+    risk: R2
+    capability: agents.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agents.workspace.update:
+    domain: agents
+    risk: R2
+    capability: agents.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agents.workspace.delete:
+    domain: agents
+    risk: R3
+    capability: agents.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  agents.run.request:
+    domain: agents
+    risk: R3
+    capability: agents.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: false }
+
+  agents.run.execute:
+    domain: agents
+    risk: R3
+    capability: agents.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  agents.run.complete:
+    domain: agents
+    risk: R2
+    capability: agents.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PLATFORM ENGINES — COLLABORATION
+  # ═══════════════════════════════════════════════════════════════════════════
+  collaboration.thread.create:
+    domain: collaboration
+    risk: R1
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  collaboration.thread.update:
+    domain: collaboration
+    risk: R1
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  collaboration.thread.delete:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  collaboration.message.create:
+    domain: collaboration
+    risk: R1
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  collaboration.message.update:
+    domain: collaboration
+    risk: R1
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  collaboration.message.delete:
+    domain: collaboration
+    risk: R2
+    capability: collaboration.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MODULES (ENGINE BINDING)
+  # ═══════════════════════════════════════════════════════════════════════════
+  module.setEnabled:
+    domain: module
+    risk: R3
+    capability: module.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  module.seed:
+    domain: module
+    risk: R2
+    capability: module.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { llamaCppEngine } from "./llamacpp-engine";
 
 /**
@@ -10,7 +10,7 @@ export const inferenceRouter = router({
   /**
    * Load a model
    */
-  loadModel: protectedProcedure
+  loadModel: governedProcedure
     .input(
       z.object({
         modelId: z.string(),
@@ -38,7 +38,7 @@ export const inferenceRouter = router({
   /**
    * Unload a model
    */
-  unloadModel: protectedProcedure
+  unloadModel: governedProcedure
     .input(z.object({ modelId: z.string() }))
     .mutation(async ({ input }) => {
       await llamaCppEngine.unloadModel(input.modelId);
@@ -48,7 +48,7 @@ export const inferenceRouter = router({
   /**
    * Run inference
    */
-  infer: protectedProcedure
+  infer: governedProcedure
     .input(
       z.object({
         modelId: z.string(),

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
+import { router, publicProcedure, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { conversations, messages } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -53,7 +53,7 @@ export const conversationsRouter = router({
    * 
    * Initializes a conversation between user and agent
    */
-  createConversation: protectedProcedure
+  createConversation: governedProcedure
     .input(z.object({
       agentId: z.number().optional(),
       workspaceId: z.number().optional(),
@@ -133,7 +133,7 @@ export const conversationsRouter = router({
   /**
    * Add message to conversation
    */
-  addMessage: protectedProcedure
+  addMessage: governedProcedure
     .input(z.object({
       conversationId: z.number(),
       content: z.string().min(1),
@@ -177,7 +177,7 @@ export const conversationsRouter = router({
   /**
    * Delete conversation
    */
-  deleteConversation: protectedProcedure
+  deleteConversation: governedProcedure
     .input(z.object({
       conversationId: z.number(),
     }))

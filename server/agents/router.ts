@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { protectedProcedure, router } from '../_core/trpc';
+import { protectedProcedure, governedProcedure, router } from '../_core/trpc';
 import {
   createAgent,
   getAgent,
@@ -18,7 +18,7 @@ import { getToolRegistry } from './tools';
 
 export const agentsRouter = router({
   // Agent management
-  deployTemplate: protectedProcedure
+  deployTemplate: governedProcedure
     .input(z.object({
       templateId: z.string(),
       name: z.string(),
@@ -88,7 +88,7 @@ export const agentsRouter = router({
       };
     }),
 
-  create: protectedProcedure
+  create: governedProcedure
     .input(z.object({
       workspaceId: z.number(),
       name: z.string().min(1).max(255),
@@ -131,7 +131,7 @@ export const agentsRouter = router({
       return listAgents(input.workspaceId);
     }),
 
-  update: protectedProcedure
+  update: governedProcedure
     .input(z.object({
       id: z.number(),
       name: z.string().min(1).max(255).optional(),
@@ -151,7 +151,7 @@ export const agentsRouter = router({
       return { success: true };
     }),
 
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({
       id: z.number(),
     }))
@@ -161,7 +161,7 @@ export const agentsRouter = router({
     }),
 
   // Conversation management
-  createConversation: protectedProcedure
+  createConversation: governedProcedure
     .input(z.object({
       workspaceId: z.number(),
       agentId: z.number().optional(),
@@ -199,7 +199,7 @@ export const agentsRouter = router({
       return listConversations(input.workspaceId, input.agentId);
     }),
 
-  updateConversation: protectedProcedure
+  updateConversation: governedProcedure
     .input(z.object({
       id: z.number(),
       title: z.string().optional(),
@@ -212,7 +212,7 @@ export const agentsRouter = router({
       return { success: true };
     }),
 
-  deleteConversation: protectedProcedure
+  deleteConversation: governedProcedure
     .input(z.object({
       id: z.number(),
     }))
@@ -222,7 +222,7 @@ export const agentsRouter = router({
     }),
 
   // Agent execution
-  execute: protectedProcedure
+  execute: governedProcedure
     .input(z.object({
       conversationId: z.number(),
       message: z.string().min(1),

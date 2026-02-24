@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import * as versionService from "./version-service";
 
 /**
@@ -30,7 +30,7 @@ export const modelVersionRouter = router({
     }),
 
   // Create a new version
-  create: protectedProcedure
+  create: governedProcedure
     .input(
       z.object({
         modelId: z.number(),
@@ -49,7 +49,7 @@ export const modelVersionRouter = router({
     }),
 
   // Set a version as latest
-  setLatest: protectedProcedure
+  setLatest: governedProcedure
     .input(z.object({ versionId: z.number() }))
     .mutation(async ({ input }) => {
       await versionService.setLatestVersion(input.versionId);
@@ -57,7 +57,7 @@ export const modelVersionRouter = router({
     }),
 
   // Deprecate a version
-  deprecate: protectedProcedure
+  deprecate: governedProcedure
     .input(z.object({ versionId: z.number() }))
     .mutation(async ({ input }) => {
       await versionService.deprecateVersion(input.versionId);
@@ -65,7 +65,7 @@ export const modelVersionRouter = router({
     }),
 
   // Update version changelog
-  updateChangelog: protectedProcedure
+  updateChangelog: governedProcedure
     .input(
       z.object({
         versionId: z.number(),
@@ -78,7 +78,7 @@ export const modelVersionRouter = router({
     }),
 
   // Delete a version
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({ versionId: z.number() }))
     .mutation(async ({ input }) => {
       await versionService.deleteModelVersion(input.versionId);

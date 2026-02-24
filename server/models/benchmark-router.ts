@@ -1,4 +1,4 @@
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { z } from "zod";
 import {
   runModelBenchmark,
@@ -14,7 +14,7 @@ import {
 
 export const modelBenchmarkRouter = router({
   // Run benchmark for a model
-  runBenchmark: protectedProcedure
+  runBenchmark: governedProcedure
     .input(
       z.object({
         modelId: z.number(),

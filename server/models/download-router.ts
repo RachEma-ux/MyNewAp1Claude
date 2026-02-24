@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import * as downloadDb from "./download-db";
 import { startModelDownload, pauseDownload, resumeDownload, cancelDownload, simulateDownload } from "./download-service";
 import { getEnabledProviders, getProviderById, updateProvider } from "../providers/db";
@@ -132,7 +132,7 @@ const HUB_MODELS = [
 
 export const modelDownloadRouter = router({
   // Create a new download with scheduling options
-  create: protectedProcedure
+  create: governedProcedure
     .input(
       z.object({
         modelId: z.number(),
@@ -187,7 +187,7 @@ export const modelDownloadRouter = router({
     }),
 
   // Update download progress
-  updateProgress: protectedProcedure
+  updateProgress: governedProcedure
     .input(
       z.object({
         downloadId: z.number(),
@@ -205,7 +205,7 @@ export const modelDownloadRouter = router({
     }),
 
   // Update download status
-  updateStatus: protectedProcedure
+  updateStatus: governedProcedure
     .input(
       z.object({
         downloadId: z.number(),
@@ -223,7 +223,7 @@ export const modelDownloadRouter = router({
     }),
 
   // Pause download
-  pause: protectedProcedure
+  pause: governedProcedure
     .input(z.object({ downloadId: z.number() }))
     .mutation(async ({ input }) => {
       const success = await pauseDownload(input.downloadId);
@@ -231,7 +231,7 @@ export const modelDownloadRouter = router({
     }),
 
   // Resume download
-  resume: protectedProcedure
+  resume: governedProcedure
     .input(z.object({ downloadId: z.number() }))
     .mutation(async ({ input }) => {
       const success = await resumeDownload(input.downloadId);
@@ -239,7 +239,7 @@ export const modelDownloadRouter = router({
     }),
 
   // Cancel download
-  cancel: protectedProcedure
+  cancel: governedProcedure
     .input(z.object({ downloadId: z.number() }))
     .mutation(async ({ input }) => {
       const success = await cancelDownload(input.downloadId);
@@ -247,7 +247,7 @@ export const modelDownloadRouter = router({
     }),
 
   // Update download priority
-  updatePriority: protectedProcedure
+  updatePriority: governedProcedure
     .input(
       z.object({
         downloadId: z.number(),
@@ -260,7 +260,7 @@ export const modelDownloadRouter = router({
     }),
 
   // Delete download
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({ downloadId: z.number() }))
     .mutation(async ({ input }) => {
       await downloadDb.deleteModelDownload(input.downloadId);
@@ -384,7 +384,7 @@ export const modelDownloadRouter = router({
     }),
 
   // Push a model to a provider's config.models (bidirectional catalog write)
-  addToCatalog: protectedProcedure
+  addToCatalog: governedProcedure
     .input(
       z.object({
         providerId: z.number(),

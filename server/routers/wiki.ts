@@ -1,4 +1,4 @@
-import { router, publicProcedure, protectedProcedure } from '../_core/trpc';
+import { router, publicProcedure, protectedProcedure, governedProcedure } from '../_core/trpc';
 import { z } from 'zod';
 import { WikiService } from '../wiki/wiki-service';
 
@@ -70,7 +70,7 @@ export const wikiRouter = router({
   /**
    * Create a new wiki page (protected)
    */
-  createPage: protectedProcedure
+  createPage: governedProcedure
     .input(
       z.object({
         title: z.string().min(1),
@@ -97,7 +97,7 @@ export const wikiRouter = router({
   /**
    * Update a wiki page (protected)
    */
-  updatePage: protectedProcedure
+  updatePage: governedProcedure
     .input(
       z.object({
         pageId: z.number(),
@@ -114,7 +114,7 @@ export const wikiRouter = router({
   /**
    * Delete a wiki page (protected)
    */
-  deletePage: protectedProcedure
+  deletePage: governedProcedure
     .input(z.object({ pageId: z.number() }))
     .mutation(async ({ input }) => {
       await WikiService.deletePage(input.pageId);
@@ -124,7 +124,7 @@ export const wikiRouter = router({
   /**
    * Publish a wiki page (protected)
    */
-  publishPage: protectedProcedure
+  publishPage: governedProcedure
     .input(z.object({ pageId: z.number() }))
     .mutation(async ({ input }) => {
       return WikiService.publishPage(input.pageId);
@@ -133,7 +133,7 @@ export const wikiRouter = router({
   /**
    * Unpublish a wiki page (protected)
    */
-  unpublishPage: protectedProcedure
+  unpublishPage: governedProcedure
     .input(z.object({ pageId: z.number() }))
     .mutation(async ({ input }) => {
       return WikiService.unpublishPage(input.pageId);
@@ -151,7 +151,7 @@ export const wikiRouter = router({
   /**
    * Revert page to a specific revision (protected)
    */
-  revertToRevision: protectedProcedure
+  revertToRevision: governedProcedure
     .input(
       z.object({
         pageId: z.number(),

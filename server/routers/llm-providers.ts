@@ -223,14 +223,14 @@ export const llmProvidersProcedures = {
       return await getInstalledModels(input.providerId);
     }),
 
-  downloadModel: protectedProcedure
+  downloadModel: governedProcedure
     .input(z.object({ providerId: z.string(), modelId: z.string() }))
     .mutation(async ({ input }) => {
       const { downloadModel } = await import("../llm/provider-installation");
       return await downloadModel(input.providerId, input.modelId);
     }),
 
-  removeModel: protectedProcedure
+  removeModel: governedProcedure
     .input(z.object({ providerId: z.string(), modelId: z.string() }))
     .mutation(async ({ input }) => {
       const { removeModel } = await import("../llm/provider-installation");

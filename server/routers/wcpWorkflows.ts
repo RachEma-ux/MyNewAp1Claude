@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { executeWorkflow } from "../wcp/execution-engine";
 
 export const wcpWorkflowsRouter = router({
   // Save or update a WCP workflow
-  saveWorkflow: protectedProcedure
+  saveWorkflow: governedProcedure
     .input(
       z.object({
         id: z.number().optional(),
@@ -127,7 +127,7 @@ export const wcpWorkflowsRouter = router({
     }),
 
   // Delete a WCP workflow
-  deleteWorkflow: protectedProcedure
+  deleteWorkflow: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -170,7 +170,7 @@ export const wcpWorkflowsRouter = router({
   }),
 
   // Create a new execution and execute the workflow
-  createExecution: protectedProcedure
+  createExecution: governedProcedure
     .input(
       z.object({
         workflowId: z.number(),

@@ -1,4 +1,4 @@
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { detectHardware, isModelCompatible } from "./detection-service";
 import { resourceManager } from "../inference/resource-manager";
 import { modelCache } from "../inference/model-cache";
@@ -71,7 +71,7 @@ export const hardwareRouter = router({
   /**
    * Clear model cache
    */
-  clearCache: protectedProcedure.mutation(() => {
+  clearCache: governedProcedure.mutation(() => {
     modelCache.clear();
     return { success: true };
   }),
