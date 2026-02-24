@@ -41,6 +41,7 @@ import { providerConnectionsRouter } from "./provider-connections/router";
 import { discoveryOpsRouter } from "./routers/discovery-ops";
 import { governanceRouter } from "./governance/router";
 import { hqRouter } from "./hq/router";
+import { modulesRouter } from "./modules/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -79,6 +80,7 @@ export const appRouter = router({
   discoveryOps: discoveryOpsRouter, // Discovery Ops: monitoring, promotion, audit
   governance: governanceRouter, // Governance Engine (CGT v2)
   hq: hqRouter, // Digital HQ aggregation
+  modules: modulesRouter, // Platform Engines (PMT, Knowledge, Agents, Collaboration, Reporting)
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

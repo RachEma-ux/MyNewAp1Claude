@@ -78,6 +78,7 @@ const LLMCreationWizard = lazy(() => import("@/pages/LLMCreationWizard"));
 const LLMProviderConfigWizard = lazy(() => import("@/pages/LLMProviderConfigWizard"));
 const NewProviderPage = lazy(() => import("@/pages/NewProviderPage"));
 const LLMCataloguePage = lazy(() => import("@/pages/LLMCataloguePage"));
+const WorkspaceShell = lazy(() => import("@/pages/WorkspaceShell"));
 const LLMPromotions = lazy(() => import("@/pages/LLMPromotions"));
 const LLMDetailPage = lazy(() => import("@/pages/LLMDetailPage"));
 const LLMTrainingDashboard = lazy(() => import("@/pages/LLMTrainingDashboard"));
@@ -135,6 +136,9 @@ function Router() {
       <Route path="/workspaces" component={() => <ProtectedRoute component={Workspaces} />} />
       <Route path="/workspaces/:id/home" component={() => <ProtectedRoute component={WorkspaceHome} />} />
       <Route path="/workspaces/:id" component={() => <ProtectedRoute component={WorkspaceDetail} />} />
+      {/* Workspace Shell — module-bound execution container */}
+      <Route path="/w/:workspaceId/:rest*" component={() => <ProtectedRoute component={WorkspaceShell} />} />
+      <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceShell} />} />
       <Route path="/models" component={() => <ProtectedRoute component={Models} />} />
       <Route path="/hardware" component={() => <ProtectedRoute component={HardwareProfile} />} />
           <Route path="/analytics/downloads" component={() => <ProtectedRoute component={DownloadAnalytics} />} />

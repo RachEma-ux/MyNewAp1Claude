@@ -17,3 +17,4 @@ export * from './tables/catalog';
 export * from './tables/governance';
 export * from './tables/enforcement';
 export * from './tables/workspace-rbac';
+export * from './tables/workspace-modules';
