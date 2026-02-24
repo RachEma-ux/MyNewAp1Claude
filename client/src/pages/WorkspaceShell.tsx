@@ -9,9 +9,8 @@
 import { useState } from "react";
 import { useParams, Route, Switch, Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Menu } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   FolderKanban,
@@ -124,31 +123,6 @@ export default function WorkspaceShell() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      {/* ─── Top App Bar ─── */}
-      <header className="flex items-center justify-between border-b bg-card px-4 h-12 shrink-0">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 lg:hidden"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-          <Link href={basePath}>
-            <span className="text-sm font-semibold hover:text-primary transition-colors cursor-pointer">
-              {workspace.name}
-            </span>
-          </Link>
-          <Badge variant="outline" className="text-[10px] hidden sm:inline-flex">
-            WS-{workspaceId}
-          </Badge>
-        </div>
-
-        <div className="flex items-center gap-2">
-        </div>
-      </header>
-
       {/* ─── Main Body: Sidebar + Content ─── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Collapsible Sidebar */}
