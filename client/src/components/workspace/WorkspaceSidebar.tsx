@@ -53,6 +53,11 @@ export function WorkspaceSidebar({
   const [location] = useLocation();
   const base = `/w/${workspaceId}`;
 
+  /** Collapse sidebar when a nav item is clicked while expanded */
+  const handleNav = () => {
+    if (!collapsed) onToggle();
+  };
+
   const navEntries: NavEntry[] = [
     {
       key: "overview",
@@ -155,6 +160,7 @@ export function WorkspaceSidebar({
       <div className="px-2 pt-2 pb-1">
         <Link href="/workspaces">
           <button
+            onClick={handleNav}
             className={cn(
               "flex items-center gap-2 w-full px-3 py-1.5 text-sm rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
               collapsed && "justify-center px-0"
@@ -173,6 +179,7 @@ export function WorkspaceSidebar({
           const item = (
             <Link key={entry.key} href={entry.path}>
               <button
+                onClick={handleNav}
                 className={cn(
                   "flex items-center gap-2 w-full px-3 py-1.5 text-sm rounded-md transition-colors",
                   active
@@ -205,6 +212,7 @@ export function WorkspaceSidebar({
                   {entry.children.map((child) => (
                     <Link key={child.path} href={child.path}>
                       <button
+                        onClick={handleNav}
                         className={cn(
                           "flex items-center w-full px-2 py-1 text-xs rounded-md transition-colors",
                           location === child.path

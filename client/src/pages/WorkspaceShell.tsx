@@ -53,7 +53,7 @@ export default function WorkspaceShell() {
   const workspaceId = parseInt(params.workspaceId || "0", 10);
   const [location] = useLocation();
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [oversightOpen, setOversightOpen] = useState(false);
 
   const { data: workspace, isLoading: wsLoading } = trpc.workspaces.get.useQuery(
