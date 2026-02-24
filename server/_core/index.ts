@@ -154,6 +154,29 @@ async function startServer() {
   // Run database migrations first
   await runMigrations();
 
+  // Ensure dev user exists in DB when DEV_MODE is active (FK safety)
+  if (process.env.DEV_MODE === "true") {
+    try {
+      const db = getDb();
+      if (db) {
+        const { users } = await import("../../drizzle/schema");
+        const existing = await db.select({ id: users.id }).from(users).where(eq(users.id, 1)).limit(1);
+        if (existing.length === 0) {
+          await db.insert(users).values({
+            openId: "dev-user-001",
+            name: "Dev User",
+            email: "dev@example.com",
+            loginMethod: "dev-mode",
+            role: "admin",
+          });
+          console.log("[DevMode] Created dev user (id=1)");
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[DevMode] Dev user seed skipped — ${e.message}`);
+    }
+  }
+
   // Ensure at least one workspace exists (idempotent)
   await ensureDefaultWorkspace();
 
