@@ -1,0 +1,48 @@
+Session Summary — 2026-02-24 01:30
+====================================
+
+## Task: Governance Documentation Restructure
+
+Performed a structural documentation reorganization to create a dedicated
+governance control-plane folder at docs/governance/.
+
+### What was done
+
+1. MOVED existing files (git mv, history preserved):
+   - docs/GOVERNANCE_BIBLE.md → docs/governance/GOVERNANCE_BIBLE.md
+   - "GOVERNANCE ENFORCEMENT — ABSOLUTE RULES" (root) → docs/governance/ENFORCEMENT_RULES.md
+   - docs/GOVERNANCE_SCORECARD_ENGINE.md → docs/governance/ENFORCEMENT_VALIDATION.md
+   - audit/redteam_findings.md → docs/governance/RED_TEAM_PROTOCOL.md
+
+2. CREATED new files:
+   - docs/governance/README.md — folder purpose, file index, authority statement
+   - docs/governance/MATURITY_LADDER.md — placeholder (header only)
+   - docs/governance/NO_REGRESSION_POLICY.md — placeholder (header only)
+
+3. UPDATED internal references:
+   - server/governance/scorecard/runner.ts:798 — path updated to docs/governance/
+   - .github/workflows/governance-gate.yml:60 — exclude pattern updated
+   - .github/workflows/governance-gate.yml:200 — required file path updated
+
+4. Verified no stale references remain outside docs/governance/
+
+### Final structure
+docs/governance/
+├── README.md
+├── GOVERNANCE_BIBLE.md
+├── ENFORCEMENT_RULES.md
+├── ENFORCEMENT_VALIDATION.md
+├── MATURITY_LADDER.md
+├── NO_REGRESSION_POLICY.md
+└── RED_TEAM_PROTOCOL.md
+
+### Deploy
+- Triggered Builder Deploy workflow (run 22330786008)
+- Tunnel URL: https://viking-cotton-bend-brown.trycloudflare.com
+- Opened all-pages test page for visual verification
+
+### Commits
+- dd6f29d — docs: complete governance folder restructure — README, placeholders, path refs
+  (Renames were in prior commit 379f80f)
+
+### No code changes. No CI workflow changes beyond path references.
