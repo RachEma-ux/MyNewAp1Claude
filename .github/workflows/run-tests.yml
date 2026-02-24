@@ -1,0 +1,29 @@
+name: Run Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_path:
+        description: 'Test path pattern (e.g. server/workspace/seed/)'
+        required: false
+        default: 'server/workspace/seed/'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run tests
+        run: npx vitest run ${{ github.event.inputs.test_path }} --reporter=verbose
