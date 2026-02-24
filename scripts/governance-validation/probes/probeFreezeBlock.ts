@@ -24,8 +24,11 @@ export function probeFreezeBlock(rootDir: string): ProbeResult {
 
     // Find isFrozen(0) in requireGovernance
     const freezeLineIdx = lines.findIndex((l) => l.includes("isFrozen(0)"));
-    // Find actual requireGate() call (not the import statement)
-    const gateLineIdx = lines.findIndex((l) => l.includes("requireGate(") && !l.trimStart().startsWith("import"));
+    // Find actual requireGate() call (not import or comment)
+    const gateLineIdx = lines.findIndex((l) => {
+      const trimmed = l.trimStart();
+      return trimmed.includes("requireGate(") && !trimmed.startsWith("import") && !trimmed.startsWith("//") && !trimmed.startsWith("*");
+    });
 
     if (freezeLineIdx < 0) {
       findings.push({
