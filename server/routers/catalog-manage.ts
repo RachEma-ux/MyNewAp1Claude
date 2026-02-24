@@ -147,7 +147,7 @@ export const catalogManageRouter = router({
       const userId = ctx.user?.id ?? 0;
       const now = Date.now();
       const windowMs = 60_000;
-      const maxRequests = 10;
+      const maxRequests = 25;
       const key = `discover:${userId}`;
       let bucket = _rateLimitBuckets.get(key);
       if (!bucket || now - bucket.windowStart > windowMs) {
@@ -156,7 +156,7 @@ export const catalogManageRouter = router({
       }
       bucket.count++;
       if (bucket.count > maxRequests) {
-        throw new Error("Rate limit exceeded — max 10 discovery requests per minute");
+        throw new Error("Rate limit exceeded — max 25 discovery requests per minute");
       }
 
       // Short-TTL cache (60s) — return cached result for same domain
