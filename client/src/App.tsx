@@ -129,6 +129,33 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   );
 }
 
+/** Auth-only route — no MainLayout wrapper (for components with their own shell) */
+function ShellRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (!isOAuthConfigured()) {
+    return <Component />;
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    const loginUrl = getLoginUrl();
+    if (loginUrl) {
+      window.location.href = loginUrl;
+    }
+    return null;
+  }
+
+  return <Component />;
+}
+
 function Router() {
   return (
     <Switch>
@@ -136,9 +163,9 @@ function Router() {
       <Route path="/workspaces" component={() => <ProtectedRoute component={Workspaces} />} />
       <Route path="/workspaces/:id/home" component={() => <ProtectedRoute component={WorkspaceHome} />} />
       <Route path="/workspaces/:id" component={() => <ProtectedRoute component={WorkspaceDetail} />} />
-      {/* Workspace Shell — module-bound execution container */}
-      <Route path="/w/:workspaceId/:rest*" component={() => <ProtectedRoute component={WorkspaceShell} />} />
-      <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceShell} />} />
+      {/* Workspace Shell — module-bound execution container (own layout, no MainLayout) */}
+      <Route path="/w/:workspaceId/:rest*" component={() => <ShellRoute component={WorkspaceShell} />} />
+      <Route path="/w/:workspaceId" component={() => <ShellRoute component={WorkspaceShell} />} />
       <Route path="/models" component={() => <ProtectedRoute component={Models} />} />
       <Route path="/hardware" component={() => <ProtectedRoute component={HardwareProfile} />} />
           <Route path="/analytics/downloads" component={() => <ProtectedRoute component={DownloadAnalytics} />} />

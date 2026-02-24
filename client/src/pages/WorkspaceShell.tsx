@@ -1,31 +1,61 @@
 /**
- * WorkspaceShell — Workspace execution container
+ * WorkspaceShell — IBM-style workspace execution container
  *
+ * Layout: Top App Bar | Collapsible Sidebar | Main Content | Oversight Drawer | Status Bar
  * Routes workspace-scoped module pages under /w/:workspaceId/*.
  * Dynamically shows/hides modules based on workspace_modules bindings.
  */
 
+import { useState } from "react";
 import { useParams, Route, Switch, Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Loader2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Loader2, Shield, Menu, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  FolderKanban,
+  BookOpen,
+  Bot,
+  MessageSquare,
+  BarChart3,
+  ShieldCheck,
+} from "lucide-react";
 
-// Module page components (lightweight placeholders — each engine gets its own page)
-function ModulePage({ title, children }: { title: string; children?: React.ReactNode }) {
-  return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">{title}</h1>
-      {children || <p className="text-muted-foreground">Module content loading...</p>}
-    </div>
-  );
-}
+import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
+import { WorkspaceStatusBar } from "@/components/workspace/WorkspaceStatusBar";
+import { OversightDrawer } from "@/components/workspace/OversightDrawer";
+import { ModuleDisabled } from "@/components/workspace/ModuleDisabled";
+
+import { PMTProjectsPage } from "./workspace/PMTProjectsPage";
+import { PMTKanbanPage } from "./workspace/PMTKanbanPage";
+import { PMTTimelinePage } from "./workspace/PMTTimelinePage";
+import { PMTProjectDetailPage } from "./workspace/PMTProjectDetailPage";
+import { KnowledgeDocsPage } from "./workspace/KnowledgeDocsPage";
+import { KnowledgeDecisionsPage } from "./workspace/KnowledgeDecisionsPage";
+import { KnowledgeSearchPage } from "./workspace/KnowledgeSearchPage";
+import { AgentsRosterPage } from "./workspace/AgentsRosterPage";
+import { AgentRunsPage } from "./workspace/AgentRunsPage";
+import { AgentRunDetailPage } from "./workspace/AgentRunDetailPage";
+import { CollabThreadsPage } from "./workspace/CollabThreadsPage";
+import { ReportingDashboardPage } from "./workspace/ReportingDashboardPage";
+import { GovernancePage } from "./workspace/GovernancePage";
+
+const moduleIcons: Record<string, React.ReactNode> = {
+  pmt: <FolderKanban className="h-5 w-5" />,
+  knowledge: <BookOpen className="h-5 w-5" />,
+  agents: <Bot className="h-5 w-5" />,
+  collaboration: <MessageSquare className="h-5 w-5" />,
+  reporting: <BarChart3 className="h-5 w-5" />,
+};
 
 export default function WorkspaceShell() {
   const params = useParams<{ workspaceId: string; rest?: string }>();
   const workspaceId = parseInt(params.workspaceId || "0", 10);
   const [location] = useLocation();
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [oversightOpen, setOversightOpen] = useState(false);
 
   const { data: workspace, isLoading: wsLoading } = trpc.workspaces.get.useQuery(
     { id: workspaceId },
@@ -37,6 +67,7 @@ export default function WorkspaceShell() {
     { enabled: workspaceId > 0 }
   );
 
+  // Loading state
   if (wsLoading || modsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -45,136 +76,291 @@ export default function WorkspaceShell() {
     );
   }
 
+  // Workspace not found
   if (!workspace) {
-    return <div className="p-6 text-destructive">Workspace not found</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-2">
+          <p className="text-destructive text-lg font-medium">Workspace not found</p>
+          <Link href="/workspaces">
+            <Button variant="outline">Back to Workspaces</Button>
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const enabledModules = new Set(
     (modules || []).filter((m) => m.enabled).map((m) => m.moduleKey)
   );
-
+  const enabledCount = enabledModules.size;
   const basePath = `/w/${workspaceId}`;
 
+  /** Module gate — renders ModuleDisabled if module is not enabled */
+  function ModuleGate({
+    moduleKey,
+    moduleName,
+    children,
+  }: {
+    moduleKey: string;
+    moduleName: string;
+    children: React.ReactNode;
+  }) {
+    if (!enabledModules.has(moduleKey)) {
+      return <ModuleDisabled moduleName={moduleName} workspaceId={workspaceId} />;
+    }
+    return <>{children}</>;
+  }
+
   const navItems = [
-    { key: "overview", label: "Overview", path: basePath, always: true },
-    { key: "pmt", label: "Projects", path: `${basePath}/projects` },
-    { key: "knowledge", label: "Knowledge", path: `${basePath}/knowledge` },
-    { key: "agents", label: "Agents", path: `${basePath}/agents` },
-    { key: "collaboration", label: "Collaboration", path: `${basePath}/collaboration` },
-    { key: "reporting", label: "Reports", path: `${basePath}/reports` },
-    { key: "governance", label: "Governance", path: `${basePath}/governance`, always: true },
+    { key: "pmt", label: "Projects", icon: moduleIcons.pmt, path: `${basePath}/projects` },
+    { key: "knowledge", label: "Knowledge", icon: moduleIcons.knowledge, path: `${basePath}/knowledge` },
+    { key: "agents", label: "Agents", icon: moduleIcons.agents, path: `${basePath}/agents` },
+    { key: "collaboration", label: "Collab", icon: moduleIcons.collaboration, path: `${basePath}/collaboration` },
+    { key: "reporting", label: "Reports", icon: moduleIcons.reporting, path: `${basePath}/reports` },
   ];
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Workspace header */}
-      <div className="border-b px-6 py-3 flex items-center gap-4">
-        <h2 className="text-lg font-semibold">{workspace.name}</h2>
-        <Badge variant="outline" className="text-xs">
-          ID: {workspaceId}
-        </Badge>
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      {/* ─── Top App Bar ─── */}
+      <header className="flex items-center justify-between border-b bg-card px-4 h-12 shrink-0">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 lg:hidden"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+          <Link href={basePath}>
+            <span className="text-sm font-semibold hover:text-primary transition-colors cursor-pointer">
+              {workspace.name}
+            </span>
+          </Link>
+          <Badge variant="outline" className="text-[10px] hidden sm:inline-flex">
+            WS-{workspaceId}
+          </Badge>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link href="/workspaces">
+            <Button variant="ghost" size="sm" className="h-7 text-xs">
+              <Home className="h-3.5 w-3.5 mr-1" />
+              All Workspaces
+            </Button>
+          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setOversightOpen(true)}
+          >
+            <Shield className="h-3.5 w-3.5 mr-1" />
+            Oversight
+          </Button>
+        </div>
+      </header>
+
+      {/* ─── Main Body: Sidebar + Content ─── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Collapsible Sidebar */}
+        <WorkspaceSidebar
+          workspaceId={workspaceId}
+          workspaceName={workspace.name}
+          enabledModules={enabledModules}
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
+
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-auto">
+          <Switch>
+            {/* ─── PMT Engine ─── */}
+            <Route path={`${basePath}/projects/board`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTKanbanPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/timeline`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTTimelinePage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/:projectId`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTProjectDetailPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTProjectsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+
+            {/* ─── Knowledge Engine ─── */}
+            <Route path={`${basePath}/knowledge/decisions`}>
+              <ModuleGate moduleKey="knowledge" moduleName="Knowledge">
+                <KnowledgeDecisionsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/knowledge/search`}>
+              <ModuleGate moduleKey="knowledge" moduleName="Knowledge">
+                <KnowledgeSearchPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/knowledge`}>
+              <ModuleGate moduleKey="knowledge" moduleName="Knowledge">
+                <KnowledgeDocsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+
+            {/* ─── Agent Orchestration ─── */}
+            <Route path={`${basePath}/agents/runs/:runId`}>
+              <ModuleGate moduleKey="agents" moduleName="Agent Orchestration">
+                <AgentRunDetailPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/agents/runs`}>
+              <ModuleGate moduleKey="agents" moduleName="Agent Orchestration">
+                <AgentRunsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/agents`}>
+              <ModuleGate moduleKey="agents" moduleName="Agent Orchestration">
+                <AgentsRosterPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+
+            {/* ─── Collaboration ─── */}
+            <Route path={`${basePath}/collaboration`}>
+              <ModuleGate moduleKey="collaboration" moduleName="Collaboration">
+                <CollabThreadsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+
+            {/* ─── Reporting ─── */}
+            <Route path={`${basePath}/reports`}>
+              <ModuleGate moduleKey="reporting" moduleName="Reporting">
+                <ReportingDashboardPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+
+            {/* ─── Governance ─── */}
+            <Route path={`${basePath}/governance`}>
+              <GovernancePage workspaceId={workspaceId} />
+            </Route>
+
+            {/* ─── Overview (default) ─── */}
+            <Route>
+              <WorkspaceOverview
+                workspaceId={workspaceId}
+                enabledModules={enabledModules}
+                basePath={basePath}
+                navItems={navItems}
+              />
+            </Route>
+          </Switch>
+        </main>
       </div>
 
-      {/* Module navigation */}
-      <div className="border-b px-6 py-2 flex gap-1 overflow-x-auto">
+      {/* ─── Bottom Status Bar ─── */}
+      <WorkspaceStatusBar
+        workspaceId={workspaceId}
+        enabledModuleCount={enabledCount}
+        onOversightOpen={() => setOversightOpen(true)}
+      />
+
+      {/* ─── Oversight Drawer ─── */}
+      <OversightDrawer
+        open={oversightOpen}
+        onOpenChange={setOversightOpen}
+        workspaceId={workspaceId}
+      />
+    </div>
+  );
+}
+
+/** Overview page — module cards with real summary data */
+function WorkspaceOverview({
+  workspaceId,
+  enabledModules,
+  basePath,
+  navItems,
+}: {
+  workspaceId: number;
+  enabledModules: Set<string>;
+  basePath: string;
+  navItems: { key: string; label: string; icon: React.ReactNode; path: string }[];
+}) {
+  const { data: summary } = trpc.modules.reporting.summary.useQuery(
+    { workspaceId },
+    { retry: false }
+  );
+
+  const summaryData: Record<string, string> = {
+    pmt: `${summary?.projects ?? 0} projects, ${summary?.tasks ?? 0} tasks`,
+    knowledge: `${summary?.documents ?? 0} documents`,
+    agents: `${summary?.agents ?? 0} runs`,
+    collaboration: `${summary?.threads ?? 0} threads`,
+    reporting: "View dashboard",
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Workspace Overview</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {enabledModules.size} modules enabled
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {navItems
-          .filter((item) => item.always || enabledModules.has(item.key))
-          .map((item) => {
-            const isActive = location === item.path ||
-              (item.path !== basePath && location.startsWith(item.path));
-            return (
-              <Link key={item.key} href={item.path}>
-                <Button
-                  variant={isActive ? "default" : "ghost"}
-                  size="sm"
-                  className="text-xs"
-                >
-                  {item.label}
-                </Button>
-              </Link>
-            );
-          })}
+          .filter((item) => enabledModules.has(item.key))
+          .map((item) => (
+            <Link key={item.key} href={item.path}>
+              <Card className="cursor-pointer hover:border-primary/50 transition-colors h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    {item.icon}
+                    {item.label}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    {summaryData[item.key] || `Open ${item.label.toLowerCase()}`}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
       </div>
 
-      {/* Module content area */}
-      <div className="flex-1 overflow-auto">
-        <Switch>
-          <Route path={`${basePath}/projects`}>
-            <ModulePage title="Projects">
-              <p className="text-muted-foreground">
-                Project Management Engine — Create and manage projects, tasks, and dependencies.
-              </p>
-            </ModulePage>
-          </Route>
-          <Route path={`${basePath}/tasks/:rest*`}>
-            <ModulePage title="Tasks" />
-          </Route>
-          <Route path={`${basePath}/knowledge`}>
-            <ModulePage title="Knowledge Base">
-              <p className="text-muted-foreground">
-                Knowledge Engine — Documents, decisions, and semantic memory.
-              </p>
-            </ModulePage>
-          </Route>
-          <Route path={`${basePath}/agents`}>
-            <ModulePage title="Agent Orchestration">
-              <p className="text-muted-foreground">
-                Agent Orchestration Engine — Manage workspace agents and runs.
-              </p>
-            </ModulePage>
-          </Route>
-          <Route path={`${basePath}/collaboration`}>
-            <ModulePage title="Collaboration">
-              <p className="text-muted-foreground">
-                Collaboration Engine — Threads, discussions, and approvals.
-              </p>
-            </ModulePage>
-          </Route>
-          <Route path={`${basePath}/reports`}>
-            <ModulePage title="Reports">
-              <p className="text-muted-foreground">
-                Reporting Engine — Velocity, agent reliability, and risk heatmaps.
-              </p>
-            </ModulePage>
-          </Route>
-          <Route path={`${basePath}/governance`}>
-            <ModulePage title="Governance">
-              <p className="text-muted-foreground">
-                Workspace governance controls and audit trail.
-              </p>
-            </ModulePage>
-          </Route>
-          <Route>
-            {/* Overview / default */}
-            <div className="p-6 space-y-6">
-              <h1 className="text-2xl font-bold">Workspace Overview</h1>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {navItems
-                  .filter((item) => !item.always && enabledModules.has(item.key))
-                  .map((item) => (
-                    <Link key={item.key} href={item.path}>
-                      <Card className="cursor-pointer hover:border-primary transition-colors">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">{item.label}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground">
-                            Open {item.label.toLowerCase()} module
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
-              </div>
-              {enabledModules.size === 0 && (
-                <p className="text-muted-foreground">
-                  No modules enabled. Configure modules in workspace settings.
-                </p>
-              )}
-            </div>
-          </Route>
-        </Switch>
-      </div>
+      {/* Governance card (always visible) */}
+      <Link href={`${basePath}/governance`}>
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors max-w-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5" />
+              Governance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              View governance status, action registry, and health checks
+            </p>
+          </CardContent>
+        </Card>
+      </Link>
+
+      {enabledModules.size === 0 && (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">
+            No modules enabled. Configure modules in workspace settings.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
