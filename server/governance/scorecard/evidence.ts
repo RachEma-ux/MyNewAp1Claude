@@ -148,24 +148,29 @@ function computeHash(data: any): string {
 
 /**
  * Persist an evidence bundle to the database (content-addressed).
- * Blocking write — failure propagates to caller.
+ * Non-fatal — logs a warning on failure so governed mutations aren't blocked
+ * by evidence persistence issues (e.g. missing table, schema mismatch).
  */
 export async function persistEvidenceBundle(bundle: EvidenceBundle): Promise<void> {
   const db = getDb();
   if (!db) return;
 
-  await db.insert(evidenceBundles).values({
-    bundleId: bundle.bundleId,
-    version: bundle.version,
-    stage: bundle.stage,
-    score: bundle.score,
-    gatePassed: bundle.gatePassed,
-    gateReason: bundle.gateReason,
-    triggeredBy: bundle.triggeredBy,
-    commitRef: bundle.commitRef,
-    integrityHash: bundle.integrityHash,
-    bundleData: bundle as unknown as Record<string, unknown>,
-  });
+  try {
+    await db.insert(evidenceBundles).values({
+      bundleId: bundle.bundleId,
+      version: bundle.version,
+      stage: bundle.stage,
+      score: bundle.score,
+      gatePassed: bundle.gatePassed,
+      gateReason: bundle.gateReason,
+      triggeredBy: bundle.triggeredBy,
+      commitRef: bundle.commitRef,
+      integrityHash: bundle.integrityHash,
+      bundleData: bundle as unknown as Record<string, unknown>,
+    });
+  } catch (err) {
+    console.warn(`[EvidenceBundle] Persistence failed (non-fatal): ${err}`);
+  }
 }
 
 /**
