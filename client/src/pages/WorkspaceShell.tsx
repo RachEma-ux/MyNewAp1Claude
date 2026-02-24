@@ -6,10 +6,10 @@
  * Dynamically shows/hides modules based on workspace_modules bindings.
  */
 
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams, Route, Switch, Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pin, PinOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -51,10 +51,38 @@ const moduleIcons: Record<string, React.ReactNode> = {
 export default function WorkspaceShell() {
   const params = useParams<{ workspaceId: string; rest?: string }>();
   const workspaceId = parseInt(params.workspaceId || "0", 10);
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [oversightOpen, setOversightOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+
+  // Drag state for floating window
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const dragging = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if (pinned) return;
+    dragging.current = true;
+    dragOffset.current = { x: e.clientX - position.x, y: e.clientY - position.y };
+    e.preventDefault();
+  }, [pinned, position]);
+
+  useEffect(() => {
+    if (pinned) return;
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      setPosition({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
+    };
+    const onMouseUp = () => { dragging.current = false; };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [pinned]);
 
   const { data: workspace, isLoading: wsLoading } = trpc.workspaces.get.useQuery(
     { id: workspaceId },
@@ -121,8 +149,8 @@ export default function WorkspaceShell() {
     { key: "reporting", label: "Reports", icon: moduleIcons.reporting, path: `${basePath}/reports` },
   ];
 
-  return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+  const shellContent = (
+    <>
       {/* ─── Main Body: Sidebar + Content ─── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Collapsible Sidebar */}
@@ -239,6 +267,65 @@ export default function WorkspaceShell() {
         onOpenChange={setOversightOpen}
         workspaceId={workspaceId}
       />
+    </>
+  );
+
+  // ─── Pinned: docked in content area ───
+  if (pinned) {
+    return (
+      <div className="flex flex-col h-full relative">
+        <button
+          onClick={() => { setPinned(false); setPosition({ x: 0, y: 0 }); }}
+          className="absolute top-2 right-2 z-10 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          title="Unpin (float)"
+        >
+          <PinOff className="h-4 w-4" />
+        </button>
+        {shellContent}
+      </div>
+    );
+  }
+
+  // ─── Unpinned: floating draggable window ───
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
+      <div
+        className="pointer-events-auto flex flex-col rounded-lg border border-border bg-background shadow-2xl"
+        style={{
+          width: "90vw",
+          height: "85vh",
+          transform: `translate(${position.x}px, ${position.y}px)`,
+        }}
+      >
+        {/* ─── Draggable Title Bar ─── */}
+        <div
+          className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/50 rounded-t-lg cursor-grab active:cursor-grabbing select-none shrink-0"
+          onMouseDown={onMouseDown}
+        >
+          <span className="text-sm font-medium truncate">{workspace.name}</span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPinned(true)}
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="Pin (dock)"
+            >
+              <Pin className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => navigate("/workspaces")}
+              className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+              title="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* ─── Shell Content ─── */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {shellContent}
+        </div>
+      </div>
     </div>
   );
 }

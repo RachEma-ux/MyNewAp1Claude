@@ -163,9 +163,9 @@ function Router() {
       <Route path="/workspaces" component={() => <ProtectedRoute component={Workspaces} />} />
       <Route path="/workspaces/:id/home" component={() => <ProtectedRoute component={WorkspaceHome} />} />
       <Route path="/workspaces/:id" component={() => <ProtectedRoute component={WorkspaceDetail} />} />
-      {/* Workspace Shell — module-bound execution container (own layout, no MainLayout) */}
-      <Route path="/w/:workspaceId/*" component={() => <ShellRoute component={WorkspaceShell} />} />
-      <Route path="/w/:workspaceId" component={() => <ShellRoute component={WorkspaceShell} />} />
+      {/* Workspace Shell — floating detachable container inside MainLayout */}
+      <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceShell} />} />
+      <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceShell} />} />
       <Route path="/models" component={() => <ProtectedRoute component={Models} />} />
       <Route path="/hardware" component={() => <ProtectedRoute component={HardwareProfile} />} />
           <Route path="/analytics/downloads" component={() => <ProtectedRoute component={DownloadAnalytics} />} />
