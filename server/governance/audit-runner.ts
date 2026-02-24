@@ -158,9 +158,8 @@ async function executeAudit(runId: number, opts: AuditRunOpts): Promise<void> {
 
   // Build args (whitelisted only)
   const args = ["tsx", "scripts/platformAudit.ts"];
-  if (opts.format === "json") args.push("--format", "json");
-  else if (opts.format === "txt") args.push("--format", "txt");
-  else args.push("--format", "both");
+  args.push(`--format=${opts.format || "both"}`);
+  args.push(`--design=${opts.design || "standard"}`);
   if (opts.strict) args.push("--strict");
 
   // Pass baseUrl so the script can reach the governance action registry
