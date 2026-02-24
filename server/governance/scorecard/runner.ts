@@ -795,7 +795,7 @@ registerRunner({
     const control = controls.find((c) => c.runnerId === "governance-docs-validator");
     if (!control) return [];
 
-    const requiredDocs = ["docs/GOVERNANCE_BIBLE.md", "ARCHITECTURE.md"];
+    const requiredDocs = ["docs/governance/GOVERNANCE_BIBLE.md", "ARCHITECTURE.md"];
     const found: string[] = [];
     const missing: string[] = [];
 

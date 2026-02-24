@@ -57,7 +57,7 @@ jobs:
               --exclude-dir=dist \
               --exclude="*.test.*" \
               --exclude="governance-gate.yml" \
-              --exclude="GOVERNANCE_BIBLE.md" \
+              --exclude-dir=docs/governance \
               . 2>/dev/null || true)
 
             if [ -n "$MATCHES" ]; then
@@ -197,7 +197,7 @@ jobs:
           MISSING=0
 
           REQUIRED_FILES=(
-            "docs/GOVERNANCE_BIBLE.md"
+            "docs/governance/GOVERNANCE_BIBLE.md"
             "ARCHITECTURE.md"
           )
 
