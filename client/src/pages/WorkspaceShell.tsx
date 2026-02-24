@@ -62,9 +62,9 @@ export default function WorkspaceShell() {
     { enabled: workspaceId > 0 }
   );
 
-  const { data: modules, isLoading: modsLoading } = trpc.modules.manage.list.useQuery(
+  const { data: modules, isLoading: modsLoading, error: modsError } = trpc.modules.manage.list.useQuery(
     { workspaceId },
-    { enabled: workspaceId > 0 }
+    { enabled: workspaceId > 0, retry: 1 }
   );
 
   // Loading state
@@ -91,10 +91,19 @@ export default function WorkspaceShell() {
   }
 
   const enabledModules = new Set(
-    (modules || []).filter((m) => m.enabled).map((m) => m.moduleKey)
+    (modules || []).filter((m: any) => m.enabled).map((m: any) => m.moduleKey)
   );
   const enabledCount = enabledModules.size;
   const basePath = `/w/${workspaceId}`;
+
+  // Debug banner for module loading issues (temporary)
+  const _modsDebug = modsError
+    ? `Error: ${modsError.message}`
+    : !modsLoading && !modules
+    ? `No data (wsId=${workspaceId})`
+    : modules
+    ? `OK: ${modules.length} modules, ${enabledCount} enabled`
+    : null;
 
   /** Module gate — renders ModuleDisabled if module is not enabled */
   function ModuleGate({
@@ -122,6 +131,13 @@ export default function WorkspaceShell() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
+      {/* Debug banner — remove after testing */}
+      {_modsDebug && (
+        <div className="bg-yellow-900/50 text-yellow-200 text-xs px-4 py-1 shrink-0">
+          Modules: {_modsDebug}
+        </div>
+      )}
+
       {/* ─── Top App Bar ─── */}
       <header className="flex items-center justify-between border-b bg-card px-4 h-12 shrink-0">
         <div className="flex items-center gap-3">
