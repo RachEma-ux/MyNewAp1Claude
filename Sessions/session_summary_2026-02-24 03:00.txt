@@ -1,0 +1,66 @@
+Session Summary — 2026-02-24 03:00
+====================================
+
+## Objective
+Make evidence persistence non-fatal in the governance engine, fix discovery flow end-to-end, and fix auto-classification for discovery submissions.
+
+## Problem
+The `persistEvidenceBundle()` function in `server/governance/scorecard/evidence.ts` was doing a blocking DB insert that threw on schema mismatch. This error propagated through `requireGate()` → `requireGovernance` middleware → killed ALL governed mutations with 500 INTERNAL_SERVER_ERROR, even when the governance gate PASSED (e.g., score 89).
+
+Additionally, `submitFromDiscovery` was missing the auto-classify step, causing the registration stage review's `compliance_matrix` check to fail with "No classification assigned".
+
+## Changes Made
+
+### 1. evidence.ts — Non-fatal persistence (prior commit, carried forward)
+- Wrapped `persistEvidenceBundle()` DB insert in try/catch
+- Logs warning on failure instead of throwing
+
+### 2. requireGate.ts — Phase A/B architectural refactor
+- **Phase A (Enforcement, blocking):** Freeze check → scorecard → denial audit + denial evidence
+- **Phase B (Observability, non-fatal):** ALLOW evidence persistence → ALLOW audit log
+- Each Phase B operation wrapped in try/catch with structured error logs:
+  - `NON_FATAL_EVIDENCE_PERSISTENCE_FAILURE`
+  - `NON_FATAL_AUDIT_LOG_FAILURE`
+- No silent catch blocks — all failures logged with subject_type, subject_id, stage, run_id
+- Freeze denial now uses `FREEZE_BLOCK` audit action (was `GATE_CHECK`)
+
+### 3. requireGate.test.ts — New test file (6 cases)
+- CASE 1: Scorecard ALLOW + persistEvidenceBundle throws → returns ALLOW
+- CASE 2: Scorecard DENY + persistEvidenceBundle throws → returns DENY
+- CASE 3: Freeze active → DENY, scorecard never runs
+- CASE 4: Normal operation → unchanged behavior
+- CASE 5: ALLOW + audit log throws → returns ALLOW with local fallback ID
+- CASE 6: DENY path → audit + evidence both blocking
+
+### 4. catalog-manage.ts — Auto-classify discovery submissions
+- Added auto-classify block to `submitFromDiscovery` mutation (lines 262-271)
+- Assigns first taxonomy axis node after entry creation
+- Matches behavior of the regular `create` mutation
+- Non-fatal: wrapped in try/catch
+
+## Commits
+1. `06dceb9` — fix: make evidence bundle persistence non-fatal
+2. `c893a3e` — fix: refactor requireGate into Phase A (enforcement) / Phase B (observability)
+3. `1e2bba5` — fix: auto-classify discovery submissions so registration review passes
+
+## Testing
+End-to-end test with Cohere (cohere.com):
+- Discovery: OK — name "Cohere", confidence 100, API https://api.cohere.com
+- Submit from discovery: OK — entry ID 79, status draft, origin discovery
+- Auto-classification: OK — "Hosting Model" axis node assigned automatically
+- Registration approval: OK — compliance_matrix check passed, stage approved
+
+Previous test with AI21 (ai21.com):
+- Discovery: OK — confidence 90, 2 models detected
+- Submit: OK — entry created at submit stage
+- Manual classification fix applied (5 nodes), registration approved
+
+## Key Architectural Principle Enforced
+- Enforcement failure may block execution (freeze, score threshold, severity)
+- Observability failure must NEVER block execution (evidence persistence, audit logging, telemetry)
+
+## Files Modified
+- server/governance/scorecard/evidence.ts (try/catch in persistEvidenceBundle)
+- server/governance/requireGate.ts (Phase A/B separation)
+- server/governance/requireGate.test.ts (NEW — 6 test cases)
+- server/routers/catalog-manage.ts (auto-classify in submitFromDiscovery)
