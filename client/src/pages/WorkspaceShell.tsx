@@ -243,10 +243,10 @@ export default function WorkspaceShell() {
     </>
   );
 
-  // ─── Pinned: fully docked, no title bar, shell IS the page ───
+  // ─── Pinned: fully docked, eats MainLayout padding, fills entire content area ───
   if (pinned) {
     return (
-      <div className="flex flex-col h-full relative">
+      <div className="-m-6 flex flex-col relative" style={{ height: "calc(100vh - 4rem)" }}>
         <button
           onClick={() => setPinned(false)}
           className="absolute top-2 right-2 z-10 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
@@ -259,9 +259,9 @@ export default function WorkspaceShell() {
     );
   }
 
-  // ─── Unpinned (default): inset panel inside the main content area ───
+  // ─── Unpinned (default): inset panel filling the main content area ───
   return (
-    <div className="flex flex-col h-full p-3 gap-0">
+    <div className="-m-6 p-3 flex flex-col" style={{ height: "calc(100vh - 4rem)" }}>
       <div className="flex flex-col flex-1 rounded-lg border border-border bg-background shadow-sm overflow-hidden">
         {/* ─── Thin Title Bar ─── */}
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/40 shrink-0">
