@@ -1,0 +1,54 @@
+Session Summary — 2026-02-24 21:30
+====================================
+
+## Feature: Platform Audit in Governance Center
+
+Implemented a full Platform Audit feature for the Governance Center, allowing
+admins to trigger comprehensive platform audits from the UI, view live status,
+browse results with 3 design profiles, download artifacts, and see run history.
+
+### New Files Created (7)
+1. drizzle/tables/platform-audit.ts — DB tables: governance_audit_runs + governance_audit_preferences
+2. drizzle/0014_platform_audit.sql — SQL migration
+3. drizzle/meta/_journal.json — Updated with migration entry (idx 14)
+4. server/governance/audit-runner.ts — Audit execution service (subprocess spawn, artifact persistence)
+5. server/governance/audit-router.ts — tRPC sub-router (6 admin endpoints: run, latest, list, get, preferences, savePreferences)
+6. client/src/pages/governance/PlatformAuditPanel.tsx — Full audit UI page
+7. scripts/platformAudit.ts — Comprehensive audit script with 30 checks across 7 categories
+8. server/governance/__tests__/audit-runner.test.ts — Vitest tests
+
+### Files Modified (5)
+- drizzle/schema.ts — Added platform-audit barrel export
+- server/governance/router.ts — Mounted audit sub-router
+- server/_core/index.ts — Added Express artifact download route
+- client/src/pages/GovernanceCenterPage.tsx — Added "audit" case
+- client/src/components/MainLayout.tsx — Added "Audit" nav item with FileSearch icon
+
+### Audit Script (scripts/platformAudit.ts)
+- 30 checks across 7 categories: structure, security, auth, governance, database, dependencies, frontend
+- Outputs JSON + TXT reports to audit-reports/
+- Exit code 0=pass, 1=fail
+- Supports --format (json|txt|both) and --strict flags
+
+### Bugs Fixed During Session
+1. Radix Select.Item empty string values — used "all" sentinel instead
+2. Missing drizzle journal entry for migration 0014
+3. Corrupted pnpm-lock.yaml — restored to pre-session state
+4. Missing scripts/platformAudit.ts — created the actual audit script
+5. False positive GOV-003/GOV-006 — corrected file paths to scorecard/runner.ts and scorecard/drift-detector.ts
+
+### Final Audit Result
+- Status: PASS
+- Score: 100% (30/30 checks passed)
+- Duration: 560ms
+- All 7 categories at 100% coverage
+- Zero violations
+
+### Commits
+- 71cc1fb feat: add Platform Audit to Governance Center
+- f8dd841 fix: use non-empty Select values for audit history filters
+- 3753fb9 fix: add platform audit migration to drizzle journal
+- 7ae22b9 fix: restore pnpm-lock.yaml to pre-session state
+- a3534fb feat: add platform audit script
+- 343951f fix: correct scorecard and drift detection file paths in audit script
+- 16a34df fix: use correct nested paths for scorecard and drift checks
