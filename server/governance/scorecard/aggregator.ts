@@ -186,7 +186,13 @@ function evaluateGate(
   stage: LifecycleStage,
   score: number
 ): GateEvaluation {
-  const threshold = STAGE_THRESHOLDS[stage] || STAGE_THRESHOLDS.publish;
+  const threshold = STAGE_THRESHOLDS[stage];
+  if (!threshold) {
+    throw new Error(
+      `[Governance] Unknown lifecycle stage "${stage}" — no fallback allowed. ` +
+      `Valid stages: ${Object.keys(STAGE_THRESHOLDS).join(", ")}`
+    );
+  }
   const blockingControls: string[] = [];
 
   // Check for severity violations

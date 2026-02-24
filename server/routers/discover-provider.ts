@@ -60,6 +60,9 @@ export interface DiscoverResult {
   failureReason?: DiscoveryFailureReason;
   warnings: string[];
 
+  // Raw body capture (only populated when captureRawBody is true)
+  rawBody?: string | null;
+
   // Debug info for support / trend detection
   debug: {
     normalizedUrl: string;
@@ -217,7 +220,18 @@ function emitDiscoveryAttempt(result: DiscoverResult) {
 
 // ── Main Discovery Function ──────────────────────────────────────────
 
-export async function discoverProvider(websiteUrl: string): Promise<DiscoverResult> {
+export interface DiscoverOptions {
+  /** When true, attach the raw HTML body to the result for artifact storage */
+  captureRawBody?: boolean;
+}
+
+export async function discoverProvider(
+  websiteUrl: string,
+  options?: DiscoverOptions
+): Promise<DiscoverResult> {
+  const captureRaw = options?.captureRawBody ?? false;
+  let capturedRawBody: string | null = null;
+
   const totalStart = performance.now();
   const warnings: string[] = [];
   const debug: DiscoverResult["debug"] = {
@@ -389,6 +403,7 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
           totalTimeoutMs: 4000,
         });
         if (quickFetch.ok) {
+          if (captureRaw) capturedRawBody = quickFetch.body;
           const q$ = cheerio.load(quickFetch.body);
           const ogName = q$('meta[property="og:site_name"]').attr("content");
           apiName = ogName?.trim() || cleanTitle(q$("title").text()) || null;
@@ -424,6 +439,7 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
         techDocs,
         status: "ok",
         warnings,
+        ...(captureRaw ? { rawBody: capturedRawBody } : {}),
         debug,
       };
       emitDiscoveryAttempt(r);
@@ -480,6 +496,8 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
     emitDiscoveryAttempt(r);
     return r;
   }
+
+  if (captureRaw && !capturedRawBody) capturedRawBody = fetchResult.body;
 
   console.log(
     `[Discovery] Fetched ${fetchResult.body.length} bytes, ${fetchResult.redirectHops.length} redirects, IPs=[${fetchResult.resolvedIPs.join(",")}]`
@@ -687,6 +705,7 @@ export async function discoverProvider(websiteUrl: string): Promise<DiscoverResu
     status,
     failureReason,
     warnings,
+    ...(captureRaw ? { rawBody: capturedRawBody } : {}),
     debug,
   };
   emitDiscoveryAttempt(result);

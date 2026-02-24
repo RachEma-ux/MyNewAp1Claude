@@ -57,6 +57,7 @@ import { getAuditLogger } from "../services/auditLogger";
 import { getProviderRegistry } from "../providers/registry";
 import * as providerDb from "../providers/db";
 import { discoverProvider, discoverDocsUrl, extractDocMetadata } from "./discover-provider";
+import { normalizeDiscovery, toArtifactSummary } from "../governance/discovery-artifact";
 import { TRPCError } from "@trpc/server";
 import { evaluateStageReview } from "../governance/stage-review";
 
@@ -165,16 +166,94 @@ export const catalogManageRouter = router({
         return cached.result;
       }
 
-      const result = await discoverProvider(input.websiteUrl);
+      const result = await discoverProvider(input.websiteUrl, { captureRawBody: true });
+
+      // Normalize into a discovery artifact (stores raw snapshot, computes hashes)
+      let artifactSummary: ReturnType<typeof toArtifactSummary> | null = null;
+      try {
+        const artifact = await normalizeDiscovery(result, result.rawBody ?? null, input.websiteUrl);
+        artifactSummary = toArtifactSummary(artifact);
+
+        // Enhanced audit logging with artifact reference
+        getAuditLogger().log({
+          action_type: "DISCOVERY_ATTEMPT",
+          target_type: "provider_discovery",
+          target_id: result.domain,
+          decision_result: result.status === "ok" ? "success" : "partial",
+          metadata: {
+            sourceUrl: input.websiteUrl,
+            rawSnapshotHash: artifact.rawSnapshotHash,
+            extractionMethod: artifact.extractionMethod,
+            confidenceScore: artifact.confidenceScore,
+            artifactId: artifact.artifactId,
+            domain: result.domain,
+            registrySlug: result.registrySlug,
+            bestUrl: result.api.bestUrl,
+            candidateCount: result.api.candidates.length,
+          },
+        });
+      } catch (err) {
+        console.warn(`[CatalogManage] Discovery normalization failed: ${err}`);
+      }
+
+      // Strip rawBody before caching/returning (not for client)
+      const { rawBody: _rawBody, ...clientResult } = result;
 
       // Cache result
-      _discoveryCache.set(domain, { result, ts: now });
+      _discoveryCache.set(domain, { result: clientResult, ts: now });
 
       // Log event asynchronously (non-blocking)
       import("./discovery-ops").then(({ logDiscoveryEvent }) => {
         logDiscoveryEvent(result).catch(() => {});
       }).catch(() => {});
-      return result;
+
+      return { ...clientResult, artifact: artifactSummary };
+    }),
+
+  /**
+   * Submit a discovered provider into the governance pipeline at the "submit" stage.
+   * Creates a catalog entry with origin="discovery", reviewState="needs_review",
+   * status="draft". The requireGovernance middleware evaluates the gate at "submit".
+   */
+  submitFromDiscovery: governedProcedure
+    .input(z.object({
+      // Governance fields (picked up by requireGovernance middleware)
+      subjectId: z.literal(0),
+      stage: z.literal("submit"),
+      subjectType: z.literal("provider"),
+      subjectName: z.string(),
+      tags: z.array(z.string()).default(["candidate"]),
+      // Entry fields
+      name: z.string().min(1).max(255),
+      displayName: z.string().max(255).optional(),
+      description: z.string().optional(),
+      config: z.any().optional(),
+      // Artifact reference
+      discoveryArtifactId: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Middleware already evaluated gate at "submit" stage
+      const entry = await createCatalogEntry({
+        name: input.name,
+        displayName: input.displayName ?? input.name,
+        description: input.description ?? null,
+        entryType: "provider",
+        scope: "app",
+        status: "draft",
+        origin: "discovery",
+        reviewState: "needs_review",
+        config: { ...input.config, discoveryArtifactId: input.discoveryArtifactId },
+        tags: input.tags,
+        createdBy: ctx.user.id,
+      });
+
+      audit("catalog.entry.submitted_from_discovery", entry.id, {
+        name: entry.name,
+        artifactId: input.discoveryArtifactId,
+        stage: "submit",
+      });
+
+      return entry;
     }),
 
   /**

@@ -141,6 +141,11 @@ export function CatalogImportWizard({
       trpcUtils.catalogManage.list.invalidate();
     },
   });
+  const submitFromDiscoveryMutation = trpc.catalogManage.submitFromDiscovery.useMutation({
+    onSuccess: () => {
+      trpcUtils.catalogManage.list.invalidate();
+    },
+  });
 
   const runBatchDiscovery = async () => {
     const urls = websiteUrl
@@ -200,19 +205,38 @@ export function CatalogImportWizard({
       return;
     }
     try {
-      await registerMutation.mutateAsync({
-        name: slug,
-        displayName: result.name || slug,
-        description: result.description || undefined,
-        entryType: "provider",
-        origin: navigateToCandidate ? "discovery" : undefined,
-        config: {
-          baseUrl: result.api?.bestUrl || undefined,
-          registryId: result.registrySlug || undefined,
-          websiteUrl: entry.url,
-        },
-        tags: navigateToCandidate ? [result.domain, "candidate"] : [result.domain],
-      });
+      if (navigateToCandidate) {
+        // Use governed submitFromDiscovery — enters at "submit" stage
+        await submitFromDiscoveryMutation.mutateAsync({
+          subjectId: 0,
+          stage: "submit",
+          subjectType: "provider",
+          subjectName: slug,
+          tags: [result.domain, "candidate"],
+          name: slug,
+          displayName: result.name || slug,
+          description: result.description || undefined,
+          config: {
+            baseUrl: result.api?.bestUrl || undefined,
+            registryId: result.registrySlug || undefined,
+            websiteUrl: entry.url,
+          },
+          discoveryArtifactId: result.artifact?.artifactId || "legacy",
+        });
+      } else {
+        await registerMutation.mutateAsync({
+          name: slug,
+          displayName: result.name || slug,
+          description: result.description || undefined,
+          entryType: "provider",
+          config: {
+            baseUrl: result.api?.bestUrl || undefined,
+            registryId: result.registrySlug || undefined,
+            websiteUrl: entry.url,
+          },
+          tags: [result.domain],
+        });
+      }
       const updated = [...batchResults];
       updated[index] = { ...entry, registered: true };
       setBatchResults(updated);
@@ -521,7 +545,7 @@ export function CatalogImportWizard({
                   size="sm"
                   variant="default"
                   className="h-6 text-xs shrink-0"
-                  disabled={!(websiteDiscoverMutation.data as any)?.name || registerMutation.isPending}
+                  disabled={!(websiteDiscoverMutation.data as any)?.name || registerMutation.isPending || submitFromDiscoveryMutation.isPending}
                   onClick={() => {
                     const result = websiteDiscoverMutation.data as any;
                     const slug = getSlug(result);
@@ -529,30 +553,50 @@ export function CatalogImportWizard({
                       toast.error(`${result.name || slug} already exists in catalog`);
                       return;
                     }
-                    registerMutation.mutate({
-                      name: slug,
-                      displayName: result.name || slug,
-                      description: result.description || undefined,
-                      entryType: "provider",
-                      origin: navigateToCandidate ? "discovery" : undefined,
-                      config: {
-                        baseUrl: result.api?.bestUrl || undefined,
-                        registryId: result.registrySlug || undefined,
-                        websiteUrl: normalizeUrl(websiteUrl),
-                      },
-                      tags: navigateToCandidate ? [result.domain, "candidate"] : [result.domain],
-                    }, {
-                      onSuccess: () => {
-                        toast.success(`Submitted: ${result.name || slug}`);
-                        if (navigateToCandidate) {
+                    if (navigateToCandidate) {
+                      submitFromDiscoveryMutation.mutate({
+                        subjectId: 0,
+                        stage: "submit",
+                        subjectType: "provider",
+                        subjectName: slug,
+                        tags: [result.domain, "candidate"],
+                        name: slug,
+                        displayName: result.name || slug,
+                        description: result.description || undefined,
+                        config: {
+                          baseUrl: result.api?.bestUrl || undefined,
+                          registryId: result.registrySlug || undefined,
+                          websiteUrl: normalizeUrl(websiteUrl),
+                        },
+                        discoveryArtifactId: result.artifact?.artifactId || "legacy",
+                      }, {
+                        onSuccess: () => {
+                          toast.success(`Submitted: ${result.name || slug}`);
                           onOpenChange(false);
                           navigate("/llm/catalogue/candidate");
-                        }
-                      },
-                    });
+                        },
+                      });
+                    } else {
+                      registerMutation.mutate({
+                        name: slug,
+                        displayName: result.name || slug,
+                        description: result.description || undefined,
+                        entryType: "provider",
+                        config: {
+                          baseUrl: result.api?.bestUrl || undefined,
+                          registryId: result.registrySlug || undefined,
+                          websiteUrl: normalizeUrl(websiteUrl),
+                        },
+                        tags: [result.domain],
+                      }, {
+                        onSuccess: () => {
+                          toast.success(`Submitted: ${result.name || slug}`);
+                        },
+                      });
+                    }
                   }}
                 >
-                  {registerMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                  {(registerMutation.isPending || submitFromDiscoveryMutation.isPending) ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
                   Submit
                 </Button>
                 )}
