@@ -58,6 +58,7 @@ import {
   Clock,
   Shield,
   Lock,
+  FileSearch,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -172,6 +173,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Freezes", icon: <Lock className="w-4 h-4" />, href: "/governance/freezes" },
         { label: "Drift", icon: <Activity className="w-4 h-4" />, href: "/governance/drift" },
         { label: "Coverage", icon: <BarChart3 className="w-4 h-4" />, href: "/governance/coverage" },
+        { label: "Audit", icon: <FileSearch className="w-4 h-4" />, href: "/governance/audit" },
       ]
     },
     { label: "Analytics", icon: <BarChart3 className="w-5 h-5" />, href: "/analytics" },

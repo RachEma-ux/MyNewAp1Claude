@@ -451,6 +451,55 @@ async function startServer() {
   // Agent chat streaming endpoint
   app.get("/api/agents/:agentId/chat/stream", handleAgentChatStream);
 
+  // Governance audit artifact download
+  app.get("/api/governance/audit/:runId/artifacts/:kind", async (req, res) => {
+    // Auth check
+    if (process.env.DEV_MODE !== "true") {
+      try {
+        const user = await sdk.authenticateRequest(req);
+        if (!user || user.role !== "admin") {
+          res.status(user ? 403 : 401).json({ error: user ? "Admin access required" : "Authentication required" });
+          return;
+        }
+      } catch {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
+    }
+
+    const { runId, kind } = req.params;
+    if (kind !== "json" && kind !== "txt") {
+      res.status(400).json({ error: "Invalid artifact kind. Use 'json' or 'txt'." });
+      return;
+    }
+
+    try {
+      const { governanceAuditRuns } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = getDb();
+      if (!db) { res.status(500).json({ error: "Database not available" }); return; }
+
+      const [run] = await db.select().from(governanceAuditRuns).where(eq(governanceAuditRuns.id, Number(runId))).limit(1);
+      if (!run) { res.status(404).json({ error: "Audit run not found" }); return; }
+
+      const ref = kind === "json" ? run.jsonRef : run.txtRef;
+      if (!ref) { res.status(404).json({ error: `No ${kind} artifact for this run` }); return; }
+
+      const { getArtifactStore } = await import("../governance/artifact-store");
+      const store = getArtifactStore();
+      const buf = await store.retrieve(ref);
+      if (!buf) { res.status(404).json({ error: "Artifact not found in store" }); return; }
+
+      const contentType = kind === "json" ? "application/json" : "text/plain";
+      const filename = `platform-audit-${runId}.${kind === "json" ? "json" : "txt"}`;
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(buf);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Internal server error" });
+    }
+  });
+
   // Import session SSE stream
   app.get("/api/import/stream", async (req, res) => {
     // Authentication check

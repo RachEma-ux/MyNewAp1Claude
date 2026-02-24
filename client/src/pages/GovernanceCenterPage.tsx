@@ -6,6 +6,7 @@ import PacksRunnersPanel from "./governance/PacksRunnersPanel";
 import FreezesPanel from "./governance/FreezesPanel";
 import DriftMonitoringPanel from "./governance/DriftMonitoringPanel";
 import CoverageMapPanel from "./governance/CoverageMapPanel";
+import PlatformAuditPanel from "./governance/PlatformAuditPanel";
 
 export default function GovernanceCenterPage() {
   const [, params] = useRoute("/governance/:item");
@@ -19,6 +20,7 @@ export default function GovernanceCenterPage() {
     case "freezes": return <FreezesPanel />;
     case "drift": return <DriftMonitoringPanel />;
     case "coverage": return <CoverageMapPanel />;
+    case "audit": return <PlatformAuditPanel />;
     default: return <GovernanceOverviewPanel />;
   }
 }

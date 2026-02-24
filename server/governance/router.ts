@@ -51,6 +51,7 @@ import { lintCatalog } from "./catalog-lint";
 import { generateGateCoverage } from "./gate-coverage";
 import { runHardeningCheck } from "./production-hardening";
 import { getArtifactStore } from "./artifact-store";
+import { auditRouter } from "./audit-router";
 import {
   buildRiskReport,
   createFinding,
@@ -851,4 +852,7 @@ export const governanceRouter = router({
       return { actions: [], total: 0, error: err.message };
     }
   }),
+
+  // ── Platform Audit ──────────────────────────────────────────────────
+  audit: auditRouter,
 });
