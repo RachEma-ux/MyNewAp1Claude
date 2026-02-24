@@ -100,12 +100,13 @@ export function GovernancePage({ workspaceId }: { workspaceId: number }) {
             {registry ? (
               <div className="space-y-2">
                 <p className="text-sm">
-                  <span className="font-bold text-lg">{registry.length}</span>{" "}
+                  <span className="font-bold text-lg">{registry.total ?? (registry.actions || []).length}</span>{" "}
                   <span className="text-muted-foreground">registered actions</span>
                 </p>
                 <div className="flex gap-2 flex-wrap">
                   {["R1", "R2", "R3", "R4", "R5"].map((level) => {
-                    const count = registry.filter(
+                    const actions = Array.isArray(registry.actions) ? registry.actions : [];
+                    const count = actions.filter(
                       (a: { risk: string }) => a.risk === level
                     ).length;
                     return (
@@ -124,17 +125,17 @@ export function GovernancePage({ workspaceId }: { workspaceId: number }) {
       </div>
 
       {/* Registry Detail */}
-      {registry && (
+      {registry?.actions && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">
-              Governed Actions ({registry.length})
+              Governed Actions ({(registry.actions || []).length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ScrollArea className="max-h-[400px]">
               <div className="space-y-1">
-                {registry.map(
+                {(registry.actions || []).map(
                   (
                     action: {
                       actionKey: string;
