@@ -48,8 +48,8 @@ export default function PlatformAuditPanel() {
   const [activeTab, setActiveTab] = useState<"summary" | "violations" | "coverage" | "artifacts">("summary");
 
   // Filters for history
-  const [filterStatus, setFilterStatus] = useState<string>("");
-  const [filterDesign, setFilterDesign] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterDesign, setFilterDesign] = useState<string>("all");
 
   // Load saved preferences
   const prefsQuery = trpc.governance.audit.preferences.useQuery(undefined, {
@@ -79,8 +79,8 @@ export default function PlatformAuditPanel() {
   // History list
   const historyQuery = trpc.governance.audit.list.useQuery({
     limit: 20,
-    ...(filterStatus ? { status: filterStatus as AuditStatus } : {}),
-    ...(filterDesign ? { design: filterDesign as DesignProfile } : {}),
+    ...(filterStatus !== "all" ? { status: filterStatus as AuditStatus } : {}),
+    ...(filterDesign !== "all" ? { design: filterDesign as DesignProfile } : {}),
   });
 
   // Run mutation
@@ -288,7 +288,7 @@ export default function PlatformAuditPanel() {
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All statuses</SelectItem>
+                <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="pass">Pass</SelectItem>
                 <SelectItem value="fail">Fail</SelectItem>
                 <SelectItem value="error">Error</SelectItem>
@@ -301,7 +301,7 @@ export default function PlatformAuditPanel() {
                 <SelectValue placeholder="All designs" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All designs</SelectItem>
+                <SelectItem value="all">All designs</SelectItem>
                 <SelectItem value="executive">Executive</SelectItem>
                 <SelectItem value="standard">Standard</SelectItem>
                 <SelectItem value="forensics">Forensics</SelectItem>
