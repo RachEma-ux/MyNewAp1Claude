@@ -1,456 +1,795 @@
-/**
- * Platform Audit Script
+/* scripts/platformAudit.ts
  *
- * Comprehensive platform health & compliance audit.
- * Checks: security headers, DB schema, governance coverage,
- * dependency health, file structure, and configuration.
+ * MyNewAp1Claude — Platform Audit Script (complete)
  *
- * Usage:
- *   npx tsx scripts/platformAudit.ts [--format json|txt|both] [--strict]
+ * What it does:
+ * - Pulls Governance Action Registry (tRPC) and performs sanity + policy checks
+ * - Optionally checks DB tables if DATABASE_URL is provided
+ * - Optionally checks local YAML catalogs (capabilities + role presets)
+ * - Writes JSON/TXT reports for CI and admin review
  *
- * Output:
+ * Outputs:
  *   audit-reports/platform-audit.json
  *   audit-reports/platform-audit.txt
  *
- * Exit code: 0 = passed, 1 = failed (violations found)
+ * Usage:
+ *   # Node 18+ (has global fetch)
+ *   node scripts/platformAudit.ts --format=both --design=standard --baseUrl=https://...trycloudflare.com
+ *
+ *   # Strict mode (fails on any violation)
+ *   node scripts/platformAudit.ts --strict --format=json --baseUrl=https://...
+ *
+ * Env:
+ *   AUDIT_BASE_URL   (optional alternative to --baseUrl)
+ *   DATABASE_URL     (optional enables DB checks)
  */
 
-import * as fs from "fs";
-import * as path from "path";
+import fs from "node:fs";
+import path from "node:path";
+import crypto from "node:crypto";
+import { URL } from "node:url";
 
-// ============================================================================
-// Types
-// ============================================================================
+type Format = "json" | "txt" | "both";
+type Design = "executive" | "standard" | "forensics";
 
-interface AuditCheck {
+type Severity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+type CheckStatus = "PASS" | "WARN" | "FAIL";
+
+type AuditViolation = {
   id: string;
-  name: string;
-  category: string;
-  severity: "critical" | "high" | "medium" | "low" | "info";
-  passed: boolean;
+  severity: Severity;
   message: string;
-  details?: string;
-}
-
-interface AuditViolation {
-  rule: string;
-  name: string;
-  severity: string;
-  message: string;
-  file?: string;
-  line?: number;
-}
-
-interface AuditCoverageSection {
-  name: string;
-  checked: number;
-  passed: number;
-  coverage: number;
-}
-
-interface AuditReport {
-  timestamp: string;
-  passed: boolean;
-  summary: {
-    totalChecks: number;
-    passedChecks: number;
-    failedChecks: number;
-    score: number;
-    severityCounts: Record<string, number>;
-  };
-  violations: AuditViolation[];
-  coverage: {
-    sections: AuditCoverageSection[];
-    overallPercent: number;
-  };
-  checks: AuditCheck[];
-}
-
-// ============================================================================
-// CLI Args
-// ============================================================================
-
-const args = process.argv.slice(2);
-let format: "json" | "txt" | "both" = "json";
-let strict = false;
-
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--format" && args[i + 1]) {
-    format = args[++i] as any;
-  }
-  if (args[i] === "--strict") {
-    strict = true;
-  }
-}
-
-const ROOT = process.cwd();
-const REPORT_DIR = path.join(ROOT, "audit-reports");
-
-// ============================================================================
-// Utility
-// ============================================================================
-
-function fileExists(p: string): boolean {
-  return fs.existsSync(path.join(ROOT, p));
-}
-
-function readFile(p: string): string {
-  const full = path.join(ROOT, p);
-  return fs.existsSync(full) ? fs.readFileSync(full, "utf-8") : "";
-}
-
-function globFiles(dir: string, ext: string): string[] {
-  const results: string[] = [];
-  const fullDir = path.join(ROOT, dir);
-  if (!fs.existsSync(fullDir)) return results;
-
-  function walk(d: string) {
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-      const full = path.join(d, entry.name);
-      if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
-        walk(full);
-      } else if (entry.isFile() && entry.name.endsWith(ext)) {
-        results.push(path.relative(ROOT, full));
-      }
-    }
-  }
-  walk(fullDir);
-  return results;
-}
-
-// ============================================================================
-// Audit Checks
-// ============================================================================
-
-const checks: AuditCheck[] = [];
-
-function check(id: string, name: string, category: string, severity: AuditCheck["severity"], test: () => { passed: boolean; message: string; details?: string }) {
-  try {
-    const result = test();
-    checks.push({ id, name, category, severity, ...result });
-  } catch (err: any) {
-    checks.push({ id, name, category, severity, passed: false, message: `Check threw error: ${err.message}` });
-  }
-}
-
-// ── Structure Checks ────────────────────────────────────────────────────
-
-check("STR-001", "Package.json exists", "structure", "critical", () => ({
-  passed: fileExists("package.json"),
-  message: fileExists("package.json") ? "package.json found" : "package.json missing",
-}));
-
-check("STR-002", "TypeScript config exists", "structure", "critical", () => ({
-  passed: fileExists("tsconfig.json"),
-  message: fileExists("tsconfig.json") ? "tsconfig.json found" : "tsconfig.json missing",
-}));
-
-check("STR-003", "Drizzle schema exists", "structure", "critical", () => ({
-  passed: fileExists("drizzle/schema.ts"),
-  message: fileExists("drizzle/schema.ts") ? "Schema barrel found" : "drizzle/schema.ts missing",
-}));
-
-check("STR-004", "Server entry exists", "structure", "critical", () => ({
-  passed: fileExists("server/_core/index.ts"),
-  message: fileExists("server/_core/index.ts") ? "Server entry found" : "server/_core/index.ts missing",
-}));
-
-check("STR-005", "Client App.tsx exists", "structure", "high", () => ({
-  passed: fileExists("client/src/App.tsx"),
-  message: fileExists("client/src/App.tsx") ? "Client entry found" : "client/src/App.tsx missing",
-}));
-
-check("STR-006", "CLAUDE.md exists", "structure", "medium", () => ({
-  passed: fileExists("CLAUDE.md"),
-  message: fileExists("CLAUDE.md") ? "CLAUDE.md found" : "CLAUDE.md missing",
-}));
-
-// ── Security Checks ────────────────────────────────────────────────────
-
-check("SEC-001", "Security headers configured", "security", "critical", () => {
-  const content = readFile("server/_core/index.ts");
-  const headers = ["X-Content-Type-Options", "X-Frame-Options", "Content-Security-Policy", "Referrer-Policy"];
-  const found = headers.filter(h => content.includes(h));
-  const missing = headers.filter(h => !content.includes(h));
-  return {
-    passed: missing.length === 0,
-    message: missing.length === 0 ? `All ${headers.length} security headers present` : `Missing headers: ${missing.join(", ")}`,
-    details: `Found: ${found.join(", ")}`,
-  };
-});
-
-check("SEC-002", "CSRF protection enabled", "security", "critical", () => {
-  const content = readFile("server/_core/index.ts");
-  const has = content.includes("CSRF") || content.includes("csrf") || content.includes("Origin");
-  return { passed: has, message: has ? "CSRF protection found" : "No CSRF protection detected" };
-});
-
-check("SEC-003", "Rate limiting configured", "security", "high", () => {
-  const content = readFile("server/_core/index.ts");
-  const has = content.includes("rate") || content.includes("Rate") || content.includes("429");
-  return { passed: has, message: has ? "Rate limiting found" : "No rate limiting detected" };
-});
-
-check("SEC-004", "No hardcoded secrets in server code", "security", "critical", () => {
-  const files = globFiles("server", ".ts");
-  const violations: string[] = [];
-  const secretPatterns = [/['"]sk-[a-zA-Z0-9]{20,}['"]/, /['"]AKIA[A-Z0-9]{16}['"]/, /password\s*=\s*['"][^'"]{8,}['"]/i];
-
-  for (const f of files) {
-    const content = readFile(f);
-    for (const pat of secretPatterns) {
-      if (pat.test(content)) {
-        violations.push(f);
-        break;
-      }
-    }
-  }
-  return {
-    passed: violations.length === 0,
-    message: violations.length === 0 ? "No hardcoded secrets found" : `Potential secrets in: ${violations.join(", ")}`,
-  };
-});
-
-check("SEC-005", "x-powered-by disabled", "security", "medium", () => {
-  const content = readFile("server/_core/index.ts");
-  const has = content.includes('disable("x-powered-by")') || content.includes("x-powered-by");
-  return { passed: has, message: has ? "x-powered-by disabled" : "x-powered-by header not disabled" };
-});
-
-check("SEC-006", "Encryption module exists", "security", "high", () => ({
-  passed: fileExists("server/_core/encryption.ts"),
-  message: fileExists("server/_core/encryption.ts") ? "Encryption module found" : "No encryption module",
-}));
-
-// ── Auth Checks ────────────────────────────────────────────────────────
-
-check("AUTH-001", "Auth procedures defined", "auth", "critical", () => {
-  const content = readFile("server/_core/trpc.ts");
-  const procs = ["publicProcedure", "protectedProcedure", "adminProcedure"];
-  const found = procs.filter(p => content.includes(p));
-  return {
-    passed: found.length === procs.length,
-    message: `${found.length}/${procs.length} auth procedure levels defined`,
-  };
-});
-
-check("AUTH-002", "OAuth routes registered", "auth", "high", () => {
-  const content = readFile("server/_core/index.ts");
-  const has = content.includes("registerOAuthRoutes") || content.includes("oauth");
-  return { passed: has, message: has ? "OAuth routes registered" : "No OAuth routes found" };
-});
-
-// ── Governance Checks ──────────────────────────────────────────────────
-
-check("GOV-001", "Governance engine exists", "governance", "critical", () => ({
-  passed: fileExists("server/governance/governance-engine.ts"),
-  message: fileExists("server/governance/governance-engine.ts") ? "Governance engine found" : "Governance engine missing",
-}));
-
-check("GOV-002", "Governance router exists", "governance", "critical", () => ({
-  passed: fileExists("server/governance/router.ts"),
-  message: fileExists("server/governance/router.ts") ? "Governance router found" : "Governance router missing",
-}));
-
-check("GOV-003", "Scorecard system exists", "governance", "high", () => {
-  const exists = fileExists("server/governance/scorecard.ts") || fileExists("server/governance/scorecard/runner.ts");
-  return { passed: exists, message: exists ? "Scorecard system found" : "Scorecard system missing" };
-});
-
-check("GOV-004", "Artifact store exists", "governance", "high", () => ({
-  passed: fileExists("server/governance/artifact-store.ts"),
-  message: fileExists("server/governance/artifact-store.ts") ? "Artifact store found" : "Artifact store missing",
-}));
-
-check("GOV-005", "RBAC model exists", "governance", "high", () => ({
-  passed: fileExists("server/governance/rbac-model.ts"),
-  message: fileExists("server/governance/rbac-model.ts") ? "RBAC model found" : "RBAC model missing",
-}));
-
-check("GOV-006", "Drift detection exists", "governance", "medium", () => {
-  const exists = fileExists("server/governance/scorecard/drift-detector.ts") || fileExists("server/governance/drift-detector.ts");
-  return { passed: exists, message: exists ? "Drift detection found" : "No drift detection" };
-});
-
-check("GOV-007", "Governed procedure middleware exists", "governance", "critical", () => {
-  const content = readFile("server/_core/trpc.ts");
-  const has = content.includes("governedProcedure");
-  return { passed: has, message: has ? "Governed procedure middleware found" : "No governed procedure middleware" };
-});
-
-// ── Database Checks ────────────────────────────────────────────────────
-
-check("DB-001", "Migration files exist", "database", "critical", () => {
-  const migrations = globFiles("drizzle", ".sql");
-  return {
-    passed: migrations.length > 0,
-    message: `${migrations.length} migration files found`,
-  };
-});
-
-check("DB-002", "Drizzle journal exists", "database", "critical", () => ({
-  passed: fileExists("drizzle/meta/_journal.json"),
-  message: fileExists("drizzle/meta/_journal.json") ? "Migration journal found" : "Migration journal missing",
-}));
-
-check("DB-003", "Schema tables directory exists", "database", "high", () => {
-  const tables = globFiles("drizzle/tables", ".ts");
-  return {
-    passed: tables.length > 0,
-    message: `${tables.length} table definition files found`,
-  };
-});
-
-// ── Dependency Checks ──────────────────────────────────────────────────
-
-check("DEP-001", "No .env files committed", "dependencies", "critical", () => {
-  const envFiles = [".env", ".env.local", ".env.production"];
-  const found = envFiles.filter(f => fileExists(f));
-  return {
-    passed: found.length === 0,
-    message: found.length === 0 ? "No .env files in repo" : `Found committed env files: ${found.join(", ")}`,
-  };
-});
-
-check("DEP-002", ".gitignore exists", "dependencies", "medium", () => ({
-  passed: fileExists(".gitignore"),
-  message: fileExists(".gitignore") ? ".gitignore found" : ".gitignore missing",
-}));
-
-check("DEP-003", "Lock file exists", "dependencies", "high", () => {
-  const has = fileExists("package-lock.json") || fileExists("pnpm-lock.yaml") || fileExists("yarn.lock");
-  return { passed: has, message: has ? "Lock file found" : "No lock file found" };
-});
-
-// ── Frontend Checks ────────────────────────────────────────────────────
-
-check("FE-001", "UI component library exists", "frontend", "medium", () => {
-  const components = globFiles("client/src/components/ui", ".tsx");
-  return {
-    passed: components.length > 0,
-    message: `${components.length} UI components found`,
-  };
-});
-
-check("FE-002", "Page files exist", "frontend", "high", () => {
-  const pages = globFiles("client/src/pages", ".tsx");
-  return {
-    passed: pages.length > 0,
-    message: `${pages.length} page files found`,
-  };
-});
-
-check("FE-003", "tRPC client configured", "frontend", "critical", () => ({
-  passed: fileExists("client/src/lib/trpc.ts"),
-  message: fileExists("client/src/lib/trpc.ts") ? "tRPC client configured" : "tRPC client missing",
-}));
-
-// ============================================================================
-// Build Report
-// ============================================================================
-
-const failedChecks = checks.filter(c => !c.passed);
-const violations: AuditViolation[] = failedChecks.map(c => ({
-  rule: c.id,
-  name: c.name,
-  severity: c.severity,
-  message: c.message,
-  details: c.details,
-}));
-
-const severityCounts: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-for (const v of violations) {
-  severityCounts[v.severity] = (severityCounts[v.severity] || 0) + 1;
-}
-
-// Build coverage by category
-const categories = [...new Set(checks.map(c => c.category))];
-const coverageSections: AuditCoverageSection[] = categories.map(cat => {
-  const catChecks = checks.filter(c => c.category === cat);
-  const passed = catChecks.filter(c => c.passed).length;
-  return {
-    name: cat,
-    checked: catChecks.length,
-    passed,
-    coverage: Math.round((passed / catChecks.length) * 100),
-  };
-});
-
-const overallPercent = Math.round((checks.filter(c => c.passed).length / checks.length) * 100);
-
-const hasCriticalFailures = severityCounts.critical > 0;
-const passed = strict ? failedChecks.length === 0 : !hasCriticalFailures;
-
-const report: AuditReport = {
-  timestamp: new Date().toISOString(),
-  passed,
-  summary: {
-    totalChecks: checks.length,
-    passedChecks: checks.filter(c => c.passed).length,
-    failedChecks: failedChecks.length,
-    score: overallPercent,
-    severityCounts,
-  },
-  violations,
-  coverage: {
-    sections: coverageSections,
-    overallPercent,
-  },
-  checks,
+  details?: Record<string, unknown>;
 };
 
-// ============================================================================
-// Write Output
-// ============================================================================
+type AuditCheck = {
+  id: string;
+  title: string;
+  status: CheckStatus;
+  severity: Severity;
+  message: string;
+  violations?: AuditViolation[];
+  details?: Record<string, unknown>;
+};
 
-if (!fs.existsSync(REPORT_DIR)) {
-  fs.mkdirSync(REPORT_DIR, { recursive: true });
+type AuditReport = {
+  meta: {
+    runId: string;
+    startedAt: string;
+    finishedAt: string;
+    durationMs: number;
+    strict: boolean;
+    design: Design;
+    format: Format;
+    baseUrl?: string;
+    dbChecked: boolean;
+    repoRoot: string;
+    outDir: string;
+    sha256: {
+      json?: string;
+      txt?: string;
+    };
+    version: number;
+  };
+  summary: {
+    status: "PASS" | "FAIL";
+    score: number; // 0-100
+    countsBySeverity: Record<Severity, number>;
+    checks: {
+      total: number;
+      pass: number;
+      warn: number;
+      fail: number;
+    };
+    topViolations: AuditViolation[];
+  };
+  checks: AuditCheck[];
+  artifacts: {
+    jsonPath?: string;
+    txtPath?: string;
+  };
+};
+
+function parseArgs(argv: string[]) {
+  const args: Record<string, string | boolean> = {};
+  for (const a of argv.slice(2)) {
+    if (!a.startsWith("--")) continue;
+    const [k, v] = a.slice(2).split("=");
+    if (typeof v === "undefined") args[k] = true;
+    else args[k] = v;
+  }
+
+  const format = (args.format as Format) || "both";
+  const strict = Boolean(args.strict);
+  const design = (args.design as Design) || "standard";
+  const baseUrl = (args.baseUrl as string | undefined) || (process.env.AUDIT_BASE_URL || undefined);
+  const outDir = (args.outDir as string | undefined) || path.join(process.cwd(), "audit-reports");
+
+  const validFormats: Format[] = ["json", "txt", "both"];
+  const validDesigns: Design[] = ["executive", "standard", "forensics"];
+
+  if (!validFormats.includes(format)) {
+    throw new Error(`Invalid --format=${String(format)} (allowed: ${validFormats.join(", ")})`);
+  }
+  if (!validDesigns.includes(design)) {
+    throw new Error(`Invalid --design=${String(design)} (allowed: ${validDesigns.join(", ")})`);
+  }
+
+  return { format, strict, design, baseUrl, outDir };
 }
 
-if (format === "json" || format === "both") {
-  fs.writeFileSync(path.join(REPORT_DIR, "platform-audit.json"), JSON.stringify(report, null, 2));
+function sha256(buf: Buffer | string) {
+  return crypto.createHash("sha256").update(buf).digest("hex");
 }
 
-if (format === "txt" || format === "both") {
+function ensureDir(p: string) {
+  fs.mkdirSync(p, { recursive: true });
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function severityWeight(s: Severity): number {
+  switch (s) {
+    case "INFO":
+      return 0;
+    case "LOW":
+      return 5;
+    case "MEDIUM":
+      return 15;
+    case "HIGH":
+      return 30;
+    case "CRITICAL":
+      return 50;
+  }
+}
+
+/** --- YAML loader (optional dependency). If 'yaml' package not installed, script still runs. --- */
+async function loadYamlIfAvailable<T = any>(
+  filePath: string
+): Promise<{ ok: boolean; value?: T; error?: string }> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const YAML = require("yaml");
+    const raw = fs.readFileSync(filePath, "utf8");
+    const parsed = YAML.parse(raw);
+    return { ok: true, value: parsed };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
+/** --- HTTP fetch helper (Node 18+ has global fetch) --- */
+async function safeFetchJson(
+  url: string,
+  timeoutMs = 15_000
+): Promise<{ ok: boolean; status?: number; value?: any; error?: string }> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        "content-type": "application/json",
+      } as any,
+    });
+
+    const text = await res.text();
+    clearTimeout(t);
+
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return { ok: false, status: res.status, error: `Non-JSON response (status ${res.status})` };
+    }
+
+    if (!res.ok) {
+      return { ok: false, status: res.status, value: data, error: `HTTP ${res.status}` };
+    }
+    return { ok: true, status: res.status, value: data };
+  } catch (e: any) {
+    clearTimeout(t);
+    return {
+      ok: false,
+      error: e?.name === "AbortError" ? "Timeout" : e?.message || String(e),
+    };
+  }
+}
+
+/** --- DB check helper (optional) --- */
+async function tryDbQuery(sql: string): Promise<{ ok: boolean; rows?: any[]; error?: string }> {
+  const url = process.env.DATABASE_URL;
+  if (!url) return { ok: false, error: "DATABASE_URL not set" };
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pg = require("pg");
+    const client = new pg.Client({ connectionString: url });
+    await client.connect();
+    const res = await client.query(sql);
+    await client.end();
+    return { ok: true, rows: res.rows || [] };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
+/** --- Governance action registry parsing (tRPC response shape) --- */
+function extractActionsFromTrpc(trpcJson: any): any[] {
+  // Expected shape (based on your paste):
+  // { result: { data: { json: { actions: [...], total: N } } } }
+  const actions = trpcJson?.result?.data?.json?.actions;
+  if (Array.isArray(actions)) return actions;
+
+  // Alternate
+  const alt = trpcJson?.result?.data?.actions;
+  if (Array.isArray(alt)) return alt;
+
+  return [];
+}
+
+/** --- Report rendering --- */
+function renderTxt(report: AuditReport): string {
+  const { meta, summary, checks } = report;
+
   const lines: string[] = [];
-  lines.push("=".repeat(70));
-  lines.push("  PLATFORM AUDIT REPORT");
-  lines.push(`  ${report.timestamp}`);
-  lines.push("=".repeat(70));
-  lines.push("");
-  lines.push(`  Result: ${report.passed ? "PASSED" : "FAILED"}`);
-  lines.push(`  Score:  ${report.summary.score}%`);
-  lines.push(`  Checks: ${report.summary.passedChecks}/${report.summary.totalChecks} passed`);
+  const banner = summary.status === "PASS" ? "PASS" : "FAIL";
+
+  lines.push(`MyNewAp1Claude — Platform Audit (${banner})`);
+  lines.push(`RunId: ${meta.runId}`);
+  lines.push(`Started: ${meta.startedAt}`);
+  lines.push(`Finished: ${meta.finishedAt}`);
+  lines.push(`Duration: ${meta.durationMs}ms`);
+  lines.push(`Design: ${meta.design} | Strict: ${meta.strict} | Format: ${meta.format}`);
+  if (meta.baseUrl) lines.push(`BaseUrl: ${meta.baseUrl}`);
+  lines.push(`RepoRoot: ${meta.repoRoot}`);
+  lines.push(`DB Checked: ${meta.dbChecked ? "yes" : "no"}`);
   lines.push("");
 
-  if (report.violations.length > 0) {
-    lines.push("-".repeat(70));
-    lines.push("  VIOLATIONS");
-    lines.push("-".repeat(70));
-    for (const v of report.violations) {
-      lines.push(`  [${v.severity.toUpperCase()}] ${v.rule}: ${v.name}`);
-      lines.push(`    ${v.message}`);
+  lines.push(`Score: ${summary.score}/100`);
+  lines.push(
+    `Counts: INFO=${summary.countsBySeverity.INFO} LOW=${summary.countsBySeverity.LOW} MEDIUM=${summary.countsBySeverity.MEDIUM} HIGH=${summary.countsBySeverity.HIGH} CRITICAL=${summary.countsBySeverity.CRITICAL}`
+  );
+  lines.push(
+    `Checks: total=${summary.checks.total} pass=${summary.checks.pass} warn=${summary.checks.warn} fail=${summary.checks.fail}`
+  );
+  lines.push("");
+
+  if (meta.design === "executive") {
+    lines.push("Top issues:");
+    if (summary.topViolations.length === 0) {
+      lines.push("  (none)");
+    } else {
+      for (const v of summary.topViolations.slice(0, 10)) {
+        lines.push(`  - [${v.severity}] ${v.id}: ${v.message}`);
+      }
+    }
+    lines.push("");
+    lines.push("Checks (compact):");
+    for (const c of checks) {
+      lines.push(`  - ${c.status} [${c.severity}] ${c.id}: ${c.title}`);
+    }
+    return lines.join("\n");
+  }
+
+  lines.push("Checks:");
+  for (const c of checks) {
+    lines.push(`- ${c.id}: ${c.title}`);
+    lines.push(`  Status: ${c.status} | Severity: ${c.severity}`);
+    lines.push(`  ${c.message}`);
+    if (c.violations && c.violations.length) {
+      lines.push(`  Violations (${c.violations.length}):`);
+      for (const v of c.violations.slice(0, meta.design === "forensics" ? 200 : 50)) {
+        lines.push(`    - [${v.severity}] ${v.id}: ${v.message}`);
+      }
+      const cap = meta.design === "forensics" ? 200 : 50;
+      if (c.violations.length > cap) {
+        lines.push(`    ... (${c.violations.length - cap} more)`);
+      }
     }
     lines.push("");
   }
 
-  lines.push("-".repeat(70));
-  lines.push("  COVERAGE BY CATEGORY");
-  lines.push("-".repeat(70));
-  for (const s of report.coverage.sections) {
-    lines.push(`  ${s.name.padEnd(20)} ${s.passed}/${s.checked} (${s.coverage}%)`);
+  if (meta.design === "forensics") {
+    lines.push("Artifacts:");
+    if (report.artifacts.jsonPath) lines.push(`- JSON: ${report.artifacts.jsonPath}`);
+    if (report.artifacts.txtPath) lines.push(`- TXT: ${report.artifacts.txtPath}`);
   }
-  lines.push("");
-  lines.push("=".repeat(70));
 
-  fs.writeFileSync(path.join(REPORT_DIR, "platform-audit.txt"), lines.join("\n"));
+  return lines.join("\n");
 }
 
-// Console output
-console.log(`Platform Audit: ${report.passed ? "PASSED" : "FAILED"} — ${report.summary.score}% (${report.summary.passedChecks}/${report.summary.totalChecks})`);
-if (report.violations.length > 0) {
-  console.log(`Violations: ${report.violations.length} (critical: ${severityCounts.critical}, high: ${severityCounts.high})`);
+function requiredFieldViolation(id: string, field: string, action: any): AuditViolation {
+  return {
+    id,
+    severity: "MEDIUM",
+    message: `Action missing required field '${field}'`,
+    details: { actionKey: action?.actionKey, domain: action?.domain },
+  };
 }
 
-// Exit code
-process.exit(report.passed ? 0 : 1);
+async function main() {
+  const startedAtMs = Date.now();
+  const runId = crypto.randomUUID();
+
+  const { format, strict, design, baseUrl, outDir } = parseArgs(process.argv);
+  const repoRoot = process.cwd();
+
+  ensureDir(outDir);
+
+  const checks: AuditCheck[] = [];
+  const allViolations: AuditViolation[] = [];
+
+  function pushCheck(c: AuditCheck) {
+    checks.push(c);
+    if (c.violations?.length) allViolations.push(...c.violations);
+  }
+
+  /** CHECK 1: Capabilities catalog presence + parse */
+  {
+    const id = "CATALOG_CAPABILITIES";
+    const file = path.join(repoRoot, "config", "capabilities.yaml");
+    if (!fs.existsSync(file)) {
+      pushCheck({
+        id,
+        title: "Capabilities catalog exists",
+        status: "FAIL",
+        severity: "HIGH",
+        message: `Missing ${path.relative(repoRoot, file)} (required for consistent RBAC).`,
+        violations: [
+          { id: "capabilities.missing", severity: "HIGH", message: "config/capabilities.yaml not found" },
+        ],
+      });
+    } else {
+      const loaded = await loadYamlIfAvailable<any>(file);
+      if (!loaded.ok) {
+        pushCheck({
+          id,
+          title: "Capabilities catalog parses",
+          status: "WARN",
+          severity: "MEDIUM",
+          message: `Found ${path.relative(repoRoot, file)} but could not parse via 'yaml' package: ${loaded.error}`,
+          violations: [
+            {
+              id: "capabilities.parse_failed",
+              severity: "MEDIUM",
+              message: "Could not parse capabilities.yaml (install 'yaml' or ensure valid YAML)",
+              details: { error: loaded.error },
+            },
+          ],
+        });
+      } else {
+        const caps = loaded.value?.capabilities;
+        const count = Array.isArray(caps) ? caps.length : 0;
+        const bad = Array.isArray(caps)
+          ? caps.filter((c: any) => !c?.key || typeof c.key !== "string")
+          : [];
+        const v: AuditViolation[] = [];
+        if (count === 0) v.push({ id: "capabilities.empty", severity: "MEDIUM", message: "capabilities.yaml has no capabilities[]" });
+        if (bad.length) {
+          v.push({
+            id: "capabilities.invalid_entries",
+            severity: "MEDIUM",
+            message: `capabilities.yaml contains ${bad.length} entries missing 'key'`,
+          });
+        }
+        pushCheck({
+          id,
+          title: "Capabilities catalog exists + basic integrity",
+          status: v.length ? "WARN" : "PASS",
+          severity: v.length ? "MEDIUM" : "INFO",
+          message: v.length ? "Capabilities catalog present but has integrity warnings." : `OK (${count} capabilities).`,
+          violations: v.length ? v : undefined,
+          details: { count },
+        });
+      }
+    }
+  }
+
+  /** CHECK 2: Workspace role presets presence */
+  {
+    const id = "CATALOG_ROLE_PRESETS";
+    const file = path.join(repoRoot, "config", "workspace_role_presets.yaml");
+    if (!fs.existsSync(file)) {
+      pushCheck({
+        id,
+        title: "Workspace role presets exists",
+        status: "WARN",
+        severity: "MEDIUM",
+        message: `Missing ${path.relative(repoRoot, file)}. Recommended for consistent bootstrap.`,
+        violations: [
+          { id: "rolePresets.missing", severity: "MEDIUM", message: "config/workspace_role_presets.yaml not found" },
+        ],
+      });
+    } else {
+      pushCheck({
+        id,
+        title: "Workspace role presets exists",
+        status: "PASS",
+        severity: "INFO",
+        message: `OK (${path.relative(repoRoot, file)} present).`,
+      });
+    }
+  }
+
+  /** CHECK 3: Governance action registry reachable */
+  let actions: any[] = [];
+  if (!baseUrl) {
+    pushCheck({
+      id: "GOV_ACTION_REGISTRY",
+      title: "Governance action registry reachable",
+      status: "WARN",
+      severity: "MEDIUM",
+      message: "No baseUrl provided (use --baseUrl or AUDIT_BASE_URL). Skipping HTTP governance checks.",
+      violations: [{ id: "governance.baseUrl.missing", severity: "MEDIUM", message: "No baseUrl configured" }],
+    });
+  } else {
+    const url = new URL("/api/trpc/governance.actionRegistry", baseUrl).toString();
+    const res = await safeFetchJson(url);
+    if (!res.ok) {
+      pushCheck({
+        id: "GOV_ACTION_REGISTRY",
+        title: "Governance action registry reachable",
+        status: "FAIL",
+        severity: "HIGH",
+        message: `Failed to fetch governance.actionRegistry from ${url}: ${res.error || "unknown error"}`,
+        violations: [
+          {
+            id: "governance.actionRegistry.unreachable",
+            severity: "HIGH",
+            message: "Governance action registry endpoint unreachable",
+            details: { url, error: res.error, status: res.status, body: res.value },
+          },
+        ],
+      });
+    } else {
+      actions = extractActionsFromTrpc(res.value);
+      const total = actions.length;
+      pushCheck({
+        id: "GOV_ACTION_REGISTRY",
+        title: "Governance action registry reachable",
+        status: total > 0 ? "PASS" : "WARN",
+        severity: total > 0 ? "INFO" : "MEDIUM",
+        message: total > 0 ? `OK (${total} actions).` : "Fetched registry but no actions found (unexpected).",
+        violations: total > 0 ? undefined : [{ id: "governance.actionRegistry.empty", severity: "MEDIUM", message: "Registry returned 0 actions" }],
+        details: { total },
+      });
+    }
+  }
+
+  /** CHECK 4: Required engine domains present in registry */
+  if (actions.length) {
+    const id = "GOV_REQUIRED_DOMAINS";
+    const requiredDomains = ["pmt", "knowledge", "agents", "collaboration", "reporting"];
+    const presentDomains = new Set(actions.map((a) => a.domain).filter(Boolean));
+    const missing = requiredDomains.filter((d) => !presentDomains.has(d));
+
+    const v: AuditViolation[] = missing.map((d) => ({
+      id: `governance.domain.missing.${d}`,
+      severity: "HIGH",
+      message: `Missing governance domain '${d}' in action registry`,
+    }));
+
+    pushCheck({
+      id,
+      title: "Required engine domains registered in Governance",
+      status: missing.length ? "FAIL" : "PASS",
+      severity: missing.length ? "HIGH" : "INFO",
+      message: missing.length ? `Missing required domains: ${missing.join(", ")}` : `OK (${requiredDomains.join(", ")})`,
+      violations: missing.length ? v : undefined,
+      details: { requiredDomains, missing, presentDomains: Array.from(presentDomains).sort() },
+    });
+  }
+
+  /** CHECK 5: Heuristic consistency: agents execute should not be weaker than request */
+  if (actions.length) {
+    const id = "GOV_AGENT_EXECUTE_CONSISTENCY";
+    const find = (key: string) => actions.find((a) => a.actionKey === key);
+
+    const req = find("agents.run.request");
+    const exe = find("agents.run.execute");
+
+    const v: AuditViolation[] = [];
+    if (req && exe) {
+      if (req.approvalRequired === true && exe.approvalRequired === false) {
+        v.push({
+          id: "agents.execute.approval_mismatch",
+          severity: "MEDIUM",
+          message:
+            "Registry: agents.run.request requires approval but agents.run.execute does not. Ensure execute endpoint enforces an approved approval record (or governance conditions).",
+          details: { request: req, execute: exe },
+        });
+      }
+      // If execute risk lower than request, warn (string compare is ok for R1..R5)
+      if (String(exe.risk || "") < String(req.risk || "")) {
+        v.push({
+          id: "agents.execute.risk_lower_than_request",
+          severity: "MEDIUM",
+          message: "Registry: agents.run.execute risk appears lower than agents.run.request (unexpected).",
+          details: { requestRisk: req.risk, executeRisk: exe.risk },
+        });
+      }
+    } else {
+      if (!req) v.push({ id: "agents.run.request.missing", severity: "HIGH", message: "Missing agents.run.request in registry" });
+      if (!exe) v.push({ id: "agents.run.execute.missing", severity: "HIGH", message: "Missing agents.run.execute in registry" });
+    }
+
+    pushCheck({
+      id,
+      title: "Agents run request/execute registry consistency",
+      status: v.some((x) => x.severity === "HIGH") ? "FAIL" : v.length ? "WARN" : "PASS",
+      severity: v.some((x) => x.severity === "HIGH") ? "HIGH" : v.length ? "MEDIUM" : "INFO",
+      message: v.length ? "See violations." : "OK.",
+      violations: v.length ? v : undefined,
+    });
+  }
+
+  /** CHECK 6: Optional DB — confirm workspace_modules exists */
+  let dbChecked = false;
+  {
+    const id = "DB_WORKSPACE_MODULES";
+    const res = await tryDbQuery(`select to_regclass('public.workspace_modules') as table_name;`);
+    if (!res.ok) {
+      pushCheck({
+        id,
+        title: "DB check: workspace_modules table exists",
+        status: "WARN",
+        severity: "MEDIUM",
+        message: `DB not checked: ${res.error}`,
+        violations: [
+          {
+            id: "db.unavailable",
+            severity: "MEDIUM",
+            message: "DATABASE_URL missing or DB unreachable",
+            details: { error: res.error },
+          },
+        ],
+      });
+    } else {
+      dbChecked = true;
+      const tname = res.rows?.[0]?.table_name;
+      if (!tname) {
+        pushCheck({
+          id,
+          title: "DB check: workspace_modules table exists",
+          status: "FAIL",
+          severity: "HIGH",
+          message: "workspace_modules table not found in DB.",
+          violations: [{ id: "db.workspace_modules.missing", severity: "HIGH", message: "workspace_modules table missing" }],
+        });
+      } else {
+        pushCheck({
+          id,
+          title: "DB check: workspace_modules table exists",
+          status: "PASS",
+          severity: "INFO",
+          message: "OK (workspace_modules exists).",
+          details: { table: tname },
+        });
+      }
+    }
+  }
+
+  /** CHECK 7: Optional DB — can read workspaces */
+  if (dbChecked) {
+    const id = "DB_WORKSPACES_READ";
+    const res = await tryDbQuery(`select count(*)::int as c from workspaces;`);
+    if (!res.ok) {
+      pushCheck({
+        id,
+        title: "DB check: can read workspaces",
+        status: "WARN",
+        severity: "MEDIUM",
+        message: `Could not query workspaces: ${res.error}`,
+        violations: [
+          {
+            id: "db.workspaces.query_failed",
+            severity: "MEDIUM",
+            message: "Failed to query workspaces",
+            details: { error: res.error },
+          },
+        ],
+      });
+    } else {
+      const c = res.rows?.[0]?.c ?? null;
+      pushCheck({
+        id,
+        title: "DB check: can read workspaces",
+        status: "PASS",
+        severity: "INFO",
+        message: `OK (workspaces count: ${c}).`,
+        details: { count: c },
+      });
+    }
+  }
+
+  /** CHECK 8: Registry sanity — detect duplicates + missing capability + required fields */
+  if (actions.length) {
+    const id = "GOV_REGISTRY_SANITY";
+    const seen = new Map<string, number>();
+    const duplicates: string[] = [];
+    const missingCapability: any[] = [];
+    const v: AuditViolation[] = [];
+
+    for (const a of actions) {
+      const k = String(a.actionKey || "");
+      if (!k) {
+        v.push(requiredFieldViolation("governance.registry.missing_actionKey", "actionKey", a));
+        continue;
+      }
+
+      const n = (seen.get(k) || 0) + 1;
+      seen.set(k, n);
+      if (n === 2) duplicates.push(k);
+
+      if (!a.domain || typeof a.domain !== "string") {
+        v.push(requiredFieldViolation("governance.registry.missing_domain", "domain", a));
+      }
+      if (!a.capability || typeof a.capability !== "string") {
+        missingCapability.push({ actionKey: a.actionKey, domain: a.domain });
+      }
+      if (!a.risk || typeof a.risk !== "string") {
+        v.push(requiredFieldViolation("governance.registry.missing_risk", "risk", a));
+      }
+      if (typeof a.approvalRequired !== "boolean") {
+        v.push(requiredFieldViolation("governance.registry.missing_approvalRequired", "approvalRequired", a));
+      }
+      if (typeof a.evidenceRequired !== "boolean") {
+        v.push(requiredFieldViolation("governance.registry.missing_evidenceRequired", "evidenceRequired", a));
+      }
+      if (!Array.isArray(a.evidenceTypes)) {
+        v.push(requiredFieldViolation("governance.registry.missing_evidenceTypes", "evidenceTypes[]", a));
+      }
+    }
+
+    if (duplicates.length) {
+      v.push({
+        id: "governance.registry.duplicate_actionKey",
+        severity: "HIGH",
+        message: `Duplicate actionKey(s): ${duplicates.slice(0, 20).join(", ")}${duplicates.length > 20 ? "..." : ""}`,
+        details: { duplicatesCount: duplicates.length },
+      });
+    }
+
+    if (missingCapability.length) {
+      v.push({
+        id: "governance.registry.missing_capability",
+        severity: "MEDIUM",
+        message: `Actions missing capability mapping: ${missingCapability.length}`,
+        details: { sample: missingCapability.slice(0, 25) },
+      });
+    }
+
+    pushCheck({
+      id,
+      title: "Governance registry sanity",
+      status: v.some((x) => x.severity === "HIGH") ? "FAIL" : v.length ? "WARN" : "PASS",
+      severity: v.some((x) => x.severity === "HIGH") ? "HIGH" : v.length ? "MEDIUM" : "INFO",
+      message: v.length ? "Registry has issues (see violations)." : "OK.",
+      violations: v.length ? v : undefined,
+      details: { total: actions.length, unique: seen.size },
+    });
+  }
+
+  /** CHECK 9: Registry policy heuristic — high risks should tend to have approvals/evidence */
+  if (actions.length) {
+    const id = "GOV_POLICY_HEURISTICS";
+    const v: AuditViolation[] = [];
+
+    const highish = actions.filter((a) => String(a.risk) === "R4" || String(a.risk) === "R5");
+    const suspicious = highish.filter(
+      (a) => a.approvalRequired !== true && a.evidenceRequired !== true
+    );
+
+    if (suspicious.length) {
+      v.push({
+        id: "governance.policy.r4_r5_without_controls",
+        severity: "MEDIUM",
+        message: `Found ${suspicious.length} R4/R5 actions with neither approvalRequired nor evidenceRequired. Verify these are safe exceptions.`,
+        details: { sample: suspicious.slice(0, 30).map((a) => ({ actionKey: a.actionKey, domain: a.domain, risk: a.risk })) },
+      });
+    }
+
+    pushCheck({
+      id,
+      title: "Governance policy heuristics (R4/R5 expectations)",
+      status: v.length ? "WARN" : "PASS",
+      severity: v.length ? "MEDIUM" : "INFO",
+      message: v.length ? "Heuristic warnings detected (review exceptions)." : "OK.",
+      violations: v.length ? v : undefined,
+      details: { r4r5Count: highish.length, suspiciousCount: suspicious.length },
+    });
+  }
+
+  /** Summary + scoring */
+  const countsBySeverity: Record<Severity, number> = { INFO: 0, LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 };
+  for (const v of allViolations) countsBySeverity[v.severity]++;
+
+  const hasHighOrCritical = allViolations.some((v) => v.severity === "HIGH" || v.severity === "CRITICAL");
+  const strictFail = strict && allViolations.length > 0;
+  const fail = strictFail || hasHighOrCritical;
+
+  const penalty = allViolations.reduce((acc, v) => acc + severityWeight(v.severity), 0);
+  const score = clamp(100 - penalty, 0, 100);
+
+  const passCount = checks.filter((c) => c.status === "PASS").length;
+  const warnCount = checks.filter((c) => c.status === "WARN").length;
+  const failCount = checks.filter((c) => c.status === "FAIL").length;
+
+  const topViolations = [...allViolations]
+    .sort((a, b) => severityWeight(b.severity) - severityWeight(a.severity))
+    .slice(0, 10);
+
+  const finishedAtMs = Date.now();
+
+  const report: AuditReport = {
+    meta: {
+      runId,
+      startedAt: new Date(startedAtMs).toISOString(),
+      finishedAt: new Date(finishedAtMs).toISOString(),
+      durationMs: finishedAtMs - startedAtMs,
+      strict,
+      design,
+      format,
+      baseUrl,
+      dbChecked,
+      repoRoot,
+      outDir,
+      sha256: {},
+      version: 1,
+    },
+    summary: {
+      status: fail ? "FAIL" : "PASS",
+      score,
+      countsBySeverity,
+      checks: { total: checks.length, pass: passCount, warn: warnCount, fail: failCount },
+      topViolations,
+    },
+    checks,
+    artifacts: {},
+  };
+
+  const jsonPath = path.join(outDir, "platform-audit.json");
+  const txtPath = path.join(outDir, "platform-audit.txt");
+
+  // Write outputs
+  if (format === "json" || format === "both") {
+    const json = JSON.stringify(report, null, 2);
+    fs.writeFileSync(jsonPath, json, "utf8");
+    report.artifacts.jsonPath = jsonPath;
+    report.meta.sha256.json = sha256(json);
+  }
+
+  if (format === "txt" || format === "both") {
+    const txt = renderTxt(report);
+    fs.writeFileSync(txtPath, txt, "utf8");
+    report.artifacts.txtPath = txtPath;
+    report.meta.sha256.txt = sha256(txt);
+  }
+
+  // Rewrite JSON so the final JSON includes sha256 + artifacts paths
+  if (format === "json" || format === "both") {
+    const finalJson = JSON.stringify(report, null, 2);
+    fs.writeFileSync(jsonPath, finalJson, "utf8");
+    report.meta.sha256.json = sha256(finalJson);
+  }
+
+  // CI-friendly console output
+  const statusEmoji = report.summary.status === "PASS" ? "✅" : "❌";
+  console.log(
+    `${statusEmoji} Platform Audit ${report.summary.status} — score ${report.summary.score}/100 — checks: ${passCount} pass, ${warnCount} warn, ${failCount} fail — violations: HIGH=${countsBySeverity.HIGH}, CRITICAL=${countsBySeverity.CRITICAL}`
+  );
+  if (report.artifacts.jsonPath) console.log(`JSON: ${report.artifacts.jsonPath}`);
+  if (report.artifacts.txtPath) console.log(`TXT: ${report.artifacts.txtPath}`);
+
+  // Exit codes
+  process.exit(fail ? 1 : 0);
+}
+
+main().catch((e) => {
+  console.error("❌ Platform Audit ERROR:", e?.stack || e);
+  process.exit(1);
+});

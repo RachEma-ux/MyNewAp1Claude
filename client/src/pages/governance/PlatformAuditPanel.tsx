@@ -385,6 +385,8 @@ function SummaryView({ run, design }: { run: any; design: DesignProfile }) {
   if (!summary) return <p className="text-muted-foreground">No summary data available</p>;
 
   if (design === "executive") {
+    const counts = summary.countsBySeverity || {};
+    const checksInfo = summary.checks || {};
     return (
       <div className="space-y-4">
         {/* Banner */}
@@ -394,37 +396,53 @@ function SummaryView({ run, design }: { run: any; design: DesignProfile }) {
             : "bg-red-500/10 text-red-500 border border-red-500/20"
         }`}>
           Platform Audit: {run.status === "pass" ? "PASSED" : "FAILED"}
+          {summary.score != null && ` — Score: ${summary.score}/100`}
         </div>
 
-        {/* Key metrics */}
-        {summary.severityCounts && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(summary.severityCounts as Record<string, number>).map(([sev, count]) => (
+        {/* Severity counts */}
+        {Object.keys(counts).length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {(["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const).map((sev) => (
               <Card key={sev}>
                 <CardHeader className="pb-2">
-                  <CardDescription className="capitalize">{sev}</CardDescription>
-                  <CardTitle className="text-xl">{count}</CardTitle>
+                  <CardDescription>{sev}</CardDescription>
+                  <CardTitle className="text-xl">{counts[sev] ?? 0}</CardTitle>
                 </CardHeader>
               </Card>
             ))}
           </div>
         )}
 
-        {/* Top-level stats */}
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          {summary.totalChecks != null && (
-            <div><span className="text-muted-foreground">Total Checks:</span> {summary.totalChecks}</div>
+        {/* Check stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          {checksInfo.total != null && (
+            <div><span className="text-muted-foreground">Total Checks:</span> {checksInfo.total}</div>
           )}
-          {summary.passedChecks != null && (
-            <div><span className="text-muted-foreground">Passed:</span> {summary.passedChecks}</div>
+          {checksInfo.pass != null && (
+            <div><span className="text-muted-foreground">Passed:</span> {checksInfo.pass}</div>
           )}
-          {summary.failedChecks != null && (
-            <div><span className="text-muted-foreground">Failed:</span> {summary.failedChecks}</div>
+          {checksInfo.warn != null && (
+            <div><span className="text-muted-foreground">Warnings:</span> {checksInfo.warn}</div>
           )}
-          {summary.score != null && (
-            <div><span className="text-muted-foreground">Score:</span> {summary.score}</div>
+          {checksInfo.fail != null && (
+            <div><span className="text-muted-foreground">Failed:</span> {checksInfo.fail}</div>
           )}
         </div>
+
+        {/* Top violations */}
+        {Array.isArray(summary.topViolations) && summary.topViolations.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">Top Issues</p>
+            {summary.topViolations.slice(0, 5).map((v: any, i: number) => (
+              <div key={i} className="p-2 bg-muted rounded-md text-sm flex items-center justify-between">
+                <span>{v.id}: {v.message}</span>
+                <Badge variant={v.severity === "CRITICAL" || v.severity === "HIGH" ? "destructive" : "secondary"}>
+                  {v.severity}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -455,7 +473,7 @@ function ViolationsView({ run, design }: { run: any; design: DesignProfile }) {
         {top10.map((v: any, i: number) => (
           <div key={i} className="p-3 bg-muted rounded-md text-sm">
             <div className="flex items-center justify-between">
-              <span className="font-medium">{v.rule || v.name || `Violation #${i + 1}`}</span>
+              <span className="font-medium">{v.id || v.rule || v.name || `Violation #${i + 1}`}</span>
               {v.severity && (
                 <Badge variant={v.severity === "critical" || v.severity === "high" ? "destructive" : "secondary"}>
                   {v.severity}
@@ -489,7 +507,7 @@ function ViolationsView({ run, design }: { run: any; design: DesignProfile }) {
           {violations.map((v: any, i: number) => (
             <tr key={i} className="border-b">
               <td className="py-2 pr-4">{i + 1}</td>
-              <td className="py-2 pr-4 font-medium">{v.rule || v.name || "—"}</td>
+              <td className="py-2 pr-4 font-medium">{v.id || v.rule || v.name || "—"}</td>
               <td className="py-2 pr-4">
                 {v.severity && (
                   <Badge variant={v.severity === "critical" || v.severity === "high" ? "destructive" : "secondary"} className="text-xs">
@@ -514,47 +532,99 @@ function ViolationsView({ run, design }: { run: any; design: DesignProfile }) {
 }
 
 function CoverageView({ run, design }: { run: any; design: DesignProfile }) {
-  const coverage = run.coverageJson;
-  if (!coverage) return <p className="text-muted-foreground">No coverage data available</p>;
+  const checks: any[] = run.coverageJson || [];
+  if (!Array.isArray(checks) || checks.length === 0) {
+    return <p className="text-muted-foreground">No check detail data available</p>;
+  }
 
   if (design === "executive") {
-    // Key sections only
-    const sections = coverage.sections || coverage;
-    const entries = Array.isArray(sections)
-      ? sections.slice(0, 5)
-      : Object.entries(sections).slice(0, 5);
-
     return (
       <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">Top 5 coverage sections (Executive view)</p>
-        {Array.isArray(entries) ? entries.map((entry: any, i: number) => {
-          const name = Array.isArray(entry) ? entry[0] : entry.name || `Section ${i + 1}`;
-          const value = Array.isArray(entry) ? entry[1] : entry.coverage || entry.value;
-          return (
-            <div key={i} className="flex justify-between items-center p-3 bg-muted rounded-md">
-              <span className="font-medium text-sm">{String(name)}</span>
-              <span className="text-sm">{typeof value === "number" ? `${value}%` : JSON.stringify(value)}</span>
-            </div>
-          );
-        }) : null}
+        <p className="text-sm text-muted-foreground">Check results (Executive view)</p>
+        {checks.map((c: any, i: number) => (
+          <div key={i} className="flex justify-between items-center p-3 bg-muted rounded-md">
+            <span className="font-medium text-sm">{c.id}: {c.title}</span>
+            <Badge variant={c.status === "FAIL" ? "destructive" : c.status === "WARN" ? "secondary" : "default"}>
+              {c.status}
+            </Badge>
+          </div>
+        ))}
       </div>
     );
   }
 
-  // Standard — summary view
+  // Standard — checks table
   if (design === "standard") {
     return (
-      <pre className="bg-muted p-4 rounded-md text-sm overflow-auto max-h-[60vh]">
-        {JSON.stringify(coverage, null, 2)}
-      </pre>
+      <div className="overflow-x-auto">
+        <p className="text-sm text-muted-foreground mb-3">{checks.length} checks</p>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="pb-2 pr-4">ID</th>
+              <th className="pb-2 pr-4">Title</th>
+              <th className="pb-2 pr-4">Status</th>
+              <th className="pb-2 pr-4">Severity</th>
+              <th className="pb-2 pr-4">Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            {checks.map((c: any, i: number) => (
+              <tr key={i} className="border-b">
+                <td className="py-2 pr-4 font-mono text-xs">{c.id}</td>
+                <td className="py-2 pr-4">{c.title}</td>
+                <td className="py-2 pr-4">
+                  <Badge variant={c.status === "FAIL" ? "destructive" : c.status === "WARN" ? "secondary" : "default"} className="text-xs">
+                    {c.status}
+                  </Badge>
+                </td>
+                <td className="py-2 pr-4">
+                  <Badge variant={c.severity === "CRITICAL" || c.severity === "HIGH" ? "destructive" : "secondary"} className="text-xs">
+                    {c.severity}
+                  </Badge>
+                </td>
+                <td className="py-2 pr-4 text-muted-foreground">{c.message}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 
-  // Forensics — full coverage map table + raw JSON
+  // Forensics — full table + raw JSON
   return (
     <div className="space-y-6">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="pb-2 pr-4">ID</th>
+              <th className="pb-2 pr-4">Title</th>
+              <th className="pb-2 pr-4">Status</th>
+              <th className="pb-2 pr-4">Severity</th>
+              <th className="pb-2 pr-4">Violations</th>
+            </tr>
+          </thead>
+          <tbody>
+            {checks.map((c: any, i: number) => (
+              <tr key={i} className="border-b">
+                <td className="py-2 pr-4 font-mono text-xs">{c.id}</td>
+                <td className="py-2 pr-4">{c.title}</td>
+                <td className="py-2 pr-4">
+                  <Badge variant={c.status === "FAIL" ? "destructive" : c.status === "WARN" ? "secondary" : "default"} className="text-xs">
+                    {c.status}
+                  </Badge>
+                </td>
+                <td className="py-2 pr-4">{c.severity}</td>
+                <td className="py-2 pr-4">{c.violations?.length || 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <pre className="bg-muted p-4 rounded-md text-sm overflow-auto max-h-[60vh]">
-        {JSON.stringify(coverage, null, 2)}
+        {JSON.stringify(checks, null, 2)}
       </pre>
     </div>
   );

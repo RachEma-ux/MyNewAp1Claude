@@ -163,6 +163,11 @@ async function executeAudit(runId: number, opts: AuditRunOpts): Promise<void> {
   else args.push("--format", "both");
   if (opts.strict) args.push("--strict");
 
+  // Pass baseUrl so the script can reach the governance action registry
+  const port = process.env.PORT || "3000";
+  const baseUrl = `http://localhost:${port}`;
+  args.push(`--baseUrl=${baseUrl}`);
+
   let stdout = "";
   let stderr = "";
   let killed = false;
@@ -238,10 +243,13 @@ async function executeAudit(runId: number, opts: AuditRunOpts): Promise<void> {
         });
         updateData.jsonRef = stored.sha256;
 
-        // Extract parsed fields
+        // Extract parsed fields (new report format)
         updateData.summaryJson = jsonData.summary || jsonData;
-        updateData.violationsJson = truncateViolations(jsonData.violations || [], opts.design);
-        updateData.coverageJson = jsonData.coverage || null;
+        // Violations are in summary.topViolations and per-check
+        const allViolations = collectViolations(jsonData);
+        updateData.violationsJson = truncateViolations(allViolations, opts.design);
+        // Store checks array as coverage data
+        updateData.coverageJson = jsonData.checks || null;
       } catch (e: any) {
         console.warn(`[AuditRunner] Failed to process JSON artifact: ${e.message}`);
       }
@@ -268,7 +276,7 @@ async function executeAudit(runId: number, opts: AuditRunOpts): Promise<void> {
       if (!updateData.errorMessage && stderr) {
         updateData.errorMessage = stderr.slice(0, 2000);
       }
-    } else if (jsonData?.passed === false) {
+    } else if (jsonData?.summary?.status === "FAIL") {
       updateData.status = "fail";
     } else {
       updateData.status = "pass";
@@ -294,6 +302,23 @@ async function markError(db: any, runId: number, startTime: number, message: str
       errorMessage: message.slice(0, 2000),
     })
     .where(eq(governanceAuditRuns.id, runId));
+}
+
+/**
+ * Collect all violations from the new report format.
+ * Violations live in summary.topViolations and in each check's violations array.
+ */
+function collectViolations(jsonData: any): any[] {
+  const all: any[] = [];
+  // Gather from each check
+  if (Array.isArray(jsonData?.checks)) {
+    for (const check of jsonData.checks) {
+      if (Array.isArray(check.violations)) {
+        all.push(...check.violations);
+      }
+    }
+  }
+  return all;
 }
 
 function truncateViolations(violations: any[], design: string): any[] {
