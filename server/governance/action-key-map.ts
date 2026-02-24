@@ -288,8 +288,8 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "modules.pmt.tasks.create": "pmt.task.create",
   "modules.pmt.tasks.update": "pmt.task.update",
   "modules.pmt.tasks.delete": "pmt.task.delete",
-  "modules.pmt.members.add": "pmt.member.add",
-  "modules.pmt.members.remove": "pmt.member.remove",
+  "modules.pmt.dependencies.add": "pmt.dependency.add",
+  "modules.pmt.dependencies.remove": "pmt.dependency.remove",
 
   // ── Platform Engines — Knowledge ─────────────────────────────────────────
   "modules.knowledge.documents.create": "knowledge.document.create",
@@ -297,14 +297,16 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "modules.knowledge.documents.delete": "knowledge.document.delete",
   "modules.knowledge.chunks.create": "knowledge.chunk.create",
   "modules.knowledge.chunks.update": "knowledge.chunk.update",
+  "modules.knowledge.decisions.create": "knowledge.decision.create",
+  "modules.knowledge.decisions.update": "knowledge.decision.update",
 
   // ── Platform Engines — Agent Orchestration ───────────────────────────────
-  "modules.agents.agents.create": "agents.workspace.create",
-  "modules.agents.agents.update": "agents.workspace.update",
-  "modules.agents.agents.delete": "agents.workspace.delete",
-  "modules.agents.runs.request": "agents.run.request",
-  "modules.agents.runs.execute": "agents.run.execute",
-  "modules.agents.runs.complete": "agents.run.complete",
+  "modules.agentOrch.agents.create": "agents.workspace.create",
+  "modules.agentOrch.agents.update": "agents.workspace.update",
+  "modules.agentOrch.agents.delete": "agents.workspace.delete",
+  "modules.agentOrch.runs.request": "agents.run.request",
+  "modules.agentOrch.runs.execute": "agents.run.execute",
+  "modules.agentOrch.runs.complete": "agents.run.complete",
 
   // ── Platform Engines — Collaboration ─────────────────────────────────────
   "modules.collaboration.threads.create": "collaboration.thread.create",
@@ -315,8 +317,8 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "modules.collaboration.messages.delete": "collaboration.message.delete",
 
   // ── Modules (Engine Binding) ─────────────────────────────────────────────
-  "modules.setEnabled": "module.setEnabled",
-  "modules.seed": "module.seed",
+  "modules.manage.setEnabled": "module.setEnabled",
+  "modules.manage.seed": "module.seed",
 };
 
 /**

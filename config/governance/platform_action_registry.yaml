@@ -1774,17 +1774,17 @@ actions:
     approval: none
     evidence: { required: false }
 
-  pmt.member.add:
+  pmt.dependency.add:
     domain: pmt
-    risk: R2
+    risk: R1
     capability: pmt.manage
     stage: mutate
     approval: none
     evidence: { required: false }
 
-  pmt.member.remove:
+  pmt.dependency.remove:
     domain: pmt
-    risk: R2
+    risk: R1
     capability: pmt.manage
     stage: mutate
     approval: none
@@ -1826,6 +1826,22 @@ actions:
     evidence: { required: false }
 
   knowledge.chunk.update:
+    domain: knowledge
+    risk: R1
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  knowledge.decision.create:
+    domain: knowledge
+    risk: R1
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  knowledge.decision.update:
     domain: knowledge
     risk: R1
     capability: knowledge.manage
