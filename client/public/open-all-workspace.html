@@ -5,52 +5,122 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Workspace Pages Test</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; background: #1a1a2e; color: #e0e0e0; }
-    h1 { color: #fff; }
-    ul { list-style: none; padding: 0; }
-    li { margin: 8px 0; }
-    a { color: #7cb3ff; text-decoration: none; font-size: 16px; }
-    a:hover { text-decoration: underline; }
-    button { margin: 20px 0; padding: 12px 24px; font-size: 16px; background: #3b82f6; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
-    button:hover { background: #2563eb; }
-    p.note { color: #aaa; font-size: 14px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; padding: 16px; }
+    h1 { color: #fff; margin-bottom: 12px; font-size: 20px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .card { border: 1px solid #334; border-radius: 8px; overflow: hidden; }
+    .card-header { background: #252547; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; }
+    .card-header span { font-size: 14px; font-weight: 600; }
+    .card-header a { color: #7cb3ff; font-size: 12px; text-decoration: none; }
+    .card-header a:hover { text-decoration: underline; }
+    .status { font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+    .status.ok { background: #16a34a33; color: #4ade80; }
+    .status.err { background: #dc262633; color: #f87171; }
+    .status.loading { background: #eab30833; color: #fbbf24; }
+    iframe { width: 100%; height: 300px; border: none; background: #111; }
+    .links { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .links a { color: #7cb3ff; font-size: 13px; padding: 4px 10px; border: 1px solid #334; border-radius: 4px; text-decoration: none; }
+    .links a:hover { background: #334; }
+    .summary { margin-bottom: 12px; font-size: 14px; color: #aaa; }
   </style>
 </head>
 <body>
   <h1>Workspace Pages Test</h1>
-  <p class="note">Allow popups for this page if your browser blocks them, then reload.</p>
-  <button id="openAll">Open All</button>
-  <ul id="links"></ul>
+  <div class="summary" id="summary">Loading 12 pages...</div>
+  <div class="links" id="quicklinks"></div>
+  <div class="grid" id="grid"></div>
+
   <script>
     var pages = [
-      '/w/2',
-      '/w/2/projects',
-      '/w/2/projects/board',
-      '/w/2/projects/timeline',
-      '/w/2/knowledge',
-      '/w/2/knowledge/decisions',
-      '/w/2/knowledge/search',
-      '/w/2/agents',
-      '/w/2/agents/runs',
-      '/w/2/collaboration',
-      '/w/2/reports',
-      '/w/2/governance'
+      { path: '/w/2', label: 'Dashboard' },
+      { path: '/w/2/projects', label: 'Projects' },
+      { path: '/w/2/projects/board', label: 'Board' },
+      { path: '/w/2/projects/timeline', label: 'Timeline' },
+      { path: '/w/2/knowledge', label: 'Knowledge' },
+      { path: '/w/2/knowledge/decisions', label: 'Decisions' },
+      { path: '/w/2/knowledge/search', label: 'Search' },
+      { path: '/w/2/agents', label: 'Agents' },
+      { path: '/w/2/agents/runs', label: 'Agent Runs' },
+      { path: '/w/2/collaboration', label: 'Collaboration' },
+      { path: '/w/2/reports', label: 'Reports' },
+      { path: '/w/2/governance', label: 'Governance' }
     ];
 
-    var ul = document.getElementById('links');
-    pages.forEach(function(p) {
-      var li = document.createElement('li');
+    var results = {};
+    var grid = document.getElementById('grid');
+    var quicklinks = document.getElementById('quicklinks');
+
+    pages.forEach(function(page, i) {
+      // Quick link
       var a = document.createElement('a');
-      a.href = p;
+      a.href = page.path;
       a.target = '_blank';
-      a.textContent = p;
-      li.appendChild(a);
-      ul.appendChild(li);
+      a.textContent = page.label;
+      quicklinks.appendChild(a);
+
+      // Card
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.id = 'card-' + i;
+
+      var header = document.createElement('div');
+      header.className = 'card-header';
+      header.innerHTML = '<span>' + page.label + '</span>' +
+        '<span class="status loading" id="status-' + i + '">loading</span>';
+
+      var iframe = document.createElement('iframe');
+      iframe.id = 'frame-' + i;
+      iframe.src = page.path;
+
+      iframe.onload = function() {
+        try {
+          var doc = iframe.contentDocument || iframe.contentWindow.document;
+          var text = doc.body ? doc.body.innerText : '';
+          if (text.indexOf('404') > -1 && text.indexOf('Page Not Found') > -1) {
+            document.getElementById('status-' + i).className = 'status err';
+            document.getElementById('status-' + i).textContent = '404';
+            results[i] = 'err';
+          } else {
+            document.getElementById('status-' + i).className = 'status ok';
+            document.getElementById('status-' + i).textContent = 'OK';
+            results[i] = 'ok';
+          }
+        } catch(e) {
+          document.getElementById('status-' + i).className = 'status ok';
+          document.getElementById('status-' + i).textContent = 'loaded';
+          results[i] = 'ok';
+        }
+        updateSummary();
+      };
+
+      iframe.onerror = function() {
+        document.getElementById('status-' + i).className = 'status err';
+        document.getElementById('status-' + i).textContent = 'error';
+        results[i] = 'err';
+        updateSummary();
+      };
+
+      card.appendChild(header);
+      card.appendChild(iframe);
+      grid.appendChild(card);
     });
 
-    document.getElementById('openAll').addEventListener('click', function() {
-      pages.forEach(function(p) { window.open(p, '_blank'); });
-    });
+    function updateSummary() {
+      var done = Object.keys(results).length;
+      var ok = 0, err = 0;
+      for (var k in results) {
+        if (results[k] === 'ok') ok++;
+        else err++;
+      }
+      var el = document.getElementById('summary');
+      if (done < pages.length) {
+        el.textContent = done + '/' + pages.length + ' loaded (' + ok + ' OK, ' + err + ' errors)';
+      } else {
+        el.textContent = 'All ' + pages.length + ' pages loaded: ' + ok + ' OK, ' + err + ' errors';
+        el.style.color = err === 0 ? '#4ade80' : '#f87171';
+      }
+    }
   </script>
 </body>
 </html>
