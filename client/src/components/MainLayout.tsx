@@ -102,6 +102,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       label: "AI Types",
       icon: <Database className="w-5 h-5" />,
       children: [
+        { label: "Catalogue", icon: <List className="w-4 h-4" />, href: "/llm/catalogue" },
         {
           label: "Providers",
           icon: <Cloud className="w-4 h-4" />,
@@ -118,7 +119,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
             { label: "Dashboard", icon: <LayoutDashboard className="w-3 h-3" />, href: "/llm" },
             { label: "Control Plane", icon: <Settings className="w-3 h-3" />, href: "/llm/control-plane" },
             { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/llm/create" },
-            { label: "Catalogue", icon: <List className="w-3 h-3" />, href: "/llm/catalogue" },
           ]
         },
         {
