@@ -1,0 +1,67 @@
+Session Summary — 2026-02-24 22:00
+====================================
+
+## Goal
+Fix all 4 forensic+strict platform audit failures and achieve 100% pass.
+
+## Checkpoint Created
+- Tag: `checkpoint-2026-02-24-audit-100`
+- Commit: c5a90c9
+- This is the reference point for all future governance work.
+
+## What Was Done
+
+### Fixed 4 forensic+strict audit failures
+
+1. **Missing `reporting` domain** (HIGH)
+   - Added 5 reporting actions to config/governance/platform_action_registry.yaml
+   - Added tRPC path mappings in server/governance/action-key-map.ts
+   - Added reporting.view and reporting.manage to config/capabilities.yaml
+   - Added reporting capabilities to roles in config/workspace_role_presets.yaml
+
+2. **YAML parsing failure — `require is not defined`** (MEDIUM)
+   - Changed require("yaml") → await import("js-yaml") in audit script (ESM fix)
+   - Package name was also wrong: yaml → js-yaml
+
+3. **agents.run.execute approval mismatch** (MEDIUM)
+   - Changed agents.run.execute from approval: none to approval: role_any
+   - Now consistent with agents.run.request
+
+4. **DB check skipped — require("pg") fails** (MEDIUM)
+   - Changed require("pg") → await import("pg") with pgModule.default || pgModule
+
+### Earlier in session (from context continuation)
+- Replaced platformAudit.ts with new governance-aware version (9 checks, severity-weighted)
+- Updated audit-runner.ts for new report format (summary.status, collectViolations, checks)
+- Updated PlatformAuditPanel.tsx for new data shape (countsBySeverity, checks array)
+- Fixed --format arg parsing (space-separated → equals-sign format)
+
+## Deploy & Verify
+- Deploy run ID: 22370494968
+- Tunnel: https://mls-activation-accessing-doe.trycloudflare.com
+- Forensic + TXT + Strict audit: PASS — Score 100, 9/9 checks, 0 violations
+
+## Audit Results (Forensic + Strict)
+  CATALOG_CAPABILITIES          → PASS
+  CATALOG_ROLE_PRESETS           → PASS
+  GOV_ACTION_REGISTRY            → PASS
+  GOV_REQUIRED_DOMAINS           → PASS
+  GOV_AGENT_EXECUTE_CONSISTENCY  → PASS
+  DB_WORKSPACE_MODULES           → PASS
+  DB_WORKSPACES_READ             → PASS
+  GOV_REGISTRY_SANITY            → PASS
+  GOV_POLICY_HEURISTICS          → PASS
+
+## Commits (this session)
+- c5a90c9 fix: resolve all 4 forensic+strict audit failures
+- 5774548 fix: use --key=value format for audit script args
+- 35d6ee0 refactor: replace platform audit script with governance-aware version
+
+## Key Files Modified
+- scripts/platformAudit.ts
+- server/governance/audit-runner.ts
+- client/src/pages/governance/PlatformAuditPanel.tsx
+- config/governance/platform_action_registry.yaml
+- server/governance/action-key-map.ts
+- config/capabilities.yaml
+- config/workspace_role_presets.yaml
