@@ -253,7 +253,7 @@ check("GOV-002", "Governance router exists", "governance", "critical", () => ({
 }));
 
 check("GOV-003", "Scorecard system exists", "governance", "high", () => {
-  const exists = fileExists("server/governance/scorecard.ts") || fileExists("server/governance/runner.ts");
+  const exists = fileExists("server/governance/scorecard.ts") || fileExists("server/governance/scorecard/runner.ts");
   return { passed: exists, message: exists ? "Scorecard system found" : "Scorecard system missing" };
 });
 
@@ -268,7 +268,7 @@ check("GOV-005", "RBAC model exists", "governance", "high", () => ({
 }));
 
 check("GOV-006", "Drift detection exists", "governance", "medium", () => {
-  const exists = fileExists("server/governance/drift-detector.ts");
+  const exists = fileExists("server/governance/scorecard/drift-detector.ts") || fileExists("server/governance/drift-detector.ts");
   return { passed: exists, message: exists ? "Drift detection found" : "No drift detection" };
 });
 
