@@ -1,0 +1,52 @@
+Session Summary — 2026-02-24 07:30
+====================================
+
+## Objective
+Fix lifecycle pipeline bug: stage transitions (Register/Validate/Publish) were happening even when the review badge was still yellow (needs_review). Enforce review-before-transition at both server and client level.
+
+## Problem
+The CandidatePage had three buttons (Register, Validate, Publish) that directly called `governedTransition()` — which ran automated checks and added lifecycle tags — without requiring the admin to open the review dialog and approve the checklist first. The review badge was purely decorative.
+
+Specific issues:
+- **Register button**: Called both `governedTransition(entry, "register")` AND `approveMutation.mutate()` simultaneously — skipping the review dialog entirely
+- **Validate button**: Called `governedTransition(entry, "validate")` — entry moved forward while `stageReviews.validate` stayed "needs_review"
+- **Publish button**: Called `governedTransition(entry, "publish")` AND `activateMutation.mutate()` — same bypass
+
+## Changes Made
+
+### 1. server/governance/router.ts — Server-side guard
+- Added check in `stageTransition` mutation: `stageReviews[targetStage]` must equal `"approved"` before transition is allowed
+- Excludes "submit" and "mutate" stages (system-level, no manual review needed)
+- Returns 409 CONFLICT with clear message: "Stage review for X has not been approved yet"
+
+### 2. client/src/pages/CandidatePage.tsx — Client-side flow fix
+- **Register button**: Changed from `governedTransition() + approveMutation()` → `openReviewDialog(entry, "register")`
+- **Validate button**: Changed from `governedTransition()` → `openReviewDialog(entry, "validate")`
+- **Publish button**: Changed from `governedTransition() + activateMutation()` → `openReviewDialog(entry, "publish")`
+- All three buttons now show Shield icon (review required) instead of action icons
+- The `approve` mutation in catalog-manage.ts already handles the full lifecycle (runs checklist, sets stageReviews, adds lifecycle tags, auto-activates on validate)
+
+## Correct Flow (After Fix)
+1. Entry enters stage → `stageReviews[stage] = "needs_review"` (yellow badge)
+2. Admin clicks Register/Validate/Publish button → review dialog opens → sees checklist
+3. Admin clicks "Approve" in dialog → `approve` mutation runs checks → sets `stageReviews[stage] = "approved"` (green badge) → adds lifecycle tag
+4. Entry moves to next stage with `stageReviews[nextStage] = "needs_review"`
+
+## Testing — Mistral AI (id=81) Full Pipeline
+| Step | Action | Result |
+|------|--------|--------|
+| 1 | Discover mistral.ai | OK — conf 100, API https://api.mistral.ai |
+| 2 | Submit from discovery | OK — id=81, status=draft, needs_review |
+| 3 | Transition to register WITHOUT review | BLOCKED |
+| 4 | Approve register review | OK — {register: approved, validate: needs_review} |
+| 5 | Transition to validate WITHOUT review | BLOCKED |
+| 6 | Approve validate review | OK — {register: approved, validate: approved, publish: needs_review} |
+| 7 | Transition to publish WITHOUT review | BLOCKED |
+| 8 | Approve publish review | OK — all 3 stages approved, status=active |
+
+## Commits
+- `1d4967d` — fix: enforce stage review before lifecycle transition
+
+## Files Modified
+- server/governance/router.ts (server-side guard in stageTransition)
+- client/src/pages/CandidatePage.tsx (buttons open review dialog instead of direct transition)
