@@ -573,6 +573,17 @@ export const governanceRouter = router({
         });
       }
 
+      // Enforce: stage review must be approved before transition is allowed
+      // This prevents transitions when the review badge is still yellow ("needs_review")
+      const stageReviews = (dbEntry as any).stageReviews || {};
+      const reviewState = stageReviews[targetStage];
+      if (targetStage !== "submit" && targetStage !== "mutate" && reviewState !== "approved") {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Stage review for "${targetStage}" has not been approved yet. Complete the review before transitioning.`,
+        });
+      }
+
       const result = await executeStageTransition(entry, targetStage, actor);
 
       if (!result.allowed) {

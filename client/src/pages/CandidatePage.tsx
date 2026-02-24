@@ -805,19 +805,11 @@ export default function CandidatePage() {
                         {(entry.tags || []).includes("candidate") && !(entry.tags || []).includes("registered") ? (
                         <Button
                           size="sm"
-                          onClick={() => {
-                            governedTransition(entry, "register");
-                            // Approve the register stage specifically
-                            approveMutation.mutate({ id: entry.id, stage: "register", activateNow: false });
-                          }}
+                          onClick={() => openReviewDialog(entry, "register")}
                           disabled={stageTransitionMutation.isPending || updateMutation.isPending}
                           className="text-xs"
                         >
-                          {stageTransitionMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <ShieldCheck className="h-4 w-4 mr-1" />
-                          )}
+                          <Shield className="h-4 w-4 mr-1" />
                           Register
                         </Button>
                         ) : (
@@ -978,14 +970,10 @@ export default function CandidatePage() {
                           {(entry.tags || []).includes("registered") && !(entry.tags || []).includes("validated") ? (
                           <Button
                             size="sm"
-                            onClick={() => governedTransition(entry, "validate")}
+                            onClick={() => openReviewDialog(entry, "validate")}
                             disabled={stageTransitionMutation.isPending || updateMutation.isPending}
                           >
-                            {stageTransitionMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            ) : (
-                              <CheckCircle2 className="h-4 w-4 mr-1" />
-                            )}
+                            <Shield className="h-4 w-4 mr-1" />
                             Validate
                           </Button>
                           ) : (
@@ -1205,15 +1193,9 @@ export default function CandidatePage() {
                             <CardTitle className="text-base break-words cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>{entry.displayName || entry.name}</CardTitle>
                             <div className="flex gap-1 shrink-0">
                             {(entry.tags || []).includes("validated") && !(entry.tags || []).includes("published") ? (
-                            <Button size="sm" onClick={() => {
-                              governedTransition(entry, "publish");
-                              activateMutation.mutate({ id: entry.id });
-                            }} disabled={stageTransitionMutation.isPending || updateMutation.isPending}>
-                              {stageTransitionMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              ) : (
-                                <Rocket className="h-4 w-4 mr-1" />
-                              )}
+                            <Button size="sm" onClick={() => openReviewDialog(entry, "publish")}
+                              disabled={stageTransitionMutation.isPending || updateMutation.isPending}>
+                              <Shield className="h-4 w-4 mr-1" />
                               Publish
                             </Button>
                             ) : (
