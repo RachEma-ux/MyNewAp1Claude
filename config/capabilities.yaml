@@ -1,0 +1,79 @@
+# Workspace Capabilities Catalog
+# Each capability is a granular permission that can be assigned to roles.
+# Version must be incremented when capabilities are added/removed.
+version: 1
+
+capabilities:
+  # --- Workspace Administration ---
+  - key: workspace.manage
+    description: Create, rename, archive, or delete the workspace
+  - key: workspace.settings
+    description: Modify workspace-level settings (embedding model, chunking, routing profile)
+  - key: workspace.members.invite
+    description: Invite new members to the workspace
+  - key: workspace.members.remove
+    description: Remove members from the workspace
+  - key: workspace.members.editRole
+    description: Change a member's role within the workspace
+  - key: workspace.billing
+    description: View and manage workspace billing and quotas
+
+  # --- Model & Provider Management ---
+  - key: models.view
+    description: View available models and their status
+  - key: models.manage
+    description: Add, remove, or configure models
+  - key: models.benchmark
+    description: Run model benchmarks and evaluations
+  - key: providers.view
+    description: View provider configurations
+  - key: providers.manage
+    description: Add, remove, or configure LLM providers
+  - key: providers.secrets
+    description: View or edit provider API keys and secrets
+
+  # --- Chat & Inference ---
+  - key: chat.send
+    description: Send chat messages and receive responses
+  - key: chat.history
+    description: View conversation history
+  - key: inference.route
+    description: Override inference routing (pin provider, change tier)
+  - key: inference.batch
+    description: Submit batch inference jobs
+
+  # --- Documents & RAG ---
+  - key: documents.upload
+    description: Upload documents for ingestion
+  - key: documents.view
+    description: View document list and metadata
+  - key: documents.delete
+    description: Delete documents and their chunks
+  - key: documents.reindex
+    description: Trigger re-chunking and re-embedding
+
+  # --- Agents ---
+  - key: agents.view
+    description: View agent definitions and status
+  - key: agents.create
+    description: Create new agent definitions
+  - key: agents.edit
+    description: Modify agent configuration, tools, and prompts
+  - key: agents.delete
+    description: Delete agent definitions
+  - key: agents.promote
+    description: Promote agents through lifecycle stages
+
+  # --- Automation & Workflows ---
+  - key: workflows.view
+    description: View workflow definitions and execution history
+  - key: workflows.manage
+    description: Create, edit, publish, or delete workflows
+  - key: workflows.execute
+    description: Manually trigger workflow execution
+
+  # --- Governance & Compliance ---
+  - key: governance.view
+    description: View scorecards, audit logs, and compliance status
+  - key: governance.manage
+    description: Configure governance rules, packs, and freeze policies

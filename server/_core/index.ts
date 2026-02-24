@@ -23,6 +23,7 @@ import { eq } from "drizzle-orm";
 import { encrypt } from "./encryption";
 import { sdk } from "./sdk";
 import { initializeGovernance } from "../governance/governance-engine";
+import { syncCapabilitiesOnBoot } from "../workspace/seed/syncCapabilitiesOnBoot";
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -179,6 +180,9 @@ async function startServer() {
   } catch (error: any) {
     console.warn(`[TaxonomySeed] Skipped — ${error.message}`);
   }
+
+  // Sync workspace capabilities from YAML config
+  await syncCapabilitiesOnBoot();
 
   // Start import session cleanup interval
   startCleanupInterval();

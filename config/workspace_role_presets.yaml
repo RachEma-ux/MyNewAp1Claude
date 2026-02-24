@@ -1,0 +1,232 @@
+# Workspace Role Presets
+# Defines system roles with their allowed capabilities and workspace type presets.
+# Version must be incremented when roles or presets change.
+version: 1
+
+# ============================================================================
+# System Roles — 9 built-in roles
+# ============================================================================
+roles:
+  - name: WorkspaceOwner
+    description: Full control over the workspace — all capabilities granted
+    isSystem: true
+    allow:
+      - workspace.manage
+      - workspace.settings
+      - workspace.members.invite
+      - workspace.members.remove
+      - workspace.members.editRole
+      - workspace.billing
+      - models.view
+      - models.manage
+      - models.benchmark
+      - providers.view
+      - providers.manage
+      - providers.secrets
+      - chat.send
+      - chat.history
+      - inference.route
+      - inference.batch
+      - documents.upload
+      - documents.view
+      - documents.delete
+      - documents.reindex
+      - agents.view
+      - agents.create
+      - agents.edit
+      - agents.delete
+      - agents.promote
+      - workflows.view
+      - workflows.manage
+      - workflows.execute
+      - governance.view
+      - governance.manage
+
+  - name: WorkspaceAdmin
+    description: Administrative access — everything except billing and workspace deletion
+    isSystem: true
+    allow:
+      - workspace.settings
+      - workspace.members.invite
+      - workspace.members.remove
+      - workspace.members.editRole
+      - models.view
+      - models.manage
+      - models.benchmark
+      - providers.view
+      - providers.manage
+      - providers.secrets
+      - chat.send
+      - chat.history
+      - inference.route
+      - inference.batch
+      - documents.upload
+      - documents.view
+      - documents.delete
+      - documents.reindex
+      - agents.view
+      - agents.create
+      - agents.edit
+      - agents.delete
+      - agents.promote
+      - workflows.view
+      - workflows.manage
+      - workflows.execute
+      - governance.view
+      - governance.manage
+
+  - name: Developer
+    description: Build and iterate — models, agents, documents, workflows
+    isSystem: true
+    allow:
+      - models.view
+      - models.manage
+      - models.benchmark
+      - providers.view
+      - chat.send
+      - chat.history
+      - inference.route
+      - inference.batch
+      - documents.upload
+      - documents.view
+      - documents.delete
+      - documents.reindex
+      - agents.view
+      - agents.create
+      - agents.edit
+      - agents.delete
+      - agents.promote
+      - workflows.view
+      - workflows.manage
+      - workflows.execute
+      - governance.view
+
+  - name: Analyst
+    description: Read-heavy access — view models, documents, chat, governance
+    isSystem: true
+    allow:
+      - models.view
+      - providers.view
+      - chat.send
+      - chat.history
+      - documents.view
+      - agents.view
+      - workflows.view
+      - governance.view
+
+  - name: Viewer
+    description: Read-only access to workspace resources
+    isSystem: true
+    allow:
+      - models.view
+      - providers.view
+      - chat.history
+      - documents.view
+      - agents.view
+      - workflows.view
+      - governance.view
+
+  - name: Auditor
+    description: Governance and compliance read access only
+    isSystem: true
+    allow:
+      - governance.view
+      - agents.view
+      - workflows.view
+      - models.view
+      - providers.view
+
+  - name: AIAgent
+    description: Capabilities for AI agent service accounts — chat and inference
+    isSystem: true
+    allow:
+      - chat.send
+      - chat.history
+      - inference.route
+      - inference.batch
+      - documents.view
+      - agents.view
+      - models.view
+
+  - name: AIOrchestrator
+    description: Extended AI role — can manage agents and execute workflows
+    isSystem: true
+    allow:
+      - chat.send
+      - chat.history
+      - inference.route
+      - inference.batch
+      - documents.view
+      - documents.upload
+      - agents.view
+      - agents.create
+      - agents.edit
+      - agents.promote
+      - workflows.view
+      - workflows.execute
+      - models.view
+
+  - name: ExternalReviewer
+    description: Temporary access for external review — governance and read-only
+    isSystem: true
+    allow:
+      - governance.view
+      - agents.view
+      - models.view
+      - documents.view
+
+# ============================================================================
+# Workspace Type Presets — restrict capabilities based on workspace purpose
+# blockedCapabilities are removed from ALL roles in that workspace type.
+# ============================================================================
+workspaceTypes:
+  - type: personal
+    description: Single-user workspace — no member management needed
+    blockedCapabilities:
+      - workspace.members.invite
+      - workspace.members.remove
+      - workspace.members.editRole
+      - workspace.billing
+
+  - type: team
+    description: Multi-user collaborative workspace — full feature set
+    blockedCapabilities: []
+
+  - type: enterprise
+    description: Enterprise workspace — full features plus governance
+    blockedCapabilities: []
+
+  - type: sandbox
+    description: Isolated experimentation — no governance, no production ops
+    blockedCapabilities:
+      - governance.manage
+      - agents.promote
+      - providers.secrets
+      - workspace.billing
+
+  - type: readonly
+    description: Archive or demo workspace — view-only access
+    blockedCapabilities:
+      - workspace.manage
+      - workspace.settings
+      - workspace.members.invite
+      - workspace.members.remove
+      - workspace.members.editRole
+      - workspace.billing
+      - models.manage
+      - models.benchmark
+      - providers.manage
+      - providers.secrets
+      - chat.send
+      - inference.route
+      - inference.batch
+      - documents.upload
+      - documents.delete
+      - documents.reindex
+      - agents.create
+      - agents.edit
+      - agents.delete
+      - agents.promote
+      - workflows.manage
+      - workflows.execute
+      - governance.manage

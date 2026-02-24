@@ -63,6 +63,7 @@ export const workspaceMembers = pgTable("workspace_members", {
   workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
   userId: integer("userId").notNull().references(() => users.id),
   role: varchar("role", { length: 50 }).default("viewer").notNull(),
+  roleId: integer("roleId"),  // FK to workspace_roles — nullable for backwards compat
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

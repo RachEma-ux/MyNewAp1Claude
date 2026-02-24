@@ -32,3 +32,4 @@ export * from "./db/conversations";
 export * from "./db/workflows";
 export * from "./db/llms";
 export * from "./db/catalog";
+export * from "./db/workspace-rbac";

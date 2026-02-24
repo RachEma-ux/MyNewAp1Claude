@@ -85,6 +85,13 @@
       "when": 1771977600000,
       "tag": "0011_stage_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1772064000000,
+      "tag": "0012_workspace_rbac",
+      "breakpoints": true
     }
   ]
 }
