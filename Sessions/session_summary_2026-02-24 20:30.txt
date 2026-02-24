@@ -1,0 +1,52 @@
+Session Summary — 2026-02-24 20:30
+====================================
+
+## Goal
+Implement floating detachable Workspace Shell with pin/unpin toggle, then create a reusable Shell template with full documentation.
+
+## Changes Made
+
+### 1. Floating Detachable Workspace Shell (3 commits)
+
+**Commit 3e424e9** — `feat: floating detachable workspace shell with pin/unpin toggle`
+- `client/src/App.tsx`: Changed `/w/` routes from `ShellRoute` → `ProtectedRoute` so workspace renders inside MainLayout
+- `client/src/pages/WorkspaceShell.tsx`: Added pin/unpin state, floating overlay with draggable title bar
+
+**Commit 9d0104a** — `fix: workspace shell renders as inset panel inside main content area`
+- Removed floating overlay + drag logic
+- Default (unpinned) = inset bordered panel that looks native to the app
+- Pinned = fills content area, PinOff button in corner
+
+**Commit 7e7c40a** — `fix: workspace shell fills full main content area in both modes`
+- Used `-m-6` to counteract MainLayout's `p-6` padding
+- Used `calc(100vh - 4rem)` for proper height (4rem = top bar)
+- Both pinned and unpinned now fill full width
+
+### 2. Shell Template (1 commit)
+
+**Commit 7998aa1** — `docs: add Shell template — plug & play shell container blueprint`
+
+Created `templates/Shell/` directory with 6 files:
+
+| File | Purpose |
+|------|---------|
+| `SHELL-TEMPLATE.md` | 15KB comprehensive documentation — architecture diagrams, file map, frontend/backend deep dives, DB schema, step-by-step "How to Create a New Shell" guide |
+| `ShellTemplate.tsx` | Main shell component template with pin/unpin, ModuleGate, inline sidebar, overview |
+| `ShellSidebarTemplate.tsx` | Collapsible sidebar template (48px ↔ 240px, tooltips, sub-items) |
+| `ShellStatusBarTemplate.tsx` | Bottom status bar template |
+| `ShellOversightDrawerTemplate.tsx` | Right-side governance Sheet drawer template |
+| `shell-backend-template.ts` | Backend patterns: DB schema, module registry, tRPC router, App.tsx registration |
+
+## Architecture Documented
+
+- Shell = self-contained app-within-the-app inside MainLayout
+- `-m-6` CSS hack to counteract MainLayout padding
+- ModuleGate pattern for module-scoped access control
+- Module presets (personal/team/enterprise/sandbox/readonly)
+- Full tRPC data flow: schema → registry → router → frontend hooks
+- 3 DB tables: workspaces, workspace_modules, workspace_activity_log
+- 13 sub-pages across 5 modules + governance (always-on)
+
+## Deploys
+- 3 deploys during the session, all successful
+- Final tunnel: jack-playback-documentary-combined.trycloudflare.com
