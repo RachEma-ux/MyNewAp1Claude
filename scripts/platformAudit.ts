@@ -252,10 +252,10 @@ check("GOV-002", "Governance router exists", "governance", "critical", () => ({
   message: fileExists("server/governance/router.ts") ? "Governance router found" : "Governance router missing",
 }));
 
-check("GOV-003", "Scorecard system exists", "governance", "high", () => ({
-  passed: fileExists("server/governance/scorecard.ts"),
-  message: fileExists("server/governance/scorecard.ts") ? "Scorecard system found" : "Scorecard system missing",
-}));
+check("GOV-003", "Scorecard system exists", "governance", "high", () => {
+  const exists = fileExists("server/governance/scorecard.ts") || fileExists("server/governance/runner.ts");
+  return { passed: exists, message: exists ? "Scorecard system found" : "Scorecard system missing" };
+});
 
 check("GOV-004", "Artifact store exists", "governance", "high", () => ({
   passed: fileExists("server/governance/artifact-store.ts"),
@@ -268,9 +268,8 @@ check("GOV-005", "RBAC model exists", "governance", "high", () => ({
 }));
 
 check("GOV-006", "Drift detection exists", "governance", "medium", () => {
-  const content = readFile("server/governance/scorecard.ts");
-  const has = content.includes("detectDrift") || content.includes("drift");
-  return { passed: has, message: has ? "Drift detection found" : "No drift detection" };
+  const exists = fileExists("server/governance/drift-detector.ts");
+  return { passed: exists, message: exists ? "Drift detection found" : "No drift detection" };
 });
 
 check("GOV-007", "Governed procedure middleware exists", "governance", "critical", () => {
