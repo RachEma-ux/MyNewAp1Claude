@@ -22,8 +22,8 @@ No governance documentation should exist outside this folder (except archived hi
 | `GOVERNANCE_BIBLE.md` | Canonical governance and security standard (CGT v2). Defines all rules, compliance matrices, risk classification, and the YAML enforcement spec. Primary governance authority. |
 | `ENFORCEMENT_RULES.md` | Non-negotiable governance invariants. Absolute rules that override convenience, velocity, and developer preference. |
 | `ENFORCEMENT_VALIDATION.md` | Governance Scorecard Engine blueprint. Defines the control-plane architecture, pack system, scoring model, CI integration, drift detection, and API contracts. |
-| `MATURITY_LADDER.md` | Governance maturity progression levels. *(Placeholder — content pending.)* |
-| `NO_REGRESSION_POLICY.md` | Policy ensuring governance coverage never decreases. *(Placeholder — content pending.)* |
+| `MATURITY_LADDER.md` | Governance maturity progression levels (Level 0–5) with criteria per level. |
+| `NO_REGRESSION_POLICY.md` | Invariants that prevent governance from weakening — ratchet rules, downgrade prohibitions, CI enforcement. |
 | `RED_TEAM_PROTOCOL.md` | Red team validation findings. Static analysis results covering mutation coverage, freeze enforcement, principal attribution, evidence integrity, and drift monitoring. |
 
 ---
