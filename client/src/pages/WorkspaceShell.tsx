@@ -90,9 +90,9 @@ export default function WorkspaceShell() {
     );
   }
 
-  // If modules data isn't available yet, show all modules (assume enabled)
+  // Always show all sidebar items; ModuleGate handles disabled content
   const ALL_MODULE_KEYS = ["pmt", "knowledge", "agents", "collaboration", "reporting"];
-  const enabledModules = modules
+  const enabledModules = (modules && (modules as any[]).length > 0)
     ? new Set((modules as any[]).filter((m: any) => m.enabled).map((m: any) => m.moduleKey))
     : new Set(ALL_MODULE_KEYS);
   const enabledCount = enabledModules.size;

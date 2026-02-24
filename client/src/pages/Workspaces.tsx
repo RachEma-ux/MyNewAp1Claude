@@ -39,14 +39,24 @@ export default function Workspaces() {
   const utils = trpc.useUtils();
   const { data: workspaces, isLoading } = trpc.workspaces.list.useQuery();
   
+  const seedMutation = trpc.modules.manage.seed.useMutation();
+
   const createMutation = trpc.workspaces.create.useMutation({
     onSuccess: (data) => {
       utils.workspaces.list.invalidate();
       setCreateDialogOpen(false);
       setName("");
       setDescription("");
-      toast.success("Workspace created successfully");
-      setLocation(`/w/${data.id}/overview`);
+      // Auto-seed modules, then navigate
+      seedMutation.mutate(
+        { workspaceId: data.id, _evidence: { types: ["reason"], refs: ["workspace-create"] } } as any,
+        {
+          onSettled: () => {
+            toast.success("Workspace created successfully");
+            setLocation(`/w/${data.id}/overview`);
+          },
+        }
+      );
     },
     onError: (error) => {
       toast.error(error.message || "Failed to create workspace");
