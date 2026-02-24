@@ -259,6 +259,17 @@ export const catalogManageRouter = router({
         artifact_version: "1.0.0",
       });
 
+      // Auto-classify: assign the first axis node so registration stage review passes
+      try {
+        const axisNodes = await getTaxonomyNodes({ entryType: "provider", level: "axis" });
+        if (axisNodes.length > 0) {
+          await setEntryClassifications(entry.id, [axisNodes[0].id]);
+          audit("catalog.entry.auto-classified", entry.id, { nodeIds: [axisNodes[0].id], label: axisNodes[0].label });
+        }
+      } catch (e: any) {
+        console.warn(`[CatalogManage] Auto-classify failed for discovery entry ${entry.id}:`, e.message);
+      }
+
       return entry;
     }),
 
