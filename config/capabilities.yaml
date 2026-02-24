@@ -77,3 +77,9 @@ capabilities:
     description: View scorecards, audit logs, and compliance status
   - key: governance.manage
     description: Configure governance rules, packs, and freeze policies
+
+  # --- Reporting ---
+  - key: reporting.view
+    description: View platform reports (velocity, approval latency, agent reliability, risk heatmap)
+  - key: reporting.manage
+    description: Export reports and manage reporting configuration

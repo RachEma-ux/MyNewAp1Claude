@@ -316,6 +316,13 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "modules.collaboration.messages.update": "collaboration.message.update",
   "modules.collaboration.messages.delete": "collaboration.message.delete",
 
+  // ── Platform Engines — Reporting ────────────────────────────────────────
+  "modules.reporting.velocity.view": "reporting.velocity.view",
+  "modules.reporting.approvalLatency.view": "reporting.approvalLatency.view",
+  "modules.reporting.agentReliability.view": "reporting.agentReliability.view",
+  "modules.reporting.riskHeatmap.view": "reporting.riskHeatmap.view",
+  "modules.reporting.export": "reporting.export",
+
   // ── Modules (Engine Binding) ─────────────────────────────────────────────
   "modules.manage.setEnabled": "module.setEnabled",
   "modules.manage.seed": "module.seed",

@@ -41,6 +41,8 @@ roles:
       - workflows.execute
       - governance.view
       - governance.manage
+      - reporting.view
+      - reporting.manage
 
   - name: WorkspaceAdmin
     description: Administrative access — everything except billing and workspace deletion
@@ -74,6 +76,8 @@ roles:
       - workflows.execute
       - governance.view
       - governance.manage
+      - reporting.view
+      - reporting.manage
 
   - name: Developer
     description: Build and iterate — models, agents, documents, workflows
@@ -100,6 +104,7 @@ roles:
       - workflows.manage
       - workflows.execute
       - governance.view
+      - reporting.view
 
   - name: Analyst
     description: Read-heavy access — view models, documents, chat, governance
@@ -113,6 +118,7 @@ roles:
       - agents.view
       - workflows.view
       - governance.view
+      - reporting.view
 
   - name: Viewer
     description: Read-only access to workspace resources
@@ -135,6 +141,7 @@ roles:
       - workflows.view
       - models.view
       - providers.view
+      - reporting.view
 
   - name: AIAgent
     description: Capabilities for AI agent service accounts — chat and inference

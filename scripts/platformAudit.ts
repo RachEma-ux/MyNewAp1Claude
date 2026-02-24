@@ -145,15 +145,14 @@ function severityWeight(s: Severity): number {
   }
 }
 
-/** --- YAML loader (optional dependency). If 'yaml' package not installed, script still runs. --- */
+/** --- YAML loader (uses js-yaml which is an installed dependency). --- */
 async function loadYamlIfAvailable<T = any>(
   filePath: string
 ): Promise<{ ok: boolean; value?: T; error?: string }> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const YAML = require("yaml");
+    const jsYaml = await import("js-yaml");
     const raw = fs.readFileSync(filePath, "utf8");
-    const parsed = YAML.parse(raw);
+    const parsed = jsYaml.load(raw) as T;
     return { ok: true, value: parsed };
   } catch (e: any) {
     return { ok: false, error: e?.message || String(e) };
@@ -205,8 +204,8 @@ async function tryDbQuery(sql: string): Promise<{ ok: boolean; rows?: any[]; err
   if (!url) return { ok: false, error: "DATABASE_URL not set" };
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pg = require("pg");
+    const pgModule = await import("pg");
+    const pg = pgModule.default || pgModule;
     const client = new pg.Client({ connectionString: url });
     await client.connect();
     const res = await client.query(sql);
