@@ -7,13 +7,19 @@
  * This is the single enforcement point for all lifecycle transitions.
  * Every lifecycle mutation MUST call requireGate() before proceeding.
  *
- * Enforcement:
- *   - Runs scorecard for the target stage
- *   - Returns ALLOW or DENY
- *   - DENY returns HTTP 409 (Conflict)
- *   - Frozen subjects are blocked before scoring
- *   - All decisions are audit-logged
- *   - No bypass path exists
+ * Architecture — two strict phases:
+ *
+ *   PHASE A — Enforcement (blocking)
+ *     Freeze check, scorecard evaluation, denial persistence.
+ *     Failures here MUST propagate.
+ *
+ *   PHASE B — Observability (non-fatal)
+ *     Evidence persistence, audit logging for ALLOW verdicts.
+ *     Failures here are logged but NEVER block execution.
+ *
+ * Principle:
+ *   Enforcement failure may block execution.
+ *   Observability failure must NEVER block execution.
  *
  * Usage:
  *   const verdict = await requireGate("validate", subject, actor);
@@ -59,16 +65,18 @@ export interface GateResult {
  * Mandatory gate check for lifecycle transitions.
  *
  * MUST be called before ANY lifecycle mutation.
- * Returns ALLOW or DENY. Never throws — always returns a result.
+ * Returns ALLOW or DENY. Never throws on observability failures.
  *
- * Checks (in order):
- *   1. Subject frozen? → DENY
+ * PHASE A — Enforcement (blocking):
+ *   1. Subject frozen? → DENY (denial audit is blocking)
  *   2. Run scorecard → evaluate gate
- *   3. Persist evidence bundle
- *   4. Gate FAIL → DENY (409)
- *   5. Gate PASS → ALLOW (200)
+ *   3. Gate FAIL → DENY (denial audit is blocking)
  *
- * Note: System-wide freeze is handled by the requireFreeze middleware
+ * PHASE B — Observability (non-fatal):
+ *   4. Persist evidence bundle (try/catch — never blocks)
+ *   5. Audit log ALLOW verdict (try/catch — never blocks)
+ *
+ * System-wide freeze is handled by the requireFreeze middleware
  * in trpc.ts, which runs BEFORE this function.
  */
 export async function requireGate(
@@ -88,14 +96,19 @@ export async function requireGate(
 ): Promise<GateResult> {
   const audit = getAuditLogger();
 
-  // ── Check 1: Subject frozen ──────────────────────────────────────────
+  // ====================================================================
+  // PHASE A — Enforcement (blocking)
+  // ====================================================================
+
+  // ── A1: Subject frozen → DENY ─────────────────────────────────────
   if (isFrozen(subject.id)) {
     const details = getFreezeDetails(subject.id);
     const reason = `Subject #${subject.id} "${subject.name}" is FROZEN: ${details?.reason || "governance freeze active"}`;
 
+    // Denial audit is blocking — must record why we blocked
     const event = await audit.log({
       actor_id: actor.id,
-      action_type: "GATE_CHECK",
+      action_type: "FREEZE_BLOCK",
       target_type: "lifecycle_gate",
       target_id: String(subject.id),
       decision_result: "denied",
@@ -117,47 +130,109 @@ export async function requireGate(
     };
   }
 
-  // ── Check 2: Run scorecard ───────────────────────────────────────────
+  // ── A2: Run scorecard ─────────────────────────────────────────────
   const scorecardResult = await runScorecard({
     stage,
     entry: subject,
     actor,
   });
 
-  // ── Persist evidence bundle ──────────────────────────────────────────
-  await persistEvidenceBundle(scorecardResult.evidence);
-
   const gatePassed = scorecardResult.scorecard.gateStatus.passed;
   const verdict: GateVerdict = gatePassed ? "ALLOW" : "DENY";
   const reason = scorecardResult.scorecard.gateStatus.reason;
 
-  // ── Audit log (blocking) ─────────────────────────────────────────────
-  const event = await audit.log({
-    actor_id: actor.id,
-    action_type: "GATE_CHECK",
-    target_type: "lifecycle_gate",
-    target_id: String(subject.id),
-    decision_result: gatePassed ? "success" : "denied",
-    metadata: {
-      stage,
-      verdict,
+  // ── A3: Gate DENY → blocking denial persistence ───────────────────
+  if (!gatePassed) {
+    // Denial audit is blocking — must durably record why we blocked
+    const event = await audit.log({
+      actor_id: actor.id,
+      action_type: "GATE_CHECK",
+      target_type: "lifecycle_gate",
+      target_id: String(subject.id),
+      decision_result: "denied",
+      metadata: {
+        stage,
+        verdict: "DENY",
+        reason,
+        score: scorecardResult.scorecard.score.score,
+        riskCritical: scorecardResult.scorecard.riskBreakdown.critical,
+        riskHigh: scorecardResult.scorecard.riskBreakdown.high,
+        evidenceBundleId: scorecardResult.evidence.bundleId,
+        evidenceHash: scorecardResult.evidence.integrityHash,
+        blocked: scorecardResult.blocked,
+      },
+    });
+
+    // Evidence persistence for denials — also blocking (denial evidence is enforcement record)
+    await persistEvidenceBundle(scorecardResult.evidence);
+
+    return {
+      verdict: "DENY",
+      denied: true,
       reason,
-      score: scorecardResult.scorecard.score.score,
-      riskCritical: scorecardResult.scorecard.riskBreakdown.critical,
-      riskHigh: scorecardResult.scorecard.riskBreakdown.high,
-      evidenceBundleId: scorecardResult.evidence.bundleId,
-      evidenceHash: scorecardResult.evidence.integrityHash,
-      blocked: scorecardResult.blocked,
-    },
-  });
+      httpStatus: scorecardResult.httpStatus,
+      scorecard: scorecardResult,
+      auditId: event.event_id,
+      frozen: false,
+    };
+  }
+
+  // ====================================================================
+  // PHASE B — Observability (non-fatal)
+  // Gate PASSED — execution must proceed regardless of persistence.
+  // ====================================================================
+
+  let auditId = `local-${Date.now()}`;
+
+  // ── B1: Persist evidence bundle (non-fatal) ───────────────────────
+  try {
+    await persistEvidenceBundle(scorecardResult.evidence);
+  } catch (err) {
+    console.error(
+      `[requireGate] NON_FATAL_EVIDENCE_PERSISTENCE_FAILURE | ` +
+      `subject_type=${subject.type} subject_id=${subject.id} ` +
+      `stage=${stage} run_id=${scorecardResult.evidence.bundleId} ` +
+      `error=${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+
+  // ── B2: Audit log ALLOW verdict (non-fatal) ──────────────────────
+  try {
+    const event = await audit.log({
+      actor_id: actor.id,
+      action_type: "GATE_CHECK",
+      target_type: "lifecycle_gate",
+      target_id: String(subject.id),
+      decision_result: "success",
+      metadata: {
+        stage,
+        verdict: "ALLOW",
+        reason,
+        score: scorecardResult.scorecard.score.score,
+        riskCritical: scorecardResult.scorecard.riskBreakdown.critical,
+        riskHigh: scorecardResult.scorecard.riskBreakdown.high,
+        evidenceBundleId: scorecardResult.evidence.bundleId,
+        evidenceHash: scorecardResult.evidence.integrityHash,
+        blocked: false,
+      },
+    });
+    auditId = event.event_id;
+  } catch (err) {
+    console.error(
+      `[requireGate] NON_FATAL_AUDIT_LOG_FAILURE | ` +
+      `subject_type=${subject.type} subject_id=${subject.id} ` +
+      `stage=${stage} verdict=ALLOW ` +
+      `error=${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 
   return {
-    verdict,
-    denied: !gatePassed,
+    verdict: "ALLOW",
+    denied: false,
     reason,
     httpStatus: scorecardResult.httpStatus,
     scorecard: scorecardResult,
-    auditId: event.event_id,
+    auditId,
     frozen: false,
   };
 }
