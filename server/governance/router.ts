@@ -21,7 +21,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
+import { router, protectedProcedure, adminProcedure, governedProcedure, governedAdminProcedure } from "../_core/trpc";
 import { getCatalogEntryById, getEntryClassifications } from "../db/catalog";
 import { getGovernanceEngine } from "./governance-engine";
 import { runSelfCheck } from "./self-check";
@@ -530,7 +530,7 @@ export const governanceRouter = router({
    * Returns 409 CONFLICT if blocked. On success, returns new tags.
    * Uses protectedProcedure — RBAC is enforced within the stage review checklist.
    */
-  stageTransition: protectedProcedure
+  stageTransition: governedProcedure
     .input(
       z.object({
         entryId: z.number(),
@@ -633,7 +633,7 @@ export const governanceRouter = router({
   /**
    * Start/stop drift detection.
    */
-  driftToggle: adminProcedure
+  driftToggle: governedAdminProcedure
     .input(z.object({
       active: z.boolean(),
       intervalMs: z.number().optional(),

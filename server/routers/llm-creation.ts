@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { protectedProcedure } from "../_core/trpc";
+import { protectedProcedure, governedProcedure } from "../_core/trpc";
 import { createLLM } from "../db";
 import { jobQueue } from "../services/job-queue";
 import { getAuditLogger } from "../services/auditLogger";
@@ -379,7 +379,7 @@ export const llmCreationProcedures = {
       return updated;
     }),
 
-  startTraining: protectedProcedure
+  startTraining: governedProcedure
     .input(
       z.object({
         projectId: z.number(),
@@ -587,7 +587,7 @@ export const llmCreationProcedures = {
       return updated;
     }),
 
-  startQuantization: protectedProcedure
+  startQuantization: governedProcedure
     .input(
       z.object({
         projectId: z.number(),

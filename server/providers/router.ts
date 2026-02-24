@@ -1,7 +1,7 @@
 // Provider Hub - tRPC Router
 
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { getProviderRegistry } from "./registry";
 import * as providerDb from "./db";
 import type { ProviderType } from "./types";
@@ -80,7 +80,7 @@ export const providerRouter = router({
     }),
 
   // Create new provider
-  create: protectedProcedure
+  create: governedProcedure
     .input(z.object({
       name: z.string().min(1).max(255),
       type: z.enum(["local-llamacpp", "local-ollama", "openai", "anthropic", "google", "groq", "custom"]),
@@ -158,7 +158,7 @@ export const providerRouter = router({
     }),
 
   // Update provider
-  update: protectedProcedure
+  update: governedProcedure
     .input(z.object({
       id: z.number(),
       name: z.string().min(1).max(255).optional(),
@@ -194,7 +194,7 @@ export const providerRouter = router({
     }),
 
   // Delete provider
-  delete: protectedProcedure
+  delete: governedProcedure
     .input(z.object({
       id: z.number(),
     }))
@@ -217,7 +217,7 @@ export const providerRouter = router({
     }),
 
   // Test connection for provider
-  testConnection: protectedProcedure
+  testConnection: governedProcedure
     .input(z.object({
       providerId: z.number(),
     }))

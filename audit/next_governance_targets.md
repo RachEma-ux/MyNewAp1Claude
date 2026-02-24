@@ -1,50 +1,50 @@
 # Next Governance Targets — Top 15 Highest-Risk Ungoverned Mutations
 
 **Date:** 2026-02-24
-**Current coverage:** 82/205 = 40%
-**Remaining ungoverned:** 123 mutations
+**Status:** ALL 15 COMPLETED (Phase 5)
+**Previous coverage:** 82/205 = 40%
+**New coverage:** 97/205 = 47% (threshold ratcheted to 45%)
 
 ---
 
 ## Ranked by Risk Category
 
-| # | Entrypoint | File | Line | Risk Category | Justification | Recommended Wrapper |
-|---|-----------|------|------|---------------|---------------|-------------------|
-| 1 | `configureProvider` | `server/routers/llm-providers.ts` | 146 | external connection | Stores provider API credentials; controls external service access | `governedProcedure` |
-| 2 | `deleteProviderCredentials` | `server/routers/llm-providers.ts` | 183 | secret lifecycle | Removes stored credentials; irreversible data loss | `governedProcedure` |
-| 3 | `create` (provider) | `server/providers/router.ts` | 92 | external connection | Creates new provider registration; establishes trust boundary | `governedProcedure` |
-| 4 | `update` (provider) | `server/providers/router.ts` | 170 | external connection | Modifies provider config; can change routing behavior | `governedProcedure` |
-| 5 | `delete` (provider) | `server/providers/router.ts` | 201 | external connection | Removes provider; can break dependent agents/workflows | `governedProcedure` |
-| 6 | `testConnection` | `server/providers/router.ts` | 224 | external connection | Sends credentials to external service; network side-effect | `governedProcedure` |
-| 7 | `stageTransition` | `server/governance/router.ts` | 540 | lifecycle transitions | Governs lifecycle stage changes; already has inline freeze check but no middleware gate | `governedProcedure` |
-| 8 | `driftToggle` | `server/governance/router.ts` | 642 | policy mutation | Enables/disables drift detection; can disable safety monitoring | `governedAdminProcedure` |
-| 9 | `approve` (catalog) | `server/routers/catalog-manage.ts` | 504 | lifecycle transitions | Approves catalog entry for production use; admin gate but no governance middleware | `governedAdminProcedure` |
-| 10 | `reject` (catalog) | `server/routers/catalog-manage.ts` | 606 | lifecycle transitions | Rejects catalog entry; admin gate but no governance middleware | `governedAdminProcedure` |
-| 11 | `activate` (catalog) | `server/routers/catalog-manage.ts` | 626 | lifecycle transitions | Activates catalog entry for live use | `governedAdminProcedure` |
-| 12 | `publish` (catalog) | `server/routers/catalog-manage.ts` | 695 | deployment | Publishes catalog bundle; makes artifacts available to all users | `governedAdminProcedure` |
-| 13 | `recall` (catalog) | `server/routers/catalog-manage.ts` | 941 | deployment | Recalls published entry; affects running systems | `governedAdminProcedure` |
-| 14 | `startTraining` | `server/routers/llm-creation.ts` | 394 | automation | Initiates model training job; resource-intensive, potentially costly | `governedProcedure` |
-| 15 | `startQuantization` | `server/routers/llm-creation.ts` | 601 | automation | Initiates model quantization; resource-intensive operation | `governedProcedure` |
+| # | Entrypoint | File | Line | Risk Category | Status |
+|---|-----------|------|------|---------------|--------|
+| 1 | `configureProvider` | `server/routers/llm-providers.ts` | 131 | external connection | GOVERNED (Phase 5) |
+| 2 | `deleteProviderCredentials` | `server/routers/llm-providers.ts` | 181 | secret lifecycle | GOVERNED (Phase 5) |
+| 3 | `create` (provider) | `server/providers/router.ts` | 83 | external connection | GOVERNED (Phase 5) |
+| 4 | `update` (provider) | `server/providers/router.ts` | 161 | external connection | GOVERNED (Phase 5) |
+| 5 | `delete` (provider) | `server/providers/router.ts` | 197 | external connection | GOVERNED (Phase 5) |
+| 6 | `testConnection` | `server/providers/router.ts` | 220 | external connection | GOVERNED (Phase 5) |
+| 7 | `stageTransition` | `server/governance/router.ts` | 533 | lifecycle transitions | GOVERNED (Phase 5) |
+| 8 | `driftToggle` | `server/governance/router.ts` | 636 | policy mutation | GOVERNED (Phase 5) |
+| 9 | `approve` (catalog) | `server/routers/catalog-manage.ts` | 498 | lifecycle transitions | GOVERNED (Phase 5) |
+| 10 | `reject` (catalog) | `server/routers/catalog-manage.ts` | 602 | lifecycle transitions | GOVERNED (Phase 5) |
+| 11 | `activate` (catalog) | `server/routers/catalog-manage.ts` | 622 | lifecycle transitions | GOVERNED (Phase 5) |
+| 12 | `publish` (catalog) | `server/routers/catalog-manage.ts` | 689 | deployment | GOVERNED (Phase 5) |
+| 13 | `recall` (catalog) | `server/routers/catalog-manage.ts` | 937 | deployment | GOVERNED (Phase 5) |
+| 14 | `startTraining` | `server/routers/llm-creation.ts` | 382 | automation | GOVERNED (Phase 5) |
+| 15 | `startQuantization` | `server/routers/llm-creation.ts` | 590 | automation | GOVERNED (Phase 5) |
 
 ---
 
-## Risk Category Distribution (Ungoverned)
+## Risk Category Distribution (All Resolved)
 
-| Category | Count | Severity |
-|----------|-------|----------|
-| External connection | 6 | Critical |
-| Secret lifecycle | 0 (fixed in Phase 4) | Critical |
-| Lifecycle transitions | 4 | High |
-| Deployment | 2 | High |
-| Policy mutation | 1 | High |
-| Automation | 2 | Medium |
+| Category | Count | Status |
+|----------|-------|--------|
+| External connection | 5 | All governed |
+| Secret lifecycle | 1 | Governed |
+| Lifecycle transitions | 4 | All governed |
+| Deployment | 2 | All governed |
+| Policy mutation | 1 | Governed |
+| Automation | 2 | All governed |
 
 ---
 
-## Notes
+## Phase 5 Summary
 
-- Secrets lifecycle (create/update/delete) was addressed in this phase
-- Agent lifecycle transitions (admitToSandbox/promote/disable) were addressed in this phase
-- Discovery ops admin operations (markInReview/accept/reject/cleanup) were addressed in this phase
-- catalog-manage.ts has governance on authoring ops but NOT on authority ops (approve/reject/activate/publish/recall) — these use `adminProcedure` without governance middleware
-- governance/router.ts `stageTransition` has inline freeze checks but lacks the `governedProcedure` middleware gate — inconsistent enforcement path
+- **Mutations governed:** 15
+- **Files modified:** 5 router files + coverage-map threshold
+- **Threshold ratcheted:** 30% → 45%
+- **New total governed:** 97/205 = 47%

@@ -11,7 +11,7 @@
  */
 
 import { z } from "zod";
-import { protectedProcedure, governedProcedure, adminProcedure, router } from "../_core/trpc";
+import { protectedProcedure, governedProcedure, adminProcedure, governedAdminProcedure, router } from "../_core/trpc";
 import {
   getCatalogEntries,
   getCatalogEntryById,
@@ -495,7 +495,7 @@ export const catalogManageRouter = router({
    * Approve a catalog entry for a specific lifecycle stage.
    * Each stage (register, validate, publish) is reviewed independently.
    */
-  approve: adminProcedure
+  approve: governedAdminProcedure
     .input(z.object({
       id: z.number().int().positive(),
       stage: z.enum(["register", "validate", "publish"]).default("register"),
@@ -599,7 +599,7 @@ export const catalogManageRouter = router({
   /**
    * Reject a catalog entry — sets reviewState to "rejected"
    */
-  reject: adminProcedure
+  reject: governedAdminProcedure
     .input(z.object({
       id: z.number().int().positive(),
     }))
@@ -619,7 +619,7 @@ export const catalogManageRouter = router({
    * Activate a catalog entry — sets status to "active"
    * Entry must have reviewState = "approved"
    */
-  activate: adminProcedure
+  activate: governedAdminProcedure
     .input(z.object({
       id: z.number().int().positive(),
     }))
@@ -686,7 +686,7 @@ export const catalogManageRouter = router({
    * Publish a catalog entry — creates an immutable snapshot bundle
    * Entry must be status = "active" AND reviewState = "approved"
    */
-  publish: adminProcedure
+  publish: governedAdminProcedure
     .input(z.object({
       catalogEntryId: z.number().int().positive(),
       versionLabel: z.string().min(1).max(50),
@@ -934,7 +934,7 @@ export const catalogManageRouter = router({
   /**
    * Recall a published bundle — marks it as recalled (admin only)
    */
-  recall: adminProcedure
+  recall: governedAdminProcedure
     .input(z.object({
       bundleId: z.number().int().positive(),
     }))

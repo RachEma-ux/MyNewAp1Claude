@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { protectedProcedure } from "../_core/trpc";
+import { protectedProcedure, governedProcedure } from "../_core/trpc";
 import * as providers from "../llm/providers";
 import { LLMPolicyEngine } from "../policies/llm-policy-engine";
 
@@ -128,7 +128,7 @@ export const llmProvidersProcedures = {
       return await testProviderConnection(input.providerId, input.credentials);
     }),
 
-  configureProvider: protectedProcedure
+  configureProvider: governedProcedure
     .input(
       z.object({
         dbProviderId: z.number(),
@@ -178,7 +178,7 @@ export const llmProvidersProcedures = {
       };
     }),
 
-  deleteProviderCredentials: protectedProcedure
+  deleteProviderCredentials: governedProcedure
     .input(z.object({ dbProviderId: z.number() }))
     .mutation(async ({ input }) => {
       const { deleteProviderCredentials } = await import("../llm/provider-credentials");
