@@ -1,0 +1,73 @@
+Session Summary — 2026-02-24 19:00
+====================================
+
+## Work Completed
+
+### IBM-Style Workspace Shell (Full Frontend Implementation)
+Replaced the placeholder WorkspaceShell with a full IBM-style workspace layout and
+implemented all module UIs with real tRPC API integration.
+
+**Commit:** aca6fdb — feat: IBM-style workspace shell with full module UIs
+
+### Layout Components Created (5 files)
+- `client/src/components/workspace/WorkspaceSidebar.tsx` — Collapsible sidebar (240px ↔ 48px)
+  with module navigation, sub-items, icon-only mode with tooltips
+- `client/src/components/workspace/WorkspaceStatusBar.tsx` — Bottom status bar showing
+  workspace ID, module count, governance health indicator, connection status
+- `client/src/components/workspace/OversightDrawer.tsx` — Right-side drawer with governance
+  self-check health, recent activity timeline (real data from reporting API)
+- `client/src/components/workspace/PreflightModal.tsx` — Governance preflight dialog for R3+
+  actions showing risk level, approvals, evidence requirements, denial state
+- `client/src/components/workspace/ModuleDisabled.tsx` — Module-not-enabled screen
+
+### Module Pages Created (14 files in client/src/pages/workspace/)
+All pages wire to real tRPC APIs (trpc.modules.*):
+
+**PMT Engine (4 pages)**
+- PMTProjectsPage — Project list with create/delete, risk badges
+- PMTKanbanPage — Task board with 5 columns (backlog→done), drag-like status change
+- PMTTimelinePage — Timeline/Gantt-style ordered by due date, overdue indicators
+- PMTProjectDetailPage — Task list with checkbox completion, task detail sheet drawer
+
+**Knowledge Engine (3 pages)**
+- KnowledgeDocsPage — Document list with inline editor sheet, version history dialog
+- KnowledgeDecisionsPage — Decision log with status transitions (proposed→decided)
+- KnowledgeSearchPage — Full-text document search
+
+**Agent Orchestration (3 pages)**
+- AgentsRosterPage — Agent roster with create, run request, type badges
+- AgentRunsPage — Run history with status icons, duration, detail links
+- AgentRunDetailPage — Run detail with events timeline, artifacts, execute/complete actions
+
+**Collaboration (1 page with dual view)**
+- CollabThreadsPage — Thread list + inline thread detail with real-time messaging
+
+**Reporting (1 page)**
+- ReportingDashboardPage — Summary counters, velocity chart, agent reliability %,
+  risk heatmap (project + task risk distribution), activity timeline
+
+**Governance (1 page)**
+- GovernancePage — Self-check health, action registry summary, full registry viewer
+
+### WorkspaceShell.tsx Rewrite
+- IBM 5-zone layout: App Bar → Sidebar + Content → Status Bar
+- ModuleGate component checks workspace_modules before rendering
+- Overview page shows real summary data (projects, tasks, agents, threads, docs)
+- Routes all sub-pages with proper nesting
+
+### App.tsx Changes
+- Added ShellRoute component (auth-only, no MainLayout wrapper) for WorkspaceShell
+- Workspace Shell routes now use ShellRoute to avoid double navigation
+
+## Architecture Decisions
+- WorkspaceShell has its own layout (sidebar, app bar, status bar) separate from MainLayout
+- Each module page receives workspaceId as prop, manages its own state
+- All pages use real tRPC hooks — no mock data
+- Module gate pattern: check enabledModules set before rendering content
+- TanStack Query v5 compatible (no onSuccess on useQuery, use useEffect)
+
+## Files Changed: 21 files, +3642/-129 lines
+
+## Status
+- Committed and pushed to main as aca6fdb
+- Ready for CI build + deploy verification
