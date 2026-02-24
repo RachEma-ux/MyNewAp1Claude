@@ -40,12 +40,13 @@ export default function Workspaces() {
   const { data: workspaces, isLoading } = trpc.workspaces.list.useQuery();
   
   const createMutation = trpc.workspaces.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.workspaces.list.invalidate();
       setCreateDialogOpen(false);
       setName("");
       setDescription("");
       toast.success("Workspace created successfully");
+      setLocation(`/w/${data.id}/overview`);
     },
     onError: (error) => {
       toast.error(error.message || "Failed to create workspace");
@@ -214,7 +215,7 @@ export default function Workspaces() {
                     <Button
                       size="sm"
                       className="flex-1"
-                      onClick={() => setLocation(`/workspaces/${workspace.id}/home`)}
+                      onClick={() => setLocation(`/w/${workspace.id}/overview`)}
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
                       Open
@@ -222,7 +223,7 @@ export default function Workspaces() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setLocation(`/workspaces/${workspace.id}`)}
+                      onClick={() => setLocation(`/w/${workspace.id}`)}
                     >
                       <Settings className="h-4 w-4" />
                     </Button>
