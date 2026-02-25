@@ -11,7 +11,7 @@
 
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
+import { router, protectedProcedure } from "../_core/trpc";
 import { submitIntent, getJob, listJobs, listJobsByOperator } from "./orchestrator";
 import { OPERATOR_CAPABILITIES, AUTONOMY_TIERS } from "@shared/operator-types";
 import type { Intent, AutonomyLevel } from "@shared/operator-types";
@@ -20,7 +20,7 @@ export const orchestratorRouter = router({
   /**
    * Submit an intent for autonomous processing
    */
-  submit: governedProcedure
+  submit: protectedProcedure
     .input(
       z.object({
         description: z.string().min(1).max(4000),
@@ -42,7 +42,9 @@ export const orchestratorRouter = router({
       };
 
       const job = await submitIntent(intent);
-      return job;
+
+      // Return a plain serializable object (strip any non-JSON-safe values)
+      return JSON.parse(JSON.stringify(job));
     }),
 
   /**
