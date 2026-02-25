@@ -602,9 +602,12 @@ const PUBLISH_CHECKS: ReviewCheckItem[] = [
     category: "admin_checklist",
     remediation: "All prior stages (register, validate) must be approved before publishing",
     evaluator: (ctx) => {
-      const tags = ctx.entry.tags || [];
-      const registerApproved = tags.includes("registered");
-      const validateApproved = tags.includes("validated");
+      // Check stageReviews (persisted approval state) rather than tags,
+      // because lifecycle transitions replace tags (registered → validated)
+      // rather than accumulating them.
+      const reviews = (ctx.entry as any).stageReviews || {};
+      const registerApproved = reviews.register === "approved";
+      const validateApproved = reviews.validate === "approved";
       const approved = (registerApproved && validateApproved) || ctx.entry.reviewState === "approved";
       return {
         itemId: "PUB-05",
@@ -612,8 +615,8 @@ const PUBLISH_CHECKS: ReviewCheckItem[] = [
         passed: approved,
         category: "admin_checklist",
         details: approved
-          ? "Entry has registered + validated tags — all prior stages approved"
-          : `Missing: ${[!registerApproved && "registered", !validateApproved && "validated"].filter(Boolean).join(", ")} tag`,
+          ? "All prior stages (register, validate) approved"
+          : `Missing approval: ${[!registerApproved && "register", !validateApproved && "validate"].filter(Boolean).join(", ")}`,
       };
     },
   },
