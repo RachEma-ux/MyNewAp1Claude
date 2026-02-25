@@ -558,6 +558,7 @@ export const governanceRouter = router({
         reviewState: (dbEntry as any).reviewState || undefined,
         status: dbEntry.status || undefined,
         validationStatus: (dbEntry as any).validationStatus || undefined,
+        stageReviews: (dbEntry as any).stageReviews || {},
         classifications: classifications.map(c => c.label),
       };
       const actor = { id: String(ctx.user.id), role: ctx.user.role || "admin" };
