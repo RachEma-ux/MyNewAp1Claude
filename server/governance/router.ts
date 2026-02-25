@@ -520,6 +520,7 @@ export const governanceRouter = router({
           reviewState: (entry as any).reviewState || undefined,
           status: entry.status || undefined,
           validationStatus: (entry as any).validationStatus || undefined,
+          stageReviews: (entry as any).stageReviews || {},
           classifications: classifications.map(c => c.label),
         },
         targetStage,
