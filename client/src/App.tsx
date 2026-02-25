@@ -8,6 +8,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl, isOAuthConfigured } from "./const";
 import MainLayout from "./components/MainLayout";
+import InstallPrompt from "./components/InstallPrompt";
 import { Loader2 } from "lucide-react";
 
 // Lazy-loaded page components (code splitting)
@@ -273,6 +274,7 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
+          <InstallPrompt />
           <Suspense fallback={
             <div className="min-h-screen flex items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
