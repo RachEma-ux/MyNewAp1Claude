@@ -1,0 +1,64 @@
+Session Summary — 2026-02-25 13:00
+====================================
+
+## Goal
+Fix Validate and Publish pipeline steps so the full Import Catalog → Candidate Registration pipeline works end-to-end.
+
+## What Was Done
+
+### 1. Validate & Publish buttons called wrong function
+- Both buttons called `openReviewDialog()` (opens review panel) instead of `governedTransition()` (triggers stage transition)
+- Fixed: changed onClick to `governedTransition(entry, "validate")` and `governedTransition(entry, "publish")`
+- Added disabled state until review is approved, Rocket icon, spinner while transitioning
+- File: `client/src/pages/CandidatePage.tsx` lines ~975 and ~1200
+
+### 2. PUB-05 "Review approved" check used tags instead of stageReviews
+- Lifecycle transitions replace tags (registered → validated), not accumulate them
+- PUB-05 checked for both `registered` AND `validated` tags simultaneously — impossible
+- Fixed: now checks `stageReviews.register === "approved"` and `stageReviews.validate === "approved"`
+- File: `server/governance/stage-review.ts` lines ~604-618
+
+### 3. Unused "approve" lifecycle stage blocked validate→publish
+- LIFECYCLE_STAGES had: ingest → submit → register → validate → **approve** → publish
+- The lifecycle guard requires sequential transitions (diff = 1)
+- validate→publish had diff = 2 (skipping approve), so it was always blocked
+- Fixed: removed "approve" from LIFECYCLE_STAGES and all related tag mappings
+- File: `server/governance/lifecycle-guard.ts`
+
+### 4. stageReviews missing from stageReview query and stageTransition handler
+- Both `governance.stageReview` query and `governance.stageTransition` mutation built entry objects WITHOUT `stageReviews`
+- PUB-05 evaluator always got `{}`, so "Missing approval: register, validate" even when approved
+- But `catalogManage.approve` DID pass stageReviews — creating the contradiction (approve succeeds, checklist shows failure)
+- Fixed: added `stageReviews: (dbEntry as any).stageReviews || {}` to both handlers
+- File: `server/governance/router.ts` lines ~513 and ~562
+
+## Pipeline (Confirmed Working)
+1. **Import Catalog Wizard** → discover providers via URL (no PAT required)
+2. **Submit** → batch or single submission, creates candidate entries
+3. **Register** → review 6 checks → approve → click Register button → tags: registered
+4. **Validate** → review 12 checks → approve → click Validate button → tags: validated
+5. **Publish** → review 6 checks (PUB-05 checks prior stage approvals) → approve → click Publish button → tags: published
+
+## Commits
+- 7940787 fix: Validate and Publish buttons trigger stage transition instead of review dialog
+- 6cd0d84 fix: PUB-05 checks stageReviews instead of tags for prior stage approval
+- 3ea8195 fix: remove approve stage from lifecycle and pass stageReviews to transition
+- 26c0359 fix: pass stageReviews to stageReview query so PUB-05 evaluates correctly
+
+## Key Files Modified
+- client/src/pages/CandidatePage.tsx
+- server/governance/stage-review.ts
+- server/governance/lifecycle-guard.ts
+- server/governance/router.ts
+
+## Test Results (API verification on live deploy)
+- Register: approve OK → transition allowed=true, score=100 (6/6)
+- Validate: approve OK → transition allowed=true, score=100 (12/12)
+- Publish: approve OK → transition allowed=true, score=100 (6/6)
+- PUB-05 before approvals: passed=false, "Missing approval: register, validate" ✓
+- PUB-05 after approvals: passed=true, "All prior stages approved" ✓
+
+## Final Deploy
+- Run: 22398671452
+- Tunnel: https://association-outlets-structured-mid.trycloudflare.com
+- User confirmed: "the full pipeline tested from import catalog all steps working as expected"
