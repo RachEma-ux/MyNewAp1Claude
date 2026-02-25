@@ -1485,6 +1485,12 @@ export default function CandidatePage() {
          *    - Publish: Create a versioned bundle, review 6 publication checks, approve publication
          *    - Each stage follows the same pattern: checklist review → approve → tag propagated → next stage unlocked
          *
+         * 6. Batch Discovery Behavior
+         *    - Individual "Submit" only marks the entry as submitted and shows a toast — the popup
+         *      stays open so you can keep submitting others
+         *    - Close button: When you're done and click Close, if any entries were submitted it
+         *      navigates to the Candidate Register tab; otherwise it just closes
+         *
          * ═══════════════════════════════════════════════════════════════════
          */}
         <TabsContent value="discovery-ops" className="mt-4">
