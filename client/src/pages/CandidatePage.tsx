@@ -478,6 +478,7 @@ export default function CandidatePage() {
     stageTransitionMutation.mutate({
       entryId: entry.id,
       targetStage: targetStage as any,
+      _evidence: { types: ["reason"], refs: ["stage-transition"] },
     });
   }
 
@@ -697,6 +698,7 @@ export default function CandidatePage() {
         tags: createTags,
         providerId,
         capabilities: formCapabilities.length > 0 ? formCapabilities : undefined,
+        _evidence: { types: ["reason"], refs: ["manual-create"] },
       });
     }
   }
@@ -708,7 +710,7 @@ export default function CandidatePage() {
 
   function runValidation(entryId: number) {
     setValidatingId(entryId);
-    validateMutation.mutate({ id: entryId, runTestPrompt });
+    validateMutation.mutate({ id: entryId, runTestPrompt, _evidence: { types: ["probe_results"], refs: ["orchestrator-validation"] } });
   }
 
   function openPublishWizard(entry: any) {
@@ -725,6 +727,7 @@ export default function CandidatePage() {
       catalogEntryId: publishEntry.id,
       versionLabel: publishVersion,
       changeNotes: publishNotes || undefined,
+      _evidence: { types: ["reason", "diff", "tests_passed", "signed_commit"], refs: ["publish-review"] },
     });
   }
 
@@ -1358,7 +1361,7 @@ export default function CandidatePage() {
                                 variant="ghost"
                                 size="sm"
                                 className="text-destructive hover:text-destructive"
-                                onClick={() => recallMutation.mutate({ bundleId: bundle.id })}
+                                onClick={() => recallMutation.mutate({ bundleId: bundle.id, _evidence: { types: ["reason"], refs: ["user-recall"] } })}
                                 disabled={recallMutation.isPending}
                               >
                                 Recall
@@ -2577,7 +2580,7 @@ export default function CandidatePage() {
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
             <Button
               variant="destructive"
-              onClick={() => deletingEntry && deleteMutation.mutate({ id: deletingEntry.id })}
+              onClick={() => deletingEntry && deleteMutation.mutate({ id: deletingEntry.id, _evidence: { types: ["reason"], refs: ["user-requested-delete"] } })}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -2850,7 +2853,7 @@ export default function CandidatePage() {
             </Button>
             {reviewEntry && getStageReviewState(reviewEntry, reviewStage) !== "approved" && (
               <Button
-                onClick={() => approveMutation.mutate({ id: reviewEntry.id, stage: reviewStage as any, activateNow: false })}
+                onClick={() => approveMutation.mutate({ id: reviewEntry.id, stage: reviewStage as any, activateNow: false, _evidence: { types: ["reason"], refs: ["stage-review-approved"] } })}
                 disabled={approveMutation.isPending}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >
