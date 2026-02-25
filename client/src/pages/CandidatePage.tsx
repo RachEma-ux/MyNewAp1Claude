@@ -808,11 +808,12 @@ export default function CandidatePage() {
                         {(entry.tags || []).includes("candidate") && !(entry.tags || []).includes("registered") ? (
                         <Button
                           size="sm"
-                          onClick={() => openReviewDialog(entry, "register")}
-                          disabled={stageTransitionMutation.isPending || updateMutation.isPending}
+                          onClick={() => governedTransition(entry, "register")}
+                          disabled={stageTransitionMutation.isPending || updateMutation.isPending || getStageReviewState(entry, "register") !== "approved"}
                           className="text-xs"
+                          title={getStageReviewState(entry, "register") !== "approved" ? "Review must be approved first" : "Advance to Validate stage"}
                         >
-                          <Shield className="h-4 w-4 mr-1" />
+                          {stageTransitionMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Rocket className="h-4 w-4 mr-1" />}
                           Register
                         </Button>
                         ) : (
