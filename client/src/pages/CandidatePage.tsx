@@ -2765,6 +2765,7 @@ export default function CandidatePage() {
         open={importWizardOpen}
         onOpenChange={setImportWizardOpen}
         onComplete={() => refetch()}
+        navigateToCandidate
       />
 
       {/* Connect Provider Modal */}

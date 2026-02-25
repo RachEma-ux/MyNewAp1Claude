@@ -496,7 +496,23 @@ export function CatalogImportWizard({
                         websiteDiscoverMutation.mutateAsync({ websiteUrl: normalizeUrl(websiteUrl) }).then((result: any) => {
                           if (result.api?.bestUrl) {
                             setBaseUrl(result.api.bestUrl);
-                            if (result.authType !== "none") toast.success("API URL discovered! Enter your PAT key below.", { duration: 6000 });
+                          }
+                          // Auto-submit to Candidate page when provider found
+                          if (navigateToCandidate && result.name) {
+                            const slug = getSlug(result);
+                            if (!existingSlugs.has(slug.toLowerCase())) {
+                              submitFromDiscoveryMutation.mutate({
+                                subjectId: 0, stage: "submit", subjectType: "provider", subjectName: slug,
+                                tags: [result.domain, "candidate"], name: slug,
+                                displayName: result.name || slug, description: result.description || undefined,
+                                config: { baseUrl: result.api?.bestUrl || undefined, registryId: result.registrySlug || undefined, websiteUrl: normalizeUrl(websiteUrl) },
+                                discoveryArtifactId: result.artifact?.artifactId || "legacy",
+                              }, {
+                                onSuccess: () => { toast.success(`Submitted: ${result.name || slug}`); onOpenChange(false); navigate("/llm/catalogue/candidate"); },
+                              });
+                            } else {
+                              toast.error(`${result.name || slug} already exists in catalog`);
+                            }
                           }
                         }).catch(() => {});
                       }
@@ -516,7 +532,23 @@ export function CatalogImportWizard({
                       websiteDiscoverMutation.mutateAsync({ websiteUrl: normalizeUrl(websiteUrl) }).then((result: any) => {
                         if (result.api?.bestUrl) {
                           setBaseUrl(result.api.bestUrl);
-                          if (result.authType !== "none") toast.success("API URL discovered! Enter your PAT key below.", { duration: 6000 });
+                        }
+                        // Auto-submit to Candidate page when provider found
+                        if (navigateToCandidate && result.name) {
+                          const slug = getSlug(result);
+                          if (!existingSlugs.has(slug.toLowerCase())) {
+                            submitFromDiscoveryMutation.mutate({
+                              subjectId: 0, stage: "submit", subjectType: "provider", subjectName: slug,
+                              tags: [result.domain, "candidate"], name: slug,
+                              displayName: result.name || slug, description: result.description || undefined,
+                              config: { baseUrl: result.api?.bestUrl || undefined, registryId: result.registrySlug || undefined, websiteUrl: normalizeUrl(websiteUrl) },
+                              discoveryArtifactId: result.artifact?.artifactId || "legacy",
+                            }, {
+                              onSuccess: () => { toast.success(`Submitted: ${result.name || slug}`); onOpenChange(false); navigate("/llm/catalogue/candidate"); },
+                            });
+                          } else {
+                            toast.error(`${result.name || slug} already exists in catalog`);
+                          }
                         }
                       }).catch(() => {});
                     }
