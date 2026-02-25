@@ -277,9 +277,6 @@ export function CatalogImportWizard({
       updated[index] = { ...entry, registered: true };
       setBatchResults(updated);
       toast.success(`Submitted: ${result.name}`);
-      onOpenChange(false);
-      onComplete?.();
-      navigate("/llm/catalogue/candidate");
     } catch (e: any) {
       toast.error(`Failed to register ${result.name}: ${e.message}`);
     }
@@ -1005,7 +1002,14 @@ export function CatalogImportWizard({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => setBatchPopupOpen(false)}>
+          <Button variant="outline" size="sm" onClick={() => {
+            setBatchPopupOpen(false);
+            if (batchRegisteredCount > 0) {
+              onOpenChange(false);
+              onComplete?.();
+              navigate("/llm/catalogue/candidate");
+            }
+          }}>
             Close
           </Button>
           {batchFoundCount > 0 && (
