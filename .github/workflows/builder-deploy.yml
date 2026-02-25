@@ -400,6 +400,28 @@ jobs:
           echo "✅ Release v${VERSION} created!"
 
       # ========== RUN PHASE (Optional) ==========
+      - name: Install Ollama and pull models
+        if: ${{ github.event.inputs.run_app == 'yes' }}
+        run: |
+          echo "🦙 Installing Ollama..."
+          curl -fsSL https://ollama.com/install.sh | sh
+
+          echo "🦙 Starting Ollama server for model pull..."
+          ollama serve &
+          OLLAMA_PID=$!
+          sleep 5
+
+          echo "🦙 Pulling models (tinyllama ~637MB, phi3 ~2.3GB)..."
+          ollama pull tinyllama
+          ollama pull phi3
+
+          echo "🦙 Available models:"
+          ollama list
+
+          # Stop server — will be restarted in the app step
+          kill $OLLAMA_PID 2>/dev/null || true
+          sleep 2
+
       - name: Install cloudflared
         if: ${{ github.event.inputs.run_app == 'yes' }}
         run: |
@@ -421,12 +443,20 @@ jobs:
           # GitHub token + repo for deploy page (releases, etc.)
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPO: ${{ github.repository }}
+          # Ollama runs on the same runner
+          OLLAMA_BASE_URL: http://localhost:11434
           # LLM Provider API keys (auto-provisioned on startup)
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           echo "🚀 Starting application..."
+
+          # Start Ollama server (models already pulled)
+          echo "🦙 Starting Ollama server..."
+          ollama serve &
+          OLLAMA_PID=$!
+          sleep 3
 
           # Use input DATABASE_URL if provided, otherwise use the service container
           if [ -n "$DATABASE_URL_INPUT" ]; then
@@ -538,6 +568,7 @@ jobs:
           # Cleanup
           kill $SERVER_PID 2>/dev/null || true
           kill $TUNNEL_PID 2>/dev/null || true
+          kill $OLLAMA_PID 2>/dev/null || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
