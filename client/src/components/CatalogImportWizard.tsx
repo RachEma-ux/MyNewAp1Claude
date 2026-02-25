@@ -222,6 +222,7 @@ export function CatalogImportWizard({
             websiteUrl: entry.url,
           },
           discoveryArtifactId: result.artifact?.artifactId || "legacy",
+          _evidence: { types: ["reason"], refs: ["auto-discovery"] },
         });
       } else {
         await registerMutation.mutateAsync({
@@ -235,6 +236,7 @@ export function CatalogImportWizard({
             websiteUrl: entry.url,
           },
           tags: [result.domain],
+          _evidence: { types: ["reason"], refs: ["auto-discovery"] },
         });
       }
       const updated = [...batchResults];
@@ -507,6 +509,7 @@ export function CatalogImportWizard({
                                 displayName: result.name || slug, description: result.description || undefined,
                                 config: { baseUrl: result.api?.bestUrl || undefined, registryId: result.registrySlug || undefined, websiteUrl: normalizeUrl(websiteUrl) },
                                 discoveryArtifactId: result.artifact?.artifactId || "legacy",
+                                _evidence: { types: ["reason"], refs: ["auto-discovery"] },
                               }, {
                                 onSuccess: () => { toast.success(`Submitted: ${result.name || slug}`); onOpenChange(false); navigate("/llm/catalogue/candidate"); },
                               });
@@ -543,6 +546,7 @@ export function CatalogImportWizard({
                               displayName: result.name || slug, description: result.description || undefined,
                               config: { baseUrl: result.api?.bestUrl || undefined, registryId: result.registrySlug || undefined, websiteUrl: normalizeUrl(websiteUrl) },
                               discoveryArtifactId: result.artifact?.artifactId || "legacy",
+                              _evidence: { types: ["reason"], refs: ["auto-discovery"] },
                             }, {
                               onSuccess: () => { toast.success(`Submitted: ${result.name || slug}`); onOpenChange(false); navigate("/llm/catalogue/candidate"); },
                             });
@@ -601,6 +605,7 @@ export function CatalogImportWizard({
                           websiteUrl: normalizeUrl(websiteUrl),
                         },
                         discoveryArtifactId: result.artifact?.artifactId || "legacy",
+                        _evidence: { types: ["reason"], refs: ["auto-discovery"] },
                       }, {
                         onSuccess: () => {
                           toast.success(`Submitted: ${result.name || slug}`);
@@ -620,6 +625,7 @@ export function CatalogImportWizard({
                           websiteUrl: normalizeUrl(websiteUrl),
                         },
                         tags: [result.domain],
+                        _evidence: { types: ["reason"], refs: ["auto-discovery"] },
                       }, {
                         onSuccess: () => {
                           toast.success(`Submitted: ${result.name || slug}`);
