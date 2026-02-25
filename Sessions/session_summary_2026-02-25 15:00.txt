@@ -1,0 +1,68 @@
+Session Summary — 2026-02-25 15:00
+====================================
+
+## Goal
+Fix Validate and Publish pipeline steps, resolve governance check contradictions,
+and verify the full Import Catalog pipeline end-to-end (single + batch).
+
+## Checkpoint
+- Tag: `checkpoint-2026-02-25-pipeline-complete`
+- Commit: 345c1e8
+
+## What Was Done
+
+### 1. Validate & Publish buttons called openReviewDialog instead of governedTransition
+- Both buttons opened the review panel instead of triggering stage transition
+- Fixed: changed onClick to governedTransition(), disabled until review approved
+- Added Rocket icon + spinner, tooltip explaining disabled state
+- File: client/src/pages/CandidatePage.tsx (lines ~975, ~1200)
+
+### 2. PUB-05 "Review approved" checked tags instead of stageReviews
+- Lifecycle transitions replace tags (registered → validated), not accumulate
+- PUB-05 checked for both "registered" AND "validated" tags — impossible at publish stage
+- Fixed: now checks stageReviews.register and stageReviews.validate
+- File: server/governance/stage-review.ts (lines ~604-618)
+
+### 3. Unused "approve" lifecycle stage blocked validate→publish
+- LIFECYCLE_STAGES had: ingest → submit → register → validate → approve → publish
+- Lifecycle guard requires sequential (diff=1) transitions
+- validate→publish had diff=2 (skipping "approve"), always blocked
+- Fixed: removed "approve" from LIFECYCLE_STAGES and all tag mappings
+- File: server/governance/lifecycle-guard.ts
+
+### 4. stageReviews missing from governance query/mutation handlers
+- stageReview query and stageTransition mutation built entry objects WITHOUT stageReviews
+- PUB-05 evaluator always got {} → "Missing approval: register, validate"
+- But approve handler DID pass stageReviews → contradiction (approve passes, checklist fails)
+- Fixed: added stageReviews to entry objects in both handlers
+- File: server/governance/router.ts (lines ~513, ~562)
+
+### 5. Full pipeline report published
+- Created reports/pipeline-completion-report-2026-02-25.md
+- Covers all 15 commits, 5 fix phases, governance checks per stage
+
+### 6. Full pipeline tested via API on live deploy
+- TEST 1 (Single): AI21 Labs — submit → register(100%) → validate(100%) → publish(100%)
+- TEST 2 (Batch): Cerebras, SambaNova, DeepInfra — all 3 through full pipeline at 100%
+- All 4 test entries reached "published" with all 3 stage reviews approved
+- 82/82 total entries published
+
+## Commits (this session)
+- 7940787 fix: Validate and Publish buttons trigger stage transition instead of review dialog
+- 6cd0d84 fix: PUB-05 checks stageReviews instead of tags for prior stage approval
+- 3ea8195 fix: remove approve stage from lifecycle and pass stageReviews to transition
+- 26c0359 fix: pass stageReviews to stageReview query so PUB-05 evaluates correctly
+- 345c1e8 docs: session summary 2026-02-25 — fix full pipeline (validate + publish)
+- 42fb488 docs: Import Catalog pipeline completion report
+
+## Key Files Modified
+- client/src/pages/CandidatePage.tsx
+- server/governance/stage-review.ts
+- server/governance/lifecycle-guard.ts
+- server/governance/router.ts
+- reports/pipeline-completion-report-2026-02-25.md
+
+## Deploy & Verify
+- Final deploy run: 22402515878
+- Tunnel: https://enable-feelings-favorites-invalid.trycloudflare.com
+- User confirmed: "the full pipeline tested from import catalog all steps working as expected"
