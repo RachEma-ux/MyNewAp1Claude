@@ -59,6 +59,7 @@ import {
   Shield,
   Lock,
   FileSearch,
+  Terminal,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -147,6 +148,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Bots", icon: <MessageSquare className="w-4 h-4" />, href: "/ai-types/bots" },
         { label: "Other", icon: <Activity className="w-4 h-4" />, href: "/ai-types/other" },
       ]
+    },
+    {
+      label: "Run Console",
+      icon: <Terminal className="w-5 h-5" />,
+      href: "/run-console",
     },
     {
       label: "Digital HQ",
