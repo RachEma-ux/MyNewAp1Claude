@@ -205,48 +205,30 @@ export function CatalogImportWizard({
       return;
     }
     try {
-      if (navigateToCandidate) {
-        // Use governed submitFromDiscovery — enters at "submit" stage
-        await submitFromDiscoveryMutation.mutateAsync({
-          subjectId: 0,
-          stage: "submit",
-          subjectType: "provider",
-          subjectName: slug,
-          tags: [result.domain, "candidate"],
-          name: slug,
-          displayName: result.name || slug,
-          description: result.description || undefined,
-          config: {
-            baseUrl: result.api?.bestUrl || undefined,
-            registryId: result.registrySlug || undefined,
-            websiteUrl: entry.url,
-          },
-          discoveryArtifactId: result.artifact?.artifactId || "legacy",
-          _evidence: { types: ["reason"], refs: ["auto-discovery"] },
-        });
-      } else {
-        await registerMutation.mutateAsync({
-          name: slug,
-          displayName: result.name || slug,
-          description: result.description || undefined,
-          entryType: "provider",
-          config: {
-            baseUrl: result.api?.bestUrl || undefined,
-            registryId: result.registrySlug || undefined,
-            websiteUrl: entry.url,
-          },
-          tags: [result.domain],
-          _evidence: { types: ["reason"], refs: ["auto-discovery"] },
-        });
-      }
+      await submitFromDiscoveryMutation.mutateAsync({
+        subjectId: 0,
+        stage: "submit",
+        subjectType: "provider",
+        subjectName: slug,
+        tags: [result.domain, "candidate"],
+        name: slug,
+        displayName: result.name || slug,
+        description: result.description || undefined,
+        config: {
+          baseUrl: result.api?.bestUrl || undefined,
+          registryId: result.registrySlug || undefined,
+          websiteUrl: entry.url,
+        },
+        discoveryArtifactId: result.artifact?.artifactId || "legacy",
+        _evidence: { types: ["reason"], refs: ["auto-discovery"] },
+      });
       const updated = [...batchResults];
       updated[index] = { ...entry, registered: true };
       setBatchResults(updated);
       toast.success(`Submitted: ${result.name}`);
-      if (navigateToCandidate) {
-        onOpenChange(false);
-        navigate("/llm/catalogue/candidate");
-      }
+      onOpenChange(false);
+      onComplete?.();
+      navigate("/llm/catalogue/candidate");
     } catch (e: any) {
       toast.error(`Failed to register ${result.name}: ${e.message}`);
     }
@@ -511,7 +493,7 @@ export function CatalogImportWizard({
                                 discoveryArtifactId: result.artifact?.artifactId || "legacy",
                                 _evidence: { types: ["reason"], refs: ["auto-discovery"] },
                               }, {
-                                onSuccess: () => { toast.success(`Submitted: ${result.name || slug}`); onOpenChange(false); navigate("/llm/catalogue/candidate"); },
+                                onSuccess: () => { toast.success(`Submitted: ${result.name || slug}`); onOpenChange(false); onComplete?.(); navigate("/llm/catalogue/candidate"); },
                               });
                             } else {
                               toast.error(`${result.name || slug} already exists in catalog`);
@@ -548,7 +530,7 @@ export function CatalogImportWizard({
                               discoveryArtifactId: result.artifact?.artifactId || "legacy",
                               _evidence: { types: ["reason"], refs: ["auto-discovery"] },
                             }, {
-                              onSuccess: () => { toast.success(`Submitted: ${result.name || slug}`); onOpenChange(false); navigate("/llm/catalogue/candidate"); },
+                              onSuccess: () => { toast.success(`Submitted: ${result.name || slug}`); onOpenChange(false); onComplete?.(); navigate("/llm/catalogue/candidate"); },
                             });
                           } else {
                             toast.error(`${result.name || slug} already exists in catalog`);
@@ -589,49 +571,30 @@ export function CatalogImportWizard({
                       toast.error(`${result.name || slug} already exists in catalog`);
                       return;
                     }
-                    if (navigateToCandidate) {
-                      submitFromDiscoveryMutation.mutate({
-                        subjectId: 0,
-                        stage: "submit",
-                        subjectType: "provider",
-                        subjectName: slug,
-                        tags: [result.domain, "candidate"],
-                        name: slug,
-                        displayName: result.name || slug,
-                        description: result.description || undefined,
-                        config: {
-                          baseUrl: result.api?.bestUrl || undefined,
-                          registryId: result.registrySlug || undefined,
-                          websiteUrl: normalizeUrl(websiteUrl),
-                        },
-                        discoveryArtifactId: result.artifact?.artifactId || "legacy",
-                        _evidence: { types: ["reason"], refs: ["auto-discovery"] },
-                      }, {
-                        onSuccess: () => {
-                          toast.success(`Submitted: ${result.name || slug}`);
-                          onOpenChange(false);
-                          navigate("/llm/catalogue/candidate");
-                        },
-                      });
-                    } else {
-                      registerMutation.mutate({
-                        name: slug,
-                        displayName: result.name || slug,
-                        description: result.description || undefined,
-                        entryType: "provider",
-                        config: {
-                          baseUrl: result.api?.bestUrl || undefined,
-                          registryId: result.registrySlug || undefined,
-                          websiteUrl: normalizeUrl(websiteUrl),
-                        },
-                        tags: [result.domain],
-                        _evidence: { types: ["reason"], refs: ["auto-discovery"] },
-                      }, {
-                        onSuccess: () => {
-                          toast.success(`Submitted: ${result.name || slug}`);
-                        },
-                      });
-                    }
+                    submitFromDiscoveryMutation.mutate({
+                      subjectId: 0,
+                      stage: "submit",
+                      subjectType: "provider",
+                      subjectName: slug,
+                      tags: [result.domain, "candidate"],
+                      name: slug,
+                      displayName: result.name || slug,
+                      description: result.description || undefined,
+                      config: {
+                        baseUrl: result.api?.bestUrl || undefined,
+                        registryId: result.registrySlug || undefined,
+                        websiteUrl: normalizeUrl(websiteUrl),
+                      },
+                      discoveryArtifactId: result.artifact?.artifactId || "legacy",
+                      _evidence: { types: ["reason"], refs: ["auto-discovery"] },
+                    }, {
+                      onSuccess: () => {
+                        toast.success(`Submitted: ${result.name || slug}`);
+                        onOpenChange(false);
+                        onComplete?.();
+                        navigate("/llm/catalogue/candidate");
+                      },
+                    });
                   }}
                 >
                   {(registerMutation.isPending || submitFromDiscoveryMutation.isPending) ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
