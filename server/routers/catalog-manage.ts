@@ -641,46 +641,15 @@ export const catalogManageRouter = router({
         });
       }
 
-      // Update per-stage review tracking
+      // Update per-stage review tracking — approve ONLY marks the review as done.
+      // Lifecycle tag propagation (registered/validated/published) happens via the
+      // separate governance.stageTransition mutation, which the user triggers explicitly.
       const currentStageReviews = (entry as any).stageReviews || {};
       const updatedStageReviews = { ...currentStageReviews, [stage]: "approved" };
 
-      // Set next stage to needs_review if not already set
-      const stageOrder = ["register", "validate", "publish"];
-      const currentIdx = stageOrder.indexOf(stage);
-      if (currentIdx < stageOrder.length - 1) {
-        const nextStage = stageOrder[currentIdx + 1];
-        if (!updatedStageReviews[nextStage]) {
-          updatedStageReviews[nextStage] = "needs_review";
-        }
-      }
-
-      // Propagate lifecycle tags — each approved stage adds its tag so the next stage's
-      // audit trail check can verify the entry passed through prior stages
-      const STAGE_TAGS: Record<string, string> = {
-        register: "registered",
-        validate: "validated",
-        publish: "published",
-      };
-      const currentTags: string[] = (entry.tags as string[]) || [];
-      const stageTag = STAGE_TAGS[stage];
-      const updatedTags = stageTag && !currentTags.includes(stageTag)
-        ? [...currentTags, stageTag]
-        : currentTags;
-
-      // Only set legacy reviewState to approved when the final stage (publish) passes
-      if (stage === "publish") {
-        await approveCatalogEntry(input.id, 1);
-      }
       await updateCatalogEntry(input.id, {
         stageReviews: updatedStageReviews,
-        tags: updatedTags,
       } as any, 1);
-
-      // Auto-activate on validate approval if not already active
-      if (input.activateNow || stage === "validate") {
-        await updateCatalogEntry(input.id, { status: "active" }, 1);
-      }
 
       audit("catalog.entry.approved", input.id, {
         name: entry.name,
