@@ -30,28 +30,28 @@ interface OperatorModelConstraints {
 
 const OPERATOR_MODEL_CONSTRAINTS: Record<OperatorName, OperatorModelConstraints> = {
   builder: {
-    allowedModels: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "llama3.1", "codellama", "deepseek-coder"],
+    allowedModels: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "phi3", "tinyllama", "llama3.1", "codellama", "deepseek-coder"],
     maxTokens: 16384,
     maxTemperature: 0.7,
     preferredProvider: "auto",
     fallbackProvider: "ollama",
   },
   auditor: {
-    allowedModels: ["gpt-4o-mini", "gpt-4o", "llama3.1", "mistral"],
+    allowedModels: ["gpt-4o-mini", "gpt-4o", "phi3", "tinyllama", "llama3.1", "mistral"],
     maxTokens: 8192,
     maxTemperature: 0.3,
     preferredProvider: "auto",
     fallbackProvider: "ollama",
   },
   governance: {
-    allowedModels: ["gpt-4o", "gpt-4o-mini", "llama3.1"],
+    allowedModels: ["gpt-4o", "gpt-4o-mini", "phi3", "tinyllama", "llama3.1"],
     maxTokens: 4096,
     maxTemperature: 0.1,
     preferredProvider: "auto",
     fallbackProvider: "ollama",
   },
   deploy: {
-    allowedModels: ["gpt-4o-mini", "gpt-4o", "llama3.1"],
+    allowedModels: ["gpt-4o-mini", "gpt-4o", "phi3", "tinyllama", "llama3.1"],
     maxTokens: 8192,
     maxTemperature: 0.2,
     preferredProvider: "auto",
@@ -117,19 +117,54 @@ async function getOpenAIClient(): Promise<ProviderClient> {
   };
 }
 
+// Cache of locally available Ollama models (refreshed once per process)
+let _ollamaModelsCache: string[] | null = null;
+
+async function getAvailableOllamaModels(baseUrl: string): Promise<string[]> {
+  if (_ollamaModelsCache) return _ollamaModelsCache;
+  try {
+    const resp = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    if (!resp.ok) return [];
+    const data = await resp.json() as any;
+    _ollamaModelsCache = (data.models || []).map((m: any) => m.name?.replace(/:latest$/, "") || "");
+    console.log(`[ProviderHub] Ollama models available: ${_ollamaModelsCache!.join(", ")}`);
+    return _ollamaModelsCache!;
+  } catch {
+    return [];
+  }
+}
+
+function pickBestOllamaModel(allowedModels: string[], availableModels: string[]): string | null {
+  // Try exact match first (prefer models earlier in the allowed list — higher priority)
+  for (const allowed of allowedModels) {
+    if (availableModels.includes(allowed)) return allowed;
+  }
+  // Try prefix match (e.g. "phi3" matches "phi3:3.8b")
+  for (const allowed of allowedModels) {
+    const match = availableModels.find(m => m.startsWith(allowed));
+    if (match) return match;
+  }
+  return null;
+}
+
 async function getOllamaClient(): Promise<ProviderClient> {
   const baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+  const availableModels = await getAvailableOllamaModels(baseUrl);
   return {
     name: "ollama",
-    available: true, // Assume available; will fail on call if not
+    available: availableModels.length > 0,
     async call(systemPrompt, userPrompt, model, maxTokens, temperature) {
       const start = Date.now();
+      // Use the requested model if available, otherwise pick the best available one
+      const effectiveModel = availableModels.includes(model) ? model
+        : availableModels.includes(model.replace(/:latest$/, "")) ? model.replace(/:latest$/, "")
+        : model; // fallback to requested — Ollama will error if not found
 
       const response = await fetch(`${baseUrl}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: model || "llama3.1",
+          model: effectiveModel,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -144,13 +179,14 @@ async function getOllamaClient(): Promise<ProviderClient> {
       });
 
       if (!response.ok) {
-        throw new Error(`Ollama API error ${response.status}`);
+        const errText = await response.text().catch(() => "");
+        throw new Error(`Ollama API error ${response.status}: ${errText}`);
       }
 
       const data = await response.json() as any;
       return {
         content: data.message?.content || "",
-        model: data.model || model,
+        model: data.model || effectiveModel,
         tokensUsed: (data.eval_count || 0) + (data.prompt_eval_count || 0),
         latencyMs: Date.now() - start,
       };
@@ -175,22 +211,28 @@ export async function callProviderHub(request: ProviderHubRequest): Promise<Prov
   // Build provider chain
   const openai = await getOpenAIClient();
   const ollama = await getOllamaClient();
+  const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+  const availableOllamaModels = await getAvailableOllamaModels(ollamaBaseUrl);
 
-  const providerChain: ProviderClient[] = [];
+  const providerChain: Array<{ client: ProviderClient; model: string }> = [];
+
+  // Pick best model for each provider
+  const bestOllamaModel = pickBestOllamaModel(constraints.allowedModels, availableOllamaModels);
+  const openaiModel = constraints.allowedModels.find(m => m.startsWith("gpt-")) || "gpt-4o-mini";
 
   if (constraints.preferredProvider === "auto") {
-    if (openai.available) providerChain.push(openai);
-    providerChain.push(ollama);
+    if (openai.available) providerChain.push({ client: openai, model: openaiModel });
+    if (ollama.available && bestOllamaModel) providerChain.push({ client: ollama, model: bestOllamaModel });
   } else if (constraints.preferredProvider === "openai") {
-    if (openai.available) providerChain.push(openai);
-    if (constraints.fallbackProvider === "ollama") providerChain.push(ollama);
+    if (openai.available) providerChain.push({ client: openai, model: openaiModel });
+    if (constraints.fallbackProvider === "ollama" && ollama.available && bestOllamaModel) providerChain.push({ client: ollama, model: bestOllamaModel });
   } else if (constraints.preferredProvider === "ollama") {
-    providerChain.push(ollama);
-    if (constraints.fallbackProvider === "openai" && openai.available) providerChain.push(openai);
+    if (ollama.available && bestOllamaModel) providerChain.push({ client: ollama, model: bestOllamaModel });
+    if (constraints.fallbackProvider === "openai" && openai.available) providerChain.push({ client: openai, model: openaiModel });
   }
 
   if (providerChain.length === 0) {
-    throw new Error("No LLM providers available");
+    throw new Error(`No LLM providers available (OpenAI key: ${openai.available ? "set" : "not set"}, Ollama models: [${availableOllamaModels.join(",")}], needed: [${constraints.allowedModels.join(",")}])`);
   }
 
   // Try providers in order with fallback
@@ -198,8 +240,7 @@ export async function callProviderHub(request: ProviderHubRequest): Promise<Prov
   let fallbackUsed = false;
 
   for (let i = 0; i < providerChain.length; i++) {
-    const provider = providerChain[i];
-    const model = constraints.allowedModels[0]; // Use first allowed model
+    const { client: provider, model } = providerChain[i];
 
     try {
       const result = await provider.call(
