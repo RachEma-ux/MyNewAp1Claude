@@ -1,0 +1,44 @@
+Session Summary — 2026-02-25 22:00
+====================================
+
+## Goal
+Fix Ollama connectivity on tunnel deploys, test PWA install, document Run Console.
+
+## What Was Done
+
+### 1. Ollama on GitHub Actions Runner
+- Problem: Ollama runs on phone (localhost:11434), but app runs on GitHub runner — can't connect
+- Solution: Install and run Ollama directly on the GitHub Actions runner
+- Added "Install Ollama and pull models" step to builder-deploy.yml
+- Pulls tinyllama (~637MB) and phi3 (~2.3GB) models
+- Starts Ollama server alongside the Node.js app in the tunnel step
+- Passes OLLAMA_BASE_URL=http://localhost:11434 to the app
+- Commit: e5991ce
+
+### 2. Deployed and Tested
+- Deploy run: 22416717059
+- Tunnel: https://studios-december-inf-leads.trycloudflare.com
+- Ollama confirmed working on the runner
+- Chat page needs fixes (separate task for next session)
+
+### 3. Run Console Documentation
+- Created docs/run-console.md explaining the Multi-Operator Autonomous Runtime
+- Covers: 4 operators (Builder, Auditor, Governance, Deploy), 6 autonomy levels (L0-L5), example intents
+- Commit: 0c90b55
+
+### 4. Reviewed Template/Shell Folder
+- 4 workspace templates ready to build: Generic, Personal, Project, Research
+- Each has: frontend shell TSX, backend scaffold, documentation
+- Next session: wire templates into the app
+
+## Commits (this session)
+- e5991ce feat: install and run Ollama with models on GitHub Actions runner
+- 0c90b55 docs: add Run Console guide — operators, autonomy levels, example intents
+
+## Key Files Modified
+- .github/workflows/builder-deploy.yml
+- docs/run-console.md
+
+## Next Session TODO
+- Fix chat page to work with Ollama models
+- Build workspace templates (Personal, Project, Research) from Template/Shell/
