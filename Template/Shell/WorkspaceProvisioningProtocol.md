@@ -44,21 +44,27 @@ All workspace instances must originate from an approved template through this pr
 ## 3. Core Principles
 
 ### 3.1 Control-Plane Authority
+
 Digital HQ exclusively provisions and configures workspaces.
 
 ### 3.2 Deterministic Provisioning
+
 Provisioning must produce identical results given the same template version and inputs.
 
 ### 3.3 Governance Inheritance
+
 All workspaces inherit global governance constraints from Digital HQ.
 
 ### 3.4 Resource Isolation
+
 Resources are allocated, not requested dynamically by workspaces.
 
 ### 3.5 Evidence-First Design
+
 Every provisioning event must generate immutable audit artifacts.
 
 ### 3.6 Template Integrity
+
 All workspaces must conform to a validated template contract.
 
 ---
@@ -66,6 +72,7 @@ All workspaces must conform to a validated template contract.
 ## 4. Provisioning Lifecycle State Machine
 
 ### States
+
 1. requested
 2. approved
 3. provisioned
@@ -74,24 +81,30 @@ All workspaces must conform to a validated template contract.
 6. archived
 
 ### requested
+
 Workspace creation request submitted.
 No infrastructure allocated.
 
 ### approved
+
 Governance approval granted.
 Provisioning allowed.
 
 ### provisioned
+
 Infrastructure created, modules seeded, resources allocated.
 Workspace not yet enterable.
 
 ### active
+
 Workspace execution enabled.
 
 ### frozen
+
 Execution suspended, read-only or restricted mode.
 
 ### archived
+
 Workspace decommissioned, permanently read-only.
 
 ---
@@ -99,7 +112,9 @@ Workspace decommissioned, permanently read-only.
 ## 5. End-to-End Provisioning Flow
 
 ### Step 1 — Create Request
+
 Inputs:
+
 - Requestor identity
 - Workspace name
 - Template selection
@@ -107,97 +122,124 @@ Inputs:
 - Justification
 
 Artifacts:
+
 - ProvisioningRequest record
 
 ---
 
 ### Step 2 — Template Selection
+
 Actions:
+
 - Validate template contract
 - Lock template version
 
 Artifacts:
+
 - Template snapshot reference
 
 ---
 
 ### Step 3 — Governance Profile Binding
+
 Actions:
+
 - Bind policy bundle
 - Attach approval gates
 - Set audit level
 
 Artifacts:
+
 - GovernanceBinding record
 
 ---
 
 ### Step 4 — Resource Tier Assignment
+
 Actions:
+
 - Allocate compute
 - Assign storage quotas
 - Set API limits
 
 Artifacts:
+
 - ResourceAllocation record
 
 ---
 
 ### Step 5 — Identity Boundary Creation
+
 Actions:
+
 - Create workspace-scoped identity container
 - Assign owners, roles, AI participants
 
 Artifacts:
+
 - IdentityBoundary record
 
 ---
 
 ### Step 6 — Module Registry Initialization
+
 Actions:
+
 - Seed default modules
 - Apply enable/disable states
 - Bind requireModule contract
 
 Artifacts:
+
 - ModuleRegistry snapshot
 
 ---
 
 ### Step 7 — Data Domain Attachment
+
 Actions:
+
 - Create isolated data namespaces
 - Apply retention and export policies
 
 Artifacts:
+
 - DataDomain record
 
 ---
 
 ### Step 8 — Evidence Emission
+
 Actions:
+
 - Generate immutable provisioning receipt
 - Hash template and policy references
 - Emit audit events
 
 Artifacts:
+
 - ProvisioningReceipt
 - AuditTrail entries
 
 ---
 
 ### Step 9 — HQ Registry Registration
+
 Actions:
+
 - Register workspace metadata
 - Tag and index for discovery
 
 Artifacts:
+
 - RegistryEntry record
 
 ---
 
 ### Step 10 — Activation
+
 Actions:
+
 - Transition workspace to active
 - Enable routing and execution
 
