@@ -1,37 +1,37 @@
 # Workspace Template Schema — Canonical Specification
 
 **Phase:** Machine-Enforceable Governance
-**Artifact:** `Template/Shell/20-Template-Governance/workspace-template.schema.json`
+**Artifact:** Template/Shell/workspace-template.schema.json
 **Model Choice:** Extensible Plugin-Style Architecture (Option B)
 
 ---
 
-# 1. Architectural Decision
+## 1. Architectural Decision
 
 We adopt an extensible template model.
 
 This means:
 
-- A strict, validated **core contract**
-- A controlled, namespaced **extensions layer**
+- A strict, validated core contract
+- A controlled, namespaced extensions layer
 - Explicit override rules
 - Optional capability blocks
 - Compatibility validation with governance profiles and resource tiers
 
 This balances:
 
-User flexibility
-Administrative control
-Version integrity
-Governance enforcement
-Future extensibility
+- User flexibility
+- Administrative control
+- Version integrity
+- Governance enforcement
+- Future extensibility
 
 The schema defines the spine.
 Extensions provide controlled freedom.
 
 ---
 
-# 2. Design Goals
+## 2. Design Goals
 
 The schema enforces:
 
@@ -53,55 +53,46 @@ The schema allows:
 
 ---
 
-# 3. Required Core Structure
+## 3. Required Core Structure
 
-## Mandatory Fields
+### Mandatory Fields
 
-- `templateId`
-- `version`
-- `status`
-- `displayName`
-- `description`
-- `scopeAnchor`
-- `defaults`
-- `compatibility`
-- `injectionPoints`
-- `evidenceRequirements`
+- templateId
+- version (semver)
+- status (draft | submitted | approved | locked | deprecated)
+- displayName
+- description
+- scopeAnchor (identity | objective | capability | orgUnit | generic)
+- defaults
+- compatibility
+- injectionPoints
+- evidenceRequirements
 
-## Lifecycle States
-
-- draft
-- submitted
-- approved
-- locked
-- deprecated
-
-Only `locked` templates are provisionable.
+Only templates in `locked` state may provision workspaces.
 
 ---
 
-# 4. Extensibility Model
+## 4. Extensibility Model
 
-## Extensions Block
+### Extensions Block
 
-- Must be namespaced:
-  - `org.*`
-  - `plugin.*`
-  - `vendor.*`
-- Can contain arbitrary JSON
-- Cannot override core fields
+- Keys must be namespaced:
+  - org.*
+  - plugin.*
+  - vendor.*
+- Values may contain arbitrary JSON
+- Core fields cannot be overridden
 
-## Module Config Blocks
+### Module Config Blocks
 
 `moduleConfigs` allows:
 
 - Module-specific configuration
-- Additional properties
 - Future per-module schema enforcement
 
-## Overrides Block
+### Overrides Block
 
-Explicit flags define what can change post-provisioning:
+Defines what may change after provisioning:
 
 - Module toggling
 - Governance profile change
@@ -110,13 +101,13 @@ Explicit flags define what can change post-provisioning:
 
 ---
 
-# 5. Validation Guarantees
+## 5. Validation Guarantees
 
 The schema ensures:
 
 - Locked templates are immutable per version
-- Only valid semver allowed
-- Scope anchor is constrained
+- Only valid semver values are allowed
+- Scope anchors are constrained
 - Module keys follow naming standards
 - Governance/resource compatibility lists are enforced
 - Injection points are explicitly defined
@@ -125,16 +116,7 @@ This makes template promotion machine-verifiable.
 
 ---
 
-# 6. Next Governance Artifacts (Ordered)
-
-1. governance-profile.schema.json
-2. resource-tier.schema.json
-3. TemplateRegistryContract.md
-4. templates.index.json
-
----
-
-# 7. JSON Schema Definition
+## 6. JSON Schema Definition
 
 ```json
 {
@@ -219,7 +201,6 @@ This makes template promotion machine-verifiable.
     },
     "overrides": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "allowModuleToggle": { "type": "boolean" },
         "allowGovernanceProfileChange": { "type": "boolean" },
@@ -237,7 +218,3 @@ This makes template promotion machine-verifiable.
   }
 }
 ```
-
----
-
-End of Document
