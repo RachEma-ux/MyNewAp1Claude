@@ -974,10 +974,11 @@ export default function CandidatePage() {
                           {(entry.tags || []).includes("registered") && !(entry.tags || []).includes("validated") ? (
                           <Button
                             size="sm"
-                            onClick={() => openReviewDialog(entry, "validate")}
-                            disabled={stageTransitionMutation.isPending || updateMutation.isPending}
+                            onClick={() => governedTransition(entry, "validate")}
+                            disabled={stageTransitionMutation.isPending || updateMutation.isPending || getStageReviewState(entry, "validate") !== "approved"}
+                            title={getStageReviewState(entry, "validate") !== "approved" ? "Review must be approved first" : "Advance to Publish stage"}
                           >
-                            <Shield className="h-4 w-4 mr-1" />
+                            {stageTransitionMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Rocket className="h-4 w-4 mr-1" />}
                             Validate
                           </Button>
                           ) : (
@@ -1197,9 +1198,10 @@ export default function CandidatePage() {
                             <CardTitle className="text-base break-words cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>{entry.displayName || entry.name}</CardTitle>
                             <div className="flex gap-1 shrink-0">
                             {(entry.tags || []).includes("validated") && !(entry.tags || []).includes("published") ? (
-                            <Button size="sm" onClick={() => openReviewDialog(entry, "publish")}
-                              disabled={stageTransitionMutation.isPending || updateMutation.isPending}>
-                              <Shield className="h-4 w-4 mr-1" />
+                            <Button size="sm" onClick={() => governedTransition(entry, "publish")}
+                              disabled={stageTransitionMutation.isPending || updateMutation.isPending || getStageReviewState(entry, "publish") !== "approved"}
+                              title={getStageReviewState(entry, "publish") !== "approved" ? "Review must be approved first" : "Publish this entry"}>
+                              {stageTransitionMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Rocket className="h-4 w-4 mr-1" />}
                               Publish
                             </Button>
                             ) : (
