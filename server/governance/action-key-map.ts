@@ -225,6 +225,9 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "catalogManage.bulkAutoClassify": "catalog.bulkAutoClassify",
 
   // ── Catalog Import ───────────────────────────────────────────────────────
+  "catalogImport.discoverFromApi": "catalogImport.discoverFromApi",
+  "catalogImport.parseFile": "catalogImport.parseFile",
+  "catalogImport.bulkCreate": "catalogImport.bulkCreate",
   "catalogImport.importUrl": "catalogImport.importUrl",
   "catalogImport.retryAll": "catalogImport.retryAll",
   "catalogImport.resolveConflict": "catalogImport.resolveConflict",

@@ -1413,6 +1413,30 @@ actions:
   # ═══════════════════════════════════════════════════════════════════════════
   # CATALOG IMPORT / DISCOVERY
   # ═══════════════════════════════════════════════════════════════════════════
+  catalogImport.discoverFromApi:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  catalogImport.parseFile:
+    domain: catalog
+    risk: R2
+    capability: catalog.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  catalogImport.bulkCreate:
+    domain: catalog
+    risk: R3
+    capability: catalog.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
   catalogImport.importUrl:
     domain: catalog
     risk: R3
