@@ -1431,11 +1431,11 @@ actions:
 
   catalogImport.bulkCreate:
     domain: catalog
-    risk: R3
+    risk: R2
     capability: catalog.manage
     stage: mutate
-    approval: role_any
-    evidence: { required: true, types: [reason] }
+    approval: none
+    evidence: { required: false }
 
   catalogImport.importUrl:
     domain: catalog

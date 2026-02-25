@@ -672,9 +672,18 @@ export function CatalogImportWizard({
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm">
-                <XCircle className="h-4 w-4 shrink-0" />
-                {error}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm">
+                  <XCircle className="h-4 w-4 shrink-0" />
+                  {error}
+                </div>
+                {(error.includes("fetch fail") || error.includes("ECONNREFUSED")) &&
+                  (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1") || baseUrl.includes("0.0.0.0")) && (
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-yellow-900/20 border border-yellow-800/30 text-yellow-400 text-xs">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Local providers (Ollama, llama.cpp) can only be discovered when the server runs on the same machine. The cloud-deployed server cannot reach localhost on your device.
+                  </div>
+                )}
               </div>
             )}
           </div>
