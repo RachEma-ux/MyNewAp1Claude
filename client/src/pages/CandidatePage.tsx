@@ -1435,6 +1435,58 @@ export default function CandidatePage() {
           )}
         </TabsContent>
 
+        {/*
+         * ═══════════════════════════════════════════════════════════════════
+         * Import Catalog → Candidate Registration Pipeline
+         * ═══════════════════════════════════════════════════════════════════
+         *
+         * 1. Discovery (Import Catalog Wizard)
+         *    - Open LLM Catalogue → Candidate page, click Import Catalog Entries
+         *    - Select API Discovery, type a provider website (e.g. ai21.com) and press Enter
+         *    - The system calls catalogManage.discoverProvider — scrapes the website,
+         *      detects the provider name, API base URL, auth type, model count, and description
+         *    - On success, a green "Found: AI21" status appears with the detected API URL
+         *    - No authentication (PAT) required at any step of the workflow — discovery,
+         *      submission, and approval all operate without API keys or personal access tokens
+         *
+         * 2. Submit to Candidate Register
+         *    - The Submit button activates once discovery succeeds
+         *    - Clicking Submit calls catalogManage.submitFromDiscovery with governance
+         *      evidence (_evidence: { types: ["reason"], refs: ["auto-discovery"] })
+         *    - The server creates a catalog entry with status: "draft", origin: "discovery",
+         *      reviewState: "needs_review", tags ["ai21.com", "candidate"]
+         *    - It auto-classifies the entry with the first taxonomy axis node
+         *    - The wizard closes, the Candidate page refetches, and you're navigated to the Register tab
+         *
+         * 3. Registration Review
+         *    - The new entry appears in the Register tab with a Review badge
+         *    - Clicking Review opens the Governance Review Dialog, which runs
+         *      governance.stageReview with targetStage: "register"
+         *    - The system evaluates 6 registration checks:
+         *      - REG-01: Classification assigned (auto-done at submit)
+         *      - REG-02: No architecture bypass flags in config
+         *      - REG-03: RBAC mapping defined (actor has a role)
+         *      - REG-04: Documentation provided (description >= 10 chars)
+         *      - REG-05: API surface declared (config or capabilities present)
+         *      - REG-06: No direct localhost provider call patterns
+         *    - The checklist shows pass/fail for each item with a score percentage
+         *
+         * 4. Approve Registration
+         *    - If all checks pass, click Approve Registration
+         *    - This calls catalogManage.approve with stage: "register" and governance
+         *      evidence (_evidence: { types: ["reason"], refs: ["stage-review-approved"] })
+         *    - The server re-evaluates the stage review, updates stageReviews:
+         *      { register: "approved" }, adds the "registered" tag, and sets the next
+         *      stage (validate) to "needs_review"
+         *    - The entry now appears in the Validate tab for the next pipeline stage
+         *
+         * 5. Subsequent Stages (Validate → Publish)
+         *    - Validate: Run orchestrator validation, review 12 validation checks, approve validation
+         *    - Publish: Create a versioned bundle, review 6 publication checks, approve publication
+         *    - Each stage follows the same pattern: checklist review → approve → tag propagated → next stage unlocked
+         *
+         * ═══════════════════════════════════════════════════════════════════
+         */}
         <TabsContent value="discovery-ops" className="mt-4">
           <DiscoveryHealthPanel />
         </TabsContent>
