@@ -1,0 +1,55 @@
+Session Summary — 2026-02-27 01:00
+
+## What was done
+
+### 1. Diagnosed "Module agents is not enabled for workspace 10" error
+- Root cause: two issues combined
+  a) workspaces.create backend handler never called seedWorkspaceModules() — modules only seeded by a separate client-side call after creation
+  b) All templates stored as type="generic" — the template param was ignored
+- Research template preset intentionally excludes agents (knowledge + reporting only)
+
+### 2. Fixed workspace creation (server/routers.ts)
+- Added `template` param to workspaces.create input schema (personal/project/research/team/enterprise/sandbox)
+- Map template to workspace type instead of always storing "generic"
+- Call seedWorkspaceModules() after creation so module bindings exist immediately
+- Imported seedWorkspaceModules from modules/registry
+
+### 3. Deployed and verified fix (30-min deploy)
+- Tunnel: https://artificial-linking-stunning-actor.trycloudflare.com
+- Created 3 workspaces with different templates
+
+### Test Results — Template Fix Verified
+
+| WS ID | Template | Stored Type | Modules Seeded |
+|-------|----------|-------------|----------------|
+| 2 | personal | personal | pmt, knowledge, reporting |
+| 3 | project | project | pmt, knowledge, agents, collaboration, reporting |
+| 4 | research | research | knowledge, reporting |
+
+Previously all stored as "generic" with 0 modules.
+
+### Module Presets Confirmed
+
+| Template | agents | pmt | knowledge | collaboration | reporting |
+|----------|--------|-----|-----------|---------------|-----------|
+| personal | no | yes | yes | no | yes |
+| project | YES | yes | yes | yes | yes |
+| research | no | no | yes | no | yes |
+
+### Agent creation test
+- Agent created in project workspace (agents enabled) — 200 OK
+- Research workspace has agents disabled by design — explains original error
+
+### All API endpoints — 200 OK
+- All 24 endpoints tested, all returning 200
+- Previously broken endpoints (driftStatus, frozenSubjects, hardeningCheck) still working
+
+## Commits
+- 2ad1293 fix: seed workspace modules on create and store template as type
+
+## Remaining TODOs
+- Compute and replace sha256 checksums (run on CI)
+- Terminology consistency pass
+- CI schema validation (governance-validation.yml ready)
+- Add system pack controls (catalog lint flags 0 controls)
+- Improve gate coverage scanner accuracy (false positives from comments)
