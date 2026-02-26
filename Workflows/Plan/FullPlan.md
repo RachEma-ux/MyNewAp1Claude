@@ -65,12 +65,12 @@
 
 ### E) Backend Control-Plane Architecture (Spec Only)
 
-- [ ] Define Workspace Domain Model (DB schema entities + relations)
-- [ ] Define Provisioning Service Architecture (request → approve → provision → activate)
-- [ ] Define Non-Bypassable Governance Middleware wiring
-- [ ] Define Evidence & Audit Store Architecture
-- [ ] Define Module Registry Runtime Enforcement (server-side gates)
-- [ ] Define Freeze behavior across endpoints + admin override logic
+- [x] Define Workspace Domain Model (DB schema entities + relations)
+- [x] Define Provisioning Service Architecture (request → approve → provision → activate)
+- [x] Define Non-Bypassable Governance Middleware wiring
+- [x] Define Evidence & Audit Store Architecture
+- [x] Define Module Registry Runtime Enforcement (server-side gates)
+- [x] Define Freeze behavior across endpoints + admin override logic
 
 ---
 
