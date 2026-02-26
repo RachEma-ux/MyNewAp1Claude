@@ -50,6 +50,12 @@ import { PMTDiscussionDetailPage } from "./workspace/PMTDiscussionDetailPage";
 import { PMTNewsPage } from "./workspace/PMTNewsPage";
 import { PMTTeamPlannerPage } from "./workspace/PMTTeamPlannerPage";
 import { PMTWikiPage } from "./workspace/PMTWikiPage";
+import { PMTReportingPage } from "./workspace/PMTReportingPage";
+import { PMTTimeReportPage } from "./workspace/PMTTimeReportPage";
+import { PMTCostReportPage } from "./workspace/PMTCostReportPage";
+import { PMTBudgetPage } from "./workspace/PMTBudgetPage";
+import { PMTPortfolioPage } from "./workspace/PMTPortfolioPage";
+import { PMTProjectHomePage } from "./workspace/PMTProjectHomePage";
 import { KnowledgeDocsPage } from "./workspace/KnowledgeDocsPage";
 import { KnowledgeDecisionsPage } from "./workspace/KnowledgeDecisionsPage";
 import { KnowledgeSearchPage } from "./workspace/KnowledgeSearchPage";
@@ -268,6 +274,36 @@ export default function WorkspaceShell() {
             <Route path={`${basePath}/projects/wiki`}>
               <ModuleGate moduleKey="pmt" moduleName="Project Management">
                 <PMTWikiPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/reporting`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTReportingPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/time-report`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTTimeReportPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/cost-report`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTCostReportPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/budgets`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTBudgetPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/portfolio`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTPortfolioPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/project-home`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTProjectHomePage workspaceId={workspaceId} />
               </ModuleGate>
             </Route>
             <Route path={`${basePath}/projects/:projectId`}>

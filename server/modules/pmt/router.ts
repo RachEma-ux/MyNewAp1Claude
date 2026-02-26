@@ -23,6 +23,10 @@ import { sprintsRouter } from "./sprints-router";
 import { meetingsRouter } from "./meetings-router";
 import { discussionsRouter } from "./discussions-router";
 import { newsRouter } from "./news-router";
+import { timeEntriesRouter } from "./time-entries-router";
+import { costEntriesRouter } from "./cost-entries-router";
+import { budgetsRouter } from "./budgets-router";
+import { activityTypesRouter } from "./activity-types-router";
 
 const projectsRouter = router({
   list: protectedProcedure
@@ -370,4 +374,8 @@ export const pmtRouter = router({
   meetings: meetingsRouter,
   discussions: discussionsRouter,
   news: newsRouter,
+  timeEntries: timeEntriesRouter,
+  costEntries: costEntriesRouter,
+  budgets: budgetsRouter,
+  activityTypes: activityTypesRouter,
 });
