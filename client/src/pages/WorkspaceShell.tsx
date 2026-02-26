@@ -30,6 +30,7 @@ import { PMTProjectsPage } from "./workspace/PMTProjectsPage";
 import { PMTKanbanPage } from "./workspace/PMTKanbanPage";
 import { PMTTimelinePage } from "./workspace/PMTTimelinePage";
 import { PMTProjectDetailPage } from "./workspace/PMTProjectDetailPage";
+import { PMTTablePage } from "./workspace/PMTTablePage";
 import { KnowledgeDocsPage } from "./workspace/KnowledgeDocsPage";
 import { KnowledgeDecisionsPage } from "./workspace/KnowledgeDecisionsPage";
 import { KnowledgeSearchPage } from "./workspace/KnowledgeSearchPage";
@@ -143,6 +144,11 @@ export default function WorkspaceShell() {
             <Route path={`${basePath}/projects/board`}>
               <ModuleGate moduleKey="pmt" moduleName="Project Management">
                 <PMTKanbanPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/table`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTTablePage workspaceId={workspaceId} />
               </ModuleGate>
             </Route>
             <Route path={`${basePath}/projects/timeline`}>

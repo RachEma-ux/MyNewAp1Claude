@@ -5,12 +5,15 @@
  */
 
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
 import { requireModule, logActivity } from "../registry";
 import { projects, tasks, taskDependencies } from "./schema";
+import { commentsRouter } from "./comments-router";
+import { attachmentsRouter } from "./attachments-router";
+import { watchersRouter } from "./watchers-router";
 
 const projectsRouter = router({
   list: protectedProcedure
@@ -103,6 +106,11 @@ const tasksRouter = router({
       workspaceId: z.number(),
       projectId: z.number(),
       status: z.string().optional(),
+      type: z.string().optional(),
+      parentId: z.number().optional(),
+      assigneeId: z.number().optional(),
+      limit: z.number().min(1).max(200).default(50).optional(),
+      offset: z.number().min(0).default(0).optional(),
     }))
     .query(async ({ input }) => {
       await requireModule(input.workspaceId, "pmt");
@@ -110,7 +118,14 @@ const tasksRouter = router({
       if (!db) return [];
       const conditions = [eq(tasks.projectId, input.projectId), eq(tasks.workspaceId, input.workspaceId)];
       if (input.status) conditions.push(eq(tasks.status, input.status));
-      return db.select().from(tasks).where(and(...conditions)).orderBy(desc(tasks.updatedAt));
+      if (input.type) conditions.push(eq(tasks.type, input.type));
+      if (input.parentId !== undefined) conditions.push(eq(tasks.parentId, input.parentId));
+      if (input.assigneeId !== undefined) conditions.push(eq(tasks.assigneeId, input.assigneeId));
+      return db.select().from(tasks)
+        .where(and(...conditions))
+        .orderBy(desc(tasks.updatedAt))
+        .limit(input.limit ?? 50)
+        .offset(input.offset ?? 0);
     }),
 
   get: protectedProcedure
@@ -137,6 +152,16 @@ const tasksRouter = router({
       assigneeType: z.enum(["human", "ai"]).optional(),
       riskLevel: z.string().optional(),
       dueDate: z.string().optional(),
+      type: z.string().optional(),
+      startDate: z.string().optional(),
+      estimatedHours: z.number().optional(),
+      remainingHours: z.number().optional(),
+      percentComplete: z.number().min(0).max(100).optional(),
+      storyPoints: z.number().optional(),
+      labels: z.array(z.string()).optional(),
+      parentId: z.number().optional(),
+      accountableId: z.number().optional(),
+      position: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireModule(input.workspaceId, "pmt");
@@ -145,6 +170,7 @@ const tasksRouter = router({
       const [created] = await db.insert(tasks).values({
         ...input,
         dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+        startDate: input.startDate ? new Date(input.startDate) : undefined,
       }).returning();
       await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "task.create", targetType: "task", targetId: created.id });
       return created;
@@ -163,13 +189,24 @@ const tasksRouter = router({
       riskLevel: z.string().optional(),
       confidenceScore: z.number().optional(),
       governanceStage: z.string().optional(),
+      type: z.string().optional(),
+      startDate: z.string().optional(),
+      estimatedHours: z.number().optional(),
+      remainingHours: z.number().optional(),
+      percentComplete: z.number().min(0).max(100).optional(),
+      storyPoints: z.number().optional(),
+      labels: z.array(z.string()).optional(),
+      parentId: z.number().nullable().optional(),
+      accountableId: z.number().nullable().optional(),
+      position: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const { id, workspaceId, ...updates } = input;
+      const { id, workspaceId, startDate, ...updates } = input;
       const setValues: Record<string, unknown> = { ...updates, updatedAt: new Date() };
+      if (startDate) setValues.startDate = new Date(startDate);
       if (input.status === "done") setValues.completedAt = new Date();
       await db.update(tasks).set(setValues)
         .where(and(eq(tasks.id, id), eq(tasks.workspaceId, workspaceId)));
@@ -186,6 +223,81 @@ const tasksRouter = router({
       await db.delete(taskDependencies).where(eq(taskDependencies.taskId, input.id));
       await db.delete(tasks).where(and(eq(tasks.id, input.id), eq(tasks.workspaceId, input.workspaceId)));
       await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "task.delete", targetType: "task", targetId: input.id });
+      return { success: true };
+    }),
+
+  duplicate: governedProcedure
+    .input(z.object({ id: z.number(), workspaceId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireModule(input.workspaceId, "pmt");
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const rows = await db.select().from(tasks)
+        .where(and(eq(tasks.id, input.id), eq(tasks.workspaceId, input.workspaceId)))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+      const original = rows[0];
+      const { id, createdAt, updatedAt, completedAt, ...rest } = original;
+      const [created] = await db.insert(tasks).values({
+        ...rest,
+        title: `Copy of ${original.title}`,
+      }).returning();
+      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "task.duplicate", targetType: "task", targetId: created.id, metadata: { originalId: input.id } });
+      return created;
+    }),
+
+  bulkUpdate: governedProcedure
+    .input(z.object({
+      workspaceId: z.number(),
+      ids: z.array(z.number()).min(1),
+      updates: z.object({
+        status: z.string().optional(),
+        priority: z.string().optional(),
+        assigneeId: z.number().optional(),
+        type: z.string().optional(),
+      }),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireModule(input.workspaceId, "pmt");
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const setValues: Record<string, unknown> = { ...input.updates, updatedAt: new Date() };
+      if (input.updates.status === "done") setValues.completedAt = new Date();
+      await db.update(tasks).set(setValues)
+        .where(and(inArray(tasks.id, input.ids), eq(tasks.workspaceId, input.workspaceId)));
+      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "task.bulkUpdate", targetType: "task", metadata: { ids: input.ids, updates: input.updates } });
+      return { success: true, count: input.ids.length };
+    }),
+
+  bulkDelete: governedProcedure
+    .input(z.object({
+      workspaceId: z.number(),
+      ids: z.array(z.number()).min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireModule(input.workspaceId, "pmt");
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.delete(taskDependencies).where(inArray(taskDependencies.taskId, input.ids));
+      await db.delete(tasks)
+        .where(and(inArray(tasks.id, input.ids), eq(tasks.workspaceId, input.workspaceId)));
+      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "task.bulkDelete", targetType: "task", metadata: { ids: input.ids } });
+      return { success: true, count: input.ids.length };
+    }),
+
+  move: governedProcedure
+    .input(z.object({
+      id: z.number(),
+      workspaceId: z.number(),
+      targetProjectId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireModule(input.workspaceId, "pmt");
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.update(tasks).set({ projectId: input.targetProjectId, updatedAt: new Date() })
+        .where(and(eq(tasks.id, input.id), eq(tasks.workspaceId, input.workspaceId)));
+      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "task.move", targetType: "task", targetId: input.id, metadata: { targetProjectId: input.targetProjectId } });
       return { success: true };
     }),
 });
@@ -237,4 +349,7 @@ export const pmtRouter = router({
   projects: projectsRouter,
   tasks: tasksRouter,
   dependencies: dependenciesRouter,
+  comments: commentsRouter,
+  attachments: attachmentsRouter,
+  watchers: watchersRouter,
 });

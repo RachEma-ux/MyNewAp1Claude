@@ -1,5 +1,5 @@
 /**
- * PMT Kanban Board — Task board grouped by status
+ * PMT Kanban Board — Task board grouped by status with drag-and-drop
  */
 
 import { useState } from "react";
@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
+import { PMTTaskDetailDrawer } from "./PMTTaskDetailDrawer";
 
 const COLUMNS = [
   { key: "backlog", label: "Backlog", color: "bg-slate-500" },
@@ -43,6 +44,15 @@ const priorityColors: Record<string, string> = {
   critical: "text-red-500",
 };
 
+const typeColors: Record<string, string> = {
+  task: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  bug: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  story: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  epic: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  milestone: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  feature: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
+};
+
 export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -50,6 +60,8 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
   const [newDesc, setNewDesc] = useState("");
   const [newPriority, setNewPriority] = useState("medium");
   const [createColumn, setCreateColumn] = useState("todo");
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   const utils = trpc.useUtils();
   const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
@@ -59,6 +71,13 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
     { workspaceId, projectId: projectId! },
     { enabled: !!projectId }
   );
+
+  // Check governance freeze from the project
+  const { data: project } = trpc.modules.pmt.projects.get.useQuery(
+    { id: projectId!, workspaceId },
+    { enabled: !!projectId }
+  );
+  const isFrozen = project?.governanceStage === "frozen";
 
   const createMut = trpc.modules.pmt.tasks.create.useMutation({
     onSuccess: () => {
@@ -72,7 +91,10 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
   });
 
   const updateMut = trpc.modules.pmt.tasks.update.useMutation({
-    onSuccess: () => utils.modules.pmt.tasks.list.invalidate(),
+    onSuccess: () => {
+      utils.modules.pmt.tasks.list.invalidate();
+      utils.modules.pmt.tasks.get.invalidate();
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -83,6 +105,37 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
     if (!grouped[status]) grouped[status] = [];
     grouped[status]!.push(task);
   }
+
+  // Drag handlers
+  const handleDragStart = (e: React.DragEvent, taskId: number, currentStatus: string) => {
+    e.dataTransfer.setData("taskId", String(taskId));
+    e.dataTransfer.setData("fromStatus", currentStatus);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, colKey: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverColumn(colKey);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverColumn(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    setDragOverColumn(null);
+    const taskId = parseInt(e.dataTransfer.getData("taskId"), 10);
+    const fromStatus = e.dataTransfer.getData("fromStatus");
+    if (!taskId || fromStatus === targetStatus) return;
+    updateMut.mutate({ id: taskId, workspaceId, status: targetStatus });
+    toast.success(`Moved to ${COLUMNS.find((c) => c.key === targetStatus)?.label}`);
+  };
+
+  const handleDragEnd = () => {
+    setDragOverColumn(null);
+  };
 
   return (
     <div className="p-6 space-y-4 h-full flex flex-col">
@@ -119,7 +172,15 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
       ) : (
         <div className="flex-1 flex gap-3 overflow-x-auto pb-4">
           {COLUMNS.map((col) => (
-            <div key={col.key} className="flex flex-col w-64 min-w-[256px] shrink-0">
+            <div
+              key={col.key}
+              className={`flex flex-col w-64 min-w-[256px] shrink-0 rounded-lg transition-colors ${
+                dragOverColumn === col.key ? "bg-primary/5 ring-2 ring-primary/20" : ""
+              }`}
+              onDragOver={(e) => handleDragOver(e, col.key)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, col.key)}
+            >
               {/* Column header */}
               <div className="flex items-center justify-between mb-2 px-1">
                 <div className="flex items-center gap-2">
@@ -146,10 +207,22 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
               <ScrollArea className="flex-1">
                 <div className="space-y-2">
                   {grouped[col.key]?.map((task) => (
-                    <Card key={task.id} className="cursor-pointer hover:border-primary/30 transition-colors">
+                    <Card
+                      key={task.id}
+                      className="cursor-pointer hover:border-primary/30 transition-colors"
+                      draggable={!isFrozen}
+                      onDragStart={(e) => handleDragStart(e, task.id, task.status)}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => setSelectedTaskId(task.id)}
+                    >
                       <CardContent className="p-3 space-y-2">
                         <p className="text-sm font-medium leading-tight">{task.title}</p>
                         <div className="flex items-center gap-1.5">
+                          {task.type && (
+                            <Badge className={`text-[10px] px-1.5 py-0 ${typeColors[task.type] || typeColors.task}`}>
+                              {task.type}
+                            </Badge>
+                          )}
                           {task.priority && (
                             <Badge variant="outline" className={`text-[10px] ${priorityColors[task.priority] || ""}`}>
                               {task.priority}
@@ -166,9 +239,10 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
                           {COLUMNS.filter((c) => c.key !== task.status).map((c) => (
                             <button
                               key={c.key}
-                              onClick={() =>
-                                updateMut.mutate({ id: task.id, workspaceId, status: c.key })
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateMut.mutate({ id: task.id, workspaceId, status: c.key });
+                              }}
                               className="text-[9px] text-muted-foreground hover:text-foreground transition-colors"
                             >
                               {c.label}
@@ -242,6 +316,14 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Task Detail Drawer */}
+      <PMTTaskDetailDrawer
+        workspaceId={workspaceId}
+        taskId={selectedTaskId}
+        open={!!selectedTaskId}
+        onOpenChange={(open) => { if (!open) setSelectedTaskId(null); }}
+      />
     </div>
   );
 }
