@@ -50,9 +50,9 @@
 
 ### C) Drift & Integrity Layer (Spec Only)
 
-- [ ] Define Template Drift Detection Model
-- [ ] Define Workspace Drift Detection Model
-- [ ] Define Freeze / Auto-remediation triggers & severity mapping
+- [x] Define Template Drift Detection Model
+- [x] Define Workspace Drift Detection Model
+- [x] Define Freeze / Auto-remediation triggers & severity mapping
 
 ### D) Resource Governance Layer (Spec Only)
 
