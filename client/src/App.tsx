@@ -80,6 +80,9 @@ const LLMProviderConfigWizard = lazy(() => import("@/pages/LLMProviderConfigWiza
 const NewProviderPage = lazy(() => import("@/pages/NewProviderPage"));
 const LLMCataloguePage = lazy(() => import("@/pages/LLMCataloguePage"));
 const WorkspaceShell = lazy(() => import("@/pages/WorkspaceShell"));
+const PersonalWorkspaceShell = lazy(() => import("@/pages/PersonalWorkspaceShell"));
+const ProjectWorkspaceShell = lazy(() => import("@/pages/ProjectWorkspaceShell"));
+const ResearchWorkspaceShell = lazy(() => import("@/pages/ResearchWorkspaceShell"));
 const LLMPromotions = lazy(() => import("@/pages/LLMPromotions"));
 const LLMDetailPage = lazy(() => import("@/pages/LLMDetailPage"));
 const LLMTrainingDashboard = lazy(() => import("@/pages/LLMTrainingDashboard"));
@@ -168,6 +171,13 @@ function Router() {
       {/* Workspace Shell — floating detachable container inside MainLayout */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceShell} />} />
       <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceShell} />} />
+      {/* Template workspace shells */}
+      <Route path="/personal/:workspaceId/*" component={() => <ProtectedRoute component={PersonalWorkspaceShell} />} />
+      <Route path="/personal/:workspaceId" component={() => <ProtectedRoute component={PersonalWorkspaceShell} />} />
+      <Route path="/project/:workspaceId/*" component={() => <ProtectedRoute component={ProjectWorkspaceShell} />} />
+      <Route path="/project/:workspaceId" component={() => <ProtectedRoute component={ProjectWorkspaceShell} />} />
+      <Route path="/research/:workspaceId/*" component={() => <ProtectedRoute component={ResearchWorkspaceShell} />} />
+      <Route path="/research/:workspaceId" component={() => <ProtectedRoute component={ResearchWorkspaceShell} />} />
       <Route path="/models" component={() => <ProtectedRoute component={Models} />} />
       <Route path="/hardware" component={() => <ProtectedRoute component={HardwareProfile} />} />
           <Route path="/analytics/downloads" component={() => <ProtectedRoute component={DownloadAnalytics} />} />

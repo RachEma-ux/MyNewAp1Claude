@@ -106,6 +106,7 @@ export const appRouter = router({
         z.object({
           name: z.string().min(1).max(255),
           description: z.string().optional(),
+          type: z.string().optional(),
           embeddingModel: z.string().optional(),
           chunkingStrategy: z.enum(["semantic", "fixed", "recursive"]).optional(),
           chunkSize: z.number().optional(),

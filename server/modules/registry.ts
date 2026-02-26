@@ -22,6 +22,8 @@ import {
 export const MODULE_PRESETS: Record<string, ModuleKey[]> = {
   personal: ["pmt", "knowledge", "reporting"],
   team: ["pmt", "knowledge", "agents", "collaboration", "reporting"],
+  project: ["pmt", "knowledge", "agents", "collaboration", "reporting"],
+  research: ["knowledge", "reporting"],
   enterprise: ["pmt", "knowledge", "agents", "collaboration", "reporting"],
   sandbox: ["pmt", "knowledge", "agents"],
   readonly: ["reporting"],

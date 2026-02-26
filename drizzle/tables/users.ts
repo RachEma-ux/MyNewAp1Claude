@@ -36,6 +36,7 @@ export const workspaces = pgTable("workspaces", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
+  type: varchar("type", { length: 50 }).default("generic"),
   ownerId: integer("ownerId").notNull().references(() => users.id),
 
   // Workspace settings
