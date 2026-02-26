@@ -1,0 +1,67 @@
+Session Summary — 2026-02-26 22:00
+
+## What was done
+
+### 1. Resumed from previous session
+- Committed pending formatting pass changes (11 files normalized)
+- Recovered Phase 2.5 + Phase 3 content from conversation transcript
+
+### 2. Created Phase 2.5 Stabilization files (6 files)
+- Template/Shell/Glossary.md — canonical terminology reference
+- Template/Shell/LifecycleStates.md — canonical state definitions
+- Template/Shell/CHANGELOG.md — governance bible changelog
+- Template/Shell/GovernanceBible_v1.0.0.md — locked baseline index
+- .github/workflows/governance-validation.yml — CI workflow for schema validation
+- scripts/validate-schemas.mjs — schema validation script
+
+### 3. Created Phase 3 Controlled Implementation files (9 files)
+- server/governance/registry-validator.ts — registry integrity checks
+- server/governance/checksum-runner.ts — sha256 file hashing
+- server/governance/drift-runner.ts — workspace drift detection
+- server/middleware/freeze-middleware.ts — frozen workspace blocking
+- server/governance/evidence-emitter.ts — immutable evidence writer
+- server/governance/admin-override.ts — admin role enforcement
+- Template/Shell/ResourcePoolArchitecture.md — pool architecture spec
+- server/resource/budget-meter.ts — budget enforcement
+- server/resource/model-routing.ts — model access enforcement
+
+### 4. Fixed Governance tab UI (GovernancePage.tsx)
+- Frontend expected {healthy, checks[{passed, message}]} but backend returns {overallStatus, checks[{status, details}]}
+- Fixed to read correct field names; added yellow/warning state for "warn" checks
+
+### 5. Full E2E API test (24 endpoints)
+- Tested: workspace CRUD, governance self-check, action registry, RBAC, drift, scorecard, control catalog, audit trail, providers, models, preflight, artifacts, catalog lint, gate coverage, hardening check, routing profile
+- Results: 21/24 passed, 3 failed (all same root cause: missing subject_freezes table)
+
+### 6. Fixed missing enforcement DB tables
+- Added migration 0016_enforcement_tables.sql creating:
+  - subject_freezes — active freeze records
+  - drift_events — append-only drift detection history
+  - evidence_bundles — content-addressed evidence storage
+- Updated drizzle/meta/_journal.json
+
+### 7. Verified fix — 24/24 endpoints passing (100%)
+- driftStatus: 200 — {active: false, frozenSubjects: [], frozenCount: 0}
+- frozenSubjects: 200 — [] (empty)
+- hardeningCheck: 200 — 10 checks returned
+
+## Commits
+- 6eee2a4 style: normalize markdown formatting across governance spec files
+- 677b8d3 feat: add Phase 2.5 stabilization + Phase 3 controlled implementation
+- c3c0bd0 fix: align Governance tab with backend selfCheck response shape
+- 58a81f3 fix: add subject_freezes, drift_events, evidence_bundles tables
+
+## Governance Health (from self-check)
+- overallStatus: non_compliant (expected in CI — no COOKIE_SECRET, DEV_MODE=true)
+- 9 PASS, 1 FAIL (startup conditions), 3 WARN (log activity, env profile)
+- 236 registered actions, 44 controls, 48 runners, 6 packs
+- RBAC: admin role, 31 permissions, 6 role types
+- Deny-by-default: operational (unregistered action keys denied)
+
+## Remaining TODOs
+- Compute and replace sha256 checksums (run on CI)
+- Terminology consistency pass
+- CI schema validation (governance-validation.yml ready)
+- Add system pack controls (catalog lint flags 0 controls)
+- Map workspace templates to types (project/personal/research stored as generic)
+- Improve gate coverage scanner accuracy (false positives from comments)
