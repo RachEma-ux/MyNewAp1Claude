@@ -56,12 +56,12 @@
 
 ### D) Resource Governance Layer (Spec Only)
 
-- [ ] Define Resource Pool Model
-- [ ] Define Tier Allocation rules
-- [ ] Define Upgrade/Downgrade protocol
-- [ ] Define Quota enforcement behavior (throttle/deny/freeze)
-- [ ] Define Budget enforcement behavior (throttle/deny/freeze)
-- [ ] Define Model/Integration allowlist enforcement (server-side)
+- [x] Define Resource Pool Model
+- [x] Define Tier Allocation rules
+- [x] Define Upgrade/Downgrade protocol
+- [x] Define Quota enforcement behavior (throttle/deny/freeze)
+- [x] Define Budget enforcement behavior (throttle/deny/freeze)
+- [x] Define Model/Integration allowlist enforcement (server-side)
 
 ### E) Backend Control-Plane Architecture (Spec Only)
 
