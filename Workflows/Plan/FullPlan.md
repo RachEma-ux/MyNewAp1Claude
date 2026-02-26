@@ -83,14 +83,14 @@
 
 ---
 
-## Phase 3 — Runtime & Federation (Future)
+## Phase 3 — Runtime & Federation (DONE)
 
-- [ ] Inter-Workspace Protocol
-- [ ] Cross-Workspace Data Sharing Rules
-- [ ] Federated Governance Model
-- [ ] Workspace Decommissioning Protocol
-- [ ] Compliance & Reporting Specification
-- [ ] HQ Control Dashboard Contracts (audit, drift, freeze, resource)
+- [x] Inter-Workspace Protocol
+- [x] Cross-Workspace Data Sharing Rules
+- [x] Federated Governance Model
+- [x] Workspace Decommissioning Protocol
+- [x] Compliance & Reporting Specification
+- [x] HQ Control Dashboard Contracts (audit, drift, freeze, resource)
 
 ---
 
