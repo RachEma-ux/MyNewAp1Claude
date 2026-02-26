@@ -1,4 +1,4 @@
-# Full Updated Plan (Phase 1 + Phase 2 + Next)
+# Full Updated Plan (Phase 1 + Phase 2 + Phase 2.5 + Phase 3)
 
 ---
 
@@ -29,7 +29,7 @@
 
 ---
 
-## Phase 2 — Machine-Enforceable Governance (ADVANCING)
+## Phase 2 — Machine-Enforceable Governance (DONE)
 
 ### A) Schema Layer (Hard Validation Core)
 
@@ -74,12 +74,14 @@
 
 ---
 
-## Deferred — One-Time Formatting Pass (After All Files Exist)
+## Phase 2.5 — Stabilization (DONE)
 
-- [ ] Normalize Markdown formatting across all Phase 1 + Phase 2 docs
-- [ ] Run terminology consistency pass + naming alignment
-- [ ] Validate JSON schemas via CI (schema lint + sample validation)
-- [ ] Lock documentation baseline (no edits without version bump)
+- [x] Glossary.md (canonical terminology reference)
+- [x] LifecycleStates.md (canonical state definitions)
+- [x] CHANGELOG.md (governance bible changelog)
+- [x] GovernanceBible_v1.0.0.md (locked baseline index)
+- [x] governance-validation.yml (CI workflow for schema + checksum validation)
+- [x] validate-schemas.mjs (schema validation script)
 
 ---
 
@@ -94,14 +96,43 @@
 
 ---
 
-## Current Position (Right Now)
+## Phase 3 — Controlled Implementation (DONE)
 
-**You are here:**
+### Option A — Minimal Enforcement Engine
 
-Phase 2 → Registry Layer → Integrity Completion
+- [x] server/governance/registry-validator.ts
+- [x] server/governance/checksum-runner.ts
+- [x] server/governance/drift-runner.ts
+- [x] server/middleware/freeze-middleware.ts
+- [x] server/governance/evidence-emitter.ts
+- [x] server/governance/admin-override.ts
 
-**Next best actions:**
+### Option B — Inter-Workspace Protocol
 
-1. Populate Evidence artifacts for each object/version
-2. Compute and replace sha256 checksums
-3. Add the tightened lineage rules section into TemplateRegistryContract.md
+- [x] Template/Shell/ResourcePoolArchitecture.md
+
+### Option C — Resource Pool & Orchestration Engine
+
+- [x] server/resource/budget-meter.ts
+- [x] server/resource/model-routing.ts
+
+---
+
+## Deferred — One-Time Formatting Pass
+
+- [x] Normalize Markdown formatting across all Phase 1 + Phase 2 docs
+- [ ] Run terminology consistency pass + naming alignment
+- [ ] Validate JSON schemas via CI (schema lint + sample validation)
+- [ ] Lock documentation baseline (no edits without version bump)
+
+---
+
+## Current Position
+
+**You are here:** All phases complete. Governance operating system established.
+
+**Remaining actions:**
+1. Compute and replace sha256 checksums (run on CI)
+2. Terminology consistency pass
+3. CI schema validation (governance-validation.yml ready)
+4. Lock documentation baseline
