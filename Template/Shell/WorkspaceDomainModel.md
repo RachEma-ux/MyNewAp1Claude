@@ -3,6 +3,7 @@
 
 Status: Canonical Specification
 Owner: Digital HQ Control Plane
+Scope: Workspace DB entities and relations
 
 ---
 

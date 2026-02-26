@@ -2,6 +2,8 @@
 # Phase 2 — Backend Control-Plane Architecture (Spec Only)
 
 Status: Canonical Specification
+Owner: Digital HQ Control Plane
+Scope: Non-bypassable governance middleware wiring
 
 ---
 

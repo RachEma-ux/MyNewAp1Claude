@@ -1,8 +1,10 @@
 # Workspace Template Schema — Canonical Specification
 
-**Phase:** Machine-Enforceable Governance
-**Artifact:** Template/Shell/workspace-template.schema.json
-**Model Choice:** Extensible Plugin-Style Architecture (Option B)
+# Phase 2A — Schema Layer
+
+Status: Canonical Specification
+Owner: Digital HQ Control Plane
+Scope: Workspace template schema definition
 
 ---
 

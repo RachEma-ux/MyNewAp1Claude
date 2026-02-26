@@ -1,8 +1,10 @@
 # Workspace Provisioning Protocol
 
-**Status:** Canonical Specification
-**Scope:** Digital HQ Control-Plane Provisioning
-**Applies To:** All Workspace Templates (Generic, Personal, Project, Research, Future Derivatives)
+# Phase 1 — Provisioning Governance
+
+Status: Canonical Specification
+Owner: Digital HQ Control Plane
+Scope: Digital HQ Control-Plane Provisioning
 
 ---
 

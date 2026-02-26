@@ -1,9 +1,10 @@
 # Template Registry Contract
 
-**Phase:** Machine-Enforceable Governance
-**Scope:** Workspace Templates + Governance Profiles + Resource Tiers
-**Owner:** Digital HQ (Control Plane)
-**Status:** Canonical Specification
+# Phase 2B — Registry Layer
+
+Status: Canonical Specification
+Owner: Digital HQ Control Plane
+Scope: Workspace Templates + Governance Profiles + Resource Tiers
 
 ---
 

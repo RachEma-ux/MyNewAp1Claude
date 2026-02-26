@@ -1,12 +1,14 @@
 # Template Promotion Protocol
 
-**Status:** Canonical Governance Specification
-**Scope:** Workspace Template Governance
-**Applies To:** All Workspace Templates (Generic and Specialized)
+# Phase 2 — Template Governance
+
+Status: Canonical Specification
+Owner: Digital HQ Control Plane
+Scope: Workspace Template Governance
 
 ---
 
-# 1. Purpose
+## 1. Purpose
 
 This document defines the governance lifecycle for Workspace Templates.
 
@@ -30,7 +32,7 @@ This protocol ensures:
 
 ---
 
-# 2. Governance Model Overview
+## 2. Governance Model Overview
 
 Templates operate under a hybrid governance model:
 
@@ -47,7 +49,7 @@ Core enforcement rule:
 
 ---
 
-# 3. Template Lifecycle
+## 3. Template Lifecycle
 
 Templates progress through the following states:
 
@@ -128,7 +130,7 @@ Characteristics:
 
 ---
 
-# 4. Promotion Flow
+## 4. Promotion Flow
 
 ## Step 1 — Draft Creation
 
@@ -194,7 +196,7 @@ If approved:
 
 ---
 
-# 5. Versioning Rules
+## 5. Versioning Rules
 
 Templates must use Semantic Versioning:
 
@@ -214,7 +216,7 @@ Locked templates are immutable per version.
 
 ---
 
-# 6. Template Registry Integration
+## 6. Template Registry Integration
 
 Upon locking:
 
@@ -234,7 +236,7 @@ Only locked templates appear in provisioning selector.
 
 ---
 
-# 7. Provisioning Eligibility Rules
+## 7. Provisioning Eligibility Rules
 
 A template may provision workspaces only if:
 
@@ -247,7 +249,7 @@ A template may provision workspaces only if:
 
 ---
 
-# 8. Deprecation Protocol
+## 8. Deprecation Protocol
 
 Templates may be deprecated when:
 
@@ -263,7 +265,7 @@ Deprecation rules:
 
 ---
 
-# 9. Audit & Evidence Requirements
+## 9. Audit & Evidence Requirements
 
 Each promotion must emit:
 
@@ -279,7 +281,7 @@ Evidence must be immutable.
 
 ---
 
-# 10. Non-Goals
+## 10. Non-Goals
 
 This protocol does NOT define:
 
@@ -292,7 +294,7 @@ It strictly governs template lifecycle and promotion.
 
 ---
 
-# 11. Architectural Guarantees
+## 11. Architectural Guarantees
 
 This protocol guarantees:
 

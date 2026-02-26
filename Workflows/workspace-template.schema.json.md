@@ -1,8 +1,10 @@
 # Workspace Template Schema — JSON Schema Definition
 
-**Artifact:** `Template/Shell/workspace-template.schema.json`
-**Schema Standard:** JSON Schema Draft 2020-12
-**Status:** Canonical, Machine-Enforceable
+# Phase 2A — Schema Layer
+
+Status: Canonical Specification
+Owner: Digital HQ Control Plane
+Scope: JSON Schema definition for workspace templates
 
 ---
 
