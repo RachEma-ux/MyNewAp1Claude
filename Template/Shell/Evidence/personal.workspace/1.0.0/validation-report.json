@@ -1,0 +1,51 @@
+{
+  "kind": "validationReport",
+  "object": {
+    "kind": "workspaceTemplate",
+    "id": "personal.workspace",
+    "version": "1.0.0"
+  },
+  "summary": {
+    "status": "pass",
+    "checksTotal": 6,
+    "checksPassed": 6,
+    "checksFailed": 0
+  },
+  "checks": [
+    {
+      "id": "schema.valid",
+      "status": "pass"
+    },
+    {
+      "id": "registry.refs.exist",
+      "status": "pass"
+    },
+    {
+      "id": "registry.checksums.present",
+      "status": "pass"
+    },
+    {
+      "id": "lifecycle.status.allowed",
+      "status": "pass"
+    },
+    {
+      "id": "compatibility.refs.valid",
+      "status": "pass"
+    },
+    {
+      "id": "evidence.paths.exist",
+      "status": "pass"
+    }
+  ],
+  "artifacts": {
+    "schemasValidated": [
+      "Template/Shell/workspace-template.schema.json",
+      "Template/Shell/governance-profile.schema.json",
+      "Template/Shell/resource-tier.schema.json"
+    ],
+    "registryValidated": [
+      "Template/Shell/templates.index.json"
+    ]
+  },
+  "generatedAt": "2026-02-26T00:00:00Z"
+}

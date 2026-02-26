@@ -222,4 +222,37 @@ It defines the canonical registry index and integrity rules only.
 
 ---
 
+## 11. Version Lineage & Upgrade Rules (Canonical)
+
+### 11.1 Lineage Record
+Each registry object MAY include lineage entries:
+- fromVersion
+- toVersion
+- breaking (boolean)
+- migrationRequired (boolean)
+- migrationNotes (string)
+
+### 11.2 Breaking Change Definition
+A change is BREAKING if it impacts any of:
+- Required schema fields (add/remove/rename required)
+- Default modules that remove a capability users rely on
+- Governance posture that increases enforcement (monitor → enforce)
+- Resource tier ceilings that decrease quotas/limits
+- Export/integration rules that tighten access
+- Injection points/evidence requirements that become stricter
+
+### 11.3 Upgrade Constraints
+- Auto-upgrade is allowed only when: breaking=false AND migrationRequired=false.
+- Otherwise, explicit admin approval is required.
+- Locked versions are immutable; upgrades always create a new version.
+
+### 11.4 Inheritance Constraints
+If a workspace template inherits from a parent:
+- Parent id+version must exist in registry.
+- Child must declare parent reference explicitly.
+- Child may override only fields allowed by the schema and policy.
+- Parent updates do not implicitly change child versions; a child must be re-versioned to adopt parent changes.
+
+---
+
 End of Document

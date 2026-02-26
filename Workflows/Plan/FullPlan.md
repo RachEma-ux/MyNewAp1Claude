@@ -43,10 +43,10 @@
 - [x] TemplateRegistryContract.md
 - [x] templates.index.json (registry index structure)
 - [x] Evidence folder conventions (Evidence/README.md + versioned paths)
-- [ ] Populate Evidence templates for each registry object/version
-- [ ] Compute and replace all sha256 checksums (replace sha256:REPLACE_ME)
+- [x] Populate Evidence templates for each registry object/version
+- [ ] Compute and replace all sha256 checksums (replace sha256:REPLACE_ME) — tool script ready, run on CI
 - [x] Expanded lineage records beyond placeholder (initial version lineage entries)
-- [ ] Tighten version lineage rules inside TemplateRegistryContract.md (breaking change + migration constraints)
+- [x] Tighten version lineage rules inside TemplateRegistryContract.md (breaking change + migration constraints)
 
 ### C) Drift & Integrity Layer (Spec Only)
 

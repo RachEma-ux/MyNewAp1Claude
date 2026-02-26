@@ -1,0 +1,22 @@
+{
+  "kind": "promotionReceipt",
+  "object": {
+    "kind": "workspaceTemplate",
+    "id": "project.workspace",
+    "version": "1.0.0"
+  },
+  "result": "approved",
+  "approval": {
+    "approvedBy": "REPLACE_ME",
+    "approvedAt": "2026-02-26T00:00:00Z",
+    "method": "manual",
+    "ticketRef": "REPLACE_ME_OPTIONAL"
+  },
+  "inputs": {
+    "sourceCommit": "REPLACE_ME_OPTIONAL",
+    "sourcePaths": [
+      "REPLACE_ME"
+    ]
+  },
+  "notes": "Promotion receipt for locked version."
+}
