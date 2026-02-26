@@ -43,6 +43,7 @@ import { governanceRouter } from "./governance/router";
 import { hqRouter } from "./hq/router";
 import { modulesRouter } from "./modules/router";
 import { orchestratorRouter } from "./orchestrator/router";
+import { seedWorkspaceModules } from "./modules/registry";
 
 export const appRouter = router({
   system: systemRouter,
@@ -106,6 +107,7 @@ export const appRouter = router({
         z.object({
           name: z.string().min(1).max(255),
           description: z.string().optional(),
+          template: z.enum(["personal", "project", "research", "team", "enterprise", "sandbox"]).optional(),
           type: z.string().optional(),
           embeddingModel: z.string().optional(),
           chunkingStrategy: z.enum(["semantic", "fixed", "recursive"]).optional(),
@@ -114,11 +116,22 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        return await db.createWorkspace({
+        const workspaceType = input.template || input.type || "team";
+        const workspace = await db.createWorkspace({
           ...input,
+          type: workspaceType,
           ownerId: ctx.user.id,
           collectionName: `workspace_${Date.now()}`,
         });
+        // Seed module bindings based on workspace type
+        if (workspace && typeof workspace === 'object' && 'id' in workspace) {
+          try {
+            await seedWorkspaceModules((workspace as any).id, workspaceType);
+          } catch (err) {
+            console.warn(`[Workspace] Failed to seed modules: ${(err as Error).message}`);
+          }
+        }
+        return workspace;
       }),
 
     get: protectedProcedure
