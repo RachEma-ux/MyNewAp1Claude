@@ -14,6 +14,11 @@ import { projects, tasks, taskDependencies } from "./schema";
 import { commentsRouter } from "./comments-router";
 import { attachmentsRouter } from "./attachments-router";
 import { watchersRouter } from "./watchers-router";
+import { configRouter } from "./config-router";
+import { customFieldsRouter } from "./custom-fields-router";
+import { viewsRouter } from "./views-router";
+import { versionsRouter } from "./versions-router";
+import { baselinesRouter } from "./baselines-router";
 
 const projectsRouter = router({
   list: protectedProcedure
@@ -352,4 +357,9 @@ export const pmtRouter = router({
   comments: commentsRouter,
   attachments: attachmentsRouter,
   watchers: watchersRouter,
+  config: configRouter,
+  customFields: customFieldsRouter,
+  views: viewsRouter,
+  versions: versionsRouter,
+  baselines: baselinesRouter,
 });

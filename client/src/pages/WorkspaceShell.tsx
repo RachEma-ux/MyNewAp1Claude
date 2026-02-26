@@ -31,6 +31,14 @@ import { PMTKanbanPage } from "./workspace/PMTKanbanPage";
 import { PMTTimelinePage } from "./workspace/PMTTimelinePage";
 import { PMTProjectDetailPage } from "./workspace/PMTProjectDetailPage";
 import { PMTTablePage } from "./workspace/PMTTablePage";
+import { PMTGanttPage } from "./workspace/PMTGanttPage";
+import { PMTCalendarPage } from "./workspace/PMTCalendarPage";
+import { PMTRoadmapPage } from "./workspace/PMTRoadmapPage";
+import { PMTTypesConfigPage } from "./workspace/PMTTypesConfigPage";
+import { PMTStatusConfigPage } from "./workspace/PMTStatusConfigPage";
+import { PMTWorkflowConfigPage } from "./workspace/PMTWorkflowConfigPage";
+import { PMTCustomFieldsPage } from "./workspace/PMTCustomFieldsPage";
+import { PMTProjectSettingsPage } from "./workspace/PMTProjectSettingsPage";
 import { KnowledgeDocsPage } from "./workspace/KnowledgeDocsPage";
 import { KnowledgeDecisionsPage } from "./workspace/KnowledgeDecisionsPage";
 import { KnowledgeSearchPage } from "./workspace/KnowledgeSearchPage";
@@ -154,6 +162,46 @@ export default function WorkspaceShell() {
             <Route path={`${basePath}/projects/timeline`}>
               <ModuleGate moduleKey="pmt" moduleName="Project Management">
                 <PMTTimelinePage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/gantt`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTGanttPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/calendar`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTCalendarPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/roadmap`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTRoadmapPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/config/types`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTTypesConfigPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/config/statuses`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTStatusConfigPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/config/workflows`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTWorkflowConfigPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/config/fields`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTCustomFieldsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/settings`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTProjectSettingsPage workspaceId={workspaceId} />
               </ModuleGate>
             </Route>
             <Route path={`${basePath}/projects/:projectId`}>

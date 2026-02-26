@@ -76,6 +76,10 @@ export function WorkspaceSidebar({
         { label: "Board", path: `${base}/projects/board` },
         { label: "Table", path: `${base}/projects/table` },
         { label: "Timeline", path: `${base}/projects/timeline` },
+        { label: "Gantt", path: `${base}/projects/gantt` },
+        { label: "Calendar", path: `${base}/projects/calendar` },
+        { label: "Roadmap", path: `${base}/projects/roadmap` },
+        { label: "Settings", path: `${base}/projects/settings` },
       ],
     },
     {
