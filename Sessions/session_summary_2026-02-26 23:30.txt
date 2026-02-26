@@ -1,0 +1,69 @@
+Session Summary — 2026-02-26 23:30
+
+## What was done
+
+### 1. Resumed from previous session (context continuation)
+- Previous session ended at commit 8104511 with 24/24 endpoints passing
+- User requested "deploy 30 minutes and test it"
+
+### 2. Managed concurrent deploy runs
+- Three Builder Deploy runs were in progress (from interrupted + new requests)
+- Cancelled two extra runs (22461427381, 22461402786)
+- Kept the 30-minute deploy (22461432181)
+
+### 3. Monitored deploy progress
+- Tracked through steps: Build → Install Ollama → Start application with tunnel
+- Ollama model download took several minutes
+- Got tunnel URL: https://surveillance-jerry-cities-registry.trycloudflare.com
+
+### 4. Full E2E API test — 24 endpoints
+- Ran individual curl tests against all endpoints (sandbox blocked python3 script execution)
+- All 3 previously-broken endpoints now return 200 (migration 0016 fix confirmed)
+
+### Test Results: 23/24 PASS (96%)
+
+| # | Endpoint | HTTP | Notes |
+|---|----------|------|-------|
+| 1 | workspaces.list | 200 | PASS |
+| 2 | workspaces.create | 200 | PASS — created ws id=7 |
+| 3 | workspaces.get(7) | 200 | PASS |
+| 4 | governance.selfCheck | 200 | PASS — overallStatus=non_compliant (CI env) |
+| 5 | governance.actionRegistry | 200 | PASS — 236 actions |
+| 6 | governance.status | 200 | PASS |
+| 7 | governance.myPermissions | 200 | PASS — admin, 31 permissions |
+| 8 | governance.driftStatus | 200 | PASS (was 500 before fix) |
+| 9 | governance.driftLatest | 200 | PASS |
+| 10 | governance.frozenSubjects | 200 | PASS (was 500 before fix) |
+| 11 | governance.scorecardLatest | 200 | PASS |
+| 12 | governance.controlCatalog | 200 | PASS — 44 controls, 48 runners |
+| 13 | governance.auditLogs | 200 | PASS |
+| 14 | governance.auditEvents | 200 | PASS |
+| 15 | governance.auditTrail | 200 | PASS |
+| 16 | providers.list | 200 | PASS |
+| 17 | models.list | 400 | KNOWN — requires workspaceId input |
+| 18 | governance.preflight (registered) | 200 | PASS — model.startDownload R2 |
+| 19 | governance.preflight (unregistered) | 200 | PASS — model.download DENIED |
+| 20 | governance.artifactList | 200 | PASS |
+| 21 | workspaces.getRoutingProfile(7) | 200 | PASS |
+| 22 | governance.catalogLint | 200 | PASS |
+| 23 | governance.gateCoverage | 200 | PASS |
+| 24 | governance.hardeningCheck | 200 | PASS (was 500 before fix) |
+
+### Key Verified Data
+- driftStatus: {active: false, frozenSubjects: [], frozenCount: 0}
+- frozenSubjects: [] (empty)
+- hardeningCheck: 10 checks, 4 passed, 6 failed (CI env constraints)
+- Deny-by-default: unregistered key "model.download" correctly DENIED
+- Workspace: id=7 created with defaults (semantic chunking, qdrant, bge-small-en-v1.5)
+- Routing profile: AUTO route, LOW sensitivity, BALANCED quality, fallback max 3 hops
+
+## Commits (this session)
+- No new code changes — verification-only session
+
+## Remaining TODOs
+- Compute and replace sha256 checksums (run on CI)
+- Terminology consistency pass
+- CI schema validation (governance-validation.yml ready)
+- Add system pack controls (catalog lint flags 0 controls)
+- Map workspace templates to types (project/personal/research stored as generic)
+- Improve gate coverage scanner accuracy (false positives from comments)
