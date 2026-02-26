@@ -19,6 +19,10 @@ import { customFieldsRouter } from "./custom-fields-router";
 import { viewsRouter } from "./views-router";
 import { versionsRouter } from "./versions-router";
 import { baselinesRouter } from "./baselines-router";
+import { sprintsRouter } from "./sprints-router";
+import { meetingsRouter } from "./meetings-router";
+import { discussionsRouter } from "./discussions-router";
+import { newsRouter } from "./news-router";
 
 const projectsRouter = router({
   list: protectedProcedure
@@ -362,4 +366,8 @@ export const pmtRouter = router({
   views: viewsRouter,
   versions: versionsRouter,
   baselines: baselinesRouter,
+  sprints: sprintsRouter,
+  meetings: meetingsRouter,
+  discussions: discussionsRouter,
+  news: newsRouter,
 });

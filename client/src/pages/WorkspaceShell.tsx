@@ -39,6 +39,17 @@ import { PMTStatusConfigPage } from "./workspace/PMTStatusConfigPage";
 import { PMTWorkflowConfigPage } from "./workspace/PMTWorkflowConfigPage";
 import { PMTCustomFieldsPage } from "./workspace/PMTCustomFieldsPage";
 import { PMTProjectSettingsPage } from "./workspace/PMTProjectSettingsPage";
+import { PMTBacklogPage } from "./workspace/PMTBacklogPage";
+import { PMTSprintBoardPage } from "./workspace/PMTSprintBoardPage";
+import { PMTBurndownChart } from "./workspace/PMTBurndownChart";
+import { PMTVelocityChart } from "./workspace/PMTVelocityChart";
+import { PMTMeetingsPage } from "./workspace/PMTMeetingsPage";
+import { PMTMeetingDetailPage } from "./workspace/PMTMeetingDetailPage";
+import { PMTDiscussionsPage } from "./workspace/PMTDiscussionsPage";
+import { PMTDiscussionDetailPage } from "./workspace/PMTDiscussionDetailPage";
+import { PMTNewsPage } from "./workspace/PMTNewsPage";
+import { PMTTeamPlannerPage } from "./workspace/PMTTeamPlannerPage";
+import { PMTWikiPage } from "./workspace/PMTWikiPage";
 import { KnowledgeDocsPage } from "./workspace/KnowledgeDocsPage";
 import { KnowledgeDecisionsPage } from "./workspace/KnowledgeDecisionsPage";
 import { KnowledgeSearchPage } from "./workspace/KnowledgeSearchPage";
@@ -202,6 +213,61 @@ export default function WorkspaceShell() {
             <Route path={`${basePath}/projects/settings`}>
               <ModuleGate moduleKey="pmt" moduleName="Project Management">
                 <PMTProjectSettingsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/backlog`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTBacklogPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/sprint-board`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTSprintBoardPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/burndown`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTBurndownChart workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/velocity`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTVelocityChart workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/team-planner`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTTeamPlannerPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/meetings/:meetingId`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTMeetingDetailPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/meetings`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTMeetingsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/discussions/:discussionId`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTDiscussionDetailPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/discussions`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTDiscussionsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/news`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTNewsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/wiki`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTWikiPage workspaceId={workspaceId} />
               </ModuleGate>
             </Route>
             <Route path={`${basePath}/projects/:projectId`}>

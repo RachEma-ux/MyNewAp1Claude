@@ -1,8 +1,8 @@
 /**
- * PMT Kanban Board — Task board grouped by status with drag-and-drop
+ * PMT Kanban Board — Task board with configurable grouping and drag-and-drop
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,12 +29,28 @@ import { Plus, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 import { PMTTaskDetailDrawer } from "./PMTTaskDetailDrawer";
 
-const COLUMNS = [
+const STATUS_COLUMNS = [
   { key: "backlog", label: "Backlog", color: "bg-slate-500" },
   { key: "todo", label: "To Do", color: "bg-blue-500" },
   { key: "in_progress", label: "In Progress", color: "bg-yellow-500" },
   { key: "review", label: "Review", color: "bg-purple-500" },
   { key: "done", label: "Done", color: "bg-green-500" },
+];
+
+const PRIORITY_COLUMNS = [
+  { key: "low", label: "Low", color: "bg-green-500" },
+  { key: "medium", label: "Medium", color: "bg-yellow-500" },
+  { key: "high", label: "High", color: "bg-orange-500" },
+  { key: "critical", label: "Critical", color: "bg-red-500" },
+];
+
+const TYPE_COLUMNS = [
+  { key: "task", label: "Task", color: "bg-blue-500" },
+  { key: "bug", label: "Bug", color: "bg-red-500" },
+  { key: "story", label: "Story", color: "bg-green-500" },
+  { key: "epic", label: "Epic", color: "bg-purple-500" },
+  { key: "milestone", label: "Milestone", color: "bg-orange-500" },
+  { key: "feature", label: "Feature", color: "bg-cyan-500" },
 ];
 
 const priorityColors: Record<string, string> = {
@@ -53,8 +69,11 @@ const typeColors: Record<string, string> = {
   feature: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
 };
 
+type GroupByField = "status" | "priority" | "type" | "assignee";
+
 export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
+  const [groupBy, setGroupBy] = useState<GroupByField>("status");
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -98,18 +117,59 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
     onError: (e) => toast.error(e.message),
   });
 
-  const grouped: Record<string, typeof tasks> = {};
-  for (const col of COLUMNS) grouped[col.key] = [];
+  // Compute columns dynamically based on groupBy
+  const columns = useMemo(() => {
+    if (groupBy === "status") return STATUS_COLUMNS;
+    if (groupBy === "priority") return PRIORITY_COLUMNS;
+    if (groupBy === "type") return TYPE_COLUMNS;
+    // assignee: derive columns from unique assignee values in tasks
+    if (!tasks) return [];
+    const seen = new Map<string, string>();
+    for (const t of tasks) {
+      const key = t.assigneeType || (t.assigneeId ? `user-${t.assigneeId}` : "unassigned");
+      if (!seen.has(key)) {
+        const label = t.assigneeId
+          ? `User #${t.assigneeId}`
+          : t.assigneeType === "ai"
+          ? "AI Agent"
+          : key === "unassigned"
+          ? "Unassigned"
+          : key;
+        seen.set(key, label);
+      }
+    }
+    if (seen.size === 0) seen.set("unassigned", "Unassigned");
+    const assigneeCols: { key: string; label: string; color: string }[] = [];
+    const colors = ["bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500", "bg-cyan-500", "bg-pink-500"];
+    let ci = 0;
+    for (const [key, label] of seen) {
+      assigneeCols.push({ key, label, color: colors[ci % colors.length] });
+      ci++;
+    }
+    return assigneeCols;
+  }, [groupBy, tasks]);
+
+  // Get the field value for grouping a task
+  function getGroupKey(task: any): string {
+    if (groupBy === "status") return task.status || "backlog";
+    if (groupBy === "priority") return task.priority || "medium";
+    if (groupBy === "type") return task.type || "task";
+    // assignee
+    return task.assigneeType || (task.assigneeId ? `user-${task.assigneeId}` : "unassigned");
+  }
+
+  const grouped: Record<string, any[]> = {};
+  for (const col of columns) grouped[col.key] = [];
   for (const task of tasks || []) {
-    const status = task.status || "backlog";
-    if (!grouped[status]) grouped[status] = [];
-    grouped[status]!.push(task);
+    const key = getGroupKey(task);
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key]!.push(task);
   }
 
   // Drag handlers
-  const handleDragStart = (e: React.DragEvent, taskId: number, currentStatus: string) => {
+  const handleDragStart = (e: React.DragEvent, taskId: number, currentKey: string) => {
     e.dataTransfer.setData("taskId", String(taskId));
-    e.dataTransfer.setData("fromStatus", currentStatus);
+    e.dataTransfer.setData("fromKey", currentKey);
     e.dataTransfer.effectAllowed = "move";
   };
 
@@ -123,14 +183,24 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
     setDragOverColumn(null);
   };
 
-  const handleDrop = (e: React.DragEvent, targetStatus: string) => {
+  const handleDrop = (e: React.DragEvent, targetKey: string) => {
     e.preventDefault();
     setDragOverColumn(null);
     const taskId = parseInt(e.dataTransfer.getData("taskId"), 10);
-    const fromStatus = e.dataTransfer.getData("fromStatus");
-    if (!taskId || fromStatus === targetStatus) return;
-    updateMut.mutate({ id: taskId, workspaceId, status: targetStatus });
-    toast.success(`Moved to ${COLUMNS.find((c) => c.key === targetStatus)?.label}`);
+    const fromKey = e.dataTransfer.getData("fromKey");
+    if (!taskId || fromKey === targetKey) return;
+
+    // Update the corresponding field
+    const updatePayload: any = { id: taskId, workspaceId };
+    if (groupBy === "status") updatePayload.status = targetKey;
+    else if (groupBy === "priority") updatePayload.priority = targetKey;
+    else if (groupBy === "type") updatePayload.type = targetKey;
+    // For assignee grouping, we can't easily change assignee via a simple string key,
+    // so we skip mutation for assignee drag (read-only grouping)
+    else return;
+
+    updateMut.mutate(updatePayload);
+    toast.success(`Moved to ${columns.find((c) => c.key === targetKey)?.label}`);
   };
 
   const handleDragEnd = () => {
@@ -145,6 +215,17 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
           Board
         </h1>
         <div className="flex items-center gap-2">
+          <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupByField)}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Group by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="status">Status</SelectItem>
+              <SelectItem value="priority">Priority</SelectItem>
+              <SelectItem value="type">Type</SelectItem>
+              <SelectItem value="assignee">Assignee</SelectItem>
+            </SelectContent>
+          </Select>
           {projects && projects.length > 0 && (
             <Select
               value={String(projectId || "")}
@@ -171,7 +252,7 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
         </div>
       ) : (
         <div className="flex-1 flex gap-3 overflow-x-auto pb-4">
-          {COLUMNS.map((col) => (
+          {columns.map((col) => (
             <div
               key={col.key}
               className={`flex flex-col w-64 min-w-[256px] shrink-0 rounded-lg transition-colors ${
@@ -190,17 +271,19 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
                     {grouped[col.key]?.length || 0}
                   </Badge>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => {
-                    setCreateColumn(col.key);
-                    setCreateOpen(true);
-                  }}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
+                {groupBy === "status" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => {
+                      setCreateColumn(col.key);
+                      setCreateOpen(true);
+                    }}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
 
               {/* Cards */}
@@ -210,8 +293,8 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
                     <Card
                       key={task.id}
                       className="cursor-pointer hover:border-primary/30 transition-colors"
-                      draggable={!isFrozen}
-                      onDragStart={(e) => handleDragStart(e, task.id, task.status)}
+                      draggable={!isFrozen && groupBy !== "assignee"}
+                      onDragStart={(e) => handleDragStart(e, task.id, getGroupKey(task))}
                       onDragEnd={handleDragEnd}
                       onClick={() => setSelectedTaskId(task.id)}
                     >
@@ -234,21 +317,23 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
                             </Badge>
                           )}
                         </div>
-                        {/* Quick status change */}
-                        <div className="flex gap-1 flex-wrap">
-                          {COLUMNS.filter((c) => c.key !== task.status).map((c) => (
-                            <button
-                              key={c.key}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateMut.mutate({ id: task.id, workspaceId, status: c.key });
-                              }}
-                              className="text-[9px] text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              {c.label}
-                            </button>
-                          ))}
-                        </div>
+                        {/* Quick status change (only when grouped by status) */}
+                        {groupBy === "status" && (
+                          <div className="flex gap-1 flex-wrap">
+                            {STATUS_COLUMNS.filter((c) => c.key !== task.status).map((c) => (
+                              <button
+                                key={c.key}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateMut.mutate({ id: task.id, workspaceId, status: c.key });
+                                }}
+                                className="text-[9px] text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                {c.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}

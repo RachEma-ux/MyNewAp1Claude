@@ -44,6 +44,7 @@ export const tasks = pgTable("pmt_tasks", {
   assigneeType: varchar("assigneeType", { length: 20 }).default("human"), // human | ai
   accountableId: integer("accountableId").references(() => users.id),
   parentId: integer("parentId"),
+  sprintId: integer("sprintId"),
   riskLevel: varchar("riskLevel", { length: 20 }).default("low"),
   confidenceScore: integer("confidenceScore"), // AI confidence 0-100
   governanceStage: varchar("governanceStage", { length: 50 }),
@@ -66,6 +67,7 @@ export const tasks = pgTable("pmt_tasks", {
   typeIdx: index("idx_pmt_tasks_type").on(table.type),
   parentIdx: index("idx_pmt_tasks_parent").on(table.parentId),
   assigneeIdx: index("idx_pmt_tasks_assignee").on(table.assigneeId),
+  sprintIdx: index("idx_pmt_tasks_sprint").on(table.sprintId),
 }));
 
 export type Task = typeof tasks.$inferSelect;
