@@ -1,0 +1,97 @@
+Session Summary — 2026-02-26 20:00
+====================================
+
+## Goal
+Deploy and test workspace templates, organize repo, complete full governance specification (Phase 1-3).
+
+## What Was Done
+
+### 1. Deploy & Test Workspace Templates
+- Triggered Builder Deploy, got tunnel URL: https://focused-cup-amd-pod.trycloudflare.com
+- Opened /workspaces, /personal, /project, /research pages for testing
+- Commit 3a0d88e (prior session) already wired templates into app
+
+### 2. Fix Sandbox /tmp Issue
+- Root cause: /tmp owned by shell:shell, not writable by Termux user u0_a358
+- Fix: Added "TMPDIR": "/data/data/com.termux/files/usr/tmp" to ~/.claude/settings.json env section
+- Sequential xdg-open calls now work reliably; parallel calls can still fail
+
+### 3. Repo Organization
+- Created Workflows/ folder at repo root
+- Moved workflow_run.json, workflow_runs.json into Workflows/
+- Deleted corrupted workflow_logs.zip
+- Moved 16 workspace files from Template/Shell/ subdirectories to Workflows/ with same structure (00-Generic, 01-Personal, 02-Project, 03-Research)
+- Created Workflows/Plan/ subfolder with FullPlan.md
+
+### 4. Schema & Registry Files Created
+- Template/Shell/ResourceTierSchema.md (resource tier JSON schema)
+- Workflows/TemplateRegistryContract.md (registry contract spec)
+- Workflows/templates.index.json (registry index with 6 objects)
+- Workflows/Expanded lineage records beyond placeholder.md
+- Workflows/Registry Layer - Update.md
+
+### 5. Evidence & Integrity (Phase 2B completion)
+- Created Template/Shell/Evidence/ folder tree with 10 objects x 2 JSON files (20 files)
+- Created Template/Shell/tools/update-registry-checksums.mjs
+- Appended Section 11 (Version Lineage & Upgrade Rules) to TemplateRegistryContract.md
+
+### 6. Drift & Integrity Layer (Phase 2C)
+- Template/Shell/TemplateDriftDetectionModel.md
+- Template/Shell/WorkspaceDriftDetectionModel.md
+- Template/Shell/FreezeAndAutoRemediationProtocol.md
+
+### 7. Resource Governance Layer (Phase 2D)
+- Template/Shell/ResourcePoolModel.md
+- Template/Shell/TierAllocationRules.md
+- Template/Shell/UpgradeDowngradeProtocol.md
+- Template/Shell/QuotaEnforcementModel.md
+- Template/Shell/BudgetEnforcementModel.md
+- Template/Shell/ModelIntegrationAllowlistEnforcement.md
+
+### 8. Backend Control-Plane Architecture (Phase 2E)
+- Template/Shell/WorkspaceDomainModel.md
+- Template/Shell/ProvisioningServiceArchitecture.md
+- Template/Shell/GovernanceEnforcementMiddleware.md
+- Template/Shell/EvidenceAndAuditStoreArchitecture.md
+- Template/Shell/ModuleRegistryRuntimeEnforcement.md
+- Template/Shell/FreezeBehaviorSpecification.md
+
+### 9. Runtime & Federation (Phase 3)
+- Template/Shell/InterWorkspaceProtocol.md
+- Template/Shell/CrossWorkspaceDataSharingRules.md
+- Template/Shell/FederatedGovernanceModel.md
+- Template/Shell/WorkspaceDecommissioningProtocol.md
+- Template/Shell/ComplianceAndReportingSpecification.md
+- Template/Shell/HQControlDashboardContracts.md
+
+## Plan Status — ALL PHASES COMPLETE
+- Phase 1: Control-Plane Specification — DONE
+- Phase 2A: Schema Layer — DONE
+- Phase 2B: Registry Layer — DONE
+- Phase 2C: Drift & Integrity Layer — DONE
+- Phase 2D: Resource Governance Layer — DONE
+- Phase 2E: Backend Control-Plane Architecture — DONE
+- Phase 3: Runtime & Federation — DONE
+- Deferred: Formatting pass — TODO
+
+## Key Commits (this session)
+- 058376f docs: add Resource Tier JSON Schema to Template/Shell
+- 0249953 chore: move standalone workflow files to Workflows folder
+- 613a3a2 chore: remove corrupted workflow_logs.zip
+- d97735b chore: move workspace template files from Template/Shell to Workflows
+- abd9205 chore: organize Workflows with original subdirectory structure
+- e7b0529 docs: add Template Registry Contract and registry index
+- bdf3ea4 docs: add full project plan (Phase 1-3) to Workflows/Plan
+- d34a187 docs: add Registry Layer update plan
+- caa3f03 docs: add expanded lineage records for all registry objects
+- da0f458 docs: update full plan — Phase 2 advancing
+- 4c53a32 feat: populate Evidence artifacts, add checksum tool, tighten lineage rules
+- 2077eb5 docs: add Drift & Integrity Layer specs
+- dbd46e1 docs: add Resource Governance Layer specs
+- 1281839 docs: add Backend Control-Plane Architecture specs
+- b3c5cbb docs: add Phase 3 Runtime & Federation specs
+
+## Next Session TODO
+- Deferred formatting pass (normalize markdown, terminology, JSON schema CI validation)
+- Run checksum script on CI to replace sha256:REPLACE_ME placeholders
+- Start transitioning from Spec → Controlled Implementation Phase
