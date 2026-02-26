@@ -1,0 +1,267 @@
+{
+  "registryVersion": "1.0.0",
+  "generatedAt": "2026-02-26T00:00:00Z",
+  "policies": {
+    "denyByDefault": true,
+    "provisionableStatuses": ["locked"],
+    "requireChecksums": true,
+    "requireEvidence": true,
+    "allowUnversionedRefs": false
+  },
+  "objects": [
+    {
+      "kind": "workspaceTemplate",
+      "id": "generic.workspace",
+      "version": "1.0.0",
+      "status": "locked",
+      "displayName": "Generic Workspace Template",
+      "description": "Canonical base template for all workspace execution domains.",
+      "paths": {
+        "doc": "Template/Shell/00-Generic/GenericWorkspace.md",
+        "frontendShell": "Template/Shell/00-Generic/GenericWorkspaceShellTemplate.tsx",
+        "backendScaffold": "Template/Shell/00-Generic/generic-workspace-backend-template.ts",
+        "schema": "Template/Shell/workspace-template.schema.json"
+      },
+      "checksums": {
+        "doc": "sha256:REPLACE_ME",
+        "frontendShell": "sha256:REPLACE_ME",
+        "backendScaffold": "sha256:REPLACE_ME",
+        "schema": "sha256:REPLACE_ME"
+      },
+      "compatibility": {
+        "allowedGovernanceProfiles": [
+          { "id": "gov.standard", "versions": ["1.0.0"] }
+        ],
+        "allowedResourceTiers": [
+          { "id": "tier.standard", "versions": ["1.0.0"] }
+        ]
+      },
+      "relationships": {
+        "inheritsFrom": null,
+        "relatedGovernanceProfileDefault": { "id": "gov.standard", "version": "1.0.0" },
+        "relatedResourceTierDefault": { "id": "tier.standard", "version": "1.0.0" }
+      },
+      "evidence": {
+        "promotionReceipt": "Template/Shell/Evidence/generic.workspace/1.0.0/promotion-receipt.json",
+        "validationReport": "Template/Shell/Evidence/generic.workspace/1.0.0/validation-report.json"
+      },
+      "audit": {
+        "createdBy": "REPLACE_ME",
+        "createdAt": "2026-02-26T00:00:00Z",
+        "submittedBy": "REPLACE_ME",
+        "submittedAt": "2026-02-26T00:00:00Z",
+        "approvedBy": "REPLACE_ME",
+        "approvedAt": "2026-02-26T00:00:00Z"
+      }
+    },
+    {
+      "kind": "workspaceTemplate",
+      "id": "personal.workspace",
+      "version": "1.0.0",
+      "status": "locked",
+      "displayName": "Personal Workspace Template",
+      "description": "User-scoped workspace optimized for individual productivity.",
+      "paths": {
+        "doc": "Template/Shell/01-Personal/PersonalWorkspace.md",
+        "frontendShell": "Template/Shell/01-Personal/PersonalWorkspaceShellTemplate.tsx",
+        "backendScaffold": "Template/Shell/01-Personal/personal-workspace-backend-template.ts",
+        "schema": "Template/Shell/workspace-template.schema.json"
+      },
+      "checksums": {
+        "doc": "sha256:REPLACE_ME",
+        "frontendShell": "sha256:REPLACE_ME",
+        "backendScaffold": "sha256:REPLACE_ME",
+        "schema": "sha256:REPLACE_ME"
+      },
+      "compatibility": {
+        "allowedGovernanceProfiles": [
+          { "id": "gov.standard", "versions": ["1.0.0"] }
+        ],
+        "allowedResourceTiers": [
+          { "id": "tier.light", "versions": ["1.0.0"] }
+        ]
+      },
+      "relationships": {
+        "inheritsFrom": { "id": "generic.workspace", "version": "1.0.0" },
+        "relatedGovernanceProfileDefault": { "id": "gov.standard", "version": "1.0.0" },
+        "relatedResourceTierDefault": { "id": "tier.light", "version": "1.0.0" }
+      },
+      "evidence": {
+        "promotionReceipt": "Template/Shell/Evidence/personal.workspace/1.0.0/promotion-receipt.json",
+        "validationReport": "Template/Shell/Evidence/personal.workspace/1.0.0/validation-report.json"
+      },
+      "audit": {
+        "createdBy": "REPLACE_ME",
+        "createdAt": "2026-02-26T00:00:00Z",
+        "submittedBy": "REPLACE_ME",
+        "submittedAt": "2026-02-26T00:00:00Z",
+        "approvedBy": "REPLACE_ME",
+        "approvedAt": "2026-02-26T00:00:00Z"
+      }
+    },
+    {
+      "kind": "workspaceTemplate",
+      "id": "project.workspace",
+      "version": "1.0.0",
+      "status": "locked",
+      "displayName": "Project Workspace Template",
+      "description": "Objective-scoped workspace optimized for cross-team delivery.",
+      "paths": {
+        "doc": "Template/Shell/02-Project/ProjectWorkspace.md",
+        "frontendShell": "Template/Shell/02-Project/ProjectWorkspaceShellTemplate.tsx",
+        "backendScaffold": "Template/Shell/02-Project/project-workspace-backend-template.ts",
+        "schema": "Template/Shell/workspace-template.schema.json"
+      },
+      "checksums": {
+        "doc": "sha256:REPLACE_ME",
+        "frontendShell": "sha256:REPLACE_ME",
+        "backendScaffold": "sha256:REPLACE_ME",
+        "schema": "sha256:REPLACE_ME"
+      },
+      "compatibility": {
+        "allowedGovernanceProfiles": [
+          { "id": "gov.approval", "versions": ["1.0.0"] }
+        ],
+        "allowedResourceTiers": [
+          { "id": "tier.standard", "versions": ["1.0.0"] }
+        ]
+      },
+      "relationships": {
+        "inheritsFrom": { "id": "generic.workspace", "version": "1.0.0" },
+        "relatedGovernanceProfileDefault": { "id": "gov.approval", "version": "1.0.0" },
+        "relatedResourceTierDefault": { "id": "tier.standard", "version": "1.0.0" }
+      },
+      "evidence": {
+        "promotionReceipt": "Template/Shell/Evidence/project.workspace/1.0.0/promotion-receipt.json",
+        "validationReport": "Template/Shell/Evidence/project.workspace/1.0.0/validation-report.json"
+      },
+      "audit": {
+        "createdBy": "REPLACE_ME",
+        "createdAt": "2026-02-26T00:00:00Z",
+        "submittedBy": "REPLACE_ME",
+        "submittedAt": "2026-02-26T00:00:00Z",
+        "approvedBy": "REPLACE_ME",
+        "approvedAt": "2026-02-26T00:00:00Z"
+      }
+    },
+    {
+      "kind": "workspaceTemplate",
+      "id": "research.workspace",
+      "version": "1.0.0",
+      "status": "locked",
+      "displayName": "Research Workspace Template",
+      "description": "Capability-scoped workspace optimized for data-intensive research.",
+      "paths": {
+        "doc": "Template/Shell/03-Research/ResearchWorkspace.md",
+        "frontendShell": "Template/Shell/03-Research/ResearchWorkspaceShellTemplate.tsx",
+        "backendScaffold": "Template/Shell/03-Research/research-workspace-backend-template.ts",
+        "schema": "Template/Shell/workspace-template.schema.json"
+      },
+      "checksums": {
+        "doc": "sha256:REPLACE_ME",
+        "frontendShell": "sha256:REPLACE_ME",
+        "backendScaffold": "sha256:REPLACE_ME",
+        "schema": "sha256:REPLACE_ME"
+      },
+      "compatibility": {
+        "allowedGovernanceProfiles": [
+          { "id": "gov.restricted", "versions": ["1.0.0"] }
+        ],
+        "allowedResourceTiers": [
+          { "id": "tier.gpu", "versions": ["1.0.0"] }
+        ]
+      },
+      "relationships": {
+        "inheritsFrom": { "id": "generic.workspace", "version": "1.0.0" },
+        "relatedGovernanceProfileDefault": { "id": "gov.restricted", "version": "1.0.0" },
+        "relatedResourceTierDefault": { "id": "tier.gpu", "version": "1.0.0" }
+      },
+      "evidence": {
+        "promotionReceipt": "Template/Shell/Evidence/research.workspace/1.0.0/promotion-receipt.json",
+        "validationReport": "Template/Shell/Evidence/research.workspace/1.0.0/validation-report.json"
+      },
+      "audit": {
+        "createdBy": "REPLACE_ME",
+        "createdAt": "2026-02-26T00:00:00Z",
+        "submittedBy": "REPLACE_ME",
+        "submittedAt": "2026-02-26T00:00:00Z",
+        "approvedBy": "REPLACE_ME",
+        "approvedAt": "2026-02-26T00:00:00Z"
+      }
+    },
+    {
+      "kind": "governanceProfile",
+      "id": "gov.standard",
+      "version": "1.0.0",
+      "status": "locked",
+      "displayName": "Standard Governance Profile",
+      "description": "Default governance posture with standard audit and deny-by-default controls.",
+      "paths": {
+        "schema": "Template/Shell/governance-profile.schema.json"
+      },
+      "checksums": {
+        "schema": "sha256:REPLACE_ME"
+      },
+      "compatibility": {
+        "applicableTo": ["workspace", "module", "integration", "agent"]
+      },
+      "relationships": {
+        "supersedes": null
+      },
+      "evidence": {
+        "promotionReceipt": "Template/Shell/Evidence/gov.standard/1.0.0/promotion-receipt.json",
+        "validationReport": "Template/Shell/Evidence/gov.standard/1.0.0/validation-report.json"
+      },
+      "audit": {
+        "createdBy": "REPLACE_ME",
+        "createdAt": "2026-02-26T00:00:00Z",
+        "submittedBy": "REPLACE_ME",
+        "submittedAt": "2026-02-26T00:00:00Z",
+        "approvedBy": "REPLACE_ME",
+        "approvedAt": "2026-02-26T00:00:00Z"
+      }
+    },
+    {
+      "kind": "resourceTier",
+      "id": "tier.standard",
+      "version": "1.0.0",
+      "status": "locked",
+      "displayName": "Standard Resource Tier",
+      "description": "Default resource envelope for typical workspaces.",
+      "paths": {
+        "schema": "Template/Shell/resource-tier.schema.json"
+      },
+      "checksums": {
+        "schema": "sha256:REPLACE_ME"
+      },
+      "compatibility": {
+        "notes": "Define allowed model tags, integrations, and budget constraints in the tier file."
+      },
+      "relationships": {
+        "supersedes": null
+      },
+      "evidence": {
+        "promotionReceipt": "Template/Shell/Evidence/tier.standard/1.0.0/promotion-receipt.json",
+        "validationReport": "Template/Shell/Evidence/tier.standard/1.0.0/validation-report.json"
+      },
+      "audit": {
+        "createdBy": "REPLACE_ME",
+        "createdAt": "2026-02-26T00:00:00Z",
+        "submittedBy": "REPLACE_ME",
+        "submittedAt": "2026-02-26T00:00:00Z",
+        "approvedBy": "REPLACE_ME",
+        "approvedAt": "2026-02-26T00:00:00Z"
+      }
+    }
+  ],
+  "lineage": [
+    {
+      "kind": "workspaceTemplate",
+      "id": "generic.workspace",
+      "fromVersion": "1.0.0",
+      "toVersion": null,
+      "breaking": false,
+      "notes": "Base template lineage root."
+    }
+  ]
+}
