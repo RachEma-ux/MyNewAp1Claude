@@ -1,4 +1,4 @@
-# Updated Full Plan (Phase 1 + Phase 2 + Next)
+# Full Updated Plan (Phase 1 + Phase 2 + Next)
 
 ---
 
@@ -17,11 +17,11 @@
 
 - [x] Define Workspace Provisioning Protocol
 - [x] Define Workspace Lifecycle State Machine
-- [x] Define Evidence & Audit Requirements
+- [x] Define Evidence & Audit Requirements for provisioning
 
 ### Template Governance
 
-- [x] Establish Hybrid Template Governance Model (editable drafts + admin validation)
+- [x] Establish Hybrid Template Governance Model (editable drafts + admin validation + version bump)
 - [x] Define Template Lifecycle (draft → submitted → approved → locked → deprecated)
 - [x] Define Template Promotion Protocol
 - [x] Define Semantic Versioning Rules
@@ -29,7 +29,7 @@
 
 ---
 
-## Phase 2 — Machine-Enforceable Governance (IN PROGRESS)
+## Phase 2 — Machine-Enforceable Governance (ADVANCING)
 
 ### A) Schema Layer (Hard Validation Core)
 
@@ -38,13 +38,15 @@
 - [x] governance-profile.schema.json
 - [x] resource-tier.schema.json
 
-### B) Registry Layer (Catalog + Discoverability)
+### B) Registry Layer (Catalog + Discoverability + Integrity)
 
 - [x] TemplateRegistryContract.md
-- [x] templates.index.json (initial structure + sample entries)
-- [ ] Add real checksums (sha256) for every referenced file
-- [ ] Add real Evidence placeholders folder structure (receipts + validation reports)
-- [ ] Define version lineage rules for upgrades/migrations (more than placeholder)
+- [x] templates.index.json (registry index structure)
+- [x] Evidence folder conventions (Evidence/README.md + versioned paths)
+- [ ] Populate Evidence templates for each registry object/version
+- [ ] Compute and replace all sha256 checksums (replace sha256:REPLACE_ME)
+- [x] Expanded lineage records beyond placeholder (initial version lineage entries)
+- [ ] Tighten version lineage rules inside TemplateRegistryContract.md (breaking change + migration constraints)
 
 ### C) Drift & Integrity Layer (Spec Only)
 
@@ -55,27 +57,28 @@
 ### D) Resource Governance Layer (Spec Only)
 
 - [ ] Define Resource Pool Model
-- [ ] Define Tier Allocation & Upgrade/Downgrade Rules
-- [ ] Define Quota Enforcement Model
-- [ ] Define Budget Enforcement Model
-- [ ] Define Model/Integration allowlist enforcement rules
+- [ ] Define Tier Allocation rules
+- [ ] Define Upgrade/Downgrade protocol
+- [ ] Define Quota enforcement behavior (throttle/deny/freeze)
+- [ ] Define Budget enforcement behavior (throttle/deny/freeze)
+- [ ] Define Model/Integration allowlist enforcement (server-side)
 
 ### E) Backend Control-Plane Architecture (Spec Only)
 
-- [ ] Define Workspace Domain Model (DB entities + relations)
+- [ ] Define Workspace Domain Model (DB schema entities + relations)
 - [ ] Define Provisioning Service Architecture (request → approve → provision → activate)
-- [ ] Define Governance Enforcement Middleware (non-bypassable)
+- [ ] Define Non-Bypassable Governance Middleware wiring
 - [ ] Define Evidence & Audit Store Architecture
 - [ ] Define Module Registry Runtime Enforcement (server-side gates)
-- [ ] Define "Freeze" behavior across endpoints
+- [ ] Define Freeze behavior across endpoints + admin override logic
 
 ---
 
-## Deferred — One-Time Formatting Pass (After Core Files Exist)
+## Deferred — One-Time Formatting Pass (After All Files Exist)
 
 - [ ] Normalize Markdown formatting across all Phase 1 + Phase 2 docs
-- [ ] Run consistency pass on terminology + naming
-- [ ] Validate JSON schemas with CI (schema lint + sample validation)
+- [ ] Run terminology consistency pass + naming alignment
+- [ ] Validate JSON schemas via CI (schema lint + sample validation)
 - [ ] Lock documentation baseline (no edits without version bump)
 
 ---
@@ -87,8 +90,18 @@
 - [ ] Federated Governance Model
 - [ ] Workspace Decommissioning Protocol
 - [ ] Compliance & Reporting Specification
-- [ ] Control Dashboard Contracts (HQ views, audit views, drift views)
+- [ ] HQ Control Dashboard Contracts (audit, drift, freeze, resource)
 
 ---
 
-**Next most valuable move:** finish Registry Layer properly → compute checksums + create evidence folder conventions + tighten lineage/upgrade rules.
+## Current Position (Right Now)
+
+**You are here:**
+
+Phase 2 → Registry Layer → Integrity Completion
+
+**Next best actions:**
+
+1. Populate Evidence artifacts for each object/version
+2. Compute and replace sha256 checksums
+3. Add the tightened lineage rules section into TemplateRegistryContract.md
