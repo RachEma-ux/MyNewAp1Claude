@@ -54,29 +54,37 @@ export function GovernancePage({ workspaceId }: { workspaceId: number }) {
             {selfCheck ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  {selfCheck.healthy ? (
+                  {selfCheck.overallStatus === "compliant" ? (
                     <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  ) : selfCheck.overallStatus === "degraded" ? (
+                    <AlertTriangle className="h-5 w-5 text-yellow-500" />
                   ) : (
                     <XCircle className="h-5 w-5 text-red-500" />
                   )}
                   <span className="text-sm font-medium">
-                    {selfCheck.healthy ? "All checks passing" : "Issues detected"}
+                    {selfCheck.overallStatus === "compliant"
+                      ? "All checks passing"
+                      : selfCheck.overallStatus === "degraded"
+                        ? "Warnings detected"
+                        : "Issues detected"}
                   </span>
                 </div>
                 {selfCheck.checks?.map(
                   (
-                    check: { name: string; passed: boolean; message?: string },
+                    check: { name: string; status: string; details?: string },
                     i: number
                   ) => (
                     <div key={i} className="flex items-center gap-2 text-xs ml-7">
-                      {check.passed ? (
+                      {check.status === "pass" ? (
                         <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      ) : check.status === "warn" ? (
+                        <AlertTriangle className="h-3 w-3 text-yellow-500" />
                       ) : (
                         <XCircle className="h-3 w-3 text-red-500" />
                       )}
                       <span>{check.name}</span>
-                      {check.message && (
-                        <span className="text-muted-foreground">{check.message}</span>
+                      {check.details && (
+                        <span className="text-muted-foreground">{check.details}</span>
                       )}
                     </div>
                   )
