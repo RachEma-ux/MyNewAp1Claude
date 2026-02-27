@@ -1,5 +1,6 @@
 /**
  * PMT Project Templates — Create and apply reusable project blueprints
+ * Updated with OpenProject-aligned metadata display
  */
 
 import { useState } from "react";
@@ -17,8 +18,40 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, FileStack, Plus, Copy, Pencil, Trash2, Sparkles } from "lucide-react";
+import { Loader2, FileStack, Plus, Copy, Pencil, Trash2, Sparkles, Clock, ListChecks } from "lucide-react";
 import { toast } from "sonner";
+
+/** Count total tasks recursively in phases */
+function countTasks(phases: any[]): number {
+  let total = 0;
+  for (const phase of phases) {
+    if (phase.tasks) {
+      total += phase.tasks.length;
+      for (const task of phase.tasks) {
+        if (task.children) total += task.children.length;
+      }
+    }
+  }
+  return total;
+}
+
+/** Sum estimated hours recursively */
+function sumHours(phases: any[]): number {
+  let total = 0;
+  for (const phase of phases) {
+    if (phase.tasks) {
+      for (const task of phase.tasks) {
+        if (task.estimatedHours) total += task.estimatedHours;
+        if (task.children) {
+          for (const child of task.children) {
+            if (child.estimatedHours) total += child.estimatedHours;
+          }
+        }
+      }
+    }
+  }
+  return total;
+}
 
 export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -59,7 +92,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
   const seedMut = trpc.modules.pmt.templates.projectTemplates.seed.useMutation({
     onSuccess: () => {
       utils.modules.pmt.templates.projectTemplates.list.invalidate();
-      toast.success("Full PM Lifecycle template created");
+      toast.success("PM² Lifecycle + Scrum templates created");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -118,7 +151,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => seedMut.mutate({ workspaceId })} disabled={seedMut.isPending}>
             <Sparkles className="h-4 w-4 mr-1" />
-            {seedMut.isPending ? "Seeding..." : "Seed Default Template"}
+            {seedMut.isPending ? "Seeding..." : "Seed OpenProject Templates"}
           </Button>
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" />
@@ -133,7 +166,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
         </div>
       ) : !templates || (templates as any[]).length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          No project templates. Click "Seed Default Template" to create a built-in PM lifecycle template, or create your own.
+          No project templates. Click "Seed OpenProject Templates" to create PM² Lifecycle and Scrum templates, or create your own.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -141,26 +174,53 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
             const tplData = t.templateData as Record<string, unknown> | null;
             const statusCount = Array.isArray(tplData?.statuses) ? (tplData.statuses as any[]).length : 0;
             const typeCount = Array.isArray(tplData?.types) ? (tplData.types as any[]).length : 0;
-            const phaseCount = Array.isArray(tplData?.phases) ? (tplData.phases as any[]).length : 0;
+            const phases = Array.isArray(tplData?.phases) ? (tplData.phases as any[]) : [];
+            const phaseCount = phases.length;
+            const taskCount = phases.length > 0 ? countTasks(phases) : 0;
+            const totalHours = phases.length > 0 ? sumHours(phases) : 0;
+            const priorityCount = Array.isArray(tplData?.priorities) ? (tplData.priorities as any[]).length : 0;
+            const hasGates = Array.isArray(tplData?.projectPhases);
+
             return (
               <Card key={t.id}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center justify-between">
                     <span className="truncate">{t.name}</span>
-                    <Badge variant="outline" className="text-[10px]">Template</Badge>
+                    <Badge variant="outline" className="text-[10px] shrink-0">Template</Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {t.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">{t.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-3">{t.description}</p>
                   )}
-                  {(statusCount > 0 || typeCount > 0 || phaseCount > 0) && (
-                    <div className="flex flex-wrap gap-1">
-                      {statusCount > 0 && <Badge variant="secondary" className="text-[10px]">{statusCount} statuses</Badge>}
-                      {typeCount > 0 && <Badge variant="secondary" className="text-[10px]">{typeCount} types</Badge>}
-                      {phaseCount > 0 && <Badge variant="secondary" className="text-[10px]">{phaseCount} phases</Badge>}
+
+                  {/* Metadata badges */}
+                  <div className="flex flex-wrap gap-1">
+                    {statusCount > 0 && <Badge variant="secondary" className="text-[10px]">{statusCount} statuses</Badge>}
+                    {typeCount > 0 && <Badge variant="secondary" className="text-[10px]">{typeCount} types</Badge>}
+                    {priorityCount > 0 && <Badge variant="secondary" className="text-[10px]">{priorityCount} priorities</Badge>}
+                    {phaseCount > 0 && <Badge variant="secondary" className="text-[10px]">{phaseCount} phases</Badge>}
+                    {hasGates && <Badge variant="secondary" className="text-[10px]">PM² gates</Badge>}
+                  </div>
+
+                  {/* Task & hours summary */}
+                  {(taskCount > 0 || totalHours > 0) && (
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {taskCount > 0 && (
+                        <span className="flex items-center gap-1">
+                          <ListChecks className="h-3 w-3" />
+                          {taskCount} tasks
+                        </span>
+                      )}
+                      {totalHours > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {totalHours}h estimated
+                        </span>
+                      )}
                     </div>
                   )}
+
                   <div className="flex items-center gap-1">
                     <Button variant="outline" size="sm" onClick={() => openApply(t.id, t.name)} disabled={applyMut.isPending}>
                       <Copy className="h-3 w-3 mr-1" />
