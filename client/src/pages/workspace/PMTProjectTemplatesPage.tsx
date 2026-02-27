@@ -92,7 +92,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
   const seedMut = trpc.modules.pmt.templates.projectTemplates.seed.useMutation({
     onSuccess: () => {
       utils.modules.pmt.templates.projectTemplates.list.invalidate();
-      toast.success("PM² Lifecycle + Scrum templates created");
+      toast.success("5 PM templates created (PM², Scrum, Kanban, Product Launch, SDLC)");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -151,7 +151,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => seedMut.mutate({ workspaceId })} disabled={seedMut.isPending}>
             <Sparkles className="h-4 w-4 mr-1" />
-            {seedMut.isPending ? "Seeding..." : "Seed OpenProject Templates"}
+            {seedMut.isPending ? "Seeding..." : "Seed PM Templates"}
           </Button>
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" />
@@ -166,7 +166,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
         </div>
       ) : !templates || (templates as any[]).length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          No project templates. Click "Seed OpenProject Templates" to create PM² Lifecycle and Scrum templates, or create your own.
+          No project templates. Click "Seed PM Templates" to create 5 reusable templates (PM² Lifecycle, Scrum, Kanban, Product Launch, SDLC), or create your own.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

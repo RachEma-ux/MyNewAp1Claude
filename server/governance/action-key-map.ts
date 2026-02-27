@@ -297,6 +297,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "modules.pmt.templates.projectTemplates.update": "pmt.projectTemplate.update",
   "modules.pmt.templates.projectTemplates.delete": "pmt.projectTemplate.delete",
   "modules.pmt.templates.projectTemplates.useTemplate": "pmt.projectTemplate.apply",
+  "modules.pmt.templates.projectTemplates.applyExample": "pmt.projectTemplate.apply",
   "modules.pmt.templates.projectTemplates.seed": "pmt.projectTemplate.seed",
   "modules.pmt.templates.workItemTemplates.create": "pmt.workItemTemplate.create",
   "modules.pmt.templates.workItemTemplates.update": "pmt.workItemTemplate.update",

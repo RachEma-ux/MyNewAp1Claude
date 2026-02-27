@@ -1,7 +1,8 @@
 /**
- * PMT Examples — Permanent built-in project examples from OpenProject
- * These are concrete, real-world project examples that users can apply
+ * PMT Examples — Permanent built-in project examples
+ * Concrete, real-world project examples that users can apply
  * to create fully populated demo projects in their workspace.
+ * These use hardcoded data via the applyExample mutation (no DB template needed).
  */
 
 import { useState } from "react";
@@ -18,7 +19,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Sparkles, Calendar, Globe, Bug, Rocket, ListChecks, Clock, Copy } from "lucide-react";
+import {
+  Sparkles,
+  Calendar,
+  Globe,
+  Smartphone,
+  Megaphone,
+  Building2,
+  UserPlus,
+  ListChecks,
+  Clock,
+  Copy,
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface ExampleProject {
@@ -67,6 +79,74 @@ const EXAMPLES: ExampleProject[] = [
       "Releases: v1.0 → v1.1 → v2.0 with concrete scope per release",
     ],
   },
+  {
+    id: "mobile_app",
+    name: "Mobile App Launch — TaskFlow",
+    description:
+      "Launch 'TaskFlow', a productivity app for iOS and Android. Covers beta testing with TestFlight, App Store submission, Product Hunt launch, press outreach, and post-launch iteration.",
+    icon: <Smartphone className="h-6 w-6 text-purple-500" />,
+    tags: ["Product Launch", "Mobile", "Agile"],
+    taskCount: 18,
+    estimatedHours: 160,
+    highlights: [
+      "App Store listing copy, demo video, and screenshots",
+      "TestFlight & Google Play internal testing setup",
+      "Beta bug fixes: device sync, Android back button",
+      "Product Hunt launch + social media blitz",
+      "Post-launch: Crashlytics monitoring, retention analysis",
+    ],
+  },
+  {
+    id: "marketing",
+    name: "Spring SaaS Product Launch Campaign",
+    description:
+      "Execute the Q2 spring launch campaign for CloudSync Pro — a SaaS file collaboration platform. Content creation, paid ads, email drip sequences, influencer partnerships, and live webinar.",
+    icon: <Megaphone className="h-6 w-6 text-pink-500" />,
+    tags: ["Marketing", "SaaS", "Campaign"],
+    taskCount: 16,
+    estimatedHours: 100,
+    highlights: [
+      "3 audience segments with Google + LinkedIn + Facebook ads",
+      "5-email drip sequence with conversion-optimized copy",
+      "3 influencer partnerships ($1.5K–$700 each)",
+      "Live webinar: 'Future of Team Collaboration' (500 target)",
+      "ROI analysis: CAC, ROAS, channel breakdown",
+    ],
+  },
+  {
+    id: "office_relocation",
+    name: "Office Relocation — 123 Innovation Way",
+    description:
+      "Relocate a 50-person team to new HQ at 123 Innovation Way. Covers lease signing, IT infrastructure (Cat6a cabling, Ubiquiti WiFi, server room), furniture procurement, weekend move, and first-week settling.",
+    icon: <Building2 className="h-6 w-6 text-emerald-500" />,
+    tags: ["Facilities", "IT Infrastructure", "Logistics"],
+    taskCount: 22,
+    estimatedHours: 210,
+    highlights: [
+      "Lease: 4,200 sq ft, $42/sq ft/yr, 3 months free",
+      "IT: Cat6a cabling, Cisco switches, Ubiquiti WiFi, Kisi access",
+      "Furniture: Uplift standing desks + Branch ergonomic chairs",
+      "Weekend move: 3 trucks, 8 movers, IT cutover Saturday night",
+      "First week: all-hands welcome, troubleshooting, office warming",
+    ],
+  },
+  {
+    id: "hr_onboarding",
+    name: "90-Day New Hire Onboarding",
+    description:
+      "Structured 90-day onboarding program for new engineering hires. Pre-boarding setup, Day 1 orientation, buddy program, first 'good first issue' PR, and 30/60/90 day manager reviews.",
+    icon: <UserPlus className="h-6 w-6 text-sky-500" />,
+    tags: ["HR", "Onboarding", "People Ops"],
+    taskCount: 24,
+    estimatedHours: 80,
+    highlights: [
+      "Pre-boarding: laptop setup, account creation, swag kit",
+      "Day 1: office tour, HR paperwork, team lunch at Milano's",
+      "Week 1: shadow a senior engineer, first PR merged",
+      "30/60/90 day check-ins with concrete milestones",
+      "Buddy program: weekly 1:1s with assigned mentor",
+    ],
+  },
 ];
 
 export function PMTExamplesPage({ workspaceId }: { workspaceId: number }) {
@@ -75,56 +155,23 @@ export function PMTExamplesPage({ workspaceId }: { workspaceId: number }) {
 
   const utils = trpc.useUtils();
 
-  // We seed + apply in two steps: first seed the template, then apply it
-  const seedMut = trpc.modules.pmt.templates.projectTemplates.seed.useMutation();
-  const applyMut = trpc.modules.pmt.templates.projectTemplates.useTemplate.useMutation({
+  const applyMut = trpc.modules.pmt.templates.projectTemplates.applyExample.useMutation({
     onSuccess: () => {
       utils.modules.pmt.projects.list.invalidate();
       setApplyDialog(null);
       setProjectName("");
       toast.success("Example project created! Check All Projects to see it.");
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e: any) => toast.error(e.message),
   });
 
-  const handleApply = async (exampleId: string) => {
+  const handleApply = (exampleId: string) => {
     if (!projectName.trim()) return;
-
-    try {
-      // Seed templates first (idempotent — creates if not exists)
-      const seeded = await seedMut.mutateAsync({ workspaceId });
-
-      // Pick the right template ID
-      const templateId = exampleId === "conference" ? seeded.pm.id : seeded.scrum.id;
-
-      // Apply template to create concrete project
-      await applyMut.mutateAsync({
-        id: templateId,
-        workspaceId,
-        name: projectName.trim(),
-      });
-    } catch (e: any) {
-      // If seed fails because templates already exist, try to find and apply existing
-      try {
-        const templates = await utils.modules.pmt.templates.projectTemplates.list.fetch({ workspaceId });
-        const match = (templates as any[])?.find((t: any) =>
-          exampleId === "conference"
-            ? t.name.includes("Conference")
-            : t.name.includes("Website")
-        );
-        if (match) {
-          await applyMut.mutateAsync({
-            id: match.id,
-            workspaceId,
-            name: projectName.trim(),
-          });
-        } else {
-          toast.error("Could not find example template. Try again.");
-        }
-      } catch {
-        toast.error(e.message || "Failed to create example project");
-      }
-    }
+    applyMut.mutate({
+      workspaceId,
+      exampleId,
+      name: projectName.trim(),
+    });
   };
 
   const openApply = (exampleId: string, defaultName: string) => {
@@ -192,7 +239,7 @@ export function PMTExamplesPage({ workspaceId }: { workspaceId: number }) {
               <Button
                 className="w-full"
                 onClick={() => openApply(example.id, example.name)}
-                disabled={applyMut.isPending || seedMut.isPending}
+                disabled={applyMut.isPending}
               >
                 <Copy className="h-4 w-4 mr-1" />
                 Use Example
@@ -227,9 +274,9 @@ export function PMTExamplesPage({ workspaceId }: { workspaceId: number }) {
             </Button>
             <Button
               onClick={() => applyDialog && handleApply(applyDialog)}
-              disabled={applyMut.isPending || seedMut.isPending || !projectName.trim()}
+              disabled={applyMut.isPending || !projectName.trim()}
             >
-              {applyMut.isPending || seedMut.isPending ? "Creating..." : "Create Project"}
+              {applyMut.isPending ? "Creating..." : "Create Project"}
             </Button>
           </DialogFooter>
         </DialogContent>
