@@ -27,6 +27,12 @@ import { timeEntriesRouter } from "./time-entries-router";
 import { costEntriesRouter } from "./cost-entries-router";
 import { budgetsRouter } from "./budgets-router";
 import { activityTypesRouter } from "./activity-types-router";
+import { gitRouter } from "./git-router";
+import { templatesRouter } from "./templates-router";
+import { webhooksRouter } from "./webhooks-router";
+import { icalRouter } from "./ical-router";
+import { customActionsRouter } from "./custom-actions-router";
+import { notificationsRouter } from "./notifications-router";
 
 const projectsRouter = router({
   list: protectedProcedure
@@ -378,4 +384,10 @@ export const pmtRouter = router({
   costEntries: costEntriesRouter,
   budgets: budgetsRouter,
   activityTypes: activityTypesRouter,
+  git: gitRouter,
+  templates: templatesRouter,
+  webhooks: webhooksRouter,
+  ical: icalRouter,
+  customActions: customActionsRouter,
+  notifications: notificationsRouter,
 });

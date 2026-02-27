@@ -56,6 +56,12 @@ import { PMTCostReportPage } from "./workspace/PMTCostReportPage";
 import { PMTBudgetPage } from "./workspace/PMTBudgetPage";
 import { PMTPortfolioPage } from "./workspace/PMTPortfolioPage";
 import { PMTProjectHomePage } from "./workspace/PMTProjectHomePage";
+import { PMTGitReferencesPage } from "./workspace/PMTGitReferencesPage";
+import { PMTProjectTemplatesPage } from "./workspace/PMTProjectTemplatesPage";
+import { PMTWorkItemTemplatesPage } from "./workspace/PMTWorkItemTemplatesPage";
+import { PMTWebhooksPage } from "./workspace/PMTWebhooksPage";
+import { PMTCustomActionsPage } from "./workspace/PMTCustomActionsPage";
+import { PMTNotificationsPage } from "./workspace/PMTNotificationsPage";
 import { KnowledgeDocsPage } from "./workspace/KnowledgeDocsPage";
 import { KnowledgeDecisionsPage } from "./workspace/KnowledgeDecisionsPage";
 import { KnowledgeSearchPage } from "./workspace/KnowledgeSearchPage";
@@ -304,6 +310,36 @@ export default function WorkspaceShell() {
             <Route path={`${basePath}/projects/project-home`}>
               <ModuleGate moduleKey="pmt" moduleName="Project Management">
                 <PMTProjectHomePage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/git-references`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTGitReferencesPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/project-templates`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTProjectTemplatesPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/work-item-templates`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTWorkItemTemplatesPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/webhooks`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTWebhooksPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/custom-actions`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTCustomActionsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/notifications`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTNotificationsPage workspaceId={workspaceId} />
               </ModuleGate>
             </Route>
             <Route path={`${basePath}/projects/:projectId`}>
