@@ -33,6 +33,7 @@ import { webhooksRouter } from "./webhooks-router";
 import { icalRouter } from "./ical-router";
 import { customActionsRouter } from "./custom-actions-router";
 import { notificationsRouter } from "./notifications-router";
+import { aiRouter } from "./ai-router";
 
 const projectsRouter = router({
   list: protectedProcedure
@@ -390,4 +391,5 @@ export const pmtRouter = router({
   ical: icalRouter,
   customActions: customActionsRouter,
   notifications: notificationsRouter,
+  ai: aiRouter,
 });

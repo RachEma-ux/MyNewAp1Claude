@@ -62,6 +62,7 @@ import { PMTWorkItemTemplatesPage } from "./workspace/PMTWorkItemTemplatesPage";
 import { PMTWebhooksPage } from "./workspace/PMTWebhooksPage";
 import { PMTCustomActionsPage } from "./workspace/PMTCustomActionsPage";
 import { PMTNotificationsPage } from "./workspace/PMTNotificationsPage";
+import { PMTAIServicesPage } from "./workspace/PMTAIServicesPage";
 import { KnowledgeDocsPage } from "./workspace/KnowledgeDocsPage";
 import { KnowledgeDecisionsPage } from "./workspace/KnowledgeDecisionsPage";
 import { KnowledgeSearchPage } from "./workspace/KnowledgeSearchPage";
@@ -340,6 +341,11 @@ export default function WorkspaceShell() {
             <Route path={`${basePath}/projects/notifications`}>
               <ModuleGate moduleKey="pmt" moduleName="Project Management">
                 <PMTNotificationsPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/ai-services`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTAIServicesPage workspaceId={workspaceId} />
               </ModuleGate>
             </Route>
             <Route path={`${basePath}/projects/:projectId`}>

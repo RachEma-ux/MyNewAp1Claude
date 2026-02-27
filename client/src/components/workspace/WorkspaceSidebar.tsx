@@ -97,6 +97,7 @@ export function WorkspaceSidebar({
         { label: "Webhooks", path: `${base}/projects/webhooks` },
         { label: "Custom Actions", path: `${base}/projects/custom-actions` },
         { label: "Notifications", path: `${base}/projects/notifications` },
+        { label: "AI Services", path: `${base}/projects/ai-services` },
         { label: "Settings", path: `${base}/projects/settings` },
       ],
     },
