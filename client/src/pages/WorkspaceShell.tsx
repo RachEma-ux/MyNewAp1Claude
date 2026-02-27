@@ -19,6 +19,7 @@ import {
   MessageSquare,
   BarChart3,
   ShieldCheck,
+  FileStack,
 } from "lucide-react";
 
 import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
@@ -547,22 +548,41 @@ function WorkspaceOverview({
           ))}
       </div>
 
-      {/* Governance card (always visible) */}
-      <Link href={`${basePath}/governance`}>
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors max-w-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5" />
-              Governance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              View governance status, action registry, and health checks
-            </p>
-          </CardContent>
-        </Card>
-      </Link>
+      {/* Quick Access */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {enabledModules.has("pmt") && (
+          <Link href={`${basePath}/projects/project-templates`}>
+            <Card className="cursor-pointer hover:border-primary/50 transition-colors h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileStack className="h-5 w-5" />
+                  PM Templates
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Create projects from lifecycle templates with statuses, types, and phases
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+        <Link href={`${basePath}/governance`}>
+          <Card className="cursor-pointer hover:border-primary/50 transition-colors h-full">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5" />
+                Governance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                View governance status, action registry, and health checks
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
 
       {enabledModules.size === 0 && (
         <div className="text-center py-8">
