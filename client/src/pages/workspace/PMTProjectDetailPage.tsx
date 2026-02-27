@@ -122,30 +122,28 @@ export function PMTProjectDetailPage({ workspaceId }: { workspaceId: number }) {
               className="cursor-pointer hover:border-primary/30 transition-colors"
               onClick={() => setDrawerTaskId(task.id)}
             >
-              <CardContent className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <input
-                    type="checkbox"
-                    checked={task.status === "done"}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      updateMut.mutate({
-                        id: task.id,
-                        workspaceId,
-                        status: task.status === "done" ? "todo" : "done",
-                      });
-                    }}
-                    className="h-4 w-4 rounded"
-                  />
-                  <span
-                    className={`text-sm ${
-                      task.status === "done" ? "line-through text-muted-foreground" : ""
-                    }`}
-                  >
-                    {task.title}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
+              <CardContent className="flex items-center gap-3 py-3 overflow-hidden">
+                <input
+                  type="checkbox"
+                  checked={task.status === "done"}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    updateMut.mutate({
+                      id: task.id,
+                      workspaceId,
+                      status: task.status === "done" ? "todo" : "done",
+                    });
+                  }}
+                  className="h-4 w-4 rounded shrink-0"
+                />
+                <span
+                  className={`text-sm truncate flex-1 min-w-0 ${
+                    task.status === "done" ? "line-through text-muted-foreground" : ""
+                  }`}
+                >
+                  {task.title}
+                </span>
+                <div className="flex items-center gap-1 shrink-0">
                   {task.priority && (
                     <Badge variant="outline" className="text-[10px]">
                       {task.priority}
@@ -167,7 +165,7 @@ export function PMTProjectDetailPage({ workspaceId }: { workspaceId: number }) {
 
       {/* Task Drawer */}
       <Sheet open={!!drawerTaskId} onOpenChange={(open) => !open && setDrawerTaskId(null)}>
-        <SheetContent side="right" className="w-[400px] sm:max-w-[400px]">
+        <SheetContent side="right" className="w-full max-w-[min(400px,100vw)] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{drawerTask?.title || "Task"}</SheetTitle>
             <SheetDescription>Task details and actions</SheetDescription>

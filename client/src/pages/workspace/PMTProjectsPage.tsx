@@ -88,21 +88,21 @@ export function PMTProjectsPage({ workspaceId }: { workspaceId: number }) {
           {projects.map((p) => (
             <Link key={p.id} href={`/w/${workspaceId}/projects/${p.id}`}>
               <Card className="cursor-pointer hover:border-primary/50 transition-colors">
-                <CardContent className="flex items-center justify-between py-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{p.name}</span>
+                <CardContent className="flex items-center gap-3 py-4 overflow-hidden">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium truncate">{p.name}</span>
                       {p.riskLevel && (
-                        <Badge variant="outline" className={riskBadge[p.riskLevel] || ""}>
+                        <Badge variant="outline" className={`shrink-0 ${riskBadge[p.riskLevel] || ""}`}>
                           {p.riskLevel}
                         </Badge>
                       )}
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs shrink-0">
                         {p.status || "active"}
                       </Badge>
                     </div>
                     {p.description && (
-                      <p className="text-xs text-muted-foreground mt-1 truncate max-w-lg">
+                      <p className="text-xs text-muted-foreground mt-1 truncate">
                         {p.description}
                       </p>
                     )}
