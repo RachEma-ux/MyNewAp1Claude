@@ -1,0 +1,84 @@
+Session Summary — 2026-02-27 22:30 UTC
+========================================
+
+## Objective
+Complete the PM Lifecycle Workflow Template + PM Project Template implementation,
+fix governance issues, and upgrade templates to full OpenProject structure.
+
+## Work Completed
+
+### 1. Governance Fix for PMT Template Actions
+- Added 9 action entries to `config/governance/platform_action_registry.yaml`:
+  pmt.projectTemplate.create/update/delete/apply/seed
+  pmt.workItemTemplate.create/update/delete/apply
+- These were already mapped in `server/governance/action-key-map.ts` (previous session)
+- Fixed the FORBIDDEN error that blocked template seeding
+- Commit: 092506a
+
+### 2. Upgraded Templates to Full OpenProject Structure
+- Rewrote `PM_LIFECYCLE_TEMPLATE_DATA` in `server/modules/pmt/templates-router.ts`:
+  - 14 statuses with done ratios (matching OpenProject standard.yml exactly):
+    New, In specification, Specified, Confirmed, To be scheduled, Scheduled,
+    In progress, Developed, In testing, Tested, Test failed, Closed, On hold, Rejected
+  - 7 work package types: Task, Milestone, Summary task, Feature, Epic, User story, Bug
+  - 4 PM² phases with gates (RfP, RfE, RfC) + Monitor & Control
+  - Rich task data: descriptions, estimated hours (~500h total), story points
+  - PM² deliverables: Project Charter, Business Case, WBS, Risk Register, etc.
+  - 4 priorities: Low, Normal, High, Immediate
+  - 6 time entry activities: Management, Specification, Development, Testing, Support, Other
+- Added new `SCRUM_TEMPLATE_DATA` — Agile/Scrum template:
+  - Product Backlog with 8 user stories and bugs
+  - Sprint 1 & 2 with story points and nested child tasks
+  - Release milestones (v1.0, v1.1, v2.0)
+- `useTemplate` mutation now supports recursive nested children, descriptions, estimated hours, story points
+- `seed` procedure now creates BOTH PM² Lifecycle and Scrum templates
+- Commit: 9785485
+
+### 3. Updated Frontend Template Cards
+- `PMTProjectTemplatesPage.tsx` — enhanced metadata display:
+  - Shows task count, total estimated hours, PM² gates badge
+  - Seed button now says "Seed OpenProject Templates" (creates both)
+  - Added Clock and ListChecks icons
+- Commit: 9785485 (same)
+
+### 4. Fixed Card/Drawer Overflow on Mobile
+- `PMTProjectDetailPage.tsx`:
+  - Sheet drawer: `w-full max-w-[min(400px,100vw)]` instead of fixed `w-[400px]`
+  - Task cards: added overflow-hidden, truncate on title, shrink-0 on badges
+- `PMTTaskDetailDrawer.tsx`:
+  - Sheet: `max-w-[min(32rem,100vw)]` with overflow-y-auto
+- `PMTProjectsPage.tsx`:
+  - Project cards: overflow-hidden, flex-1 min-w-0, flex-wrap on badges
+- Commit: 6bf01ac
+
+### 5. Research: OpenProject Seed Data
+- Fetched and analyzed OpenProject's `standard.yml` from GitHub (opf/openproject)
+- Extracted complete seed data: 14 statuses, 7 types, 4 PM² phases, demo project
+  (conference organization), scrum project (website rebuild), priorities, activities
+- Read PM² methodology docs: 4 phases, 3 gates (RfP/RfE/RfC), deliverables per phase,
+  roles (PO, PM, PCT, PSC), Monitor & Control continuous activity
+
+## Deploys
+- Multiple deploys via GitHub Actions with 30-min tunnel duration
+- Each deploy: created workspace, enabled PMT module (with governance evidence),
+  seeded both templates, applied PM² template to create demo project
+
+## Commits (this session)
+1. 092506a - fix(governance): register PMT template action keys in action registry
+2. 9785485 - feat(pmt): upgrade templates to full OpenProject structure
+3. 6bf01ac - fix(pmt): prevent cards and drawers from overflowing viewport
+
+## Files Modified
+- config/governance/platform_action_registry.yaml (9 new action entries)
+- server/governance/action-key-map.ts (already done previous session)
+- server/modules/pmt/templates-router.ts (major rewrite — OpenProject data)
+- client/src/pages/workspace/PMTProjectTemplatesPage.tsx (richer metadata display)
+- client/src/pages/workspace/PMTProjectDetailPage.tsx (overflow fix)
+- client/src/pages/workspace/PMTTaskDetailDrawer.tsx (overflow fix)
+- client/src/pages/workspace/PMTProjectsPage.tsx (overflow fix)
+
+## Key Technical Notes
+- Governance evidence for `module.setEnabled` (R3 action): pass `_evidence: { types: ["reason"], refs: ["..."] }` in tRPC input
+- OpenProject uses Open Color palette for status/type colors (e.g., cyan-7, grape-5)
+- PM² phases are non-overlapping but Monitor & Control runs continuously
+- Template `useTemplate` now uses recursive `insertTask()` for unlimited nesting depth
