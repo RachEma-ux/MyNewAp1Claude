@@ -59,6 +59,7 @@ import { PMTPortfolioPage } from "./workspace/PMTPortfolioPage";
 import { PMTProjectHomePage } from "./workspace/PMTProjectHomePage";
 import { PMTGitReferencesPage } from "./workspace/PMTGitReferencesPage";
 import { PMTProjectTemplatesPage } from "./workspace/PMTProjectTemplatesPage";
+import { PMTExamplesPage } from "./workspace/PMTExamplesPage";
 import { PMTWorkItemTemplatesPage } from "./workspace/PMTWorkItemTemplatesPage";
 import { PMTWebhooksPage } from "./workspace/PMTWebhooksPage";
 import { PMTCustomActionsPage } from "./workspace/PMTCustomActionsPage";
@@ -322,6 +323,11 @@ export default function WorkspaceShell() {
             <Route path={`${basePath}/projects/project-templates`}>
               <ModuleGate moduleKey="pmt" moduleName="Project Management">
                 <PMTProjectTemplatesPage workspaceId={workspaceId} />
+              </ModuleGate>
+            </Route>
+            <Route path={`${basePath}/projects/examples`}>
+              <ModuleGate moduleKey="pmt" moduleName="Project Management">
+                <PMTExamplesPage workspaceId={workspaceId} />
               </ModuleGate>
             </Route>
             <Route path={`${basePath}/projects/work-item-templates`}>

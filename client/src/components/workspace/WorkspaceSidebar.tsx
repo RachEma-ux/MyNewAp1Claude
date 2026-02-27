@@ -74,6 +74,7 @@ export function WorkspaceSidebar({
       children: [
         { label: "All Projects", path: `${base}/projects` },
         { label: "Templates", path: `${base}/projects/project-templates` },
+        { label: "Examples", path: `${base}/projects/examples` },
         { label: "Board", path: `${base}/projects/board` },
         { label: "Table", path: `${base}/projects/table` },
         { label: "Timeline", path: `${base}/projects/timeline` },
