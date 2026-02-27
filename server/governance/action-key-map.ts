@@ -293,6 +293,15 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "modules.pmt.tasks.delete": "pmt.task.delete",
   "modules.pmt.dependencies.add": "pmt.dependency.add",
   "modules.pmt.dependencies.remove": "pmt.dependency.remove",
+  "modules.pmt.templates.projectTemplates.create": "pmt.projectTemplate.create",
+  "modules.pmt.templates.projectTemplates.update": "pmt.projectTemplate.update",
+  "modules.pmt.templates.projectTemplates.delete": "pmt.projectTemplate.delete",
+  "modules.pmt.templates.projectTemplates.useTemplate": "pmt.projectTemplate.apply",
+  "modules.pmt.templates.projectTemplates.seed": "pmt.projectTemplate.seed",
+  "modules.pmt.templates.workItemTemplates.create": "pmt.workItemTemplate.create",
+  "modules.pmt.templates.workItemTemplates.update": "pmt.workItemTemplate.update",
+  "modules.pmt.templates.workItemTemplates.delete": "pmt.workItemTemplate.delete",
+  "modules.pmt.templates.workItemTemplates.useTemplate": "pmt.workItemTemplate.apply",
 
   // ── Platform Engines — Knowledge ─────────────────────────────────────────
   "modules.knowledge.documents.create": "knowledge.document.create",

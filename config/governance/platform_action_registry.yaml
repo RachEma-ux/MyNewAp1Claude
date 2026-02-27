@@ -1814,6 +1814,78 @@ actions:
     approval: none
     evidence: { required: false }
 
+  pmt.projectTemplate.create:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.projectTemplate.update:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.projectTemplate.delete:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.projectTemplate.apply:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.projectTemplate.seed:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.workItemTemplate.create:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.workItemTemplate.update:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.workItemTemplate.delete:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  pmt.workItemTemplate.apply:
+    domain: pmt
+    risk: R1
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   # ═══════════════════════════════════════════════════════════════════════════
   # PLATFORM ENGINES — KNOWLEDGE
   # ═══════════════════════════════════════════════════════════════════════════
