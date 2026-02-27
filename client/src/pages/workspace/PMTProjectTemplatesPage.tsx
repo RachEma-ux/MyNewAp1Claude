@@ -43,7 +43,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
     onError: (e) => toast.error(e.message),
   });
 
-  const applyMut = trpc.modules.pmt.templates.projectTemplates.apply.useMutation({
+  const applyMut = trpc.modules.pmt.templates.projectTemplates.useTemplate.useMutation({
     onSuccess: () => { utils.modules.pmt.projects.list.invalidate(); toast.success("Project created from template"); },
     onError: (e) => toast.error(e.message),
   });

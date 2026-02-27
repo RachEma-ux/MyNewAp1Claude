@@ -89,7 +89,7 @@ const projectTemplatesRouter = router({
       return { success: true };
     }),
 
-  apply: governedProcedure
+  useTemplate: governedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number(), name: z.string().min(1).max(255) }))
     .mutation(async ({ ctx, input }) => {
       await requireModule(input.workspaceId, "pmt");
@@ -193,7 +193,7 @@ const workItemTemplatesRouter = router({
       return { success: true };
     }),
 
-  apply: governedProcedure
+  useTemplate: governedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number(), projectId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       await requireModule(input.workspaceId, "pmt");

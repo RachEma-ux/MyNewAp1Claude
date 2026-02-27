@@ -51,7 +51,7 @@ export function PMTWorkItemTemplatesPage({ workspaceId }: { workspaceId: number 
     onError: (e) => toast.error(e.message),
   });
 
-  const applyMut = trpc.modules.pmt.templates.workItemTemplates.apply.useMutation({
+  const applyMut = trpc.modules.pmt.templates.workItemTemplates.useTemplate.useMutation({
     onSuccess: () => { utils.modules.pmt.tasks.list.invalidate(); toast.success("Task created from template"); },
     onError: (e) => toast.error(e.message),
   });
