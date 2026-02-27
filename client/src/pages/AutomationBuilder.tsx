@@ -227,6 +227,73 @@ export default function AutomationBuilder() {
         { id: "e-t6-3", source: "code-action-t6", target: "email-action-t6", animated: true },
       ],
     },
+    "7": {
+      name: "Project Management Lifecycle",
+      nodes: [
+        // Trigger
+        { id: "pm-trigger", type: "workflow", data: { label: "Project Created", blockType: "trigger", config: { label: "Webhook: Project Created" } }, position: { x: 300, y: 0 } },
+        // Phase 1 — Initiating
+        { id: "pm-phase1", type: "workflow", data: { label: "Phase: Initiating", blockType: "action", config: { label: "Phase Gate" } }, position: { x: 300, y: 100 } },
+        { id: "pm-scoping", type: "workflow", data: { label: "Scoping & Requirements", blockType: "action" }, position: { x: 100, y: 200 } },
+        { id: "pm-stakeholders", type: "workflow", data: { label: "Stakeholder Identification", blockType: "action" }, position: { x: 500, y: 200 } },
+        { id: "pm-feasibility", type: "workflow", data: { label: "Feasibility Review Gate", blockType: "action", config: { label: "Approval Gate" } }, position: { x: 300, y: 320 } },
+        // Phase 2 — Planning
+        { id: "pm-phase2", type: "workflow", data: { label: "Phase: Planning", blockType: "action", config: { label: "Phase Gate" } }, position: { x: 300, y: 430 } },
+        { id: "pm-wbs", type: "workflow", data: { label: "Work Breakdown & Estimation", blockType: "action" }, position: { x: 60, y: 530 } },
+        { id: "pm-resources", type: "workflow", data: { label: "Resource & Budget Allocation", blockType: "action" }, position: { x: 300, y: 530 } },
+        { id: "pm-risk", type: "workflow", data: { label: "Risk Assessment", blockType: "action" }, position: { x: 540, y: 530 } },
+        { id: "pm-plan-gate", type: "workflow", data: { label: "Planning Approval Gate", blockType: "action", config: { label: "Approval Gate" } }, position: { x: 300, y: 650 } },
+        // Phase 3 — Executing
+        { id: "pm-phase3", type: "workflow", data: { label: "Phase: Executing", blockType: "action", config: { label: "Phase Gate" } }, position: { x: 300, y: 760 } },
+        { id: "pm-kickoff", type: "workflow", data: { label: "Sprint Kickoff", blockType: "action" }, position: { x: 80, y: 860 } },
+        { id: "pm-execution", type: "workflow", data: { label: "Task Execution & Tracking", blockType: "action" }, position: { x: 300, y: 860 } },
+        { id: "pm-quality", type: "workflow", data: { label: "Quality Review", blockType: "action" }, position: { x: 520, y: 860 } },
+        { id: "pm-reporting", type: "workflow", data: { label: "Progress Reporting", blockType: "action" }, position: { x: 300, y: 970 } },
+        // Phase 4 — Closing
+        { id: "pm-phase4", type: "workflow", data: { label: "Phase: Closing", blockType: "action", config: { label: "Phase Gate" } }, position: { x: 300, y: 1080 } },
+        { id: "pm-final-review", type: "workflow", data: { label: "Final Deliverable Review", blockType: "action" }, position: { x: 100, y: 1180 } },
+        { id: "pm-lessons", type: "workflow", data: { label: "Lessons Learned", blockType: "action" }, position: { x: 300, y: 1180 } },
+        { id: "pm-signoff", type: "workflow", data: { label: "Project Closure Sign-off", blockType: "action", config: { label: "Approval Gate" } }, position: { x: 500, y: 1180 } },
+        { id: "pm-notify", type: "workflow", data: { label: "Send Completion Notification", blockType: "action" }, position: { x: 300, y: 1300 } },
+      ],
+      edges: [
+        // Trigger → Phase 1
+        { id: "e-pm-1", source: "pm-trigger", target: "pm-phase1", animated: true },
+        // Phase 1 fan-out
+        { id: "e-pm-2", source: "pm-phase1", target: "pm-scoping", animated: true },
+        { id: "e-pm-3", source: "pm-phase1", target: "pm-stakeholders", animated: true },
+        // Converge to feasibility gate
+        { id: "e-pm-4", source: "pm-scoping", target: "pm-feasibility", animated: true },
+        { id: "e-pm-5", source: "pm-stakeholders", target: "pm-feasibility", animated: true },
+        // Phase 2
+        { id: "e-pm-6", source: "pm-feasibility", target: "pm-phase2", animated: true },
+        { id: "e-pm-7", source: "pm-phase2", target: "pm-wbs", animated: true },
+        { id: "e-pm-8", source: "pm-phase2", target: "pm-resources", animated: true },
+        { id: "e-pm-9", source: "pm-phase2", target: "pm-risk", animated: true },
+        // Converge to planning gate
+        { id: "e-pm-10", source: "pm-wbs", target: "pm-plan-gate", animated: true },
+        { id: "e-pm-11", source: "pm-resources", target: "pm-plan-gate", animated: true },
+        { id: "e-pm-12", source: "pm-risk", target: "pm-plan-gate", animated: true },
+        // Phase 3
+        { id: "e-pm-13", source: "pm-plan-gate", target: "pm-phase3", animated: true },
+        { id: "e-pm-14", source: "pm-phase3", target: "pm-kickoff", animated: true },
+        { id: "e-pm-15", source: "pm-phase3", target: "pm-execution", animated: true },
+        { id: "e-pm-16", source: "pm-phase3", target: "pm-quality", animated: true },
+        // Converge to reporting
+        { id: "e-pm-17", source: "pm-kickoff", target: "pm-reporting", animated: true },
+        { id: "e-pm-18", source: "pm-execution", target: "pm-reporting", animated: true },
+        { id: "e-pm-19", source: "pm-quality", target: "pm-reporting", animated: true },
+        // Phase 4
+        { id: "e-pm-20", source: "pm-reporting", target: "pm-phase4", animated: true },
+        { id: "e-pm-21", source: "pm-phase4", target: "pm-final-review", animated: true },
+        { id: "e-pm-22", source: "pm-phase4", target: "pm-lessons", animated: true },
+        { id: "e-pm-23", source: "pm-phase4", target: "pm-signoff", animated: true },
+        // Final notification
+        { id: "e-pm-24", source: "pm-final-review", target: "pm-notify", animated: true },
+        { id: "e-pm-25", source: "pm-lessons", target: "pm-notify", animated: true },
+        { id: "e-pm-26", source: "pm-signoff", target: "pm-notify", animated: true },
+      ],
+    },
   };
 
   // Load template from URL param

@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Zap, Plus, Play, Trash2, Edit, Clock, Home, ArrowRight, Mail, Database, Webhook, Timer, Zap as ZapIcon, GitBranch } from "lucide-react";
+import { Zap, Plus, Play, Trash2, Edit, Clock, Home, ArrowRight, Mail, Database, Webhook, Timer, Zap as ZapIcon, GitBranch, FolderKanban } from "lucide-react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -104,6 +104,13 @@ export default function Automation() {
       description: "Branch workflows based on conditions",
       icon: GitBranch,
       details: "Create complex workflows with conditional branches"
+    },
+    {
+      id: 7,
+      name: "Project Management Lifecycle",
+      description: "Full PM process from scoping to closure",
+      icon: FolderKanban,
+      details: "Complete project lifecycle: Initiating → Planning → Executing → Closing with phase gates, reviews, and approvals"
     }
   ];
 
