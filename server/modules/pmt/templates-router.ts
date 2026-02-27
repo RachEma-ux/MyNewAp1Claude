@@ -62,9 +62,13 @@ const OP_PRIORITIES = [
   { name: "Immediate", color: "#CC5DE8", position: 4, isDefault: false },
 ];
 
-/** Built-in "Full PM Lifecycle" template — OpenProject standard.yml + PM² */
-const PM_LIFECYCLE_TEMPLATE_DATA = {
-  description: "Complete PM² lifecycle based on OpenProject — 4 phases (Initiating → Planning → Executing → Closing) with phase gates (RfP, RfE, RfC), 14 statuses, 7 work package types, PM² deliverables, and monitoring activities.",
+/**
+ * Demo Project — "Organize Open Source Conference"
+ * Concrete example data from OpenProject's standard.yml seed
+ * This is a REAL project example, not a generic template.
+ */
+const DEMO_PROJECT_DATA = {
+  description: "This is a demo project to organize an open source conference. It demonstrates project management from initiation through closing with concrete tasks, milestones, and deliverables.",
   status: "active",
   statuses: OP_STATUSES,
   types: OP_TYPES,
@@ -72,84 +76,49 @@ const PM_LIFECYCLE_TEMPLATE_DATA = {
   projectPhases: OP_PHASES,
   phases: [
     {
-      name: "Initiating",
+      name: "Start of project",
+      type: "milestone",
+      description: "Project kickoff milestone — marks the official beginning of the conference organization effort.",
+      status: "closed",
+    },
+    {
+      name: "Organize open source conference",
       type: "summary",
-      description: "Define project outcomes, justify the investment, and gain approval to proceed. Primary driver: Project Owner (PO).",
+      description: "Main phase: plan and execute all activities needed to organize the open source conference, from venue selection to attendee invitations.",
+      status: "in_progress",
       tasks: [
-        { title: "Project Initiation Request", type: "task", description: "Capture requestor, business needs, desired outcomes, and initial constraints.", estimatedHours: 8 },
-        { title: "Stakeholder identification & analysis", type: "task", description: "Identify all stakeholders, assess interest/influence, build stakeholder matrix.", estimatedHours: 8 },
-        { title: "Business Case", type: "task", description: "Document justification, budget context, alternatives considered, expected ROI, and high-level roadmap.", estimatedHours: 16 },
-        { title: "Project Charter", type: "task", description: "Define scope, cost, time, risk, milestones, deliverables, and project organization structure.", estimatedHours: 16 },
-        { title: "Feasibility assessment", type: "task", description: "Technical, economic, and operational feasibility review.", estimatedHours: 8 },
-        { title: "Ready for Planning (RfP) — Gate", type: "milestone", description: "Phase gate: Project Owner and Steering Committee approve transition to Planning." },
+        { title: "Set date and location of conference", type: "task", status: "in_progress", description: "Research and book a venue. Confirm dates that avoid conflicts with other major tech events. Consider capacity for 200+ attendees, AV equipment, and catering options.", estimatedHours: 16, children: [
+          { title: "Send invitation to speakers", type: "task", status: "in_progress", description: "Draft and send CFP (Call for Proposals) to potential speakers. Include submission deadline, talk formats (keynote 45min, talk 25min, lightning 10min), and travel reimbursement policy.", estimatedHours: 8 },
+          { title: "Contact sponsoring partners", type: "task", status: "new", description: "Reach out to potential sponsors (Gold €5,000, Silver €2,500, Bronze €1,000). Prepare sponsorship tiers with benefits: logo placement, booth space, attendee list access, speaking slots.", estimatedHours: 12 },
+          { title: "Create sponsorship brochure and hand-outs", type: "task", status: "new", description: "Design a professional sponsorship brochure (PDF + print) with event details, expected attendance demographics, sponsor tier benefits, and past event highlights.", estimatedHours: 16 },
+        ]},
+        { title: "Invite attendees to conference", type: "task", status: "new", description: "Set up registration system (Eventbrite or custom). Send email invitations to mailing lists, post on social media, and coordinate with local tech meetup groups. Early-bird pricing: €49, regular: €79.", estimatedHours: 8 },
+        { title: "Setup conference website", type: "task", status: "new", description: "Build a responsive conference website with: schedule/agenda, speaker bios, venue map and directions, registration link, sponsor logos, code of conduct, and FAQ section. Deploy on conference.example.org.", estimatedHours: 24 },
       ],
     },
     {
-      name: "Planning",
+      name: "Conference",
+      type: "milestone",
+      description: "The conference day itself — all preparation complete, event takes place. Keynote at 9:00, tracks run until 17:00, networking reception 17:00-19:00.",
+      status: "scheduled",
+    },
+    {
+      name: "Follow-up tasks",
       type: "summary",
-      description: "Develop the project scope into an executable plan with schedules, budgets, resources, and risk strategies. Primary driver: Project Manager (PM).",
+      description: "Post-conference activities: publish materials, thank participants, and close out the project.",
+      status: "to_be_scheduled",
       tasks: [
-        { title: "Planning kick-off meeting", type: "task", description: "Align the core team on objectives, approach, and governance.", estimatedHours: 4 },
-        { title: "Project Handbook", type: "task", description: "Document management approach, roles & responsibilities, escalation paths, and decision-making rules.", estimatedHours: 12 },
-        { title: "Work Breakdown Structure (WBS)", type: "task", description: "Decompose deliverables into manageable work packages with effort estimates.", estimatedHours: 16 },
-        { title: "Schedule & timeline planning", type: "task", description: "Create Gantt chart with dependencies, critical path, and buffer. Set baseline.", estimatedHours: 12 },
-        { title: "Resource allocation", type: "task", description: "Assign team members, define availability, and resolve resource conflicts.", estimatedHours: 8 },
-        { title: "Budget estimation", type: "task", description: "Bottom-up cost estimation by work package. Include contingency reserves.", estimatedHours: 12 },
-        { title: "Risk identification & mitigation plan", type: "task", description: "Build risk register: identify, assess probability/impact, define response strategies.", estimatedHours: 12 },
-        { title: "Communication plan", type: "task", description: "Define reporting frequency, channels, stakeholder distribution lists, and escalation rules.", estimatedHours: 6 },
-        { title: "Deliverables Acceptance Plan", type: "task", description: "Define acceptance criteria, review process, and sign-off authorities for each deliverable.", estimatedHours: 6 },
-        { title: "Transition plan", type: "task", description: "Plan handover from project team to operations/business, including training and documentation.", estimatedHours: 8 },
-        { title: "Business Implementation Plan", type: "task", description: "Plan organizational change management, user adoption, and go-live activities.", estimatedHours: 8 },
-        { title: "Ready for Executing (RfE) — Gate", type: "milestone", description: "Phase gate: PM and Steering Committee approve the project plan and authorize execution." },
+        { title: "Upload presentations to website", type: "task", status: "new", description: "Collect slide decks from all speakers (PDF + source). Upload to conference website with speaker permission. Add video recordings once edited. Target: within 2 weeks of event.", estimatedHours: 12 },
+        { title: "Party for conference supporters :-)", type: "task", status: "new", description: "Organize a thank-you party for the organizing committee, volunteers, and key sponsors.\n\nChecklist:\n- [ ] Beer\n- [ ] Snacks\n- [ ] Music\n- [ ] Even more beer", estimatedHours: 4 },
       ],
     },
     {
-      name: "Executing",
-      type: "summary",
-      description: "Produce project deliverables according to the plan. Coordinate resources, manage quality, and communicate progress. Primary driver: Project Core Team (PCT).",
-      tasks: [
-        { title: "Executing kick-off meeting", type: "task", description: "Communicate execution approach, assignments, and reporting cadence to the full team.", estimatedHours: 4 },
-        { title: "Sprint/iteration setup", type: "task", description: "Define iteration boundaries, sprint goals, and backlog priorities.", estimatedHours: 4 },
-        { title: "Development & implementation", type: "summary", description: "Core deliverable production — design, build, integrate, and document.", estimatedHours: 120 },
-        { title: "Quality assurance & testing", type: "task", description: "Execute test plans, validate against acceptance criteria, track defects.", estimatedHours: 40 },
-        { title: "Stakeholder communication & reporting", type: "task", description: "Distribute status reports per communication plan. Conduct steering committee reviews.", estimatedHours: 8 },
-        { title: "Change request management", type: "task", description: "Evaluate scope change requests: impact on schedule, budget, resources. Obtain approval.", estimatedHours: 8 },
-        { title: "Deliverable hand-over", type: "task", description: "Formally hand over completed deliverables per the Deliverables Acceptance Plan.", estimatedHours: 8 },
-        { title: "Ready for Closing (RfC) — Gate", type: "milestone", description: "Phase gate: All deliverables accepted. PM and PO authorize transition to Closing." },
-      ],
-    },
-    {
-      name: "Monitor & Control",
-      type: "summary",
-      description: "Continuous activity running throughout all phases. Measure performance against baselines and take corrective action.",
-      tasks: [
-        { title: "Progress tracking & KPI dashboard", type: "task", description: "Track schedule variance (SV), cost variance (CV), earned value (EV), and % complete.", estimatedHours: 16 },
-        { title: "Budget vs. actual monitoring", type: "task", description: "Compare actual spend to planned budget by work package. Flag overruns.", estimatedHours: 8 },
-        { title: "Risk register updates", type: "task", description: "Review and update risk register: new risks, changed probabilities, residual risks.", estimatedHours: 8 },
-        { title: "Scope change control", type: "task", description: "Evaluate and document all scope changes. Update baselines if approved.", estimatedHours: 6 },
-        { title: "Quality control reviews", type: "task", description: "Conduct peer reviews, inspections, and quality audits per QA plan.", estimatedHours: 12 },
-        { title: "Status reporting", type: "task", description: "Weekly/biweekly status reports. Monthly executive summary for steering committee.", estimatedHours: 12 },
-        { title: "Issue & escalation management", type: "task", description: "Log issues, assign owners, track resolution. Escalate blockers per governance rules.", estimatedHours: 8 },
-      ],
-    },
-    {
-      name: "Closing",
-      type: "summary",
-      description: "Formally close the project: transfer deliverables, capture lessons learned, release resources, and archive documents. Primary driver: All stakeholders.",
-      tasks: [
-        { title: "Final deliverable review & acceptance", type: "task", description: "Verify all deliverables meet acceptance criteria. Obtain formal sign-off.", estimatedHours: 8 },
-        { title: "Project-End Report", type: "task", description: "Document final scope, schedule, budget, risks realized, and outcomes achieved vs. business case.", estimatedHours: 12 },
-        { title: "Quality Review Report", type: "task", description: "Summarize quality metrics, defect rates, and lessons for future QA planning.", estimatedHours: 6 },
-        { title: "Lessons learned documentation", type: "task", description: "Conduct retrospective: what went well, what to improve, recommendations for future projects.", estimatedHours: 8 },
-        { title: "Knowledge transfer & training", type: "task", description: "Ensure operations team is trained and documentation is complete for ongoing support.", estimatedHours: 12 },
-        { title: "Archive project artifacts", type: "task", description: "Archive all project documents, code, configurations, and communications in the organizational repository.", estimatedHours: 4 },
-        { title: "Resource release & recognition", type: "task", description: "Release team members, close contracts, and recognize contributions.", estimatedHours: 4 },
-        { title: "Administrative closure", type: "task", description: "Close financial accounts, update portfolio status, and notify stakeholders of project completion.", estimatedHours: 4 },
-        { title: "Project Closure — Sign-off", type: "milestone", description: "Final milestone: Project Owner and Steering Committee formally close the project." },
-      ],
+      name: "End of project",
+      type: "milestone",
+      description: "Final milestone — all follow-up tasks complete, budget reconciled, lessons learned documented. Project formally closed.",
+      status: "new",
     },
   ],
-  // Time entry activity categories (for time tracking)
   activities: [
     { name: "Management",    isDefault: true },
     { name: "Specification", isDefault: false },
@@ -160,71 +129,75 @@ const PM_LIFECYCLE_TEMPLATE_DATA = {
   ],
 };
 
-/** Built-in Scrum/Agile template — OpenProject-inspired */
-const SCRUM_TEMPLATE_DATA = {
-  description: "Agile/Scrum project with epics, user stories, sprints, backlogs, and release milestones. Based on OpenProject's Scrum demo project.",
+/**
+ * Scrum Project — "New Company Website"
+ * Concrete example data from OpenProject's standard.yml seed
+ * This is a REAL project example, not a generic template.
+ */
+const SCRUM_PROJECT_DATA = {
+  description: "This is a demo Scrum project for rebuilding the company website. It includes a product backlog, sprint iterations, bug tracking, and release milestones with concrete user stories and tasks.",
   status: "active",
   statuses: OP_STATUSES,
   types: OP_TYPES,
   priorities: OP_PRIORITIES,
   phases: [
     {
+      name: "New website",
+      type: "epic",
+      description: "Epic: Complete redesign and rebuild of the company website with modern stack, improved UX, and new features.",
+      status: "specified",
+      tasks: [
+        { title: "New login screen", type: "user_story", status: "in_specification", description: "As a user, I want a redesigned login page so that I can sign in with SSO (Google, GitHub) in addition to email/password. The new design should match our updated brand guidelines and include 'Remember me' and 'Forgot password' links.", storyPoints: 5 },
+        { title: "Password reset does not send email", type: "bug", status: "confirmed", description: "BUG: When clicking 'Forgot password' and entering a valid email, the system shows 'Reset link sent' but no email is delivered. Checked spam folders. Likely a misconfigured SMTP relay or missing SendGrid API key in production.", storyPoints: 2 },
+        { title: "Newsletter registration form", type: "user_story", status: "in_progress", description: "As a visitor, I want to sign up for the company newsletter so that I receive product updates and blog posts. Requirements: email validation, double opt-in confirmation, GDPR consent checkbox, Mailchimp integration.", storyPoints: 3 },
+        { title: "Implement product tour", type: "user_story", status: "in_specification", description: "As a new user, I want an interactive guided tour of the application so that I can quickly understand the key features. Use Shepherd.js or Intro.js. Tour should cover: dashboard, project creation, task management, and settings.", storyPoints: 5 },
+      ],
+    },
+    {
+      name: "Sprint 1 — Core Website",
+      type: "summary",
+      description: "First sprint (2 weeks): Build the core website pages — landing page, navigation, contact form, and feature showcase.",
+      status: "in_progress",
+      tasks: [
+        { title: "New landing page", type: "user_story", status: "specified", description: "As a visitor, I want an attractive landing page so that I understand what the product does within 5 seconds. Must include: hero section with CTA, feature highlights (3 columns), testimonials carousel, pricing table, and footer with social links.", storyPoints: 3, children: [
+          { title: "Create wireframes for new landing page", type: "task", status: "in_progress", description: "Create wireframes in Figma for desktop (1440px), tablet (768px), and mobile (375px) breakpoints. Include: hero section with illustration, 3-column feature grid, testimonial slider, pricing cards, and sticky CTA button on mobile.", estimatedHours: 8 },
+          { title: "Implement landing page HTML/CSS", type: "task", status: "new", description: "Code the landing page from approved Figma wireframes using React + Tailwind CSS. Implement responsive breakpoints, lazy-load images, add subtle scroll animations with Framer Motion. Target Lighthouse score: 90+.", estimatedHours: 16 },
+        ]},
+        { title: "Feature carousel", type: "user_story", status: "specified", description: "As a visitor, I want to see an interactive feature showcase on the homepage so that I can understand the product's capabilities through screenshots and descriptions.", storyPoints: 5, children: [
+          { title: "Make screenshots for feature tour", type: "task", status: "closed", description: "Capture 6 annotated screenshots of key features: (1) Dashboard overview, (2) Project board, (3) Gantt chart, (4) Time tracking, (5) Team collaboration, (6) Reporting. Use 1280x720 resolution, add callout annotations in Figma.", estimatedHours: 4 },
+          { title: "Build carousel component", type: "task", status: "new", description: "Build a React carousel component with: auto-advance every 5s, pause on hover, dot indicators, swipe support on mobile (react-swipeable), keyboard navigation (arrow keys), and preloaded images to prevent layout shift.", estimatedHours: 12 },
+        ]},
+        { title: "Contact form", type: "user_story", status: "specified", description: "As a visitor, I want to submit a contact form so that I can reach the sales team. Fields: name, email, company, message. Validation with react-hook-form + zod. Email delivery via SendGrid API. Success toast + redirect to thank-you page.", storyPoints: 1 },
+        { title: "Website navigation structure", type: "user_story", status: "specified", description: "As a visitor, I want clear site navigation so that I can find any page within 2 clicks. Implement: sticky top nav with logo, mega-menu for Products, hamburger menu on mobile, breadcrumbs on inner pages.", storyPoints: 3, children: [
+          { title: "Set up navigation concept for website", type: "task", status: "in_specification", description: "Design the information architecture: Home, Products (dropdown with 4 items), Pricing, Blog, Docs, Contact. Create a sitemap diagram. Define mobile navigation behavior (slide-out drawer vs. full-screen overlay).", estimatedHours: 6 },
+        ]},
+        { title: "Wrong hover color", type: "bug", status: "rejected", description: "BUG (rejected — works as designed): Reported that button hover color is orange instead of blue. Checked brand guidelines v2.3 — orange (#FF922B) is the correct hover color for primary CTAs. The reporter was referencing the old v1 guidelines.", storyPoints: 1 },
+      ],
+    },
+    {
       name: "Product Backlog",
       type: "summary",
-      description: "All user stories, features, and epics awaiting prioritization and sprint assignment.",
+      description: "Prioritized backlog of user stories and features not yet assigned to a sprint. Items are groomed and estimated, ready for sprint planning.",
+      status: "new",
       tasks: [
-        { title: "New login screen", type: "user_story", description: "Redesign the login page with SSO options and improved UX.", storyPoints: 5 },
-        { title: "Password reset does not send email", type: "bug", description: "Bug: Password reset flow fails to trigger email notification.", storyPoints: 2 },
-        { title: "SSL certificate", type: "user_story", description: "Procure and install SSL certificate for production domain.", storyPoints: 3 },
-        { title: "Set-up staging environment", type: "user_story", description: "Configure staging server that mirrors production for QA.", storyPoints: 5 },
-        { title: "Choose a content management system", type: "user_story", description: "Evaluate CMS options (WordPress, Strapi, etc.) and select one.", storyPoints: 3 },
-        { title: "Newsletter registration form", type: "user_story", description: "Build email newsletter signup with double opt-in.", storyPoints: 3 },
-        { title: "Implement product tour", type: "user_story", description: "Interactive onboarding walkthrough for new users.", storyPoints: 5 },
-        { title: "Internal link structure", type: "user_story", description: "Define SEO-friendly URL hierarchy and implement redirects.", storyPoints: 3 },
-      ],
-    },
-    {
-      name: "Sprint 1",
-      type: "summary",
-      description: "First sprint iteration — core website features.",
-      tasks: [
-        { title: "New landing page", type: "user_story", description: "Design and implement responsive landing page.", storyPoints: 3, children: [
-          { title: "Create wireframes for new landing page", type: "task", description: "Wireframe desktop & mobile layouts in Figma.", estimatedHours: 8 },
-          { title: "Implement landing page HTML/CSS", type: "task", description: "Code responsive landing page from approved wireframes.", estimatedHours: 16 },
-        ]},
-        { title: "Feature carousel", type: "user_story", description: "Interactive feature showcase carousel on homepage.", storyPoints: 5, children: [
-          { title: "Make screenshots for feature tour", type: "task", description: "Capture annotated screenshots of all features.", estimatedHours: 4 },
-          { title: "Build carousel component", type: "task", description: "Implement auto-advancing carousel with touch/swipe support.", estimatedHours: 12 },
-        ]},
-        { title: "Contact form", type: "user_story", description: "Contact form with validation and email delivery.", storyPoints: 1 },
-        { title: "Website navigation structure", type: "user_story", description: "Define and implement site-wide navigation.", storyPoints: 3, children: [
-          { title: "Set up navigation concept for website", type: "task", description: "Design IA and navigation patterns.", estimatedHours: 6 },
-        ]},
-        { title: "Wrong hover color", type: "bug", description: "Hover state on buttons uses incorrect brand color.", storyPoints: 1 },
-      ],
-    },
-    {
-      name: "Sprint 2",
-      type: "summary",
-      description: "Second sprint — advanced features and stabilization.",
-      tasks: [
-        { title: "User authentication system", type: "user_story", description: "Login, registration, and session management.", storyPoints: 8 },
-        { title: "Search functionality", type: "user_story", description: "Full-text search across all content.", storyPoints: 5 },
-        { title: "Performance optimization", type: "task", description: "Optimize images, enable caching, and minimize bundle size.", estimatedHours: 16 },
-        { title: "Accessibility audit", type: "task", description: "WCAG 2.1 AA compliance review and fixes.", estimatedHours: 12 },
+        { title: "SSL certificate", type: "user_story", status: "specified", description: "As the DevOps lead, I want to install a Let's Encrypt SSL certificate so that all traffic is served over HTTPS. Set up auto-renewal via certbot cron job. Update nginx config to redirect HTTP → HTTPS. Test with SSL Labs (target: A+ rating).", storyPoints: 3 },
+        { title: "Set-up staging environment", type: "user_story", status: "in_specification", description: "As a developer, I want a staging environment that mirrors production so that we can QA features before release. Provision on AWS (t3.medium), replicate production DB schema (sanitized data), configure CI/CD pipeline to auto-deploy develop branch.", storyPoints: 5 },
+        { title: "Choose a content management system", type: "user_story", status: "specified", description: "As the content team, we need a CMS so that we can publish blog posts and update website content without developer involvement. Evaluate: Strapi (headless, self-hosted), Contentful (headless, SaaS), WordPress (traditional). Decision criteria: cost, API quality, editorial UX, plugin ecosystem.", storyPoints: 3 },
+        { title: "Internal link structure", type: "user_story", status: "closed", description: "As the SEO lead, I want a clean URL hierarchy so that search engines can crawl the site effectively. Implemented: /products/{slug}, /blog/{year}/{slug}, /docs/{category}/{page}. Added 301 redirects from old URLs. Updated XML sitemap.", storyPoints: 3 },
       ],
     },
     {
       name: "Releases",
       type: "summary",
-      description: "Release milestones and deployment activities.",
+      description: "Release milestones tracking development progress from v1.0 through v2.0.",
+      status: "in_progress",
       tasks: [
-        { title: "Develop v1.0", type: "summary", description: "Complete core feature development for initial release.", estimatedHours: 80 },
-        { title: "Release v1.0", type: "milestone", description: "First production release with core features." },
-        { title: "Develop v1.1", type: "summary", description: "Bug fixes and minor improvements from v1.0 feedback.", estimatedHours: 40 },
-        { title: "Release v1.1", type: "milestone", description: "Patch release with bug fixes and UX improvements." },
-        { title: "Develop v2.0", type: "summary", description: "Major feature additions: auth, search, analytics.", estimatedHours: 120 },
-        { title: "Release v2.0", type: "milestone", description: "Major release with full feature set." },
+        { title: "Develop v1.0", type: "summary", status: "in_progress", description: "Core feature development for the initial website launch: landing page, navigation, contact form, basic CMS integration, SSL setup, and CI/CD pipeline.", estimatedHours: 80 },
+        { title: "Release v1.0", type: "milestone", status: "new", description: "First production release — go-live with the new company website. Includes: landing page, product pages, contact form, blog (5 launch posts), and analytics (GA4 + Plausible)." },
+        { title: "Develop v1.1", type: "summary", status: "new", description: "Post-launch iteration: fix bugs from user feedback, add newsletter signup, implement product tour, and optimize Core Web Vitals (LCP < 2.5s, CLS < 0.1).", estimatedHours: 40 },
+        { title: "Release v1.1", type: "milestone", status: "new", description: "Patch release with bug fixes, newsletter integration, and performance improvements based on v1.0 user feedback." },
+        { title: "Develop v2.0", type: "summary", status: "new", description: "Major feature release: user authentication (OAuth + email), full-text search (Algolia), customer portal, analytics dashboard, and A/B testing framework.", estimatedHours: 120 },
+        { title: "Release v2.0", type: "milestone", status: "new", description: "Major release with full feature set — customer portal, search, auth, and analytics. Target: 3 months after v1.0 launch." },
       ],
     },
   ],
@@ -360,8 +333,8 @@ const projectTemplatesRouter = router({
       }
 
       // 4. Seed phases + tasks (parent-child, supports nested children)
-      type TemplateTask = { title: string; type?: string; description?: string; estimatedHours?: number; storyPoints?: number; children?: TemplateTask[] };
-      type TemplatePhase = { name: string; type?: string; description?: string; tasks?: TemplateTask[] };
+      type TemplateTask = { title: string; type?: string; status?: string; description?: string; estimatedHours?: number; storyPoints?: number; children?: TemplateTask[] };
+      type TemplatePhase = { name: string; type?: string; status?: string; description?: string; tasks?: TemplateTask[] };
       const phasesArr = tpl.phases as TemplatePhase[] | undefined;
       if (phasesArr && phasesArr.length > 0) {
         let position = 1;
@@ -373,7 +346,7 @@ const projectTemplatesRouter = router({
             title: t.title,
             description: t.description || undefined,
             type: t.type || "task",
-            status: "todo",
+            status: t.status || "todo",
             priority: "medium",
             parentId,
             estimatedHours: t.estimatedHours || undefined,
@@ -396,7 +369,7 @@ const projectTemplatesRouter = router({
             title: phase.name,
             description: phase.description || undefined,
             type: phase.type || "task",
-            status: "todo",
+            status: phase.status || "todo",
             priority: "medium",
             position: position++,
           }).returning();
@@ -421,20 +394,20 @@ const projectTemplatesRouter = router({
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // Seed both PM² Lifecycle and Scrum templates
+      // Seed both demo project templates (concrete examples from OpenProject)
       const [pmTemplate] = await db.insert(pmProjectTemplates).values({
         workspaceId: input.workspaceId,
-        name: "PM² Lifecycle (OpenProject)",
-        description: "Complete PM² lifecycle — 4 phases (Initiating → Planning → Executing → Closing), 3 phase gates (RfP, RfE, RfC), 14 statuses, 7 work package types, PM² deliverables, and monitoring activities. Based on OpenProject standard data.",
-        templateData: PM_LIFECYCLE_TEMPLATE_DATA,
+        name: "Open Source Conference (Demo)",
+        description: "Concrete example: Organize an open source conference — venue booking, speaker invitations, sponsor outreach, website setup, and post-event follow-up. Based on OpenProject's demo project.",
+        templateData: DEMO_PROJECT_DATA,
         createdBy: ctx.user.id,
       }).returning();
 
       const [scrumTemplate] = await db.insert(pmProjectTemplates).values({
         workspaceId: input.workspaceId,
-        name: "Scrum / Agile Project",
-        description: "Agile project with product backlog, sprints, epics, user stories, bugs, and release milestones. Based on OpenProject Scrum demo project.",
-        templateData: SCRUM_TEMPLATE_DATA,
+        name: "Company Website Rebuild (Scrum Demo)",
+        description: "Concrete example: Rebuild company website using Scrum — product backlog with real user stories, 2 sprints, bug tracking, and release milestones v1.0 → v2.0. Based on OpenProject's Scrum demo project.",
+        templateData: SCRUM_PROJECT_DATA,
         createdBy: ctx.user.id,
       }).returning();
 
