@@ -60,6 +60,7 @@ import {
   Lock,
   FileSearch,
   Terminal,
+  FolderKanban,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -86,6 +87,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [hardwareMenuOpen, setHardwareMenuOpen] = useState(false);
   const [softwareMenuOpen, setSoftwareMenuOpen] = useState(false);
   const [aiTypesMenuOpen, setAiTypesMenuOpen] = useState(false);
+  const [pmCentralMenuOpen, setPmCentralMenuOpen] = useState(false);
   const [aiTypesSubMenus, setAiTypesSubMenus] = useState<Record<string, boolean>>({});
   const logoutMutation = trpc.auth.logout.useMutation();
 
@@ -183,6 +185,26 @@ export default function MainLayout({ children }: MainLayoutProps) {
       ]
     },
     { label: "Analytics", icon: <BarChart3 className="w-5 h-5" />, href: "/analytics" },
+    {
+      label: "Collaboration",
+      icon: <MessagesSquare className="w-5 h-5" />,
+      href: "/collaboration",
+    },
+    {
+      label: "PM Central",
+      icon: <FolderKanban className="w-5 h-5" />,
+      children: [
+        { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/pm-central/dashboard" },
+        { label: "PM Shell", icon: <Terminal className="w-4 h-4" />, href: "/pm-central/shell" },
+        { label: "Projects", icon: <FolderOpen className="w-4 h-4" />, href: "/pm-central/projects" },
+        { label: "Methods", icon: <BookOpen className="w-4 h-4" />, href: "/pm-central/methods" },
+        { label: "Participants", icon: <Users className="w-4 h-4" />, href: "/pm-central/participants" },
+        { label: "Tools", icon: <Package className="w-4 h-4" />, href: "/pm-central/tools" },
+        { label: "Resources", icon: <Activity className="w-4 h-4" />, href: "/pm-central/resources" },
+        { label: "Governance", icon: <ShieldCheck className="w-4 h-4" />, href: "/pm-central/governance" },
+        { label: "Documentation", icon: <FileText className="w-4 h-4" />, href: "/pm-central/documentation" },
+      ]
+    },
     {
       label: "Automation", 
       icon: <Zap className="w-5 h-5" />,
@@ -285,6 +307,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setDigitalHQMenuOpen(!digitalHQMenuOpen);
                       } else if (item.label === "Governance Center") {
                         setGovernanceCenterMenuOpen(!governanceCenterMenuOpen);
+                      } else if (item.label === "PM Central") {
+                        setPmCentralMenuOpen(!pmCentralMenuOpen);
                       }
                     }}
                     className="flex w-full items-center justify-between space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -293,10 +317,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* Automation / Digital HQ menus (2-level) */}
-                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen)) && (
+                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>

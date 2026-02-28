@@ -97,6 +97,8 @@ const AITypesPage = lazy(() => import("@/pages/AITypesPage"));
 const DigitalHQPage = lazy(() => import("@/pages/DigitalHQPage"));
 const GovernanceCenterPage = lazy(() => import("@/pages/GovernanceCenterPage"));
 const RunConsolePage = lazy(() => import("@/pages/RunConsolePage"));
+const CollaborationPage = lazy(() => import("@/pages/CollaborationPage"));
+const PMCentralPage = lazy(() => import("@/pages/PMCentralPage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -270,6 +272,11 @@ function Router() {
       <Route path="/governance/:item" component={() => <ProtectedRoute component={GovernanceCenterPage} />} />
       {/* Operator Runtime — Multi-Operator Autonomous Platform */}
       <Route path="/run-console" component={() => <ProtectedRoute component={RunConsolePage} />} />
+      {/* Collaboration */}
+      <Route path="/collaboration" component={() => <ProtectedRoute component={CollaborationPage} />} />
+      {/* PM Central */}
+      <Route path="/pm-central/:item" component={() => <ProtectedRoute component={PMCentralPage} />} />
+      <Route path="/pm-central" component={() => <ProtectedRoute component={PMCentralPage} />} />
       {/* UI Showcase — living documentation for shared components */}
       <Route path="/ui-showcase" component={() => <ProtectedRoute component={UIShowcasePage} />} />
       <Route path="/404" component={NotFound} />
