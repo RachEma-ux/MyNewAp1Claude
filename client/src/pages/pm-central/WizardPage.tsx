@@ -966,7 +966,16 @@ function AuthorityForm({ data, updateField }: StepFormProps) {
           </div>
         </Field>
         <Field label="Decision Model" required>
-          <Input value={data.decisionModel} onChange={(e) => updateField("decisionModel", e.target.value)} placeholder="e.g., RACI, Majority vote, Sponsor decides..." />
+          <Select value={data.decisionModel} onValueChange={(v) => updateField("decisionModel", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="RACI">RACI</SelectItem>
+              <SelectItem value="Majority Vote">Majority Vote</SelectItem>
+              <SelectItem value="Sponsor Decides">Sponsor Decides</SelectItem>
+              <SelectItem value="Consensus">Consensus</SelectItem>
+              <SelectItem value="Delegation Matrix">Delegation Matrix</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="Risk Tier" required>
           <Select value={data.riskTier} onValueChange={(v) => updateField("riskTier", v)}>
@@ -990,7 +999,36 @@ function AuthorityForm({ data, updateField }: StepFormProps) {
             </SelectContent>
           </Select>
         </Field>
-        <StringListField label="Compliance Tags" value={data.complianceTags} onChange={(v) => updateField("complianceTags", v)} placeholder="e.g., GDPR, SOC2, HIPAA..." />
+        <Field label="Compliance Tags">
+          <div className="flex flex-wrap gap-2 mb-2">
+            {["GDPR", "SOC2", "HIPAA", "PCI-DSS", "ISO 27001", "SOX", "CCPA", "FERPA"].map((tag) => {
+              const isActive = data.complianceTags.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => {
+                    const next = isActive
+                      ? data.complianceTags.filter((t) => t !== tag)
+                      : [...data.complianceTags, tag];
+                    updateField("complianceTags", next);
+                  }}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
+                  }`}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+        <StringListField label="Custom Compliance Tags" value={data.complianceTags.filter((t) => !["GDPR", "SOC2", "HIPAA", "PCI-DSS", "ISO 27001", "SOX", "CCPA", "FERPA"].includes(t))} onChange={(custom) => {
+          const presets = data.complianceTags.filter((t) => ["GDPR", "SOC2", "HIPAA", "PCI-DSS", "ISO 27001", "SOX", "CCPA", "FERPA"].includes(t));
+          updateField("complianceTags", [...presets, ...custom]);
+        }} placeholder="Add custom tag..." />
       </CardContent>
     </Card>
   );
@@ -1374,7 +1412,7 @@ function CostPlanForm({ data, updateField }: StepFormProps) {
   const items = data.budgetItems || [];
 
   const addItem = () => {
-    updateField("budgetItems", [...items, { name: "", wbsNodeId: "", category: "", planned: 0, notes: "" }]);
+    updateField("budgetItems", [...items, { name: "", wbsNodeId: "", category: "Labor", planned: 0, notes: "" }]);
   };
 
   return (
@@ -1396,10 +1434,23 @@ function CostPlanForm({ data, updateField }: StepFormProps) {
                 }} />
               </Field>
               <Field label="Category">
-                <Input value={item.category} onChange={(e) => {
-                  const next = [...items]; next[i] = { ...next[i], category: e.target.value };
+                <Select value={item.category} onValueChange={(v) => {
+                  const next = [...items]; next[i] = { ...next[i], category: v };
                   updateField("budgetItems", next);
-                }} placeholder="labor, materials, etc." />
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Labor">Labor</SelectItem>
+                    <SelectItem value="Materials">Materials</SelectItem>
+                    <SelectItem value="Software / Licenses">Software / Licenses</SelectItem>
+                    <SelectItem value="Hardware">Hardware</SelectItem>
+                    <SelectItem value="Travel">Travel</SelectItem>
+                    <SelectItem value="Consulting">Consulting</SelectItem>
+                    <SelectItem value="Training">Training</SelectItem>
+                    <SelectItem value="Contingency">Contingency</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Planned Cost">
                 <Input type="number" value={item.planned} onChange={(e) => {
@@ -1447,7 +1498,16 @@ function QualityPlanForm({ data, updateField }: StepFormProps) {
           <Textarea value={data.definitionOfDone} onChange={(e) => updateField("definitionOfDone", e.target.value)} placeholder="When is a work item considered done?" rows={2} />
         </Field>
         <Field label="Review Workflow">
-          <Textarea value={data.reviewWorkflow} onChange={(e) => updateField("reviewWorkflow", e.target.value)} placeholder="QA review process, sign-off chain..." rows={2} />
+          <Select value={data.reviewWorkflow} onValueChange={(v) => updateField("reviewWorkflow", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Peer Review → QA Sign-off">Peer Review → QA Sign-off</SelectItem>
+              <SelectItem value="Automated CI/CD + Manual QA">Automated CI/CD + Manual QA</SelectItem>
+              <SelectItem value="Single Approver">Single Approver</SelectItem>
+              <SelectItem value="Dual Approver Chain">Dual Approver Chain</SelectItem>
+              <SelectItem value="No Formal Review">No Formal Review</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
       </CardContent>
     </Card>
@@ -1460,7 +1520,7 @@ function ResourcesPlanForm({ data, updateField }: StepFormProps) {
   const addMember = () => {
     updateField("teamMembers", [
       ...members,
-      { name: "", role: "", type: "human", raciR: [], raciA: [], raciC: [], raciI: [] },
+      { name: "", role: "Developer", type: "human", raciR: [], raciA: [], raciC: [], raciI: [] },
     ]);
   };
 
@@ -1486,7 +1546,21 @@ function ResourcesPlanForm({ data, updateField }: StepFormProps) {
                 <Input value={m.name} onChange={(e) => updateMember(i, "name", e.target.value)} />
               </Field>
               <Field label="Role">
-                <Input value={m.role} onChange={(e) => updateMember(i, "role", e.target.value)} />
+                <Select value={m.role} onValueChange={(v) => updateMember(i, "role", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Project Manager">Project Manager</SelectItem>
+                    <SelectItem value="Developer">Developer</SelectItem>
+                    <SelectItem value="Designer">Designer</SelectItem>
+                    <SelectItem value="QA / Tester">QA / Tester</SelectItem>
+                    <SelectItem value="Business Analyst">Business Analyst</SelectItem>
+                    <SelectItem value="Architect">Architect</SelectItem>
+                    <SelectItem value="Scrum Master">Scrum Master</SelectItem>
+                    <SelectItem value="Product Owner">Product Owner</SelectItem>
+                    <SelectItem value="DevOps Engineer">DevOps Engineer</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Type">
                 <Select value={m.type} onValueChange={(v) => updateMember(i, "type", v)}>
@@ -1517,14 +1591,41 @@ function CommunicationsPlanForm({ data, updateField }: StepFormProps) {
       <CardHeader><CardTitle className="text-base">Communications Plan</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <Field label="Reporting Cadence" required>
-          <Input value={data.reportingCadence} onChange={(e) => updateField("reportingCadence", e.target.value)} placeholder="e.g., Weekly status report every Friday" />
+          <Select value={data.reportingCadence} onValueChange={(v) => updateField("reportingCadence", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Daily Standup">Daily Standup</SelectItem>
+              <SelectItem value="Weekly">Weekly</SelectItem>
+              <SelectItem value="Bi-weekly">Bi-weekly</SelectItem>
+              <SelectItem value="Monthly">Monthly</SelectItem>
+              <SelectItem value="Quarterly">Quarterly</SelectItem>
+              <SelectItem value="On Demand">On Demand</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="Stakeholder Update Frequency">
-          <Input value={data.stakeholderUpdateFrequency} onChange={(e) => updateField("stakeholderUpdateFrequency", e.target.value)} placeholder="e.g., Bi-weekly steering committee" />
+          <Select value={data.stakeholderUpdateFrequency} onValueChange={(v) => updateField("stakeholderUpdateFrequency", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Weekly">Weekly</SelectItem>
+              <SelectItem value="Bi-weekly">Bi-weekly</SelectItem>
+              <SelectItem value="Monthly">Monthly</SelectItem>
+              <SelectItem value="Quarterly">Quarterly</SelectItem>
+              <SelectItem value="As Needed">As Needed</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
         <StringListField label="Channels" value={data.channels} onChange={(v) => updateField("channels", v)} placeholder="e.g., Slack #project, email, meetings..." />
         <Field label="Escalation Path" required>
-          <Textarea value={data.escalationPath} onChange={(e) => updateField("escalationPath", e.target.value)} placeholder="Level 1: PM → Level 2: Sponsor → Level 3: PMO..." rows={3} />
+          <Select value={data.escalationPath} onValueChange={(v) => updateField("escalationPath", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="PM → Sponsor → PMO (3-Level)">PM → Sponsor → PMO (3-Level)</SelectItem>
+              <SelectItem value="PM → Executive (Flat)">PM → Executive (Flat)</SelectItem>
+              <SelectItem value="PM → Tech Lead → CTO (Technical)">PM → Tech Lead → CTO (Technical)</SelectItem>
+              <SelectItem value="PM → Sponsor → Board (Executive)">PM → Sponsor → Board (Executive)</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
       </CardContent>
     </Card>
@@ -1538,7 +1639,7 @@ function RiskPlanForm({ data, updateField }: StepFormProps) {
     const id = `risk-${Date.now()}`;
     updateField("riskRegister", [
       ...risks,
-      { id, title: "", description: "", probability: "medium", impact: "medium", score: 0, owner: "", mitigation: "", contingency: "", status: "open" },
+      { id, title: "", description: "", probability: "medium", impact: "medium", score: 0, owner: "", mitigation: "", contingency: "", status: "Open" },
     ]);
   };
 
@@ -1617,7 +1718,22 @@ function RiskPlanForm({ data, updateField }: StepFormProps) {
                 }} rows={2} />
               </Field>
             </div>
-            <div className="mt-2 flex justify-end">
+            <div className="mt-2 flex items-center justify-between">
+              <Field label="Status">
+                <Select value={r.status || "Open"} onValueChange={(v) => {
+                  const next = [...risks]; next[i] = { ...next[i], status: v };
+                  updateField("riskRegister", next);
+                }}>
+                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Open">Open</SelectItem>
+                    <SelectItem value="Mitigating">Mitigating</SelectItem>
+                    <SelectItem value="Accepted">Accepted</SelectItem>
+                    <SelectItem value="Closed">Closed</SelectItem>
+                    <SelectItem value="Escalated">Escalated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
               <Button variant="ghost" size="sm" className="text-destructive" onClick={() => updateField("riskRegister", risks.filter((_, j) => j !== i))}>
                 Remove
               </Button>
@@ -1634,7 +1750,7 @@ function ProcurementPlanForm({ data, updateField }: StepFormProps) {
   const vendors = data.vendors || [];
 
   const addVendor = () => {
-    updateField("vendors", [...vendors, { name: "", contract: "", deliverables: "", risks: "" }]);
+    updateField("vendors", [...vendors, { name: "", contract: "Fixed-Price", deliverables: "", risks: "" }]);
   };
 
   return (
@@ -1661,10 +1777,19 @@ function ProcurementPlanForm({ data, updateField }: StepFormProps) {
                 }} />
               </Field>
               <Field label="Contract Type">
-                <Input value={v.contract} onChange={(e) => {
-                  const next = [...vendors]; next[i] = { ...next[i], contract: e.target.value };
+                <Select value={v.contract} onValueChange={(val) => {
+                  const next = [...vendors]; next[i] = { ...next[i], contract: val };
                   updateField("vendors", next);
-                }} placeholder="Fixed-price, T&M, etc." />
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Fixed-Price">Fixed-Price</SelectItem>
+                    <SelectItem value="Time & Materials (T&M)">Time & Materials (T&M)</SelectItem>
+                    <SelectItem value="Cost-Plus">Cost-Plus</SelectItem>
+                    <SelectItem value="Unit Price">Unit Price</SelectItem>
+                    <SelectItem value="Framework Agreement">Framework Agreement</SelectItem>
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Deliverables">
                 <Input value={v.deliverables} onChange={(e) => {
@@ -1698,13 +1823,30 @@ function EngagementPlanForm({ data, updateField }: StepFormProps) {
       <CardHeader><CardTitle className="text-base">Stakeholder Engagement Plan</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <Field label="Engagement Strategy" required>
-          <Textarea value={data.engagementStrategy} onChange={(e) => updateField("engagementStrategy", e.target.value)} placeholder="How will stakeholders be engaged throughout the project?" rows={4} />
+          <Select value={data.engagementStrategy} onValueChange={(v) => updateField("engagementStrategy", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Active Engagement">Active Engagement</SelectItem>
+              <SelectItem value="Keep Informed">Keep Informed</SelectItem>
+              <SelectItem value="Monitor Only">Monitor Only</SelectItem>
+              <SelectItem value="Collaborative Partnership">Collaborative Partnership</SelectItem>
+              <SelectItem value="Manage Closely">Manage Closely</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="Communication Mapping">
           <Textarea value={data.communicationMapping} onChange={(e) => updateField("communicationMapping", e.target.value)} placeholder="Map stakeholders to communication channels and frequency..." rows={3} />
         </Field>
         <Field label="Change Readiness">
-          <Textarea value={data.changeReadiness} onChange={(e) => updateField("changeReadiness", e.target.value)} placeholder="Assessment of organizational change readiness..." rows={3} />
+          <Select value={data.changeReadiness} onValueChange={(v) => updateField("changeReadiness", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="High — Ready for Change">High — Ready for Change</SelectItem>
+              <SelectItem value="Medium — Needs Preparation">Medium — Needs Preparation</SelectItem>
+              <SelectItem value="Low — Significant Resistance">Low — Significant Resistance</SelectItem>
+              <SelectItem value="Not Assessed">Not Assessed</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
       </CardContent>
     </Card>
