@@ -649,9 +649,19 @@ export const catalogManageRouter = router({
       const currentStageReviews = (entry as any).stageReviews || {};
       const updatedStageReviews = { ...currentStageReviews, [stage]: "approved" };
 
-      await updateCatalogEntry(input.id, {
-        stageReviews: updatedStageReviews,
-      } as any, 1);
+      // When register stage is approved, also flip top-level reviewState to "approved"
+      // so the entry becomes eligible for activation (activate requires reviewState === "approved")
+      const updates: Record<string, any> = { stageReviews: updatedStageReviews };
+      if (stage === "register") {
+        updates.reviewState = "approved";
+        // Also propagate the "registered" tag
+        const currentTags = (entry.tags as string[]) || [];
+        if (!currentTags.includes("registered")) {
+          updates.tags = [...currentTags, "registered"];
+        }
+      }
+
+      await updateCatalogEntry(input.id, updates as any, 1);
 
       audit("catalog.entry.approved", input.id, {
         name: entry.name,
@@ -698,7 +708,7 @@ export const catalogManageRouter = router({
         throw new Error(`Entry must be approved before activation (current reviewState: ${entry.reviewState})`);
       }
 
-      // Governance gate: run Validate stage review
+      // Governance gate: run Register stage review (activation requires register approval)
       const review = evaluateStageReview(
         {
           id: entry.id,
@@ -712,13 +722,13 @@ export const catalogManageRouter = router({
           validationStatus: (entry as any).validationStatus || undefined,
           stageReviews: (entry as any).stageReviews || {},
         },
-        "validate",
+        "register",
         { id: String(ctx.user.id), role: ctx.user.role || "admin" }
       );
       if (!review.passed) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: `Validation gate FAIL: ${review.blockers.map((b) => b.name).join(", ")}`,
+          message: `Registration gate FAIL: ${review.blockers.map((b) => b.name).join(", ")}`,
           cause: review,
         });
       }

@@ -676,6 +676,18 @@ export function CatalogImportWizard({
                   Required for authenticated APIs (OpenAI, Anthropic, etc.)
                 </p>
               </div>
+              <Button
+                onClick={handleDiscover}
+                disabled={!baseUrl || discoverMutation.isPending}
+                size="sm"
+                className="w-full"
+              >
+                {discoverMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Discovering...</>
+                ) : (
+                  <><Search className="h-4 w-4 mr-1" />Discover</>
+                )}
+              </Button>
             </div>
 
             {/* Card 3: From Wizard */}
@@ -713,6 +725,14 @@ export function CatalogImportWizard({
                   Agent Wizard
                 </Button>
               </div>
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={() => { onOpenChange(false); navigate("/llm/catalogue/candidate"); }}
+              >
+                <Search className="h-4 w-4 mr-1" />
+                Discover
+              </Button>
             </div>
 
             {error && (
