@@ -16,7 +16,7 @@
 import { getProviderRegistry } from "../../providers/registry";
 import type { ILLMProvider } from "../../providers/base";
 import type { GenerationRequest, GenerationResponse, Message } from "../../providers/types";
-import { createCatalogEntry, getCatalogEntries, createCatalogAuditEvent } from "../../db/catalog";
+import { createCatalogEntry, getCatalogEntries, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../db/catalog";
 import type { IdeaBuilderInput } from "@shared/pm-artifact-schemas";
 
 // ── Agent Identity ──────────────────────────────────────────────────────────
@@ -573,13 +573,55 @@ export async function chatWithAgent(
 
 // ── Catalog Registration ────────────────────────────────────────────────────
 
+/** Resolve taxonomy classification keys to DB node IDs */
+async function resolveTaxonomyNodeIds(): Promise<number[]> {
+  const allNodes = await getTaxonomyNodes({ entryType: "agent" });
+  const nodeIds: number[] = [];
+
+  // Collect all classification keys (flatten arrays)
+  const classificationKeys: string[] = [];
+  for (const value of Object.values(AGENT_TAXONOMY_CLASSIFICATION)) {
+    if (Array.isArray(value)) {
+      classificationKeys.push(...value);
+    } else {
+      classificationKeys.push(value as string);
+    }
+  }
+
+  // Match each key to a taxonomy node
+  for (const key of classificationKeys) {
+    const node = allNodes.find(n => n.key === key);
+    if (node) {
+      nodeIds.push(node.id);
+    }
+  }
+
+  return nodeIds;
+}
+
 /** Ensure the PM Idea Builder Agent is registered in the AI Types Catalog */
 export async function ensureAgentRegistered(): Promise<number | null> {
   try {
     // Check if already registered
     const existing = await getCatalogEntries({ entryType: "agent" });
     const found = existing.find(e => e.name === AGENT_CATALOG_ID);
-    if (found) return found.id;
+
+    if (found) {
+      // Ensure taxonomy classifications are assigned (may be missing from earlier registration)
+      try {
+        const existingClassifications = await getEntryClassifications(found.id);
+        if (existingClassifications.length === 0) {
+          const nodeIds = await resolveTaxonomyNodeIds();
+          if (nodeIds.length > 0) {
+            await setEntryClassifications(found.id, nodeIds);
+            console.log(`[PM Agent] Assigned ${nodeIds.length} taxonomy classifications to existing agent (id=${found.id})`);
+          }
+        }
+      } catch (classErr: any) {
+        console.warn(`[PM Agent] Failed to assign taxonomy classifications:`, classErr.message);
+      }
+      return found.id;
+    }
 
     // Register new catalog entry
     const entry = await createCatalogEntry({
@@ -626,6 +668,17 @@ export async function ensureAgentRegistered(): Promise<number | null> {
       tags: ["pm", "pmi", "pmbok", "project-management", "artifact-generation", "llm-powered"],
       createdBy: 1, // system user
     });
+
+    // Assign taxonomy classifications (resolve keys → node IDs)
+    try {
+      const nodeIds = await resolveTaxonomyNodeIds();
+      if (nodeIds.length > 0) {
+        await setEntryClassifications(entry.id, nodeIds);
+        console.log(`[PM Agent] Assigned ${nodeIds.length} taxonomy classifications`);
+      }
+    } catch (classErr: any) {
+      console.warn(`[PM Agent] Failed to assign taxonomy classifications:`, classErr.message);
+    }
 
     // Audit the registration
     await createCatalogAuditEvent({
