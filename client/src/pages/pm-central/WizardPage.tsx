@@ -184,7 +184,7 @@ export default function WizardPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] -mx-6 -mt-6">
+    <div className="flex -mx-6 -mt-6 overflow-hidden" style={{ height: "calc(100vh - 4rem)" }}>
       {/* Left stepper panel — collapsible */}
       <div className={`border-r bg-muted/30 flex flex-col transition-all duration-200 ${sidebarOpen ? "w-72" : "w-12"}`}>
         {/* Collapse toggle */}
@@ -336,28 +336,26 @@ export default function WizardPage() {
           </div>
         </div>
 
-        {/* Form content — wrapper div constrains height for Radix ScrollArea */}
-        <div className="flex-1 min-h-0">
-          <ScrollArea className="h-full">
-            <div className="p-6">
-              <div className="max-w-3xl mx-auto pb-4">
-                <StepForm
-                  step={currentStep}
-                  data={wizardData}
-                  updateField={updateField}
-                  onSubmitG0={handleSubmitG0}
-                  onSubmitG1={handleSubmitG1}
-                  isSubmittingG0={submitG0.isPending}
-                  isSubmittingG1={submitG1.isPending}
-                  submitG0Error={submitG0.error?.message}
-                  submitG1Error={submitG1.error?.message}
-                  submitG0Success={submitG0.isSuccess}
-                  submitG1Success={submitG1.isSuccess}
-                  methodPack={methodPack}
-                />
-              </div>
+        {/* Form content — native overflow scroll, independent from sidebar */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="p-6">
+            <div className="max-w-3xl mx-auto pb-4">
+              <StepForm
+                step={currentStep}
+                data={wizardData}
+                updateField={updateField}
+                onSubmitG0={handleSubmitG0}
+                onSubmitG1={handleSubmitG1}
+                isSubmittingG0={submitG0.isPending}
+                isSubmittingG1={submitG1.isPending}
+                submitG0Error={submitG0.error?.message}
+                submitG1Error={submitG1.error?.message}
+                submitG0Success={submitG0.isSuccess}
+                submitG1Success={submitG1.isSuccess}
+                methodPack={methodPack}
+              />
             </div>
-          </ScrollArea>
+          </div>
         </div>
 
         {/* Bottom navigation */}

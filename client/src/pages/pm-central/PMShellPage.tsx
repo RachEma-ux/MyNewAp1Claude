@@ -1411,7 +1411,7 @@ export default function PMShellPage() {
           collapsed={collapsed}
           onToggle={() => setCollapsed(!collapsed)}
         />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 min-w-0 overflow-y-auto">
           {renderPanel()}
         </main>
       </div>
