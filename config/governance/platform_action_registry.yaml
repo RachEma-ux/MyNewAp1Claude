@@ -1854,6 +1854,71 @@ actions:
     approval: none
     evidence: { required: false }
 
+  # PMT Lifecycle Governance
+  pmt.project.submitForIntake:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: true, types: [reason] }
+
+  pmt.project.transition:
+    domain: pmt
+    risk: R3
+    capability: pmt.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  pmt.gate.request:
+    domain: pmt
+    risk: R3
+    capability: pmt.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, plan] }
+
+  pmt.gate.evaluate:
+    domain: pmt
+    risk: R4
+    capability: pmt.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason, probe_results] }
+
+  pmt.gate.waive:
+    domain: pmt
+    risk: R5
+    capability: pmt.manage
+    stage: mutate
+    approval: dual_control
+    evidence: { required: true, types: [reason] }
+
+  pmt.change.create:
+    domain: pmt
+    risk: R2
+    capability: pmt.manage
+    stage: mutate
+    approval: none
+    evidence: { required: true, types: [reason] }
+
+  pmt.change.submit:
+    domain: pmt
+    risk: R3
+    capability: pmt.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason, plan] }
+
+  pmt.project.archive:
+    domain: pmt
+    risk: R3
+    capability: pmt.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
   pmt.workItemTemplate.create:
     domain: pmt
     risk: R1

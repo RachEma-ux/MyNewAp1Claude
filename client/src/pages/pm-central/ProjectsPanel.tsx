@@ -11,7 +11,7 @@ export default function ProjectsPanel() {
   // Use standalone shell routes — no workspace dependency
   const { data: allProjects, isLoading } = trpc.modules.pmt.shell.projects.list.useQuery();
 
-  const activeProjects = (allProjects || []).filter((p: any) => p.status === "active");
+  const activeProjects = (allProjects || []).filter((p: any) => !["closed", "archived", "rejected"].includes(p.status));
 
   return (
     <div className="space-y-6">
@@ -83,21 +83,21 @@ export default function ProjectsPanel() {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : activeProjects.length === 0 ? (
-            <p className="text-muted-foreground">No active projects yet. Create a project in PM Shell and validate it.</p>
+            <p className="text-muted-foreground">No active projects yet. Create a project in PM Shell to get started.</p>
           ) : (
             <div className="space-y-2">
               {activeProjects.map((proj: any) => (
-                <div key={proj.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
+                <div key={proj.id} className="flex items-center justify-between rounded-lg border px-4 py-3 cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation(`/pm-central/project/${proj.id}/overview`)}>
                   <div className="flex items-center gap-3">
                     <FolderKanban className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium">{proj.name}</p>
                       <p className="text-xs text-muted-foreground">{proj.description || `Project #${proj.id}`}</p>
                     </div>
-                    <Badge variant="outline" className="text-green-500 border-green-500/30">Active</Badge>
+                    <Badge variant="outline" className="capitalize">{(proj.status || "draft").replace(/_/g, " ")}</Badge>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => setLocation("/pm-central/pm-shell")}>
-                    Open in PM Shell
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/project/${proj.id}/overview`); }}>
+                    Open Project
                   </Button>
                 </div>
               ))}

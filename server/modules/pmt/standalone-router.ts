@@ -4,17 +4,32 @@
  * Auto-manages an internal "PM Shell" workspace so callers
  * never need to pass workspaceId. Fully independent from
  * the workspace system.
+ *
+ * Includes lifecycle state machine, governance gates, change control,
+ * and project artifacts sub-routers.
  */
 
 import { z } from "zod";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { createHash } from "crypto";
 import { router, protectedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
 import { projects, tasks, taskDependencies } from "./schema";
 import { pmSprints } from "./sprints-schema";
+import {
+  pmtGateRequests, pmtChangeRequests, pmtProjectArtifacts, pmtStateTransitions,
+} from "./governance-schema";
 import { workspaces } from "../../../drizzle/tables/users";
 import { seedWorkspaceModules } from "../registry";
+import { toolsRouter } from "./tools-router";
+import {
+  validateTransition, getAvailableTransitions,
+  PROJECT_STATES, GATE_IDS, GATE_STATUSES,
+  CHANGE_TYPES, CHANGE_IMPACTS, CHANGE_STATUSES,
+  ARTIFACT_TYPES,
+  type ProjectState,
+} from "./project-lifecycle";
 
 // ── Auto-managed PM Shell workspace ──
 
@@ -93,6 +108,7 @@ const shellProjectsRouter = router({
         workspaceId: wsId,
         name: input.name,
         description: input.description,
+        status: "draft_shell",
         riskLevel: input.riskLevel,
         ownerId: ctx.user.id,
         startDate: input.startDate ? new Date(input.startDate) : undefined,
@@ -351,6 +367,400 @@ const shellDependenciesRouter = router({
     }),
 });
 
+// ── Lifecycle ──
+
+const shellLifecycleRouter = router({
+  getState: protectedProcedure
+    .input(z.object({ projectId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const wsId = await getOrCreatePMShellWorkspace(ctx.user.id);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const rows = await db.select().from(projects)
+        .where(and(eq(projects.id, input.projectId), eq(projects.workspaceId, wsId)))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+      const currentState = (rows[0].status || "draft_shell") as ProjectState;
+      return {
+        projectId: rows[0].id,
+        currentState,
+        availableTransitions: getAvailableTransitions(currentState),
+      };
+    }),
+
+  transition: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      toState: z.enum(PROJECT_STATES as unknown as [string, ...string[]]),
+      reason: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const wsId = await getOrCreatePMShellWorkspace(ctx.user.id);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Get current project
+      const rows = await db.select().from(projects)
+        .where(and(eq(projects.id, input.projectId), eq(projects.workspaceId, wsId)))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+
+      const fromState = (rows[0].status || "draft_shell") as ProjectState;
+      const validation = validateTransition(fromState, input.toState as ProjectState);
+
+      if (!validation.valid) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: validation.reason || "Invalid transition" });
+      }
+
+      // If gate required, create gate request and set project to pending state
+      let gateRequestId: number | undefined;
+      if (validation.gateRequired && validation.gateId) {
+        const [gateReq] = await db.insert(pmtGateRequests).values({
+          projectId: input.projectId,
+          gateId: validation.gateId,
+          status: "pending",
+          requestedBy: ctx.user.id,
+          reason: input.reason,
+        }).returning();
+        gateRequestId = gateReq.id;
+      }
+
+      // Update project status
+      await db.update(projects).set({
+        status: input.toState,
+        updatedAt: new Date(),
+      }).where(eq(projects.id, input.projectId));
+
+      // Log state transition
+      await db.insert(pmtStateTransitions).values({
+        projectId: input.projectId,
+        fromState,
+        toState: input.toState,
+        actorId: ctx.user.id,
+        gateRequestId,
+        reason: input.reason,
+      });
+
+      return {
+        success: true,
+        fromState,
+        toState: input.toState,
+        gateRequestId,
+        gateRequired: validation.gateRequired,
+      };
+    }),
+
+  history: protectedProcedure
+    .input(z.object({ projectId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) return [];
+      return db.select().from(pmtStateTransitions)
+        .where(eq(pmtStateTransitions.projectId, input.projectId))
+        .orderBy(desc(pmtStateTransitions.createdAt))
+        .limit(100);
+    }),
+});
+
+// ── Gates ──
+
+const shellGatesRouter = router({
+  list: protectedProcedure
+    .input(z.object({ projectId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) return [];
+      return db.select().from(pmtGateRequests)
+        .where(eq(pmtGateRequests.projectId, input.projectId))
+        .orderBy(desc(pmtGateRequests.createdAt));
+    }),
+
+  request: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      gateId: z.enum(GATE_IDS as unknown as [string, ...string[]]),
+      reason: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [created] = await db.insert(pmtGateRequests).values({
+        projectId: input.projectId,
+        gateId: input.gateId,
+        status: "pending",
+        requestedBy: ctx.user.id,
+        reason: input.reason,
+      }).returning();
+      return created;
+    }),
+
+  evaluate: protectedProcedure
+    .input(z.object({
+      gateRequestId: z.number(),
+      passed: z.boolean(),
+      verdict: z.record(z.unknown()).optional(),
+      reason: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Get gate request
+      const rows = await db.select().from(pmtGateRequests)
+        .where(eq(pmtGateRequests.id, input.gateRequestId))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Gate request not found" });
+      if (rows[0].status !== "pending" && rows[0].status !== "evaluating") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Gate already evaluated" });
+      }
+
+      const newStatus = input.passed ? "passed" : "failed";
+
+      // Update gate request
+      await db.update(pmtGateRequests).set({
+        status: newStatus,
+        evaluatedBy: ctx.user.id,
+        evaluatedAt: new Date(),
+        verdict: input.verdict || { passed: input.passed },
+        reason: input.reason,
+      }).where(eq(pmtGateRequests.id, input.gateRequestId));
+
+      // Determine state transition based on gate result
+      const gateReq = rows[0];
+      const project = await db.select().from(projects)
+        .where(eq(projects.id, gateReq.projectId))
+        .limit(1);
+      if (!project[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+
+      const currentState = project[0].status as ProjectState;
+      let targetState: ProjectState | null = null;
+
+      // Map gate results to state transitions
+      if (input.passed) {
+        if (gateReq.gateId === "G0" && currentState === "intake_review") targetState = "planning";
+        if (gateReq.gateId === "G1" && currentState === "plan_gate_pending") targetState = "authorized";
+        if (gateReq.gateId === "G2" && currentState === "change_pending") targetState = "executing";
+        if (gateReq.gateId === "G4" && currentState === "close_gate_pending") targetState = "closed";
+      } else {
+        if (gateReq.gateId === "G0" && currentState === "intake_review") targetState = "rejected";
+        if (gateReq.gateId === "G1" && currentState === "plan_gate_pending") targetState = "planning";
+        if (gateReq.gateId === "G3") targetState = "control_hold";
+        if (gateReq.gateId === "G4" && currentState === "close_gate_pending") targetState = "closing";
+      }
+
+      if (targetState) {
+        await db.update(projects).set({
+          status: targetState,
+          updatedAt: new Date(),
+        }).where(eq(projects.id, gateReq.projectId));
+
+        await db.insert(pmtStateTransitions).values({
+          projectId: gateReq.projectId,
+          fromState: currentState,
+          toState: targetState,
+          actorId: ctx.user.id,
+          gateRequestId: input.gateRequestId,
+          reason: input.reason || `${gateReq.gateId} gate ${newStatus}`,
+        });
+      }
+
+      return { success: true, gateStatus: newStatus, newProjectState: targetState };
+    }),
+
+  waive: protectedProcedure
+    .input(z.object({
+      gateRequestId: z.number(),
+      reason: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const rows = await db.select().from(pmtGateRequests)
+        .where(eq(pmtGateRequests.id, input.gateRequestId))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Gate request not found" });
+
+      await db.update(pmtGateRequests).set({
+        status: "waived",
+        evaluatedBy: ctx.user.id,
+        evaluatedAt: new Date(),
+        reason: `WAIVED: ${input.reason}`,
+      }).where(eq(pmtGateRequests.id, input.gateRequestId));
+
+      return { success: true };
+    }),
+});
+
+// ── Changes ──
+
+const shellChangesRouter = router({
+  list: protectedProcedure
+    .input(z.object({ projectId: z.number().optional() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) return [];
+      if (input.projectId) {
+        return db.select().from(pmtChangeRequests)
+          .where(eq(pmtChangeRequests.projectId, input.projectId))
+          .orderBy(desc(pmtChangeRequests.createdAt));
+      }
+      return db.select().from(pmtChangeRequests)
+        .orderBy(desc(pmtChangeRequests.createdAt))
+        .limit(100);
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      title: z.string().min(1).max(500),
+      description: z.string().optional(),
+      changeType: z.enum(CHANGE_TYPES as unknown as [string, ...string[]]),
+      impact: z.enum(CHANGE_IMPACTS as unknown as [string, ...string[]]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [created] = await db.insert(pmtChangeRequests).values({
+        projectId: input.projectId,
+        title: input.title,
+        description: input.description,
+        changeType: input.changeType,
+        impact: input.impact || "medium",
+        requestedBy: ctx.user.id,
+      }).returning();
+      return created;
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      title: z.string().optional(),
+      description: z.string().optional(),
+      changeType: z.string().optional(),
+      impact: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { id, ...updates } = input;
+      await db.update(pmtChangeRequests).set({ ...updates, updatedAt: new Date() })
+        .where(eq(pmtChangeRequests.id, id));
+      return { success: true };
+    }),
+
+  submit: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const rows = await db.select().from(pmtChangeRequests)
+        .where(eq(pmtChangeRequests.id, input.id))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Change request not found" });
+      if (rows[0].status !== "draft") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Only draft changes can be submitted" });
+      }
+
+      // Create G2 gate request
+      const [gateReq] = await db.insert(pmtGateRequests).values({
+        projectId: rows[0].projectId,
+        gateId: "G2",
+        status: "pending",
+        requestedBy: ctx.user.id,
+        reason: `Change request: ${rows[0].title}`,
+      }).returning();
+
+      // Update change request status
+      await db.update(pmtChangeRequests).set({
+        status: "submitted",
+        gateRequestId: gateReq.id,
+        updatedAt: new Date(),
+      }).where(eq(pmtChangeRequests.id, input.id));
+
+      return { success: true, gateRequestId: gateReq.id };
+    }),
+
+  approve: protectedProcedure
+    .input(z.object({ id: z.number(), reason: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.update(pmtChangeRequests).set({
+        status: "approved",
+        reviewedBy: ctx.user.id,
+        updatedAt: new Date(),
+      }).where(eq(pmtChangeRequests.id, input.id));
+      return { success: true };
+    }),
+
+  reject: protectedProcedure
+    .input(z.object({ id: z.number(), reason: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.update(pmtChangeRequests).set({
+        status: "rejected",
+        reviewedBy: ctx.user.id,
+        updatedAt: new Date(),
+      }).where(eq(pmtChangeRequests.id, input.id));
+      return { success: true };
+    }),
+});
+
+// ── Artifacts ──
+
+const shellArtifactsRouter = router({
+  list: protectedProcedure
+    .input(z.object({ projectId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) return [];
+      return db.select().from(pmtProjectArtifacts)
+        .where(eq(pmtProjectArtifacts.projectId, input.projectId))
+        .orderBy(desc(pmtProjectArtifacts.createdAt));
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      name: z.string().min(1).max(255),
+      artifactType: z.enum(ARTIFACT_TYPES as unknown as [string, ...string[]]),
+      content: z.record(z.unknown()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Compute SHA-256 hash of content
+      const contentStr = JSON.stringify(input.content);
+      const sha256 = createHash("sha256").update(contentStr).digest("hex");
+
+      const [created] = await db.insert(pmtProjectArtifacts).values({
+        projectId: input.projectId,
+        name: input.name,
+        artifactType: input.artifactType,
+        content: input.content,
+        sha256,
+        createdBy: ctx.user.id,
+      }).returning();
+      return created;
+    }),
+
+  get: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const rows = await db.select().from(pmtProjectArtifacts)
+        .where(eq(pmtProjectArtifacts.id, input.id))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Artifact not found" });
+      return rows[0];
+    }),
+});
+
 // ── Export ──
 
 export const standaloneRouter = router({
@@ -358,4 +768,9 @@ export const standaloneRouter = router({
   tasks: shellTasksRouter,
   sprints: shellSprintsRouter,
   dependencies: shellDependenciesRouter,
+  lifecycle: shellLifecycleRouter,
+  gates: shellGatesRouter,
+  changes: shellChangesRouter,
+  artifacts: shellArtifactsRouter,
+  tools: toolsRouter,
 });

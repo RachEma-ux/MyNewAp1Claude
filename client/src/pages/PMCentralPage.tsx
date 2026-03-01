@@ -3,12 +3,12 @@ import DashboardPanel from "./pm-central/DashboardPanel";
 import PMShellPanel from "./pm-central/PMShellPanel";
 import PMShellPage from "./pm-central/PMShellPage";
 import ProjectsPanel from "./pm-central/ProjectsPanel";
-import MethodsPanel from "./pm-central/MethodsPanel";
+import PlansPanel from "./pm-central/PlansPanel";
+import ExecutionPanel from "./pm-central/ExecutionPanel";
+import ChangesPanel from "./pm-central/ChangesPanel";
+import RisksPanel from "./pm-central/RisksPanel";
+import ReportsPanel from "./pm-central/ReportsPanel";
 import ParticipantsPanel from "./pm-central/ParticipantsPanel";
-import ToolsPanel from "./pm-central/ToolsPanel";
-import ResourcesPanel from "./pm-central/ResourcesPanel";
-import GovernancePanel from "./pm-central/GovernancePanel";
-import DocumentationPanel from "./pm-central/DocumentationPanel";
 import TemplatesPanel from "./pm-central/TemplatesPanel";
 
 export default function PMCentralPage() {
@@ -22,24 +22,24 @@ export default function PMCentralPage() {
       return <PMShellPanel />;
     case "pm-shell":
       return <PMShellPage />;
-    case "projects":
-      return <ProjectsPanel />;
-    case "methods":
-      return <MethodsPanel />;
-    case "participants":
+    case "plans":
+      return <PlansPanel />;
+    case "execution":
+      return <ExecutionPanel />;
+    case "changes":
+      return <ChangesPanel />;
+    case "risks":
+      return <RisksPanel />;
+    case "collaboration":
       return <ParticipantsPanel />;
-    case "tools":
-      return <ToolsPanel />;
-    case "resources":
-      return <ResourcesPanel />;
-    case "governance":
-      return <GovernancePanel />;
-    case "documentation":
-      return <DocumentationPanel />;
+    case "reports":
+      return <ReportsPanel />;
     case "templates":
       return <TemplatesPanel />;
     case "examples":
       return <TemplatesPanel defaultTab="examples" />;
+    case "projects":
+      return <DashboardPanel />;
     default:
       return <DashboardPanel />;
   }

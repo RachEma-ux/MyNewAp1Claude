@@ -99,6 +99,7 @@ const GovernanceCenterPage = lazy(() => import("@/pages/GovernanceCenterPage"));
 const RunConsolePage = lazy(() => import("@/pages/RunConsolePage"));
 const CollaborationPage = lazy(() => import("@/pages/CollaborationPage"));
 const PMCentralPage = lazy(() => import("@/pages/PMCentralPage"));
+const ProjectPage = lazy(() => import("@/pages/pm-central/ProjectPage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -274,7 +275,10 @@ function Router() {
       <Route path="/run-console" component={() => <ProtectedRoute component={RunConsolePage} />} />
       {/* Collaboration */}
       <Route path="/collaboration" component={() => <ProtectedRoute component={CollaborationPage} />} />
-      {/* PM Central */}
+      {/* PM Central — Project-level views (must be before :item catch-all) */}
+      <Route path="/pm-central/project/:id/:tool" component={() => <ProtectedRoute component={ProjectPage} />} />
+      <Route path="/pm-central/project/:id" component={() => <ProtectedRoute component={ProjectPage} />} />
+      {/* PM Central — Top-level views */}
       <Route path="/pm-central/:item" component={() => <ProtectedRoute component={PMCentralPage} />} />
       <Route path="/pm-central" component={() => <ProtectedRoute component={PMCentralPage} />} />
       {/* UI Showcase — living documentation for shared components */}
