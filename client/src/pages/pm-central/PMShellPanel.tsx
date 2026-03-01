@@ -49,19 +49,10 @@ export default function PMShellPanel() {
               <p className="text-sm text-muted-foreground">Create projects, manage tasks, timelines, and deliverables</p>
             </div>
           </div>
-          {wsLoading ? (
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          ) : defaultShellId ? (
-            <Button size="lg" onClick={() => setLocation(`/project/${defaultShellId}`)}>
-              <Terminal className="h-4 w-4 mr-2" />
-              Open PM Shell
-            </Button>
-          ) : (
-            <Button size="lg" variant="outline" onClick={() => setLocation("/workspaces")}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Workspace First
-            </Button>
-          )}
+          <Button size="lg" onClick={() => defaultShellId && setLocation(`/project/${defaultShellId}`)} disabled={wsLoading || !defaultShellId}>
+            <Terminal className="h-4 w-4 mr-2" />
+            Open PM Shell
+          </Button>
         </CardContent>
       </Card>
 
