@@ -1,7 +1,7 @@
-import { lazy } from "react";
 import { useRoute } from "wouter";
 import DashboardPanel from "./pm-central/DashboardPanel";
 import PMShellPanel from "./pm-central/PMShellPanel";
+import PMShellPage from "./pm-central/PMShellPage";
 import ProjectsPanel from "./pm-central/ProjectsPanel";
 import MethodsPanel from "./pm-central/MethodsPanel";
 import ParticipantsPanel from "./pm-central/ParticipantsPanel";
@@ -10,8 +10,6 @@ import ResourcesPanel from "./pm-central/ResourcesPanel";
 import GovernancePanel from "./pm-central/GovernancePanel";
 import DocumentationPanel from "./pm-central/DocumentationPanel";
 import TemplatesPanel from "./pm-central/TemplatesPanel";
-
-const ProjectWorkspaceShell = lazy(() => import("./ProjectWorkspaceShell"));
 
 export default function PMCentralPage() {
   const [, params] = useRoute("/pm-central/:item");
@@ -23,7 +21,7 @@ export default function PMCentralPage() {
     case "shell":
       return <PMShellPanel />;
     case "pm-shell":
-      return <ProjectWorkspaceShell />;
+      return <PMShellPage />;
     case "projects":
       return <ProjectsPanel />;
     case "methods":

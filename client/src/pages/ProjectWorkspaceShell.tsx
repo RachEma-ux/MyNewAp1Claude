@@ -334,13 +334,8 @@ function ProjectOversightDrawer({ open, onOpenChange, entityId }: { open: boolea
 
 export default function ProjectWorkspaceShell() {
   const params = useParams<{ workspaceId: string }>();
-  const paramId = parseInt(params.workspaceId || "0", 10);
+  const workspaceId = parseInt(params.workspaceId || "0", 10);
   const [location, navigate] = useLocation();
-
-  // Auto-resolve workspace when no URL param (e.g. rendered inside PM Central)
-  const { data: allWorkspaces } = trpc.workspaces.list.useQuery(undefined, { enabled: paramId === 0 });
-  const autoId = paramId === 0 ? (allWorkspaces || []).find((w: any) => w.type === "project")?.id || (allWorkspaces || [])[0]?.id || 0 : 0;
-  const workspaceId = paramId || autoId;
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [oversightOpen, setOversightOpen] = useState(false);
