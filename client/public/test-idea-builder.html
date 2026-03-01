@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Idea Builder Agent Test</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #0a0a0a; color: #e5e5e5; max-width: 800px; margin: 0 auto; padding: 20px; }
+  h1 { color: #a78bfa; font-size: 1.3rem; }
+  textarea { width: 100%; height: 120px; background: #1a1a1a; color: #e5e5e5; border: 1px solid #333; border-radius: 8px; padding: 12px; font-size: 14px; resize: vertical; }
+  button { background: #7c3aed; color: white; border: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 8px; }
+  button:hover { background: #6d28d9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .status { margin-top: 12px; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+  .status.loading { background: #1e1b4b; border: 1px solid #4338ca; color: #a5b4fc; }
+  .status.success { background: #052e16; border: 1px solid #166534; color: #86efac; }
+  .status.error { background: #2a0a0a; border: 1px solid #991b1b; color: #fca5a5; }
+  pre { background: #111; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 12px; white-space: pre-wrap; max-height: 600px; overflow-y: auto; border: 1px solid #222; }
+  .step { margin-top: 16px; }
+  .step h3 { color: #818cf8; font-size: 0.95rem; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<h1>PM Idea-to-PMI Builder Agent Test</h1>
+
+<div class="step">
+  <h3>Step 1: Enter Project Idea</h3>
+  <textarea id="idea">Build a mobile banking app for a credit union with 50,000 members. Needs account management, bill pay, mobile check deposit, P2P transfers, push notifications. Must comply with PCI-DSS and SOC2. Budget $800,000 with a 9-month deadline.</textarea>
+</div>
+
+<div class="step">
+  <h3>Step 2: Analyze</h3>
+  <button id="analyzeBtn" onclick="runAnalyze()">Analyze Idea</button>
+  <div id="analyzeStatus"></div>
+  <pre id="analyzeResult" style="display:none"></pre>
+</div>
+
+<div class="step">
+  <h3>Step 3: Launch Full Generation (after analyze succeeds)</h3>
+  <button id="launchBtn" onclick="runLaunch()" disabled>Launch DAG Execution</button>
+  <div id="launchStatus"></div>
+  <pre id="launchResult" style="display:none"></pre>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let analyzeData = null;
+
+async function callTRPC(procedure, input) {
+  const resp = await fetch(`${BASE}/api/trpc/${procedure}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ json: { ...input, _evidence: { types: ['reason'], refs: ['test-page'] } } })
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(JSON.stringify(data.error, null, 2));
+  return data.result?.data?.json ?? data.result?.data ?? data;
+}
+
+async function runAnalyze() {
+  const btn = document.getElementById('analyzeBtn');
+  const status = document.getElementById('analyzeStatus');
+  const result = document.getElementById('analyzeResult');
+  const idea = document.getElementById('idea').value;
+
+  btn.disabled = true;
+  status.className = 'status loading';
+  status.textContent = 'Analyzing idea with AI agent... (may take 30-60s with local LLM)';
+  result.style.display = 'none';
+
+  try {
+    const data = await callTRPC('modules.pmt.shell.ideaBuilder.analyze', { ideaText: idea });
+    analyzeData = data;
+    status.className = 'status success';
+    status.textContent = `Analysis complete! Mode: ${data.mode || 'unknown'}`;
+    result.style.display = 'block';
+    result.textContent = JSON.stringify(data, null, 2);
+    document.getElementById('launchBtn').disabled = false;
+  } catch (err) {
+    status.className = 'status error';
+    status.textContent = `Error: ${err.message}`;
+    result.style.display = 'block';
+    result.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function runLaunch() {
+  const btn = document.getElementById('launchBtn');
+  const status = document.getElementById('launchStatus');
+  const result = document.getElementById('launchResult');
+  const idea = document.getElementById('idea').value;
+
+  btn.disabled = true;
+  status.className = 'status loading';
+  status.textContent = 'Launching full DAG execution... (generates all PMI artifacts, may take 2-5 min)';
+  result.style.display = 'none';
+
+  try {
+    const data = await callTRPC('modules.pmt.shell.ideaBuilder.launch', { ideaText: idea });
+    status.className = 'status success';
+    status.textContent = `Launch complete! Generated ${Object.keys(data.artifacts || {}).length} artifacts.`;
+    result.style.display = 'block';
+    result.textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    status.className = 'status error';
+    status.textContent = `Error: ${err.message}`;
+    result.style.display = 'block';
+    result.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Also check agent info on load
+(async () => {
+  try {
+    const resp = await fetch(`${BASE}/api/trpc/modules.pmt.shell.ideaBuilder.agentInfo`);
+    const data = await resp.json();
+    const info = data.result?.data?.json;
+    const el = document.createElement('div');
+    el.className = 'status success';
+    el.innerHTML = `Agent: <b>${info?.displayName}</b> | LLM: <b>${info?.llmAvailable ? 'Available (' + info?.providerInfo?.name + ')' : 'Not available'}</b> | Entry #${info?.catalogEntryId}`;
+    document.querySelector('h1').after(el);
+  } catch {}
+})();
+</script>
+</body>
+</html>
