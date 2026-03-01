@@ -1,0 +1,61 @@
+Session Summary — 2026-03-01 22:00
+
+## What was done
+
+### 1. Added Collaboration & PM Central to hamburger menu
+- Added two new top-level sidebar items: **Collaboration** (simple link) and **PM Central** (expandable with 9 sub-items)
+- PM Central sub-items: Dashboard, PM Shell, Projects, Methods, Participants, Tools, Resources, Governance, Documentation
+- Added `FolderKanban` icon import, `pmCentralMenuOpen` state, toggle handler, chevron logic, and 2-level rendering
+- Files modified: `client/src/components/MainLayout.tsx`, `client/src/App.tsx`
+
+### 2. Created stub pages
+- `client/src/pages/CollaborationPage.tsx` — stub with 4 stat cards + getting started card
+- `client/src/pages/PMCentralPage.tsx` — router page (same pattern as DigitalHQPage) switching between 9 sub-panels
+- 9 panel stubs in `client/src/pages/pm-central/`:
+  - DashboardPanel, PMShellPanel, ProjectsPanel, MethodsPanel, ParticipantsPanel, ToolsPanel, ResourcesPanel, GovernancePanel, DocumentationPanel
+
+### 3. Created repo folders
+- `Collaboration/.gitkeep`
+- `PM Central/.gitkeep`
+
+### 4. Added routes in App.tsx
+- Lazy imports for CollaborationPage and PMCentralPage
+- Routes: `/collaboration`, `/pm-central/:item`, `/pm-central`
+
+### 5. Added "Open Shell" button to PM Shell panel
+- Initially added to Dashboard by mistake, then moved to PM Shell panel per user request
+- PM Shell panel now fetches project workspaces via tRPC and lists them with "Open Shell" buttons
+- Each button navigates to `/project/{workspaceId}` to open the Project Workspace Shell
+- Shows "Create a Project Workspace" fallback when no project workspaces exist
+
+### 6. Fixed stale GIST_TOKEN
+- Gist was returning null for tunnel URL despite tunnel step running
+- Refreshed GIST_TOKEN secret with `gh secret set GIST_TOKEN < ~/.github_pat`
+- Re-deployed successfully after token refresh
+
+## Commits
+- `0a076c4` feat: add Collaboration page and PM Central hub with 9 sub-pages
+- `b8b939e` feat(pm-central): add Open Shell button to dashboard with project workspace list
+- `77bc318` fix(pm-central): move Open Shell button from Dashboard to PM Shell panel
+
+## Files created (14 new)
+- Collaboration/.gitkeep
+- PM Central/.gitkeep
+- client/src/pages/CollaborationPage.tsx
+- client/src/pages/PMCentralPage.tsx
+- client/src/pages/pm-central/DashboardPanel.tsx
+- client/src/pages/pm-central/PMShellPanel.tsx
+- client/src/pages/pm-central/ProjectsPanel.tsx
+- client/src/pages/pm-central/MethodsPanel.tsx
+- client/src/pages/pm-central/ParticipantsPanel.tsx
+- client/src/pages/pm-central/ToolsPanel.tsx
+- client/src/pages/pm-central/ResourcesPanel.tsx
+- client/src/pages/pm-central/GovernancePanel.tsx
+- client/src/pages/pm-central/DocumentationPanel.tsx
+
+## Files modified (2)
+- client/src/components/MainLayout.tsx
+- client/src/App.tsx
+
+## Current deploy
+- Tunnel: https://readings-loose-conference-consistently.trycloudflare.com (30 min)
