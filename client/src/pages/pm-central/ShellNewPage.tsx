@@ -31,7 +31,7 @@ export default function ShellNewPage() {
 
   const createMutation = trpc.modules.pmt.shell.projects.create.useMutation({
     onSuccess: (data: any) => {
-      setLocation(`/pm-central/p/${data.id}/charter`);
+      setLocation(`/pm-central/p/${data.id}/wizard/start`);
     },
     onError: () => {
       setCreating(false);

@@ -22,6 +22,7 @@ import {
   AlertTriangle, AlertCircle, GitBranch, ShieldCheck,
   MessageSquare, FolderOpen, ShieldAlert,
   ChevronLeft, ChevronDown, ChevronRight, Inbox,
+  Wand2,
 } from "lucide-react";
 import ProjectSwitcher from "./ProjectSwitcher";
 import ProjectControlStrip from "./ProjectStatusStrip";
@@ -207,6 +208,7 @@ export default function PMProjectSidebar({ projectId, activeTool }: PMProjectSid
         {/* 1. Project */}
         <NavSection label="Project">
           <NavItem icon={<LayoutDashboard className="h-3.5 w-3.5" />} label="Overview" href={`${base}/overview`} active={activeTool === "overview"} statusDot={overallDot} />
+          <NavItem icon={<Wand2 className="h-3.5 w-3.5" />} label="PMI Wizard" href={`${base}/wizard/start`} active={activeTool === "wizard"} />
           <NavItem icon={<FileText className="h-3.5 w-3.5" />} label="Charter / Intake" href={`${base}/charter`} active={activeTool === "charter"} />
           <NavItem icon={<Network className="h-3.5 w-3.5" />} label="Scope & WBS" href={`${base}/wbs`} active={activeTool === "wbs"} />
           <NavItem icon={<Flag className="h-3.5 w-3.5" />} label="Milestones" href={`${base}/milestones`} active={activeTool === "milestones"} />

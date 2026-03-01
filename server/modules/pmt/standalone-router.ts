@@ -23,6 +23,7 @@ import {
 import { workspaces } from "../../../drizzle/tables/users";
 import { seedWorkspaceModules } from "../registry";
 import { toolsRouter } from "./tools-router";
+import { wizardRouter } from "./wizard-router";
 import {
   validateTransition, getAvailableTransitions,
   PROJECT_STATES, GATE_IDS, GATE_STATUSES,
@@ -773,4 +774,5 @@ export const standaloneRouter = router({
   changes: shellChangesRouter,
   artifacts: shellArtifactsRouter,
   tools: toolsRouter,
+  wizard: wizardRouter,
 });
