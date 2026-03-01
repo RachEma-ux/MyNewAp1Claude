@@ -103,6 +103,7 @@ const ProjectPage = lazy(() => import("@/pages/pm-central/ProjectPage"));
 const ShellNewPage = lazy(() => import("@/pages/pm-central/ShellNewPage"));
 const InboxPage = lazy(() => import("@/pages/pm-central/InboxPage"));
 const WizardPage = lazy(() => import("@/pages/pm-central/WizardPage"));
+const MethodesPage = lazy(() => import("@/pages/pm-central/MethodesPage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -281,6 +282,10 @@ function Router() {
       {/* PM Central — Project creation + inbox (must be before :id catch-all) */}
       <Route path="/pm-central/shell/new" component={() => <ProtectedRoute component={ShellNewPage} />} />
       <Route path="/pm-central/inbox" component={() => <ProtectedRoute component={InboxPage} />} />
+      {/* PM Central — Méthodes (nested routes before generic :item catch-all) */}
+      <Route path="/pm-central/methodes/detail/:methodId" component={() => <ProtectedRoute component={MethodesPage} />} />
+      <Route path="/pm-central/methodes/:categoryId" component={() => <ProtectedRoute component={MethodesPage} />} />
+      <Route path="/pm-central/methodes" component={() => <ProtectedRoute component={MethodesPage} />} />
       {/* PM Central — Wizard routes (must be before generic /p/:id/:tool) */}
       <Route path="/pm-central/p/:id/wizard/:step" component={() => <ProtectedRoute component={WizardPage} />} />
       <Route path="/pm-central/p/:id/wizard" component={() => <ProtectedRoute component={WizardPage} />} />

@@ -10,6 +10,7 @@ import RisksPanel from "./pm-central/RisksPanel";
 import ReportsPanel from "./pm-central/ReportsPanel";
 import ParticipantsPanel from "./pm-central/ParticipantsPanel";
 import TemplatesPanel from "./pm-central/TemplatesPanel";
+import MethodesPage from "./pm-central/MethodesPage";
 
 export default function PMCentralPage() {
   const [, params] = useRoute("/pm-central/:item");
@@ -34,6 +35,8 @@ export default function PMCentralPage() {
       return <ParticipantsPanel />;
     case "reports":
       return <ReportsPanel />;
+    case "methodes":
+      return <MethodesPage />;
     case "templates":
       return <TemplatesPanel />;
     case "examples":

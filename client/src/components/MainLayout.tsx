@@ -206,6 +206,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Risks", icon: <AlertTriangle className="w-4 h-4" />, href: "/pm-central/risks" },
         { label: "Collaboration", icon: <MessagesSquare className="w-4 h-4" />, href: "/pm-central/collaboration" },
         { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, href: "/pm-central/reports" },
+        { label: "Méthodes", icon: <BookOpen className="w-4 h-4" />, href: "/pm-central/methodes" },
       ]
     },
     {

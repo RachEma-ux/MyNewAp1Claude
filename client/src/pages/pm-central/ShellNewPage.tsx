@@ -19,7 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Terminal, ArrowRight, Loader2 } from "lucide-react";
+import { Terminal, ArrowRight, Loader2, BookOpen } from "lucide-react";
+import { METHOD_CATEGORIES, ALL_METHODS, getMethodsByCategory } from "@shared/pm-methods-catalog";
 
 export default function ShellNewPage() {
   const [, setLocation] = useLocation();
@@ -103,19 +104,28 @@ export default function ShellNewPage() {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium">Methodology</label>
+              <label className="text-sm font-medium flex items-center gap-1">
+                Methodology
+                <button className="text-muted-foreground hover:text-foreground" onClick={() => setLocation("/pm-central/methodes")} title="Browse all methods">
+                  <BookOpen className="h-3 w-3" />
+                </button>
+              </label>
               <Select value={methodology} onValueChange={setMethodology}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select..." />
+                  <SelectValue placeholder="Select methodology..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="agile">Agile</SelectItem>
-                  <SelectItem value="scrum">Scrum</SelectItem>
-                  <SelectItem value="kanban">Kanban</SelectItem>
-                  <SelectItem value="waterfall">Waterfall</SelectItem>
-                  <SelectItem value="pm2">PM2</SelectItem>
-                  <SelectItem value="prince2">PRINCE2</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
+                  {METHOD_CATEGORIES.map((cat) => {
+                    const methods = getMethodsByCategory(cat.id);
+                    return methods.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        <span className="flex items-center gap-2">
+                          <span className={`h-1.5 w-1.5 rounded-full ${cat.color}`} />
+                          {m.name}
+                        </span>
+                      </SelectItem>
+                    ));
+                  })}
                 </SelectContent>
               </Select>
             </div>
