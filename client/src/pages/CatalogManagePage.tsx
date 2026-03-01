@@ -83,6 +83,8 @@ import {
   Plug,
   UserCheck,
 } from "lucide-react";
+import { getLifecycleSteps, getLifecycleProgress, getAvailableActions } from "@shared/catalog-lifecycle";
+import type { LifecycleEntry } from "@shared/catalog-lifecycle";
 import { CatalogSelect } from "@/components/CatalogSelect";
 import { MultiAxisPanel } from "@/components/MultiAxisPanel";
 import { CatalogImportWizard } from "@/components/CatalogImportWizard";
@@ -119,6 +121,8 @@ const ORIGIN_COLORS: Record<string, string> = {
   admin: "bg-blue-600/20 text-blue-400 border-blue-600/30",
   discovery: "bg-purple-600/20 text-purple-400 border-purple-600/30",
   api: "bg-cyan-600/20 text-cyan-400 border-cyan-600/30",
+  connect: "bg-teal-600/20 text-teal-400 border-teal-600/30",
+  import: "bg-indigo-600/20 text-indigo-400 border-indigo-600/30",
 };
 
 /** Inline component to show classification badges for a table row */
@@ -149,7 +153,8 @@ function ClassificationBadges({ entryId }: { entryId: number }) {
 
 export default function CatalogManagePage() {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"catalog" | "audit" | "discovery-ops">("catalog");
+  const [activeTab, setActiveTab] = useState<"catalog" | "audit" | "discovery-ops" | "lifecycle">("catalog");
+  const [selectedEntryId, setSelectedEntryId] = useState<number | null>(null);
   const [discoveringEntryId, setDiscoveringEntryId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | EntryType>("all");
@@ -663,6 +668,7 @@ export default function CatalogManagePage() {
             <TabsTrigger value="catalog">Catalog</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
             <TabsTrigger value="discovery-ops">Discovery</TabsTrigger>
+            <TabsTrigger value="lifecycle">Lifecycle</TabsTrigger>
           </TabsList>
         </div>
 
@@ -723,10 +729,13 @@ export default function CatalogManagePage() {
                 </TableHeader>
                 <TableBody>
                   {filteredEntries.map((entry: any) => (
-                    <TableRow key={entry.id}>
+                    <TableRow
+                      key={entry.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => { setSelectedEntryId(entry.id); setActiveTab("lifecycle"); }}
+                    >
                       <TableCell
-                        onDoubleClick={() => openEditDialog(entry)}
-                        className="cursor-pointer"
+                        onDoubleClick={(e) => { e.stopPropagation(); openEditDialog(entry); }}
                       >
                         <div className="min-w-0 flex items-center gap-2">
                           <div className="flex-1 min-w-0">
@@ -802,7 +811,7 @@ export default function CatalogManagePage() {
                           {new Date(entry.updatedAt).toLocaleDateString()}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-1 justify-end">
                           {entry.reviewState === "needs_review" && (
                             <Button
@@ -919,6 +928,24 @@ export default function CatalogManagePage() {
 
         <TabsContent value="discovery-ops" className="mt-4">
           <DiscoveryHealthPanel />
+        </TabsContent>
+
+        <TabsContent value="lifecycle" className="mt-4">
+          <LifecyclePanel
+            entryId={selectedEntryId}
+            onBack={() => setActiveTab("catalog")}
+            entries={entries}
+            onValidate={runValidation}
+            validatingId={validatingId}
+            validationResults={validationResults}
+            runTestPrompt={runTestPrompt}
+            onApprove={(id: number, stage?: string) => approveMutation.mutate({ id, stage })}
+            onActivate={(id: number) => activateMutation.mutate({ id })}
+            onPublish={(entry: any) => openPublishWizard(entry)}
+            onRecall={(bundleId: number) => recallMutation.mutate({ bundleId })}
+            approvePending={approveMutation.isPending}
+            activatePending={activateMutation.isPending}
+          />
         </TabsContent>
       </Tabs>
 
@@ -2280,6 +2307,348 @@ export default function CatalogManagePage() {
         onOpenChange={setConnectModalOpen}
         onComplete={() => refetch()}
       />
+    </div>
+  );
+}
+
+// ── Lifecycle Panel Component ─────────────────────────────────────────
+
+function LifecyclePanel({
+  entryId,
+  onBack,
+  entries,
+  onValidate,
+  validatingId,
+  validationResults,
+  runTestPrompt,
+  onApprove,
+  onActivate,
+  onPublish,
+  onRecall,
+  approvePending,
+  activatePending,
+}: {
+  entryId: number | null;
+  onBack: () => void;
+  entries: any[];
+  onValidate: (id: number) => void;
+  validatingId: number | null;
+  validationResults: Record<number, any>;
+  runTestPrompt: boolean;
+  onApprove: (id: number, stage?: string) => void;
+  onActivate: (id: number) => void;
+  onPublish: (entry: any) => void;
+  onRecall: (bundleId: number) => void;
+  approvePending: boolean;
+  activatePending: boolean;
+}) {
+  const entry = entries.find((e: any) => e.id === entryId);
+
+  // Queries for the selected entry
+  const { data: entryBundles = [] } = trpc.catalogManage.listBundles.useQuery(
+    { catalogEntryId: entryId! },
+    { enabled: !!entryId }
+  );
+  const { data: entryAudit = [] } = trpc.catalogRegistry.auditLog.useQuery(
+    { catalogEntryId: entryId!, limit: 15 },
+    { enabled: !!entryId }
+  );
+  const { data: classNodes } = trpc.catalogManage.getClassifications.useQuery(
+    { catalogEntryId: entryId! },
+    { enabled: !!entryId }
+  );
+
+  if (!entryId || !entry) {
+    return (
+      <div className="text-center py-12 text-muted-foreground border rounded-md">
+        <Activity className="h-10 w-10 mx-auto mb-3 opacity-50" />
+        <p className="text-lg font-medium">No entry selected</p>
+        <p className="text-sm mt-1">Click an entry in the Catalog tab to view its lifecycle</p>
+        <Button className="mt-4" variant="outline" onClick={onBack}>
+          <ChevronLeft className="h-4 w-4 mr-1" />Back to Catalog
+        </Button>
+      </div>
+    );
+  }
+
+  const lifecycleEntry: LifecycleEntry = {
+    status: entry.status,
+    reviewState: entry.reviewState,
+    stageReviews: entry.stageReviews,
+    validationStatus: entry.validationStatus,
+    tags: entry.tags,
+  };
+
+  const steps = getLifecycleSteps(lifecycleEntry);
+  const progress = getLifecycleProgress(lifecycleEntry);
+  const available = getAvailableActions(lifecycleEntry);
+  const valResult = validationResults[entry.id];
+  const TypeIcon = TYPE_ICONS[entry.entryType] || Package;
+
+  const stepIcon = (status: string) => {
+    switch (status) {
+      case "done": return <CheckCircle2 className="h-5 w-5 text-green-400" />;
+      case "current": return <Play className="h-5 w-5 text-blue-400" />;
+      case "in_progress": return <Loader2 className="h-5 w-5 text-yellow-400 animate-spin" />;
+      case "failed": return <XCircle className="h-5 w-5 text-red-400" />;
+      default: return <Clock className="h-5 w-5 text-muted-foreground/40" />;
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ChevronLeft className="h-4 w-4 mr-1" />Back to Catalog
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <TypeIcon className="h-6 w-6 text-primary" />
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-lg">{entry.displayName || entry.name}</CardTitle>
+              {entry.description && (
+                <p className="text-sm text-muted-foreground mt-0.5 truncate">{entry.description}</p>
+              )}
+            </div>
+            <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
+          </div>
+          <div className="flex gap-2 mt-2 flex-wrap">
+            <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
+              Origin: {entry.origin}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              Type: {entry.entryType}
+            </Badge>
+            {classNodes && classNodes.length > 0 && classNodes.slice(0, 3).map((n: any) => (
+              <Badge key={n.id} variant="secondary" className="text-xs">{n.label}</Badge>
+            ))}
+            <span className="text-xs text-muted-foreground ml-auto">
+              Created: {new Date(entry.createdAt).toLocaleDateString()}
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {/* Progress bar */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-muted-foreground">Lifecycle Progress</span>
+              <span className="text-xs font-medium">{progress}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Timeline */}
+          <div className="space-y-0">
+            {steps.map((step, i) => (
+              <div key={step.key} className="flex gap-3">
+                {/* Vertical line + icon */}
+                <div className="flex flex-col items-center">
+                  {stepIcon(step.status)}
+                  {i < steps.length - 1 && (
+                    <div className={`w-0.5 flex-1 min-h-[24px] ${
+                      step.status === "done" ? "bg-green-600/40" : "bg-muted-foreground/20"
+                    }`} />
+                  )}
+                </div>
+
+                {/* Step content */}
+                <div className="pb-4 flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-medium ${
+                      step.status === "done" ? "text-green-400"
+                      : step.status === "current" ? "text-blue-400"
+                      : step.status === "failed" ? "text-red-400"
+                      : "text-muted-foreground/60"
+                    }`}>
+                      {step.label}
+                    </span>
+                    <Badge variant="outline" className={`text-[10px] ${
+                      step.status === "done" ? "border-green-600/30 text-green-400"
+                      : step.status === "failed" ? "border-red-600/30 text-red-400"
+                      : step.status === "in_progress" ? "border-yellow-600/30 text-yellow-400"
+                      : "border-muted text-muted-foreground"
+                    }`}>
+                      {step.detail}
+                    </Badge>
+                  </div>
+
+                  {/* Validation detail */}
+                  {step.key === "validate" && valResult && (
+                    <div className="mt-1.5 text-xs space-y-0.5 pl-1">
+                      <div className="flex gap-3">
+                        <span className={valResult.health?.status === "ok" ? "text-green-400" : "text-red-400"}>
+                          Health: {valResult.health?.status === "ok" ? "\u2713" : "\u2717"}
+                        </span>
+                        <span className={valResult.capabilities?.length > 0 ? "text-green-400" : "text-red-400"}>
+                          Caps: {valResult.capabilities?.length > 0 ? "\u2713" : "\u2717"}
+                        </span>
+                        <span className={valResult.models?.count > 0 ? "text-green-400" : "text-red-400"}>
+                          Models: {valResult.models?.count > 0 ? `\u2713 (${valResult.models.count})` : "\u2717"}
+                        </span>
+                        {valResult.testPrompt && (
+                          <span className={valResult.testPrompt?.status === "ok" ? "text-green-400" : "text-red-400"}>
+                            Test: {valResult.testPrompt?.status === "ok" ? `\u2713 (${valResult.testPrompt.latencyMs}ms)` : "\u2717"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="mt-1.5 flex gap-2 flex-wrap">
+                    {step.key === "register" && available.includes("register") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={(e) => { e.stopPropagation(); onApprove(entry.id, "register"); }}
+                        disabled={approvePending}
+                      >
+                        {approvePending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ShieldCheck className="h-3 w-3 mr-1" />}
+                        Approve Register
+                      </Button>
+                    )}
+                    {step.key === "activate" && available.includes("activate") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={(e) => { e.stopPropagation(); onActivate(entry.id); }}
+                        disabled={activatePending}
+                      >
+                        {activatePending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+                        Activate
+                      </Button>
+                    )}
+                    {step.key === "validate" && available.includes("validate") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={(e) => { e.stopPropagation(); onValidate(entry.id); }}
+                        disabled={validatingId === entry.id}
+                      >
+                        {validatingId === entry.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Activity className="h-3 w-3 mr-1" />}
+                        Run Validation
+                      </Button>
+                    )}
+                    {step.key === "approve_validation" && available.includes("approve_validation") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={(e) => { e.stopPropagation(); onApprove(entry.id, "validate"); }}
+                        disabled={approvePending}
+                      >
+                        {approvePending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ShieldCheck className="h-3 w-3 mr-1" />}
+                        Approve Validation
+                      </Button>
+                    )}
+                    {step.key === "publish" && available.includes("publish") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={(e) => { e.stopPropagation(); onPublish(entry); }}
+                      >
+                        <Rocket className="h-3 w-3 mr-1" />
+                        Publish
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Published Bundles */}
+      {entryBundles.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Published Bundles
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              {entryBundles.map((b: any) => (
+                <div key={b.id} className="flex items-center justify-between p-2 rounded border bg-muted/20 text-sm">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Badge variant="outline" className="text-xs font-mono">v{b.versionLabel}</Badge>
+                    <Badge className={`text-xs ${b.status === "active" ? "bg-green-600/20 text-green-400 border-green-600/30" : "bg-gray-600/20 text-gray-400 border-gray-600/30"}`}>
+                      {b.status}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground font-mono truncate">
+                      sha:{b.snapshotHash?.substring(0, 8)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(b.publishedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  {b.status === "active" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-red-400 hover:text-red-300"
+                      onClick={() => onRecall(b.id)}
+                    >
+                      Recall
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Audit Trail */}
+      {entryAudit.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Audit Trail
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-1">
+              {entryAudit.map((evt: any) => (
+                <div key={evt.id} className="flex items-center gap-3 px-2 py-1.5 rounded text-xs hover:bg-muted/30">
+                  <span className="text-muted-foreground w-[130px] shrink-0">
+                    {new Date(evt.timestamp).toLocaleString()}
+                  </span>
+                  <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                    {evt.eventType}
+                  </Badge>
+                  <span className="text-muted-foreground truncate">
+                    {(() => {
+                      const p = evt.payload as any;
+                      if (p?.name) return p.name;
+                      if (p?.versionLabel) return `v${p.versionLabel}`;
+                      if (p?.passed !== undefined) return p.passed ? "Passed" : "Failed";
+                      if (p?.changes) return `Changed: ${p.changes.join(", ")}`;
+                      return "";
+                    })()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

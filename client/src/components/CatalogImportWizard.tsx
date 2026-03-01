@@ -277,6 +277,7 @@ export function CatalogImportWizard({
           websiteUrl: entry.url,
         },
         discoveryArtifactId: result.artifact?.artifactId || "legacy",
+        origin: "import",
         _evidence: { types: ["reason"], refs: ["auto-discovery"] },
       });
       const updated = [...batchResults];
@@ -604,6 +605,7 @@ export function CatalogImportWizard({
                         websiteUrl: normalizeUrl(websiteUrl),
                       },
                       discoveryArtifactId: result.artifact?.artifactId || "legacy",
+                      origin: "import",
                       _evidence: { types: ["reason"], refs: ["auto-discovery"] },
                     }, {
                       onSuccess: () => {

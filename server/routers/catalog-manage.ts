@@ -81,7 +81,7 @@ export function stopCatalogCleanup() {
 
 const entryTypeSchema = z.enum(["provider", "llm", "model", "agent", "bot"]);
 const statusSchema = z.enum(["draft", "active", "deprecated", "disabled"]);
-const originSchema = z.enum(["admin", "discovery", "api"]);
+const originSchema = z.enum(["admin", "discovery", "api", "connect", "import"]);
 const scopeSchema = z.enum(["app", "workspace", "org", "global"]);
 
 const createEntrySchema = z.object({
@@ -230,6 +230,8 @@ export const catalogManageRouter = router({
       config: z.any().optional(),
       // Artifact reference
       discoveryArtifactId: z.string(),
+      // Optional origin override (defaults to "discovery")
+      origin: originSchema.optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       // Middleware already evaluated gate at "submit" stage
@@ -240,7 +242,7 @@ export const catalogManageRouter = router({
         entryType: "provider",
         scope: "app",
         status: "draft",
-        origin: "discovery",
+        origin: input.origin ?? "discovery",
         reviewState: "needs_review",
         config: {
           ...input.config,
