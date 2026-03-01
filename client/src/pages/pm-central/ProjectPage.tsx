@@ -49,6 +49,8 @@ const GateCenterPanel = lazy(() => import("./project/GateCenterPanel"));
 const FreezeHoldsPanel = lazy(() => import("./project/FreezeHoldsPanel"));
 const EvidencePanel = lazy(() => import("./project/EvidencePanel"));
 const ScorecardPanel = lazy(() => import("./project/ScorecardPanel"));
+// -- AI Agents section --
+const ProjectAgentRunsPanel = lazy(() => import("./project/ProjectAgentRunsPanel"));
 // -- Legacy aliases --
 const ProjectReportsPanel = lazy(() => import("./project/ProjectReportsPanel"));
 const PolicyPanel = lazy(() => import("./project/PolicyPanel"));
@@ -91,6 +93,8 @@ function ToolPanel({ tool, projectId }: { tool: string; projectId: number }) {
     docs: <DocsPanel projectId={projectId} />,
     meetings: <MeetingsPanel projectId={projectId} />,
     participants: <ParticipantsPanel projectId={projectId} />,
+    // AI Agents
+    "agent-runs": <ProjectAgentRunsPanel projectId={projectId} />,
     // Governance
     gates: <GateCenterPanel projectId={projectId} />,
     "freeze-holds": <FreezeHoldsPanel projectId={projectId} />,

@@ -11,6 +11,8 @@ import ReportsPanel from "./pm-central/ReportsPanel";
 import ParticipantsPanel from "./pm-central/ParticipantsPanel";
 import TemplatesPanel from "./pm-central/TemplatesPanel";
 import MethodesPage from "./pm-central/MethodesPage";
+import AgentEnginePanel from "./pm-central/AgentEnginePanel";
+import AgentRunDetailPanel from "./pm-central/AgentRunDetailPanel";
 
 export default function PMCentralPage() {
   const [, params] = useRoute("/pm-central/:item");
@@ -41,6 +43,8 @@ export default function PMCentralPage() {
       return <TemplatesPanel />;
     case "examples":
       return <TemplatesPanel defaultTab="examples" />;
+    case "agent-engine":
+      return <AgentEnginePanel />;
     case "projects":
       return <DashboardPanel />;
     default:

@@ -1,0 +1,251 @@
+# PM Central — Agent Engine Bundle (Enterprise Catalog)
+#
+# Catalog-bound multi-agent orchestration for AI-assisted project management.
+# Agents live in the AI Types Catalog (catalog_entries with entryType: "agent").
+# PM Central consumes them via catalog bindings: alias → catalog_id + pinned_digest.
+#
+# Agents are ASSISTIVE ONLY — they generate drafts, check readiness, validate artifacts.
+# They CANNOT approve gates, transition lifecycle states, lock baselines, or write canonical artifacts.
+# All outputs require human commit.
+
+version: "1.0"
+schema: pm_central_agent_engine_bundle_enterprise_catalog
+
+# ── Module Identity ──────────────────────────────────────────────────────────
+
+module:
+  id: pm_central_agent_engine
+  name: "PM Central — Agent Engine"
+  description: "Catalog-bound multi-agent orchestration for AI-assisted PM workflows"
+  layer: agent  # Provider → LLM → Model → Agent → Bot
+
+# ── Catalog Bindings ─────────────────────────────────────────────────────────
+# alias → catalog entry ref + digest pin + PM Central enforcement overlay
+
+catalog_bindings:
+  charter_drafter:
+    catalog_id: "catalog.ai.agent.pm.charter_drafter"
+    pinned_digest: "sha256:placeholder_charter"
+    display_name: "Charter Drafter"
+    description: "Generates project charter draft from wizard intake data"
+    phases_allowed: ["initiating"]
+    enforcement_overlay:
+      deny: [gate_submit, gate_approve, gate_reject, gate_waive, state_transition, baseline_lock, baseline_unlock, freeze, unfreeze, artifact_write_canonical]
+      require_human_review: true
+
+  scope_analyst:
+    catalog_id: "catalog.ai.agent.pm.scope_analyst"
+    pinned_digest: "sha256:placeholder_scope"
+    display_name: "Scope Analyst"
+    description: "Analyzes scope definition, identifies gaps and overlaps"
+    phases_allowed: ["initiating", "planning"]
+    enforcement_overlay:
+      deny: [gate_submit, gate_approve, gate_reject, gate_waive, state_transition, baseline_lock, baseline_unlock, freeze, unfreeze, artifact_write_canonical]
+      require_human_review: true
+
+  stakeholder_mapper:
+    catalog_id: "catalog.ai.agent.pm.stakeholder_mapper"
+    pinned_digest: "sha256:placeholder_stakeholder"
+    display_name: "Stakeholder Mapper"
+    description: "Maps stakeholder influence/interest and suggests engagement strategies"
+    phases_allowed: ["initiating"]
+    enforcement_overlay:
+      deny: [gate_submit, gate_approve, gate_reject, gate_waive, state_transition, baseline_lock, baseline_unlock, freeze, unfreeze, artifact_write_canonical]
+      require_human_review: true
+
+  risk_screener:
+    catalog_id: "catalog.ai.agent.pm.risk_screener"
+    pinned_digest: "sha256:placeholder_riskscreen"
+    display_name: "Risk Screener"
+    description: "Screens initial risks, suggests probability/impact ratings and mitigations"
+    phases_allowed: ["initiating"]
+    enforcement_overlay:
+      deny: [gate_submit, gate_approve, gate_reject, gate_waive, state_transition, baseline_lock, baseline_unlock, freeze, unfreeze, artifact_write_canonical]
+      require_human_review: true
+
+  readiness_checker:
+    catalog_id: "catalog.ai.agent.pm.readiness_checker"
+    pinned_digest: "sha256:placeholder_readiness"
+    display_name: "Readiness Checker"
+    description: "Validates gate readiness by checking completeness of required artifacts"
+    phases_allowed: ["initiating", "planning"]
+    enforcement_overlay:
+      deny: [gate_submit, gate_approve, gate_reject, gate_waive, state_transition, baseline_lock, baseline_unlock, freeze, unfreeze, artifact_write_canonical]
+      require_human_review: true
+
+  schedule_builder:
+    catalog_id: "catalog.ai.agent.pm.schedule_builder"
+    pinned_digest: "sha256:placeholder_schedule"
+    display_name: "Schedule Builder"
+    description: "Generates schedule draft with task dependencies and milestone mapping"
+    phases_allowed: ["planning"]
+    enforcement_overlay:
+      deny: [gate_submit, gate_approve, gate_reject, gate_waive, state_transition, baseline_lock, baseline_unlock, freeze, unfreeze, artifact_write_canonical]
+      require_human_review: true
+
+  cost_estimator:
+    catalog_id: "catalog.ai.agent.pm.cost_estimator"
+    pinned_digest: "sha256:placeholder_cost"
+    display_name: "Cost Estimator"
+    description: "Estimates project costs from WBS, resources, and schedule data"
+    phases_allowed: ["planning"]
+    enforcement_overlay:
+      deny: [gate_submit, gate_approve, gate_reject, gate_waive, state_transition, baseline_lock, baseline_unlock, freeze, unfreeze, artifact_write_canonical]
+      require_human_review: true
+
+  quality_checker:
+    catalog_id: "catalog.ai.agent.pm.quality_checker"
+    pinned_digest: "sha256:placeholder_quality"
+    display_name: "Quality Checker"
+    description: "Reviews quality standards and acceptance criteria for completeness"
+    phases_allowed: ["planning"]
+    enforcement_overlay:
+      deny: [gate_submit, gate_approve, gate_reject, gate_waive, state_transition, baseline_lock, baseline_unlock, freeze, unfreeze, artifact_write_canonical]
+      require_human_review: true
+
+  risk_analyst:
+    catalog_id: "catalog.ai.agent.pm.risk_analyst"
+    pinned_digest: "sha256:placeholder_riskanalyst"
+    display_name: "Risk Analyst"
+    description: "Full risk analysis with heat map, mitigation strategies, and contingencies"
+    phases_allowed: ["planning"]
+    enforcement_overlay:
+      deny: [gate_submit, gate_approve, gate_reject, gate_waive, state_transition, baseline_lock, baseline_unlock, freeze, unfreeze, artifact_write_canonical]
+      require_human_review: true
+
+# ── Agent Packs ──────────────────────────────────────────────────────────────
+# Named groups of binding aliases for specific workflow types
+
+packs:
+  pmi_predictive_initiating:
+    name: "PMI Predictive — Initiating"
+    description: "Full initiating phase pack: charter, scope, stakeholders, risk screen, readiness"
+    agents: [charter_drafter, scope_analyst, stakeholder_mapper, risk_screener, readiness_checker]
+    trigger: "project_created"
+    policies:
+      require_human_commit: true
+      forbid_gate_actions: true
+      forbid_state_transitions: true
+
+  pmi_predictive_planning:
+    name: "PMI Predictive — Planning"
+    description: "Full planning phase pack: scope, schedule, cost, quality, risk, readiness"
+    agents: [scope_analyst, schedule_builder, cost_estimator, quality_checker, risk_analyst, readiness_checker]
+    trigger: "gate_g0_passed"
+    policies:
+      require_human_commit: true
+      forbid_gate_actions: true
+      forbid_state_transitions: true
+
+  gate_readiness:
+    name: "Gate Readiness Check"
+    description: "Quick readiness validation before gate submission"
+    agents: [readiness_checker]
+    trigger: "manual"
+    policies:
+      require_human_commit: true
+      forbid_gate_actions: true
+      forbid_state_transitions: true
+
+  risk_deep_dive:
+    name: "Risk Deep Dive"
+    description: "Comprehensive risk analysis for high-risk projects"
+    agents: [risk_screener, risk_analyst]
+    trigger: "manual"
+    policies:
+      require_human_commit: true
+      forbid_gate_actions: true
+      forbid_state_transitions: true
+
+# ── Orchestrator Invariants ──────────────────────────────────────────────────
+# Safety rules that CANNOT be overridden by any agent or pack
+
+orchestrator:
+  invariants:
+    deny_gate_actions: true
+    deny_state_transitions: true
+    deny_baseline_lock: true
+    require_human_commit_for_all_drafts: true
+  execution_mode: sequential  # Phase 1: sequential; Phase 2: parallel DAG
+  max_concurrent_agents: 1
+  timeout_per_step_seconds: 30
+
+# ── DAG Templates ────────────────────────────────────────────────────────────
+# Run plans: ordered node lists with dependency declarations
+
+dag_templates:
+  initiating_run:
+    description: "Full initiating phase run"
+    nodes:
+      - id: resolve_bindings
+        agent_alias: "_system"
+        depends_on: []
+      - id: charter_drafter
+        agent_alias: charter_drafter
+        depends_on: [resolve_bindings]
+      - id: scope_analyst
+        agent_alias: scope_analyst
+        depends_on: [resolve_bindings]
+      - id: stakeholder_mapper
+        agent_alias: stakeholder_mapper
+        depends_on: [resolve_bindings]
+      - id: risk_screener
+        agent_alias: risk_screener
+        depends_on: [resolve_bindings]
+      - id: readiness_checker
+        agent_alias: readiness_checker
+        depends_on: [charter_drafter, scope_analyst, stakeholder_mapper, risk_screener]
+      - id: compile_evidence
+        agent_alias: "_system"
+        depends_on: [readiness_checker]
+
+  planning_run:
+    description: "Full planning phase run"
+    nodes:
+      - id: resolve_bindings
+        agent_alias: "_system"
+        depends_on: []
+      - id: scope_analyst
+        agent_alias: scope_analyst
+        depends_on: [resolve_bindings]
+      - id: schedule_builder
+        agent_alias: schedule_builder
+        depends_on: [scope_analyst]
+      - id: cost_estimator
+        agent_alias: cost_estimator
+        depends_on: [schedule_builder]
+      - id: quality_checker
+        agent_alias: quality_checker
+        depends_on: [resolve_bindings]
+      - id: risk_analyst
+        agent_alias: risk_analyst
+        depends_on: [scope_analyst, schedule_builder, cost_estimator]
+      - id: readiness_checker
+        agent_alias: readiness_checker
+        depends_on: [scope_analyst, schedule_builder, cost_estimator, quality_checker, risk_analyst]
+      - id: compile_evidence
+        agent_alias: "_system"
+        depends_on: [readiness_checker]
+
+  gate_readiness_check:
+    description: "Quick gate readiness validation"
+    nodes:
+      - id: resolve_bindings
+        agent_alias: "_system"
+        depends_on: []
+      - id: readiness_checker
+        agent_alias: readiness_checker
+        depends_on: [resolve_bindings]
+
+  risk_deep_dive:
+    description: "Deep risk analysis run"
+    nodes:
+      - id: resolve_bindings
+        agent_alias: "_system"
+        depends_on: []
+      - id: risk_screener
+        agent_alias: risk_screener
+        depends_on: [resolve_bindings]
+      - id: risk_analyst
+        agent_alias: risk_analyst
+        depends_on: [risk_screener]

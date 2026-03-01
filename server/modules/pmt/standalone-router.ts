@@ -24,6 +24,7 @@ import { workspaces } from "../../../drizzle/tables/users";
 import { seedWorkspaceModules } from "../registry";
 import { toolsRouter } from "./tools-router";
 import { wizardRouter } from "./wizard-router";
+import { agentEngineRouter } from "./agent-engine-router";
 import {
   validateTransition, validateEvent, getAvailableTransitions,
   getAvailableEvents, inferEventFromTransition,
@@ -992,4 +993,5 @@ export const standaloneRouter = router({
   artifacts: shellArtifactsRouter,
   tools: toolsRouter,
   wizard: wizardRouter,
+  agentEngine: agentEngineRouter,
 });

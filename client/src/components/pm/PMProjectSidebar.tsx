@@ -23,7 +23,7 @@ import {
   AlertTriangle, AlertCircle, GitBranch, ShieldCheck,
   MessageSquare, FolderOpen, ShieldAlert,
   ChevronLeft, ChevronDown, ChevronRight, Inbox,
-  Wand2, PanelLeftClose, PanelLeftOpen,
+  Wand2, PanelLeftClose, PanelLeftOpen, Bot,
 } from "lucide-react";
 import ProjectSwitcher from "./ProjectSwitcher";
 import ProjectControlStrip from "./ProjectStatusStrip";
@@ -311,7 +311,12 @@ export default function PMProjectSidebar({ projectId, activeTool }: PMProjectSid
             <NavItem icon={<Users className="h-3.5 w-3.5" />} label="Participants" href={`${base}/participants`} active={activeTool === "participants"} collapsed={collapsed} />
           </NavSection>
 
-          {/* 7. Governance */}
+          {/* 7. AI Agents */}
+          <NavSection label="AI Agents" defaultOpen={false} collapsed={collapsed}>
+            <NavItem icon={<Bot className="h-3.5 w-3.5" />} label="Agent Runs" href={`${base}/agent-runs`} active={activeTool === "agent-runs"} collapsed={collapsed} />
+          </NavSection>
+
+          {/* 8. Governance */}
           <NavSection label="Governance" defaultOpen={false} collapsed={collapsed}>
             <NavItem icon={<ShieldAlert className="h-3.5 w-3.5" />} label="Gate Center" href={`${base}/gates`} active={activeTool === "gates"} statusDot={gateDot} collapsed={collapsed} />
             <NavItem icon={<Lock className="h-3.5 w-3.5" />} label="Freeze / Holds" href={`${base}/freeze-holds`} active={activeTool === "freeze-holds"} statusDot={freezeActive ? "block" : undefined} collapsed={collapsed} />
