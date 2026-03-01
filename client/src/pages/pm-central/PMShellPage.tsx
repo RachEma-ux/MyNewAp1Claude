@@ -1386,7 +1386,7 @@ function SettingsPanel() {
 
 export default function PMShellPage() {
   const [activeNav, setActiveNav] = useState<NavKey>("overview");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const renderPanel = () => {
     switch (activeNav) {

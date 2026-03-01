@@ -2,6 +2,7 @@
  * PMProjectSidebar — 7-section project sidebar with ProjectSwitcher + ControlStrip
  *
  * Sections: Project, Plan, Execute, Follow-up, Control, Collaboration, Governance
+ * Collapsible: defaults to collapsed (icon-only) mode.
  *
  * Status dot logic (governed priority):
  *   BLOCK: freeze active OR required gate failed
@@ -22,7 +23,7 @@ import {
   AlertTriangle, AlertCircle, GitBranch, ShieldCheck,
   MessageSquare, FolderOpen, ShieldAlert,
   ChevronLeft, ChevronDown, ChevronRight, Inbox,
-  Wand2,
+  Wand2, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import ProjectSwitcher from "./ProjectSwitcher";
 import ProjectControlStrip from "./ProjectStatusStrip";
@@ -36,10 +37,17 @@ interface NavSectionProps {
   children: React.ReactNode;
   defaultOpen?: boolean;
   badge?: number;
+  collapsed?: boolean;
 }
 
-function NavSection({ label, children, defaultOpen = true, badge }: NavSectionProps) {
+function NavSection({ label, children, defaultOpen = true, badge, collapsed }: NavSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
+
+  if (collapsed) {
+    // In collapsed mode, always show children (icon-only items)
+    return <div className="py-1">{children}</div>;
+  }
+
   return (
     <div className="py-1">
       <button
@@ -71,9 +79,10 @@ interface NavItemProps {
   statusDot?: "ok" | "warn" | "block";
   meta?: string;
   active?: boolean;
+  collapsed?: boolean;
 }
 
-function NavItem({ icon, label, href, badge, statusDot, meta, active }: NavItemProps) {
+function NavItem({ icon, label, href, badge, statusDot, meta, active, collapsed }: NavItemProps) {
   const [, setLocation] = useLocation();
 
   const dotColors = {
@@ -81,6 +90,30 @@ function NavItem({ icon, label, href, badge, statusDot, meta, active }: NavItemP
     warn: "bg-yellow-500",
     block: "bg-red-500",
   };
+
+  if (collapsed) {
+    return (
+      <button
+        onClick={() => setLocation(href)}
+        title={label}
+        className={`flex items-center justify-center w-full py-1.5 rounded-sm transition-colors relative ${
+          active
+            ? "bg-primary/10 text-primary"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        }`}
+      >
+        <span className="opacity-70">{icon}</span>
+        {statusDot && (
+          <div className={`absolute top-1 right-1 h-1.5 w-1.5 rounded-full ${dotColors[statusDot]}`} />
+        )}
+        {badge !== undefined && badge > 0 && (
+          <div className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[8px] px-1 rounded-full min-w-[12px] text-center leading-tight">
+            {badge}
+          </div>
+        )}
+      </button>
+    );
+  }
 
   return (
     <button
@@ -131,6 +164,7 @@ interface PMProjectSidebarProps {
 
 export default function PMProjectSidebar({ projectId, activeTool }: PMProjectSidebarProps) {
   const [, setLocation] = useLocation();
+  const [collapsed, setCollapsed] = useState(true);
   const base = `/pm-central/p/${projectId}`;
 
   // Fetch sidebar summary
@@ -164,23 +198,43 @@ export default function PMProjectSidebar({ projectId, activeTool }: PMProjectSid
   const gateDot: DotLevel = freezeActive ? "block" : gateLabel ? "warn" : s ? "ok" : undefined;
 
   return (
-    <div className="w-56 border-r bg-background flex flex-col h-full">
-      {/* Project Switcher */}
-      <div className="px-2 py-1.5 border-b">
-        <ProjectSwitcher currentProjectId={projectId} currentProjectName={projectName} />
+    <div className={`border-r bg-background flex flex-col h-full transition-all duration-200 shrink-0 ${collapsed ? "w-12" : "w-56"}`}>
+      {/* Toggle button */}
+      <div className={`flex items-center border-b ${collapsed ? "justify-center py-1.5" : "justify-between px-2 py-1.5"}`}>
+        {!collapsed && (
+          <span className="text-xs font-semibold text-muted-foreground truncate">Project</span>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0 shrink-0"
+          onClick={() => setCollapsed(!collapsed)}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </Button>
       </div>
 
-      {/* Control Strip */}
-      <ProjectControlStrip
-        projectId={projectId}
-        projectName={projectName}
-        projectState={projectState}
-        freezeActive={freezeActive}
-        gateStatus={gateLabel}
-      />
+      {/* Project Switcher — expanded only */}
+      {!collapsed && (
+        <div className="px-2 py-1.5 border-b">
+          <ProjectSwitcher currentProjectId={projectId} currentProjectName={projectName} />
+        </div>
+      )}
 
-      {/* Attention queue */}
-      {s && (
+      {/* Control Strip — expanded only */}
+      {!collapsed && (
+        <ProjectControlStrip
+          projectId={projectId}
+          projectName={projectName}
+          projectState={projectState}
+          freezeActive={freezeActive}
+          gateStatus={gateLabel}
+        />
+      )}
+
+      {/* Attention queue — expanded only */}
+      {!collapsed && s && (
         <AttentionQueue
           overdueTasksCount={s.overdueTasksCount}
           approvalsPendingCount={s.approvalsPendingCount}
@@ -192,79 +246,83 @@ export default function PMProjectSidebar({ projectId, activeTool }: PMProjectSid
         />
       )}
 
-      {/* Quick create */}
-      <QuickCreate projectId={projectId} onSelect={(type) => {
-        const toolMap: Record<string, string> = {
-          task: "tasks", risk: "risks", issue: "issues",
-          change: "changes", decision: "decisions",
-          action_item: "action-items", status_update: "status-updates",
-          meeting: "meetings", deliverable: "deliverables",
-        };
-        setLocation(`${base}/${toolMap[type] || "overview"}`);
-      }} />
+      {/* Quick create — expanded only */}
+      {!collapsed && (
+        <QuickCreate projectId={projectId} onSelect={(type) => {
+          const toolMap: Record<string, string> = {
+            task: "tasks", risk: "risks", issue: "issues",
+            change: "changes", decision: "decisions",
+            action_item: "action-items", status_update: "status-updates",
+            meeting: "meetings", deliverable: "deliverables",
+          };
+          setLocation(`${base}/${toolMap[type] || "overview"}`);
+        }} />
+      )}
 
       {/* Navigation sections — 7 sections */}
       <ScrollArea className="flex-1">
-        {/* 1. Project */}
-        <NavSection label="Project">
-          <NavItem icon={<LayoutDashboard className="h-3.5 w-3.5" />} label="Overview" href={`${base}/overview`} active={activeTool === "overview"} statusDot={overallDot} />
-          <NavItem icon={<Wand2 className="h-3.5 w-3.5" />} label="PMI Wizard" href={`${base}/wizard/start`} active={activeTool === "wizard"} />
-          <NavItem icon={<FileText className="h-3.5 w-3.5" />} label="Charter / Intake" href={`${base}/charter`} active={activeTool === "charter"} />
-          <NavItem icon={<Network className="h-3.5 w-3.5" />} label="Scope & WBS" href={`${base}/wbs`} active={activeTool === "wbs"} />
-          <NavItem icon={<Flag className="h-3.5 w-3.5" />} label="Milestones" href={`${base}/milestones`} active={activeTool === "milestones"} />
-        </NavSection>
+        <div className={collapsed ? "px-1" : ""}>
+          {/* 1. Project */}
+          <NavSection label="Project" collapsed={collapsed}>
+            <NavItem icon={<LayoutDashboard className="h-3.5 w-3.5" />} label="Overview" href={`${base}/overview`} active={activeTool === "overview"} statusDot={overallDot} collapsed={collapsed} />
+            <NavItem icon={<Wand2 className="h-3.5 w-3.5" />} label="PMI Wizard" href={`${base}/wizard/start`} active={activeTool === "wizard"} collapsed={collapsed} />
+            <NavItem icon={<FileText className="h-3.5 w-3.5" />} label="Charter / Intake" href={`${base}/charter`} active={activeTool === "charter"} collapsed={collapsed} />
+            <NavItem icon={<Network className="h-3.5 w-3.5" />} label="Scope & WBS" href={`${base}/wbs`} active={activeTool === "wbs"} collapsed={collapsed} />
+            <NavItem icon={<Flag className="h-3.5 w-3.5" />} label="Milestones" href={`${base}/milestones`} active={activeTool === "milestones"} collapsed={collapsed} />
+          </NavSection>
 
-        {/* 2. Plan */}
-        <NavSection label="Plan">
-          <NavItem icon={<Calendar className="h-3.5 w-3.5" />} label="Timeline" href={`${base}/timeline`} active={activeTool === "timeline"} />
-          <NavItem icon={<DollarSign className="h-3.5 w-3.5" />} label="Budget" href={`${base}/budget`} active={activeTool === "budget"} />
-          <NavItem icon={<Users className="h-3.5 w-3.5" />} label="Resources" href={`${base}/resources`} active={activeTool === "resources"} />
-          <NavItem icon={<Lock className="h-3.5 w-3.5" />} label="Baselines" href={`${base}/baselines`} active={activeTool === "baselines"} />
-        </NavSection>
+          {/* 2. Plan */}
+          <NavSection label="Plan" collapsed={collapsed}>
+            <NavItem icon={<Calendar className="h-3.5 w-3.5" />} label="Timeline" href={`${base}/timeline`} active={activeTool === "timeline"} collapsed={collapsed} />
+            <NavItem icon={<DollarSign className="h-3.5 w-3.5" />} label="Budget" href={`${base}/budget`} active={activeTool === "budget"} collapsed={collapsed} />
+            <NavItem icon={<Users className="h-3.5 w-3.5" />} label="Resources" href={`${base}/resources`} active={activeTool === "resources"} collapsed={collapsed} />
+            <NavItem icon={<Lock className="h-3.5 w-3.5" />} label="Baselines" href={`${base}/baselines`} active={activeTool === "baselines"} collapsed={collapsed} />
+          </NavSection>
 
-        {/* 3. Execute */}
-        <NavSection label="Execute">
-          <NavItem icon={<CheckSquare className="h-3.5 w-3.5" />} label="Tasks Board" href={`${base}/tasks`} active={activeTool === "tasks"} statusDot={tasksDot} meta={s && s.overdueTasksCount > 0 ? `${s.overdueTasksCount} overdue` : undefined} />
-          <NavItem icon={<Package className="h-3.5 w-3.5" />} label="Deliverables" href={`${base}/deliverables`} active={activeTool === "deliverables"} badge={s?.pendingDeliverablesCount} />
-          <NavItem icon={<Clock className="h-3.5 w-3.5" />} label="Worklog" href={`${base}/worklog`} active={activeTool === "worklog"} />
-          <NavItem icon={<Repeat className="h-3.5 w-3.5" />} label="Iterations" href={`${base}/iterations`} active={activeTool === "iterations"} />
-        </NavSection>
+          {/* 3. Execute */}
+          <NavSection label="Execute" collapsed={collapsed}>
+            <NavItem icon={<CheckSquare className="h-3.5 w-3.5" />} label="Tasks Board" href={`${base}/tasks`} active={activeTool === "tasks"} statusDot={tasksDot} meta={!collapsed && s && s.overdueTasksCount > 0 ? `${s.overdueTasksCount} overdue` : undefined} collapsed={collapsed} />
+            <NavItem icon={<Package className="h-3.5 w-3.5" />} label="Deliverables" href={`${base}/deliverables`} active={activeTool === "deliverables"} badge={s?.pendingDeliverablesCount} collapsed={collapsed} />
+            <NavItem icon={<Clock className="h-3.5 w-3.5" />} label="Worklog" href={`${base}/worklog`} active={activeTool === "worklog"} collapsed={collapsed} />
+            <NavItem icon={<Repeat className="h-3.5 w-3.5" />} label="Iterations" href={`${base}/iterations`} active={activeTool === "iterations"} collapsed={collapsed} />
+          </NavSection>
 
-        {/* 4. Follow-up */}
-        <NavSection label="Follow-up" badge={followupBadge > 0 ? followupBadge : undefined}>
-          <NavItem icon={<Bell className="h-3.5 w-3.5" />} label="My Follow-ups" href={`${base}/follow-ups`} active={activeTool === "follow-ups"} />
-          <NavItem icon={<ListChecks className="h-3.5 w-3.5" />} label="Action Items" href={`${base}/action-items`} active={activeTool === "action-items"} badge={s?.openActionItemsCount} />
-          <NavItem icon={<FileBarChart className="h-3.5 w-3.5" />} label="Status Updates" href={`${base}/status-updates`} active={activeTool === "status-updates"} />
-          <NavItem icon={<Stamp className="h-3.5 w-3.5" />} label="Decisions" href={`${base}/decisions`} active={activeTool === "decisions"} />
-        </NavSection>
+          {/* 4. Follow-up */}
+          <NavSection label="Follow-up" badge={followupBadge > 0 ? followupBadge : undefined} collapsed={collapsed}>
+            <NavItem icon={<Bell className="h-3.5 w-3.5" />} label="My Follow-ups" href={`${base}/follow-ups`} active={activeTool === "follow-ups"} collapsed={collapsed} />
+            <NavItem icon={<ListChecks className="h-3.5 w-3.5" />} label="Action Items" href={`${base}/action-items`} active={activeTool === "action-items"} badge={s?.openActionItemsCount} collapsed={collapsed} />
+            <NavItem icon={<FileBarChart className="h-3.5 w-3.5" />} label="Status Updates" href={`${base}/status-updates`} active={activeTool === "status-updates"} collapsed={collapsed} />
+            <NavItem icon={<Stamp className="h-3.5 w-3.5" />} label="Decisions" href={`${base}/decisions`} active={activeTool === "decisions"} collapsed={collapsed} />
+          </NavSection>
 
-        {/* 5. Control */}
-        <NavSection label="Control" badge={controlBadge > 0 ? controlBadge : undefined}>
-          <NavItem icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Risks" href={`${base}/risks`} active={activeTool === "risks"} badge={s?.highRisksCount} statusDot={risksDot} />
-          <NavItem icon={<AlertCircle className="h-3.5 w-3.5" />} label="Issues" href={`${base}/issues`} active={activeTool === "issues"} badge={s?.openIssuesCount} statusDot={issuesDot} />
-          <NavItem icon={<GitBranch className="h-3.5 w-3.5" />} label="Changes (CRs)" href={`${base}/changes`} active={activeTool === "changes"} badge={s?.changesPendingCount} />
-          <NavItem icon={<ShieldCheck className="h-3.5 w-3.5" />} label="Approvals Inbox" href={`${base}/approvals`} active={activeTool === "approvals"} badge={s?.approvalsPendingCount} statusDot={approvalsDot} />
-        </NavSection>
+          {/* 5. Control */}
+          <NavSection label="Control" badge={controlBadge > 0 ? controlBadge : undefined} collapsed={collapsed}>
+            <NavItem icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Risks" href={`${base}/risks`} active={activeTool === "risks"} badge={s?.highRisksCount} statusDot={risksDot} collapsed={collapsed} />
+            <NavItem icon={<AlertCircle className="h-3.5 w-3.5" />} label="Issues" href={`${base}/issues`} active={activeTool === "issues"} badge={s?.openIssuesCount} statusDot={issuesDot} collapsed={collapsed} />
+            <NavItem icon={<GitBranch className="h-3.5 w-3.5" />} label="Changes (CRs)" href={`${base}/changes`} active={activeTool === "changes"} badge={s?.changesPendingCount} collapsed={collapsed} />
+            <NavItem icon={<ShieldCheck className="h-3.5 w-3.5" />} label="Approvals Inbox" href={`${base}/approvals`} active={activeTool === "approvals"} badge={s?.approvalsPendingCount} statusDot={approvalsDot} collapsed={collapsed} />
+          </NavSection>
 
-        {/* 6. Collaboration */}
-        <NavSection label="Collaboration" defaultOpen={false}>
-          <NavItem icon={<MessageSquare className="h-3.5 w-3.5" />} label="Threads" href={`${base}/threads`} active={activeTool === "threads"} />
-          <NavItem icon={<FolderOpen className="h-3.5 w-3.5" />} label="Docs Hub" href={`${base}/docs`} active={activeTool === "docs"} />
-          <NavItem icon={<Calendar className="h-3.5 w-3.5" />} label="Meetings" href={`${base}/meetings`} active={activeTool === "meetings"} />
-          <NavItem icon={<Users className="h-3.5 w-3.5" />} label="Participants" href={`${base}/participants`} active={activeTool === "participants"} />
-        </NavSection>
+          {/* 6. Collaboration */}
+          <NavSection label="Collaboration" defaultOpen={false} collapsed={collapsed}>
+            <NavItem icon={<MessageSquare className="h-3.5 w-3.5" />} label="Threads" href={`${base}/threads`} active={activeTool === "threads"} collapsed={collapsed} />
+            <NavItem icon={<FolderOpen className="h-3.5 w-3.5" />} label="Docs Hub" href={`${base}/docs`} active={activeTool === "docs"} collapsed={collapsed} />
+            <NavItem icon={<Calendar className="h-3.5 w-3.5" />} label="Meetings" href={`${base}/meetings`} active={activeTool === "meetings"} collapsed={collapsed} />
+            <NavItem icon={<Users className="h-3.5 w-3.5" />} label="Participants" href={`${base}/participants`} active={activeTool === "participants"} collapsed={collapsed} />
+          </NavSection>
 
-        {/* 7. Governance */}
-        <NavSection label="Governance" defaultOpen={false}>
-          <NavItem icon={<ShieldAlert className="h-3.5 w-3.5" />} label="Gate Center" href={`${base}/gates`} active={activeTool === "gates"} statusDot={gateDot} />
-          <NavItem icon={<Lock className="h-3.5 w-3.5" />} label="Freeze / Holds" href={`${base}/freeze-holds`} active={activeTool === "freeze-holds"} statusDot={freezeActive ? "block" : undefined} />
-          <NavItem icon={<Package className="h-3.5 w-3.5" />} label="Evidence Packs" href={`${base}/evidence`} active={activeTool === "evidence"} />
-          <NavItem icon={<FileBarChart className="h-3.5 w-3.5" />} label="Scorecard" href={`${base}/scorecard`} active={activeTool === "scorecard"} />
-        </NavSection>
+          {/* 7. Governance */}
+          <NavSection label="Governance" defaultOpen={false} collapsed={collapsed}>
+            <NavItem icon={<ShieldAlert className="h-3.5 w-3.5" />} label="Gate Center" href={`${base}/gates`} active={activeTool === "gates"} statusDot={gateDot} collapsed={collapsed} />
+            <NavItem icon={<Lock className="h-3.5 w-3.5" />} label="Freeze / Holds" href={`${base}/freeze-holds`} active={activeTool === "freeze-holds"} statusDot={freezeActive ? "block" : undefined} collapsed={collapsed} />
+            <NavItem icon={<Package className="h-3.5 w-3.5" />} label="Evidence Packs" href={`${base}/evidence`} active={activeTool === "evidence"} collapsed={collapsed} />
+            <NavItem icon={<FileBarChart className="h-3.5 w-3.5" />} label="Scorecard" href={`${base}/scorecard`} active={activeTool === "scorecard"} collapsed={collapsed} />
+          </NavSection>
 
-        {/* PM Inbox link */}
-        <div className="py-1 border-t mt-1">
-          <NavItem icon={<Inbox className="h-3.5 w-3.5" />} label="PM Inbox (all)" href="/pm-central/inbox" active={false} />
+          {/* PM Inbox link */}
+          <div className="py-1 border-t mt-1">
+            <NavItem icon={<Inbox className="h-3.5 w-3.5" />} label="PM Inbox (all)" href="/pm-central/inbox" active={false} collapsed={collapsed} />
+          </div>
         </div>
       </ScrollArea>
     </div>

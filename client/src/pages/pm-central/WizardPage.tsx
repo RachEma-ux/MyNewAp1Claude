@@ -86,7 +86,7 @@ export default function WizardPage() {
 
   const [wizardData, setWizardData] = useState<WizardData | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Load wizard data from server
   useEffect(() => {
