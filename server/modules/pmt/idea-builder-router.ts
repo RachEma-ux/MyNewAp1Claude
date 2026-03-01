@@ -1,15 +1,25 @@
 /**
  * Idea Builder Router — tRPC API for Idea-to-PMI Project Builder Agent
  *
+ * This is a REAL AI agent powered by an LLM via the provider system.
+ * It analyzes project ideas, asks clarifying questions, and generates
+ * all 11 PMI artifacts using actual LLM reasoning.
+ *
+ * Falls back to template generators when no LLM provider is available.
+ *
  * Endpoints:
- *   launch    — Create project + run full DAG
- *   status    — Get run status with DAG progress
- *   drafts    — List all drafts for a run
- *   commit    — Commit individual draft (human commit)
- *   commitAll — Commit all pending drafts
- *   reject    — Reject individual draft
- *   validate  — Run validation on all drafts
- *   dryRun    — Execute without persisting (governance simulation)
+ *   agentInfo   — Get agent catalog info + provider status
+ *   analyze     — LLM analyzes the idea, returns questions + insights
+ *   chat        — Conversational message with the PM expert agent
+ *   launch      — Create project + run full artifact generation via LLM
+ *   status      — Get run status with DAG progress
+ *   drafts      — List all drafts for a run
+ *   commit      — Commit individual draft (human commit)
+ *   commitAll   — Commit all pending drafts
+ *   reject      — Reject individual draft
+ *   validate    — Run validation on all drafts
+ *   audit       — Get audit trail for a run
+ *   list        — List all idea builder runs
  */
 
 import { z } from "zod";
@@ -25,9 +35,33 @@ import {
   getBinding,
   getDagTemplate,
   DENIED_ACTIONS,
-  type DagNode,
 } from "@shared/pm-agent-engine";
 import type { IdeaBuilderInput } from "@shared/pm-artifact-schemas";
+import {
+  validateArtifact,
+  validateCrossArtifactConsistency,
+  validateAuthorityCompliance,
+} from "./idea-builder-validation";
+import {
+  validateBindingShape,
+} from "./agent-engine-guards";
+
+// Real AI agent
+import {
+  getAvailableProvider,
+  analyzeIdea,
+  generateArtifactViaLLM,
+  chatWithAgent,
+  ensureAgentRegistered,
+  parseLLMJson,
+  AGENT_CATALOG_ID,
+  AGENT_DISPLAY_NAME,
+  AGENT_VERSION,
+  AGENT_TAXONOMY_CLASSIFICATION,
+  AGENT_CAPABILITIES,
+} from "./idea-builder-agent";
+
+// Template fallbacks (used when no LLM provider is available)
 import {
   generateScopeStatement,
   generateProjectCharter,
@@ -41,15 +75,6 @@ import {
   generateChangeControlPlan,
   generateGateReadinessReport,
 } from "./idea-builder-generators";
-import {
-  validateArtifact,
-  validateCrossArtifactConsistency,
-  validateAuthorityCompliance,
-} from "./idea-builder-validation";
-import {
-  assertHumanReviewRequired,
-  validateBindingShape,
-} from "./agent-engine-guards";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -80,19 +105,48 @@ async function getOrCreatePMWorkspace(userId: number): Promise<number> {
   return ws.id;
 }
 
-// ── Full DAG Executor ───────────────────────────────────────────────────────
+// Artifact type → DAG node mapping
+const ARTIFACT_DAG_MAP: Record<string, string> = {
+  scope_statement: "scope_builder",
+  project_charter: "charter_builder",
+  stakeholder_register: "stakeholder_register",
+  wbs: "wbs_generator",
+  schedule_baseline: "schedule_builder",
+  cost_baseline: "cost_estimator",
+  risk_register: "risk_register",
+  communications_plan: "communications_plan",
+  quality_plan: "quality_plan",
+  change_control_plan: "change_control_plan",
+  gate_readiness_report: "gate_readiness",
+};
+
+// Generation order (respects dependencies)
+const ARTIFACT_ORDER = [
+  "scope_statement",
+  "project_charter",
+  "stakeholder_register",
+  "wbs",
+  "schedule_baseline",
+  "cost_baseline",
+  "risk_register",
+  "communications_plan",
+  "quality_plan",
+  "change_control_plan",
+  "gate_readiness_report",
+];
+
+// ── LLM-Powered DAG Executor ────────────────────────────────────────────────
 
 async function executeIdeaBuilderDag(
   runId: number,
   projectId: number,
   input: IdeaBuilderInput,
   userId: number,
-  dryRun: boolean = false,
+  answers: Record<string, string> = {},
 ): Promise<void> {
   const db = getDb();
   if (!db) throw new Error("DB unavailable");
 
-  // Load run
   const runs = await db.select().from(pmtAgentRuns).where(eq(pmtAgentRuns.id, runId)).limit(1);
   const run = runs[0];
   if (!run) throw new Error(`Run ${runId} not found`);
@@ -101,7 +155,17 @@ async function executeIdeaBuilderDag(
 
   // Mark running
   await db.update(pmtAgentRuns).set({ status: "running", updatedAt: new Date() }).where(eq(pmtAgentRuns.id, runId));
-  await emitAudit(runId, "_system", "run_started", { runType: run.runType, dryRun }, userId);
+
+  // Check for LLM provider
+  const provider = getAvailableProvider();
+  const useLLM = provider !== null;
+
+  await emitAudit(runId, "_system", "run_started", {
+    runType: run.runType,
+    engine: useLLM ? "llm" : "template_fallback",
+    providerType: provider?.type || "none",
+    providerName: provider?.name || "none",
+  }, userId);
 
   // Validate binding
   const binding = getBinding("idea_to_pmi_builder");
@@ -111,14 +175,6 @@ async function executeIdeaBuilderDag(
       await emitAudit(runId, "_system", "guard_denied", { errors }, userId);
       await db.update(pmtAgentRuns).set({ status: "failed", updatedAt: new Date() }).where(eq(pmtAgentRuns.id, runId));
       return;
-    }
-  }
-
-  // Authority check — verify no forbidden actions
-  for (const action of DENIED_ACTIONS) {
-    const authResult = validateAuthorityCompliance(action, "idea_to_pmi_builder");
-    if (!authResult.valid) {
-      // This is expected — we're verifying the deny list is enforced
     }
   }
 
@@ -132,125 +188,85 @@ async function executeIdeaBuilderDag(
 
       node.status = "running";
       await db.update(pmtAgentRuns).set({ planDag: dagNodes, updatedAt: new Date() }).where(eq(pmtAgentRuns.id, runId));
-      await emitAudit(runId, node.agent_alias, "step_started", { nodeId: node.id }, userId);
+      await emitAudit(runId, node.agent_alias, "step_started", {
+        nodeId: node.id,
+        engine: useLLM ? "llm" : "template",
+      }, userId);
 
       try {
         let draft: Record<string, unknown> | null = null;
         let artifactType = "";
 
-        switch (node.id) {
-          case "resolve_bindings": {
-            if (binding) {
-              await emitAudit(runId, "_system", "binding_resolved", {
-                catalog_id: binding.catalog_id, pinned_digest: binding.pinned_digest,
-              }, userId);
-            }
-            break;
-          }
-          case "scope_builder": {
-            const scope = generateScopeStatement(input);
-            draft = scope as unknown as Record<string, unknown>;
-            artifactType = "scope_statement";
-            artifacts.scope_statement = draft;
-            break;
-          }
-          case "charter_builder": {
-            const scope = artifacts.scope_statement as any;
-            const charter = generateProjectCharter(input, scope);
-            draft = charter as unknown as Record<string, unknown>;
-            artifactType = "project_charter";
-            artifacts.project_charter = draft;
-            break;
-          }
-          case "stakeholder_register": {
-            const reg = generateStakeholderRegister(input);
-            draft = reg as unknown as Record<string, unknown>;
-            artifactType = "stakeholder_register";
-            artifacts.stakeholder_register = draft;
-            break;
-          }
-          case "wbs_generator": {
-            const scope = artifacts.scope_statement as any;
-            const wbs = generateWbs(input, scope);
-            draft = wbs as unknown as Record<string, unknown>;
-            artifactType = "wbs";
-            artifacts.wbs = draft;
-            break;
-          }
-          case "schedule_builder": {
-            const wbs = artifacts.wbs as any;
-            const schedule = generateScheduleBaseline(input, wbs);
-            draft = schedule as unknown as Record<string, unknown>;
-            artifactType = "schedule_baseline";
-            artifacts.schedule_baseline = draft;
-            break;
-          }
-          case "cost_estimator": {
-            const wbs = artifacts.wbs as any;
-            const schedule = artifacts.schedule_baseline as any;
-            const cost = generateCostBaseline(input, wbs, schedule);
-            draft = cost as unknown as Record<string, unknown>;
-            artifactType = "cost_baseline";
-            artifacts.cost_baseline = draft;
-            break;
-          }
-          case "risk_register": {
-            const scope = artifacts.scope_statement as any;
-            const wbs = artifacts.wbs as any;
-            const risks = generateRiskRegister(input, scope, wbs);
-            draft = risks as unknown as Record<string, unknown>;
-            artifactType = "risk_register";
-            artifacts.risk_register = draft;
-            break;
-          }
-          case "communications_plan": {
-            const stakeholders = artifacts.stakeholder_register as any;
-            const comms = generateCommunicationsPlan(input, stakeholders);
-            draft = comms as unknown as Record<string, unknown>;
-            artifactType = "communications_plan";
-            artifacts.communications_plan = draft;
-            break;
-          }
-          case "quality_plan": {
-            const scope = artifacts.scope_statement as any;
-            const quality = generateQualityPlan(input, scope);
-            draft = quality as unknown as Record<string, unknown>;
-            artifactType = "quality_plan";
-            artifacts.quality_plan = draft;
-            break;
-          }
-          case "change_control_plan": {
-            const ccp = generateChangeControlPlan(input);
-            draft = ccp as unknown as Record<string, unknown>;
-            artifactType = "change_control_plan";
-            artifacts.change_control_plan = draft;
-            break;
-          }
-          case "gate_readiness": {
-            const report = generateGateReadinessReport(input, artifacts);
-            draft = report as unknown as Record<string, unknown>;
-            artifactType = "gate_readiness_report";
-            artifacts.gate_readiness_report = draft;
-            break;
-          }
-          case "compile_evidence": {
-            const evidenceHashes: Record<string, string> = {};
-            for (const [key, value] of Object.entries(artifacts)) {
-              evidenceHashes[key] = createHash("sha256")
-                .update(JSON.stringify(value))
-                .digest("hex")
-                .substring(0, 64);
-            }
-            await emitAudit(runId, "_system", "evidence_compiled", {
-              artifactCount: Object.keys(artifacts).length,
-              digests: evidenceHashes,
+        if (node.id === "resolve_bindings") {
+          // System step: resolve catalog binding
+          if (binding) {
+            await emitAudit(runId, "_system", "binding_resolved", {
+              catalog_id: binding.catalog_id,
+              pinned_digest: binding.pinned_digest,
+              llmAvailable: useLLM,
             }, userId);
-            break;
+          }
+          // Register agent in catalog if not already done
+          await ensureAgentRegistered().catch(() => {});
+        } else if (node.id === "compile_evidence") {
+          // System step: compile evidence
+          const evidenceHashes: Record<string, string> = {};
+          for (const [key, value] of Object.entries(artifacts)) {
+            evidenceHashes[key] = createHash("sha256")
+              .update(JSON.stringify(value))
+              .digest("hex")
+              .substring(0, 64);
+          }
+          await emitAudit(runId, "_system", "evidence_compiled", {
+            artifactCount: Object.keys(artifacts).length,
+            digests: evidenceHashes,
+            generationEngine: useLLM ? "llm" : "template",
+          }, userId);
+        } else {
+          // Artifact generation node
+          // Find which artifact type this node generates
+          const artifactEntry = Object.entries(ARTIFACT_DAG_MAP).find(([, nodeId]) => nodeId === node.id);
+          if (artifactEntry) {
+            artifactType = artifactEntry[0];
+
+            if (useLLM && provider) {
+              // ═══ LLM-POWERED GENERATION ═══
+              try {
+                draft = await generateArtifactViaLLM(
+                  artifactType,
+                  input.ideaText,
+                  input,
+                  artifacts,
+                  answers,
+                  provider,
+                );
+                await emitAudit(runId, "idea_to_pmi_builder", "llm_generation_success", {
+                  artifactType,
+                  providerType: provider.type,
+                }, userId);
+              } catch (llmErr: any) {
+                console.warn(`[IdeaBuilder] LLM failed for ${artifactType}, falling back to template:`, llmErr.message);
+                await emitAudit(runId, "idea_to_pmi_builder", "llm_generation_fallback", {
+                  artifactType,
+                  error: llmErr.message,
+                  fallbackTo: "template",
+                }, userId);
+                // Fall back to template
+                draft = generateArtifactWithTemplate(artifactType, input, artifacts);
+              }
+            } else {
+              // ═══ TEMPLATE FALLBACK ═══
+              draft = generateArtifactWithTemplate(artifactType, input, artifacts);
+            }
+
+            if (draft) {
+              artifacts[artifactType] = draft;
+            }
           }
         }
 
-        // Store draft if generated
-        if (draft && artifactType && !dryRun) {
+        // Store draft
+        if (draft && artifactType) {
           await db.insert(pmtAgentDrafts).values({
             projectId,
             runId,
@@ -263,6 +279,7 @@ async function executeIdeaBuilderDag(
           await emitAudit(runId, "idea_to_pmi_builder", "draft_created", {
             artifactType,
             requiresReview: true,
+            engine: useLLM ? "llm" : "template",
           }, userId);
         }
 
@@ -272,7 +289,6 @@ async function executeIdeaBuilderDag(
       } catch (err: any) {
         node.status = "failed";
         await emitAudit(runId, node.agent_alias, "step_failed", { nodeId: node.id, error: err.message }, userId);
-        // Skip dependents by marking them
         const failedId = node.id;
         for (const n of dagNodes) {
           if (n.depends_on.includes(failedId) && n.status === "pending") {
@@ -287,11 +303,20 @@ async function executeIdeaBuilderDag(
     const anyFailed = dagNodes.some((n) => n.status === "failed");
     const finalStatus = anyFailed ? "failed" : "completed";
     await db.update(pmtAgentRuns).set({
-      status: finalStatus, planDag: dagNodes, outputs: { artifactCount: Object.keys(artifacts).length }, updatedAt: new Date(),
+      status: finalStatus,
+      planDag: dagNodes,
+      outputs: {
+        artifactCount: Object.keys(artifacts).length,
+        engine: useLLM ? "llm" : "template",
+        providerType: provider?.type || "none",
+      },
+      updatedAt: new Date(),
     }).where(eq(pmtAgentRuns.id, runId));
+
     await emitAudit(runId, "_system", anyFailed ? "run_failed" : "run_completed", {
       nodeStatuses: dagNodes.map((n) => ({ id: n.id, status: n.status })),
       artifactsGenerated: Object.keys(artifacts),
+      engine: useLLM ? "llm" : "template",
     }, userId);
 
   } catch (err: any) {
@@ -300,9 +325,140 @@ async function executeIdeaBuilderDag(
   }
 }
 
+/** Template fallback: generates artifact using hardcoded generators */
+function generateArtifactWithTemplate(
+  artifactType: string,
+  input: IdeaBuilderInput,
+  previousArtifacts: Record<string, Record<string, unknown>>,
+): Record<string, unknown> | null {
+  switch (artifactType) {
+    case "scope_statement":
+      return generateScopeStatement(input) as unknown as Record<string, unknown>;
+    case "project_charter":
+      return generateProjectCharter(input, previousArtifacts.scope_statement as any) as unknown as Record<string, unknown>;
+    case "stakeholder_register":
+      return generateStakeholderRegister(input) as unknown as Record<string, unknown>;
+    case "wbs":
+      return generateWbs(input, previousArtifacts.scope_statement as any) as unknown as Record<string, unknown>;
+    case "schedule_baseline":
+      return generateScheduleBaseline(input, previousArtifacts.wbs as any) as unknown as Record<string, unknown>;
+    case "cost_baseline":
+      return generateCostBaseline(input, previousArtifacts.wbs as any, previousArtifacts.schedule_baseline as any) as unknown as Record<string, unknown>;
+    case "risk_register":
+      return generateRiskRegister(input, previousArtifacts.scope_statement as any, previousArtifacts.wbs as any) as unknown as Record<string, unknown>;
+    case "communications_plan":
+      return generateCommunicationsPlan(input, previousArtifacts.stakeholder_register as any) as unknown as Record<string, unknown>;
+    case "quality_plan":
+      return generateQualityPlan(input, previousArtifacts.scope_statement as any) as unknown as Record<string, unknown>;
+    case "change_control_plan":
+      return generateChangeControlPlan(input) as unknown as Record<string, unknown>;
+    case "gate_readiness_report":
+      return generateGateReadinessReport(input, previousArtifacts) as unknown as Record<string, unknown>;
+    default:
+      return null;
+  }
+}
+
 // ── Router ──────────────────────────────────────────────────────────────────
 
 export const ideaBuilderRouter = router({
+
+  /** Get agent info: catalog registration, taxonomy, provider status */
+  agentInfo: protectedProcedure.query(async () => {
+    const provider = getAvailableProvider();
+    let catalogEntryId: number | null = null;
+    try { catalogEntryId = await ensureAgentRegistered(); } catch {}
+
+    return {
+      catalogId: AGENT_CATALOG_ID,
+      displayName: AGENT_DISPLAY_NAME,
+      version: AGENT_VERSION,
+      catalogEntryId,
+      taxonomyClassification: AGENT_TAXONOMY_CLASSIFICATION,
+      capabilities: [...AGENT_CAPABILITIES],
+      llmAvailable: provider !== null,
+      providerInfo: provider ? {
+        id: provider.id,
+        name: provider.name,
+        type: provider.type,
+      } : null,
+      enforcementOverlay: {
+        deny: [...DENIED_ACTIONS],
+        requireHumanReview: true,
+      },
+    };
+  }),
+
+  /** LLM-powered idea analysis — returns insights + clarifying questions */
+  analyze: protectedProcedure
+    .input(z.object({
+      ideaText: z.string().min(10, "Idea must be at least 10 characters"),
+      budgetEnvelope: z.number().positive().optional(),
+      deadline: z.string().optional(),
+      riskTier: z.enum(["low", "medium", "high", "critical"]).optional(),
+      methodology: z.enum(["predictive", "agile", "hybrid"]).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const provider = getAvailableProvider();
+      if (!provider) {
+        // No LLM available — return a basic analysis
+        return {
+          llmPowered: false,
+          projectType: "general",
+          estimatedComplexity: "medium",
+          methodology: input.methodology || "predictive",
+          keyInsights: [
+            "No LLM provider configured — using template-based generation",
+            "Configure an AI provider (OpenAI, Anthropic, etc.) in Provider Hub for intelligent analysis",
+          ],
+          identifiedRisks: [],
+          identifiedStakeholders: [],
+          missingInformation: [],
+          clarifyingQuestions: [],
+          confidence: { overall: 0.5, scopeClarity: 0.5, stakeholderClarity: 0.3, riskIdentification: 0.3, budgetClarity: input.budgetEnvelope ? 0.7 : 0.2, timelineClarity: input.deadline ? 0.7 : 0.2 },
+          readyToGenerate: true,
+          agentThinking: "Template mode: artifacts will be generated using structured templates. For AI-powered analysis, configure an LLM provider.",
+        };
+      }
+
+      const builderInput: IdeaBuilderInput = {
+        ideaText: input.ideaText,
+        budgetEnvelope: input.budgetEnvelope,
+        deadline: input.deadline,
+        riskTier: input.riskTier,
+        methodology: input.methodology,
+      };
+
+      const analysis = await analyzeIdea(input.ideaText, builderInput, provider);
+      return { llmPowered: true, ...analysis };
+    }),
+
+  /** Conversational chat with the PM expert agent */
+  chat: protectedProcedure
+    .input(z.object({
+      messages: z.array(z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string(),
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      const provider = getAvailableProvider();
+      if (!provider) {
+        return {
+          llmPowered: false,
+          response: "I'm currently running in template mode because no LLM provider is configured. Please configure an AI provider (OpenAI, Anthropic, Ollama, etc.) in the Provider Hub to enable conversational analysis. You can still generate artifacts using the template engine — click 'Generate Artifacts' to proceed.",
+        };
+      }
+
+      const response = await chatWithAgent(
+        input.messages.map(m => ({ role: m.role, content: m.content })),
+        provider,
+      );
+
+      return { llmPowered: true, response };
+    }),
+
+  /** Create project + run full artifact generation (LLM or template) */
   launch: protectedProcedure
     .input(z.object({
       ideaText: z.string().min(20, "Idea must be at least 20 characters"),
@@ -310,19 +466,17 @@ export const ideaBuilderRouter = router({
       deadline: z.string().optional(),
       riskTier: z.enum(["low", "medium", "high", "critical"]).optional(),
       methodology: z.enum(["predictive", "agile", "hybrid"]).optional(),
+      answers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // Parse project name from idea
       const firstSentence = input.ideaText.split(/[.!?]/)[0]?.trim() || input.ideaText.substring(0, 60);
       const projectName = firstSentence.length > 60 ? firstSentence.substring(0, 60) : firstSentence;
 
-      // Get or create PM workspace
       const wsId = await getOrCreatePMWorkspace(ctx.user.id);
 
-      // Create project shell
       const [project] = await db.insert(projects).values({
         workspaceId: wsId,
         name: projectName,
@@ -336,15 +490,15 @@ export const ideaBuilderRouter = router({
           deadline: input.deadline,
           riskTier: input.riskTier || "medium",
           methodology: input.methodology || "predictive",
-          createdVia: "idea_builder",
+          createdVia: "idea_builder_agent",
+          answers: input.answers || {},
         },
       }).returning();
 
-      // Build DAG from template
       const dagNodes = getDagTemplate("idea_to_pmi_build");
       if (!dagNodes) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DAG template not found" });
 
-      // Create run
+      const provider = getAvailableProvider();
       const [run] = await db.insert(pmtAgentRuns).values({
         projectId: project.id,
         runType: "idea_to_pmi_build",
@@ -352,11 +506,10 @@ export const ideaBuilderRouter = router({
         status: "pending",
         phase: "initiating",
         planDag: dagNodes,
-        outputs: {},
+        outputs: { engine: provider ? "llm" : "template" },
         initiatedBy: ctx.user.id,
       }).returning();
 
-      // Execute async
       const builderInput: IdeaBuilderInput = {
         ideaText: input.ideaText,
         budgetEnvelope: input.budgetEnvelope,
@@ -365,11 +518,17 @@ export const ideaBuilderRouter = router({
         methodology: input.methodology,
       };
 
-      executeIdeaBuilderDag(run.id, project.id, builderInput, ctx.user.id).catch((err) => {
+      executeIdeaBuilderDag(run.id, project.id, builderInput, ctx.user.id, input.answers || {}).catch((err) => {
         console.error(`[IdeaBuilder] Run ${run.id} failed:`, err.message);
       });
 
-      return { runId: run.id, projectId: project.id, projectName };
+      return {
+        runId: run.id,
+        projectId: project.id,
+        projectName,
+        engine: provider ? "llm" : "template",
+        providerName: provider?.name || null,
+      };
     }),
 
   status: protectedProcedure
@@ -471,76 +630,6 @@ export const ideaBuilderRouter = router({
         crossArtifactValidation: crossArtifact,
         overallValid: Object.values(results).every((r: any) => r.valid) && crossArtifact.valid,
         totalArtifacts: drafts.length,
-      };
-    }),
-
-  dryRun: protectedProcedure
-    .input(z.object({
-      ideaText: z.string().min(20),
-      budgetEnvelope: z.number().positive().optional(),
-      deadline: z.string().optional(),
-      riskTier: z.enum(["low", "medium", "high", "critical"]).optional(),
-      methodology: z.enum(["predictive", "agile", "hybrid"]).optional(),
-    }))
-    .mutation(async ({ input }) => {
-      const builderInput: IdeaBuilderInput = {
-        ideaText: input.ideaText,
-        budgetEnvelope: input.budgetEnvelope,
-        deadline: input.deadline,
-        riskTier: input.riskTier,
-        methodology: input.methodology,
-      };
-
-      // Execute generators without persisting
-      const scope = generateScopeStatement(builderInput);
-      const charter = generateProjectCharter(builderInput, scope);
-      const stakeholders = generateStakeholderRegister(builderInput);
-      const wbs = generateWbs(builderInput, scope);
-      const schedule = generateScheduleBaseline(builderInput, wbs);
-      const cost = generateCostBaseline(builderInput, wbs, schedule);
-      const risks = generateRiskRegister(builderInput, scope, wbs);
-      const comms = generateCommunicationsPlan(builderInput, stakeholders);
-      const quality = generateQualityPlan(builderInput, scope);
-      const changeControl = generateChangeControlPlan(builderInput);
-
-      const artifacts: Record<string, Record<string, unknown>> = {
-        scope_statement: scope as any,
-        project_charter: charter as any,
-        stakeholder_register: stakeholders as any,
-        wbs: wbs as any,
-        schedule_baseline: schedule as any,
-        cost_baseline: cost as any,
-        risk_register: risks as any,
-        communications_plan: comms as any,
-        quality_plan: quality as any,
-        change_control_plan: changeControl as any,
-      };
-
-      const readiness = generateGateReadinessReport(builderInput, artifacts);
-      artifacts.gate_readiness_report = readiness as any;
-
-      // Validate all
-      const validations: Record<string, any> = {};
-      for (const [key, value] of Object.entries(artifacts)) {
-        validations[key] = validateArtifact(key, value);
-      }
-      const crossArtifact = validateCrossArtifactConsistency(artifacts);
-
-      // Governance simulation
-      const governanceChecks = DENIED_ACTIONS.map((action) => ({
-        action,
-        result: "denied",
-        enforced: true,
-      }));
-
-      return {
-        mode: "dry_run",
-        artifactsGenerated: Object.keys(artifacts).length,
-        artifacts,
-        validations,
-        crossArtifactValidation: crossArtifact,
-        governanceSimulation: governanceChecks,
-        overallValid: Object.values(validations).every((v: any) => v.valid) && crossArtifact.valid,
       };
     }),
 
