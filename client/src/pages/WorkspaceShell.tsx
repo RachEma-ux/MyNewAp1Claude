@@ -19,7 +19,6 @@ import {
   MessageSquare,
   BarChart3,
   ShieldCheck,
-  FileStack,
 } from "lucide-react";
 
 import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
@@ -58,9 +57,6 @@ import { PMTBudgetPage } from "./workspace/PMTBudgetPage";
 import { PMTPortfolioPage } from "./workspace/PMTPortfolioPage";
 import { PMTProjectHomePage } from "./workspace/PMTProjectHomePage";
 import { PMTGitReferencesPage } from "./workspace/PMTGitReferencesPage";
-import { PMTProjectTemplatesPage } from "./workspace/PMTProjectTemplatesPage";
-import { PMTExamplesPage } from "./workspace/PMTExamplesPage";
-import { PMTWorkItemTemplatesPage } from "./workspace/PMTWorkItemTemplatesPage";
 import { PMTWebhooksPage } from "./workspace/PMTWebhooksPage";
 import { PMTCustomActionsPage } from "./workspace/PMTCustomActionsPage";
 import { PMTNotificationsPage } from "./workspace/PMTNotificationsPage";
@@ -320,21 +316,6 @@ export default function WorkspaceShell() {
                 <PMTGitReferencesPage workspaceId={workspaceId} />
               </ModuleGate>
             </Route>
-            <Route path={`${basePath}/projects/project-templates`}>
-              <ModuleGate moduleKey="pmt" moduleName="Project Management">
-                <PMTProjectTemplatesPage workspaceId={workspaceId} />
-              </ModuleGate>
-            </Route>
-            <Route path={`${basePath}/projects/examples`}>
-              <ModuleGate moduleKey="pmt" moduleName="Project Management">
-                <PMTExamplesPage workspaceId={workspaceId} />
-              </ModuleGate>
-            </Route>
-            <Route path={`${basePath}/projects/work-item-templates`}>
-              <ModuleGate moduleKey="pmt" moduleName="Project Management">
-                <PMTWorkItemTemplatesPage workspaceId={workspaceId} />
-              </ModuleGate>
-            </Route>
             <Route path={`${basePath}/projects/webhooks`}>
               <ModuleGate moduleKey="pmt" moduleName="Project Management">
                 <PMTWebhooksPage workspaceId={workspaceId} />
@@ -556,23 +537,6 @@ function WorkspaceOverview({
 
       {/* Quick Access */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {enabledModules.has("pmt") && (
-          <Link href={`${basePath}/projects/project-templates`}>
-            <Card className="cursor-pointer hover:border-primary/50 transition-colors h-full">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileStack className="h-5 w-5" />
-                  PM Templates
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Create projects from lifecycle templates with statuses, types, and phases
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        )}
         <Link href={`${basePath}/governance`}>
           <Card className="cursor-pointer hover:border-primary/50 transition-colors h-full">
             <CardHeader className="pb-2">

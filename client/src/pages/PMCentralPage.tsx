@@ -8,6 +8,7 @@ import ToolsPanel from "./pm-central/ToolsPanel";
 import ResourcesPanel from "./pm-central/ResourcesPanel";
 import GovernancePanel from "./pm-central/GovernancePanel";
 import DocumentationPanel from "./pm-central/DocumentationPanel";
+import TemplatesPanel from "./pm-central/TemplatesPanel";
 
 export default function PMCentralPage() {
   const [, params] = useRoute("/pm-central/:item");
@@ -32,6 +33,10 @@ export default function PMCentralPage() {
       return <GovernancePanel />;
     case "documentation":
       return <DocumentationPanel />;
+    case "templates":
+      return <TemplatesPanel />;
+    case "examples":
+      return <TemplatesPanel defaultTab="examples" />;
     default:
       return <DashboardPanel />;
   }

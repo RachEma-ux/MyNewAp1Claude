@@ -32,7 +32,7 @@ export default function ProjectsPanel() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation("/automation/templates")}>
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation("/pm-central/templates")}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Templates</CardTitle>
             <FileStack className="h-5 w-5 text-blue-400" />
@@ -48,7 +48,7 @@ export default function ProjectsPanel() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation("/automation/templates")}>
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation("/pm-central/examples")}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Examples</CardTitle>
             <Sparkles className="h-5 w-5 text-amber-400" />

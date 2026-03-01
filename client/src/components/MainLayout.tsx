@@ -61,6 +61,8 @@ import {
   FileSearch,
   Terminal,
   FolderKanban,
+  FileStack,
+  Sparkles,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -203,6 +205,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Resources", icon: <Activity className="w-4 h-4" />, href: "/pm-central/resources" },
         { label: "Governance", icon: <ShieldCheck className="w-4 h-4" />, href: "/pm-central/governance" },
         { label: "Documentation", icon: <FileText className="w-4 h-4" />, href: "/pm-central/documentation" },
+        { label: "Templates", icon: <FileStack className="w-4 h-4" />, href: "/pm-central/templates" },
+        { label: "Examples", icon: <Sparkles className="w-4 h-4" />, href: "/pm-central/examples" },
       ]
     },
     {
