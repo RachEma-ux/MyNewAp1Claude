@@ -64,8 +64,30 @@ export class OllamaProvider extends BaseProvider {
     // No cleanup needed for Ollama
   }
 
+  /** Resolve a model name — auto-detect from Ollama if none configured */
+  private async resolveModel(requestModel?: string): Promise<string> {
+    if (requestModel) return requestModel;
+    if (this.defaultModel) return this.defaultModel;
+    // Fallback: query Ollama for installed models at runtime
+    try {
+      const resp = await fetch(`${this.baseUrl}/api/tags`);
+      if (resp.ok) {
+        const data = await resp.json();
+        const models = data.models?.map((m: { name: string }) => m.name) || [];
+        if (models.length > 0) {
+          const preferred = ['phi3', 'llama3', 'mistral', 'tinyllama'];
+          const match = preferred.find(p => models.some((m: string) => m.startsWith(p)));
+          this.defaultModel = match ? models.find((m: string) => m.startsWith(match))! : models[0];
+          this.installedModels = models;
+          return this.defaultModel;
+        }
+      }
+    } catch {}
+    throw new Error('No model available — pull a model with `ollama pull phi3`');
+  }
+
   async generate(request: GenerationRequest): Promise<GenerationResponse> {
-    const model = request.model || this.defaultModel;
+    const model = await this.resolveModel(request.model);
     const startTime = Date.now();
 
     try {
@@ -118,7 +140,7 @@ export class OllamaProvider extends BaseProvider {
   }
 
   async *generateStream(request: GenerationRequest): AsyncGenerator<Token> {
-    const model = request.model || this.defaultModel;
+    const model = await this.resolveModel(request.model);
 
     try {
       const response = await fetch(`${this.baseUrl}/api/chat`, {
