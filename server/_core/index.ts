@@ -210,6 +210,17 @@ async function startServer() {
   // Start import session cleanup interval
   startCleanupInterval();
 
+  // Register PM Idea Builder Agent in AI Types Catalog
+  try {
+    const { ensureAgentRegistered } = await import("../modules/pmt/idea-builder-agent");
+    const agentId = await ensureAgentRegistered();
+    if (agentId) {
+      console.log(`[AgentSeed] PM Idea Builder Agent registered in catalog (id=${agentId})`);
+    }
+  } catch (error: any) {
+    console.warn(`[AgentSeed] Skipped — ${error.message}`);
+  }
+
   // Initialize Governance Engine (CGT v2)
   initializeGovernance();
 
