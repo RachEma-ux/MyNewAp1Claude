@@ -97,6 +97,9 @@ import {
   ArrowRight,
   Download,
   Plus,
+  Wand2,
+  Brain,
+  Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -514,12 +517,12 @@ export function CatalogImportWizard({
         {/* Step 2: Input Form */}
         {step === 2 && method === "api_discovery" && (
           <div className="space-y-4 py-4">
-            {/* Discover from Website */}
-            <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
-              <Label className="flex items-center gap-2 text-sm">
+            {/* Card 1: Configure the import source */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2 font-medium text-sm">
                 <Search className="h-4 w-4" />
-                Discover from Website
-              </Label>
+                Configure the import source
+              </div>
               <div className="flex gap-2">
                 <Input
                   placeholder="ai21.com, reka.ai, voyage.ai"
@@ -630,47 +633,86 @@ export function CatalogImportWizard({
               </p>
             </div>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs"><span className="bg-background px-2 text-muted-foreground">or select manually</span></div>
+            {/* Card 2: Select manually */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2 font-medium text-sm">
+                <Globe className="h-4 w-4" />
+                Select manually
+              </div>
+              <div className="space-y-2">
+                <Label>Provider (optional)</Label>
+                <CatalogSelect
+                  entryType="provider"
+                  value={selectedProviderId}
+                  onValueChange={handleProviderSelect}
+                  placeholder="Select a provider to auto-fill..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="baseUrl" className="flex items-center gap-2">
+                  Provider API Base URL
+                  {baseUrl && websiteDiscoverMutation.isSuccess && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                </Label>
+                <Input
+                  id="baseUrl"
+                  placeholder="https://api.openai.com"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Supports OpenAI-compatible (/v1/models) and Ollama (/api/tags) endpoints
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="apiKey">API Key (optional)</Label>
+                <Input
+                  id="apiKey"
+                  type="password"
+                  placeholder="sk-..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Required for authenticated APIs (OpenAI, Anthropic, etc.)
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Provider (optional)</Label>
-              <CatalogSelect
-                entryType="provider"
-                value={selectedProviderId}
-                onValueChange={handleProviderSelect}
-                placeholder="Select a provider to auto-fill..."
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="baseUrl" className="flex items-center gap-2">
-                Provider API Base URL
-                {baseUrl && websiteDiscoverMutation.isSuccess && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-              </Label>
-              <Input
-                id="baseUrl"
-                placeholder="https://api.openai.com"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-              />
+            {/* Card 3: From Wizard */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2 font-medium text-sm">
+                <Wand2 className="h-4 w-4" />
+                From Wizard
+              </div>
               <p className="text-xs text-muted-foreground">
-                Supports OpenAI-compatible (/v1/models) and Ollama (/api/tags) endpoints
+                Create entries through guided wizards — outputs are auto-registered in the catalog
               </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">API Key (optional)</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Required for authenticated APIs (OpenAI, Anthropic, etc.)
-              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { onOpenChange(false); navigate("/llm/wizard"); }}
+                >
+                  <Brain className="h-4 w-4 mr-1" />
+                  LLM Quick Setup
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { onOpenChange(false); navigate("/llm/create"); }}
+                >
+                  <Brain className="h-4 w-4 mr-1" />
+                  LLM Creation
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { onOpenChange(false); navigate("/agents"); }}
+                >
+                  <Workflow className="h-4 w-4 mr-1" />
+                  Agent Wizard
+                </Button>
+              </div>
             </div>
 
             {error && (
