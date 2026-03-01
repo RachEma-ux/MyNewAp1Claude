@@ -27,16 +27,19 @@ import {
   Loader2, Send, AlertTriangle, FileText, Users, Shield,
   Target, ClipboardList, Calendar, DollarSign, Award,
   UserCheck, MessageSquare, ShieldAlert, ShoppingCart,
-  Handshake, Milestone,
+  Handshake, Milestone, Wand2, Package,
 } from "lucide-react";
 import {
   INITIATING_STEPS, PLANNING_STEPS, ALL_WIZARD_STEPS,
   type WizardStepConfig, type WizardData,
 } from "@shared/pm-wizard-config";
+import { getMethodPack, type MethodPack, DEFAULT_PACK } from "@shared/pm-method-packs";
+import { ALL_METHODS, METHOD_CATEGORIES, getMethodsByCategory, getMethodById, getCategoryById } from "@shared/pm-methods-catalog";
 
 // ── Step icon map ──
 
 const STEP_ICONS: Record<string, React.ReactNode> = {
+  "method-confirmation": <Package className="h-4 w-4" />,
   "start": <FileText className="h-4 w-4" />,
   "business-case": <Target className="h-4 w-4" />,
   "scope-deliverables": <ClipboardList className="h-4 w-4" />,
@@ -56,6 +59,11 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
   "engagement-plan": <Handshake className="h-4 w-4" />,
   "pmp-review": <Send className="h-4 w-4" />,
 };
+
+/** Resolve the current method pack from wizard data */
+function useMethodPack(wizardData: WizardData | null): MethodPack {
+  return wizardData?.methodPackId ? getMethodPack(wizardData.methodPackId) : DEFAULT_PACK;
+}
 
 // ── Main page ──
 
@@ -92,6 +100,7 @@ export default function WizardPage() {
 
   const currentStepIndex = ALL_WIZARD_STEPS.findIndex((s) => s.id === stepParam);
   const completedSteps = wizardData?.completedSteps || [];
+  const methodPack = useMethodPack(wizardData);
 
   const isPhaseA = currentStep.phase === "initiating";
   const activeSteps = isPhaseA ? INITIATING_STEPS : PLANNING_STEPS;
@@ -289,6 +298,7 @@ export default function WizardPage() {
               submitG1Error={submitG1.error?.message}
               submitG0Success={submitG0.isSuccess}
               submitG1Success={submitG1.isSuccess}
+              methodPack={methodPack}
             />
           </div>
         </ScrollArea>
@@ -335,10 +345,12 @@ interface StepFormProps {
   submitG1Error?: string;
   submitG0Success: boolean;
   submitG1Success: boolean;
+  methodPack: MethodPack;
 }
 
 function StepForm(props: StepFormProps) {
   switch (props.step.id) {
+    case "method-confirmation": return <MethodConfirmationForm {...props} />;
     case "start": return <StartForm {...props} />;
     case "business-case": return <BusinessCaseForm {...props} />;
     case "scope-deliverables": return <ScopeForm {...props} />;
@@ -435,6 +447,143 @@ function StringListField({
 // ═══════════════════════════════════════════════════════════════
 // PHASE A FORMS — Initiating
 // ═══════════════════════════════════════════════════════════════
+
+function MethodConfirmationForm({ data, updateField }: StepFormProps) {
+  const [, setLocation] = useLocation();
+  const currentMethod = data.methodPackId ? getMethodById(data.methodPackId) : null;
+  const pack = data.methodPackId ? getMethodPack(data.methodPackId) : null;
+
+  if (pack && currentMethod && data.methodPackId) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                {currentMethod.name}
+              </CardTitle>
+              <Badge variant="outline" className="text-xs">{pack.deliveryApproach}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">{currentMethod.description}</p>
+
+            <div>
+              <p className="text-xs font-medium mb-1">Workflow</p>
+              <div className="flex items-center gap-1 flex-wrap">
+                {pack.workflow.taskStates.map((state, i) => (
+                  <span key={state}>
+                    <Badge variant={state === pack.workflow.defaultState ? "default" : "secondary"} className="text-[10px]">
+                      {state.replace(/_/g, " ")}
+                    </Badge>
+                    {i < pack.workflow.taskStates.length - 1 && <span className="text-muted-foreground mx-0.5">&rarr;</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium mb-1">Ceremonies</p>
+              <div className="space-y-1">
+                {pack.ceremonies.map((c) => (
+                  <div key={c.name} className="flex items-center justify-between text-xs">
+                    <span>{c.name}</span>
+                    <Badge variant="outline" className="text-[10px]">{c.cadence}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium mb-1">Metrics</p>
+              <div className="flex flex-wrap gap-1">
+                {pack.metrics.filter(m => m.enabled).map((m) => (
+                  <Badge key={m.name} variant="secondary" className="text-[10px]">{m.name}</Badge>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium mb-1">Required Artifacts</p>
+              <div className="flex flex-wrap gap-1">
+                {pack.requiredArtifacts.map((a) => (
+                  <Badge key={a} variant="outline" className="text-[10px]">{a.replace(/_/g, " ")}</Badge>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium mb-1">Planning Adaptations</p>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div>Scope: <span className="text-foreground">{pack.planningAdaptations.scopeLabel}</span></div>
+                <div>Schedule: <span className="text-foreground">{pack.planningAdaptations.scheduleLabel}</span></div>
+                {pack.planningAdaptations.sprintCadenceDefault && (
+                  <div>Sprint Cadence: <span className="text-foreground">{pack.planningAdaptations.sprintCadenceDefault} days</span></div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex gap-3">
+          <Button variant="outline" size="sm" onClick={() => setLocation("/pm-central/methodes")}>
+            <Wand2 className="h-3.5 w-3.5 mr-1" />
+            Change Method
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => updateField("methodPackId", "")}>
+            Clear Selection
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // No method selected — inline picker
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Select a Methodology</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Choose a project methodology to configure workflow, ceremonies, and planning approach.
+            Methods with a pack badge have full operational integration.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {METHOD_CATEGORIES.slice(0, 3).map((cat) => {
+              const methods = getMethodsByCategory(cat.id);
+              return methods.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => updateField("methodPackId", m.id)}
+                  className={`text-left p-3 rounded-lg border transition-colors hover:border-primary/50 ${
+                    data.methodPackId === m.id ? "border-primary bg-primary/5" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium">{m.name}</span>
+                    {m.hasMethodPack && (
+                      <Badge variant="default" className="text-[10px]">Pack</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{m.description}</p>
+                  <Badge variant="outline" className="text-[10px] mt-2">{m.deliveryApproach}</Badge>
+                </button>
+              ));
+            })}
+          </div>
+          <div className="mt-3 text-center">
+            <Button variant="link" size="sm" onClick={() => setLocation("/pm-central/methodes")}>
+              Browse all {ALL_METHODS.length} methods
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function StartForm({ data, updateField }: StepFormProps) {
   return (
@@ -849,10 +998,17 @@ function CharterReviewForm({ data, onSubmitG0, isSubmittingG0, submitG0Error, su
 // ═══════════════════════════════════════════════════════════════
 
 function PlanningSetupForm({ data, updateField }: StepFormProps) {
+  const pack = getMethodPack(data.methodPackId);
   return (
     <Card>
       <CardHeader><CardTitle className="text-base">Planning Setup</CardTitle></CardHeader>
       <CardContent className="space-y-4">
+        {data.methodPackId && (
+          <div className="p-2 bg-muted/50 rounded text-xs text-muted-foreground">
+            Pre-configured by <span className="font-medium text-foreground">{pack.methodName}</span> method pack.
+            Planning mode set to <Badge variant="outline" className="text-[10px] ml-1">{pack.deliveryApproach}</Badge>
+          </div>
+        )}
         <Field label="Planning Mode" required>
           <Select value={data.planningMode} onValueChange={(v) => updateField("planningMode", v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -891,6 +1047,7 @@ function PlanningSetupForm({ data, updateField }: StepFormProps) {
 }
 
 function ScopePlanForm({ data, updateField }: StepFormProps) {
+  const pack = getMethodPack(data.methodPackId);
   const wbsNodes = data.wbsNodes || [];
 
   const addWbsNode = () => {
@@ -901,8 +1058,9 @@ function ScopePlanForm({ data, updateField }: StepFormProps) {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader><CardTitle className="text-base">Scope Statement</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{pack.planningAdaptations.scopeLabel}</CardTitle></CardHeader>
         <CardContent>
+          <p className="text-xs text-muted-foreground mb-3">{pack.planningAdaptations.scopeDescription}</p>
           <Field label="Scope Statement" required>
             <Textarea value={data.scopeStatement} onChange={(e) => updateField("scopeStatement", e.target.value)} placeholder="Detailed project scope description..." rows={4} />
           </Field>
@@ -911,8 +1069,8 @@ function ScopePlanForm({ data, updateField }: StepFormProps) {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">WBS Nodes</CardTitle>
-            <Button variant="outline" size="sm" onClick={addWbsNode}>+ Add Node</Button>
+            <CardTitle className="text-base">{pack.planningAdaptations.wbsRequired ? "WBS Nodes" : "Backlog Items"}</CardTitle>
+            <Button variant="outline" size="sm" onClick={addWbsNode}>+ Add {pack.planningAdaptations.wbsRequired ? "Node" : "Item"}</Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -925,7 +1083,7 @@ function ScopePlanForm({ data, updateField }: StepFormProps) {
                   next[i] = { ...next[i], title: e.target.value };
                   updateField("wbsNodes", next);
                 }}
-                placeholder="WBS node title..."
+                placeholder={pack.planningAdaptations.wbsRequired ? "WBS node title..." : "Backlog item title..."}
                 className="flex-1"
               />
               <Button variant="ghost" size="sm" onClick={() => updateField("wbsNodes", wbsNodes.filter((_, j) => j !== i))}>
@@ -934,7 +1092,11 @@ function ScopePlanForm({ data, updateField }: StepFormProps) {
             </div>
           ))}
           {wbsNodes.length === 0 && (
-            <p className="text-sm text-muted-foreground">No WBS nodes yet. Add nodes to build the work breakdown structure.</p>
+            <p className="text-sm text-muted-foreground">
+              {pack.planningAdaptations.wbsRequired
+                ? "No WBS nodes yet. Add nodes to build the work breakdown structure."
+                : "No backlog items yet. Add items to build the product backlog."}
+            </p>
           )}
         </CardContent>
       </Card>
@@ -943,6 +1105,7 @@ function ScopePlanForm({ data, updateField }: StepFormProps) {
 }
 
 function SchedulePlanForm({ data, updateField }: StepFormProps) {
+  const pack = getMethodPack(data.methodPackId);
   const tasks = data.scheduleTasks || [];
 
   const addTask = () => {
@@ -954,7 +1117,7 @@ function SchedulePlanForm({ data, updateField }: StepFormProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Schedule Tasks</CardTitle>
+          <CardTitle className="text-base">{pack.planningAdaptations.scheduleLabel}</CardTitle>
           <Button variant="outline" size="sm" onClick={addTask}>+ Add Task</Button>
         </div>
       </CardHeader>
@@ -1005,7 +1168,16 @@ function SchedulePlanForm({ data, updateField }: StepFormProps) {
             </div>
           </Card>
         ))}
-        {tasks.length === 0 && <p className="text-sm text-muted-foreground">No schedule tasks yet.</p>}
+        {tasks.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            {pack.planningAdaptations.ganttRequired ? "No schedule tasks yet." : "Define sprint cadence and release targets."}
+          </p>
+        )}
+        {!pack.planningAdaptations.ganttRequired && pack.planningAdaptations.sprintCadenceDefault && (
+          <div className="p-2 bg-muted/50 rounded text-xs text-muted-foreground">
+            Default sprint cadence: <span className="font-medium text-foreground">{pack.planningAdaptations.sprintCadenceDefault} days</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -1353,9 +1525,10 @@ function EngagementPlanForm({ data, updateField }: StepFormProps) {
 }
 
 function PmpReviewForm({ data, onSubmitG1, isSubmittingG1, submitG1Error, submitG1Success }: StepFormProps) {
+  const pack = getMethodPack(data.methodPackId);
   const artifactChecks = [
-    { label: "Scope baseline (statement + WBS)", ok: !!data.scopeStatement && data.wbsNodes.length > 0 },
-    { label: "Schedule baseline (tasks)", ok: data.scheduleTasks.length > 0 },
+    { label: `Scope baseline (${pack.planningAdaptations.scopeLabel})`, ok: !!data.scopeStatement && (pack.planningAdaptations.wbsRequired ? data.wbsNodes.length > 0 : true) },
+    { label: `Schedule baseline (${pack.planningAdaptations.scheduleLabel})`, ok: pack.planningAdaptations.ganttRequired ? data.scheduleTasks.length > 0 : true },
     { label: "Cost baseline (budget items)", ok: data.budgetItems.length > 0 },
     { label: "Quality plan", ok: !!data.qualityStandards && !!data.acceptanceCriteria },
     { label: "Resource plan (team members)", ok: data.teamMembers.length > 0 },
@@ -1402,6 +1575,12 @@ function PmpReviewForm({ data, onSubmitG1, isSubmittingG1, submitG1Error, submit
           <div><span className="font-medium">Planning Mode:</span> {data.planningMode}</div>
         </CardContent>
       </Card>
+
+      {data.methodPackId && (
+        <div className="p-2 bg-muted/50 rounded text-xs text-muted-foreground">
+          Method: <span className="font-medium text-foreground">{pack.methodName}</span> — validation adapted per method pack requirements.
+        </div>
+      )}
 
       {submitG1Error && (
         <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-md text-sm text-destructive">

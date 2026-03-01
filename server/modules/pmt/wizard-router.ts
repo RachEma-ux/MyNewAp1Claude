@@ -18,6 +18,7 @@ import { projects } from "./schema";
 import { pmtGateRequests, pmtProjectArtifacts, pmtStateTransitions } from "./governance-schema";
 import type { WizardData } from "@shared/pm-wizard-config";
 import { createDefaultWizardData, ALL_WIZARD_STEPS, INITIATING_STEPS, PLANNING_STEPS } from "@shared/pm-wizard-config";
+import { getMethodPack } from "@shared/pm-method-packs";
 
 // ── Helpers ──
 
@@ -70,11 +71,13 @@ export const wizardRouter = router({
 
       const wizard = extractWizard(rows[0].metadata);
       const completedSteps = computeCompletedSteps(wizard);
+      const methodPackId = (rows[0].metadata as any)?.methodPackId || wizard.methodPackId || "";
 
       return {
-        wizard: { ...wizard, completedSteps },
+        wizard: { ...wizard, completedSteps, methodPackId },
         projectStatus: rows[0].status,
         projectName: rows[0].name,
+        methodPackId,
       };
     }),
 
@@ -110,6 +113,9 @@ export const wizardRouter = router({
         metadata: { ...currentMeta, wizard: updatedWizard },
         updatedAt: new Date(),
       };
+      if (input.data.methodPackId && typeof input.data.methodPackId === "string") {
+        (projectUpdates.metadata as any).methodPackId = input.data.methodPackId;
+      }
       if (input.data.name && typeof input.data.name === "string") {
         projectUpdates.name = input.data.name;
       }
@@ -255,13 +261,19 @@ export const wizardRouter = router({
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
 
       const wizard = extractWizard(rows[0].metadata);
+      const methodPackId = (rows[0].metadata as any)?.methodPackId || wizard.methodPackId || "";
+      const pack = getMethodPack(methodPackId);
 
-      // Validate required planning fields
+      // Validate required planning fields (method-aware)
       const missingFields: string[] = [];
       for (const step of PLANNING_STEPS) {
         if (step.isGateStep) continue;
         if (step.conditional && !(wizard as any)[step.conditional]) continue;
         for (const field of step.requiredFields) {
+          // Skip WBS validation if pack doesn't require it
+          if (field === "wbsNodes" && !pack.planningAdaptations.wbsRequired) continue;
+          // Relax schedule validation for agile methods (no Gantt required)
+          if (field === "scheduleTasks" && !pack.planningAdaptations.ganttRequired) continue;
           const val = (wizard as any)[field];
           if (val === undefined || val === null || val === "" || (Array.isArray(val) && val.length === 0)) {
             missingFields.push(field);
@@ -399,5 +411,38 @@ export const wizardRouter = router({
           costBaselineHash: sha256(costBaseline),
         },
       };
+    }),
+
+  /** Apply a method pack to an existing project */
+  applyMethodPack: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      methodPackId: z.string().min(1),
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const rows = await db.select().from(projects)
+        .where(eq(projects.id, input.projectId))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+
+      const currentMeta = (rows[0].metadata || {}) as Record<string, unknown>;
+      const currentWizard = extractWizard(currentMeta);
+
+      const methodPack = getMethodPack(input.methodPackId);
+      const updatedWizard = {
+        ...currentWizard,
+        methodPackId: input.methodPackId,
+        planningMode: methodPack.deliveryApproach,
+      };
+
+      await db.update(projects).set({
+        metadata: { ...currentMeta, methodPackId: input.methodPackId, wizard: updatedWizard },
+        updatedAt: new Date(),
+      } as any).where(eq(projects.id, input.projectId));
+
+      return { success: true, methodPackId: input.methodPackId };
     }),
 });

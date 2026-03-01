@@ -106,6 +106,7 @@ export interface MethodDefinition {
   deliveryApproach: "predictive" | "agile" | "hybrid";
   origin: string;
   gateModel?: string; // how gates map to this method
+  hasMethodPack?: boolean; // true if an operational MethodPack exists for this method
 }
 
 // ── 1. Predictive ───────────────────────────────────────────────────────────
@@ -123,6 +124,7 @@ const PREDICTIVE_METHODS: MethodDefinition[] = [
     deliveryApproach: "predictive",
     origin: "Winston Royce (1970)",
     gateModel: "G0 → G1 → G2 (change control) → G4 closure. Each phase has a formal gate.",
+    hasMethodPack: true,
   },
   {
     id: "v-model",
@@ -175,6 +177,7 @@ const PREDICTIVE_METHODS: MethodDefinition[] = [
     deliveryApproach: "predictive",
     origin: "UK Office of Government Commerce (OGC)",
     gateModel: "Built-in stage gates. Maps 1:1 to G0–G4 model.",
+    hasMethodPack: true,
   },
   {
     id: "pmbok",
@@ -206,6 +209,7 @@ const AGILE_METHODS: MethodDefinition[] = [
     deliveryApproach: "agile",
     origin: "Ken Schwaber & Jeff Sutherland (1995)",
     gateModel: "Sprint Reviews as lightweight gates. G0 at product vision, G1 at initial backlog, G4 at release.",
+    hasMethodPack: true,
   },
   {
     id: "kanban",
@@ -219,6 +223,7 @@ const AGILE_METHODS: MethodDefinition[] = [
     deliveryApproach: "agile",
     origin: "Toyota Production System / David Anderson",
     gateModel: "Flow-based; gates trigger on cumulative flow thresholds or service classes.",
+    hasMethodPack: true,
   },
   {
     id: "xp",
@@ -315,6 +320,7 @@ const HYBRID_METHODS: MethodDefinition[] = [
     deliveryApproach: "hybrid",
     origin: "Industry practice",
     gateModel: "G0/G1 as predictive gates. Execution uses sprint reviews. G4 at closure.",
+    hasMethodPack: true,
   },
   {
     id: "safe",
@@ -328,6 +334,7 @@ const HYBRID_METHODS: MethodDefinition[] = [
     deliveryApproach: "hybrid",
     origin: "Scaled Agile Inc. / Dean Leffingwell",
     gateModel: "PI boundaries as program gates. Portfolio Kanban for strategic gating.",
+    hasMethodPack: true,
   },
   {
     id: "less",

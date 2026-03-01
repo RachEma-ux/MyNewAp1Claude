@@ -18,15 +18,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Blocks, Zap, Merge, Settings, Lightbulb, Server,
   Shield, Sparkles, Search, ChevronRight, ArrowLeft,
   CheckCircle, AlertTriangle, MinusCircle, ExternalLink,
   BookOpen, Target, Users, ShieldCheck, Wand2,
+  Package, Play, Settings2,
 } from "lucide-react";
 import {
   METHOD_CATEGORIES, ALL_METHODS, getMethodsByCategory, getMethodById, getCategoryById,
   type MethodCategory, type MethodDefinition,
 } from "@shared/pm-methods-catalog";
+import { getMethodPack, hasMethodPack as checkHasMethodPack } from "@shared/pm-method-packs";
+import { trpc } from "@/lib/trpc";
 
 // ── Icon mapping ──
 
@@ -282,10 +292,18 @@ function MethodCard({ method, onClick }: { method: MethodDefinition; onClick: ()
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium">{method.name}</CardTitle>
-          <Badge variant={govBadge.variant} className="text-[10px] flex items-center gap-1">
-            {govBadge.icon}
-            {govBadge.label}
-          </Badge>
+          <div className="flex items-center gap-1">
+            {method.hasMethodPack && (
+              <Badge variant="default" className="text-[10px] flex items-center gap-0.5">
+                <Package className="h-2.5 w-2.5" />
+                Pack
+              </Badge>
+            )}
+            <Badge variant={govBadge.variant} className="text-[10px] flex items-center gap-1">
+              {govBadge.icon}
+              {govBadge.label}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -320,6 +338,21 @@ function MethodDetailView({ methodId }: { methodId: string }) {
   }
 
   const govBadge = GOV_COMPAT_BADGE[method.governanceCompatibility];
+  const hasPack = checkHasMethodPack(method.id);
+  const pack = hasPack ? getMethodPack(method.id) : null;
+
+  // Apply to existing project support
+  const projectsQuery = trpc.modules.pmt.shell.projects.list.useQuery();
+  const applyMutation = trpc.modules.pmt.shell.wizard.applyMethodPack.useMutation();
+  const [applyProjectId, setApplyProjectId] = useState<number | null>(null);
+
+  const handleApplyToExisting = () => {
+    if (!applyProjectId) return;
+    applyMutation.mutate(
+      { projectId: applyProjectId, methodPackId: method.id },
+      { onSuccess: () => setLocation(`/pm-central/p/${applyProjectId}/wizard/method-confirmation`) },
+    );
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -342,7 +375,10 @@ function MethodDetailView({ methodId }: { methodId: string }) {
           {CATEGORY_ICONS[method.categoryId]}
         </div>
         <div>
-          <h1 className="text-2xl font-bold">{method.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">{method.name}</h1>
+            {hasPack && <Badge variant="default" className="text-xs flex items-center gap-1"><Package className="h-3 w-3" /> Method Pack</Badge>}
+          </div>
           <p className="text-muted-foreground mt-1">{method.description}</p>
           <div className="flex items-center gap-3 mt-3">
             <Badge variant={govBadge.variant} className="flex items-center gap-1">
@@ -435,19 +471,193 @@ function MethodDetailView({ methodId }: { methodId: string }) {
         </Card>
       )}
 
-      {/* Quick use action */}
+      {/* ── Method Pack Sections (only if pack exists) ── */}
+      {pack && (
+        <>
+          {/* Default Workflow */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Play className="h-4 w-4" />
+                Default Workflow
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-1 flex-wrap">
+                {pack.workflow.taskStates.map((state, i) => (
+                  <span key={state}>
+                    <Badge variant={state === pack.workflow.defaultState ? "default" : "secondary"} className="text-xs">
+                      {state.replace(/_/g, " ")}
+                    </Badge>
+                    {i < pack.workflow.taskStates.length - 1 && <span className="text-muted-foreground mx-1">&rarr;</span>}
+                  </span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Required Artifacts */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                Required Artifacts
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {pack.requiredArtifacts.map((a) => (
+                  <div key={a} className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                    <span>{a.replace(/_/g, " ")}</span>
+                  </div>
+                ))}
+              </div>
+              {pack.optionalArtifacts.length > 0 && (
+                <div className="mt-3 pt-3 border-t">
+                  <p className="text-xs text-muted-foreground mb-1">Optional:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {pack.optionalArtifacts.map((a) => (
+                      <Badge key={a} variant="outline" className="text-[10px]">{a.replace(/_/g, " ")}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Ceremonies */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Ceremonies
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {pack.ceremonies.map((c) => (
+                  <div key={c.name} className="flex items-start justify-between text-sm">
+                    <div>
+                      <div className="font-medium">{c.name}</div>
+                      <div className="text-xs text-muted-foreground">{c.description}</div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] ml-2 shrink-0">{c.cadence}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Metrics */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {pack.metrics.map((m) => (
+                  <Badge key={m.name} variant={m.enabled ? "secondary" : "outline"} className={`text-xs ${!m.enabled ? "opacity-50" : ""}`}>
+                    {m.name}
+                    {!m.enabled && " (off)"}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Automations */}
+          {pack.automations.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  Automations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {pack.automations.map((a) => (
+                    <div key={a.name} className="text-sm">
+                      <span className="font-medium">{a.name}</span>
+                      <div className="text-xs text-muted-foreground">
+                        Trigger: {a.trigger} &rarr; Action: {a.action}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Primary Views */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Primary Views
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {pack.primaryViews.map((v) => (
+                  <Badge key={v} variant="secondary" className="text-xs">{v}</Badge>
+                ))}
+              </div>
+              {pack.hiddenViews.length > 0 && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  De-emphasized: {pack.hiddenViews.join(", ")}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* ── CTAs ── */}
       <Card className="bg-muted/30">
-        <CardContent className="py-4">
+        <CardContent className="py-4 space-y-3">
+          {/* CTA 1: Create Project */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">Use this method in a project</p>
-              <p className="text-xs text-muted-foreground">Create a new PM Shell with {method.name} as the selected methodology</p>
+              <p className="text-sm font-medium">Create Project with this Method</p>
+              <p className="text-xs text-muted-foreground">Start a new PM Shell pre-configured with {method.name}</p>
             </div>
-            <Button size="sm" onClick={() => setLocation("/pm-central/shell/new")}>
+            <Button size="sm" onClick={() => setLocation(`/pm-central/shell/new?method=${method.id}`)}>
               <Wand2 className="h-3.5 w-3.5 mr-1" />
               New Project
             </Button>
           </div>
+
+          {/* CTA 2: Apply to Existing */}
+          {hasPack && (
+            <div className="border-t pt-3">
+              <p className="text-sm font-medium mb-2">Apply to Existing Project</p>
+              <div className="flex items-center gap-2">
+                <Select value={applyProjectId?.toString() || ""} onValueChange={(v) => setApplyProjectId(Number(v))}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select a project..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(projectsQuery.data || []).map((p: any) => (
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!applyProjectId || applyMutation.isPending}
+                  onClick={handleApplyToExisting}
+                >
+                  Apply
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

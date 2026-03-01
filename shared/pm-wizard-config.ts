@@ -35,6 +35,17 @@ export interface WizardStepConfig {
 
 export const INITIATING_STEPS: WizardStepConfig[] = [
   {
+    id: "method-confirmation",
+    label: "Method Selection",
+    shortLabel: "Method",
+    phase: "initiating",
+    pmiGroup: "initiating",
+    description: "Confirm or select the project methodology",
+    requiredFields: [],
+    artifacts: [],
+    isGateStep: false,
+  },
+  {
     id: "start",
     label: "Create PM Shell",
     shortLabel: "Start",
@@ -321,6 +332,7 @@ export interface WizardData {
   currentStep: string;
   completedSteps: string[];
   phase: "initiating" | "planning" | "executing";
+  methodPackId: string; // method pack ID (empty = DEFAULT_PACK)
 
   // Phase A — Initiating
   // A0: Start
@@ -453,9 +465,10 @@ export interface WizardData {
 
 export function createDefaultWizardData(): WizardData {
   return {
-    currentStep: "start",
+    currentStep: "method-confirmation",
     completedSteps: [],
     phase: "initiating",
+    methodPackId: "",
     name: "", sponsor: "", projectManager: "",
     deliveryApproach: "hybrid", objective: "",
     businessCase: "", problemStatement: "", expectedValue: "",

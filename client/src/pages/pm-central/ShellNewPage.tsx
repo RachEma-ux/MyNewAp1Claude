@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,19 +20,23 @@ import {
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { Terminal, ArrowRight, Loader2, BookOpen } from "lucide-react";
-import { METHOD_CATEGORIES, ALL_METHODS, getMethodsByCategory } from "@shared/pm-methods-catalog";
+import { METHOD_CATEGORIES, ALL_METHODS, getMethodsByCategory, getMethodById } from "@shared/pm-methods-catalog";
 
 export default function ShellNewPage() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const preselectedMethod = searchParams.get("method") || "";
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [riskLevel, setRiskLevel] = useState("low");
-  const [methodology, setMethodology] = useState("");
+  const [methodology, setMethodology] = useState(preselectedMethod);
   const [creating, setCreating] = useState(false);
 
   const createMutation = trpc.modules.pmt.shell.projects.create.useMutation({
     onSuccess: (data: any) => {
-      setLocation(`/pm-central/p/${data.id}/wizard/start`);
+      setLocation(`/pm-central/p/${data.id}/wizard/method-confirmation`);
     },
     onError: () => {
       setCreating(false);
@@ -45,8 +49,8 @@ export default function ShellNewPage() {
     createMutation.mutate({
       name: name.trim(),
       description: description.trim() || undefined,
-      riskLevel,
-      methodology: methodology || undefined,
+      riskLevel: riskLevel as "low" | "medium" | "high" | "critical",
+      methodPackId: methodology || undefined,
     });
   };
 
@@ -130,6 +134,13 @@ export default function ShellNewPage() {
               </Select>
             </div>
           </div>
+
+          {methodology && getMethodById(methodology) && (
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              <p className="text-sm font-medium">Selected: {getMethodById(methodology)!.name}</p>
+              <p className="text-xs text-muted-foreground mt-1">{getMethodById(methodology)!.description}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

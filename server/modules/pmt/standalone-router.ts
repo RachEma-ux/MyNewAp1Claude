@@ -100,6 +100,7 @@ const shellProjectsRouter = router({
       riskLevel: z.enum(["low", "medium", "high", "critical"]).optional(),
       startDate: z.string().optional(),
       targetDate: z.string().optional(),
+      methodPackId: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getOrCreatePMShellWorkspace(ctx.user.id);
@@ -114,6 +115,7 @@ const shellProjectsRouter = router({
         ownerId: ctx.user.id,
         startDate: input.startDate ? new Date(input.startDate) : undefined,
         targetDate: input.targetDate ? new Date(input.targetDate) : undefined,
+        metadata: input.methodPackId ? { methodPackId: input.methodPackId } : undefined,
       }).returning();
       return created;
     }),
