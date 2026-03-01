@@ -346,12 +346,20 @@ export function CatalogImportWizard({
       const config = entry.config as Record<string, any> | null;
       const registryId = (config?.registryId || config?.providerId || entry.name) as string | undefined;
       const providerType = config?.type as string | undefined;
+      const displayName = (entry as any).displayName || entry.name;
 
-      // 1. Auto-fill base URL: catalog config → well-known URL by name/type
+      // 1. Auto-fill base URL: catalog config → well-known URL by name/type/displayName
+      const nameLower = entry.name?.toLowerCase();
       const url = config?.baseUrl || config?.apiUrl || config?.endpoint
         || (registryId && PROVIDER_BASE_URLS[registryId])
-        || (providerType && PROVIDER_BASE_URLS[providerType]);
-      if (url) setBaseUrl(url);
+        || (providerType && PROVIDER_BASE_URLS[providerType])
+        || (nameLower && PROVIDER_BASE_URLS[nameLower]);
+      if (url) {
+        setBaseUrl(url);
+        toast.success(`${displayName}: auto-filled ${url}`);
+      } else {
+        toast.info(`${displayName} selected — enter the API base URL manually`);
+      }
 
       // 2. Auto-fill API key — use dedicated decrypt endpoint
       let resolvedKey: string | undefined;
@@ -373,7 +381,7 @@ export function CatalogImportWizard({
 
       // Source C: try matching by provider name
       if (!resolvedKey) {
-        const typesToTry = [providerType, entry.name.toLowerCase()].filter(Boolean) as string[];
+        const typesToTry = [providerType, nameLower].filter(Boolean) as string[];
         for (const t of typesToTry) {
           try {
             const result = await trpcUtils.providers.getApiKeyByType.fetch({ type: t });
@@ -384,7 +392,8 @@ export function CatalogImportWizard({
 
       if (resolvedKey) setApiKey(resolvedKey);
     } catch {
-      // Ignore fetch errors — user can still type manually
+      // Catalog entry fetch failed — try well-known URL by value as fallback
+      toast.error("Could not fetch provider details — enter URL manually");
     }
   };
 
