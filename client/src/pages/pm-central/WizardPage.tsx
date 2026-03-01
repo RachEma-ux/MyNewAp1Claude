@@ -336,27 +336,29 @@ export default function WizardPage() {
           </div>
         </div>
 
-        {/* Form content */}
-        <ScrollArea className="flex-1">
-          <div className="p-6">
-            <div className="max-w-3xl mx-auto pb-4">
-              <StepForm
-                step={currentStep}
-                data={wizardData}
-                updateField={updateField}
-                onSubmitG0={handleSubmitG0}
-                onSubmitG1={handleSubmitG1}
-                isSubmittingG0={submitG0.isPending}
-                isSubmittingG1={submitG1.isPending}
-                submitG0Error={submitG0.error?.message}
-                submitG1Error={submitG1.error?.message}
-                submitG0Success={submitG0.isSuccess}
-                submitG1Success={submitG1.isSuccess}
-                methodPack={methodPack}
-              />
+        {/* Form content — wrapper div constrains height for Radix ScrollArea */}
+        <div className="flex-1 min-h-0">
+          <ScrollArea className="h-full">
+            <div className="p-6">
+              <div className="max-w-3xl mx-auto pb-4">
+                <StepForm
+                  step={currentStep}
+                  data={wizardData}
+                  updateField={updateField}
+                  onSubmitG0={handleSubmitG0}
+                  onSubmitG1={handleSubmitG1}
+                  isSubmittingG0={submitG0.isPending}
+                  isSubmittingG1={submitG1.isPending}
+                  submitG0Error={submitG0.error?.message}
+                  submitG1Error={submitG1.error?.message}
+                  submitG0Success={submitG0.isSuccess}
+                  submitG1Success={submitG1.isSuccess}
+                  methodPack={methodPack}
+                />
+              </div>
             </div>
-          </div>
-        </ScrollArea>
+          </ScrollArea>
+        </div>
 
         {/* Bottom navigation */}
         <div className="border-t px-6 py-3 flex items-center justify-between">
