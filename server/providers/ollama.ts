@@ -23,8 +23,8 @@ export class OllamaProvider extends BaseProvider {
     super(config);
 
     // Get Ollama base URL from config or use default
-    this.baseUrl = (config.config.apiEndpoint as string) || 'http://localhost:11434';
-    this.defaultModel = (config.config.defaultModel as string) || 'smollm2';
+    this.baseUrl = (config.config.apiEndpoint as string) || (config.config.baseUrl as string) || 'http://localhost:11434';
+    this.defaultModel = (config.config.defaultModel as string) || '';
   }
 
   protected async doInitialize(): Promise<void> {
@@ -40,7 +40,17 @@ export class OllamaProvider extends BaseProvider {
 
       const data = await response.json();
       this.installedModels = data.models?.map((m: { name: string }) => m.name) || [];
-      console.log(`[Ollama] Connected successfully. Available models: ${this.installedModels.length}`);
+      // Auto-detect default model from installed models if not configured
+      if (!this.defaultModel && this.installedModels.length > 0) {
+        // Prefer larger models for better quality: phi3 > tinyllama > first available
+        const preferred = ['phi3', 'phi3:latest', 'llama3', 'llama3:latest', 'mistral', 'mistral:latest', 'tinyllama', 'tinyllama:latest'];
+        const match = preferred.find(p => this.installedModels.some(m => m.startsWith(p.split(':')[0])));
+        this.defaultModel = match
+          ? this.installedModels.find(m => m.startsWith(match.split(':')[0]))!
+          : this.installedModels[0];
+        console.log(`[Ollama] Auto-selected default model: ${this.defaultModel}`);
+      }
+      console.log(`[Ollama] Connected successfully. Available models: ${this.installedModels.join(', ')} (default: ${this.defaultModel})`);
     } catch (error) {
       throw new Error(
         `Failed to connect to Ollama at ${this.baseUrl}. ` +
