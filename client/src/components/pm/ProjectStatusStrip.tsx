@@ -1,11 +1,18 @@
 /**
- * ProjectStatusStrip — Compact always-visible project status header
+ * ProjectControlStrip — PM Shell / Project Control Strip
  *
- * Shows: lifecycle state, gate status, freeze indicator, next required action
+ * Always visible when inside a project. Shows:
+ * - Project name + key
+ * - Lifecycle state badge
+ * - Gate status badge (next gate)
+ * - Freeze indicator + reason
+ * - "Next action" CTA button (contextual)
  */
 
+import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, ShieldAlert, Lock, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ShieldCheck, Lock, ArrowRight } from "lucide-react";
 
 const STATE_LABELS: Record<string, string> = {
   draft_shell: "Draft",
@@ -39,38 +46,42 @@ const STATE_COLORS: Record<string, string> = {
   archived: "bg-zinc-500",
 };
 
-const NEXT_ACTIONS: Record<string, string> = {
-  draft_shell: "Submit for Intake",
-  intake_review: "Evaluate G0 Gate",
-  planning: "Submit Plan for G1",
-  plan_gate_pending: "Evaluate G1 Gate",
-  authorized: "Start Execution",
-  executing: "Monitor & Deliver",
-  control_hold: "Remediate & Resume",
-  change_pending: "Evaluate G2 Gate",
-  closing: "Submit for G4",
-  close_gate_pending: "Evaluate G4 Gate",
-  closed: "Archive",
-  rejected: "—",
-  archived: "—",
+// Next action CTA per state → { label, tool }
+const NEXT_ACTIONS: Record<string, { label: string; tool: string } | null> = {
+  draft_shell: { label: "Submit Intake", tool: "gates" },
+  intake_review: { label: "Evaluate G0", tool: "gates" },
+  planning: { label: "Submit Plan Gate", tool: "gates" },
+  plan_gate_pending: { label: "Evaluate G1", tool: "gates" },
+  authorized: { label: "Start Execution", tool: "tasks" },
+  executing: { label: "Track Progress", tool: "follow-ups" },
+  control_hold: { label: "Resolve Freeze", tool: "freeze-holds" },
+  change_pending: { label: "Evaluate G2", tool: "gates" },
+  closing: { label: "Submit Close Gate", tool: "gates" },
+  close_gate_pending: { label: "Evaluate G4", tool: "gates" },
+  closed: null,
+  rejected: null,
+  archived: null,
 };
 
-interface ProjectStatusStripProps {
+interface ProjectControlStripProps {
+  projectId: number;
   projectName: string;
   projectState: string;
   freezeActive?: boolean;
-  gateStatus?: string; // "G0 pending", "G1 passed", etc.
+  gateStatus?: string;
 }
 
-export default function ProjectStatusStrip({
+export default function ProjectControlStrip({
+  projectId,
   projectName,
   projectState,
   freezeActive,
   gateStatus,
-}: ProjectStatusStripProps) {
+}: ProjectControlStripProps) {
+  const [, setLocation] = useLocation();
   const stateLabel = STATE_LABELS[projectState] || projectState;
   const stateColor = STATE_COLORS[projectState] || "bg-gray-500";
-  const nextAction = NEXT_ACTIONS[projectState] || "—";
+  const nextAction = NEXT_ACTIONS[projectState];
 
   return (
     <div className="px-3 py-2 border-b bg-muted/30 space-y-1.5">
@@ -94,11 +105,16 @@ export default function ProjectStatusStrip({
           </Badge>
         )}
       </div>
-      {nextAction !== "—" && (
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+      {nextAction && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start h-6 px-1 text-[10px] text-primary hover:text-primary font-medium gap-1"
+          onClick={() => setLocation(`/pm-central/p/${projectId}/${nextAction.tool}`)}
+        >
           <ArrowRight className="h-2.5 w-2.5" />
-          <span>{nextAction}</span>
-        </div>
+          {nextAction.label}
+        </Button>
       )}
     </div>
   );

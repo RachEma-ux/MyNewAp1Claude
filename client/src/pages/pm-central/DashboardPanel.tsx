@@ -61,7 +61,7 @@ export default function DashboardPanel() {
             Portfolio overview — lifecycle status, governance gates, and activity
           </p>
         </div>
-        <Button onClick={() => setLocation("/pm-central/shell")}>
+        <Button onClick={() => setLocation("/pm-central/shell/new")}>
           <Plus className="h-4 w-4 mr-1" />
           New Project
         </Button>
@@ -162,7 +162,7 @@ export default function DashboardPanel() {
                 <div
                   key={project.id}
                   className="flex items-center justify-between p-3 rounded-lg border hover:border-primary/50 cursor-pointer transition-colors"
-                  onClick={() => setLocation(`/pm-central/project/${project.id}/overview`)}
+                  onClick={() => setLocation(`/pm-central/p/${project.id}/overview`)}
                 >
                   <div>
                     <p className="font-medium">{project.name}</p>
@@ -199,7 +199,7 @@ export default function DashboardPanel() {
                 <div
                   key={project.id}
                   className="flex items-center justify-between p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20 hover:border-yellow-500/50 cursor-pointer transition-colors"
-                  onClick={() => setLocation(`/pm-central/project/${project.id}/gates`)}
+                  onClick={() => setLocation(`/pm-central/p/${project.id}/gates`)}
                 >
                   <div>
                     <p className="font-medium">{project.name}</p>
@@ -234,7 +234,7 @@ export default function DashboardPanel() {
               <div
                 key={project.id}
                 className="flex items-center justify-between p-3 rounded-lg bg-red-500/5 border border-red-500/20 hover:border-red-500/50 cursor-pointer transition-colors"
-                onClick={() => setLocation(`/pm-central/project/${project.id}/gates`)}
+                onClick={() => setLocation(`/pm-central/p/${project.id}/gates`)}
               >
                 <div>
                   <p className="font-medium">{project.name}</p>
@@ -270,7 +270,7 @@ export default function DashboardPanel() {
                 )
               )}
             </div>
-            <Button className="mt-2" onClick={() => setLocation("/pm-central/shell")}>
+            <Button className="mt-2" onClick={() => setLocation("/pm-central/shell/new")}>
               <Plus className="h-4 w-4 mr-1" />
               Create First Project
             </Button>

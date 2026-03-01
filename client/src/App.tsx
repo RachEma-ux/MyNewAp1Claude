@@ -100,6 +100,8 @@ const RunConsolePage = lazy(() => import("@/pages/RunConsolePage"));
 const CollaborationPage = lazy(() => import("@/pages/CollaborationPage"));
 const PMCentralPage = lazy(() => import("@/pages/PMCentralPage"));
 const ProjectPage = lazy(() => import("@/pages/pm-central/ProjectPage"));
+const ShellNewPage = lazy(() => import("@/pages/pm-central/ShellNewPage"));
+const InboxPage = lazy(() => import("@/pages/pm-central/InboxPage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -275,7 +277,13 @@ function Router() {
       <Route path="/run-console" component={() => <ProtectedRoute component={RunConsolePage} />} />
       {/* Collaboration */}
       <Route path="/collaboration" component={() => <ProtectedRoute component={CollaborationPage} />} />
-      {/* PM Central — Project-level views (must be before :item catch-all) */}
+      {/* PM Central — Project creation + inbox (must be before :id catch-all) */}
+      <Route path="/pm-central/shell/new" component={() => <ProtectedRoute component={ShellNewPage} />} />
+      <Route path="/pm-central/inbox" component={() => <ProtectedRoute component={InboxPage} />} />
+      {/* PM Central — Project-level views /pm-central/p/:id/:tool */}
+      <Route path="/pm-central/p/:id/:tool" component={() => <ProtectedRoute component={ProjectPage} />} />
+      <Route path="/pm-central/p/:id" component={() => <ProtectedRoute component={ProjectPage} />} />
+      {/* PM Central — Legacy route compat (/pm-central/project/:id/:tool) */}
       <Route path="/pm-central/project/:id/:tool" component={() => <ProtectedRoute component={ProjectPage} />} />
       <Route path="/pm-central/project/:id" component={() => <ProtectedRoute component={ProjectPage} />} />
       {/* PM Central — Top-level views */}

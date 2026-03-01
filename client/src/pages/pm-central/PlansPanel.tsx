@@ -44,7 +44,7 @@ export default function PlansPanel() {
 
       <div className="grid gap-4">
         {projects.map((project: any) => (
-          <Card key={project.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation(`/pm-central/project/${project.id}/overview`)}>
+          <Card key={project.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation(`/pm-central/p/${project.id}/overview`)}>
             <CardHeader className="flex flex-row items-start justify-between space-y-0">
               <div>
                 <CardTitle className="text-lg">{project.name}</CardTitle>
@@ -80,13 +80,13 @@ export default function PlansPanel() {
                   </div>
                 </div>
                 {project.status === "planning" && (
-                  <Button size="sm" className="shrink-0" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/project/${project.id}/gates`); }}>
+                  <Button size="sm" className="shrink-0" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/p/${project.id}/gates`); }}>
                     <ArrowRight className="h-4 w-4 mr-1" />
                     Submit for G1
                   </Button>
                 )}
                 {project.status === "plan_gate_pending" && (
-                  <Button size="sm" variant="outline" className="shrink-0" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/project/${project.id}/gates`); }}>
+                  <Button size="sm" variant="outline" className="shrink-0" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/p/${project.id}/gates`); }}>
                     <ShieldCheck className="h-4 w-4 mr-1" />
                     View Gate
                   </Button>

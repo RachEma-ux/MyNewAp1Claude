@@ -32,7 +32,7 @@ export default function OverviewPanel({ projectId }: { projectId: number }) {
   if (projectQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (!project) return <div className="text-muted-foreground text-center py-20">Project not found</div>;
 
-  const base = `/pm-central/project/${projectId}`;
+  const base = `/pm-central/p/${projectId}`;
 
   return (
     <div className="space-y-6">

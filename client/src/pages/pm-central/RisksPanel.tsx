@@ -76,7 +76,7 @@ export default function RisksPanel() {
           </CardHeader>
           <CardContent className="space-y-3">
             {frozenProjects.map((project: any) => (
-              <div key={project.id} className="flex items-center justify-between p-3 rounded-lg bg-red-500/5 border border-red-500/20 hover:border-red-500/50 cursor-pointer transition-colors" onClick={() => setLocation(`/pm-central/project/${project.id}/gates`)}>
+              <div key={project.id} className="flex items-center justify-between p-3 rounded-lg bg-red-500/5 border border-red-500/20 hover:border-red-500/50 cursor-pointer transition-colors" onClick={() => setLocation(`/pm-central/p/${project.id}/gates`)}>
                 <div>
                   <p className="font-medium">{project.name}</p>
                   <p className="text-sm text-muted-foreground">
@@ -101,7 +101,7 @@ export default function RisksPanel() {
           </CardHeader>
           <CardContent className="space-y-3">
             {rejectedProjects.map((project: any) => (
-              <div key={project.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted cursor-pointer transition-colors" onClick={() => setLocation(`/pm-central/project/${project.id}/overview`)}>
+              <div key={project.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted cursor-pointer transition-colors" onClick={() => setLocation(`/pm-central/p/${project.id}/overview`)}>
                 <div>
                   <p className="font-medium">{project.name}</p>
                   <p className="text-sm text-muted-foreground">
@@ -139,7 +139,7 @@ export default function RisksPanel() {
                         key={p.id}
                         className={`px-2 py-1 text-xs rounded border cursor-pointer hover:opacity-80 transition-opacity ${RISK_COLORS[level]}`}
                         title={p.name}
-                        onClick={() => setLocation(`/pm-central/project/${p.id}/risks`)}
+                        onClick={() => setLocation(`/pm-central/p/${p.id}/risks`)}
                       >
                         {p.name.length > 20 ? p.name.slice(0, 20) + "..." : p.name}
                       </div>

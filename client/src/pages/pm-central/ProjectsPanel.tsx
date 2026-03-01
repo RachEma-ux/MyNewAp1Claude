@@ -87,7 +87,7 @@ export default function ProjectsPanel() {
           ) : (
             <div className="space-y-2">
               {activeProjects.map((proj: any) => (
-                <div key={proj.id} className="flex items-center justify-between rounded-lg border px-4 py-3 cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation(`/pm-central/project/${proj.id}/overview`)}>
+                <div key={proj.id} className="flex items-center justify-between rounded-lg border px-4 py-3 cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation(`/pm-central/p/${proj.id}/overview`)}>
                   <div className="flex items-center gap-3">
                     <FolderKanban className="h-4 w-4 text-muted-foreground" />
                     <div>
@@ -96,7 +96,7 @@ export default function ProjectsPanel() {
                     </div>
                     <Badge variant="outline" className="capitalize">{(proj.status || "draft").replace(/_/g, " ")}</Badge>
                   </div>
-                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/project/${proj.id}/overview`); }}>
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/p/${proj.id}/overview`); }}>
                     Open Project
                   </Button>
                 </div>

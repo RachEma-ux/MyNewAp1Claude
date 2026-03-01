@@ -1,7 +1,7 @@
 /**
- * ProjectPage — Project-level layout with smart sidebar + tool panels
+ * ProjectPage — Project-level layout with 7-section sidebar + tool panels
  *
- * Route: /pm-central/project/:id/:tool
+ * Route: /pm-central/p/:id/:tool
  * Renders PMProjectSidebar + the active tool panel side by side.
  */
 
@@ -9,28 +9,47 @@ import { useRoute } from "wouter";
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import PMProjectSidebar from "@/components/pm/PMProjectSidebar";
+import PmCentralSidebarLayout from "@/components/pm/PmCentralSidebarLayout";
 
-// Lazy-load tool panels for code splitting
+// Lazy-load all tool panels for code splitting
+// -- Project section --
 const OverviewPanel = lazy(() => import("./project/OverviewPanel"));
-const TaskBoardPanel = lazy(() => import("./project/TaskBoardPanel"));
+const CharterPanel = lazy(() => import("./project/CharterPanel"));
+const ScopeWbsPanel = lazy(() => import("./project/ScopeWbsPanel"));
+const MilestonesPanel = lazy(() => import("./project/MilestonesPanel"));
+// -- Plan section --
 const TimelinePanel = lazy(() => import("./project/TimelinePanel"));
+const BudgetPanel = lazy(() => import("./project/BudgetPanel"));
+const ResourcesPanel = lazy(() => import("./project/ResourcesPanel"));
+const BaselinesPanel = lazy(() => import("./project/BaselinesPanel"));
+// -- Execute section --
+const TaskBoardPanel = lazy(() => import("./project/TaskBoardPanel"));
 const DeliverablesPanel = lazy(() => import("./project/DeliverablesPanel"));
+const WorklogPanel = lazy(() => import("./project/WorklogPanel"));
+const IterationsPanel = lazy(() => import("./project/IterationsPanel"));
+// -- Follow-up section --
+const MyFollowupsPanel = lazy(() => import("./project/MyFollowupsPanel"));
+const ActionItemsPanel = lazy(() => import("./project/ActionItemsPanel"));
+const StatusUpdatesPanel = lazy(() => import("./project/StatusUpdatesPanel"));
+const DecisionsPanel = lazy(() => import("./project/DecisionsPanel"));
+// -- Control section --
 const ProjectRisksPanel = lazy(() => import("./project/ProjectRisksPanel"));
 const IssuesPanel = lazy(() => import("./project/IssuesPanel"));
 const ProjectChangesPanel = lazy(() => import("./project/ProjectChangesPanel"));
 const ApprovalsPanel = lazy(() => import("./project/ApprovalsPanel"));
-const StatusUpdatesPanel = lazy(() => import("./project/StatusUpdatesPanel"));
-const ActionItemsPanel = lazy(() => import("./project/ActionItemsPanel"));
-const DecisionsPanel = lazy(() => import("./project/DecisionsPanel"));
-const ProjectReportsPanel = lazy(() => import("./project/ProjectReportsPanel"));
+// -- Collaboration section --
 const ThreadsPanel = lazy(() => import("./project/ThreadsPanel"));
 const DocsPanel = lazy(() => import("./project/DocsPanel"));
 const MeetingsPanel = lazy(() => import("./project/MeetingsPanel"));
 const ParticipantsPanel = lazy(() => import("./project/ParticipantsPanel"));
+// -- Governance section --
 const GateCenterPanel = lazy(() => import("./project/GateCenterPanel"));
+const FreezeHoldsPanel = lazy(() => import("./project/FreezeHoldsPanel"));
 const EvidencePanel = lazy(() => import("./project/EvidencePanel"));
+const ScorecardPanel = lazy(() => import("./project/ScorecardPanel"));
+// -- Legacy aliases --
+const ProjectReportsPanel = lazy(() => import("./project/ProjectReportsPanel"));
 const PolicyPanel = lazy(() => import("./project/PolicyPanel"));
-const BudgetPanel = lazy(() => import("./project/BudgetPanel"));
 
 function ToolPanel({ tool, projectId }: { tool: string; projectId: number }) {
   const fallback = (
@@ -40,26 +59,44 @@ function ToolPanel({ tool, projectId }: { tool: string; projectId: number }) {
   );
 
   const panelMap: Record<string, React.ReactNode> = {
+    // Project
     overview: <OverviewPanel projectId={projectId} />,
-    tasks: <TaskBoardPanel projectId={projectId} />,
+    charter: <CharterPanel projectId={projectId} />,
+    wbs: <ScopeWbsPanel projectId={projectId} />,
+    milestones: <MilestonesPanel projectId={projectId} />,
+    // Plan
     timeline: <TimelinePanel projectId={projectId} />,
+    budget: <BudgetPanel projectId={projectId} />,
+    resources: <ResourcesPanel projectId={projectId} />,
+    baselines: <BaselinesPanel projectId={projectId} />,
+    // Execute
+    tasks: <TaskBoardPanel projectId={projectId} />,
     deliverables: <DeliverablesPanel projectId={projectId} />,
+    worklog: <WorklogPanel projectId={projectId} />,
+    iterations: <IterationsPanel projectId={projectId} />,
+    // Follow-up
+    "follow-ups": <MyFollowupsPanel projectId={projectId} />,
+    "action-items": <ActionItemsPanel projectId={projectId} />,
+    "status-updates": <StatusUpdatesPanel projectId={projectId} />,
+    decisions: <DecisionsPanel projectId={projectId} />,
+    // Control
     risks: <ProjectRisksPanel projectId={projectId} />,
     issues: <IssuesPanel projectId={projectId} />,
     changes: <ProjectChangesPanel projectId={projectId} />,
     approvals: <ApprovalsPanel projectId={projectId} />,
-    "status-updates": <StatusUpdatesPanel projectId={projectId} />,
-    "action-items": <ActionItemsPanel projectId={projectId} />,
-    decisions: <DecisionsPanel projectId={projectId} />,
-    reports: <ProjectReportsPanel projectId={projectId} />,
+    // Collaboration
     threads: <ThreadsPanel projectId={projectId} />,
     docs: <DocsPanel projectId={projectId} />,
     meetings: <MeetingsPanel projectId={projectId} />,
     participants: <ParticipantsPanel projectId={projectId} />,
+    // Governance
     gates: <GateCenterPanel projectId={projectId} />,
+    "freeze-holds": <FreezeHoldsPanel projectId={projectId} />,
     evidence: <EvidencePanel projectId={projectId} />,
+    scorecard: <ScorecardPanel projectId={projectId} />,
+    // Legacy aliases
+    reports: <ProjectReportsPanel projectId={projectId} />,
     policy: <PolicyPanel projectId={projectId} />,
-    budget: <BudgetPanel projectId={projectId} />,
   };
 
   return (
@@ -70,12 +107,14 @@ function ToolPanel({ tool, projectId }: { tool: string; projectId: number }) {
 }
 
 export default function ProjectPage() {
-  // Match /pm-central/project/:id/:tool
-  const [, params] = useRoute("/pm-central/project/:id/:tool");
-  const [, params2] = useRoute("/pm-central/project/:id");
+  // Match /pm-central/p/:id/:tool (primary) and /pm-central/project/:id/:tool (legacy)
+  const [, params] = useRoute("/pm-central/p/:id/:tool");
+  const [, params2] = useRoute("/pm-central/p/:id");
+  const [, params3] = useRoute("/pm-central/project/:id/:tool");
+  const [, params4] = useRoute("/pm-central/project/:id");
 
-  const id = params?.id || params2?.id;
-  const tool = params?.tool || "overview";
+  const id = params?.id || params2?.id || params3?.id || params4?.id;
+  const tool = params?.tool || params3?.tool || "overview";
   const projectId = id ? parseInt(id, 10) : 0;
 
   if (!projectId || isNaN(projectId)) {
@@ -87,11 +126,10 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] -mx-6 -mt-6">
-      <PMProjectSidebar projectId={projectId} activeTool={tool} />
-      <div className="flex-1 overflow-auto p-6">
-        <ToolPanel tool={tool} projectId={projectId} />
-      </div>
-    </div>
+    <PmCentralSidebarLayout
+      sidebar={<PMProjectSidebar projectId={projectId} activeTool={tool} />}
+    >
+      <ToolPanel tool={tool} projectId={projectId} />
+    </PmCentralSidebarLayout>
   );
 }

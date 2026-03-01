@@ -63,6 +63,7 @@ import {
   FolderKanban,
   FileStack,
   Sparkles,
+  Inbox,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -197,6 +198,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       icon: <FolderKanban className="w-5 h-5" />,
       children: [
         { label: "Projects Home", icon: <FolderKanban className="w-4 h-4" />, href: "/pm-central/dashboard" },
+        { label: "PM Inbox", icon: <Inbox className="w-4 h-4" />, href: "/pm-central/inbox" },
         { label: "PM Shells", icon: <Terminal className="w-4 h-4" />, href: "/pm-central/shell" },
         { label: "Plans", icon: <FileText className="w-4 h-4" />, href: "/pm-central/plans" },
         { label: "Execution", icon: <Activity className="w-4 h-4" />, href: "/pm-central/execution" },

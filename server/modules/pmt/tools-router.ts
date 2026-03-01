@@ -379,6 +379,40 @@ const budgetRouter = router({
     }),
 });
 
+// ── Next action logic (per lifecycle state) ──────────────────────────────────
+
+const NEXT_ACTION_MAP: Record<string, { label: string; route: string } | null> = {
+  draft_shell: { label: "Submit Intake", route: "gates" },
+  intake_review: { label: "Evaluate G0", route: "gates" },
+  planning: { label: "Submit Plan Gate", route: "gates" },
+  plan_gate_pending: { label: "Evaluate G1", route: "gates" },
+  authorized: { label: "Start Execution", route: "tasks" },
+  executing: { label: "Track Progress", route: "follow-ups" },
+  control_hold: { label: "Resolve Freeze", route: "freeze-holds" },
+  change_pending: { label: "Evaluate G2", route: "gates" },
+  closing: { label: "Submit Close Gate", route: "gates" },
+  close_gate_pending: { label: "Evaluate G4", route: "gates" },
+  closed: null,
+  rejected: null,
+  archived: null,
+};
+
+const NEXT_GATE_MAP: Record<string, string | null> = {
+  draft_shell: "G0",
+  intake_review: "G0",
+  planning: "G1",
+  plan_gate_pending: "G1",
+  authorized: "G3",
+  executing: "G3",
+  control_hold: "G3",
+  change_pending: "G2",
+  closing: "G4",
+  close_gate_pending: "G4",
+  closed: null,
+  rejected: null,
+  archived: null,
+};
+
 // ── Sidebar Summary (aggregation endpoint) ──────────────────────────────────
 
 const sidebarSummaryRouter = router({
@@ -400,6 +434,7 @@ const sidebarSummaryRouter = router({
         pendingChangeRows,
         openActionRows,
         pendingDeliverableRows,
+        allGateRows,
       ] = await Promise.all([
         db.select().from(projects).where(eq(projects.id, pid)).limit(1),
         db.select({ count: sql<number>`count(*)` }).from(tasks)
@@ -416,17 +451,39 @@ const sidebarSummaryRouter = router({
           .where(and(eq(pmtActionItems.projectId, pid), ne(pmtActionItems.status, "done"), ne(pmtActionItems.status, "cancelled"))),
         db.select({ count: sql<number>`count(*)` }).from(pmtDeliverables)
           .where(and(eq(pmtDeliverables.projectId, pid), eq(pmtDeliverables.status, "pending"))),
+        db.select().from(pmtGateRequests)
+          .where(eq(pmtGateRequests.projectId, pid))
+          .orderBy(desc(pmtGateRequests.createdAt)),
       ]);
 
       const project = projectRows[0];
       if (!project) return null;
 
+      const state = project.status || "draft_shell";
+      const freezeActive = state === "control_hold";
+
+      // Compute governance summary
+      const nextGate = NEXT_GATE_MAP[state] || null;
+      const gates = allGateRows.map((g: any) => ({
+        gateId: g.gateId,
+        status: g.status,
+        evaluatedAt: g.evaluatedAt,
+      }));
+      const passed = gates.filter((g: any) => g.status === "passed").length;
+      const failed = gates.filter((g: any) => g.status === "failed").length;
+      const total = gates.length;
+      const score = total > 0 ? Math.max(0, 100 - (failed * 20)) : 100;
+      const trend = failed > 0 ? "down" : passed > 0 ? "up" : "flat";
+
+      // Next action
+      const nextAction = NEXT_ACTION_MAP[state] || null;
+
       return {
         projectId: pid,
         projectName: project.name,
-        projectState: project.status,
+        projectState: state,
         riskLevel: project.riskLevel,
-        freezeActive: project.status === "control_hold",
+        // Counts
         overdueTasksCount: Number(overdueTaskRows[0]?.count ?? 0),
         approvalsPendingCount: Number(pendingGateRows[0]?.count ?? 0),
         highRisksCount: Number(highRiskRows[0]?.count ?? 0),
@@ -434,6 +491,16 @@ const sidebarSummaryRouter = router({
         changesPendingCount: Number(pendingChangeRows[0]?.count ?? 0),
         openActionItemsCount: Number(openActionRows[0]?.count ?? 0),
         pendingDeliverablesCount: Number(pendingDeliverableRows[0]?.count ?? 0),
+        // Governance
+        freezeActive,
+        governance: {
+          nextGate,
+          gates,
+          freeze: { active: freezeActive, reason: freezeActive ? "G3 compliance failure" : null },
+          scorecard: { score, trend },
+        },
+        // Next action CTA
+        nextAction,
       };
     }),
 });

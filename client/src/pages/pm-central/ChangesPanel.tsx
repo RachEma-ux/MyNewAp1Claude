@@ -225,7 +225,7 @@ export default function ChangesPanel() {
       {executingProjects
         .filter((p: any) => p.status === "change_pending")
         .map((project: any) => (
-          <Card key={project.id} className="border-orange-500/50 cursor-pointer hover:border-orange-500 transition-colors" onClick={() => setLocation(`/pm-central/project/${project.id}/changes`)}>
+          <Card key={project.id} className="border-orange-500/50 cursor-pointer hover:border-orange-500 transition-colors" onClick={() => setLocation(`/pm-central/p/${project.id}/changes`)}>
             <CardHeader className="flex flex-row items-start justify-between space-y-0">
               <div>
                 <CardTitle className="text-lg flex items-center gap-2">

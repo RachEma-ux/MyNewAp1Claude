@@ -82,7 +82,7 @@ export default function ExecutionPanel() {
       {projects
         .filter((p: any) => p.status === "control_hold")
         .map((project: any) => (
-          <Card key={project.id} className="border-red-500/50 bg-red-500/5 cursor-pointer hover:border-red-500 transition-colors" onClick={() => setLocation(`/pm-central/project/${project.id}/gates`)}>
+          <Card key={project.id} className="border-red-500/50 bg-red-500/5 cursor-pointer hover:border-red-500 transition-colors" onClick={() => setLocation(`/pm-central/p/${project.id}/gates`)}>
             <CardHeader className="flex flex-row items-start justify-between space-y-0">
               <div>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -96,7 +96,7 @@ export default function ExecutionPanel() {
               <Badge variant="destructive">Control Hold</Badge>
             </CardHeader>
             <CardContent>
-              <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/project/${project.id}/gates`); }}>
+              <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/p/${project.id}/gates`); }}>
                 <Pause className="h-4 w-4 mr-1" />
                 View Freeze Details
               </Button>
@@ -108,7 +108,7 @@ export default function ExecutionPanel() {
       {projects
         .filter((p: any) => p.status !== "control_hold")
         .map((project: any) => (
-          <Card key={project.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation(`/pm-central/project/${project.id}/overview`)}>
+          <Card key={project.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation(`/pm-central/p/${project.id}/overview`)}>
             <CardHeader className="flex flex-row items-start justify-between space-y-0">
               <div>
                 <CardTitle className="text-lg">{project.name}</CardTitle>
@@ -151,7 +151,7 @@ export default function ExecutionPanel() {
                 G3 Compliant
               </div>
               {project.status === "authorized" && (
-                <Button size="sm" className="mt-2" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/project/${project.id}/tasks`); }}>
+                <Button size="sm" className="mt-2" onClick={(e) => { e.stopPropagation(); setLocation(`/pm-central/p/${project.id}/tasks`); }}>
                   <Play className="h-4 w-4 mr-1" />
                   Start Execution
                 </Button>
