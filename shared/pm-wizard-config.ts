@@ -268,7 +268,7 @@ export interface G0SubmissionPayload {
     projectManager: string;
     businessCase: string;
     problemStatement: string;
-    expectedValue: string;
+    expectedValue: string[];
     objective: string;
     inScope: string[];
     outOfScope: string[];
@@ -345,7 +345,7 @@ export interface WizardData {
   // A1: Business Case
   businessCase: string;
   problemStatement: string;
-  expectedValue: string;
+  expectedValue: string[];
   constraints: string;
   assumptions: string;
 
@@ -471,7 +471,7 @@ export function createDefaultWizardData(): WizardData {
     methodPackId: "",
     name: "", sponsor: "", projectManager: "",
     deliveryApproach: "hybrid", objective: "",
-    businessCase: "", problemStatement: "", expectedValue: "",
+    businessCase: "", problemStatement: "", expectedValue: ["Cost Savings"],
     constraints: "", assumptions: "",
     inScope: [], outOfScope: [], deliverables: [], acceptanceDefinition: "",
     stakeholders: [],

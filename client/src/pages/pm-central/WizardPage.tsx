@@ -816,8 +816,36 @@ function BusinessCaseForm({ data, updateField }: StepFormProps) {
           <Textarea value={data.problemStatement} onChange={(e) => updateField("problemStatement", e.target.value)} placeholder="What problem does this solve or what opportunity does it capture?" rows={3} />
         </Field>
         <Field label="Expected Value" required>
-          <Textarea value={data.expectedValue} onChange={(e) => updateField("expectedValue", e.target.value)} placeholder="Quantifiable benefits — ROI, cost savings, revenue, efficiency..." rows={3} />
+          <div className="flex flex-wrap gap-2 mb-2">
+            {["Cost Savings", "Revenue Growth", "Efficiency Gains", "Risk Reduction", "Customer Satisfaction", "Compliance / Regulatory", "Market Expansion", "Time to Market", "Quality Improvement", "Strategic Alignment"].map((val) => {
+              const vals = Array.isArray(data.expectedValue) ? data.expectedValue : [];
+              const isActive = vals.includes(val);
+              return (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => {
+                    const next = isActive
+                      ? vals.filter((v) => v !== val)
+                      : [...vals, val];
+                    updateField("expectedValue", next);
+                  }}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
+                  }`}
+                >
+                  {val}
+                </button>
+              );
+            })}
+          </div>
         </Field>
+        <StringListField label="Custom Expected Values" value={(Array.isArray(data.expectedValue) ? data.expectedValue : []).filter((v) => !["Cost Savings", "Revenue Growth", "Efficiency Gains", "Risk Reduction", "Customer Satisfaction", "Compliance / Regulatory", "Market Expansion", "Time to Market", "Quality Improvement", "Strategic Alignment"].includes(v))} onChange={(custom) => {
+          const presets = (Array.isArray(data.expectedValue) ? data.expectedValue : []).filter((v) => ["Cost Savings", "Revenue Growth", "Efficiency Gains", "Risk Reduction", "Customer Satisfaction", "Compliance / Regulatory", "Market Expansion", "Time to Market", "Quality Improvement", "Strategic Alignment"].includes(v));
+          updateField("expectedValue", [...presets, ...custom]);
+        }} placeholder="Add custom value..." />
         <Field label="Constraints">
           <Textarea value={data.constraints} onChange={(e) => updateField("constraints", e.target.value)} placeholder="Budget limits, time constraints, regulatory requirements..." rows={2} />
         </Field>
