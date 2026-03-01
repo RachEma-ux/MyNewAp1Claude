@@ -119,11 +119,16 @@ export default function AgentWizard({ open, onOpenChange, onSuccess }: AgentWiza
   });
 
   const createMutation = trpc.agents.create.useMutation({
+    onSuccess: () => {
+      toast.success("Agent created successfully");
+      onOpenChange(false);
+      onSuccess?.();
+      resetWizard();
+    },
     onError: (error) => {
       toast.error(`Failed to create agent: ${error.message}`);
     },
   });
-  const catalogCreateMutation = trpc.catalogManage.create.useMutation();
 
   const validateIdentity = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -195,31 +200,13 @@ export default function AgentWizard({ open, onOpenChange, onSuccess }: AgentWiza
 
   const handleSubmit = async () => {
     try {
-      const result = await createMutation.mutateAsync({
+      await createMutation.mutateAsync({
         ...formData,
         anatomy: {
           mode: mode,
           systemPrompt: formData.systemPrompt,
         },
       });
-
-      // Register in catalog for governance lifecycle
-      try {
-        await catalogCreateMutation.mutateAsync({
-          name: formData.name,
-          displayName: formData.name,
-          description: formData.description || undefined,
-          entryType: "agent",
-          origin: "agent",
-          tags: ["agent-wizard", "candidate"],
-          config: { agentId: result.id, roleClass: formData.roleClass, mode: mode },
-        });
-      } catch { /* catalog registration is non-blocking */ }
-
-      toast.success("Agent created successfully");
-      onOpenChange(false);
-      onSuccess?.();
-      resetWizard();
     } catch (error) {
       // Error handled by mutation
     }

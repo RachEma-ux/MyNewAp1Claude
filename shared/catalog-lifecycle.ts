@@ -14,7 +14,7 @@ export const EXECUTION_STATES = ["validating", "publishing"] as const;
 export type ExecutionState = (typeof EXECUTION_STATES)[number];
 
 // Entry origins — how the entry was created
-export const ENTRY_ORIGINS = ["admin", "discovery", "api", "connect", "import", "wizard", "agent"] as const;
+export const ENTRY_ORIGINS = ["admin", "discovery", "api", "connect", "import"] as const;
 export type EntryOrigin = (typeof ENTRY_ORIGINS)[number];
 
 // Lifecycle actions — the gated operations on the spine
