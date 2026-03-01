@@ -3,30 +3,22 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { Terminal, FolderOpen, Loader2, Plus, CheckCircle } from "lucide-react";
+import { Terminal, FolderOpen, Loader2, CheckCircle } from "lucide-react";
 
 export default function PMShellPanel() {
   const [, setLocation] = useLocation();
-  const { data: workspaces, isLoading: wsLoading } = trpc.workspaces.list.useQuery();
 
-  const projectWorkspaces = (workspaces || []).filter((w: any) => w.type === "project");
-  const defaultShellId = projectWorkspaces[0]?.id;
-
-  const { data: allProjects, isLoading: projLoading } = trpc.modules.pmt.projects.list.useQuery(
-    { workspaceId: defaultShellId! },
-    { enabled: !!defaultShellId }
-  );
+  // Use standalone shell routes — no workspace dependency
+  const { data: allProjects, isLoading } = trpc.modules.pmt.shell.projects.list.useQuery();
 
   const draftProjects = (allProjects || []).filter((p: any) => p.status === "draft");
   const utils = trpc.useUtils();
 
-  const validateMutation = trpc.modules.pmt.projects.update.useMutation({
+  const validateMutation = trpc.modules.pmt.shell.projects.update.useMutation({
     onSuccess: () => {
-      utils.modules.pmt.projects.list.invalidate();
+      utils.modules.pmt.shell.projects.list.invalidate();
     },
   });
-
-  const isLoading = wsLoading || projLoading;
 
   return (
     <div className="space-y-6">
@@ -88,7 +80,7 @@ export default function PMShellPanel() {
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
-                      onClick={() => validateMutation.mutate({ id: proj.id, workspaceId: proj.workspaceId, status: "active" })}
+                      onClick={() => validateMutation.mutate({ id: proj.id, status: "active" })}
                       disabled={validateMutation.isPending}
                     >
                       <CheckCircle className="h-4 w-4 mr-1" />

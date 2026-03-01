@@ -3,19 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { FolderOpen, Plus, FileStack, Sparkles, Terminal, Loader2 } from "lucide-react";
+import { FolderOpen, Plus, FileStack, Sparkles, Loader2, FolderKanban } from "lucide-react";
 
 export default function ProjectsPanel() {
   const [, setLocation] = useLocation();
-  const { data: workspaces, isLoading: wsLoading } = trpc.workspaces.list.useQuery();
 
-  const projectWorkspaces = (workspaces || []).filter((w: any) => w.type === "project");
-  const workspaceId = projectWorkspaces[0]?.id;
-
-  const { data: allProjects, isLoading: projLoading } = trpc.modules.pmt.projects.list.useQuery(
-    { workspaceId: workspaceId! },
-    { enabled: !!workspaceId }
-  );
+  // Use standalone shell routes — no workspace dependency
+  const { data: allProjects, isLoading } = trpc.modules.pmt.shell.projects.list.useQuery();
 
   const activeProjects = (allProjects || []).filter((p: any) => p.status === "active");
 
@@ -29,14 +23,14 @@ export default function ProjectsPanel() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation("/pm-central/shell")}>
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation("/pm-central/pm-shell")}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">New Project</CardTitle>
             <Plus className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground text-sm">
-              Create a new project and open the PM Shell directly to start managing tasks.
+              Create a new project in the PM Shell and start managing tasks.
             </p>
             <Button size="sm" className="mt-3">
               <Plus className="h-4 w-4 mr-1" />
@@ -52,7 +46,7 @@ export default function ProjectsPanel() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground text-sm">
-              Start from a PM template — PM², Scrum, Kanban, PRINCE2, Waterfall, and more.
+              Start from a PM template — PM2, Scrum, Kanban, PRINCE2, Waterfall, and more.
             </p>
             <Button size="sm" variant="outline" className="mt-3">
               <FileStack className="h-4 w-4 mr-1" />
@@ -84,29 +78,26 @@ export default function ProjectsPanel() {
           <FolderOpen className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          {wsLoading || projLoading ? (
+          {isLoading ? (
             <div className="flex justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : !workspaceId ? (
-            <p className="text-muted-foreground">No project workspace found. Create one first.</p>
           ) : activeProjects.length === 0 ? (
-            <p className="text-muted-foreground">No active projects yet. Create a project and validate it in PM Shell to see it here.</p>
+            <p className="text-muted-foreground">No active projects yet. Create a project in PM Shell and validate it.</p>
           ) : (
             <div className="space-y-2">
               {activeProjects.map((proj: any) => (
                 <div key={proj.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                    <FolderKanban className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium">{proj.name}</p>
                       <p className="text-xs text-muted-foreground">{proj.description || `Project #${proj.id}`}</p>
                     </div>
                     <Badge variant="outline" className="text-green-500 border-green-500/30">Active</Badge>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => setLocation(`/project/${proj.workspaceId}`)}>
-                    <Terminal className="h-4 w-4 mr-1" />
-                    Open Shell
+                  <Button size="sm" variant="outline" onClick={() => setLocation("/pm-central/pm-shell")}>
+                    Open in PM Shell
                   </Button>
                 </div>
               ))}

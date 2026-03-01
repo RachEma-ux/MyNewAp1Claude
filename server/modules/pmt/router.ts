@@ -34,6 +34,7 @@ import { icalRouter } from "./ical-router";
 import { customActionsRouter } from "./custom-actions-router";
 import { notificationsRouter } from "./notifications-router";
 import { aiRouter } from "./ai-router";
+import { standaloneRouter } from "./standalone-router";
 
 const projectsRouter = router({
   list: protectedProcedure
@@ -392,4 +393,5 @@ export const pmtRouter = router({
   customActions: customActionsRouter,
   notifications: notificationsRouter,
   ai: aiRouter,
+  shell: standaloneRouter,
 });
