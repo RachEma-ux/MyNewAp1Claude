@@ -739,7 +739,7 @@ async function applyTemplateData(db: any, userId: number, workspaceId: number, p
     workspaceId,
     name: projectName,
     description: (tpl.description as string) || undefined,
-    status: (tpl.status as string) || "active",
+    status: "draft",
     ownerId: userId,
   }).returning();
 

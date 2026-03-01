@@ -13,7 +13,7 @@ export const projects = pgTable("pmt_projects", {
   workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  status: varchar("status", { length: 50 }).default("active").notNull(),
+  status: varchar("status", { length: 50 }).default("draft").notNull(),
   ownerId: integer("ownerId").references(() => users.id),
   riskLevel: varchar("riskLevel", { length: 20 }).default("low"),
   governanceStage: varchar("governanceStage", { length: 50 }),
