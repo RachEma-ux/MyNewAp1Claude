@@ -33,7 +33,7 @@ import {
   INITIATING_STEPS, PLANNING_STEPS, ALL_WIZARD_STEPS,
   type WizardStepConfig, type WizardData,
 } from "@shared/pm-wizard-config";
-import { getMethodPack, type MethodPack, DEFAULT_PACK } from "@shared/pm-method-packs";
+import { getMethodPack, type MethodPack, DEFAULT_PACK, LEAN_SUB_PACKS } from "@shared/pm-method-packs";
 import { ALL_METHODS, METHOD_CATEGORIES, getMethodsByCategory, getMethodById, getCategoryById } from "@shared/pm-methods-catalog";
 
 // ── Step icon map ──
@@ -448,11 +448,104 @@ function StringListField({
 // PHASE A FORMS — Initiating
 // ═══════════════════════════════════════════════════════════════
 
+/** Lean sub-mode picker descriptions */
+const LEAN_MODE_CARDS = [
+  {
+    packId: "lean-kanban",
+    label: "A) Lightweight Kanban Execution",
+    description: "Lean flow with minimal overhead. WIP limits, pull-based delivery, service-level expectations.",
+    icon: "kanban",
+  },
+  {
+    packId: "lean-value-stream",
+    label: "B) True Value-Stream Management",
+    description: "Enterprise Lean. Value stream mapping, bottleneck detection, capacity modeling.",
+    icon: "stream",
+  },
+  {
+    packId: "lean-small-project",
+    label: "C) Small Project Governance Tier",
+    description: "Reduced bureaucratic load. Budget cap ($20k), duration limit (30d), simplified planning.",
+    icon: "light",
+  },
+] as const;
+
+const LEAN_PACK_IDS = new Set(LEAN_SUB_PACKS.map((p) => p.id));
+
 function MethodConfirmationForm({ data, updateField }: StepFormProps) {
   const [, setLocation] = useLocation();
-  const currentMethod = data.methodPackId ? getMethodById(data.methodPackId) : null;
+  const isLeanParent = data.methodPackId === "lean-pm";
+  const isLeanSubMode = LEAN_PACK_IDS.has(data.methodPackId);
+  const currentMethod = data.methodPackId ? getMethodById(isLeanSubMode ? "lean-pm" : data.methodPackId) : null;
   const pack = data.methodPackId ? getMethodPack(data.methodPackId) : null;
 
+  // Lean parent selected → show sub-mode selector
+  if (isLeanParent) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Lean Project Management — Select Sub-Mode
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Lean offers 3 operational modes. Each configures a different governance level, workflow, and artifact set.
+            </p>
+            <div className="grid gap-3">
+              {LEAN_MODE_CARDS.map((card) => {
+                const subPack = getMethodPack(card.packId);
+                return (
+                  <button
+                    key={card.packId}
+                    onClick={() => updateField("methodPackId", card.packId)}
+                    className="text-left p-4 rounded-lg border transition-colors hover:border-primary/50 hover:bg-primary/5"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold">{card.label}</span>
+                      <Badge variant="default" className="text-[10px]">Lean</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">{card.description}</p>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {subPack.workflow.taskStates.map((state, i) => (
+                        <span key={state}>
+                          <Badge variant="secondary" className="text-[10px]">{state.replace(/_/g, " ")}</Badge>
+                          {i < subPack.workflow.taskStates.length - 1 && <span className="text-muted-foreground mx-0.5 text-[10px]">&rarr;</span>}
+                        </span>
+                      ))}
+                    </div>
+                    {subPack.constraints && (
+                      <div className="flex gap-2 mt-2">
+                        {subPack.constraints.maxDurationDays && (
+                          <Badge variant="outline" className="text-[10px]">&le; {subPack.constraints.maxDurationDays}d</Badge>
+                        )}
+                        {subPack.constraints.maxBudgetAmount && (
+                          <Badge variant="outline" className="text-[10px]">&le; ${subPack.constraints.maxBudgetAmount.toLocaleString()}</Badge>
+                        )}
+                        {subPack.constraints.allowedRiskTiers && (
+                          <Badge variant="outline" className="text-[10px]">Risk: {subPack.constraints.allowedRiskTiers.join("/")}</Badge>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex gap-3">
+          <Button variant="ghost" size="sm" onClick={() => updateField("methodPackId", "")}>
+            Clear Selection
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Lean sub-mode or non-Lean method selected — show pack detail
   if (pack && currentMethod && data.methodPackId) {
     return (
       <div className="space-y-4">
@@ -461,13 +554,31 @@ function MethodConfirmationForm({ data, updateField }: StepFormProps) {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <Package className="h-4 w-4" />
-                {currentMethod.name}
+                {isLeanSubMode ? pack.methodName : currentMethod.name}
               </CardTitle>
-              <Badge variant="outline" className="text-xs">{pack.deliveryApproach}</Badge>
+              <div className="flex gap-1">
+                {isLeanSubMode && <Badge variant="default" className="text-[10px]">Lean</Badge>}
+                <Badge variant="outline" className="text-xs">{pack.deliveryApproach}</Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">{currentMethod.description}</p>
+            <p className="text-sm text-muted-foreground">
+              {isLeanSubMode
+                ? `${currentMethod.description.split(".")[0]}. Mode: ${pack.leanMode?.replace(/_/g, " ")}.`
+                : currentMethod.description}
+            </p>
+
+            {pack.constraints && (
+              <div className="p-2 bg-orange-500/10 border border-orange-500/20 rounded text-xs">
+                <p className="font-medium mb-1">Governance Constraints</p>
+                <div className="flex gap-3 text-muted-foreground">
+                  {pack.constraints.maxDurationDays && <span>Max duration: <span className="text-foreground">{pack.constraints.maxDurationDays} days</span></span>}
+                  {pack.constraints.maxBudgetAmount && <span>Max budget: <span className="text-foreground">${pack.constraints.maxBudgetAmount.toLocaleString()}</span></span>}
+                  {pack.constraints.allowedRiskTiers && <span>Risk tiers: <span className="text-foreground">{pack.constraints.allowedRiskTiers.join(", ")}</span></span>}
+                </div>
+              </div>
+            )}
 
             <div>
               <p className="text-xs font-medium mb-1">Workflow</p>
@@ -527,6 +638,12 @@ function MethodConfirmationForm({ data, updateField }: StepFormProps) {
         </Card>
 
         <div className="flex gap-3">
+          {isLeanSubMode && (
+            <Button variant="outline" size="sm" onClick={() => updateField("methodPackId", "lean-pm")}>
+              <Package className="h-3.5 w-3.5 mr-1" />
+              Change Lean Mode
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setLocation("/pm-central/methodes")}>
             <Wand2 className="h-3.5 w-3.5 mr-1" />
             Change Method
@@ -554,24 +671,39 @@ function MethodConfirmationForm({ data, updateField }: StepFormProps) {
           <div className="grid gap-3 sm:grid-cols-2">
             {METHOD_CATEGORIES.slice(0, 3).map((cat) => {
               const methods = getMethodsByCategory(cat.id);
-              return methods.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => updateField("methodPackId", m.id)}
-                  className={`text-left p-3 rounded-lg border transition-colors hover:border-primary/50 ${
-                    data.methodPackId === m.id ? "border-primary bg-primary/5" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium">{m.name}</span>
-                    {m.hasMethodPack && (
-                      <Badge variant="default" className="text-[10px]">Pack</Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{m.description}</p>
-                  <Badge variant="outline" className="text-[10px] mt-2">{m.deliveryApproach}</Badge>
-                </button>
-              ));
+              return methods.map((m) => {
+                // Lean-pm has sub-modes: route to sub-mode picker instead of direct pack attach
+                const handleClick = () => {
+                  if (m.hasSubModes) {
+                    updateField("methodPackId", m.id); // "lean-pm" triggers sub-mode selector
+                  } else {
+                    updateField("methodPackId", m.id);
+                  }
+                };
+                return (
+                  <button
+                    key={m.id}
+                    onClick={handleClick}
+                    className={`text-left p-3 rounded-lg border transition-colors hover:border-primary/50 ${
+                      data.methodPackId === m.id ? "border-primary bg-primary/5" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium">{m.name}</span>
+                      <div className="flex gap-1">
+                        {m.hasSubModes && (
+                          <Badge variant="secondary" className="text-[10px]">A/B/C</Badge>
+                        )}
+                        {m.hasMethodPack && (
+                          <Badge variant="default" className="text-[10px]">Pack</Badge>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{m.description}</p>
+                    <Badge variant="outline" className="text-[10px] mt-2">{m.deliveryApproach}</Badge>
+                  </button>
+                );
+              });
             })}
           </div>
           <div className="mt-3 text-center">

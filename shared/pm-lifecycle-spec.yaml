@@ -1,0 +1,262 @@
+# PMT Project Lifecycle — Event-Driven State Machine Specification
+# Reference document describing all states, events, transitions, guards, and side effects.
+# Machine-importable version: pm-lifecycle-spec.json
+
+states:
+  - draft_shell
+  - intake_review
+  - planning
+  - plan_gate_pending
+  - authorized
+  - executing
+  - control_hold
+  - change_pending
+  - closing
+  - close_gate_pending
+  - closed
+  - rejected
+  - archived
+
+events:
+  - SUBMIT_INTAKE
+  - G0_PASS
+  - G0_FAIL
+  - SUBMIT_PLAN
+  - G1_PASS
+  - G1_FAIL
+  - START_EXECUTION
+  - SUBMIT_CHANGE
+  - G2_PASS
+  - G3_FAIL
+  - REMEDIATION_COMPLETE
+  - BEGIN_CLOSURE
+  - SUBMIT_CLOSURE
+  - G4_PASS
+  - G4_FAIL
+  - ARCHIVE
+  - FREEZE
+  - UNFREEZE
+  - ATTACH_METHODPACK
+  - SELECT_LEAN_MODE
+
+transitions:
+  # Entry Path A — Standard Initiation
+  - event: SUBMIT_INTAKE
+    from: draft_shell
+    to: intake_review
+    authority: pm_owner
+    label: Submit for Intake
+
+  # G0 Gate Outcomes
+  - event: G0_PASS
+    from: intake_review
+    to: planning
+    authority: system
+    gate_required: true
+    gate_id: G0
+    label: G0 Pass — Begin Planning
+
+  - event: G0_FAIL
+    from: intake_review
+    to: rejected
+    authority: system
+    gate_required: true
+    gate_id: G0
+    label: G0 Fail — Reject
+
+  # Planning Phase
+  - event: SUBMIT_PLAN
+    from: planning
+    to: plan_gate_pending
+    authority: pm_owner
+    label: Submit Plan for Authorization
+
+  # G1 Gate Outcomes
+  - event: G1_PASS
+    from: plan_gate_pending
+    to: authorized
+    authority: system
+    gate_required: true
+    gate_id: G1
+    label: G1 Pass — Authorize
+    guards:
+      - methodpack_artifacts_check
+
+  - event: G1_FAIL
+    from: plan_gate_pending
+    to: planning
+    authority: system
+    gate_required: true
+    gate_id: G1
+    label: G1 Fail — Rework Plan
+
+  # Execution Phase
+  - event: START_EXECUTION
+    from: authorized
+    to: executing
+    authority: pm_owner
+    label: Start Execution
+
+  - event: SUBMIT_CHANGE
+    from: executing
+    to: change_pending
+    authority: pm_owner
+    label: Submit Change Request
+
+  - event: G2_PASS
+    from: change_pending
+    to: executing
+    authority: system
+    gate_required: true
+    gate_id: G2
+    label: G2 Pass — Resume Execution
+
+  - event: G3_FAIL
+    from: executing
+    to: control_hold
+    authority: system
+    gate_required: true
+    gate_id: G3
+    label: G3 Fail — Control Hold
+    side_effects:
+      - audit_control_hold
+
+  - event: REMEDIATION_COMPLETE
+    from: control_hold
+    to: executing
+    authority: system
+    label: Remediation Complete — Resume
+    guards:
+      - not_frozen
+
+  # Closure Phase
+  - event: BEGIN_CLOSURE
+    from: executing
+    to: closing
+    authority: pm_owner
+    label: Begin Closure
+
+  - event: SUBMIT_CLOSURE
+    from: closing
+    to: close_gate_pending
+    authority: pm_owner
+    label: Submit for Closure Gate
+
+  - event: G4_PASS
+    from: close_gate_pending
+    to: closed
+    authority: system
+    gate_required: true
+    gate_id: G4
+    label: G4 Pass — Close Project
+
+  - event: G4_FAIL
+    from: close_gate_pending
+    to: closing
+    authority: system
+    gate_required: true
+    gate_id: G4
+    label: G4 Fail — Rework Closure
+
+  # Terminal
+  - event: ARCHIVE
+    from: closed
+    to: archived
+    authority: admin
+    label: Archive
+
+  # FREEZE (from 5 eligible states)
+  - event: FREEZE
+    from: [planning, authorized, executing, change_pending, closing]
+    to: control_hold
+    authority: pm_owner
+    label: Freeze Project
+    side_effects:
+      - store_prior_state
+
+  # UNFREEZE (return to prior state)
+  - event: UNFREEZE
+    from: control_hold
+    to: _prior_state
+    authority: pm_owner
+    label: Unfreeze Project
+    guards:
+      - has_prior_state
+    side_effects:
+      - restore_prior_state
+
+  # Method Pack Attachment (self-transition)
+  - event: ATTACH_METHODPACK
+    from: _any_active
+    to: _same
+    authority: pm_owner
+    label: Attach Method Pack
+    side_effects:
+      - persist_methodpack
+
+# Gates Reference
+gates:
+  G0:
+    name: Intake Review
+    artifacts_required: [charter, stakeholder_register]
+    evaluator: project_sponsor
+    passing_criteria: charter approved, business case validated
+
+  G1:
+    name: Planning Authorization
+    artifacts_required: [scope_baseline, schedule_baseline, cost_baseline, quality_plan, risk_register, communications_plan, resource_plan, engagement_plan]
+    evaluator: steering_committee
+    passing_criteria: PMP approved, baselines accepted
+    methodpack_overrides:
+      predictive: all artifacts required
+      agile: wbs and gantt optional, backlog and release_plan required
+      hybrid: wbs optional, gantt required
+    lean_method_requirements:
+      kanban:
+        required_artifacts: [flow_policy, kanban_board_config, service_level_expectation, budget_guardrails, risk_register, communications_plan, quality_plan, resource_plan, engagement_plan]
+        optional_artifacts: [procurement_plan]
+        wbs_required: false
+        gantt_required: false
+      value_stream:
+        required_artifacts: [flow_policy, kanban_board_config, service_level_expectation, budget_guardrails, risk_register, communications_plan, quality_plan, resource_plan, engagement_plan, value_stream_map, capacity_model, bottleneck_register]
+        optional_artifacts: [procurement_plan]
+        wbs_required: false
+        gantt_required: false
+      small_project:
+        required_artifacts: [risk_register, communications_plan, quality_plan, resource_plan, engagement_plan, budget_guardrails]
+        optional_artifacts: []
+        wbs_required: false
+        gantt_required: false
+        constraints:
+          max_duration_days: 30
+          max_budget_amount: 20000
+          allowed_risk_tiers: [low, medium]
+
+  G2:
+    name: Change Control
+    artifacts_required: [change_request]
+    evaluator: change_control_board
+    passing_criteria: change impact assessed, approved by CCB
+
+  G3:
+    name: Operational Compliance
+    artifacts_required: [status_report]
+    evaluator: system
+    passing_criteria: SV and CV within thresholds, no blocking risks
+
+  G4:
+    name: Closure
+    artifacts_required: [closure_report, lessons_learned]
+    evaluator: project_sponsor
+    passing_criteria: all deliverables accepted, documentation complete
+
+# Freeze Behavior
+freeze_behavior:
+  eligible_states: [planning, authorized, executing, change_pending, closing]
+  target_state: control_hold
+  prior_state_storage: metadata.frozenFromState
+  unfreeze_behavior: transition back to metadata.frozenFromState, then clear it
+  note: >
+    FREEZE stores the current state in metadata.frozenFromState before
+    transitioning to control_hold. UNFREEZE reads this value and returns
+    the project to its prior state. Only one freeze level is supported.

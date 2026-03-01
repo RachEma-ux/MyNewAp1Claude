@@ -1,0 +1,271 @@
+{
+  "version": "2.0",
+  "description": "PMT Project Lifecycle — Event-Driven State Machine",
+  "states": [
+    "draft_shell", "intake_review", "planning", "plan_gate_pending",
+    "authorized", "executing", "control_hold", "change_pending",
+    "closing", "close_gate_pending", "closed", "rejected", "archived"
+  ],
+  "events": [
+    "SUBMIT_INTAKE", "G0_PASS", "G0_FAIL",
+    "SUBMIT_PLAN", "G1_PASS", "G1_FAIL",
+    "START_EXECUTION",
+    "SUBMIT_CHANGE", "G2_PASS",
+    "G3_FAIL", "REMEDIATION_COMPLETE",
+    "BEGIN_CLOSURE", "SUBMIT_CLOSURE", "G4_PASS", "G4_FAIL",
+    "ARCHIVE",
+    "FREEZE", "UNFREEZE",
+    "ATTACH_METHODPACK",
+    "SELECT_LEAN_MODE"
+  ],
+  "transitions": [
+    {
+      "event": "SUBMIT_INTAKE",
+      "fromState": "draft_shell",
+      "toState": "intake_review",
+      "authority": "pm_owner",
+      "label": "Submit for Intake"
+    },
+    {
+      "event": "G0_PASS",
+      "fromState": "intake_review",
+      "toState": "planning",
+      "authority": "system",
+      "gateRequired": true,
+      "gateId": "G0",
+      "label": "G0 Pass — Begin Planning"
+    },
+    {
+      "event": "G0_FAIL",
+      "fromState": "intake_review",
+      "toState": "rejected",
+      "authority": "system",
+      "gateRequired": true,
+      "gateId": "G0",
+      "label": "G0 Fail — Reject"
+    },
+    {
+      "event": "SUBMIT_PLAN",
+      "fromState": "planning",
+      "toState": "plan_gate_pending",
+      "authority": "pm_owner",
+      "label": "Submit Plan for Authorization"
+    },
+    {
+      "event": "G1_PASS",
+      "fromState": "plan_gate_pending",
+      "toState": "authorized",
+      "authority": "system",
+      "gateRequired": true,
+      "gateId": "G1",
+      "label": "G1 Pass — Authorize",
+      "guards": ["methodpack_artifacts_check"]
+    },
+    {
+      "event": "G1_FAIL",
+      "fromState": "plan_gate_pending",
+      "toState": "planning",
+      "authority": "system",
+      "gateRequired": true,
+      "gateId": "G1",
+      "label": "G1 Fail — Rework Plan"
+    },
+    {
+      "event": "START_EXECUTION",
+      "fromState": "authorized",
+      "toState": "executing",
+      "authority": "pm_owner",
+      "label": "Start Execution"
+    },
+    {
+      "event": "SUBMIT_CHANGE",
+      "fromState": "executing",
+      "toState": "change_pending",
+      "authority": "pm_owner",
+      "label": "Submit Change Request"
+    },
+    {
+      "event": "G2_PASS",
+      "fromState": "change_pending",
+      "toState": "executing",
+      "authority": "system",
+      "gateRequired": true,
+      "gateId": "G2",
+      "label": "G2 Pass — Resume Execution"
+    },
+    {
+      "event": "G3_FAIL",
+      "fromState": "executing",
+      "toState": "control_hold",
+      "authority": "system",
+      "gateRequired": true,
+      "gateId": "G3",
+      "label": "G3 Fail — Control Hold",
+      "sideEffects": ["audit_control_hold"]
+    },
+    {
+      "event": "REMEDIATION_COMPLETE",
+      "fromState": "control_hold",
+      "toState": "executing",
+      "authority": "system",
+      "label": "Remediation Complete — Resume",
+      "guards": ["not_frozen"]
+    },
+    {
+      "event": "BEGIN_CLOSURE",
+      "fromState": "executing",
+      "toState": "closing",
+      "authority": "pm_owner",
+      "label": "Begin Closure"
+    },
+    {
+      "event": "SUBMIT_CLOSURE",
+      "fromState": "closing",
+      "toState": "close_gate_pending",
+      "authority": "pm_owner",
+      "label": "Submit for Closure Gate"
+    },
+    {
+      "event": "G4_PASS",
+      "fromState": "close_gate_pending",
+      "toState": "closed",
+      "authority": "system",
+      "gateRequired": true,
+      "gateId": "G4",
+      "label": "G4 Pass — Close Project"
+    },
+    {
+      "event": "G4_FAIL",
+      "fromState": "close_gate_pending",
+      "toState": "closing",
+      "authority": "system",
+      "gateRequired": true,
+      "gateId": "G4",
+      "label": "G4 Fail — Rework Closure"
+    },
+    {
+      "event": "ARCHIVE",
+      "fromState": "closed",
+      "toState": "archived",
+      "authority": "admin",
+      "label": "Archive"
+    },
+    {
+      "event": "FREEZE",
+      "fromState": "planning",
+      "toState": "control_hold",
+      "authority": "pm_owner",
+      "label": "Freeze Project",
+      "sideEffects": ["store_prior_state"]
+    },
+    {
+      "event": "FREEZE",
+      "fromState": "authorized",
+      "toState": "control_hold",
+      "authority": "pm_owner",
+      "label": "Freeze Project",
+      "sideEffects": ["store_prior_state"]
+    },
+    {
+      "event": "FREEZE",
+      "fromState": "executing",
+      "toState": "control_hold",
+      "authority": "pm_owner",
+      "label": "Freeze Project",
+      "sideEffects": ["store_prior_state"]
+    },
+    {
+      "event": "FREEZE",
+      "fromState": "change_pending",
+      "toState": "control_hold",
+      "authority": "pm_owner",
+      "label": "Freeze Project",
+      "sideEffects": ["store_prior_state"]
+    },
+    {
+      "event": "FREEZE",
+      "fromState": "closing",
+      "toState": "control_hold",
+      "authority": "pm_owner",
+      "label": "Freeze Project",
+      "sideEffects": ["store_prior_state"]
+    },
+    {
+      "event": "UNFREEZE",
+      "fromState": "control_hold",
+      "toState": "_prior_state",
+      "authority": "pm_owner",
+      "label": "Unfreeze Project",
+      "guards": ["has_prior_state"],
+      "sideEffects": ["restore_prior_state"]
+    }
+  ],
+  "freezeBehavior": {
+    "eligibleStates": ["planning", "authorized", "executing", "change_pending", "closing"],
+    "targetState": "control_hold",
+    "priorStateStorage": "metadata.frozenFromState",
+    "unfreezeRestoresTo": "metadata.frozenFromState"
+  },
+  "gates": {
+    "G0": {
+      "name": "Intake Review",
+      "artifactsRequired": ["charter", "stakeholder_register"],
+      "evaluator": "project_sponsor",
+      "passingCriteria": "Charter approved, business case validated"
+    },
+    "G1": {
+      "name": "Planning Authorization",
+      "artifactsRequired": ["scope_baseline", "schedule_baseline", "cost_baseline", "quality_plan", "risk_register", "communications_plan", "resource_plan", "engagement_plan"],
+      "evaluator": "steering_committee",
+      "passingCriteria": "PMP approved, baselines accepted",
+      "methodpackOverrides": {
+        "predictive": { "allRequired": true },
+        "agile": { "optional": ["wbs", "gantt"], "additional": ["backlog", "release_plan"] },
+        "hybrid": { "optional": ["wbs"], "required": ["gantt"] }
+      },
+      "leanMethodRequirements": {
+        "kanban": {
+          "requiredArtifacts": ["flow_policy", "kanban_board_config", "service_level_expectation", "budget_guardrails", "risk_register", "communications_plan", "quality_plan", "resource_plan", "engagement_plan"],
+          "optionalArtifacts": ["procurement_plan"],
+          "wbsRequired": false,
+          "ganttRequired": false
+        },
+        "value_stream": {
+          "requiredArtifacts": ["flow_policy", "kanban_board_config", "service_level_expectation", "budget_guardrails", "risk_register", "communications_plan", "quality_plan", "resource_plan", "engagement_plan", "value_stream_map", "capacity_model", "bottleneck_register"],
+          "optionalArtifacts": ["procurement_plan"],
+          "wbsRequired": false,
+          "ganttRequired": false
+        },
+        "small_project": {
+          "requiredArtifacts": ["risk_register", "communications_plan", "quality_plan", "resource_plan", "engagement_plan", "budget_guardrails"],
+          "optionalArtifacts": [],
+          "wbsRequired": false,
+          "ganttRequired": false,
+          "constraints": {
+            "maxDurationDays": 30,
+            "maxBudgetAmount": 20000,
+            "allowedRiskTiers": ["low", "medium"]
+          }
+        }
+      }
+    },
+    "G2": {
+      "name": "Change Control",
+      "artifactsRequired": ["change_request"],
+      "evaluator": "change_control_board",
+      "passingCriteria": "Change impact assessed, approved by CCB"
+    },
+    "G3": {
+      "name": "Operational Compliance",
+      "artifactsRequired": ["status_report"],
+      "evaluator": "system",
+      "passingCriteria": "SV and CV within thresholds, no blocking risks"
+    },
+    "G4": {
+      "name": "Closure",
+      "artifactsRequired": ["closure_report", "lessons_learned"],
+      "evaluator": "project_sponsor",
+      "passingCriteria": "All deliverables accepted, documentation complete"
+    }
+  }
+}

@@ -107,6 +107,7 @@ export interface MethodDefinition {
   origin: string;
   gateModel?: string; // how gates map to this method
   hasMethodPack?: boolean; // true if an operational MethodPack exists for this method
+  hasSubModes?: boolean;   // true if method has selectable sub-mode packs (e.g., Lean A/B/C)
 }
 
 // ── 1. Predictive ───────────────────────────────────────────────────────────
@@ -242,14 +243,16 @@ const AGILE_METHODS: MethodDefinition[] = [
     id: "lean-pm",
     name: "Lean Project Management",
     categoryId: "agile",
-    description: "Focus on waste reduction, flow efficiency, and value stream mapping. Eliminate non-value-adding activities.",
+    description: "Focus on waste reduction, flow efficiency, and value stream mapping. Three sub-modes: Kanban execution, Value Stream management, or Small Project governance.",
     philosophy: "Optimize flow & reduce waste",
-    strengths: ["Waste elimination", "Value focus", "Process efficiency"],
-    bestFor: ["Manufacturing", "Operations optimization", "Process improvement"],
+    strengths: ["Waste elimination", "Value focus", "Process efficiency", "Sub-mode flexibility"],
+    bestFor: ["Manufacturing", "Operations optimization", "Process improvement", "Small projects"],
     governanceCompatibility: "partial",
     deliveryApproach: "agile",
     origin: "Toyota Production System / Womack & Jones",
     gateModel: "Value stream milestones as gates. G3 via continuous waste audits.",
+    hasMethodPack: true,
+    hasSubModes: true,
   },
   {
     id: "crystal",

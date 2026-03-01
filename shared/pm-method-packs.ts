@@ -18,6 +18,13 @@ export interface MethodPack {
   id: string;                     // matches MethodDefinition.id
   methodName: string;
   deliveryApproach: "predictive" | "agile" | "hybrid";
+  category?: string;              // "lean", "predictive", "agile", etc.
+  leanMode?: "kanban" | "value_stream" | "small_project";
+  constraints?: {
+    maxDurationDays?: number;
+    maxBudgetAmount?: number;
+    allowedRiskTiers?: string[];
+  };
 
   workflow: {
     taskStates: string[];
@@ -423,6 +430,179 @@ const AGILE_WATERFALL_PACK: MethodPack = {
   ],
 };
 
+// ── Lean Kanban Pack ────────────────────────────────────────────────────────
+
+const LEAN_KANBAN_PACK: MethodPack = {
+  id: "lean-kanban",
+  methodName: "Lean — Kanban Execution",
+  deliveryApproach: "agile",
+  category: "lean",
+  leanMode: "kanban",
+
+  workflow: {
+    taskStates: ["backlog", "ready", "in_progress", "review", "done"],
+    defaultState: "backlog",
+  },
+
+  requiredArtifacts: [
+    "flow_policy", "kanban_board_config", "service_level_expectation",
+    "budget_guardrails", "risk_register", "communications_plan",
+    "quality_plan", "resource_plan", "engagement_plan",
+  ],
+  optionalArtifacts: ["procurement_plan"],
+
+  primaryViews: ["dashboard", "kanban", "cumulative-flow", "lead-time"],
+  hiddenViews: ["gantt", "wbs", "sprints"],
+
+  ceremonies: [
+    { name: "Replenishment Meeting", cadence: "Weekly", description: "Pull new items into ready column based on capacity" },
+    { name: "Delivery Cadence Review", cadence: "Bi-weekly", description: "Review delivered items and cycle times" },
+    { name: "Service Delivery Review", cadence: "Monthly", description: "Analyze flow metrics, identify improvement areas" },
+  ],
+
+  metrics: [
+    { name: "Lead Time", type: "flow", enabled: true },
+    { name: "Cycle Time", type: "flow", enabled: true },
+    { name: "Throughput", type: "flow", enabled: true },
+    { name: "WIP Trend", type: "flow", enabled: true },
+    { name: "Cumulative Flow", type: "flow", enabled: true },
+  ],
+
+  planningAdaptations: {
+    scopeLabel: "Flow Backlog",
+    scheduleLabel: "Flow Targets",
+    scopeDescription: "Prioritized flow backlog with WIP limits and service-level expectations. No WBS required.",
+    scheduleDescription: "Target lead times by service class. Continuous flow delivery — no fixed timeline.",
+    wbsRequired: false,
+    ganttRequired: false,
+  },
+
+  automations: [
+    { name: "WIP limit alert", trigger: "Column WIP exceeds limit", action: "Notify team lead" },
+    { name: "Aging alert", trigger: "Item in column > 5 days", action: "Flag as blocked" },
+    { name: "Throughput report", trigger: "Weekly", action: "Generate throughput chart" },
+  ],
+};
+
+// ── Lean Value Stream Pack ─────────────────────────────────────────────────
+
+const LEAN_VALUE_STREAM_PACK: MethodPack = {
+  id: "lean-value-stream",
+  methodName: "Lean — Value Stream Management",
+  deliveryApproach: "agile",
+  category: "lean",
+  leanMode: "value_stream",
+
+  workflow: {
+    taskStates: ["intake", "ready", "in_progress", "validation", "done"],
+    defaultState: "intake",
+  },
+
+  requiredArtifacts: [
+    "flow_policy", "kanban_board_config", "service_level_expectation",
+    "budget_guardrails", "risk_register", "communications_plan",
+    "quality_plan", "resource_plan", "engagement_plan",
+    "value_stream_map", "capacity_model", "bottleneck_register",
+  ],
+  optionalArtifacts: ["procurement_plan"],
+
+  primaryViews: ["dashboard", "kanban", "value-stream", "cumulative-flow", "capacity"],
+  hiddenViews: ["gantt", "wbs", "sprints"],
+
+  ceremonies: [
+    { name: "Replenishment Meeting", cadence: "Weekly", description: "Pull new items into ready column based on capacity" },
+    { name: "Delivery Cadence Review", cadence: "Bi-weekly", description: "Review delivered items and cycle times" },
+    { name: "Service Delivery Review", cadence: "Monthly", description: "Analyze flow metrics, identify improvement areas" },
+    { name: "Bottleneck Review", cadence: "Bi-weekly", description: "Identify and resolve value-stream bottlenecks" },
+    { name: "Capacity Planning", cadence: "Monthly", description: "Model capacity and forecast throughput" },
+  ],
+
+  metrics: [
+    { name: "Lead Time", type: "flow", enabled: true },
+    { name: "Cycle Time", type: "flow", enabled: true },
+    { name: "Throughput", type: "flow", enabled: true },
+    { name: "WIP Trend", type: "flow", enabled: true },
+    { name: "Cumulative Flow", type: "flow", enabled: true },
+    { name: "Flow Efficiency", type: "flow", enabled: true },
+    { name: "Predictability Index", type: "flow", enabled: true },
+  ],
+
+  planningAdaptations: {
+    scopeLabel: "Value Stream Backlog",
+    scheduleLabel: "Value Stream Targets",
+    scopeDescription: "Value-stream-mapped backlog with bottleneck register and capacity model. Enterprise Lean planning.",
+    scheduleDescription: "Capacity-modeled targets with flow efficiency thresholds. Bottleneck-aware scheduling.",
+    wbsRequired: false,
+    ganttRequired: false,
+  },
+
+  automations: [
+    { name: "WIP limit alert", trigger: "Column WIP exceeds limit", action: "Notify team lead" },
+    { name: "Bottleneck detection", trigger: "Stage wait time > threshold", action: "Flag bottleneck in register" },
+    { name: "Capacity forecast", trigger: "Monthly", action: "Generate capacity model update" },
+    { name: "Flow efficiency alert", trigger: "Flow efficiency < 15%", action: "Escalate to value stream manager" },
+  ],
+};
+
+// ── Lean Small Project Pack ────────────────────────────────────────────────
+
+const LEAN_SMALL_PROJECT_PACK: MethodPack = {
+  id: "lean-small-project",
+  methodName: "Lean — Small Project",
+  deliveryApproach: "agile",
+  category: "lean",
+  leanMode: "small_project",
+  constraints: {
+    maxDurationDays: 30,
+    maxBudgetAmount: 20000,
+    allowedRiskTiers: ["low", "medium"],
+  },
+
+  workflow: {
+    taskStates: ["todo", "doing", "done"],
+    defaultState: "todo",
+  },
+
+  requiredArtifacts: [
+    "risk_register", "communications_plan", "quality_plan",
+    "resource_plan", "engagement_plan", "budget_guardrails",
+  ],
+  optionalArtifacts: [],
+
+  primaryViews: ["dashboard", "kanban"],
+  hiddenViews: ["gantt", "wbs", "sprints", "cumulative-flow", "value-stream"],
+
+  ceremonies: [
+    { name: "Status Check", cadence: "Weekly (15 min)", description: "Lightweight team status and blocker review" },
+    { name: "Completion Review", cadence: "At closure", description: "Final review of deliverables and lessons learned" },
+  ],
+
+  metrics: [
+    { name: "Cycle Time", type: "flow", enabled: true },
+    { name: "Throughput", type: "flow", enabled: true },
+    { name: "Overdue Items", type: "progress", enabled: true },
+  ],
+
+  planningAdaptations: {
+    scopeLabel: "Simplified Scope",
+    scheduleLabel: "Milestone Targets",
+    scopeDescription: "Lightweight scope definition. No WBS — just deliverables and acceptance criteria.",
+    scheduleDescription: "Simple milestone targets within the 30-day constraint. No Gantt required.",
+    wbsRequired: false,
+    ganttRequired: false,
+  },
+
+  automations: [
+    { name: "Budget alert", trigger: "Spend > 80% of budget cap", action: "Notify PM" },
+    { name: "Duration alert", trigger: "5 days before deadline", action: "Send closure reminder" },
+    { name: "Overdue alert", trigger: "Item overdue > 2 days", action: "Flag in dashboard" },
+  ],
+};
+
+// ── Lean sub-packs export ───────────────────────────────────────────────────
+
+export const LEAN_SUB_PACKS = [LEAN_KANBAN_PACK, LEAN_VALUE_STREAM_PACK, LEAN_SMALL_PROJECT_PACK];
+
 // ── Pack registry ───────────────────────────────────────────────────────────
 
 export const ALL_METHOD_PACKS: MethodPack[] = [
@@ -432,6 +612,9 @@ export const ALL_METHOD_PACKS: MethodPack[] = [
   SAFE_PACK,
   PRINCE2_PACK,
   AGILE_WATERFALL_PACK,
+  LEAN_KANBAN_PACK,
+  LEAN_VALUE_STREAM_PACK,
+  LEAN_SMALL_PROJECT_PACK,
 ];
 
 const PACK_MAP = new Map<string, MethodPack>(

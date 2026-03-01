@@ -220,7 +220,7 @@ export const wizardRouter = router({
           fromState: currentState,
           toState: "intake_review",
           actorId: ctx.user.id,
-          reason: "G0 charter submitted for review",
+          reason: "[SUBMIT_INTAKE] G0 charter submitted for review",
         });
       }
 
@@ -285,6 +285,45 @@ export const wizardRouter = router({
           code: "BAD_REQUEST",
           message: `Missing required fields for G1: ${missingFields.join(", ")}`,
         });
+      }
+
+      // Lean Small Project constraint validation
+      if (pack.constraints) {
+        const { maxBudgetAmount, maxDurationDays, allowedRiskTiers } = pack.constraints;
+
+        if (maxBudgetAmount !== undefined && wizard.budgetItems) {
+          const totalBudget = wizard.budgetItems.reduce((sum: number, it: any) => sum + (it.planned || 0), 0);
+          if (totalBudget > maxBudgetAmount) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Small Project constraint: budget ($${totalBudget.toLocaleString()}) exceeds maximum ($${maxBudgetAmount.toLocaleString()})`,
+            });
+          }
+        }
+
+        if (maxDurationDays !== undefined && wizard.milestones && wizard.milestones.length > 0) {
+          const startDate = wizard.milestones[0]?.targetDate;
+          const endDate = wizard.milestones[wizard.milestones.length - 1]?.targetDate;
+          if (startDate && endDate) {
+            const durationMs = new Date(endDate).getTime() - new Date(startDate).getTime();
+            const durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
+            if (durationDays > maxDurationDays) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `Small Project constraint: duration (${durationDays} days) exceeds maximum (${maxDurationDays} days)`,
+              });
+            }
+          }
+        }
+
+        if (allowedRiskTiers && wizard.riskTier) {
+          if (!allowedRiskTiers.includes(wizard.riskTier)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Small Project constraint: risk tier "${wizard.riskTier}" is not allowed (allowed: ${allowedRiskTiers.join(", ")})`,
+            });
+          }
+        }
       }
 
       // Build baseline artifacts
@@ -382,7 +421,7 @@ export const wizardRouter = router({
           fromState: currentState,
           toState: "plan_gate_pending",
           actorId: ctx.user.id,
-          reason: "PMP submitted for G1 authorization",
+          reason: "[SUBMIT_PLAN] PMP submitted for G1 authorization",
         });
       }
 
