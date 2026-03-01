@@ -1,0 +1,65 @@
+Session Summary — 2026-03-01 23:30
+====================================
+
+## Goal
+Implement Unified Catalog Lifecycle — merge entry creation and lifecycle actions into one governed state machine with a visual Lifecycle tab.
+
+## What Was Done
+
+### 1. Created shared/catalog-lifecycle.ts (~155 lines)
+- Single source of truth for lifecycle contract (shared between client & server)
+- Exports: LIFECYCLE_STATES, EXECUTION_STATES, ENTRY_ORIGINS, LIFECYCLE_ACTIONS
+- Helper functions: getLifecycleSteps(), getAvailableActions(), getLifecycleProgress(), getStageReviewSummary()
+- Used by the new LifecyclePanel component
+
+### 2. Added Lifecycle tab to CatalogManagePage (+370 lines)
+- 4th tab: Catalog | Audit | Discovery | Lifecycle
+- LifecyclePanel component with:
+  - Entry header (name, type, origin, classification badges, created date)
+  - Progress bar (0-100% lifecycle completion)
+  - Visual vertical timeline with 6 steps: Created → Register Review → Activated → Validate (4-step) → Validate Review → Publish
+  - Each step shows status icon (✓/○/✗/⏳), detail badge, and action buttons when applicable
+  - Validation detail expansion (Health, Caps, Models, Test results)
+  - Published Bundles section with version, status, hash, and Recall button
+  - Audit Trail section showing entry-specific events
+- Row click in Catalog table navigates to Lifecycle tab for that entry
+- Action buttons stopPropagation to prevent accidental navigation
+
+### 3. Extended origin schema (server/routers/catalog-manage.ts)
+- Added "connect" and "import" to originSchema enum
+- Added optional `origin` input param to submitFromDiscovery endpoint (defaults to "discovery")
+- Added origin colors for connect (teal) and import (indigo) in CatalogManagePage
+
+### 4. Updated CatalogImportWizard
+- Both single-submit and batch-submit now pass `origin: "import"` to submitFromDiscovery
+- Previously all import wizard entries got origin: "discovery"
+
+### 5. Audit log filter (already existed)
+- Confirmed catalogRegistry.auditLog already accepts catalogEntryId filter
+- DB function getCatalogAuditEvents already supports it
+- No changes needed
+
+## Files Changed
+| Action  | File                                        |
+|---------|---------------------------------------------|
+| Created | shared/catalog-lifecycle.ts                 |
+| Edited  | client/src/pages/CatalogManagePage.tsx       |
+| Edited  | server/routers/catalog-manage.ts             |
+| Edited  | client/src/components/CatalogImportWizard.tsx|
+
+## What Was NOT Changed
+- No DB schema changes or migrations
+- No new tRPC endpoints
+- Existing Catalog/Audit/Discovery tabs unchanged
+- Existing create/edit/delete dialogs unchanged
+- Existing validation and publishing wizards unchanged
+
+## Deployment
+- Commit: 2cb1b23 feat(catalog): add unified lifecycle tab and origin tracking
+- Pushed to main, deployed via Builder Deploy workflow
+- Tunnel URL: https://kent-submitted-several-thumbs.trycloudflare.com
+- Verified: type check passed, build succeeded, app running
+
+## Lifecycle Process (for reference)
+Create → Register Review → Activate → Validate (auto 4-step) → Validate Review → Publish → Cataloged
+Each arrow is a gated transition — no skipping, no backward movement.
