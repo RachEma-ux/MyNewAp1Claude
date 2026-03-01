@@ -5,9 +5,11 @@
  * Renders PMProjectSidebar + the active tool panel side by side.
  */
 
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { lazy, Suspense } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Copy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc";
 import PMProjectSidebar from "@/components/pm/PMProjectSidebar";
 import PmCentralSidebarLayout from "@/components/pm/PmCentralSidebarLayout";
 
@@ -106,6 +108,30 @@ function ToolPanel({ tool, projectId }: { tool: string; projectId: number }) {
   );
 }
 
+function ProjectActions({ projectId }: { projectId: number }) {
+  const [, navigate] = useLocation();
+  const { data: project } = trpc.modules.pmt.shell.projects.get.useQuery(
+    { id: projectId },
+    { enabled: projectId > 0 },
+  );
+
+  // Only show clone for projects past draft_shell
+  if (!project || project.status === "draft_shell") return null;
+
+  return (
+    <div className="flex justify-end px-4 pt-2 pb-1">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => navigate(`/pm-central/shell/clone/${projectId}`)}
+      >
+        <Copy className="h-3.5 w-3.5 mr-1.5" />
+        Clone Project
+      </Button>
+    </div>
+  );
+}
+
 export default function ProjectPage() {
   // Match /pm-central/p/:id/:tool (primary) and /pm-central/project/:id/:tool (legacy)
   const [, params] = useRoute("/pm-central/p/:id/:tool");
@@ -129,6 +155,7 @@ export default function ProjectPage() {
     <PmCentralSidebarLayout
       sidebar={<PMProjectSidebar projectId={projectId} activeTool={tool} />}
     >
+      <ProjectActions projectId={projectId} />
       <ToolPanel tool={tool} projectId={projectId} />
     </PmCentralSidebarLayout>
   );

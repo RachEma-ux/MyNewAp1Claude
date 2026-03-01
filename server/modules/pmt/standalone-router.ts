@@ -25,12 +25,14 @@ import { seedWorkspaceModules } from "../registry";
 import { toolsRouter } from "./tools-router";
 import { wizardRouter } from "./wizard-router";
 import {
-  validateTransition, getAvailableTransitions,
-  PROJECT_STATES, GATE_IDS, GATE_STATUSES,
+  validateTransition, validateEvent, getAvailableTransitions,
+  getAvailableEvents, inferEventFromTransition,
+  PROJECT_STATES, LIFECYCLE_EVENTS, GATE_IDS, GATE_STATUSES,
   CHANGE_TYPES, CHANGE_IMPACTS, CHANGE_STATUSES,
-  ARTIFACT_TYPES,
-  type ProjectState,
+  ARTIFACT_TYPES, FREEZE_ELIGIBLE_STATES, isFreezable,
+  type ProjectState, type LifecycleEvent,
 } from "./project-lifecycle";
+import { getMethodPack } from "@shared/pm-method-packs";
 
 // ── Auto-managed PM Shell workspace ──
 
@@ -388,13 +390,17 @@ const shellLifecycleRouter = router({
         projectId: rows[0].id,
         currentState,
         availableTransitions: getAvailableTransitions(currentState),
+        availableEvents: getAvailableEvents(currentState),
+        isFrozen: currentState === "control_hold" && !!(rows[0].metadata as any)?.frozenFromState,
+        frozenFromState: (rows[0].metadata as any)?.frozenFromState || null,
       };
     }),
 
   transition: protectedProcedure
     .input(z.object({
       projectId: z.number(),
-      toState: z.enum(PROJECT_STATES as unknown as [string, ...string[]]),
+      event: z.enum(LIFECYCLE_EVENTS as unknown as [string, ...string[]]).optional(),
+      toState: z.enum(PROJECT_STATES as unknown as [string, ...string[]]).optional(),
       reason: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -402,25 +408,49 @@ const shellLifecycleRouter = router({
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // Get current project
+      if (!input.event && !input.toState) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Either event or toState is required" });
+      }
+
       const rows = await db.select().from(projects)
         .where(and(eq(projects.id, input.projectId), eq(projects.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
 
       const fromState = (rows[0].status || "draft_shell") as ProjectState;
-      const validation = validateTransition(fromState, input.toState as ProjectState);
+      let targetState: ProjectState;
+      let eventName: LifecycleEvent | undefined;
+      let gateRequired = false;
+      let gateId: string | undefined;
 
-      if (!validation.valid) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: validation.reason || "Invalid transition" });
+      if (input.event) {
+        // Event-based validation (primary path)
+        const ev = validateEvent(fromState, input.event as LifecycleEvent);
+        if (!ev.valid || !ev.transition) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: ev.reason || "Invalid event" });
+        }
+        targetState = ev.transition.toState;
+        eventName = ev.transition.event;
+        gateRequired = ev.transition.gateRequired ?? false;
+        gateId = ev.transition.gateId;
+      } else {
+        // Backward-compatible toState-based validation
+        const validation = validateTransition(fromState, input.toState as ProjectState);
+        if (!validation.valid) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: validation.reason || "Invalid transition" });
+        }
+        targetState = input.toState as ProjectState;
+        eventName = validation.event;
+        gateRequired = validation.gateRequired;
+        gateId = validation.gateId;
       }
 
-      // If gate required, create gate request and set project to pending state
+      // If gate required, create gate request
       let gateRequestId: number | undefined;
-      if (validation.gateRequired && validation.gateId) {
+      if (gateRequired && gateId) {
         const [gateReq] = await db.insert(pmtGateRequests).values({
           projectId: input.projectId,
-          gateId: validation.gateId,
+          gateId,
           status: "pending",
           requestedBy: ctx.user.id,
           reason: input.reason,
@@ -430,27 +460,186 @@ const shellLifecycleRouter = router({
 
       // Update project status
       await db.update(projects).set({
-        status: input.toState,
+        status: targetState,
         updatedAt: new Date(),
       }).where(eq(projects.id, input.projectId));
 
-      // Log state transition
+      // Log state transition with event name
+      const reason = eventName
+        ? `[${eventName}] ${input.reason || ""}`
+        : input.reason;
       await db.insert(pmtStateTransitions).values({
         projectId: input.projectId,
         fromState,
-        toState: input.toState,
+        toState: targetState,
         actorId: ctx.user.id,
         gateRequestId,
-        reason: input.reason,
+        reason: reason?.trim() || undefined,
       });
 
       return {
         success: true,
         fromState,
-        toState: input.toState,
+        toState: targetState,
+        event: eventName,
         gateRequestId,
-        gateRequired: validation.gateRequired,
+        gateRequired,
       };
+    }),
+
+  freeze: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      reason: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const wsId = await getOrCreatePMShellWorkspace(ctx.user.id);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const rows = await db.select().from(projects)
+        .where(and(eq(projects.id, input.projectId), eq(projects.workspaceId, wsId)))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+
+      const currentState = (rows[0].status || "draft_shell") as ProjectState;
+      if (!isFreezable(currentState)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Cannot freeze project in state "${currentState}". Eligible states: ${FREEZE_ELIGIBLE_STATES.join(", ")}`,
+        });
+      }
+
+      // Store prior state in metadata
+      const currentMeta = (rows[0].metadata || {}) as Record<string, unknown>;
+      await db.update(projects).set({
+        status: "control_hold",
+        metadata: { ...currentMeta, frozenFromState: currentState },
+        updatedAt: new Date(),
+      } as any).where(eq(projects.id, input.projectId));
+
+      // Log audit
+      await db.insert(pmtStateTransitions).values({
+        projectId: input.projectId,
+        fromState: currentState,
+        toState: "control_hold",
+        actorId: ctx.user.id,
+        reason: `[FREEZE] ${input.reason}`,
+      });
+
+      return { success: true, fromState: currentState, toState: "control_hold" as const };
+    }),
+
+  unfreeze: protectedProcedure
+    .input(z.object({
+      projectId: z.number(),
+      reason: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const wsId = await getOrCreatePMShellWorkspace(ctx.user.id);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const rows = await db.select().from(projects)
+        .where(and(eq(projects.id, input.projectId), eq(projects.workspaceId, wsId)))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+
+      const currentState = (rows[0].status || "draft_shell") as ProjectState;
+      if (currentState !== "control_hold") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Project is not in control_hold state" });
+      }
+
+      const frozenFromState = (rows[0].metadata as any)?.frozenFromState as ProjectState | undefined;
+      if (!frozenFromState) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No prior state recorded — cannot unfreeze (project may have entered control_hold via G3 fail, not freeze)" });
+      }
+
+      // Restore prior state, clear frozenFromState
+      const currentMeta = (rows[0].metadata || {}) as Record<string, unknown>;
+      const { frozenFromState: _, ...cleanedMeta } = currentMeta;
+      await db.update(projects).set({
+        status: frozenFromState,
+        metadata: cleanedMeta,
+        updatedAt: new Date(),
+      } as any).where(eq(projects.id, input.projectId));
+
+      // Log audit
+      await db.insert(pmtStateTransitions).values({
+        projectId: input.projectId,
+        fromState: "control_hold",
+        toState: frozenFromState,
+        actorId: ctx.user.id,
+        reason: `[UNFREEZE] ${input.reason || "Resumed from freeze"}`,
+      });
+
+      return { success: true, fromState: "control_hold" as const, toState: frozenFromState };
+    }),
+
+  clone: protectedProcedure
+    .input(z.object({
+      sourceProjectId: z.number(),
+      name: z.string().min(1).max(255),
+      cloneOptions: z.object({
+        copyWizardData: z.boolean().default(true),
+        copyMethodPack: z.boolean().default(true),
+        copyRiskLevel: z.boolean().default(true),
+      }).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const wsId = await getOrCreatePMShellWorkspace(ctx.user.id);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Load source project
+      const rows = await db.select().from(projects)
+        .where(and(eq(projects.id, input.sourceProjectId), eq(projects.workspaceId, wsId)))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Source project not found" });
+
+      const source = rows[0];
+      const opts = input.cloneOptions ?? { copyWizardData: true, copyMethodPack: true, copyRiskLevel: true };
+
+      // Build new metadata
+      const newMeta: Record<string, unknown> = {};
+      const sourceMeta = (source.metadata || {}) as Record<string, unknown>;
+
+      if (opts.copyMethodPack && sourceMeta.methodPackId) {
+        newMeta.methodPackId = sourceMeta.methodPackId;
+      }
+
+      if (opts.copyWizardData && sourceMeta.wizard) {
+        const sourceWizard = sourceMeta.wizard as Record<string, unknown>;
+        newMeta.wizard = {
+          ...sourceWizard,
+          completedSteps: [],
+          currentStep: "method-confirmation",
+          phase: "initiating",
+        };
+      }
+
+      // Create new project as draft_shell
+      const [created] = await db.insert(projects).values({
+        workspaceId: wsId,
+        name: input.name,
+        description: source.description,
+        status: "draft_shell",
+        riskLevel: opts.copyRiskLevel ? source.riskLevel : "low",
+        ownerId: ctx.user.id,
+        parentProjectId: source.id,
+        metadata: Object.keys(newMeta).length > 0 ? newMeta : undefined,
+      }).returning();
+
+      // Log audit event on new project
+      await db.insert(pmtStateTransitions).values({
+        projectId: created.id,
+        fromState: "draft_shell",
+        toState: "draft_shell",
+        actorId: ctx.user.id,
+        reason: `Cloned from project #${source.id} (${source.name})`,
+      });
+
+      return created;
     }),
 
   history: protectedProcedure
@@ -517,19 +706,45 @@ const shellGatesRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Gate already evaluated" });
       }
 
+      const gateReq = rows[0];
       const newStatus = input.passed ? "passed" : "failed";
 
-      // Update gate request
+      // Method-pack-aware G1 artifact check
+      let methodPackWarnings: string[] = [];
+      if (gateReq.gateId === "G1" && input.passed) {
+        const projRows = await db.select().from(projects)
+          .where(eq(projects.id, gateReq.projectId))
+          .limit(1);
+        const packId = (projRows[0]?.metadata as any)?.methodPackId;
+        if (packId) {
+          const pack = getMethodPack(packId);
+          if (pack.requiredArtifacts && pack.requiredArtifacts.length > 0) {
+            const artifacts = await db.select().from(pmtProjectArtifacts)
+              .where(eq(pmtProjectArtifacts.projectId, gateReq.projectId));
+            const existingTypes = new Set(artifacts.map((a) => a.name.toLowerCase().replace(/\s+/g, "_")));
+            const existingArtifactTypes = new Set(artifacts.map((a) => a.artifactType));
+            for (const req of pack.requiredArtifacts) {
+              if (!existingTypes.has(req) && !existingArtifactTypes.has(req)) {
+                methodPackWarnings.push(`Method pack requires artifact "${req}" which was not found`);
+              }
+            }
+          }
+        }
+      }
+
+      // Update gate request (include method pack warnings in verdict)
+      const verdictPayload = input.verdict
+        ? { ...input.verdict, methodPackWarnings }
+        : { passed: input.passed, methodPackWarnings };
       await db.update(pmtGateRequests).set({
         status: newStatus,
         evaluatedBy: ctx.user.id,
         evaluatedAt: new Date(),
-        verdict: input.verdict || { passed: input.passed },
+        verdict: verdictPayload,
         reason: input.reason,
       }).where(eq(pmtGateRequests.id, input.gateRequestId));
 
       // Determine state transition based on gate result
-      const gateReq = rows[0];
       const project = await db.select().from(projects)
         .where(eq(projects.id, gateReq.projectId))
         .limit(1);
@@ -567,7 +782,7 @@ const shellGatesRouter = router({
         });
       }
 
-      return { success: true, gateStatus: newStatus, newProjectState: targetState };
+      return { success: true, gateStatus: newStatus, newProjectState: targetState, methodPackWarnings };
     }),
 
   waive: protectedProcedure

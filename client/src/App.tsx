@@ -104,6 +104,7 @@ const ShellNewPage = lazy(() => import("@/pages/pm-central/ShellNewPage"));
 const InboxPage = lazy(() => import("@/pages/pm-central/InboxPage"));
 const WizardPage = lazy(() => import("@/pages/pm-central/WizardPage"));
 const MethodesPage = lazy(() => import("@/pages/pm-central/MethodesPage"));
+const ShellClonePage = lazy(() => import("@/pages/pm-central/ShellClonePage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -279,7 +280,8 @@ function Router() {
       <Route path="/run-console" component={() => <ProtectedRoute component={RunConsolePage} />} />
       {/* Collaboration */}
       <Route path="/collaboration" component={() => <ProtectedRoute component={CollaborationPage} />} />
-      {/* PM Central — Project creation + inbox (must be before :id catch-all) */}
+      {/* PM Central — Project creation, clone + inbox (must be before :id catch-all) */}
+      <Route path="/pm-central/shell/clone/:sourceId" component={() => <ProtectedRoute component={ShellClonePage} />} />
       <Route path="/pm-central/shell/new" component={() => <ProtectedRoute component={ShellNewPage} />} />
       <Route path="/pm-central/inbox" component={() => <ProtectedRoute component={InboxPage} />} />
       {/* PM Central — Méthodes (nested routes before generic :item catch-all) */}
