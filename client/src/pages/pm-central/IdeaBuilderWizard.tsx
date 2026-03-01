@@ -56,6 +56,7 @@ export default function IdeaBuilderWizard() {
   const [runId, setRunId] = useState<number | null>(null);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [projectName, setProjectName] = useState("");
+  const [launchError, setLaunchError] = useState<string | null>(null);
 
   const launchMut = trpc.modules.pmt.shell.ideaBuilder.launch.useMutation();
   const commitMut = trpc.modules.pmt.shell.ideaBuilder.commit.useMutation();
@@ -83,6 +84,7 @@ export default function IdeaBuilderWizard() {
   }, [step, run]);
 
   async function handleLaunch() {
+    setLaunchError(null);
     try {
       const result = await launchMut.mutateAsync({
         ideaText,
@@ -96,7 +98,7 @@ export default function IdeaBuilderWizard() {
       setProjectName(result.projectName);
       setStep(4);
     } catch (err: any) {
-      console.error("Launch failed:", err.message);
+      setLaunchError(err.message || "Launch failed. Please try again.");
     }
   }
 
@@ -469,6 +471,16 @@ export default function IdeaBuilderWizard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Launch Error */}
+        {launchError && step === 3 && (
+          <Card className="border-red-500/30 bg-red-500/5">
+            <CardContent className="py-3 px-4 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+              <div className="text-sm text-red-400 min-w-0 break-words">{launchError}</div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Navigation Buttons */}
         {step <= 3 && (
