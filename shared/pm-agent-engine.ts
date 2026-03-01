@@ -201,6 +201,15 @@ export const CATALOG_BINDINGS: CatalogBinding[] = [
     phases_allowed: ["planning"],
     enforcement_overlay: ENFORCEMENT_OVERLAY,
   },
+  {
+    alias: "idea_to_pmi_builder",
+    catalog_id: "catalog.ai.agent.pm.idea_to_pmi_builder",
+    pinned_digest: "sha256:idea_builder_v1_2026030100",
+    display_name: "Idea-to-PMI Builder",
+    description: "Converts a textual idea into complete PMI project artifacts",
+    phases_allowed: ["draft_shell", "initiating", "planning"],
+    enforcement_overlay: ENFORCEMENT_OVERLAY,
+  },
 ];
 
 // ── Hardcoded Agent Packs ───────────────────────────────────────────────────
@@ -235,6 +244,14 @@ export const AGENT_PACKS: AgentPack[] = [
     name: "Risk Deep Dive",
     description: "Comprehensive risk analysis for high-risk projects",
     agents: ["risk_screener", "risk_analyst"],
+    trigger: "manual",
+    policies: { require_human_commit: true, forbid_gate_actions: true, forbid_state_transitions: true },
+  },
+  {
+    id: "idea_to_pmi_full_build",
+    name: "Idea-to-PMI Full Build",
+    description: "Complete PMI artifact generation from a textual project idea",
+    agents: ["idea_to_pmi_builder"],
     trigger: "manual",
     policies: { require_human_commit: true, forbid_gate_actions: true, forbid_state_transitions: true },
   },
@@ -283,6 +300,21 @@ export const DAG_TEMPLATES: Record<string, DagNode[]> = {
     makeNode("resolve_bindings", "_system", []),
     makeNode("risk_screener", "risk_screener", ["resolve_bindings"]),
     makeNode("risk_analyst", "risk_analyst", ["risk_screener"]),
+  ],
+  idea_to_pmi_build: [
+    makeNode("resolve_bindings", "_system", []),
+    makeNode("scope_builder", "idea_to_pmi_builder", ["resolve_bindings"]),
+    makeNode("charter_builder", "idea_to_pmi_builder", ["scope_builder"]),
+    makeNode("stakeholder_register", "idea_to_pmi_builder", ["resolve_bindings"]),
+    makeNode("wbs_generator", "idea_to_pmi_builder", ["scope_builder"]),
+    makeNode("schedule_builder", "idea_to_pmi_builder", ["wbs_generator"]),
+    makeNode("cost_estimator", "idea_to_pmi_builder", ["schedule_builder"]),
+    makeNode("risk_register", "idea_to_pmi_builder", ["scope_builder"]),
+    makeNode("communications_plan", "idea_to_pmi_builder", ["stakeholder_register"]),
+    makeNode("quality_plan", "idea_to_pmi_builder", ["scope_builder"]),
+    makeNode("change_control_plan", "idea_to_pmi_builder", ["scope_builder"]),
+    makeNode("gate_readiness", "idea_to_pmi_builder", ["charter_builder", "wbs_generator", "schedule_builder", "cost_estimator", "risk_register", "communications_plan", "quality_plan", "change_control_plan"]),
+    makeNode("compile_evidence", "_system", ["gate_readiness"]),
   ],
 };
 

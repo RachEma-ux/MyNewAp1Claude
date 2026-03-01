@@ -13,6 +13,7 @@ import TemplatesPanel from "./pm-central/TemplatesPanel";
 import MethodesPage from "./pm-central/MethodesPage";
 import AgentEnginePanel from "./pm-central/AgentEnginePanel";
 import AgentRunDetailPanel from "./pm-central/AgentRunDetailPanel";
+import IdeaBuilderWizard from "./pm-central/IdeaBuilderWizard";
 
 export default function PMCentralPage() {
   const [, params] = useRoute("/pm-central/:item");
@@ -45,6 +46,8 @@ export default function PMCentralPage() {
       return <TemplatesPanel defaultTab="examples" />;
     case "agent-engine":
       return <AgentEnginePanel />;
+    case "idea-builder":
+      return <IdeaBuilderWizard />;
     case "projects":
       return <DashboardPanel />;
     default:

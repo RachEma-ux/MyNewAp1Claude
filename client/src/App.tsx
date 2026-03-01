@@ -106,6 +106,7 @@ const WizardPage = lazy(() => import("@/pages/pm-central/WizardPage"));
 const MethodesPage = lazy(() => import("@/pages/pm-central/MethodesPage"));
 const ShellClonePage = lazy(() => import("@/pages/pm-central/ShellClonePage"));
 const AgentRunDetailPanel = lazy(() => import("@/pages/pm-central/AgentRunDetailPanel"));
+const IdeaBuilderWizard = lazy(() => import("@/pages/pm-central/IdeaBuilderWizard"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -300,6 +301,7 @@ function Router() {
       <Route path="/pm-central/project/:id" component={() => <ProtectedRoute component={ProjectPage} />} />
       {/* PM Central — Agent Engine run detail (must be before :item catch-all) */}
       <Route path="/pm-central/agent-engine/run/:id" component={() => <ProtectedRoute component={AgentRunDetailPanel} />} />
+      <Route path="/pm-central/idea-builder" component={() => <ProtectedRoute component={IdeaBuilderWizard} />} />
       {/* PM Central — Top-level views */}
       <Route path="/pm-central/:item" component={() => <ProtectedRoute component={PMCentralPage} />} />
       <Route path="/pm-central" component={() => <ProtectedRoute component={PMCentralPage} />} />

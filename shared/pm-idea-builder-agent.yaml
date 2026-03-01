@@ -1,0 +1,484 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Idea-to-PMI Project Builder Agent — Full Enterprise Specification
+#
+# AI Types Agent Definition + Catalog Entry + PM Central Binding + Run Plan DAG
+# + Enforcement Overlay + Security Config + Testing Spec
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: "1.0"
+schema: ai_types_agent_enterprise_definition
+
+# ─── 1. AI TYPES AGENT DEFINITION ────────────────────────────────────────────
+
+agent:
+  id: "ai.agent.pm.idea_to_pmi_builder.v1"
+  name: "Idea-to-PMI Project Builder"
+  domain: pm_central
+  version: "1.0.0"
+  status: active
+  description: >
+    Converts a textual project idea into a complete set of PMI-compliant
+    project management artifacts: Project Charter, WBS, Schedule Baseline,
+    Cost Baseline, Risk Register, Communications Plan, Quality Plan,
+    Change Control Plan, Stakeholder Register, and Gate Readiness Report.
+    All outputs are draft-only and require explicit human commit.
+
+  layer: agent  # Provider → LLM → Model → Agent → Bot
+
+  runtime:
+    provider_ref: "catalog.ai.provider.template_engine.v1"
+    execution_mode: sequential
+    timeout_seconds: 120
+    max_retries: 0
+    idempotent: true
+
+  capabilities:
+    allowed:
+      - draft_generation
+      - artifact_validation
+      - readiness_assessment
+      - cross_artifact_consistency_check
+      - evidence_emission
+      - audit_event_emission
+    forbidden:
+      - gate_submit
+      - gate_approve
+      - gate_reject
+      - gate_waive
+      - state_transition
+      - baseline_lock
+      - baseline_unlock
+      - freeze
+      - unfreeze
+      - artifact_write_canonical
+      - admin_override
+      - external_export
+      - user_impersonation
+      - secret_access
+      - database_direct_write
+
+  output_contracts:
+    scope_statement:
+      format: json
+      schema_ref: "#/artifact_schemas/scope_statement"
+      requires_human_review: true
+    project_charter:
+      format: json
+      schema_ref: "#/artifact_schemas/project_charter"
+      requires_human_review: true
+    stakeholder_register:
+      format: json
+      schema_ref: "#/artifact_schemas/stakeholder_register"
+      requires_human_review: true
+    wbs:
+      format: json
+      schema_ref: "#/artifact_schemas/wbs"
+      requires_human_review: true
+    schedule_baseline:
+      format: json
+      schema_ref: "#/artifact_schemas/schedule_baseline"
+      requires_human_review: true
+    cost_baseline:
+      format: json
+      schema_ref: "#/artifact_schemas/cost_baseline"
+      requires_human_review: true
+    risk_register:
+      format: json
+      schema_ref: "#/artifact_schemas/risk_register"
+      requires_human_review: true
+    communications_plan:
+      format: json
+      schema_ref: "#/artifact_schemas/communications_plan"
+      requires_human_review: true
+    quality_plan:
+      format: json
+      schema_ref: "#/artifact_schemas/quality_plan"
+      requires_human_review: true
+    change_control_plan:
+      format: json
+      schema_ref: "#/artifact_schemas/change_control_plan"
+      requires_human_review: true
+    gate_readiness_report:
+      format: json
+      schema_ref: "#/artifact_schemas/gate_readiness_report"
+      requires_human_review: true
+
+  phase_restrictions:
+    allowed_phases:
+      - draft_shell
+      - initiating
+      - planning
+    forbidden_phases:
+      - executing
+      - monitoring
+      - closing
+
+  policy_profile: enterprise_hardened
+  data_tier: internal
+  risk_tier: medium
+
+# ─── 2. CATALOG PUBLICATION ENTRY ────────────────────────────────────────────
+
+catalog_entry:
+  catalog_id: "catalog.ai.agent.pm.idea_to_pmi_builder"
+  entry_type: agent
+  name: "Idea-to-PMI Project Builder"
+  version: "1.0.0"
+  pinned_digest: "sha256:idea_builder_v1_2026030100"
+  status: active
+  allowed_modules:
+    - pm_central
+  publisher: "system"
+  immutable_after_publish: true
+  version_history:
+    - version: "1.0.0"
+      digest: "sha256:idea_builder_v1_2026030100"
+      published_at: "2026-03-01T00:00:00Z"
+      changelog: "Initial release — template-based PMI artifact generation"
+
+# ─── 3. PM CENTRAL BINDING ───────────────────────────────────────────────────
+
+pm_central_binding:
+  alias: "idea_to_pmi_builder"
+  catalog_id: "catalog.ai.agent.pm.idea_to_pmi_builder"
+  pinned_digest: "sha256:idea_builder_v1_2026030100"
+  display_name: "Idea-to-PMI Builder"
+  description: "Converts a textual idea into complete PMI project artifacts"
+  phases_allowed:
+    - draft_shell
+    - initiating
+    - planning
+  enforcement_overlay:
+    deny:
+      - gate_submit
+      - gate_approve
+      - gate_reject
+      - gate_waive
+      - state_transition
+      - baseline_lock
+      - baseline_unlock
+      - freeze
+      - unfreeze
+      - artifact_write_canonical
+    require_human_review: true
+    max_execution_time_seconds: 120
+    data_tier_guard: internal
+    no_admin_override: true
+    no_external_export: true
+
+# ─── 4. AGENT PACK ───────────────────────────────────────────────────────────
+
+pack:
+  id: "idea_to_pmi_full_build"
+  name: "Idea-to-PMI Full Build"
+  description: "Complete PMI artifact generation from a textual project idea"
+  agents:
+    - idea_to_pmi_builder
+  trigger: manual
+  policies:
+    require_human_commit: true
+    forbid_gate_actions: true
+    forbid_state_transitions: true
+    forbid_baseline_lock: true
+    strict_timeout: true
+    timeout_seconds: 120
+
+# ─── 5. RUN PLAN DAG ─────────────────────────────────────────────────────────
+
+dag_template:
+  id: "idea_to_pmi_build"
+  description: "Full PMI artifact generation from idea input"
+
+  input_schema:
+    required:
+      - idea_text
+    optional:
+      - budget_envelope
+      - deadline
+      - risk_tier
+      - methodology
+
+  nodes:
+    - id: resolve_bindings
+      agent_alias: "_system"
+      depends_on: []
+      description: "Validate catalog binding and enforcement overlay"
+
+    - id: scope_builder
+      agent_alias: idea_to_pmi_builder
+      depends_on: [resolve_bindings]
+      artifact_output: scope_statement
+      description: "Generate project scope statement from idea"
+
+    - id: charter_builder
+      agent_alias: idea_to_pmi_builder
+      depends_on: [scope_builder]
+      artifact_output: project_charter
+      description: "Generate project charter from scope + idea"
+
+    - id: stakeholder_register
+      agent_alias: idea_to_pmi_builder
+      depends_on: [resolve_bindings]
+      artifact_output: stakeholder_register
+      description: "Generate stakeholder register from idea context"
+
+    - id: wbs_generator
+      agent_alias: idea_to_pmi_builder
+      depends_on: [scope_builder]
+      artifact_output: wbs
+      description: "Generate full WBS with all levels from scope"
+
+    - id: schedule_builder
+      agent_alias: idea_to_pmi_builder
+      depends_on: [wbs_generator]
+      artifact_output: schedule_baseline
+      description: "Generate schedule baseline from WBS"
+
+    - id: cost_estimator
+      agent_alias: idea_to_pmi_builder
+      depends_on: [schedule_builder]
+      artifact_output: cost_baseline
+      description: "Generate cost baseline from schedule + WBS"
+
+    - id: risk_register
+      agent_alias: idea_to_pmi_builder
+      depends_on: [scope_builder, wbs_generator]
+      artifact_output: risk_register
+      description: "Generate risk register from scope and WBS"
+
+    - id: communications_plan
+      agent_alias: idea_to_pmi_builder
+      depends_on: [stakeholder_register]
+      artifact_output: communications_plan
+      description: "Generate communications plan from stakeholders"
+
+    - id: quality_plan
+      agent_alias: idea_to_pmi_builder
+      depends_on: [scope_builder]
+      artifact_output: quality_plan
+      description: "Generate quality plan from scope"
+
+    - id: change_control_plan
+      agent_alias: idea_to_pmi_builder
+      depends_on: [resolve_bindings]
+      artifact_output: change_control_plan
+      description: "Generate change control plan"
+
+    - id: gate_readiness
+      agent_alias: idea_to_pmi_builder
+      depends_on:
+        - scope_builder
+        - charter_builder
+        - stakeholder_register
+        - wbs_generator
+        - schedule_builder
+        - cost_estimator
+        - risk_register
+        - communications_plan
+        - quality_plan
+        - change_control_plan
+      artifact_output: gate_readiness_report
+      description: "Validate gate readiness across all artifacts"
+
+    - id: compile_evidence
+      agent_alias: "_system"
+      depends_on: [gate_readiness]
+      description: "Compile evidence pack with all draft digests"
+
+  validation_checks:
+    pre_run:
+      - idea_text_not_empty
+      - idea_text_min_length_20
+      - risk_tier_valid_if_provided
+      - budget_envelope_positive_if_provided
+    post_run:
+      - all_artifacts_generated
+      - cross_artifact_consistency
+      - schema_validation_all_pass
+      - no_governance_violations
+
+  cross_artifact_consistency:
+    - scope_deliverables_in_wbs
+    - wbs_tasks_in_schedule
+    - schedule_costs_in_budget
+    - risks_reference_valid_wbs_nodes
+    - stakeholders_in_communications_plan
+    - charter_scope_matches_scope_statement
+
+  failure_policy:
+    on_node_failure: skip_dependents
+    on_validation_failure: mark_run_failed
+    on_governance_violation: abort_immediately
+    emit_audit_on_failure: true
+
+  governance_overlay:
+    enforce_deny_list: true
+    enforce_human_commit: true
+    enforce_data_tier: true
+    enforce_timeout: true
+    emit_evidence: true
+
+# ─── 6. SECURITY & GOVERNANCE ENFORCEMENT ────────────────────────────────────
+
+security:
+  authentication: required
+  authorization: protectedProcedure
+  data_classification: internal
+  encryption_at_rest: platform_default
+  encryption_in_transit: tls
+
+  enforcement_rules:
+    - rule: deny_lifecycle_transition
+      action: state_transition
+      effect: deny
+      severity: blocker
+    - rule: deny_gate_submission
+      action: gate_submit
+      effect: deny
+      severity: blocker
+    - rule: deny_gate_approval
+      action: gate_approve
+      effect: deny
+      severity: blocker
+    - rule: deny_baseline_lock
+      action: baseline_lock
+      effect: deny
+      severity: blocker
+    - rule: deny_canonical_write
+      action: artifact_write_canonical
+      effect: deny
+      severity: blocker
+    - rule: deny_admin_override
+      action: admin_override
+      effect: deny
+      severity: blocker
+    - rule: deny_external_export
+      action: external_export
+      effect: deny
+      severity: blocker
+    - rule: enforce_timeout
+      action: execution
+      max_duration_seconds: 120
+      effect: abort
+      severity: critical
+    - rule: enforce_data_tier
+      data_tier: internal
+      effect: deny_if_exceeds
+      severity: blocker
+
+# ─── 7. TESTING SPECIFICATION ─────────────────────────────────────────────────
+
+testing:
+  dry_run:
+    enabled: true
+    description: "Execute full DAG without persisting to database"
+    validates:
+      - all_generators_produce_output
+      - all_schemas_valid
+      - cross_artifact_consistency
+      - governance_overlay_enforced
+
+  governance_simulation:
+    enabled: true
+    test_cases:
+      - name: deny_gate_submit
+        action: gate_submit
+        expected: denied
+      - name: deny_state_transition
+        action: state_transition
+        expected: denied
+      - name: deny_baseline_lock
+        action: baseline_lock
+        expected: denied
+      - name: deny_canonical_write
+        action: artifact_write_canonical
+        expected: denied
+      - name: deny_admin_override
+        action: admin_override
+        expected: denied
+
+  schema_validation:
+    test_all_artifact_types: true
+    test_required_fields: true
+    test_cross_references: true
+
+  performance:
+    max_runtime_seconds: 120
+    max_memory_mb: 256
+
+# ─── 8. UI WIZARD SPECIFICATION ──────────────────────────────────────────────
+
+wizard:
+  id: "idea_to_pmi_wizard"
+  name: "Idea-to-PMI Builder"
+  steps:
+    - step: 1
+      id: describe_idea
+      label: "Describe Your Idea"
+      fields:
+        - id: idea_text
+          type: textarea
+          label: "Project Idea"
+          placeholder: "Describe your project idea in detail..."
+          required: true
+          min_length: 20
+          max_length: 5000
+      validation: idea_text_not_empty
+
+    - step: 2
+      id: constraints
+      label: "Optional Constraints"
+      fields:
+        - id: budget_envelope
+          type: number
+          label: "Budget Envelope (USD)"
+          required: false
+          min: 0
+        - id: deadline
+          type: date
+          label: "Target Deadline"
+          required: false
+        - id: risk_tier
+          type: select
+          label: "Risk Tier"
+          required: false
+          options: [low, medium, high, critical]
+          default: medium
+
+    - step: 3
+      id: method_selection
+      label: "Select Methodology"
+      fields:
+        - id: methodology
+          type: select
+          label: "PM Methodology"
+          options: [predictive, agile, hybrid]
+          default: predictive
+          required: true
+
+    - step: 4
+      id: run_agent
+      label: "Generate Artifacts"
+      type: action
+      action: launch_idea_builder_run
+      shows: dag_progress_timeline
+
+    - step: 5
+      id: review_drafts
+      label: "Review Drafts"
+      type: review
+      shows: all_draft_artifacts
+      actions:
+        - commit_individual
+        - reject_individual
+        - commit_all
+        - reject_all
+
+    - step: 6
+      id: finalize
+      label: "Commit & Finalize"
+      type: summary
+      shows: commit_summary
+      actions:
+        - navigate_to_project
+        - launch_another

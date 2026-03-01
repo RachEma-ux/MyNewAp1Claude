@@ -208,6 +208,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, href: "/pm-central/reports" },
         { label: "Méthodes", icon: <BookOpen className="w-4 h-4" />, href: "/pm-central/methodes" },
         { label: "Agent Engine", icon: <Bot className="w-4 h-4" />, href: "/pm-central/agent-engine" },
+        { label: "Idea Builder", icon: <Bot className="w-4 h-4" />, href: "/pm-central/idea-builder" },
       ]
     },
     {

@@ -25,6 +25,7 @@ import { seedWorkspaceModules } from "../registry";
 import { toolsRouter } from "./tools-router";
 import { wizardRouter } from "./wizard-router";
 import { agentEngineRouter } from "./agent-engine-router";
+import { ideaBuilderRouter } from "./idea-builder-router";
 import {
   validateTransition, validateEvent, getAvailableTransitions,
   getAvailableEvents, inferEventFromTransition,
@@ -994,4 +995,5 @@ export const standaloneRouter = router({
   tools: toolsRouter,
   wizard: wizardRouter,
   agentEngine: agentEngineRouter,
+  ideaBuilder: ideaBuilderRouter,
 });
