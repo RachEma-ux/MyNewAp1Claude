@@ -123,6 +123,8 @@ const ORIGIN_COLORS: Record<string, string> = {
   api: "bg-cyan-600/20 text-cyan-400 border-cyan-600/30",
   connect: "bg-teal-600/20 text-teal-400 border-teal-600/30",
   import: "bg-indigo-600/20 text-indigo-400 border-indigo-600/30",
+  wizard: "bg-amber-600/20 text-amber-400 border-amber-600/30",
+  agent: "bg-rose-600/20 text-rose-400 border-rose-600/30",
 };
 
 /** Inline component to show classification badges for a table row */

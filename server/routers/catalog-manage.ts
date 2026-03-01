@@ -81,7 +81,7 @@ export function stopCatalogCleanup() {
 
 const entryTypeSchema = z.enum(["provider", "llm", "model", "agent", "bot"]);
 const statusSchema = z.enum(["draft", "active", "deprecated", "disabled"]);
-const originSchema = z.enum(["admin", "discovery", "api", "connect", "import"]);
+const originSchema = z.enum(["admin", "discovery", "api", "connect", "import", "wizard", "agent"]);
 const scopeSchema = z.enum(["app", "workspace", "org", "global"]);
 
 const createEntrySchema = z.object({

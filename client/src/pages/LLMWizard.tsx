@@ -731,6 +731,7 @@ function ReviewStep({ state, onSuccess }: { state: WizardState; onSuccess: () =>
   const createLLMMutation = trpc.llm.create.useMutation();
   const createVersionMutation = trpc.llm.createVersion.useMutation();
   const validatePolicyMutation = trpc.llm.validatePolicy.useMutation();
+  const catalogCreateMutation = trpc.catalogManage.create.useMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [policyResult, setPolicyResult] = useState<any>(null);
   const [showPolicyResults, setShowPolicyResults] = useState(false);
@@ -797,6 +798,19 @@ function ReviewStep({ state, onSuccess }: { state: WizardState; onSuccess: () =>
       });
 
       toast.success(`Version ${version.version} created in sandbox`);
+
+      // Register in catalog for governance lifecycle
+      try {
+        await catalogCreateMutation.mutateAsync({
+          name: state.identity.name,
+          displayName: state.identity.name,
+          description: state.identity.description || undefined,
+          entryType: "llm",
+          origin: "wizard",
+          tags: ["llm-quick-setup", "candidate"],
+          config: { llmId: llm.id, versionId: version.id, runtime: state.configuration.runtime, model: state.configuration.model },
+        });
+      } catch { /* catalog registration is non-blocking */ }
 
       // Success!
       onSuccess();

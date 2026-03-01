@@ -233,6 +233,7 @@ export default function LLMCreationWizard() {
 
   const createProjectMutation = trpc.llm.createCreationProject.useMutation();
   const createDatasetMutation = trpc.llm.createDataset.useMutation();
+  const catalogCreateMutation = trpc.catalogManage.create.useMutation();
 
   // Load draft from localStorage on mount
   useEffect(() => {
@@ -337,6 +338,20 @@ export default function LLMCreationWizard() {
       });
 
       toast.success("LLM creation project started!");
+
+      // Register in catalog for governance lifecycle
+      try {
+        await catalogCreateMutation.mutateAsync({
+          name: project.name.trim(),
+          displayName: project.name.trim(),
+          description: project.description || undefined,
+          entryType: "llm",
+          origin: "wizard",
+          tags: ["llm-creation", "candidate", project.path || "PATH_A"],
+          config: { projectId: createdProject.id, target: project.target, baseModel: project.baseModel },
+        });
+      } catch { /* catalog registration is non-blocking */ }
+
       localStorage.removeItem(DRAFT_KEY);
       setLocation("/llm");
     } catch (error: any) {
