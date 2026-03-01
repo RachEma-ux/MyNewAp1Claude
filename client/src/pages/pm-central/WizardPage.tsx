@@ -27,7 +27,7 @@ import {
   Loader2, Send, AlertTriangle, FileText, Users, Shield,
   Target, ClipboardList, Calendar, DollarSign, Award,
   UserCheck, MessageSquare, ShieldAlert, ShoppingCart,
-  Handshake, Milestone, Wand2, Package,
+  Handshake, Milestone, Wand2, Package, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import {
   INITIATING_STEPS, PLANNING_STEPS, ALL_WIZARD_STEPS,
@@ -86,6 +86,7 @@ export default function WizardPage() {
 
   const [wizardData, setWizardData] = useState<WizardData | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Load wizard data from server
   useEffect(() => {
@@ -184,82 +185,134 @@ export default function WizardPage() {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] -mx-6 -mt-6">
-      {/* Left stepper panel */}
-      <div className="w-72 border-r bg-muted/30 flex flex-col">
-        {/* Phase tabs */}
-        <div className="flex border-b">
+      {/* Left stepper panel — collapsible */}
+      <div className={`border-r bg-muted/30 flex flex-col transition-all duration-200 ${sidebarOpen ? "w-72" : "w-12"}`}>
+        {/* Collapse toggle */}
+        <div className={`flex items-center border-b ${sidebarOpen ? "justify-end px-2 py-1.5" : "justify-center py-1.5"}`}>
           <button
-            className={`flex-1 py-2.5 text-xs font-medium text-center ${isPhaseA ? "bg-background border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => goToStep("start")}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
-            Phase A: Initiating
-          </button>
-          <button
-            className={`flex-1 py-2.5 text-xs font-medium text-center ${!isPhaseA ? "bg-background border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => goToStep("planning-setup")}
-          >
-            Phase B: Planning
+            {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
           </button>
         </div>
 
-        {/* Steps list */}
-        <ScrollArea className="flex-1">
-          <div className="p-2 space-y-0.5">
-            {activeSteps.map((step) => {
-              const isActive = step.id === stepParam;
-              const isComplete = completedSteps.includes(step.id);
-              const isLocked = step.conditional && !(wizardData as any)[step.conditional];
+        {sidebarOpen ? (
+          <>
+            {/* Phase tabs */}
+            <div className="flex border-b">
+              <button
+                className={`flex-1 py-2.5 text-xs font-medium text-center ${isPhaseA ? "bg-background border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => goToStep("start")}
+              >
+                Phase A: Initiating
+              </button>
+              <button
+                className={`flex-1 py-2.5 text-xs font-medium text-center ${!isPhaseA ? "bg-background border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => goToStep("planning-setup")}
+              >
+                Phase B: Planning
+              </button>
+            </div>
 
-              return (
-                <button
-                  key={step.id}
-                  onClick={() => !isLocked && goToStep(step.id)}
-                  disabled={!!isLocked}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-left text-sm transition-colors ${
-                    isActive
-                      ? "bg-primary/10 text-primary font-medium"
-                      : isComplete
-                      ? "text-foreground hover:bg-muted"
-                      : isLocked
-                      ? "text-muted-foreground/50 cursor-not-allowed"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  {/* Status icon */}
-                  <span className="shrink-0">
-                    {isLocked ? (
-                      <Lock className="h-3.5 w-3.5" />
-                    ) : isComplete ? (
-                      <Check className="h-3.5 w-3.5 text-green-500" />
-                    ) : isActive ? (
-                      <Circle className="h-3.5 w-3.5 fill-primary text-primary" />
+            {/* Steps list */}
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-0.5">
+                {activeSteps.map((step) => {
+                  const isActive = step.id === stepParam;
+                  const isComplete = completedSteps.includes(step.id);
+                  const isLocked = step.conditional && !(wizardData as any)[step.conditional];
+
+                  return (
+                    <button
+                      key={step.id}
+                      onClick={() => !isLocked && goToStep(step.id)}
+                      disabled={!!isLocked}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-left text-sm transition-colors ${
+                        isActive
+                          ? "bg-primary/10 text-primary font-medium"
+                          : isComplete
+                          ? "text-foreground hover:bg-muted"
+                          : isLocked
+                          ? "text-muted-foreground/50 cursor-not-allowed"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      {/* Status icon */}
+                      <span className="shrink-0">
+                        {isLocked ? (
+                          <Lock className="h-3.5 w-3.5" />
+                        ) : isComplete ? (
+                          <Check className="h-3.5 w-3.5 text-green-500" />
+                        ) : isActive ? (
+                          <Circle className="h-3.5 w-3.5 fill-primary text-primary" />
+                        ) : (
+                          <Circle className="h-3.5 w-3.5" />
+                        )}
+                      </span>
+
+                      {/* Step icon + label */}
+                      <span className="shrink-0 opacity-60">{STEP_ICONS[step.id]}</span>
+                      <span className="truncate">{step.shortLabel}</span>
+
+                      {/* Gate badge */}
+                      {step.isGateStep && (
+                        <Badge variant="outline" className="ml-auto text-[10px] px-1 py-0">
+                          {step.gateId}
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+
+            {/* Project status */}
+            <div className="border-t p-3">
+              <div className="text-xs text-muted-foreground">
+                Status: <Badge variant="outline" className="text-[10px] ml-1">{wizardQuery.data?.projectStatus || "draft_shell"}</Badge>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* Collapsed: icon-only step indicators */
+          <ScrollArea className="flex-1">
+            <div className="py-2 space-y-1 flex flex-col items-center">
+              {activeSteps.map((step) => {
+                const isActive = step.id === stepParam;
+                const isComplete = completedSteps.includes(step.id);
+                const isLocked = step.conditional && !(wizardData as any)[step.conditional];
+
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => !isLocked && goToStep(step.id)}
+                    disabled={!!isLocked}
+                    title={step.shortLabel}
+                    className={`p-1.5 rounded-md transition-colors ${
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : isComplete
+                        ? "text-green-500 hover:bg-muted"
+                        : isLocked
+                        ? "text-muted-foreground/30 cursor-not-allowed"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    {isComplete ? (
+                      <Check className="h-4 w-4" />
+                    ) : isLocked ? (
+                      <Lock className="h-4 w-4" />
                     ) : (
-                      <Circle className="h-3.5 w-3.5" />
+                      <span className="opacity-80">{STEP_ICONS[step.id] || <Circle className="h-4 w-4" />}</span>
                     )}
-                  </span>
-
-                  {/* Step icon + label */}
-                  <span className="shrink-0 opacity-60">{STEP_ICONS[step.id]}</span>
-                  <span className="truncate">{step.shortLabel}</span>
-
-                  {/* Gate badge */}
-                  {step.isGateStep && (
-                    <Badge variant="outline" className="ml-auto text-[10px] px-1 py-0">
-                      {step.gateId}
-                    </Badge>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </ScrollArea>
-
-        {/* Project status */}
-        <div className="border-t p-3">
-          <div className="text-xs text-muted-foreground">
-            Status: <Badge variant="outline" className="text-[10px] ml-1">{wizardQuery.data?.projectStatus || "draft_shell"}</Badge>
-          </div>
-        </div>
+                  </button>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        )}
       </div>
 
       {/* Main form area */}
