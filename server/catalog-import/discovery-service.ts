@@ -79,36 +79,77 @@ async function fetchOpenAIModels(baseUrl: string, apiKey?: string): Promise<RawM
 }
 
 async function fetchOllamaModels(baseUrl: string): Promise<RawModel[]> {
-  const url = `${baseUrl.replace(/\/$/, "")}/api/tags`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw new Error(`Ollama API returned ${res.status}: ${res.statusText}`);
+  const base = baseUrl.replace(/\/$/, "");
 
-  const text = await res.text();
-  let body: any;
+  // Strategy 1: Try native Ollama /api/tags endpoint
+  let models: RawModel[] = [];
+  let ollamaReachable = false;
+
   try {
-    body = JSON.parse(text);
-  } catch {
-    // Ollama sometimes returns NDJSON or extra whitespace — try first line
-    const firstLine = text.split("\n").find((l) => l.trim().startsWith("{"));
-    if (firstLine) {
-      body = JSON.parse(firstLine);
-    } else {
-      throw new Error(`Ollama returned invalid JSON: ${text.slice(0, 200)}`);
+    const res = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(15000) });
+    ollamaReachable = true;
+    if (res.ok) {
+      const text = await res.text();
+      let body: any;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        const firstLine = text.split("\n").find((l) => l.trim().startsWith("{"));
+        if (firstLine) body = JSON.parse(firstLine);
+      }
+      if (body?.models?.length > 0) {
+        models = (body.models as any[]).map((m: any) => ({
+          id: m.name || m.model,
+          name: m.name || m.model,
+          description: m.details
+            ? `${m.details.family || "unknown"} · ${m.details.parameter_size || "?"} · ${m.details.quantization_level || "?"}`
+            : undefined,
+          metadata: {
+            size: m.size,
+            digest: m.digest,
+            modified_at: m.modified_at,
+            details: m.details,
+          },
+        }));
+        return models;
+      }
     }
+  } catch {
+    // /api/tags failed — try fallback
   }
-  const models = (body.models || []) as any[];
 
-  return models.map((m: any) => ({
-    id: m.name || m.model,
-    name: m.name || m.model,
-    description: m.details?.family ? `Family: ${m.details.family}` : undefined,
-    metadata: {
-      size: m.size,
-      digest: m.digest,
-      modified_at: m.modified_at,
-      details: m.details,
-    },
-  }));
+  // Strategy 2: Try OpenAI-compatible /v1/models (Ollama 0.1.24+ supports this)
+  try {
+    const res = await fetch(`${base}/v1/models`, { signal: AbortSignal.timeout(10000) });
+    ollamaReachable = true;
+    if (res.ok) {
+      const body = await res.json();
+      const data = (body.data || []) as any[];
+      if (data.length > 0) {
+        return data.map((m: any) => ({
+          id: m.id,
+          name: m.id,
+          description: m.owned_by ? `Owned by ${m.owned_by}` : undefined,
+          metadata: { owned_by: m.owned_by, created: m.created },
+        }));
+      }
+    }
+  } catch {
+    // /v1/models also failed
+  }
+
+  // Strategy 3: Check /api/version to confirm it's Ollama
+  if (!ollamaReachable) {
+    try {
+      const res = await fetch(`${base}/api/version`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) ollamaReachable = true;
+    } catch { /* not reachable */ }
+  }
+
+  if (ollamaReachable) {
+    throw new Error(`Ollama is running at ${base} but has no models installed. Pull a model first: ollama pull llama3.2`);
+  }
+  throw new Error(`Cannot connect to Ollama at ${base}. Ensure Ollama is running.`);
 }
 
 // ============================================================================
@@ -192,15 +233,20 @@ export async function discoverFromApiUrl(
       rawModels = await fetchOpenAIModels(baseUrl, apiKey);
     }
   } catch (e: any) {
-    // If OpenAI format fails, try Ollama as fallback
-    if (providerType === "openai" || providerType === "unknown") {
+    // If primary format fails, try the other format as fallback
+    if (providerType !== "ollama") {
       try {
         rawModels = await fetchOllamaModels(baseUrl);
-      } catch {
+      } catch (e2: any) {
+        // Prefer the Ollama error if it mentions "running but no models" (more informative)
+        const ollamaMsg = e2.message || "";
+        if (ollamaMsg.includes("running") || ollamaMsg.includes("no models")) {
+          throw new Error(ollamaMsg);
+        }
         throw new Error(`Failed to discover models from ${baseUrl}: ${e.message}`);
       }
     } else {
-      throw new Error(`Failed to discover models from ${baseUrl}: ${e.message}`);
+      throw new Error(e.message);
     }
   }
 
