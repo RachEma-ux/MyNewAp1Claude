@@ -337,22 +337,24 @@ export default function WizardPage() {
         </div>
 
         {/* Form content */}
-        <ScrollArea className="flex-1 p-6">
-          <div className="max-w-3xl mx-auto">
-            <StepForm
-              step={currentStep}
-              data={wizardData}
-              updateField={updateField}
-              onSubmitG0={handleSubmitG0}
-              onSubmitG1={handleSubmitG1}
-              isSubmittingG0={submitG0.isPending}
-              isSubmittingG1={submitG1.isPending}
-              submitG0Error={submitG0.error?.message}
-              submitG1Error={submitG1.error?.message}
-              submitG0Success={submitG0.isSuccess}
-              submitG1Success={submitG1.isSuccess}
-              methodPack={methodPack}
-            />
+        <ScrollArea className="flex-1">
+          <div className="p-6">
+            <div className="max-w-3xl mx-auto pb-4">
+              <StepForm
+                step={currentStep}
+                data={wizardData}
+                updateField={updateField}
+                onSubmitG0={handleSubmitG0}
+                onSubmitG1={handleSubmitG1}
+                isSubmittingG0={submitG0.isPending}
+                isSubmittingG1={submitG1.isPending}
+                submitG0Error={submitG0.error?.message}
+                submitG1Error={submitG1.error?.message}
+                submitG0Success={submitG0.isSuccess}
+                submitG1Success={submitG1.isSuccess}
+                methodPack={methodPack}
+              />
+            </div>
           </div>
         </ScrollArea>
 
