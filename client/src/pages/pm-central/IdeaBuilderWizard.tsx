@@ -128,7 +128,7 @@ export default function IdeaBuilderWizard() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6 overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3">
           <Bot className="h-7 w-7 text-primary" />
@@ -141,11 +141,11 @@ export default function IdeaBuilderWizard() {
         </div>
 
         {/* Step Indicator */}
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {STEPS.map((s, i) => (
             <div key={s.id} className="flex items-center">
               <div
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-colors shrink-0 ${
                   s.id === step
                     ? "bg-primary text-primary-foreground"
                     : s.id < step
@@ -157,15 +157,15 @@ export default function IdeaBuilderWizard() {
                 <span className="hidden sm:inline">{s.label}</span>
               </div>
               {i < STEPS.length - 1 && (
-                <ChevronRight className="h-4 w-4 text-muted-foreground mx-1" />
+                <ChevronRight className="h-3 w-3 text-muted-foreground mx-0.5" />
               )}
             </div>
           ))}
         </div>
 
         {/* Step Content */}
-        <Card>
-          <CardContent className="py-6 px-6">
+        <Card className="overflow-hidden">
+          <CardContent className="py-4 px-4 sm:py-6 sm:px-6">
             {/* Step 1: Describe Idea */}
             {step === 1 && (
               <div className="space-y-4">
@@ -353,10 +353,10 @@ export default function IdeaBuilderWizard() {
             {/* Step 5: Review Drafts */}
             {step === 5 && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
                     <h2 className="text-lg font-semibold flex items-center gap-2">
-                      <FileSearch className="h-5 w-5" />
+                      <FileSearch className="h-5 w-5 shrink-0" />
                       Review Draft Artifacts
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
@@ -367,7 +367,7 @@ export default function IdeaBuilderWizard() {
                     <Button
                       onClick={handleCommitAll}
                       disabled={commitAllMut.isPending}
-                      className="gap-1.5"
+                      className="gap-1.5 shrink-0"
                     >
                       <Check className="h-4 w-4" />
                       Commit All ({pendingDrafts.length})
@@ -530,16 +530,16 @@ function DraftReviewCard({
   const label = (draft.artifactType as string).replace(/_/g, " ");
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-3">
           <CollapsibleTrigger asChild>
-            <button className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors">
-              {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              <span className="capitalize">{label}</span>
+            <button className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors min-w-0">
+              {expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+              <span className="capitalize truncate">{label}</span>
             </button>
           </CollapsibleTrigger>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
             <AgentBadge
               variant={
                 draft.commitStatus === "committed" ? "committed"
@@ -560,8 +560,8 @@ function DraftReviewCard({
           </div>
         </div>
         <CollapsibleContent>
-          <div className="px-4 pb-3 border-t pt-3">
-            <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-80 overflow-y-auto">
+          <div className="px-3 sm:px-4 pb-3 border-t pt-3">
+            <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap break-words">
               {JSON.stringify(content, null, 2)}
             </pre>
           </div>
