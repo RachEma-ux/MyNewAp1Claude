@@ -140,6 +140,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           icon: <Bot className="w-4 h-4" />,
           children: [
             { label: "Manage", icon: <Settings className="w-3 h-3" />, href: "/agents" },
+            { label: "Agent Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/agents/wizard" },
             { label: "Approvals", icon: <Activity className="w-3 h-3" />, href: "/promotion-requests" },
             { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/agent-dashboard" },
             { label: "Drift Detection", icon: <Activity className="w-3 h-3" />, href: "/drift-detection" },

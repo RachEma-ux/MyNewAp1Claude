@@ -210,6 +210,7 @@ function Router() {
         <Route path="/templates" component={() => <ProtectedRoute component={TemplatesPage} />} />
         <Route path="/agents" component={() => <ProtectedRoute component={AgentsPage} />} />
         <Route path="/agents/create" component={() => <ProtectedRoute component={AgentsPage} />} />
+      <Route path="/agents/wizard" component={() => <ProtectedRoute component={AgentsPage} />} />
         <Route path="/agents/:id" component={() => <ProtectedRoute component={AgentDetailPage} />} />
         <Route path="/agent-dashboard" component={() => <ProtectedRoute component={AgentDashboardPage} />} />
         <Route path="/protocols" component={() => <ProtectedRoute component={ProtocolsPage} />} />

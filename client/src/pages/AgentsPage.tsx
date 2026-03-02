@@ -20,14 +20,16 @@ import { format } from "date-fns";
 
 export default function AgentsPage() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
   const [promotionResult, setPromotionResult] = useState<any>(null);
   const [selectedAgents, setSelectedAgents] = useState<Set<number>>(new Set());
   const [bulkActionOpen, setBulkActionOpen] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(
+    location === "/agents/create" || location === "/agents/wizard"
+  );
 
   // Fetch agents (skip if wizard is open to avoid loading state)
   const { data: agents = [], isLoading, refetch } = trpc.agents.list.useQuery(undefined, {
