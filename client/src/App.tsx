@@ -67,6 +67,7 @@ const PolicyManagement = lazy(() => import("@/pages/PolicyManagement"));
 const AgentDetailPage = lazy(() => import("@/pages/AgentDetailPage"));
 const AgentList = lazy(() => import("@/pages/AgentList").then(m => ({ default: m.AgentList })));
 const AgentEditor = lazy(() => import("@/pages/AgentEditor").then(m => ({ default: m.AgentEditor })));
+const AgentControlPanelPage = lazy(() => import("@/pages/AgentControlPanelPage"));
 const AutoRemediationPage = lazy(() => import("@/pages/AutoRemediationPage"));
 const ToolsManagementPage = lazy(() => import("@/pages/ToolsManagementPage"));
 const WikiPage = lazy(() => import("@/pages/WikiPage"));
@@ -211,6 +212,7 @@ function Router() {
         <Route path="/agents" component={() => <ProtectedRoute component={AgentsPage} />} />
         <Route path="/agents/create" component={() => <ProtectedRoute component={AgentsPage} />} />
       <Route path="/agents/wizard" component={() => <ProtectedRoute component={AgentsPage} />} />
+      <Route path="/agents/control-panel" component={() => <ProtectedRoute component={AgentControlPanelPage} />} />
         <Route path="/agents/:id" component={() => <ProtectedRoute component={AgentDetailPage} />} />
         <Route path="/agent-dashboard" component={() => <ProtectedRoute component={AgentDashboardPage} />} />
         <Route path="/protocols" component={() => <ProtectedRoute component={ProtocolsPage} />} />

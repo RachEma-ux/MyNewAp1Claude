@@ -139,16 +139,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
           label: "Agents",
           icon: <Bot className="w-4 h-4" />,
           children: [
-            { label: "Manage", icon: <Settings className="w-3 h-3" />, href: "/agents" },
-            { label: "Agent Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/agents/wizard" },
-            { label: "Approvals", icon: <Activity className="w-3 h-3" />, href: "/promotion-requests" },
             { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/agent-dashboard" },
-            { label: "Drift Detection", icon: <Activity className="w-3 h-3" />, href: "/drift-detection" },
-            { label: "Compliance Export", icon: <FileText className="w-3 h-3" />, href: "/compliance-export" },
-            { label: "Auto-Remediation", icon: <Zap className="w-3 h-3" />, href: "/auto-remediation" },
-            { label: "Tools Management", icon: <Package className="w-3 h-3" />, href: "/tools-management" },
-            { label: "Protocols", icon: <FileText className="w-3 h-3" />, href: "/protocols" },
-            { label: "Policies", icon: <Key className="w-3 h-3" />, href: "/policies" },
+            { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/agents/control-panel" },
+            { label: "Agent Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/agents/wizard" },
           ]
         },
         { label: "Bots", icon: <MessageSquare className="w-4 h-4" />, href: "/ai-types/bots" },
