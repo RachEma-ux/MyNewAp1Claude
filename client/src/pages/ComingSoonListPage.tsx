@@ -7,6 +7,7 @@ const meta: Record<string, { title: string; description: string }> = {
   llms: { title: "LLMs List", description: "Coming soon" },
   agents: { title: "Agents List", description: "AI agents with cognitive loops, tools, and governance" },
   bots: { title: "Bots List", description: "Coming soon" },
+  models: { title: "Models List", description: "Coming soon" },
 };
 
 export default function ComingSoonListPage() {

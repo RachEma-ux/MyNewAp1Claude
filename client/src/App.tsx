@@ -72,6 +72,7 @@ const ComingSoonListPage = lazy(() => import("@/pages/ComingSoonListPage"));
 const BotsComingSoonPage = lazy(() => import("@/pages/BotsComingSoonPage"));
 const ProviderControlPanelPage = lazy(() => import("@/pages/ProviderControlPanelPage"));
 const ProvidersComingSoonPage = lazy(() => import("@/pages/ProvidersComingSoonPage"));
+const ModelsComingSoonPage = lazy(() => import("@/pages/ModelsComingSoonPage"));
 const AutoRemediationPage = lazy(() => import("@/pages/AutoRemediationPage"));
 const ToolsManagementPage = lazy(() => import("@/pages/ToolsManagementPage"));
 const WikiPage = lazy(() => import("@/pages/WikiPage"));
@@ -193,6 +194,10 @@ function Router() {
       <Route path="/project/:workspaceId" component={() => <ProtectedRoute component={ProjectWorkspaceShell} />} />
       <Route path="/research/:workspaceId/*" component={() => <ProtectedRoute component={ResearchWorkspaceShell} />} />
       <Route path="/research/:workspaceId" component={() => <ProtectedRoute component={ResearchWorkspaceShell} />} />
+      {/* Models coming soon pages */}
+      <Route path="/models/dashboard" component={() => <ProtectedRoute component={ModelsComingSoonPage} />} />
+      <Route path="/models/control-panel" component={() => <ProtectedRoute component={ModelsComingSoonPage} />} />
+      <Route path="/models/wizard" component={() => <ProtectedRoute component={ModelsComingSoonPage} />} />
       <Route path="/models" component={() => <ProtectedRoute component={Models} />} />
       <Route path="/hardware" component={() => <ProtectedRoute component={HardwareProfile} />} />
           <Route path="/analytics/downloads" component={() => <ProtectedRoute component={DownloadAnalytics} />} />
