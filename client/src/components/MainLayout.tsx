@@ -134,6 +134,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           label: "Models",
           icon: <Package className="w-4 h-4" />,
           children: [
+            { label: "Browse", icon: <Package className="w-3 h-3" />, href: "/models" },
             { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/models/dashboard" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/models/control-panel" },
             { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/models/wizard" },
