@@ -70,6 +70,8 @@ const AgentEditor = lazy(() => import("@/pages/AgentEditor").then(m => ({ defaul
 const AgentControlPanelPage = lazy(() => import("@/pages/AgentControlPanelPage"));
 const ComingSoonListPage = lazy(() => import("@/pages/ComingSoonListPage"));
 const BotsComingSoonPage = lazy(() => import("@/pages/BotsComingSoonPage"));
+const ProviderControlPanelPage = lazy(() => import("@/pages/ProviderControlPanelPage"));
+const ProvidersComingSoonPage = lazy(() => import("@/pages/ProvidersComingSoonPage"));
 const AutoRemediationPage = lazy(() => import("@/pages/AutoRemediationPage"));
 const ToolsManagementPage = lazy(() => import("@/pages/ToolsManagementPage"));
 const WikiPage = lazy(() => import("@/pages/WikiPage"));
@@ -235,6 +237,9 @@ function Router() {
       <Route path="/wcp/executions/:id" component={() => <ProtectedRoute component={WCPExecutionDetails} />} />
             <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
             <Route path="/resources" component={() => <ProtectedRoute component={ResourceMonitor} />} />
+      <Route path="/providers/control-panel" component={() => <ProtectedRoute component={ProviderControlPanelPage} />} />
+      <Route path="/providers/dashboard" component={() => <ProtectedRoute component={ProvidersComingSoonPage} />} />
+      <Route path="/providers/wizard" component={() => <ProtectedRoute component={ProvidersComingSoonPage} />} />
       <Route path="/providers/connections" component={() => <ProtectedRoute component={ProviderConnectionsPage} />} />
       <Route path="/providers" component={() => <ProtectedRoute component={Providers} />} />
       <Route path="/providers/:id" component={() => <ProtectedRoute component={ProviderDetail} />} />

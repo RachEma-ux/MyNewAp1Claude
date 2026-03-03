@@ -114,9 +114,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
           label: "Providers",
           icon: <Cloud className="w-4 h-4" />,
           children: [
-            { label: "Manage", icon: <Cloud className="w-3 h-3" />, href: "/providers" },
-            { label: "Connections", icon: <Plug className="w-3 h-3" />, href: "/providers/connections" },
-            { label: "Settings", icon: <Settings className="w-3 h-3" />, href: "/settings" },
+            { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/providers/dashboard" },
+            { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/providers/control-panel" },
+            { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/providers/wizard" },
             { label: "Providers List", icon: <List className="w-3 h-3" />, href: "/list/providers" },
           ]
         },
