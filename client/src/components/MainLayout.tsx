@@ -147,7 +147,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
             { label: "Agents List", icon: <List className="w-3 h-3" />, href: "/list/agents" },
           ]
         },
-        { label: "Bots", icon: <MessageSquare className="w-4 h-4" />, href: "/ai-types/bots" },
+        {
+          label: "Bots",
+          icon: <MessageSquare className="w-4 h-4" />,
+          children: [
+            { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/bots/dashboard" },
+            { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/bots/control-panel" },
+            { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/bots/wizard" },
+            { label: "Bots List", icon: <List className="w-3 h-3" />, href: "/list/bots" },
+          ]
+        },
       ]
     },
     {

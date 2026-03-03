@@ -69,6 +69,7 @@ const AgentList = lazy(() => import("@/pages/AgentList").then(m => ({ default: m
 const AgentEditor = lazy(() => import("@/pages/AgentEditor").then(m => ({ default: m.AgentEditor })));
 const AgentControlPanelPage = lazy(() => import("@/pages/AgentControlPanelPage"));
 const ComingSoonListPage = lazy(() => import("@/pages/ComingSoonListPage"));
+const BotsComingSoonPage = lazy(() => import("@/pages/BotsComingSoonPage"));
 const AutoRemediationPage = lazy(() => import("@/pages/AutoRemediationPage"));
 const ToolsManagementPage = lazy(() => import("@/pages/ToolsManagementPage"));
 const WikiPage = lazy(() => import("@/pages/WikiPage"));
@@ -246,6 +247,8 @@ function Router() {
       <Route path="/policies" component={() => <ProtectedRoute component={PolicyManagement} />} />
       {/* Coming Soon list pages */}
       <Route path="/list/:type" component={() => <ProtectedRoute component={ComingSoonListPage} />} />
+      {/* Bots coming soon pages */}
+      <Route path="/bots/:section" component={() => <ProtectedRoute component={BotsComingSoonPage} />} />
       {/* Redirect stale /agent-detail/:id to canonical /agents/:id */}
       <Route path="/agent-detail/:id">{(params) => <Redirect to={`/agents/${params.id}`} />}</Route>
       {/* Governance agent routes — consolidated under /governance/agents */}
