@@ -148,7 +148,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
           ]
         },
         { label: "Bots", icon: <MessageSquare className="w-4 h-4" />, href: "/ai-types/bots" },
-        { label: "Other", icon: <Activity className="w-4 h-4" />, href: "/ai-types/other" },
       ]
     },
     {
