@@ -116,7 +116,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           children: [
             { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/providers/dashboard" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/providers/control-panel" },
-            { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/providers/wizard" },
+            { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/llm/provider-wizard" },
             { label: "Providers List", icon: <List className="w-3 h-3" />, href: "/list/providers" },
           ]
         },
