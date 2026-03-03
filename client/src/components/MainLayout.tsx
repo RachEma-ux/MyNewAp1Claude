@@ -114,20 +114,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
           label: "Providers",
           icon: <Cloud className="w-4 h-4" />,
           children: [
-            { label: "Providers Liste", icon: <List className="w-3 h-3" />, href: "/providers" },
             { label: "Manage", icon: <Cloud className="w-3 h-3" />, href: "/providers" },
             { label: "Connections", icon: <Plug className="w-3 h-3" />, href: "/providers/connections" },
             { label: "Settings", icon: <Settings className="w-3 h-3" />, href: "/settings" },
+            { label: "Providers Liste", icon: <List className="w-3 h-3" />, href: "/providers" },
           ]
         },
         {
           label: "LLMs",
           icon: <Database className="w-4 h-4" />,
           children: [
-            { label: "LLMs Liste", icon: <List className="w-3 h-3" />, href: "/llm" },
             { label: "Dashboard", icon: <LayoutDashboard className="w-3 h-3" />, href: "/llm" },
             { label: "Control Plane", icon: <Settings className="w-3 h-3" />, href: "/llm/control-plane" },
             { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/llm/create" },
+            { label: "LLMs Liste", icon: <List className="w-3 h-3" />, href: "/llm" },
           ]
         },
         {
@@ -141,10 +141,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
           label: "Agents",
           icon: <Bot className="w-4 h-4" />,
           children: [
-            { label: "Agents Liste", icon: <List className="w-3 h-3" />, href: "/agents" },
             { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/agent-dashboard" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/agents/control-panel" },
             { label: "Agent Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/agents/wizard" },
+            { label: "Agents Liste", icon: <List className="w-3 h-3" />, href: "/agents" },
           ]
         },
         { label: "Bots", icon: <MessageSquare className="w-4 h-4" />, href: "/ai-types/bots" },
