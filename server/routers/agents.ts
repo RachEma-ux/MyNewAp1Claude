@@ -17,6 +17,10 @@ import {
 } from "@shared/agent-lifecycle";
 import { createCatalogEntry, createCatalogAuditEvent } from "../db/catalog";
 
+// Agent definitions are AI Types platform-level assets.
+// workspaceId is retained only for database compatibility and MUST NOT be used for ownership or filtering.
+const SYSTEM_WORKSPACE_ID = 0;
+
 function getAgentStatus(status: string | null | undefined): AgentStatus {
   return status && isAgentStatus(status) ? status : "draft";
 }
@@ -45,12 +49,12 @@ function buildCatalogAgentConfig(agent: any) {
   };
 }
 
-function mapAgentCreateInputToInsert(input: AgentCreateInput, workspaceId: number, createdBy: number) {
+function mapAgentCreateInputToInsert(input: AgentCreateInput, createdBy: number) {
   const tags = input.identity.tags.length > 0 ? input.identity.tags : null;
   const allowedTools = input.capabilities.hasToolAccess ? input.capabilities.allowedTools : [];
 
   return {
-    workspaceId,
+    workspaceId: SYSTEM_WORKSPACE_ID,
     createdBy,
     name: input.identity.name,
     description: input.identity.description || null,
@@ -83,40 +87,26 @@ function mapAgentCreateInputToInsert(input: AgentCreateInput, workspaceId: numbe
 }
 
 export const agentsRouter = router({
-  // List all agents for current user's workspace
-  list: protectedProcedure.query(async ({ ctx }) => {
+  // Agent definitions are AI Types assets and are not workspace-scoped.
+  list: protectedProcedure.query(async () => {
     const db = getDb();
-    const workspaceId = ctx.user.id;
-    
-    const agentList = await db
+
+    return await db
       .select()
       .from(agents)
-      .where(
-        and(
-          eq(agents.workspaceId, workspaceId),
-          ne(agents.status, "archived")
-        )
-      );
-    
-    return agentList;
+      .where(ne(agents.status, "archived"));
   }),
 
   // Get single agent by ID
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const db = getDb();
-      const workspaceId = ctx.user.id;
-      
+
       const agent = await db
         .select()
         .from(agents)
-        .where(
-          and(
-            eq(agents.id, input.id),
-            eq(agents.workspaceId, workspaceId)
-          )
-        )
+        .where(eq(agents.id, input.id))
         .limit(1);
       
       if (!agent[0]) {
@@ -134,8 +124,7 @@ export const agentsRouter = router({
     .input(AgentCreateInputSchema)
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const workspaceId = ctx.user.id;
-      const insertData = mapAgentCreateInputToInsert(input, workspaceId, ctx.user.id);
+      const insertData = mapAgentCreateInputToInsert(input, ctx.user.id);
 
       const [createdAgent] = await db.insert(agents).values(insertData).returning();
 
@@ -157,20 +146,13 @@ export const agentsRouter = router({
       hasToolAccess: z.boolean().optional(),
       allowedTools: z.array(z.string()).optional(),
     }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const db = getDb();
-      const workspaceId = ctx.user.id;
-      
-      // Verify ownership
+
       const agent = await db
         .select()
         .from(agents)
-        .where(
-          and(
-            eq(agents.id, input.id),
-            eq(agents.workspaceId, workspaceId)
-          )
-        )
+        .where(eq(agents.id, input.id))
         .limit(1);
       
       if (!agent[0]) {
@@ -203,20 +185,13 @@ export const agentsRouter = router({
   // Delete agent
   delete: governedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const db = getDb();
-      const workspaceId = ctx.user.id;
-      
-      // Verify ownership
+
       const agent = await db
         .select()
         .from(agents)
-        .where(
-          and(
-            eq(agents.id, input.id),
-            eq(agents.workspaceId, workspaceId)
-          )
-        )
+        .where(eq(agents.id, input.id))
         .limit(1);
       
       if (!agent[0]) {
@@ -239,29 +214,23 @@ export const agentsRouter = router({
       return { success: true };
     }),
 
-  // Detect drift across all agents
+  // Detect drift across all agent definitions
   detectAllDrift: protectedProcedure.query(async ({ ctx }) => {
     const db = getDb();
-    const workspaceId = ctx.user.id;
+    const policyWorkspaceId = ctx.user.id;
 
-    // Fetch all non-archived agents
     const agentList = await db
       .select()
       .from(agents)
-      .where(
-        and(
-          eq(agents.workspaceId, workspaceId),
-          ne(agents.status, "archived")
-        )
-      );
+      .where(ne(agents.status, "archived"));
 
-    // Fetch the active policy for the workspace
+    // Governance evaluates platform-level agent definitions through the AI Types backing workspace
     const activePolicy = await db
       .select()
       .from(policies)
       .where(
         and(
-          eq(policies.workspaceId, workspaceId),
+          eq(policies.workspaceId, policyWorkspaceId),
           eq(policies.isActive, true),
           eq(policies.isTemplate, false)
         )
@@ -342,17 +311,12 @@ export const agentsRouter = router({
     .input(z.object({ agentId: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const workspaceId = ctx.user.id;
+      const policyWorkspaceId = ctx.user.id;
 
       const agent = await db
         .select()
         .from(agents)
-        .where(
-          and(
-            eq(agents.id, input.agentId),
-            eq(agents.workspaceId, workspaceId)
-          )
-        )
+        .where(eq(agents.id, input.agentId))
         .limit(1);
 
       if (!agent[0]) {
@@ -374,7 +338,7 @@ export const agentsRouter = router({
         .from(policies)
         .where(
           and(
-            eq(policies.workspaceId, workspaceId),
+            eq(policies.workspaceId, policyWorkspaceId),
             eq(policies.isActive, true),
             eq(policies.isTemplate, false)
           )
@@ -431,19 +395,13 @@ export const agentsRouter = router({
   // Export compliance report
   exportCompliance: governedProcedure
     .input(z.object({ format: z.enum(["pdf", "csv", "json"]).optional() }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const db = getDb();
-      const workspaceId = ctx.user.id;
-      
+
       const agentList = await db
         .select()
         .from(agents)
-        .where(
-          and(
-            eq(agents.workspaceId, workspaceId),
-            ne(agents.status, "archived")
-          )
-        );
+        .where(ne(agents.status, "archived"));
       
       const format = input.format || "json";
       const timestamp = new Date().toISOString();
@@ -451,7 +409,7 @@ export const agentsRouter = router({
       
       const report = {
         timestamp,
-        workspaceId: String(workspaceId),
+        scope: "ai-types",
         totalAgents: agentList.length,
         compliantAgents: Math.floor(agentList.length * 0.8),
         nonCompliantAgents: Math.ceil(agentList.length * 0.2),
@@ -477,19 +435,13 @@ export const agentsRouter = router({
       agentId: z.number(),
       violationType: z.string().optional(),
     }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const db = getDb();
-      const workspaceId = ctx.user.id;
-      
+
       const agent = await db
         .select()
         .from(agents)
-        .where(
-          and(
-            eq(agents.id, input.agentId),
-            eq(agents.workspaceId, workspaceId)
-          )
-        )
+        .where(eq(agents.id, input.agentId))
         .limit(1);
       
       if (!agent[0]) {
@@ -537,11 +489,8 @@ export const agentsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const workspaceId = ctx.user.id;
-      
-      // Create agent from template
       await db.insert(agents).values({
-        workspaceId,
+        workspaceId: SYSTEM_WORKSPACE_ID,
         name: input.name,
         description: `Deployed from template ${input.templateId}`,
         roleClass: "assistant",
@@ -566,17 +515,11 @@ export const agentsRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const workspaceId = ctx.user.id;
 
       const [agent] = await db
         .select()
         .from(agents)
-        .where(
-          and(
-            eq(agents.id, input.id),
-            eq(agents.workspaceId, workspaceId)
-          )
-        )
+        .where(eq(agents.id, input.id))
         .limit(1);
 
       if (!agent) {
@@ -656,17 +599,12 @@ export const agentsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const workspaceId = ctx.user.id;
+      const policyWorkspaceId = ctx.user.id;
 
       const agent = await db
         .select()
         .from(agents)
-        .where(
-          and(
-            eq(agents.id, input.id),
-            eq(agents.workspaceId, workspaceId)
-          )
-        )
+        .where(eq(agents.id, input.id))
         .limit(1);
 
       if (!agent[0]) {
@@ -702,7 +640,7 @@ export const agentsRouter = router({
           .from(policies)
           .where(
             and(
-              eq(policies.workspaceId, workspaceId),
+              eq(policies.workspaceId, policyWorkspaceId),
               eq(policies.isActive, true),
               eq(policies.isTemplate, false)
             )
