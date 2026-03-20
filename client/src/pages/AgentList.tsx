@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { AgentStatusBadge } from '@/components/agents/AgentStatusBadge';
+import { AppBlockerAlert } from '@/components/errors/AppBlockerAlert';
+import { getAppBlocker, showBlockerToast } from '@/lib/appBlockers';
 import { AGENT_STATUS_LABELS, getDefaultPromotionTarget, type AgentStatus } from '@shared/agent-lifecycle';
 
 interface AgentListItem {
@@ -29,9 +31,23 @@ export function AgentList() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const { data: agents, isLoading, error, refetch } = trpc.agents.list.useQuery();
-  const promoteMutation = trpc.agents.promote.useMutation({ onSuccess: () => refetch() });
-  const importMutation = trpc.agents.importToCatalog.useMutation();
-  const deleteAgentMutation = trpc.agents.delete.useMutation({ onSuccess: () => refetch() });
+  const promoteMutation = trpc.agents.promote.useMutation({
+    onSuccess: () => refetch(),
+    onError: (mutationError) => {
+      showBlockerToast(mutationError, 'Agent lifecycle update blocked');
+    },
+  });
+  const importMutation = trpc.agents.importToCatalog.useMutation({
+    onError: (mutationError) => {
+      showBlockerToast(mutationError, 'Catalog import blocked');
+    },
+  });
+  const deleteAgentMutation = trpc.agents.delete.useMutation({
+    onSuccess: () => refetch(),
+    onError: (mutationError) => {
+      showBlockerToast(mutationError, 'Agent deletion blocked');
+    },
+  });
 
   const filteredAgents = useMemo(() => (agents || []).filter((agent) =>
     agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -45,7 +61,11 @@ export function AgentList() {
   };
 
   if (error) {
-    return <div className="container mx-auto py-8"><div className="text-red-600">Error loading agents: {error.message}</div></div>;
+    return (
+      <div className="container mx-auto py-8">
+        <AppBlockerAlert blocker={getAppBlocker(error)} />
+      </div>
+    );
   }
 
   return (
@@ -98,7 +118,7 @@ export function AgentList() {
                     <p>Tool access: {agent.hasToolAccess ? 'Yes' : 'No'}</p>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 pt-4 border-t">
+                  <div className="flex flex-wrap gap-2 border-t pt-4">
                     <Button size="sm" variant="outline" onClick={() => navigate(`/agents/${agent.id}/edit`)}>
                       <Edit2 className="mr-1 h-3 w-3" />
                       Edit

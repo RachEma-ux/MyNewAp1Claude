@@ -1,11 +1,11 @@
 import { trpc } from "@/lib/trpc";
-import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl, isOAuthConfigured } from "./const";
+import { isAuthRequiredError } from "@/lib/appBlockers";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -13,14 +13,10 @@ const queryClient = new QueryClient();
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
+  if (!isAuthRequiredError(error)) return;
 
-  const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
-
-  if (!isUnauthorized) return;
-
-  // Only redirect if OAuth is configured
   if (!isOAuthConfigured()) {
-    console.warn('OAuth not configured, skipping redirect to login');
+    console.warn("OAuth not configured, skipping redirect to login");
     return;
   }
 

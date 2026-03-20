@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, protectedProcedure, governedProcedure, router } from "../_core/trpc";
+import { createAppBlockerError } from "../_core/blockers";
 import { getDb } from "../db";
 import { agents, policies, catalogEntries } from "../../drizzle/schema";
 import { eq, and, ne, sql } from "drizzle-orm";
@@ -16,7 +17,7 @@ import {
   type AgentStatus,
 } from "@shared/agent-lifecycle";
 import { createCatalogEntry, createCatalogAuditEvent } from "../db/catalog";
-import { createAgentDefinition } from "../agents/create-definition";
+import { createAgentDefinition, SYSTEM_WORKSPACE_ID } from "../agents/create-definition";
 
 
 function getAgentStatus(status: string | null | undefined): AgentStatus {
@@ -490,10 +491,20 @@ export const agentsRouter = router({
 
       const status = getAgentStatus(agent.status);
       if (!isCatalogImportEligible(status)) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Only deployable agents can be imported into Catalog",
-        });
+        throw createAppBlockerError({
+          code: "agent_not_deployable",
+          category: "lifecycle_rule",
+          title: "This agent is not ready for catalog import",
+          summary: "Only deployable agents can be imported into the catalog.",
+          details: [
+            `Current lifecycle stage: ${status}`,
+          ],
+          recommendedActions: [
+            "Advance the agent through the remaining lifecycle stages first.",
+          ],
+          context: { agentId: agent.id, currentStatus: status },
+          technicalDetails: "Only deployable agents can be imported into Catalog",
+        }, "BAD_REQUEST");
       }
 
       const [existingEntry] = await db
@@ -555,6 +566,10 @@ export const agentsRouter = router({
     .input(z.object({
       id: z.number(),
       targetStatus: z.enum(["sandbox", "governed", "deployable"]).optional(),
+      _evidence: z.object({
+        types: z.array(z.string()).optional(),
+        refs: z.array(z.string()).optional(),
+      }).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
@@ -577,17 +592,38 @@ export const agentsRouter = router({
       const targetStatus = input.targetStatus ?? getDefaultPromotionTarget(currentStatus);
 
       if (!targetStatus) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `No further lifecycle transition is allowed from ${currentStatus}`,
-        });
+        throw createAppBlockerError({
+          code: "agent_lifecycle_complete",
+          category: "lifecycle_rule",
+          title: "This agent cannot move to another stage",
+          summary: "This lifecycle action is blocked because the agent is already at its last allowed stage.",
+          details: [
+            `Current lifecycle stage: ${currentStatus}`,
+          ],
+          recommendedActions: [
+            "Choose a different action, or review the current lifecycle status before trying again.",
+          ],
+          context: { agentId: agent[0].id, currentStatus },
+          technicalDetails: `No further lifecycle transition is allowed from ${currentStatus}`,
+        }, "BAD_REQUEST");
       }
 
       if (!canTransitionAgentStatus(currentStatus, targetStatus)) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Transition from ${currentStatus} to ${targetStatus} is not allowed`,
-        });
+        throw createAppBlockerError({
+          code: "invalid_agent_lifecycle_transition",
+          category: "lifecycle_rule",
+          title: "This lifecycle move is not allowed",
+          summary: "This agent cannot move directly to the selected stage.",
+          details: [
+            `Current stage: ${currentStatus}`,
+            `Requested stage: ${targetStatus}`,
+          ],
+          recommendedActions: [
+            "Move the agent through the required intermediate stage first.",
+          ],
+          context: { agentId: agent[0].id, currentStatus, targetStatus },
+          technicalDetails: `Transition from ${currentStatus} to ${targetStatus} is not allowed`,
+        }, "BAD_REQUEST");
       }
 
       let evaluationResult = null;
@@ -621,13 +657,24 @@ export const agentsRouter = router({
           }, rules);
 
           if (!evaluationResult.compliant) {
-            return {
-              success: false,
-              compliant: false,
-              violations: evaluationResult.violations,
-              score: evaluationResult.score,
-              policyName: activePolicyName,
-            };
+            throw createAppBlockerError({
+              code: "agent_policy_denied",
+              category: "governance_block",
+              title: "Governance blocked this agent promotion",
+              summary: "This agent cannot move to the governed stage because it did not pass policy review.",
+              details: evaluationResult.violations,
+              recommendedActions: [
+                "Fix the listed policy issues, then try the promotion again.",
+              ],
+              context: {
+                agentId: agent[0].id,
+                currentStatus,
+                targetStatus,
+                policyName: activePolicyName,
+                score: evaluationResult.score,
+              },
+              technicalDetails: `Policy ${activePolicyName} blocked agent promotion`,
+            }, "FORBIDDEN");
           }
         }
       }

@@ -14,10 +14,7 @@ import {
   type ModuleKey,
   type WorkspaceModule,
 } from "../../drizzle/schema";
-
-// ============================================================================
-// Module Presets — applied when creating a workspace
-// ============================================================================
+import { createAppBlockerError } from "../_core/blockers";
 
 export const MODULE_PRESETS: Record<string, ModuleKey[]> = {
   personal: ["pmt", "knowledge", "reporting"],
@@ -29,13 +26,6 @@ export const MODULE_PRESETS: Record<string, ModuleKey[]> = {
   readonly: ["reporting"],
 };
 
-// ============================================================================
-// Module Operations
-// ============================================================================
-
-/**
- * Seed default modules for a workspace based on workspace type.
- */
 export async function seedWorkspaceModules(
   workspaceId: number,
   workspaceType: string = "team"
@@ -57,18 +47,12 @@ export async function seedWorkspaceModules(
   }
 }
 
-/**
- * Get all module bindings for a workspace.
- */
 export async function getWorkspaceModules(workspaceId: number): Promise<WorkspaceModule[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(workspaceModules).where(eq(workspaceModules.workspaceId, workspaceId));
 }
 
-/**
- * Check if a module is enabled for a workspace.
- */
 export async function isModuleEnabled(workspaceId: number, moduleKey: ModuleKey): Promise<boolean> {
   const db = getDb();
   if (!db) return false;
@@ -88,9 +72,6 @@ export async function isModuleEnabled(workspaceId: number, moduleKey: ModuleKey)
   return rows.length > 0;
 }
 
-/**
- * Enable or disable a module for a workspace.
- */
 export async function setModuleEnabled(
   workspaceId: number,
   moduleKey: ModuleKey,
@@ -122,13 +103,6 @@ export async function setModuleEnabled(
   }
 }
 
-// ============================================================================
-// Activity Logging
-// ============================================================================
-
-/**
- * Log a workspace activity event.
- */
 export async function logActivity(params: {
   workspaceId: number;
   moduleKey?: string;
@@ -148,12 +122,19 @@ export async function logActivity(params: {
   }
 }
 
-/**
- * Guard: throws if module is not enabled for workspace.
- */
 export async function requireModule(workspaceId: number, moduleKey: ModuleKey): Promise<void> {
   const enabled = await isModuleEnabled(workspaceId, moduleKey);
   if (!enabled) {
-    throw new Error(`Module "${moduleKey}" is not enabled for workspace ${workspaceId}`);
+    throw createAppBlockerError({
+      code: "workspace_module_disabled",
+      category: "dependency_block",
+      title: "A required workspace feature is turned off",
+      summary: `This action cannot continue because the ${moduleKey} module is not enabled for this workspace.`,
+      recommendedActions: [
+        "Enable the required module for this workspace, or switch to a workspace where it is available.",
+      ],
+      context: { workspaceId, moduleKey },
+      technicalDetails: `Module \"${moduleKey}\" is not enabled for workspace ${workspaceId}`,
+    }, "CONFLICT");
   }
 }

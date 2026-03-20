@@ -4,10 +4,12 @@ import { format } from "date-fns";
 import { Plus, Shield, Trash2, Download, CheckSquare, Square, TrendingUp, Edit2, Upload } from "lucide-react";
 import AgentWizard from "@/components/AgentWizard";
 import { AgentStatusBadge } from "@/components/agents/AgentStatusBadge";
+import { AppBlockerAlert } from "@/components/errors/AppBlockerAlert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { trpc } from "@/lib/trpc";
+import { getAppBlocker, showBlockerToast } from "@/lib/appBlockers";
+import type { AppBlockerPayload } from "@shared/blockers";
 import {
   AGENT_STATUS_LABELS,
   getDefaultPromotionTarget,
@@ -69,6 +73,9 @@ export default function AgentsPage() {
   const [bulkActionOpen, setBulkActionOpen] = useState(false);
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [promotionResult, setPromotionResult] = useState<any>(null);
+  const [promotionBlocker, setPromotionBlocker] = useState<AppBlockerPayload | null>(null);
+  const [promotionReason, setPromotionReason] = useState("");
+  const [promotionDiff, setPromotionDiff] = useState("");
 
   const utils = trpc.useUtils();
   const { data: agents = [], isLoading, refetch } = trpc.agents.list.useQuery();
@@ -76,6 +83,7 @@ export default function AgentsPage() {
   const promoteMutation = trpc.agents.promote.useMutation({
     onSuccess: async (result) => {
       setPromotionResult(result);
+      setPromotionBlocker(null);
       if (result.success) {
         toast({ title: `Agent moved to ${AGENT_STATUS_LABELS[result.status as AgentStatus]}` });
         await utils.agents.list.invalidate();
@@ -83,7 +91,8 @@ export default function AgentsPage() {
       }
     },
     onError: (error) => {
-      toast({ title: "Failed to transition agent", description: error.message, variant: "destructive" });
+      setPromotionResult(null);
+      setPromotionBlocker(getAppBlocker(error));
     },
   });
 
@@ -93,7 +102,7 @@ export default function AgentsPage() {
       await utils.agents.list.invalidate();
     },
     onError: (error) => {
-      toast({ title: "Catalog import failed", description: error.message, variant: "destructive" });
+      showBlockerToast(error, "Catalog import blocked");
     },
   });
 
@@ -104,7 +113,7 @@ export default function AgentsPage() {
       await refetch();
     },
     onError: (error) => {
-      toast({ title: "Failed to delete agent", description: error.message, variant: "destructive" });
+      showBlockerToast(error, "Agent deletion blocked");
     },
   });
 
@@ -128,6 +137,58 @@ export default function AgentsPage() {
       return;
     }
     setSelectedAgents(new Set(filteredAgents.map((agent) => agent.id)));
+  };
+
+  const openPromotionDialog = (agent: any) => {
+    setSelectedAgent(agent);
+    setPromotionResult(null);
+    setPromotionBlocker(null);
+    setPromotionReason("");
+    setPromotionDiff("");
+    setPromoteDialogOpen(true);
+  };
+
+  const handleAdvance = () => {
+    const targetStatus = selectedAgent ? getDefaultPromotionTarget((selectedAgent.status || "draft") as AgentStatus) : null;
+    if (!selectedAgent || !targetStatus) {
+      return;
+    }
+
+    if (!promotionReason.trim() || !promotionDiff.trim()) {
+      setPromotionBlocker({
+        code: "promotion_input_missing",
+        category: "missing_input",
+        title: "Required transition details are missing",
+        summary: "This lifecycle action cannot continue until the required transition details are provided.",
+        details: [
+          "Governed transitions require a reason and a summary of the change.",
+        ],
+        missingRequirements: [
+          ...(!promotionReason.trim() ? ["Reason"] : []),
+          ...(!promotionDiff.trim() ? ["Diff summary"] : []),
+        ],
+        fieldIssues: [],
+        recommendedActions: [
+          "Add the missing transition details, then try the promotion again.",
+        ],
+        retryable: false,
+        context: { agentId: selectedAgent.id, targetStatus },
+      });
+      return;
+    }
+
+    setPromotionBlocker(null);
+    promoteMutation.mutate({
+      id: selectedAgent.id,
+      targetStatus,
+      _evidence: {
+        types: ["reason", "diff"],
+        refs: [
+          `reason:${promotionReason.trim()}`,
+          `diff:${promotionDiff.trim()}`,
+        ],
+      },
+    });
   };
 
   const handleBulkDelete = async () => {
@@ -251,11 +312,7 @@ export default function AgentsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              setSelectedAgent(agent);
-                              setPromotionResult(null);
-                              setPromoteDialogOpen(true);
-                            }}
+                            onClick={() => openPromotionDialog(agent)}
                           >
                             <Shield className="mr-1 h-4 w-4" />
                             Move to {AGENT_STATUS_LABELS[nextStatus]}
@@ -295,37 +352,46 @@ export default function AgentsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {promotionResult ? (
-            <div className="space-y-3">
-              {promotionResult.success ? (
-                <p className="text-sm text-green-700">Lifecycle transition succeeded.</p>
-              ) : (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  {(promotionResult.violations || []).map((violation: string, index: number) => (
-                    <div key={index}>{violation}</div>
-                  ))}
+          <div className="space-y-4">
+            {promotionBlocker && <AppBlockerAlert blocker={promotionBlocker} />}
+
+            {promotionResult?.success ? (
+              <p className="text-sm text-green-700">Lifecycle transition succeeded.</p>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Governed validation is enforced before an agent can become deployable. Catalog import stays disabled until the agent reaches Deployable.
+                </p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Reason</label>
+                  <Textarea
+                    value={promotionReason}
+                    onChange={(event) => setPromotionReason(event.target.value)}
+                    placeholder="Explain why this agent should advance."
+                    rows={3}
+                  />
                 </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Governed validation is enforced before an agent can become deployable. Catalog import stays disabled until the agent reaches Deployable.
-            </p>
-          )}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Diff Summary</label>
+                  <Textarea
+                    value={promotionDiff}
+                    onChange={(event) => setPromotionDiff(event.target.value)}
+                    placeholder="Summarize what changed and what was reviewed."
+                    rows={3}
+                  />
+                </div>
+              </>
+            )}
+          </div>
 
           <DialogFooter>
-            {promotionResult ? (
+            {promotionResult?.success ? (
               <Button onClick={() => setPromoteDialogOpen(false)}>Close</Button>
             ) : (
               <>
                 <Button variant="outline" onClick={() => setPromoteDialogOpen(false)}>Cancel</Button>
                 <Button
-                  onClick={() => {
-                    const targetStatus = selectedAgent ? getNextStatus(selectedAgent.status || "draft") : null;
-                    if (selectedAgent && targetStatus) {
-                      promoteMutation.mutate({ id: selectedAgent.id, targetStatus });
-                    }
-                  }}
+                  onClick={handleAdvance}
                   disabled={promoteMutation.isPending || !selectedAgent || !getNextStatus(selectedAgent.status || "draft")}
                 >
                   {promoteMutation.isPending ? "Applying..." : "Advance"}

@@ -91,6 +91,7 @@ import { CatalogImportWizard } from "@/components/CatalogImportWizard";
 import { ConnectProviderModal } from "@/components/ConnectProviderModal";
 import { DiscoveryHealthPanel } from "@/components/DiscoveryOpsPanel";
 import { toast } from "sonner";
+import { showBlockerToast } from "@/lib/appBlockers";
 
 const TYPE_ICONS: Record<string, any> = {
   provider: Server,
@@ -338,21 +339,13 @@ export default function CatalogManagePage() {
   const approveMutation = trpc.catalogManage.approve.useMutation({
     onSuccess: () => { refetch(); toast.success("Entry approved — governance gate passed"); },
     onError: (error) => {
-      if (error.message.includes("gate FAIL")) {
-        toast.error(`Governance blocked: ${error.message}`);
-      } else {
-        toast.error(error.message);
-      }
+      showBlockerToast(error, "Approval blocked");
     },
   });
   const activateMutation = trpc.catalogManage.activate.useMutation({
     onSuccess: () => { refetch(); toast.success("Entry activated — governance gate passed"); },
     onError: (error) => {
-      if (error.message.includes("gate FAIL")) {
-        toast.error(`Governance blocked: ${error.message}`);
-      } else {
-        toast.error(error.message);
-      }
+      showBlockerToast(error, "Activation blocked");
     },
   });
   const classifyMutation = trpc.catalogManage.classify.useMutation();
