@@ -16,10 +16,8 @@ import {
   type AgentStatus,
 } from "@shared/agent-lifecycle";
 import { createCatalogEntry, createCatalogAuditEvent } from "../db/catalog";
+import { createAgentDefinition } from "../agents/create-definition";
 
-// Agent definitions are AI Types platform-level assets.
-// workspaceId is retained only for database compatibility and MUST NOT be used for ownership or filtering.
-const SYSTEM_WORKSPACE_ID = 0;
 
 function getAgentStatus(status: string | null | undefined): AgentStatus {
   return status && isAgentStatus(status) ? status : "draft";
@@ -49,42 +47,6 @@ function buildCatalogAgentConfig(agent: any) {
   };
 }
 
-function mapAgentCreateInputToInsert(input: AgentCreateInput, createdBy: number) {
-  const tags = input.identity.tags.length > 0 ? input.identity.tags : null;
-  const allowedTools = input.capabilities.hasToolAccess ? input.capabilities.allowedTools : [];
-
-  return {
-    workspaceId: SYSTEM_WORKSPACE_ID,
-    createdBy,
-    name: input.identity.name,
-    description: input.identity.description || null,
-    tags,
-    roleClass: input.definition.roleClass,
-    status: "draft" as const,
-    systemPrompt: input.definition.systemPrompt,
-    modelId: input.runtime.modelId,
-    temperature: input.runtime.temperature.toFixed(2),
-    hasDocumentAccess: input.capabilities.hasDocumentAccess,
-    hasToolAccess: input.capabilities.hasToolAccess,
-    allowedTools,
-    capabilities: {
-      tools: allowedTools,
-      custom: input.capabilities.custom ?? {},
-      anatomy: input.definition.anatomy ?? {},
-    },
-    limits: {
-      maxTokens: input.limits.maxTokens,
-      dailyBudget: input.limits.dailyBudget,
-      sandboxConstraints: input.limits.sandboxConstraints ?? {},
-      expiresAt: input.limits.expiresAt ?? null,
-    },
-    lifecycle: {
-      state: "draft",
-      version: input.identity.version,
-      creationMode: input.definition.creationMode,
-    },
-  };
-}
 
 export const agentsRouter = router({
   // Agent definitions are AI Types assets and are not workspace-scoped.
@@ -123,10 +85,7 @@ export const agentsRouter = router({
   create: governedProcedure
     .input(AgentCreateInputSchema)
     .mutation(async ({ input, ctx }) => {
-      const db = getDb();
-      const insertData = mapAgentCreateInputToInsert(input, ctx.user.id);
-
-      const [createdAgent] = await db.insert(agents).values(insertData).returning();
+      const createdAgent = await createAgentDefinition(input, ctx.user.id);
 
       return {
         success: true,
