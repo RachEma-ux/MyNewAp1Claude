@@ -2,12 +2,48 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, protectedProcedure, governedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { agents, policies } from "../../drizzle/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { agents, policies, catalogEntries } from "../../drizzle/schema";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { evaluateAgentCompliance, extractPolicyRules } from "../services/policyEvaluation";
 import { createHash } from "crypto";
 import { getToolRegistry } from "../agents/tools";
 import { AgentCreateInputSchema, type AgentCreateInput } from "@shared/schemas/agent-create";
+import {
+  canTransitionAgentStatus,
+  getDefaultPromotionTarget,
+  isAgentStatus,
+  isCatalogImportEligible,
+  type AgentStatus,
+} from "@shared/agent-lifecycle";
+import { createCatalogEntry, createCatalogAuditEvent } from "../db/catalog";
+
+function getAgentStatus(status: string | null | undefined): AgentStatus {
+  return status && isAgentStatus(status) ? status : "draft";
+}
+
+function getLifecyclePayload(existing: unknown, status: AgentStatus) {
+  const current = existing && typeof existing === "object" ? existing as Record<string, unknown> : {};
+  return {
+    ...current,
+    state: status,
+  };
+}
+
+function buildCatalogAgentConfig(agent: any) {
+  return {
+    sourceAgentId: agent.id,
+    sourceStatus: getAgentStatus(agent.status),
+    lifecycle: agent.lifecycle ?? { state: getAgentStatus(agent.status) },
+    roleClass: agent.roleClass,
+    systemPrompt: agent.systemPrompt,
+    modelId: agent.modelId,
+    temperature: agent.temperature,
+    hasDocumentAccess: agent.hasDocumentAccess ?? false,
+    hasToolAccess: agent.hasToolAccess ?? false,
+    allowedTools: Array.isArray(agent.allowedTools) ? agent.allowedTools : [],
+    callable: true,
+  };
+}
 
 function mapAgentCreateInputToInsert(input: AgentCreateInput, workspaceId: number, createdBy: number) {
   const tags = input.identity.tags.length > 0 ? input.identity.tags : null;
@@ -195,6 +231,7 @@ export const agentsRouter = router({
         .update(agents)
         .set({
           status: "archived",
+          lifecycle: getLifecyclePayload(agent[0].lifecycle, "archived"),
           updatedAt: new Date(),
         })
         .where(eq(agents.id, input.id));
@@ -242,7 +279,7 @@ export const agentsRouter = router({
       let severity: "low" | "medium" | "high" = "low";
 
       // Check 1: Policy digest drift — does the agent's stored policyDigest match the current policy hash?
-      if (agent.status === "governed" && currentPolicyHash) {
+      if ((agent.status === "governed" || agent.status === "deployable") && currentPolicyHash) {
         if (agent.policyDigest && agent.policyDigest !== currentPolicyHash) {
           hasDrift = true;
           driftType = "policy_change";
@@ -348,7 +385,7 @@ export const agentsRouter = router({
         ? createHash("sha256").update(String(activePolicy[0].content || "")).digest("hex").slice(0, 16)
         : null;
 
-      if (a.status === "governed" && currentPolicyHash && a.policyDigest !== currentPolicyHash) {
+      if ((a.status === "governed" || a.status === "deployable") && currentPolicyHash && a.policyDigest !== currentPolicyHash) {
         hasDrift = true;
         driftType = "policy_change";
         severity = "high";
@@ -514,6 +551,7 @@ export const agentsRouter = router({
         hasToolAccess: false,
         allowedTools: [],
         status: "draft",
+        lifecycle: { state: "draft", creationMode: "template" },
         createdBy: ctx.user.id,
       });
 
@@ -524,13 +562,102 @@ export const agentsRouter = router({
       };
     }),
 
-  // Promote agent from draft/sandbox to governed with policy evaluation
-  promote: governedProcedure
+  importToCatalog: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
       const workspaceId = ctx.user.id;
-      
+
+      const [agent] = await db
+        .select()
+        .from(agents)
+        .where(
+          and(
+            eq(agents.id, input.id),
+            eq(agents.workspaceId, workspaceId)
+          )
+        )
+        .limit(1);
+
+      if (!agent) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Agent not found",
+        });
+      }
+
+      const status = getAgentStatus(agent.status);
+      if (!isCatalogImportEligible(status)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only deployable agents can be imported into Catalog",
+        });
+      }
+
+      const [existingEntry] = await db
+        .select()
+        .from(catalogEntries)
+        .where(
+          and(
+            eq(catalogEntries.entryType, "agent"),
+            sql`${catalogEntries.config} ->> 'sourceAgentId' = ${String(agent.id)}`
+          )
+        )
+        .limit(1);
+
+      if (existingEntry) {
+        return {
+          success: true,
+          entry: existingEntry,
+          imported: false,
+        };
+      }
+
+      const entry = await createCatalogEntry({
+        name: agent.name,
+        displayName: agent.name,
+        description: agent.description ?? null,
+        entryType: "agent",
+        scope: "app",
+        status: "active",
+        origin: "admin",
+        reviewState: "approved",
+        config: buildCatalogAgentConfig(agent),
+        tags: ["agent", "catalog-import", status],
+        category: null,
+        subCategory: null,
+        capabilities: Array.isArray(agent.allowedTools) ? agent.allowedTools : [],
+        createdBy: ctx.user.id,
+      });
+
+      await createCatalogAuditEvent({
+        eventType: "catalog.agent.imported",
+        catalogEntryId: entry.id,
+        actor: ctx.user.id,
+        actorType: "user",
+        payload: {
+          sourceAgentId: agent.id,
+          sourceStatus: status,
+        },
+      });
+
+      return {
+        success: true,
+        entry,
+        imported: true,
+      };
+    }),
+
+  // Promote agent through the enforced lifecycle
+  promote: governedProcedure
+    .input(z.object({
+      id: z.number(),
+      targetStatus: z.enum(["sandbox", "governed", "deployable"]).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      const workspaceId = ctx.user.id;
+
       const agent = await db
         .select()
         .from(agents)
@@ -541,76 +668,90 @@ export const agentsRouter = router({
           )
         )
         .limit(1);
-      
+
       if (!agent[0]) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Agent not found",
         });
       }
-      
-      if (agent[0].status !== "draft" && agent[0].status !== "sandbox") {
+
+      const currentStatus = getAgentStatus(agent[0].status);
+      const targetStatus = input.targetStatus ?? getDefaultPromotionTarget(currentStatus);
+
+      if (!targetStatus) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Only draft or sandbox agents can be promoted",
+          message: `No further lifecycle transition is allowed from ${currentStatus}`,
         });
       }
-      
-      // Fetch active policy for workspace
-      const activePolicy = await db
-        .select()
-        .from(policies)
-        .where(
-          and(
-            eq(policies.workspaceId, workspaceId),
-            eq(policies.isActive, true),
-            eq(policies.isTemplate, false)
-          )
-        )
-        .limit(1);
-      
-      // Evaluate agent against policy if one exists
+
+      if (!canTransitionAgentStatus(currentStatus, targetStatus)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Transition from ${currentStatus} to ${targetStatus} is not allowed`,
+        });
+      }
+
       let evaluationResult = null;
-      if (activePolicy[0]) {
-        const rules = extractPolicyRules(activePolicy[0].content);
-        evaluationResult = evaluateAgentCompliance({
-          id: agent[0].id,
-          name: agent[0].name,
-          roleClass: agent[0].roleClass,
-          temperature: agent[0].temperature || "0.7",
-          hasDocumentAccess: agent[0].hasDocumentAccess || false,
-          hasToolAccess: agent[0].hasToolAccess || false,
-          allowedTools: Array.isArray(agent[0].allowedTools) ? agent[0].allowedTools : [],
-          systemPrompt: agent[0].systemPrompt,
-        }, rules);
-        
-        // Block promotion if agent fails policy evaluation
-        if (!evaluationResult.compliant) {
-          return {
-            success: false,
-            compliant: false,
-            violations: evaluationResult.violations,
-            score: evaluationResult.score,
-            policyName: activePolicy[0].name,
-          };
+      let activePolicyName = "No active policy";
+
+      if (targetStatus === "governed") {
+        const activePolicy = await db
+          .select()
+          .from(policies)
+          .where(
+            and(
+              eq(policies.workspaceId, workspaceId),
+              eq(policies.isActive, true),
+              eq(policies.isTemplate, false)
+            )
+          )
+          .limit(1);
+
+        if (activePolicy[0]) {
+          activePolicyName = activePolicy[0].name;
+          const rules = extractPolicyRules(activePolicy[0].content);
+          evaluationResult = evaluateAgentCompliance({
+            id: agent[0].id,
+            name: agent[0].name,
+            roleClass: agent[0].roleClass,
+            temperature: agent[0].temperature || "0.7",
+            hasDocumentAccess: agent[0].hasDocumentAccess || false,
+            hasToolAccess: agent[0].hasToolAccess || false,
+            allowedTools: Array.isArray(agent[0].allowedTools) ? agent[0].allowedTools : [],
+            systemPrompt: agent[0].systemPrompt,
+          }, rules);
+
+          if (!evaluationResult.compliant) {
+            return {
+              success: false,
+              compliant: false,
+              violations: evaluationResult.violations,
+              score: evaluationResult.score,
+              policyName: activePolicyName,
+            };
+          }
         }
       }
-      
-      // Promotion approved - update agent status
+
       await db
         .update(agents)
         .set({
-          status: "governed",
+          status: targetStatus,
+          lifecycle: getLifecyclePayload(agent[0].lifecycle, targetStatus),
           updatedAt: new Date(),
         })
         .where(eq(agents.id, input.id));
-      
+
       return {
         success: true,
         compliant: true,
+        status: targetStatus,
+        previousStatus: currentStatus,
         violations: [],
         score: evaluationResult?.score || 100,
-        policyName: activePolicy[0]?.name || "No active policy",
+        policyName: activePolicyName,
       };
     }),
 });

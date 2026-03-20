@@ -179,7 +179,7 @@ export const catalogManageRouter = router({
           action_type: "DISCOVERY_ATTEMPT",
           target_type: "provider_discovery",
           target_id: result.domain,
-          decision_result: result.status === "ok" ? "success" : "partial",
+          decision_result: result.status === "ok" ? "success" : "failure",
           metadata: {
             sourceUrl: input.websiteUrl,
             rawHash: artifact.raw_hash,
@@ -300,6 +300,13 @@ export const catalogManageRouter = router({
   create: governedProcedure
     .input(createEntrySchema)
     .mutation(async ({ input, ctx }) => {
+      if (input.entryType === "agent") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Agent catalog items must be imported from deployable agent definitions",
+        });
+      }
+
       const origin = input.origin ?? "admin";
       const reviewState = origin !== "admin" ? "needs_review" : "approved";
 

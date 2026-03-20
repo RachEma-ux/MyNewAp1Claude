@@ -221,22 +221,15 @@ export const agentsRouter = router({
       return { success: true };
     }),
 
-  // Agent execution
+  // Direct agent execution is disabled. Only catalog items may be callable.
   execute: governedProcedure
     .input(z.object({
       conversationId: z.number(),
       message: z.string().min(1),
       workspaceId: z.number(),
     }))
-    .mutation(async ({ input, ctx }) => {
-      const result = await executeAgent({
-        conversationId: input.conversationId,
-        userMessage: input.message,
-        userId: ctx.user.id,
-        workspaceId: input.workspaceId,
-      });
-
-      return result;
+    .mutation(async () => {
+      throw new Error("Direct agent execution is disabled. Import a deployable agent into Catalog before invoking it.");
     }),
 
   // Tool management

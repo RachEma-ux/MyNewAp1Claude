@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Trash2, AlertTriangle, CheckCircle2 } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AgentStatusBadge } from "@/components/agents/AgentStatusBadge";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -163,19 +164,10 @@ export default function AgentDetailPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold">{agent.name}</h1>
-            <p className="text-muted-foreground mt-1">
-              {agent.status === "governed" ? (
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  Governed Agent
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                  Draft Agent
-                </span>
-              )}
-            </p>
+<div className="mt-2 flex items-center gap-2 text-muted-foreground">
+              <AgentStatusBadge status={agent.status || "draft"} />
+              <span>{agent.roleClass}</span>
+            </div>
           </div>
         </div>
         <div className="flex gap-2">

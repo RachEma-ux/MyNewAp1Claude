@@ -9,10 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save, Play, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Shield, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DiffViewer } from "@/components/DiffViewer";
+import { AgentStatusBadge } from "@/components/agents/AgentStatusBadge";
 import type { Agent, AgentMode, GovernanceStatus, AgentRoleClass, AgentAnatomy, AgentGovernance } from "@shared/types";
+import { AGENT_STATUS_LABELS, getDefaultPromotionTarget, type AgentStatus } from "@shared/agent-lifecycle";
 
 export default function AgentEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +34,25 @@ export default function AgentEditorPage() {
     },
     onError: (error) => {
       toast({ title: "Failed to update agent", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const promoteMutation = trpc.agents.promote.useMutation({
+    onSuccess: () => {
+      toast({ title: "Agent lifecycle advanced" });
+      refetch();
+    },
+    onError: (error) => {
+      toast({ title: "Failed to advance agent", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const importMutation = trpc.agents.importToCatalog.useMutation({
+    onSuccess: () => {
+      toast({ title: "Agent imported to Catalog" });
+    },
+    onError: (error) => {
+      toast({ title: "Catalog import failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -76,16 +97,7 @@ export default function AgentEditorPage() {
     }
   };
 
-  const getStatusBadge = () => {
-    const status = agent.governanceStatus || "SANDBOX";
-    const variants: Record<string, any> = {
-      SANDBOX: "secondary",
-      GOVERNED_VALID: "default",
-      GOVERNED_RESTRICTED: "outline",
-      GOVERNED_INVALIDATED: "destructive",
-    };
-    return <Badge variant={variants[status]}>{status}</Badge>;
-  };
+  const nextStatus = getDefaultPromotionTarget((agent.status || "draft") as AgentStatus);
 
   return (
     <div className="container py-8">
@@ -99,21 +111,35 @@ export default function AgentEditorPage() {
             <h1 className="text-3xl font-bold">{agent.name}</h1>
             <p className="text-muted-foreground">{agent.description}</p>
           </div>
-          {getStatusBadge()}
+          <AgentStatusBadge status={agent.status || "draft"} />
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleSave} disabled={updateMutation.isPending}>
             <Save className="h-4 w-4 mr-2" />
             Save
           </Button>
-          <Button variant="outline" size="sm">
-            <Play className="h-4 w-4 mr-2" />
-            Start
-          </Button>
-          <Button variant="outline" size="sm">
-            <Square className="h-4 w-4 mr-2" />
-            Stop
-          </Button>
+{nextStatus && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => promoteMutation.mutate({ id: agent.id, targetStatus: nextStatus })}
+              disabled={promoteMutation.isPending}
+            >
+              <Shield className="h-4 w-4 mr-2" />
+              Move to {AGENT_STATUS_LABELS[nextStatus]}
+            </Button>
+          )}
+          {agent.status === "deployable" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => importMutation.mutate({ id: agent.id })}
+              disabled={importMutation.isPending}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import to Catalog
+            </Button>
+          )}
           <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleteMutation.isPending}>
             <Trash2 className="h-4 w-4 mr-2" />
             Delete

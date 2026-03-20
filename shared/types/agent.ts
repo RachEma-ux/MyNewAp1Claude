@@ -1,3 +1,5 @@
+import { type AgentStatus, AGENT_STATUSES } from "../agent-lifecycle";
+
 /**
  * COMPREHENSIVE AGENT TYPE DEFINITION
  * Single source of truth for all agent-related types
@@ -10,12 +12,13 @@
 
 // AgentLifecycleState
 export const AgentLifecycleState = {
-  DRAFT: "draft",
-  SANDBOX: "sandbox",
-  GOVERNED: "governed",
-  DISABLED: "disabled",
+  DRAFT: AGENT_STATUSES[0],
+  SANDBOX: AGENT_STATUSES[1],
+  GOVERNED: AGENT_STATUSES[2],
+  DEPLOYABLE: AGENT_STATUSES[3],
+  ARCHIVED: AGENT_STATUSES[4],
 } as const;
-export type AgentLifecycleState = typeof AgentLifecycleState[keyof typeof AgentLifecycleState];
+export type AgentLifecycleState = AgentStatus;
 
 // AgentOrigin
 export const AgentOrigin = {
@@ -87,6 +90,7 @@ export interface Agent {
   
   // Lifecycle & Governance
   lifecycleState: AgentLifecycleState;
+  status?: AgentStatus;
   lifecycleVersion: number;
   origin: AgentOrigin;
   trigger: any | null; // JSON
@@ -135,6 +139,7 @@ export interface InsertAgent {
   maxIterations?: number;
   autoSummarize?: boolean;
   lifecycleState?: AgentLifecycleState;
+  status?: AgentStatus;
   lifecycleVersion?: number;
   origin?: AgentOrigin;
   trigger?: any | null;

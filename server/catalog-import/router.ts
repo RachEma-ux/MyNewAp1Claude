@@ -208,6 +208,14 @@ export const catalogImportRouter = router({
         if (row.duplicateStatus === "conflict") conflictOverrides++;
         if (row.riskLevel === "high") highRiskCount++;
 
+        if (row.type === "agent") {
+          entry.outcome = "error";
+          entry.error = "Deployable agent definitions must be imported through the Agents lifecycle";
+          result.errors++;
+          result.entries.push(entry);
+          continue;
+        }
+
         try {
           const catalogEntry = await createCatalogEntry({
             name: row.name,

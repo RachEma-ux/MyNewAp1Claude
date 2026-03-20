@@ -13,6 +13,17 @@ export type {
   PromotionRequest, 
   AgentProof,
 } from './agent';
+export type { AgentStatus } from '../agent-lifecycle';
+export {
+  AGENT_STATUSES,
+  AGENT_STATUS_LABELS,
+  AGENT_STATUS_BADGE_CLASSES,
+  AGENT_STATUS_TRANSITIONS,
+  canTransitionAgentStatus,
+  getDefaultPromotionTarget,
+  isCatalogImportEligible,
+  isAgentStatus,
+} from '../agent-lifecycle';
 
 // Export enum constants and types (TypeScript handles both)
 export {
