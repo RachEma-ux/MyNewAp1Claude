@@ -7,6 +7,44 @@ import { eq, and, ne } from "drizzle-orm";
 import { evaluateAgentCompliance, extractPolicyRules } from "../services/policyEvaluation";
 import { createHash } from "crypto";
 import { getToolRegistry } from "../agents/tools";
+import { AgentCreateInputSchema, type AgentCreateInput } from "@shared/schemas/agent-create";
+
+function mapAgentCreateInputToInsert(input: AgentCreateInput, workspaceId: number, createdBy: number) {
+  const tags = input.identity.tags.length > 0 ? input.identity.tags : null;
+  const allowedTools = input.capabilities.hasToolAccess ? input.capabilities.allowedTools : [];
+
+  return {
+    workspaceId,
+    createdBy,
+    name: input.identity.name,
+    description: input.identity.description || null,
+    tags,
+    roleClass: input.definition.roleClass,
+    status: "draft" as const,
+    systemPrompt: input.definition.systemPrompt,
+    modelId: input.runtime.modelId,
+    temperature: input.runtime.temperature.toFixed(2),
+    hasDocumentAccess: input.capabilities.hasDocumentAccess,
+    hasToolAccess: input.capabilities.hasToolAccess,
+    allowedTools,
+    capabilities: {
+      tools: allowedTools,
+      custom: input.capabilities.custom ?? {},
+      anatomy: input.definition.anatomy ?? {},
+    },
+    limits: {
+      maxTokens: input.limits.maxTokens,
+      dailyBudget: input.limits.dailyBudget,
+      sandboxConstraints: input.limits.sandboxConstraints ?? {},
+      expiresAt: input.limits.expiresAt ?? null,
+    },
+    lifecycle: {
+      state: "draft",
+      version: input.identity.version,
+      creationMode: input.definition.creationMode,
+    },
+  };
+}
 
 export const agentsRouter = router({
   // List all agents for current user's workspace
@@ -57,37 +95,18 @@ export const agentsRouter = router({
 
   // Create new agent
   create: governedProcedure
-    .input(z.object({
-      name: z.string().min(1).max(255),
-      description: z.string().optional(),
-      roleClass: z.enum(["assistant", "analyst", "support", "reviewer", "automator", "monitor", "custom"]),
-      systemPrompt: z.string(),
-      modelId: z.string(),
-      temperature: z.number().min(0).max(2).optional().default(0.7),
-      hasDocumentAccess: z.boolean().optional().default(false),
-      hasToolAccess: z.boolean().optional().default(false),
-      allowedTools: z.array(z.string()).optional(),
-    }))
+    .input(AgentCreateInputSchema)
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
       const workspaceId = ctx.user.id;
-      
-      await db.insert(agents).values({
-        workspaceId,
-        name: input.name,
-        description: input.description,
-        roleClass: input.roleClass,
-        systemPrompt: input.systemPrompt,
-        modelId: input.modelId,
-        temperature: String(input.temperature),
-        hasDocumentAccess: input.hasDocumentAccess,
-        hasToolAccess: input.hasToolAccess,
-        allowedTools: input.allowedTools,
-        status: "draft",
-        createdBy: ctx.user.id,
-      });
+      const insertData = mapAgentCreateInputToInsert(input, workspaceId, ctx.user.id);
 
-      return { success: true };
+      const [createdAgent] = await db.insert(agents).values(insertData).returning();
+
+      return {
+        success: true,
+        agent: createdAgent,
+      };
     }),
 
   // Update agent

@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useLocation } from 'wouter';
 import { ArrowLeft, Save } from 'lucide-react';
 import { CatalogSelect } from '@/components/CatalogSelect';
+import type { AgentCreateInput } from '@shared/schemas/agent-create';
 
 const ROLE_CLASSES = [
   { value: 'assistant', label: 'Assistant' },
@@ -143,10 +144,37 @@ export function AgentEditor({ agentId }: { agentId?: string }) {
           ...formData,
         });
       } else {
-        await createAgentMutation.mutateAsync({
-          ...formData,
-          roleClass: formData.roleClass as any,
-        });
+        const payload: AgentCreateInput = {
+          identity: {
+            name: formData.name,
+            version: '1.0.0',
+            description: formData.description,
+            tags: [],
+          },
+          definition: {
+            creationMode: 'scratch',
+            roleClass: formData.roleClass as AgentCreateInput['definition']['roleClass'],
+            systemPrompt: formData.systemPrompt,
+            anatomy: {},
+          },
+          runtime: {
+            modelId: formData.modelId,
+            temperature: formData.temperature,
+          },
+          capabilities: {
+            hasDocumentAccess: formData.hasDocumentAccess,
+            hasToolAccess: formData.hasToolAccess,
+            allowedTools: formData.hasToolAccess ? formData.allowedTools : [],
+            custom: {},
+          },
+          limits: {
+            maxTokens: 2000,
+            dailyBudget: 100,
+            sandboxConstraints: {},
+            expiresAt: null,
+          },
+        };
+        await createAgentMutation.mutateAsync(payload);
       }
       navigate('/governance/agents');
     } catch (error) {
