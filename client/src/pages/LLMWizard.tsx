@@ -1,17 +1,18 @@
 /**
- * LLM Quick Setup - Fast registration wizard for existing LLMs
+ * LLMs Register - Quick registration wizard for existing LLMs
+ *
+ * Route: /llm/register
  *
  * Purpose: Register existing models (Claude, GPT-4, Ollama) in the governance system
  * Use when: You want to manage/govern existing models without training
  *
- * RFC-001 Compliant Wizard Implementation:
- * - 3-step flow: Identity → Configuration → Review
+ * 3-step flow: Identity → Configuration → Review
  * - Auto-save drafts to localStorage
  * - Policy validation on submit
- * - Creates version in sandbox environment
+ * - Creates LLM identity + initial sandbox version
  *
- * NOTE: This does NOT train models. For full model training/fine-tuning,
- * use "LLM Creation (Full Lifecycle)" wizard at /llm/create
+ * NOTE: This does NOT train models. For the full LLM creation/training pipeline,
+ * use "LLM Wizard" at /llm/wizard
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -280,9 +281,9 @@ export default function LLMWizard() {
         <div>
           <div className="flex items-center gap-3">
             <Wand2 className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">LLM Quick Setup</h1>
+            <h1 className="text-3xl font-bold">LLMs Register</h1>
           </div>
-          <p className="text-muted-foreground">Register an existing model in the governance system</p>
+          <p className="text-muted-foreground">Quick registration for existing models (GPT, Claude, Gemini, Ollama)</p>
         </div>
       </div>
 
@@ -403,7 +404,7 @@ function IdentityStep({
     <Card>
       <CardHeader>
         <CardTitle>LLM Identity</CardTitle>
-        <CardDescription>Define the identity and purpose of this LLM (Quick Setup - for existing models)</CardDescription>
+        <CardDescription>Define the identity and purpose of this LLM (Register - for existing models)</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Name */}
