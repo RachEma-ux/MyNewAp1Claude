@@ -12,6 +12,7 @@ import {
   getBundleByHash,
   getActiveBundleForEntry,
   getCatalogAuditEvents,
+  listExecutionRuns,
 } from "../db";
 
 export const catalogRegistryRouter = router({
@@ -89,5 +90,15 @@ export const catalogRegistryRouter = router({
     }).optional())
     .query(async ({ input }) => {
       return await getCatalogAuditEvents(input ?? { limit: 50 });
+    }),
+
+  executionRuns: protectedProcedure
+    .input(z.object({
+      catalogEntryId: z.number().int().positive(),
+      conversationId: z.number().int().positive().optional(),
+      limit: z.number().int().positive().max(50).optional(),
+    }))
+    .query(async ({ input }) => {
+      return await listExecutionRuns(input);
     }),
 });

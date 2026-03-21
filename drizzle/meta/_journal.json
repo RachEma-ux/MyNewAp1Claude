@@ -134,6 +134,13 @@
       "when": 1772582400000,
       "tag": "0018_agent_engine",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1774051200000,
+      "tag": "0019_catalog_execution_observability",
+      "breakpoints": true
     }
   ]
 }

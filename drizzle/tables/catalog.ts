@@ -152,6 +152,35 @@ export const catalogAuditEvents = pgTable("catalog_audit_events", {
 export type CatalogAuditEvent = typeof catalogAuditEvents.$inferSelect;
 export type InsertCatalogAuditEvent = typeof catalogAuditEvents.$inferInsert;
 
+export const executionRuns = pgTable("execution_runs", {
+  id: serial("id").primaryKey(),
+  catalogEntryId: integer("catalogEntryId").notNull(),
+  sourceAgentId: integer("sourceAgentId"),
+  conversationId: integer("conversationId"),
+  actorUserId: integer("actorUserId"),
+  triggerSource: varchar("triggerSource", { length: 50 }).notNull(),
+  state: varchar("state", { length: 20 }).default("created").notNull(),
+  provider: varchar("provider", { length: 255 }),
+  modelId: varchar("modelId", { length: 255 }),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  firstTokenAt: timestamp("firstTokenAt"),
+  completedAt: timestamp("completedAt"),
+  success: boolean("success"),
+  blockerCode: varchar("blockerCode", { length: 100 }),
+  blockerCategory: varchar("blockerCategory", { length: 100 }),
+  blockerSummary: text("blockerSummary"),
+  finishReason: varchar("finishReason", { length: 50 }),
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+}, (table) => ({
+  entryIdx: index("idx_execution_runs_entry").on(table.catalogEntryId),
+  conversationIdx: index("idx_execution_runs_conversation").on(table.conversationId),
+  stateIdx: index("idx_execution_runs_state").on(table.state),
+  startedIdx: index("idx_execution_runs_started").on(table.startedAt),
+}));
+
+export type ExecutionRun = typeof executionRuns.$inferSelect;
+export type InsertExecutionRun = typeof executionRuns.$inferInsert;
+
 // ============================================================================
 // Taxonomy
 // ============================================================================

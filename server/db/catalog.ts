@@ -17,9 +17,12 @@ import {
   type InsertPublishBundle,
   type CatalogAuditEvent,
   type InsertCatalogAuditEvent,
+  type ExecutionRun,
+  type InsertExecutionRun,
   type TaxonomyNode,
   type InsertTaxonomyNode,
   type CatalogEntryClassification,
+  executionRuns,
 } from "../../drizzle/schema";
 import { AXES_MAP, type AxisDef, type AxisNode, type EntryType } from "../../shared/catalog-taxonomy";
 import { getDb } from "./connection";
@@ -278,6 +281,63 @@ export async function getCatalogAuditEvents(filter?: {
   const filtered = conditions.length > 0 ? query.where(and(...conditions)) : query;
   const ordered = filtered.orderBy(desc(catalogAuditEvents.timestamp));
   return filter?.limit ? await ordered.limit(filter.limit) : await ordered;
+}
+
+export async function createExecutionRun(data: InsertExecutionRun): Promise<ExecutionRun> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [run] = await db.insert(executionRuns).values({
+    ...data,
+    startedAt: data.startedAt ?? new Date(),
+  }).returning();
+
+  return run;
+}
+
+export async function updateExecutionRun(
+  id: number,
+  data: Partial<Omit<InsertExecutionRun, "catalogEntryId">>
+): Promise<ExecutionRun> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [run] = await db
+    .update(executionRuns)
+    .set(data)
+    .where(eq(executionRuns.id, id))
+    .returning();
+
+  return run;
+}
+
+export async function getExecutionRunById(id: number): Promise<ExecutionRun | null> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [run] = await db.select().from(executionRuns).where(eq(executionRuns.id, id)).limit(1);
+  return run ?? null;
+}
+
+export async function listExecutionRuns(filter: {
+  catalogEntryId: number;
+  conversationId?: number;
+  limit?: number;
+}): Promise<ExecutionRun[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  const conditions = [eq(executionRuns.catalogEntryId, filter.catalogEntryId)];
+  if (filter.conversationId) {
+    conditions.push(eq(executionRuns.conversationId, filter.conversationId));
+  }
+
+  return await db
+    .select()
+    .from(executionRuns)
+    .where(and(...conditions))
+    .orderBy(desc(executionRuns.startedAt))
+    .limit(filter.limit ?? 20);
 }
 
 // ============================================================================
