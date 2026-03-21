@@ -478,14 +478,9 @@ jobs:
           echo "  JWT_SECRET: ${JWT_SECRET:+(configured)}"
           echo "  APP_ID: ${VITE_APP_ID:-(not set)}"
 
-          # Set NODE_ENV based on DEV_MODE to align environment settings
-          # DEV_MODE=true → development (built-in encryption fallback)
-          # DEV_MODE=false → production (requires ENCRYPTION_KEY secret)
-          if [ "${{ github.event.inputs.dev_mode }}" = "true" ]; then
-            EFFECTIVE_NODE_ENV="development"
-          else
-            EFFECTIVE_NODE_ENV="production"
-          fi
+          # Always use NODE_ENV=production to serve pre-built static files
+          # DEV_MODE controls auth bypass independently of NODE_ENV
+          EFFECTIVE_NODE_ENV="production"
 
           echo "Runtime environment:"
           echo "  NODE_ENV: ${EFFECTIVE_NODE_ENV}"
