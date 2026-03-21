@@ -450,6 +450,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
+          set -euo pipefail
+
           echo "🚀 Starting application..."
 
           # Start Ollama server (models already pulled)
@@ -492,25 +494,71 @@ jobs:
           OPENAI_API_KEY="${OPENAI_API_KEY}" \
           ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
           GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
-          node dist/index.js &
+          node dist/index.js > server.log 2>&1 &
           SERVER_PID=$!
 
-          # Wait for server startup
-          echo "⏳ Waiting for server to start..."
-          sleep 10
+          # Wait for server startup and fail fast if the process dies.
+          echo "⏳ Waiting for server to pass health checks..."
+          HEALTH_OK="false"
+          for attempt in $(seq 1 18); do
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "❌ Server exited before startup completed"
+              echo "----- server.log -----"
+              cat server.log || true
+              exit 1
+            fi
 
-          # Health check
-          echo "🔍 Health check:"
-          curl -s http://localhost:3000/api/health || echo "(No database - running in standalone mode)"
+            if curl -fsS http://localhost:3000/api/health > health.log 2>&1; then
+              HEALTH_OK="true"
+              echo "✅ Health check passed on attempt $attempt"
+              cat health.log
+              break
+            fi
+
+            echo "⌛ Health check attempt $attempt/18 failed; retrying..."
+            sleep 5
+          done
+
+          if [ "$HEALTH_OK" != "true" ]; then
+            echo "❌ Server did not become healthy on localhost:3000"
+            echo "----- health.log -----"
+            cat health.log || true
+            echo "----- server.log -----"
+            cat server.log || true
+            exit 1
+          fi
 
           # Start tunnel
           echo "🌐 Starting Cloudflare tunnel..."
           ./cloudflared tunnel --url http://localhost:3000 2>&1 | tee tunnel.log &
           TUNNEL_PID=$!
 
-          # Wait for tunnel URL
-          sleep 15
-          TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' tunnel.log | head -1)
+          # Wait for tunnel URL and verify the tunnel process is still alive.
+          TUNNEL_URL=""
+          for attempt in $(seq 1 12); do
+            if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
+              echo "❌ Cloudflare tunnel exited before publishing a URL"
+              echo "----- tunnel.log -----"
+              cat tunnel.log || true
+              exit 1
+            fi
+
+            TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' tunnel.log | head -1 || true)
+            if [ -n "$TUNNEL_URL" ]; then
+              echo "✅ Tunnel URL published on attempt $attempt"
+              break
+            fi
+
+            echo "⌛ Waiting for tunnel URL ($attempt/12)..."
+            sleep 5
+          done
+
+          if [ -z "$TUNNEL_URL" ]; then
+            echo "❌ Tunnel URL was not published"
+            echo "----- tunnel.log -----"
+            cat tunnel.log || true
+            exit 1
+          fi
 
           echo ""
           echo "============================================"
@@ -577,6 +625,9 @@ jobs:
           name: deployment-v${{ steps.version.outputs.VERSION }}
           path: |
             app_url.txt
+            server.log
+            health.log
+            tunnel.log
             pack-output/pack.json
             ${{ env.ARCHIVE_NAME }}
           retention-days: 7
