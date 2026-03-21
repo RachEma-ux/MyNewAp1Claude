@@ -4,6 +4,7 @@ import { getDb } from "../db";
 import { conversations, messages } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { resolveCatalogAgentExecutionTarget } from "../catalog/execution";
 
 /**
  * Conversations Router
@@ -56,6 +57,7 @@ export const conversationsRouter = router({
   createConversation: governedProcedure
     .input(z.object({
       agentId: z.number().optional(),
+      catalogEntryId: z.number().int().positive().optional(),
       workspaceId: z.number().optional(),
       title: z.string().min(1).max(255).optional(),
       initialMessage: z.string().min(1).optional(),
@@ -64,8 +66,26 @@ export const conversationsRouter = router({
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
 
+      if (input.agentId && input.catalogEntryId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Choose either a Catalog entry or a raw agent, not both",
+        });
+      }
+
+      let resolvedAgentId = input.agentId ?? null;
+      let derivedTitle = input.title || "New Conversation";
+      let resolvedWorkspaceId = input.workspaceId;
+
+      if (input.catalogEntryId) {
+        const target = await resolveCatalogAgentExecutionTarget(input.catalogEntryId);
+        resolvedAgentId = target.sourceAgent.id;
+        resolvedWorkspaceId = resolvedWorkspaceId ?? target.sourceAgent.workspaceId;
+        derivedTitle = input.title || `${target.entry.displayName || target.entry.name} Run`;
+      }
+
       // Use provided workspaceId, or fall back to user's first workspace
-      let wsId = input.workspaceId;
+      let wsId = resolvedWorkspaceId;
       if (!wsId) {
         const { getUserWorkspaces } = await import("../db");
         const workspaces = await getUserWorkspaces(ctx.user.id);
@@ -75,8 +95,8 @@ export const conversationsRouter = router({
       const [conversation] = await db.insert(conversations).values({
         workspaceId: wsId,
         userId: ctx.user.id,
-        agentId: input.agentId ?? null,
-        title: input.title || "New Conversation",
+        agentId: resolvedAgentId,
+        title: derivedTitle,
       }).returning();
 
       // Add initial message if provided

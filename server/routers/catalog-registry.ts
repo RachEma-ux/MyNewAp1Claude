@@ -13,6 +13,7 @@ import {
   getActiveBundleForEntry,
   getCatalogAuditEvents,
 } from "../db";
+import { resolveCatalogAgentExecutionTarget } from "../catalog/execution";
 
 export const catalogRegistryRouter = router({
   /**
@@ -44,6 +45,35 @@ export const catalogRegistryRouter = router({
       const bundle = await getActiveBundleForEntry(input.catalogEntryId);
       if (!bundle) throw new Error(`No active bundle for entry ${input.catalogEntryId}`);
       return bundle;
+    }),
+
+  /**
+   * Resolve a Catalog agent entry into an executable runtime target.
+   * The Catalog entry is the execution authority for this path.
+   */
+  getAgentExecutionTarget: protectedProcedure
+    .input(z.object({ catalogEntryId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const target = await resolveCatalogAgentExecutionTarget(input.catalogEntryId);
+      return {
+        catalogEntryId: target.entry.id,
+        name: target.entry.displayName || target.entry.name,
+        entryType: target.entry.entryType,
+        status: target.entry.status,
+        reviewState: target.entry.reviewState,
+        tags: target.entry.tags,
+        bundleId: target.bundle.id,
+        bundleVersionLabel: target.bundle.versionLabel,
+        sourceAgentId: target.sourceAgent.id,
+        sourceAgentName: target.sourceAgent.name,
+        config: {
+          roleClass: target.executionConfig.roleClass,
+          modelId: target.executionConfig.modelId,
+          hasDocumentAccess: target.executionConfig.hasDocumentAccess,
+          hasToolAccess: target.executionConfig.hasToolAccess,
+          callable: target.executionConfig.callable,
+        },
+      };
     }),
 
   /**

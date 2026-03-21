@@ -58,6 +58,7 @@ export type AgentRoleClass = typeof AgentRoleClass[keyof typeof AgentRoleClass];
 
 export const agents = pgTable("agents", {
   id: serial("id").primaryKey(),
+  // Compatibility column: agent definitions are AI Types assets and are not workspace-scoped operationally.
   workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
   createdBy: integer("createdBy").notNull().references(() => users.id),
 
@@ -157,6 +158,7 @@ export type InsertAgentVersion = typeof agentVersions.$inferInsert;
 // Agent Protocols
 export const protocols = pgTable("protocols", {
   id: serial("id").primaryKey(),
+  // Compatibility column: agent definitions are AI Types assets and are not workspace-scoped operationally.
   workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
 
   name: varchar("name", { length: 255 }).notNull(),
@@ -183,6 +185,7 @@ export type InsertProtocol = typeof protocols.$inferInsert;
 
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
+  // Compatibility column: agent definitions are AI Types assets and are not workspace-scoped operationally.
   workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
   agentId: integer("agentId").references(() => agents.id),
 

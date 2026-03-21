@@ -20,6 +20,7 @@ const Models = lazy(() => import("./pages/Models"));
 const Documents = lazy(() => import("./pages/Documents"));
 // Agents page replaced by AgentsPage (governance-aware)
 const AgentChat = lazy(() => import("./pages/AgentChat"));
+const CatalogAgentChat = lazy(() => import("./pages/CatalogAgentChat"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Automation = lazy(() => import("./pages/Automation"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -232,6 +233,7 @@ function Router() {
       <Route path="/tools-management" component={() => <ProtectedRoute component={ToolsManagementPage} />} />
       <Route path="/documents" component={() => <ProtectedRoute component={Documents} />} />
       <Route path="/agents/:agentId/chat" component={() => <ProtectedRoute component={AgentChat} />} />
+      <Route path="/catalog/agents/:catalogEntryId/chat" component={() => <ProtectedRoute component={CatalogAgentChat} />} />
       <Route path="/setup/ollama" component={() => <ProtectedRoute component={OllamaSetup} />} />
       <Route path="/chat" component={() => <ProtectedRoute component={Chat} />} />
       <Route path="/conversations" component={() => <ProtectedRoute component={Conversations} />} />

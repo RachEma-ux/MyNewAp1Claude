@@ -16,12 +16,17 @@
  *   - Unknown stage throws — no fallback
  */
 
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { computeSha256, getArtifactStore } from "./artifact-store";
 import type { DiscoverResult } from "../routers/discover-provider";
 
-// Load schema at runtime to avoid tsconfig resolveJsonModule requirement
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const discoveryArtifactSchema = require("../../schemas/discovery-artifact.schema.json");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const discoveryArtifactSchema = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, "../../schemas/discovery-artifact.schema.json"), "utf8")
+);
 
 // ============================================================================
 // Stage Definition — RFC-DA-001

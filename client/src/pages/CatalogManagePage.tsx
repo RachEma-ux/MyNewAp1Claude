@@ -390,6 +390,14 @@ export default function CatalogManagePage() {
     (e.tags || []).includes("published")
   );
 
+  const canRunCatalogAgentEntry = (entry: any) => (
+    entry.entryType === "agent" &&
+    entry.status === "active" &&
+    entry.reviewState === "approved" &&
+    (entry.tags || []).includes("published") &&
+    entry.config?.callable === true
+  );
+
   // Filter published entries by search
   const filteredEntries = publishedEntries.filter((e: any) => {
     if (!search) return true;
@@ -836,6 +844,11 @@ export default function CatalogManagePage() {
                               ) : (
                                 <Zap className="h-4 w-4" />
                               )}
+                            </Button>
+                          )}
+                          {canRunCatalogAgentEntry(entry) && (
+                            <Button variant="ghost" size="sm" onClick={() => navigate(`/catalog/agents/${entry.id}/chat`)} title="Run this published Catalog agent">
+                              <Play className="h-4 w-4" />
                             </Button>
                           )}
                           <Button variant="ghost" size="sm" onClick={() => openVersions(entry.id)} title="Version history">

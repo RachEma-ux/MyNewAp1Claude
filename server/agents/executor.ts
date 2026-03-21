@@ -7,6 +7,7 @@ import { getAgent, getConversation, addMessage, getMessages } from './db';
 import { getToolRegistry } from './tools';
 import { getProviderRegistry } from '../providers/registry';
 import { EmbeddingService } from '../embeddings/service';
+import { resolveCatalogAgentExecutionTarget } from '../catalog/execution';
 
 // Initialize embedding service
 const embeddingService = new EmbeddingService();
@@ -17,6 +18,7 @@ export interface AgentExecutionOptions {
   userMessage: string;
   userId: number;
   workspaceId: number;
+  catalogEntryId?: number;
 }
 
 export interface AgentExecutionResult {
@@ -34,20 +36,71 @@ export interface AgentExecutionResult {
   iterations: number;
 }
 
-/**
- * Execute an agent conversation turn
- */
-export async function executeAgent(options: AgentExecutionOptions): Promise<AgentExecutionResult> {
-  const { conversationId, userMessage, userId, workspaceId } = options;
+interface RuntimeExecutionConfig {
+  agentId: number | null;
+  systemPrompt: string;
+  modelId?: string;
+  temperature: number;
+  hasDocumentAccess: boolean;
+  hasToolAccess: boolean;
+  allowedTools: string[];
+}
 
-  // Get conversation and agent
-  const conversation = await getConversation(conversationId);
+async function resolveRuntimeExecutionConfig(options: AgentExecutionOptions): Promise<RuntimeExecutionConfig> {
+  if (options.catalogEntryId) {
+    const target = await resolveCatalogAgentExecutionTarget(options.catalogEntryId);
+    const conversation = await getConversation(options.conversationId);
+    if (!conversation) {
+      throw new Error('Conversation not found');
+    }
+
+    if (conversation.agentId && conversation.agentId !== target.sourceAgent.id) {
+      throw new Error('Conversation does not match the selected Catalog execution target');
+    }
+
+    return {
+      agentId: target.sourceAgent.id,
+      systemPrompt: target.executionConfig.systemPrompt,
+      modelId: target.executionConfig.modelId,
+      temperature: target.executionConfig.temperature,
+      hasDocumentAccess: target.executionConfig.hasDocumentAccess,
+      hasToolAccess: target.executionConfig.hasToolAccess,
+      allowedTools: target.executionConfig.allowedTools,
+    };
+  }
+
+  const conversation = await getConversation(options.conversationId);
   if (!conversation) {
     throw new Error('Conversation not found');
   }
 
   const agent = conversation.agentId ? await getAgent(conversation.agentId) : null;
-  
+
+  return {
+    agentId: agent?.id ?? null,
+    systemPrompt: agent?.systemPrompt ?? '',
+    modelId: typeof agent?.modelId === 'string' ? agent.modelId : undefined,
+    temperature: parseFloat(agent?.temperature || '0.7'),
+    hasDocumentAccess: agent?.hasDocumentAccess ?? false,
+    hasToolAccess: agent?.hasToolAccess ?? false,
+    allowedTools: Array.isArray(agent?.allowedTools) ? agent.allowedTools : [],
+  };
+}
+
+/**
+ * Execute an agent conversation turn
+ */
+export async function executeAgent(options: AgentExecutionOptions): Promise<AgentExecutionResult> {
+  const { conversationId, userMessage } = options;
+
+  // Get conversation and execution config
+  const conversation = await getConversation(conversationId);
+  if (!conversation) {
+    throw new Error('Conversation not found');
+  }
+
+  const executionConfig = await resolveRuntimeExecutionConfig(options);
+
   // Add user message to conversation
   await addMessage({
     conversationId,
@@ -57,15 +110,14 @@ export async function executeAgent(options: AgentExecutionOptions): Promise<Agen
 
   // Get conversation history
   const history = await getMessages(conversationId);
-  
+
   // Build messages for LLM
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
 
-  // Add system prompt if agent exists
-  if (agent) {
+  if (executionConfig.systemPrompt) {
     messages.push({
       role: 'system',
-      content: agent.systemPrompt,
+      content: executionConfig.systemPrompt,
     });
   }
 
@@ -80,7 +132,7 @@ export async function executeAgent(options: AgentExecutionOptions): Promise<Agen
 
   // Handle RAG if agent has document access
   let retrievedChunks: Array<{ documentId: number; content: string; similarity: number }> = [];
-  if (agent?.hasDocumentAccess) {
+  if (executionConfig.hasDocumentAccess) {
     try {
       const chunks = await embeddingService.searchSimilarChunks(userMessage, 3);
       retrievedChunks = chunks.map((c: any) => ({
@@ -90,7 +142,9 @@ export async function executeAgent(options: AgentExecutionOptions): Promise<Agen
       }));
 
       if (chunks.length > 0) {
-        const contextMessage = `Relevant context from documents:\n\n${chunks.map((c: any) => c.content).join('\n\n---\n\n')}`;
+        const contextMessage = `Relevant context from documents:
+
+${chunks.map((c: any) => c.content).join('\n\n---\n\n')}`;
         messages.push({
           role: 'system',
           content: contextMessage,
@@ -104,23 +158,29 @@ export async function executeAgent(options: AgentExecutionOptions): Promise<Agen
   // Handle tool calling if agent has tool access
   const toolCalls: Array<{ tool: string; params: Record<string, any>; result: string }> = [];
   let iterations = 0;
-  const limits = agent?.limits as { maxIterations?: number } | null;
-  const maxIterations = limits?.maxIterations || 10;
+  const maxIterations = 10;
 
-  if (agent?.hasToolAccess) {
-    // Add tool instructions to system prompt
+  if (executionConfig.hasToolAccess) {
     const toolRegistry = getToolRegistry();
-    const allowedTools = agent.allowedTools ? JSON.parse(agent.allowedTools as any) : toolRegistry.listNames();
+    const allowedTools = executionConfig.allowedTools.length > 0 ? executionConfig.allowedTools : toolRegistry.listNames();
     const tools = toolRegistry.list().filter(t => allowedTools.includes(t.name));
 
     if (tools.length > 0) {
-      const toolDescriptions = tools.map(t => 
-        `- ${t.name}: ${t.description}\n  Parameters: ${t.parameters.map(p => `${p.name} (${p.type}${p.required ? ', required' : ', optional'})`).join(', ')}`
+      const toolDescriptions = tools.map(t =>
+        `- ${t.name}: ${t.description}
+  Parameters: ${t.parameters.map(p => `${p.name} (${p.type}${p.required ? ', required' : ', optional'})`).join(', ')}`
       ).join('\n');
 
       messages.push({
         role: 'system',
-        content: `You have access to the following tools:\n\n${toolDescriptions}\n\nTo use a tool, respond with JSON in this format:\n{"tool": "tool_name", "params": {"param1": "value1"}}\n\nAfter receiving tool results, provide your final answer to the user.`,
+        content: `You have access to the following tools:
+
+${toolDescriptions}
+
+To use a tool, respond with JSON in this format:
+{"tool": "tool_name", "params": {"param1": "value1"}}
+
+After receiving tool results, provide your final answer to the user.`,
       });
     }
   }
@@ -128,7 +188,7 @@ export async function executeAgent(options: AgentExecutionOptions): Promise<Agen
   // Get provider
   const providerRegistry = getProviderRegistry();
   const providers = providerRegistry.getAllProviders().filter(p => p.getCapabilities().supportsStreaming);
-  
+
   if (providers.length === 0) {
     throw new Error('No providers available');
   }
@@ -142,22 +202,25 @@ export async function executeAgent(options: AgentExecutionOptions): Promise<Agen
 
     const request: GenerationRequest = {
       messages,
-      temperature: parseFloat(agent?.temperature || '0.7'),
+      model: executionConfig.modelId,
+      temperature: executionConfig.temperature,
       maxTokens: 2000,
+      workspaceId: conversation.workspaceId,
+      userId: options.userId,
     };
 
     const result = await provider.generate(request);
     response = result.content;
 
     // Check if response is a tool call
-    if (agent?.hasToolAccess && response.trim().startsWith('{')) {
+    if (executionConfig.hasToolAccess && response.trim().startsWith('{')) {
       try {
         const toolCall = JSON.parse(response.trim());
-        
+
         if (toolCall.tool && toolCall.params) {
           const toolRegistry = getToolRegistry();
           const toolResult = await toolRegistry.execute(toolCall.tool, toolCall.params);
-          
+
           toolCalls.push({
             tool: toolCall.tool,
             params: toolCall.params,
@@ -171,7 +234,10 @@ export async function executeAgent(options: AgentExecutionOptions): Promise<Agen
           });
           messages.push({
             role: 'system',
-            content: `Tool result:\n${toolResult}\n\nNow provide your final answer to the user based on this result.`,
+            content: `Tool result:
+${toolResult}
+
+Now provide your final answer to the user based on this result.`,
           });
 
           continue; // Continue loop to get final response
@@ -207,38 +273,32 @@ export async function executeAgent(options: AgentExecutionOptions): Promise<Agen
  * Execute agent with streaming response
  */
 export async function* executeAgentStream(options: AgentExecutionOptions): AsyncGenerator<string> {
-  const { conversationId, userMessage, userId, workspaceId } = options;
+  const { conversationId, userMessage } = options;
 
-  // Get conversation and agent
   const conversation = await getConversation(conversationId);
   if (!conversation) {
     throw new Error('Conversation not found');
   }
 
-  const agent = conversation.agentId ? await getAgent(conversation.agentId) : null;
-  
-  // Add user message to conversation
+  const executionConfig = await resolveRuntimeExecutionConfig(options);
+
   await addMessage({
     conversationId,
     role: 'user',
     content: userMessage,
   });
 
-  // Get conversation history
   const history = await getMessages(conversationId);
-  
-  // Build messages for LLM
+
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
 
-  // Add system prompt if agent exists
-  if (agent) {
+  if (executionConfig.systemPrompt) {
     messages.push({
       role: 'system',
-      content: agent.systemPrompt,
+      content: executionConfig.systemPrompt,
     });
   }
 
-  // Add conversation history (limit to recent messages)
   const recentHistory = history.slice(-10);
   for (const msg of recentHistory) {
     messages.push({
@@ -247,13 +307,14 @@ export async function* executeAgentStream(options: AgentExecutionOptions): Async
     });
   }
 
-  // Handle RAG if agent has document access
-  if (agent?.hasDocumentAccess) {
+  if (executionConfig.hasDocumentAccess) {
     try {
       const chunks = await embeddingService.searchSimilarChunks(userMessage, 3);
 
       if (chunks.length > 0) {
-        const contextMessage = `Relevant context from documents:\n\n${chunks.map((c: any) => c.content).join('\n\n---\n\n')}`;
+        const contextMessage = `Relevant context from documents:
+
+${chunks.map((c: any) => c.content).join('\n\n---\n\n')}`;
         messages.push({
           role: 'system',
           content: contextMessage,
@@ -264,10 +325,9 @@ export async function* executeAgentStream(options: AgentExecutionOptions): Async
     }
   }
 
-  // Get provider
   const providerRegistry = getProviderRegistry();
   const providers = providerRegistry.getAllProviders().filter(p => p.getCapabilities().supportsStreaming);
-  
+
   if (providers.length === 0) {
     throw new Error('No providers available');
   }
@@ -276,11 +336,13 @@ export async function* executeAgentStream(options: AgentExecutionOptions): Async
 
   const request: GenerationRequest = {
     messages,
-    temperature: parseFloat(agent?.temperature || '0.7'),
+    model: executionConfig.modelId,
+    temperature: executionConfig.temperature,
     maxTokens: 2000,
+    workspaceId: conversation.workspaceId,
+    userId: options.userId,
   };
 
-  // Stream response
   let fullResponse = '';
   for await (const token of provider.generateStream(request)) {
     if (!token.isComplete) {
@@ -289,7 +351,6 @@ export async function* executeAgentStream(options: AgentExecutionOptions): Async
     }
   }
 
-  // Save assistant response
   await addMessage({
     conversationId,
     role: 'assistant',

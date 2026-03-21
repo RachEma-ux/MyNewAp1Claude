@@ -10,7 +10,7 @@ import uploadRouter from "../upload";
 import { serveStatic, setupVite } from "./vite";
 import { initializeProviders } from "../providers/init";
 import { handleChatStream } from "../chat/stream";
-import { handleAgentChatStream } from "../agents/stream";
+import { handleAgentChatStream, handleCatalogAgentChatStream } from "../agents/stream";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
 import { getDb, ensureDefaultWorkspace } from "../db";
@@ -461,6 +461,8 @@ async function startServer() {
   app.post("/api/chat/stream", handleChatStream);
   // Agent chat streaming endpoint
   app.get("/api/agents/:agentId/chat/stream", handleAgentChatStream);
+  // Catalog-authoritative agent chat streaming endpoint
+  app.get("/api/catalog/agents/:catalogEntryId/chat/stream", handleCatalogAgentChatStream);
 
   // Governance audit artifact download
   app.get("/api/governance/audit/:runId/artifacts/:kind", async (req, res) => {
