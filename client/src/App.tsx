@@ -280,6 +280,7 @@ function Router() {
       {/* LLMs — governed LLM lifecycle */}
       <Route path="/llm" component={() => <ProtectedRoute component={LLMDashboard} />} />
       <Route path="/llm/control-panel" component={() => <ProtectedRoute component={LLMControlPlane} />} />
+      <Route path="/llm/control-plane">{() => <Redirect to="/llm/control-panel" />}</Route>
       <Route path="/llm/register" component={() => <ProtectedRoute component={LLMWizard} />} />
       <Route path="/llm/create">{() => <Redirect to="/llm/register" />}</Route>
       <Route path="/llm/wizard" component={() => <ProtectedRoute component={LLMCreationWizard} />} />

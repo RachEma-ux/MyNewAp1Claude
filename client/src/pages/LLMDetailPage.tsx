@@ -248,7 +248,7 @@ export default function LLMDetailPage() {
       <div className="container mx-auto py-4 sm:py-8 px-4 max-w-7xl">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Invalid LLM ID</h1>
-          <Button onClick={() => setLocation("/llm/control-plane")}>
+          <Button onClick={() => setLocation("/llm/control-panel")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Control Plane
           </Button>
@@ -273,7 +273,7 @@ export default function LLMDetailPage() {
       <div className="container mx-auto py-4 sm:py-8 px-4 max-w-7xl">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">LLM Not Found</h1>
-          <Button onClick={() => setLocation("/llm/control-plane")}>
+          <Button onClick={() => setLocation("/llm/control-panel")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Control Plane
           </Button>
@@ -287,7 +287,7 @@ export default function LLMDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/llm/control-plane")}>
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/llm/control-panel")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

@@ -47,11 +47,11 @@ export default function LLMDashboard() {
   };
 
   const openControlPlane = () => {
-    setLocation("/llm/control-plane");
+    setLocation("/llm/control-panel");
   };
 
   const openProviderWizard = () => {
-    setLocation("/llm/provider-wizard");
+    setLocation("/providers/wizard");
   };
 
   if (isLoading) {
