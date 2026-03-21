@@ -21,13 +21,22 @@
  *   - Gate FAIL on any Critical/High at validate+
  */
 
-import { getActiveControls, getControlsForStage, type ControlDefinition } from "./control-catalog";
+import {
+  getActiveControls,
+  getControlsForStage,
+  type ControlDefinition,
+} from "./control-catalog";
 import { resolvePacks, type PackResolution } from "./pack-resolver";
-import { validateSubject, type GovernedSubject, type SubjectType } from "./governed-subject";
+import {
+  validateSubject,
+  type GovernedSubject,
+  type SubjectType,
+} from "./governed-subject";
 import { getRunner, type RunnerContext, type ControlResult } from "./runner";
 import { aggregateResults, type AggregatedScorecard } from "./aggregator";
 import { generateEvidenceBundle, type EvidenceBundle } from "./evidence";
 import type { LifecycleStage } from "../lifecycle-guard";
+import { toUserSafeGovernanceDetail } from "../../../shared/error-presentation";
 
 // ============================================================================
 // Types
@@ -70,7 +79,11 @@ export interface ScorecardResult {
   /** Pack resolution details */
   packResolution: PackResolution | null;
   /** Subject validation result */
-  subjectValidation: { valid: boolean; errors: string[]; warnings: string[] } | null;
+  subjectValidation: {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+  } | null;
   /** Whether this is a 409 (blocked transition) */
   blocked: boolean;
   /** HTTP status code to return (200 or 409) */
@@ -89,7 +102,9 @@ export function getScorecardHistory(): ScorecardResult[] {
 }
 
 export function getLatestScorecard(): ScorecardResult | null {
-  return _scorecardHistory.length > 0 ? _scorecardHistory[_scorecardHistory.length - 1] : null;
+  return _scorecardHistory.length > 0
+    ? _scorecardHistory[_scorecardHistory.length - 1]
+    : null;
 }
 
 // ============================================================================
@@ -110,11 +125,19 @@ export function getLatestScorecard(): ScorecardResult | null {
  *   8. Determine HTTP status (200 or 409)
  *   9. Store in history
  */
-export async function runScorecard(request: ScorecardRequest): Promise<ScorecardResult> {
+export async function runScorecard(
+  request: ScorecardRequest
+): Promise<ScorecardResult> {
   // 1. Normalize subject
-  const subject = request.subject || (request.entry ? entryToSubject(request.entry) : undefined);
+  const subject =
+    request.subject ||
+    (request.entry ? entryToSubject(request.entry) : undefined);
   let packResolution: PackResolution | null = null;
-  let subjectValidation: { valid: boolean; errors: string[]; warnings: string[] } | null = null;
+  let subjectValidation: {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+  } | null = null;
 
   // 2. Select controls
   let controls: ControlDefinition[];
@@ -125,37 +148,43 @@ export async function runScorecard(request: ScorecardRequest): Promise<Scorecard
 
     if (subjectValidation.valid) {
       // Resolve packs for this subject type
-      packResolution = resolvePacks(subject.type, request.stageOnly ? request.stage : undefined);
+      packResolution = resolvePacks(
+        subject.type,
+        request.stageOnly ? request.stage : undefined
+      );
 
       if (packResolution.resolved) {
         controls = packResolution.controls;
       } else {
         // Pack resolution failed — use base controls only + inject pack failure
-        controls = packResolution.baseControls.length > 0
-          ? packResolution.baseControls
-          : getActiveControls().filter((c) => c.pack === "base");
+        controls =
+          packResolution.baseControls.length > 0
+            ? packResolution.baseControls
+            : getActiveControls().filter(c => c.pack === "base");
       }
     } else {
       // Invalid subject — run base controls only
-      controls = getActiveControls().filter((c) => c.pack === "base");
+      controls = getActiveControls().filter(c => c.pack === "base");
     }
   } else {
     // No subject — system-wide check (base controls only)
     controls = request.stageOnly
-      ? getControlsForStage(request.stage).filter((c) => c.pack === "base")
-      : getActiveControls().filter((c) => c.pack === "base");
+      ? getControlsForStage(request.stage).filter(c => c.pack === "base")
+      : getActiveControls().filter(c => c.pack === "base");
   }
 
   // 3. Build runner context
   const ctx: RunnerContext = {
-    entry: subject ? {
-      id: subject.id,
-      name: subject.name,
-      type: subject.type,
-      tags: subject.tags,
-      description: subject.description,
-      config: subject.config,
-    } : request.entry,
+    entry: subject
+      ? {
+          id: subject.id,
+          name: subject.name,
+          type: subject.type,
+          tags: subject.tags,
+          description: subject.description,
+          config: subject.config,
+        }
+      : request.entry,
     actor: request.actor,
     currentStage: subject
       ? getStageFromEntryTags(subject.tags)
@@ -207,7 +236,8 @@ export async function runScorecard(request: ScorecardRequest): Promise<Scorecard
         finding: "invalid_subject",
         targets: subjectValidation.errors,
       },
-      remediation: "Fix subject contract violations before entering the scorecard pipeline.",
+      remediation:
+        "Fix subject contract violations before entering the scorecard pipeline.",
       timestamp: new Date(),
     });
   }
@@ -248,18 +278,26 @@ export async function runScorecard(request: ScorecardRequest): Promise<Scorecard
       results.push(...runnerResults);
       runnersInvoked.add(runnerId);
     } catch (err) {
+      const technicalDetails = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[Governance][Scorecard] RUNNER_FAILURE | runner=${runnerId} ` +
+          `subject_type=${subject?.type || "unknown"} subject_id=${subject?.id || 0} ` +
+          `stage=${request.stage} error=${technicalDetails}`,
+        err
+      );
+
       for (const control of runnerControls) {
         results.push({
           controlId: control.id,
           runnerId,
           status: "fail",
           severity: control.severity,
-          details: `Runner "${runnerId}" threw: ${err instanceof Error ? err.message : String(err)}`,
+          details: toUserSafeGovernanceDetail(technicalDetails),
           evidence: {
             check: control.name,
             finding: "runner_error",
             targets: [runnerId],
-            data: { error: err instanceof Error ? err.message : String(err) },
+            data: { error: technicalDetails },
           },
           remediation: control.remediation,
           timestamp: new Date(),
@@ -307,7 +345,14 @@ export async function runScorecard(request: ScorecardRequest): Promise<Scorecard
 // Helpers
 // ============================================================================
 
-function entryToSubject(entry: { id: number; name: string; type: string; tags: string[]; description?: string; config?: any }): GovernedSubject {
+function entryToSubject(entry: {
+  id: number;
+  name: string;
+  type: string;
+  tags: string[];
+  description?: string;
+  config?: any;
+}): GovernedSubject {
   return {
     id: entry.id,
     name: entry.name,

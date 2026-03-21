@@ -1,12 +1,21 @@
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
+import { toUserSafeGovernanceMessage } from "@shared/error-presentation";
 import { Loader2, ShieldCheck, ChevronDown, ChevronRight } from "lucide-react";
 
 export default function ScorecardsExplorerPanel() {
-  const { data: history, isLoading: histLoading } = trpc.governance.scorecardHistory.useQuery();
-  const { data: latest, isLoading: latestLoading } = trpc.governance.scorecardLatest.useQuery();
+  const { data: history, isLoading: histLoading } =
+    trpc.governance.scorecardHistory.useQuery();
+  const { data: latest, isLoading: latestLoading } =
+    trpc.governance.scorecardLatest.useQuery();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const isLoading = histLoading || latestLoading;
@@ -39,12 +48,19 @@ export default function ScorecardsExplorerPanel() {
               Latest Run
             </CardTitle>
             <CardDescription>
-              Stage: {latest.stage ?? "—"} | Score: {latest.scorecard?.score ?? "N/A"}/100
+              Stage: {latest.stage ?? "—"} | Score:{" "}
+              {latest.scorecard?.score ?? "N/A"}/100
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
-              <Badge variant={latest.scorecard?.gateStatus?.passed ? "default" : "destructive"}>
+              <Badge
+                variant={
+                  latest.scorecard?.gateStatus?.passed
+                    ? "default"
+                    : "destructive"
+                }
+              >
                 Gate: {latest.scorecard?.gateStatus?.status ?? "unknown"}
               </Badge>
               {latest.timestamp && (
@@ -67,7 +83,9 @@ export default function ScorecardsExplorerPanel() {
               {runs.map((run: any, i: number) => (
                 <div key={i}>
                   <button
-                    onClick={() => setSelectedIndex(selectedIndex === i ? null : i)}
+                    onClick={() =>
+                      setSelectedIndex(selectedIndex === i ? null : i)
+                    }
                     className="w-full flex items-center justify-between py-2 px-3 hover:bg-muted/50 rounded-lg transition-colors text-left"
                   >
                     <div className="flex items-center gap-3">
@@ -79,14 +97,24 @@ export default function ScorecardsExplorerPanel() {
                       <span className="text-sm font-medium">
                         {run.stage ?? "—"} gate
                       </span>
-                      <Badge variant={run.scorecard?.gateStatus?.passed ? "default" : "destructive"}>
+                      <Badge
+                        variant={
+                          run.scorecard?.gateStatus?.passed
+                            ? "default"
+                            : "destructive"
+                        }
+                      >
                         {run.scorecard?.gateStatus?.passed ? "PASS" : "FAIL"}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm">{run.scorecard?.score ?? "—"}/100</span>
+                      <span className="text-sm">
+                        {run.scorecard?.score ?? "—"}/100
+                      </span>
                       <span className="text-xs text-muted-foreground">
-                        {run.timestamp ? new Date(run.timestamp).toLocaleString() : "—"}
+                        {run.timestamp
+                          ? new Date(run.timestamp).toLocaleString()
+                          : "—"}
                       </span>
                     </div>
                   </button>
@@ -96,33 +124,65 @@ export default function ScorecardsExplorerPanel() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                         <div className="text-center p-2 rounded bg-muted/50">
                           <p className="text-xs text-muted-foreground">Score</p>
-                          <p className="font-bold">{selectedRun.scorecard?.score ?? "—"}/100</p>
+                          <p className="font-bold">
+                            {selectedRun.scorecard?.score ?? "—"}/100
+                          </p>
                         </div>
                         <div className="text-center p-2 rounded bg-muted/50">
-                          <p className="text-xs text-muted-foreground">Risk Critical</p>
-                          <p className="font-bold">{selectedRun.scorecard?.riskBreakdown?.critical ?? 0}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Risk Critical
+                          </p>
+                          <p className="font-bold">
+                            {selectedRun.scorecard?.riskBreakdown?.critical ??
+                              0}
+                          </p>
                         </div>
                         <div className="text-center p-2 rounded bg-muted/50">
-                          <p className="text-xs text-muted-foreground">Risk High</p>
-                          <p className="font-bold">{selectedRun.scorecard?.riskBreakdown?.high ?? 0}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Risk High
+                          </p>
+                          <p className="font-bold">
+                            {selectedRun.scorecard?.riskBreakdown?.high ?? 0}
+                          </p>
                         </div>
                         <div className="text-center p-2 rounded bg-muted/50">
-                          <p className="text-xs text-muted-foreground">Gate Reason</p>
-                          <p className="text-xs mt-1">{selectedRun.scorecard?.gateStatus?.reason ?? "—"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Gate Reason
+                          </p>
+                          <p className="text-xs mt-1">
+                            {toUserSafeGovernanceMessage(
+                              selectedRun.scorecard?.gateStatus?.reason ?? "—"
+                            )}
+                          </p>
                         </div>
                       </div>
 
                       {selectedRun.scorecard?.controlResults && (
                         <div className="space-y-1">
-                          <p className="text-sm font-medium mb-2">Control Results</p>
-                          {selectedRun.scorecard.controlResults.map((cr: any, j: number) => (
-                            <div key={j} className="flex items-center justify-between py-1 text-sm">
-                              <span>{cr.controlId}</span>
-                              <Badge variant={cr.status === "pass" ? "default" : cr.status === "fail" ? "destructive" : "secondary"}>
-                                {cr.status}
-                              </Badge>
-                            </div>
-                          ))}
+                          <p className="text-sm font-medium mb-2">
+                            Control Results
+                          </p>
+                          {selectedRun.scorecard.controlResults.map(
+                            (cr: any, j: number) => (
+                              <div
+                                key={j}
+                                className="flex items-center justify-between py-1 text-sm"
+                              >
+                                <span>{cr.controlId}</span>
+                                <Badge
+                                  variant={
+                                    cr.status === "pass"
+                                      ? "default"
+                                      : cr.status === "fail"
+                                        ? "destructive"
+                                        : "secondary"
+                                  }
+                                >
+                                  {cr.status}
+                                </Badge>
+                              </div>
+                            )
+                          )}
                         </div>
                       )}
                     </div>
@@ -131,7 +191,9 @@ export default function ScorecardsExplorerPanel() {
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">No scorecard runs recorded</p>
+            <p className="text-muted-foreground text-sm">
+              No scorecard runs recorded
+            </p>
           )}
         </CardContent>
       </Card>

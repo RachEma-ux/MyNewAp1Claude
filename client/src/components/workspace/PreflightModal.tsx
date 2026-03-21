@@ -6,6 +6,7 @@
  */
 
 import { trpc } from "@/lib/trpc";
+import { toUserSafeGovernanceMessage } from "@shared/error-presentation";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ShieldAlert, AlertTriangle, CheckCircle2, Lock, FileText } from "lucide-react";
+import {
+  ShieldAlert,
+  AlertTriangle,
+  CheckCircle2,
+  Lock,
+  FileText,
+} from "lucide-react";
 
 interface PreflightModalProps {
   open: boolean;
@@ -125,7 +132,10 @@ export function PreflightModal({
               <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/5 p-3">
                 <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                 <p className="text-xs text-red-600 dark:text-red-400">
-                  {preflight.denialReason || "This action is currently blocked by governance."}
+                  {toUserSafeGovernanceMessage(
+                    preflight.denialReason ||
+                      "This action is currently blocked by governance."
+                  )}
                 </p>
               </div>
             )}
@@ -140,11 +150,12 @@ export function PreflightModal({
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button
-            onClick={onConfirm}
-            disabled={preflight?.denied}
-          >
-            {preflight?.denied ? "Blocked" : isHighRisk ? "Proceed with Governance" : "Confirm"}
+          <Button onClick={onConfirm} disabled={preflight?.denied}>
+            {preflight?.denied
+              ? "Blocked"
+              : isHighRisk
+                ? "Proceed with Governance"
+                : "Confirm"}
           </Button>
         </DialogFooter>
       </DialogContent>
