@@ -114,7 +114,7 @@ export const agentsRouter = router({
         target_type: "agent",
         target_id: String(createdAgent.id),
         decision_result: "success",
-        metadata: { action: "create", name: input.name },
+        metadata: { action: "create", name: input.identity.name },
       });
 
       return {

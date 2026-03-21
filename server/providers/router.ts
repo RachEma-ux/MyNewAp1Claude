@@ -242,7 +242,7 @@ export const providerRouter = router({
 
       await getAuditLogger().log({
         actor_id: String(ctx.user.id),
-        action_type: "PROVIDER_LIFECYCLE_UPDATE",
+        action_type: "LIFECYCLE_CHANGE",
         target_type: "provider",
         target_id: String(input.id),
         decision_result: "success",
