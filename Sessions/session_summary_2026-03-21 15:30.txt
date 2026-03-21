@@ -1,0 +1,70 @@
+Session Summary — 2026-03-21 15:30
+
+## Goals
+- Complete governance hardening mission (P03/P05/P07 probe fixes)
+- Update hamburger menu: rename LLM Wizard, add LLM Wizard sub-item
+- Update App.tsx routes to match menu changes
+
+## Changes Made
+
+### Governance Hardening (commit f25f7e3)
+10 files changed, 34 insertions, 6 deletions.
+
+**P03 — Freeze Block (FAIL → expected PASS)**
+- Added `isFrozen(0)` system freeze check in `requireGovernance` middleware (trpc.ts)
+- Throws TRPCError with `code: "CONFLICT"` and `"FREEZE active"` message
+- Runs BEFORE `requireGovernedAction` for short-circuit denial
+
+**P05 — Audit Trail (WARN → improved)**
+- Added `principal_type` field (`"human" | "ai" | "system"`) to AuditLogger interface and log method
+- Added `principal_type: "human"` to all 3 `audit.log()` calls in requireGate.ts
+- Fixed governance engine RBAC denial: `ADMIN_ROLE_CHANGE` → `RBAC_DENIAL` + `principal_type`
+- Added `actor_id` and `principal_type` to catalog-manage.ts unified audit calls
+
+**P07 — Principal Attribution (WARN → expected PASS)**
+- idea-builder-agent.ts:687 — `actor: 1` → `actor: 0, actorType: "system"`
+- catalog-manage.ts:36 — `actor: number = 1` → `actor: number = 0` with dynamic actorType
+- plugins/registry.ts:384 — `installedBy ?? 1` → `?? 0`
+- policyService.ts:297 — `loadedBy ?? 1` → `?? 0`
+
+**Production Safety**
+- architecture-validator.ts: Added fail-closed error for DEV_MODE=true + NODE_ENV=production
+  without ALLOW_DEV_MODE_IN_PROD escape hatch
+- builder-deploy.yml: Added ALLOW_DEV_MODE_IN_PROD=true for CI deploys
+
+**Report**
+- Generated GOVERNANCE_COMPLIANCE_REPORT.md with fix summary and remaining items
+
+### Menu Update: LLM Wizard → LLMs Register (commit 41fe01a)
+- Renamed "Wizard" to "LLMs Register" with FileStack icon under AI Types > LLMs
+- Added new "LLM Wizard" sub-item pointing to /llm/wizard (route already existed)
+
+### Route Update (commit a80001d)
+- Added /llm/register route → LLMCreationWizard (canonical for "LLMs Register" menu)
+- Kept /llm/create as backward-compatible alias
+- Updated menu href from /llm/create to /llm/register
+
+## Files Modified
+- server/_core/trpc.ts
+- server/governance/architecture-validator.ts
+- server/governance/governance-engine.ts
+- server/governance/requireGate.ts
+- server/modules/pmt/idea-builder-agent.ts
+- server/plugins/registry.ts
+- server/routers/catalog-manage.ts
+- server/services/auditLogger.ts
+- server/services/policyService.ts
+- .github/workflows/builder-deploy.yml
+- GOVERNANCE_COMPLIANCE_REPORT.md (new)
+- client/src/components/MainLayout.tsx
+- client/src/App.tsx
+
+## Commits
+- f25f7e3 Governance hardening: fix P03/P05/P07 probes + production fail-closed
+- 41fe01a UI: Rename LLM Wizard to LLMs Register, add LLM Wizard sub-item
+- a80001d Update routes: add /llm/register route, update menu href
+
+## Current State
+- All changes committed and pushed to origin/main
+- No uncommitted changes
+- CI should validate governance harness improvements
