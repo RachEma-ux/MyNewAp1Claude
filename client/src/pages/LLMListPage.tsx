@@ -3,10 +3,15 @@
  *
  * This is an inventory page (NOT a dashboard).
  * Shows all LLMs from both register and creation flows with computed statuses.
+ *
+ * Supports two modes:
+ * A. Normal mode — full inventory with statuses, filters, no import initiation
+ * B. Catalog-import mode — triggered via ?mode=catalog-import&deployableOnly=1&returnTo=...
+ *    Shows only deployable LLMs, selection UI, returns to Catalog candidate flow
  */
 
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -253,14 +258,24 @@ function SourceBadge({ source }: { source: "registered" | "created" }) {
 
 export default function LLMListPage() {
   const [, navigate] = useLocation();
+  const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+
+  // Catalog-import mode detection (mirrors Agent pattern)
+  const searchParams = useMemo(() => new URLSearchParams(search), [search]);
+  const importSelectionMode = searchParams.get("mode") === "catalog-import";
+  const deployableOnly = searchParams.get("deployableOnly") === "1";
+  const returnTo = searchParams.get("returnTo") || "/llm/catalogue/candidate";
 
   // Data queries — listEnriched returns LLMs with per-LLM version summaries
   const llmsQuery = trpc.llm.listEnriched.useQuery({ archived: false });
   const projectsQuery = trpc.llm.listCreationProjects.useQuery({});
   const catalogQuery = trpc.catalogManage.list.useQuery({ entryType: "llm" });
+
+  // Catalog import mutation (mirrors agents.importToCatalog)
+  const importMutation = trpc.llm.importToCatalog.useMutation();
 
   const isLoading = llmsQuery.isLoading || projectsQuery.isLoading || catalogQuery.isLoading;
   const isError = llmsQuery.isError || projectsQuery.isError;
@@ -368,6 +383,13 @@ export default function LLMListPage() {
   const filtered = useMemo(() => {
     let result = rows;
 
+    // In catalog-import mode with deployableOnly, show only deployable + not already imported
+    if (importSelectionMode && deployableOnly) {
+      result = result.filter(
+        (r) => r.status === "deployable" && r.catalogState === "not_imported"
+      );
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -379,16 +401,16 @@ export default function LLMListPage() {
       );
     }
 
-    if (statusFilter !== "all") {
+    if (!importSelectionMode && statusFilter !== "all") {
       result = result.filter((r) => r.status === statusFilter);
     }
 
-    if (sourceFilter !== "all") {
+    if (!importSelectionMode && sourceFilter !== "all") {
       result = result.filter((r) => r.source === sourceFilter);
     }
 
     return result;
-  }, [rows, searchQuery, statusFilter, sourceFilter]);
+  }, [rows, searchQuery, statusFilter, sourceFilter, importSelectionMode, deployableOnly]);
 
   // Summary counts
   const counts = useMemo(() => {
@@ -397,7 +419,15 @@ export default function LLMListPage() {
     return c;
   }, [rows]);
 
-  // Action handlers
+  // Catalog import selection handler (mirrors Agent pattern)
+  const handleCatalogSelection = async (row: LLMRow) => {
+    if (row.id <= 0) return; // Orphan projects can't be imported
+    const result = await importMutation.mutateAsync({ id: row.id });
+    const entryId = result.entry?.id;
+    navigate(entryId ? `${returnTo}?entryId=${entryId}` : returnTo);
+  };
+
+  // Action handlers (normal mode only)
   const handleImport = (row: LLMRow) => {
     navigate(`/llm/catalogue/manage`);
   };
@@ -457,64 +487,94 @@ export default function LLMListPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">LLMs List</h1>
+          <h1 className="text-2xl font-bold">
+            {importSelectionMode ? "Select LLM for Catalog" : "LLMs List"}
+          </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Governed LLM inventory and Catalog import readiness
+            {importSelectionMode
+              ? "Select a deployable LLM to continue Catalog candidate creation"
+              : "Governed LLM inventory and Catalog import readiness"}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate("/llm/register")}>
-            <Wand2 className="h-4 w-4 mr-1" /> Register LLM
+        {importSelectionMode ? (
+          <Button variant="outline" size="sm" onClick={() => navigate(returnTo)}>
+            Back to Candidate Pipeline
           </Button>
-          <Button size="sm" onClick={() => navigate("/llm/wizard")}>
-            <Cpu className="h-4 w-4 mr-1" /> LLM Wizard
-          </Button>
-        </div>
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate("/llm/register")}>
+              <Wand2 className="h-4 w-4 mr-1" /> Register LLM
+            </Button>
+            <Button size="sm" onClick={() => navigate("/llm/wizard")}>
+              <Cpu className="h-4 w-4 mr-1" /> LLM Wizard
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Summary Strip */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-        {[
-          { label: "Total", value: counts.total, className: "text-foreground" },
-          { label: "Draft", value: counts.draft, className: "text-gray-400" },
-          { label: "Building", value: counts.building, className: "text-blue-500" },
-          { label: "Blocked", value: counts.blocked, className: "text-red-500" },
-          { label: "Deployable", value: counts.deployable, className: "text-green-500" },
-          { label: "Imported", value: counts.imported, className: "text-purple-400" },
-        ].map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-3 text-center">
-              <p className={`text-xl font-bold ${s.className}`}>{s.value}</p>
-              <p className="text-xs text-muted-foreground">{s.label}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Catalog Import Mode Banner */}
+      {importSelectionMode && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex items-start gap-3 pt-6">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 text-primary" />
+            <div className="space-y-1 text-sm">
+              <p className="font-medium">Catalog Import Mode</p>
+              <p className="text-muted-foreground">
+                Only deployable LLMs are shown. Select one to create a Catalog candidate entry.
+                This does not grant runtime authority — the Catalog pipeline handles review, publication, and activation.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary Strip — hidden in catalog-import mode */}
+      {!importSelectionMode && (
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {[
+            { label: "Total", value: counts.total, className: "text-foreground" },
+            { label: "Draft", value: counts.draft, className: "text-gray-400" },
+            { label: "Building", value: counts.building, className: "text-blue-500" },
+            { label: "Blocked", value: counts.blocked, className: "text-red-500" },
+            { label: "Deployable", value: counts.deployable, className: "text-green-500" },
+            { label: "Imported", value: counts.imported, className: "text-purple-400" },
+          ].map((s) => (
+            <Card key={s.label}>
+              <CardContent className="p-3 text-center">
+                <p className={`text-xl font-bold ${s.className}`}>{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by name, role, description..."
+            placeholder={importSelectionMode ? "Search deployable LLMs..." : "Search by name, role, description..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="building">Building</SelectItem>
-            <SelectItem value="blocked">Blocked</SelectItem>
-            <SelectItem value="deployable">Deployable</SelectItem>
-            <SelectItem value="imported">Imported</SelectItem>
-          </SelectContent>
-        </Select>
+        {!importSelectionMode && (
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="building">Building</SelectItem>
+              <SelectItem value="blocked">Blocked</SelectItem>
+              <SelectItem value="deployable">Deployable</SelectItem>
+              <SelectItem value="imported">Imported</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <Select value={sourceFilter} onValueChange={setSourceFilter}>
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Source" />
@@ -525,6 +585,7 @@ export default function LLMListPage() {
             <SelectItem value="created">Created</SelectItem>
           </SelectContent>
         </Select>
+        )}
       </div>
 
       {/* Error state */}
@@ -543,14 +604,24 @@ export default function LLMListPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Package className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">
-              {rows.length === 0 ? "No LLMs registered" : "No LLMs match filters"}
+              {importSelectionMode
+                ? "No deployable LLMs available"
+                : rows.length === 0
+                  ? "No LLMs registered"
+                  : "No LLMs match filters"}
             </h3>
             <p className="text-muted-foreground text-center mb-4 text-sm">
-              {rows.length === 0
-                ? "Get started by registering an LLM or using the creation wizard."
-                : "Try adjusting your search or filter criteria."}
+              {importSelectionMode
+                ? "Register and configure an LLM with passing governance before it can be imported to the Catalog."
+                : rows.length === 0
+                  ? "Get started by registering an LLM or using the creation wizard."
+                  : "Try adjusting your search or filter criteria."}
             </p>
-            {rows.length === 0 && (
+            {importSelectionMode ? (
+              <Button variant="outline" size="sm" onClick={() => navigate(returnTo)}>
+                Back to Candidate Pipeline
+              </Button>
+            ) : rows.length === 0 ? (
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => navigate("/llm/register")}>
                   Register LLM
@@ -559,7 +630,7 @@ export default function LLMListPage() {
                   LLM Wizard
                 </Button>
               </div>
-            )}
+            ) : null}
           </CardContent>
         </Card>
       )}
@@ -646,7 +717,19 @@ export default function LLMListPage() {
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
-                        <ActionButton row={row} onAction={handleAction} />
+                        {importSelectionMode ? (
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={importMutation.isPending}
+                            onClick={() => handleCatalogSelection(row)}
+                          >
+                            <Upload className="w-3.5 h-3.5 mr-1" />
+                            {importMutation.isPending ? "Importing..." : "Select for Catalog"}
+                          </Button>
+                        ) : (
+                          <ActionButton row={row} onAction={handleAction} />
+                        )}
                       </td>
                     </tr>
                   ))}

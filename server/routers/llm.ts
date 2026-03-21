@@ -48,6 +48,13 @@ import {
   onboardLLMVersionToCatalogCandidate,
   resolveCatalogLLMRuntimeAuthority,
 } from "../llm/authority";
+import {
+  createCatalogEntry,
+  getCatalogEntries,
+  createCatalogAuditEvent,
+  getTaxonomyNodes,
+  setEntryClassifications,
+} from "../db";
 
 // ============================================================================
 // Input Validation Schemas
@@ -395,6 +402,112 @@ export const llmRouter = router({
       });
 
       return entry;
+    }),
+
+  /**
+   * Import a deployable LLM into the Catalog as a candidate.
+   * Mirrors the agent pattern: agents.importToCatalog.
+   * Takes an LLM ID (not version ID), validates it has deployable versions,
+   * creates a catalog entry with entryType "llm", status "draft", reviewState "needs_review".
+   * Catalog owns candidate creation — this just hands off the governed LLM.
+   */
+  importToCatalog: governedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const llm = await getLLMById(input.id);
+      if (!llm) throw new Error("LLM not found");
+
+      // Check that the LLM has at least one version with passing policy
+      const versions = await getLLMVersions(input.id);
+      const hasPassingPolicy = versions.some(
+        (v) => v.policyDecision === "pass" || v.policyDecision === "warn"
+      );
+      const hasBlocker = versions.some(
+        (v) => v.policyDecision === "deny" || v.attestationStatus === "failed" || v.attestationStatus === "revoked"
+      );
+
+      if (!hasPassingPolicy || hasBlocker) {
+        throw new Error(
+          "Only deployable LLMs can be imported into the Catalog. " +
+          "This LLM must have at least one version with passing policy and no governance blockers."
+        );
+      }
+
+      // Check for existing catalog entry to prevent duplicates
+      const existingEntries = await getCatalogEntries({ entryType: "llm" });
+      const duplicate = existingEntries.find((entry) => {
+        const config = (entry.config as Record<string, any>) || {};
+        return config.sourceLLMId === input.id;
+      });
+      if (duplicate) {
+        return { success: true, entry: duplicate, imported: false };
+      }
+
+      // Pick the best version (latest with passing policy)
+      const bestVersion = versions.find(
+        (v) => v.policyDecision === "pass" || v.policyDecision === "warn"
+      );
+
+      const config: Record<string, unknown> = {
+        sourceLLMId: llm.id,
+        sourceLLMVersionId: bestVersion?.id ?? null,
+        sourceEnvironment: bestVersion?.environment ?? null,
+        runtimeAuthority: "catalog_entry",
+        catalogEligible: true,
+        callableMeaning: "catalog_candidate_runtime_disabled_until_published_and_activated",
+        llmRole: llm.role,
+      };
+
+      const entry = await createCatalogEntry({
+        name: llm.name,
+        displayName: llm.name,
+        description: llm.description ?? null,
+        entryType: "llm",
+        scope: "app",
+        status: "draft",
+        origin: "admin",
+        reviewState: "needs_review",
+        config,
+        tags: ["candidate", "llm", "catalog-import"],
+        category: llm.role,
+        subCategory: null,
+        capabilities: null,
+        createdBy: ctx.user.id,
+      });
+
+      // Auto-classify
+      try {
+        const axisNodes = await getTaxonomyNodes({ entryType: "llm", level: "axis" });
+        if (axisNodes.length > 0) {
+          await setEntryClassifications(entry.id, [axisNodes[0].id]);
+        }
+      } catch (e: any) {
+        console.warn(`[LLM] Auto-classify failed for imported catalog entry ${entry.id}:`, e.message);
+      }
+
+      await createCatalogAuditEvent({
+        eventType: "catalog.llm.submitted",
+        catalogEntryId: entry.id,
+        actor: ctx.user.id,
+        actorType: "user",
+        payload: {
+          sourceLLMId: llm.id,
+          sourceLLMVersionId: bestVersion?.id ?? null,
+          reviewState: "needs_review",
+          status: "draft",
+        },
+      });
+
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "llm",
+        target_id: String(llm.id),
+        decision_result: "success",
+        metadata: { action: "importToCatalog", catalogEntryId: entry.id },
+      });
+
+      return { success: true, entry, imported: true };
     }),
 
   getCatalogRuntimeAuthority: protectedProcedure

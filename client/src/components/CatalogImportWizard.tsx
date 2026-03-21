@@ -706,9 +706,17 @@ export function CatalogImportWizard({
                 From Wizard
               </div>
               <p className="text-xs text-muted-foreground">
-                Create entries through guided wizards, or choose an existing callable agent for Catalog onboarding
+                Select a deployable LLM or callable Agent for Catalog onboarding, or create entries through guided wizards
               </p>
               <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { onOpenChange(false); navigate("/list/llms?mode=catalog-import&deployableOnly=1&returnTo=/llm/catalogue/candidate"); }}
+                >
+                  <Brain className="h-4 w-4 mr-1" />
+                  LLM Select
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
