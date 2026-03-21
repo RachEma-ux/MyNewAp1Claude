@@ -298,6 +298,7 @@ function Router() {
       {/* Digital HQ — collaboration & authority pages */}
       <Route path="/hq/:item" component={() => <ProtectedRoute component={DigitalHQPage} />} />
       {/* Governance Center — governance enforcement pages */}
+      <Route path="/governance" component={() => <Redirect to="/governance/overview" />} />
       <Route path="/governance/:item" component={() => <ProtectedRoute component={GovernanceCenterPage} />} />
       {/* Operator Runtime — Multi-Operator Autonomous Platform */}
       <Route path="/run-console" component={() => <ProtectedRoute component={RunConsolePage} />} />
