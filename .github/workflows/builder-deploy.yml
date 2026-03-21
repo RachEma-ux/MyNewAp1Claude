@@ -479,42 +479,52 @@ jobs:
           echo "  APP_ID: ${VITE_APP_ID:-(not set)}"
 
           # Set NODE_ENV based on DEV_MODE to align environment settings
-          # DEV_MODE=true → development (no strict validation)
-          # DEV_MODE=false → production (requires secrets)
+          # DEV_MODE=true → development (built-in encryption fallback)
+          # DEV_MODE=false → production (requires ENCRYPTION_KEY secret)
           if [ "${{ github.event.inputs.dev_mode }}" = "true" ]; then
             EFFECTIVE_NODE_ENV="development"
-            # Fallback encryption key for dev mode (not secure, only for testing)
-            EFFECTIVE_ENCRYPTION_KEY="dev-fallback-key-for-testing-only"
           else
             EFFECTIVE_NODE_ENV="production"
-            # Production requires real encryption key from secrets
-            EFFECTIVE_ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}"
-          fi
-
-          # Use secret if available, otherwise use fallback
-          if [ -n "${{ secrets.ENCRYPTION_KEY }}" ]; then
-            EFFECTIVE_ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}"
           fi
 
           echo "Runtime environment:"
           echo "  NODE_ENV: ${EFFECTIVE_NODE_ENV}"
           echo "  DEV_MODE: ${{ github.event.inputs.dev_mode }}"
-          echo "  ENCRYPTION_KEY: ${EFFECTIVE_ENCRYPTION_KEY:+(configured)}"
+          echo "  ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY && '(from secret)' || '(using built-in dev fallback)' }}"
 
-          # Start the Node.js server with all auth environment variables
-          PORT=3000 \
-          NODE_ENV="${EFFECTIVE_NODE_ENV}" \
-          DATABASE_URL="${EFFECTIVE_DB_URL}" \
-          DEV_MODE="${{ github.event.inputs.dev_mode }}" \
-          ENCRYPTION_KEY="${EFFECTIVE_ENCRYPTION_KEY}" \
-          OAUTH_SERVER_URL="${EFFECTIVE_OAUTH_SERVER}" \
-          JWT_SECRET="${JWT_SECRET}" \
-          COOKIE_SECRET="${COOKIE_SECRET:-$JWT_SECRET}" \
-          VITE_APP_ID="${VITE_APP_ID}" \
-          OPENAI_API_KEY="${OPENAI_API_KEY}" \
-          ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
-          GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
-          node dist/index.js > server.log 2>&1 &
+          # Start the Node.js server
+          # In dev mode: ENCRYPTION_KEY is intentionally NOT set to trigger built-in fallback
+          # In prod mode: ENCRYPTION_KEY must be provided from secrets
+          if [ "${{ github.event.inputs.dev_mode }}" = "false" ] && [ -n "${{ secrets.ENCRYPTION_KEY }}" ]; then
+            # Production with secret
+            PORT=3000 \
+            NODE_ENV="${EFFECTIVE_NODE_ENV}" \
+            DATABASE_URL="${EFFECTIVE_DB_URL}" \
+            DEV_MODE="${{ github.event.inputs.dev_mode }}" \
+            ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}" \
+            OAUTH_SERVER_URL="${EFFECTIVE_OAUTH_SERVER}" \
+            JWT_SECRET="${JWT_SECRET}" \
+            COOKIE_SECRET="${COOKIE_SECRET:-$JWT_SECRET}" \
+            VITE_APP_ID="${VITE_APP_ID}" \
+            OPENAI_API_KEY="${OPENAI_API_KEY}" \
+            ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+            GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
+            node dist/index.js > server.log 2>&1 &
+          else
+            # Dev mode - ENCRYPTION_KEY not set to trigger built-in fallback
+            PORT=3000 \
+            NODE_ENV="${EFFECTIVE_NODE_ENV}" \
+            DATABASE_URL="${EFFECTIVE_DB_URL}" \
+            DEV_MODE="${{ github.event.inputs.dev_mode }}" \
+            OAUTH_SERVER_URL="${EFFECTIVE_OAUTH_SERVER}" \
+            JWT_SECRET="${JWT_SECRET}" \
+            COOKIE_SECRET="${COOKIE_SECRET:-$JWT_SECRET}" \
+            VITE_APP_ID="${VITE_APP_ID}" \
+            OPENAI_API_KEY="${OPENAI_API_KEY}" \
+            ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+            GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
+            node dist/index.js > server.log 2>&1 &
+          fi
           SERVER_PID=$!
 
           # Wait for server startup and fail fast if the process dies.
