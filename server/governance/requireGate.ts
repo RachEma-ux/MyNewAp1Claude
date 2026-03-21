@@ -108,6 +108,7 @@ export async function requireGate(
     // Denial audit is blocking — must record why we blocked
     const event = await audit.log({
       actor_id: actor.id,
+      principal_type: "human",
       action_type: "FREEZE_BLOCK",
       target_type: "lifecycle_gate",
       target_id: String(subject.id),
@@ -146,6 +147,7 @@ export async function requireGate(
     // Denial audit is blocking — must durably record why we blocked
     const event = await audit.log({
       actor_id: actor.id,
+      principal_type: "human",
       action_type: "GATE_CHECK",
       target_type: "lifecycle_gate",
       target_id: String(subject.id),
@@ -200,6 +202,7 @@ export async function requireGate(
   try {
     const event = await audit.log({
       actor_id: actor.id,
+      principal_type: "human",
       action_type: "GATE_CHECK",
       target_type: "lifecycle_gate",
       target_id: String(subject.id),

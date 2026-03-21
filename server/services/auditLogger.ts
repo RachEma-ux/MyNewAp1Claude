@@ -37,10 +37,13 @@ export type AuditActionType =
   // Discovery Artifact Governance v1
   | "DISCOVERY_ATTEMPT";
 
+export type PrincipalType = "human" | "ai" | "system";
+
 export interface AuditEvent {
   event_id: string;
   timestamp: Date;
   actor_id: string | null;
+  principal_type: PrincipalType;
   workspace_id: string | null;
   action_type: AuditActionType;
   target_type: string;
@@ -58,6 +61,7 @@ class AuditLogger {
    */
   async log(params: {
     actor_id?: string | null;
+    principal_type?: PrincipalType;
     workspace_id?: string | null;
     action_type: AuditActionType;
     target_type: string;
@@ -69,6 +73,7 @@ class AuditLogger {
       event_id: randomUUID(),
       timestamp: new Date(),
       actor_id: params.actor_id ?? null,
+      principal_type: params.principal_type ?? "human",
       workspace_id: params.workspace_id ?? null,
       action_type: params.action_type,
       target_type: params.target_type,

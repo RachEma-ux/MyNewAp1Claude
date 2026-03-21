@@ -684,7 +684,7 @@ export async function ensureAgentRegistered(): Promise<number | null> {
     await createCatalogAuditEvent({
       eventType: "agent_registered",
       catalogEntryId: entry.id,
-      actor: 1,
+      actor: 0,
       actorType: "system",
       payload: {
         agentId: AGENT_CATALOG_ID,

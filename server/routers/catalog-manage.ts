@@ -33,19 +33,21 @@ import {
 import { createHash } from "crypto";
 
 /** Helper to emit audit events without blocking the response */
-function audit(eventType: string, catalogEntryId: number | null, payload: any, bundleId?: number, actor: number = 1) {
+function audit(eventType: string, catalogEntryId: number | null, payload: any, bundleId?: number, actor: number = 0) {
   // Legacy DB audit
   createCatalogAuditEvent({
     eventType,
     catalogEntryId,
     publishBundleId: bundleId ?? null,
     actor,
-    actorType: "user",
+    actorType: actor === 0 ? "system" : "user",
     payload,
   }).catch((e) => console.warn(`[CatalogAudit] Failed to log ${eventType}:`, e.message));
 
   // Unified audit logger
   getAuditLogger().log({
+    actor_id: actor ? String(actor) : null,
+    principal_type: actor === 0 ? "system" : "human",
     action_type: eventType.startsWith("catalog.bundle") ? "PUBLICATION_GATE" : "LIFECYCLE_TRANSITION",
     target_type: "catalog_entry",
     target_id: catalogEntryId ? String(catalogEntryId) : null,

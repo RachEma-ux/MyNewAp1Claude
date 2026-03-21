@@ -245,6 +245,12 @@ export function validateStartupConditions(): {
     if (process.env.DEBUG === "true") {
       warnings.push("DEBUG=true in production — consider disabling");
     }
+
+    // DEV_MODE=true in production is a fail-closed violation
+    // unless explicitly allowed for CI/staging via ALLOW_DEV_MODE_IN_PROD
+    if (process.env.DEV_MODE === "true" && !process.env.ALLOW_DEV_MODE_IN_PROD) {
+      errors.push("DEV_MODE=true in production — authentication is BYPASSED. Set ALLOW_DEV_MODE_IN_PROD=true for CI/staging.");
+    }
   }
 
   return {

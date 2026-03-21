@@ -487,6 +487,7 @@ jobs:
           NODE_ENV="${EFFECTIVE_NODE_ENV}" \
           DATABASE_URL="${EFFECTIVE_DB_URL}" \
           DEV_MODE="${{ github.event.inputs.dev_mode }}" \
+          ALLOW_DEV_MODE_IN_PROD=true \
           ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}" \
           OAUTH_SERVER_URL="${EFFECTIVE_OAUTH_SERVER}" \
           JWT_SECRET="${JWT_SECRET}" \

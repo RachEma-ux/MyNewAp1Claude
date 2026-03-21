@@ -294,7 +294,7 @@ export async function storePolicyVersion(
     policyHash: hash,
     bundle: bundle,
     loadedAt: new Date(),
-    loadedBy: actorId ?? 1,
+    loadedBy: actorId ?? 0, // 0 = system actor (never hardcode user ID 1)
     isCurrent: true,
   });
 }

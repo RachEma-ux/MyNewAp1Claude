@@ -4,6 +4,7 @@ import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { requireGovernedAction, type GovernanceReceipt } from "../governance/requireGovernedAction";
 import { resolveActionKey } from "../governance/action-key-map";
+import { isFrozen } from "../governance/scorecard";
 import { getAppBlockerFromTRPCError, toTRPCError } from "./blockers";
 
 const t = initTRPC.context<TrpcContext>().create({
@@ -66,6 +67,15 @@ const requireGovernance = t.middleware(async (opts) => {
 
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  }
+
+  // ── Freeze check (BEFORE governance evaluation) ──────────────────────
+  // System-wide freeze blocks ALL governed mutations immediately.
+  if (isFrozen(0)) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "System-wide governance FREEZE active — all mutations blocked",
+    });
   }
 
   const trpcPath = opts.path || "system-mutation";

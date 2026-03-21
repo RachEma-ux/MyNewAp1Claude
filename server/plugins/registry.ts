@@ -381,7 +381,7 @@ export class PluginRegistry {
       permissions: manifest.permissions || {},
       enabled: status === "enabled",
       verified: false,
-      installedBy: installedByUserId ?? 1,
+      installedBy: installedByUserId ?? 0, // 0 = system actor (never hardcode user ID 1)
     });
   }
   

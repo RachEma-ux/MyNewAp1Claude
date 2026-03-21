@@ -106,7 +106,8 @@ class GovernanceEngine {
       // Audit log the denial
       getAuditLogger().log({
         actor_id: context?.actorId,
-        action_type: "ADMIN_ROLE_CHANGE" as any,
+        principal_type: "human",
+        action_type: "RBAC_DENIAL",
         target_type: "rbac_enforcement",
         target_id: context?.target,
         decision_result: "denied",
