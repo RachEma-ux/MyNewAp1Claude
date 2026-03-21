@@ -479,20 +479,26 @@ jobs:
           echo "  APP_ID: ${VITE_APP_ID:-(not set)}"
 
           # Set NODE_ENV based on DEV_MODE to align environment settings
-          # DEV_MODE=true → development (no encryption key required, serves built files)
-          # DEV_MODE=false → production (requires ENCRYPTION_KEY secret)
+          # DEV_MODE=true → development (no strict validation)
+          # DEV_MODE=false → production (requires secrets)
           if [ "${{ github.event.inputs.dev_mode }}" = "true" ]; then
             EFFECTIVE_NODE_ENV="development"
-            # Use fallback encryption key for dev/testing (not secure, only for CI)
-            EFFECTIVE_ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY || 'dev-key-not-for-production-use-only-testing' }}"
+            # Fallback encryption key for dev mode (not secure, only for testing)
+            EFFECTIVE_ENCRYPTION_KEY="dev-fallback-key-for-testing-only"
           else
             EFFECTIVE_NODE_ENV="production"
             # Production requires real encryption key from secrets
             EFFECTIVE_ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}"
           fi
 
+          # Use secret if available, otherwise use fallback
+          if [ -n "${{ secrets.ENCRYPTION_KEY }}" ]; then
+            EFFECTIVE_ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}"
+          fi
+
           echo "Runtime environment:"
           echo "  NODE_ENV: ${EFFECTIVE_NODE_ENV}"
+          echo "  DEV_MODE: ${{ github.event.inputs.dev_mode }}"
           echo "  ENCRYPTION_KEY: ${EFFECTIVE_ENCRYPTION_KEY:+(configured)}"
 
           # Start the Node.js server with all auth environment variables
