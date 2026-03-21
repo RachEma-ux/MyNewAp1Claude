@@ -575,16 +575,17 @@ export default function LLMListPage() {
             </SelectContent>
           </Select>
         )}
-        <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Source" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All sources</SelectItem>
-            <SelectItem value="registered">Registered</SelectItem>
-            <SelectItem value="created">Created</SelectItem>
-          </SelectContent>
-        </Select>
+        {!importSelectionMode && (
+          <Select value={sourceFilter} onValueChange={setSourceFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Source" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sources</SelectItem>
+              <SelectItem value="registered">Registered</SelectItem>
+              <SelectItem value="created">Created</SelectItem>
+            </SelectContent>
+          </Select>
         )}
       </div>
 
