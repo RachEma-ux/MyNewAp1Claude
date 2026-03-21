@@ -25,7 +25,7 @@ const ProviderWizardPage = lazy(() => import("./ProviderWizardPage"));
 
 function ProviderDashboard() {
   const [, navigate] = useLocation();
-  const { data: providers, isLoading } = trpc.provider.list.useQuery({});
+  const { data: providers, isLoading } = trpc.providers.list.useQuery({});
 
   const total = providers?.length ?? 0;
   const cloudCount = providers?.filter((p) => p.kind === "cloud" || (!p.kind && !["local-llamacpp", "local-ollama"].includes(p.type))).length ?? 0;

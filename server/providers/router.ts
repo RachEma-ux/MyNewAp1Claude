@@ -93,7 +93,7 @@ export const providerRouter = router({
       config: z.record(z.string(), z.unknown()),
       costPer1kTokens: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       // Provider policy evaluation
       const namePattern = /^[a-z][a-z0-9-]*[a-z0-9]$/;
       if (!namePattern.test(input.name.toLowerCase().replace(/\s+/g, '-'))) {
@@ -158,6 +158,7 @@ export const providerRouter = router({
       }
 
       await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
         action_type: "PROVIDER_CONNECT",
         target_type: "provider",
         target_id: String(provider.id),
@@ -178,9 +179,9 @@ export const providerRouter = router({
       config: z.record(z.string(), z.unknown()).optional(),
       costPer1kTokens: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
-      
+
       // Update in database
       await providerDb.updateProvider(id, data);
 
@@ -194,6 +195,7 @@ export const providerRouter = router({
       }
 
       await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
         action_type: "PROVIDER_UPDATE",
         target_type: "provider",
         target_id: String(id),
@@ -210,7 +212,7 @@ export const providerRouter = router({
       id: z.number(),
       lifecycleStatus: z.enum(["configured", "authenticated", "validated", "healthy", "active", "suspended"]),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       // Lifecycle transition validation
       const VALID_TRANSITIONS: Record<string, string[]> = {
         configured: ["authenticated"],
@@ -239,6 +241,7 @@ export const providerRouter = router({
       await providerDb.updateProviderLifecycleStatus(input.id, input.lifecycleStatus);
 
       await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
         action_type: "PROVIDER_LIFECYCLE_UPDATE",
         target_type: "provider",
         target_id: String(input.id),
@@ -254,7 +257,7 @@ export const providerRouter = router({
     .input(z.object({
       id: z.number(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       // Unregister from registry
       const registry = getProviderRegistry();
       await registry.unregisterProvider(input.id);
@@ -263,6 +266,7 @@ export const providerRouter = router({
       await providerDb.deleteProvider(input.id);
 
       await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
         action_type: "PROVIDER_DELETE",
         target_type: "provider",
         target_id: String(input.id),
