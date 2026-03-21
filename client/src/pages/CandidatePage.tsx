@@ -89,6 +89,10 @@ import { CatalogImportWizard } from "@/components/CatalogImportWizard";
 import { ConnectProviderModal } from "@/components/ConnectProviderModal";
 import { DiscoveryHealthPanel } from "@/components/DiscoveryOpsPanel";
 import { toast } from "sonner";
+import {
+  toUserSafeGovernanceDetail,
+  toUserSafeGovernanceMessage,
+} from "@shared/error-presentation";
 
 const TYPE_ICONS: Record<string, any> = {
   provider: Server,
@@ -132,9 +136,9 @@ function getStageReviewState(entry: any, stage: string): string {
 
 /** Inline component to show classification badges for a table row */
 function ClassificationBadges({ entryId }: { entryId: number }) {
-  const { data: nodes } = trpc.catalogManage.getClassifications.useQuery(
-    { catalogEntryId: entryId },
-  );
+  const { data: nodes } = trpc.catalogManage.getClassifications.useQuery({
+    catalogEntryId: entryId,
+  });
   if (!nodes || nodes.length === 0) {
     return <span className="text-xs text-muted-foreground">—</span>;
   }
@@ -158,10 +162,11 @@ function ClassificationBadges({ entryId }: { entryId: number }) {
 
 export default function CandidatePage() {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"catalog" | "validation" | "publishing" | "audit" | "discovery-ops">("catalog");
+  const [activeTab, setActiveTab] = useState<
+    "catalog" | "validation" | "publishing" | "audit" | "discovery-ops"
+  >("catalog");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | EntryType>("all");
-
 
   // Import wizard state
   const [importWizardOpen, setImportWizardOpen] = useState(false);
@@ -188,8 +193,11 @@ export default function CandidatePage() {
   const [showCandidates, setShowCandidates] = useState(false);
   // Undo snapshot: captures form state before Apply so admin can revert
   const [preApplySnapshot, setPreApplySnapshot] = useState<{
-    formName: string; formDisplayName: string; formDescription: string;
-    formConfig: string; formTags: string;
+    formName: string;
+    formDisplayName: string;
+    formDescription: string;
+    formConfig: string;
+    formTags: string;
   } | null>(null);
 
   // Step 2: Security & Governance
@@ -277,7 +285,9 @@ export default function CandidatePage() {
 
   // Validation state
   const [validatingId, setValidatingId] = useState<number | null>(null);
-  const [validationResults, setValidationResults] = useState<Record<number, any>>({});
+  const [validationResults, setValidationResults] = useState<
+    Record<number, any>
+  >({});
   const [runTestPrompt, setRunTestPrompt] = useState(false);
 
   // Governance review dialog state
@@ -297,42 +307,63 @@ export default function CandidatePage() {
   const trpcUtils = trpc.useUtils();
 
   // Data queries
-  const { data: entries = [], isLoading, refetch } = trpc.catalogManage.list.useQuery({
+  const {
+    data: entries = [],
+    isLoading,
+    refetch,
+  } = trpc.catalogManage.list.useQuery({
     ...(typeFilter !== "all" ? { entryType: typeFilter } : {}),
   });
   const { data: versions = [] } = trpc.catalogManage.listVersions.useQuery(
     { catalogEntryId: versionsEntryId! },
     { enabled: !!versionsEntryId }
   );
-  const { data: bundles = [], refetch: refetchBundles } = trpc.catalogManage.listBundles.useQuery({});
-  const { data: auditEvents = [] } = trpc.catalogRegistry.auditLog.useQuery({ limit: 50 });
+  const { data: bundles = [], refetch: refetchBundles } =
+    trpc.catalogManage.listBundles.useQuery({});
+  const { data: auditEvents = [] } = trpc.catalogRegistry.auditLog.useQuery({
+    limit: 50,
+  });
 
   // Mutations
   const createMutation = trpc.catalogManage.create.useMutation({
-    onSuccess: (created) => {
+    onSuccess: created => {
       if (formClassifications.length > 0) {
-        classifyMutation.mutate({ catalogEntryId: created.id, nodeIds: formClassifications });
+        classifyMutation.mutate({
+          catalogEntryId: created.id,
+          nodeIds: formClassifications,
+        });
       }
-      refetch(); closeDialog();
+      refetch();
+      closeDialog();
     },
   });
   const updateMutation = trpc.catalogManage.update.useMutation({
     onSuccess: (_, vars) => {
-      classifyMutation.mutate({ catalogEntryId: vars.id, nodeIds: formClassifications });
-      refetch(); closeDialog();
+      classifyMutation.mutate({
+        catalogEntryId: vars.id,
+        nodeIds: formClassifications,
+      });
+      refetch();
+      closeDialog();
     },
   });
   const deleteMutation = trpc.catalogManage.delete.useMutation({
-    onSuccess: () => { refetch(); setDeleteDialogOpen(false); setDeletingEntry(null); },
+    onSuccess: () => {
+      refetch();
+      setDeleteDialogOpen(false);
+      setDeletingEntry(null);
+    },
   });
   const validateMutation = trpc.catalogManage.validate.useMutation({
     onSuccess: (data, variables) => {
-      setValidationResults((prev) => ({ ...prev, [variables.id]: data }));
+      setValidationResults(prev => ({ ...prev, [variables.id]: data }));
       setValidatingId(null);
       refetch();
       // Validation results displayed — stage transition is handled by the governed Validate button
       if (data.success) {
-        toast.success("Orchestrator validation passed — click Validate to advance to next stage");
+        toast.success(
+          "Orchestrator validation passed — click Validate to advance to next stage"
+        );
       }
     },
     onError: () => setValidatingId(null),
@@ -352,11 +383,20 @@ export default function CandidatePage() {
       refetch();
       setReviewDialogOpen(false);
       setReviewEntry(null);
-      const stageMsg = reviewStage === "register" ? "registration" : reviewStage === "validate" ? "validation" : reviewStage === "publish" ? "publication" : "review";
+      const stageMsg =
+        reviewStage === "register"
+          ? "registration"
+          : reviewStage === "validate"
+            ? "validation"
+            : reviewStage === "publish"
+              ? "publication"
+              : "review";
       toast.success(`Entry approved — ${stageMsg} criteria met`);
     },
-    onError: (error) => {
-      toast.error(`Approval failed: ${error.message}`);
+    onError: error => {
+      toast.error(
+        `Approval failed: ${toUserSafeGovernanceMessage(error.message)}`
+      );
     },
   });
   const activateMutation = trpc.catalogManage.activate.useMutation({
@@ -368,8 +408,10 @@ export default function CandidatePage() {
       refetch();
       toast.success("Tech docs refreshed — governance metadata updated");
     },
-    onError: (error) => {
-      toast.error(`Docs refresh failed: ${error.message}`);
+    onError: error => {
+      toast.error(
+        `Docs refresh failed: ${toUserSafeGovernanceMessage(error.message)}`
+      );
     },
   });
 
@@ -379,19 +421,21 @@ export default function CandidatePage() {
       // Update tags on the entry via updateMutation
       updateMutation.mutate({ id: variables.entryId, tags: data.newTags });
       const stageName = variables.targetStage;
-      toast.success(`Stage transition to ${stageName} approved — all governance checks passed`);
+      toast.success(
+        `Stage transition to ${stageName} approved — all governance checks passed`
+      );
       // Store review result for display
-      setStageReviewResults((prev) => ({
+      setStageReviewResults(prev => ({
         ...prev,
         [variables.entryId]: data.stageReview,
       }));
     },
-    onError: (error) => {
-      toast.error(error.message);
+    onError: error => {
+      toast.error(toUserSafeGovernanceMessage(error.message));
       // Extract review data from error if available
       const cause = (error as any)?.data?.cause;
       if (cause?.stageReview) {
-        setStageReviewResults((prev) => ({
+        setStageReviewResults(prev => ({
           ...prev,
           [cause.stageReview.stage]: cause.stageReview,
         }));
@@ -400,12 +444,14 @@ export default function CandidatePage() {
   });
 
   // Stage review results for UI display
-  const [stageReviewResults, setStageReviewResults] = useState<Record<number, any>>({});
+  const [stageReviewResults, setStageReviewResults] = useState<
+    Record<number, any>
+  >({});
   // Track which entries have their checklist panel open
   const [openChecklists, setOpenChecklists] = useState<Set<number>>(new Set());
 
   function toggleChecklist(entryId: number) {
-    setOpenChecklists((prev) => {
+    setOpenChecklists(prev => {
       const next = new Set(prev);
       if (next.has(entryId)) next.delete(entryId);
       else next.add(entryId);
@@ -437,16 +483,18 @@ export default function CandidatePage() {
         entryId: entry.id,
         targetStage: stage as any,
       })
-      .then((result) => {
-        setStageReviewResults((prev) => ({ ...prev, [entry.id]: result }));
-        setOpenChecklists((prev) => {
+      .then(result => {
+        setStageReviewResults(prev => ({ ...prev, [entry.id]: result }));
+        setOpenChecklists(prev => {
           const next = new Set(prev);
           next.add(entry.id);
           return next;
         });
       })
-      .catch((err) => {
-        toast.error(`Stage review failed: ${err.message}`);
+      .catch(err => {
+        toast.error(
+          `Stage review failed: ${toUserSafeGovernanceMessage(err.message)}`
+        );
       });
   }
 
@@ -463,12 +511,14 @@ export default function CandidatePage() {
         entryId: entry.id,
         targetStage: stage as any,
       })
-      .then((result) => {
+      .then(result => {
         setReviewChecklist(result);
         setReviewLoading(false);
       })
-      .catch((err) => {
-        toast.error(`Review failed: ${err.message}`);
+      .catch(err => {
+        toast.error(
+          `Review failed: ${toUserSafeGovernanceMessage(err.message)}`
+        );
         setReviewLoading(false);
       });
   }
@@ -485,16 +535,32 @@ export default function CandidatePage() {
   // Pipeline stage filters — each tab shows entries tagged with its stage
   // Also includes entries that have already progressed (for history)
   // Entries with NO lifecycle tags are treated as fresh submissions (candidate)
-  const LIFECYCLE_TAGS = ["candidate", "registered", "validated", "published", "catalog"];
+  const LIFECYCLE_TAGS = [
+    "candidate",
+    "registered",
+    "validated",
+    "published",
+    "catalog",
+  ];
   const registerEntries = entries.filter((e: any) => {
     const tags = e.tags || [];
-    const hasLifecycleTag = LIFECYCLE_TAGS.some((lt) => tags.includes(lt));
+    const hasLifecycleTag = LIFECYCLE_TAGS.some(lt => tags.includes(lt));
     // Show if it has a pipeline tag OR if it has no lifecycle tag at all (fresh entry)
-    return !hasLifecycleTag || tags.includes("candidate") || tags.includes("registered") || tags.includes("validated") || tags.includes("published");
+    return (
+      !hasLifecycleTag ||
+      tags.includes("candidate") ||
+      tags.includes("registered") ||
+      tags.includes("validated") ||
+      tags.includes("published")
+    );
   });
   const validateEntries = entries.filter((e: any) => {
     const tags = e.tags || [];
-    return tags.includes("registered") || tags.includes("validated") || tags.includes("published");
+    return (
+      tags.includes("registered") ||
+      tags.includes("validated") ||
+      tags.includes("published")
+    );
   });
   const publishEntries = entries.filter((e: any) => {
     const tags = e.tags || [];
@@ -512,7 +578,6 @@ export default function CandidatePage() {
     );
   });
 
-
   function openEditDialog(entry: any) {
     setEditingEntry(entry);
     setFormName(entry.name);
@@ -528,7 +593,7 @@ export default function CandidatePage() {
     // Load classifications from DB
     trpcUtils.catalogManage.getClassifications
       .fetch({ catalogEntryId: entry.id })
-      .then((nodes) => setFormClassifications(nodes.map((n: any) => n.id)))
+      .then(nodes => setFormClassifications(nodes.map((n: any) => n.id)))
       .catch(() => {});
   }
 
@@ -547,8 +612,14 @@ export default function CandidatePage() {
   const stepLabels = isEnterprise
     ? ["Details", "Security", "Performance", "Integration", "Monitoring"]
     : isSaas
-    ? ["Details", "API Architecture", "Security", "Reliability", "Developer XP"]
-    : ["Details", "Step 2", "Step 3", "Step 4", "Step 5"];
+      ? [
+          "Details",
+          "API Architecture",
+          "Security",
+          "Reliability",
+          "Developer XP",
+        ]
+      : ["Details", "Step 2", "Step 3", "Step 4", "Step 5"];
 
   // Build the enriched config by merging user JSON with step 2-5 data
   function buildFullConfig(): Record<string, unknown> {
@@ -647,13 +718,15 @@ export default function CandidatePage() {
       if (!formName.trim()) return "Name is required";
     }
     if (isEnterprise && createStep === 1) {
-      if (authProtocols.length === 0) return "Select at least one authentication protocol";
+      if (authProtocols.length === 0)
+        return "Select at least one authentication protocol";
     }
     if (isSaas && createStep === 1) {
       if (!saasApiStyle) return "Select an API style";
     }
     if (isSaas && createStep === 2) {
-      if (saasAuthMethods.length === 0) return "Select at least one authentication method";
+      if (saasAuthMethods.length === 0)
+        return "Select at least one authentication method";
     }
     return null;
   }
@@ -672,8 +745,14 @@ export default function CandidatePage() {
 
   function handleSave() {
     const fullConfig = buildFullConfig();
-    const tags = formTags.split(",").map((t) => t.trim()).filter(Boolean);
-    const providerId = formProviderId && formProviderId !== "none" ? parseInt(formProviderId, 10) : undefined;
+    const tags = formTags
+      .split(",")
+      .map(t => t.trim())
+      .filter(Boolean);
+    const providerId =
+      formProviderId && formProviderId !== "none"
+        ? parseInt(formProviderId, 10)
+        : undefined;
 
     if (editingEntry) {
       updateMutation.mutate({
@@ -683,12 +762,15 @@ export default function CandidatePage() {
         description: formDescription || undefined,
         config: fullConfig,
         tags,
-        capabilities: formCapabilities.length > 0 ? formCapabilities : undefined,
+        capabilities:
+          formCapabilities.length > 0 ? formCapabilities : undefined,
         providerId,
       });
     } else {
       // Auto-inject "candidate" tag for new entries so they enter the pipeline
-      const createTags = tags.includes("candidate") ? tags : ["candidate", ...tags];
+      const createTags = tags.includes("candidate")
+        ? tags
+        : ["candidate", ...tags];
       createMutation.mutate({
         name: formName,
         displayName: formDisplayName || undefined,
@@ -697,7 +779,8 @@ export default function CandidatePage() {
         config: fullConfig,
         tags: createTags,
         providerId,
-        capabilities: formCapabilities.length > 0 ? formCapabilities : undefined,
+        capabilities:
+          formCapabilities.length > 0 ? formCapabilities : undefined,
         _evidence: { types: ["reason"], refs: ["manual-create"] },
       });
     }
@@ -710,7 +793,14 @@ export default function CandidatePage() {
 
   function runValidation(entryId: number) {
     setValidatingId(entryId);
-    validateMutation.mutate({ id: entryId, runTestPrompt, _evidence: { types: ["probe_results"], refs: ["orchestrator-validation"] } });
+    validateMutation.mutate({
+      id: entryId,
+      runTestPrompt,
+      _evidence: {
+        types: ["probe_results"],
+        refs: ["orchestrator-validation"],
+      },
+    });
   }
 
   function openPublishWizard(entry: any) {
@@ -727,7 +817,10 @@ export default function CandidatePage() {
       catalogEntryId: publishEntry.id,
       versionLabel: publishVersion,
       changeNotes: publishNotes || undefined,
-      _evidence: { types: ["reason", "diff", "tests_passed", "signed_commit"], refs: ["publish-review"] },
+      _evidence: {
+        types: ["reason", "diff", "tests_passed", "signed_commit"],
+        refs: ["publish-review"],
+      },
     });
   }
 
@@ -735,21 +828,30 @@ export default function CandidatePage() {
 
   return (
     <div className="container mx-auto py-8 max-w-6xl px-4">
-      <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate("/llm/catalogue/manage")}>
-        <ChevronLeft className="h-4 w-4 mr-1" />Back to Manage Catalogue
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mb-4"
+        onClick={() => navigate("/llm/catalogue/manage")}
+      >
+        <ChevronLeft className="h-4 w-4 mr-1" />
+        Back to Manage Catalogue
       </Button>
 
       <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Candidate Pipeline</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Candidate Pipeline
+          </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Submit, review, and promote catalog entries through a structured approval workflow
+            Submit, review, and promote catalog entries through a structured
+            approval workflow
           </p>
         </div>
         <div className="flex gap-2 shrink-0 self-start" />
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as any)}>
         <div className="overflow-x-auto">
           <TabsList>
             <TabsTrigger value="catalog">Register</TabsTrigger>
@@ -768,18 +870,23 @@ export default function CandidatePage() {
               <Input
                 placeholder="Search entries..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={e => setSearch(e.target.value)}
                 className="pl-9"
               />
             </div>
-            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+            <Select
+              value={typeFilter}
+              onValueChange={v => setTypeFilter(v as any)}
+            >
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                {ENTRY_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{ENTRY_TYPE_DEFS[t].label}s</SelectItem>
+                {ENTRY_TYPES.map(t => (
+                  <SelectItem key={t} value={t}>
+                    {ENTRY_TYPE_DEFS[t].label}s
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -794,7 +901,9 @@ export default function CandidatePage() {
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-10 w-10 mx-auto mb-3 opacity-50" />
               <p className="text-lg font-medium">No candidate entries yet</p>
-              <p className="text-sm mt-1">Entries submitted for review will appear here</p>
+              <p className="text-sm mt-1">
+                Entries submitted for review will appear here
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -803,92 +912,152 @@ export default function CandidatePage() {
                   <CardHeader className="pb-3">
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-2">
-                        <CardTitle className="text-base break-words cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>{entry.displayName || entry.name}</CardTitle>
+                        <CardTitle
+                          className="text-base break-words cursor-pointer"
+                          onDoubleClick={() => openEditDialog(entry)}
+                        >
+                          {entry.displayName || entry.name}
+                        </CardTitle>
                         <div className="flex gap-1 shrink-0">
-                        {(entry.tags || []).includes("candidate") && !(entry.tags || []).includes("registered") ? (
-                        <Button
-                          size="sm"
-                          onClick={() => governedTransition(entry, "register")}
-                          disabled={stageTransitionMutation.isPending || updateMutation.isPending || getStageReviewState(entry, "register") !== "approved"}
-                          className="text-xs"
-                          title={getStageReviewState(entry, "register") !== "approved" ? "Review must be approved first" : "Advance to Validate stage"}
-                        >
-                          {stageTransitionMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Rocket className="h-4 w-4 mr-1" />}
-                          Register
-                        </Button>
-                        ) : (
-                        <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
-                          <ShieldCheck className="h-3 w-3 mr-1" />
-                          Registered
-                        </Badge>
-                        )}
-                        {entry.entryType === "provider" && (entry.config?.docsUrl || entry.config?.baseUrl) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => refreshDocsMutation.mutate({ entryId: entry.id })}
-                          disabled={refreshDocsMutation.isPending}
-                          title="Refresh tech docs metadata"
-                        >
-                          {refreshDocsMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                          {(entry.tags || []).includes("candidate") &&
+                          !(entry.tags || []).includes("registered") ? (
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                governedTransition(entry, "register")
+                              }
+                              disabled={
+                                stageTransitionMutation.isPending ||
+                                updateMutation.isPending ||
+                                getStageReviewState(entry, "register") !==
+                                  "approved"
+                              }
+                              className="text-xs"
+                              title={
+                                getStageReviewState(entry, "register") !==
+                                "approved"
+                                  ? "Review must be approved first"
+                                  : "Advance to Validate stage"
+                              }
+                            >
+                              {stageTransitionMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Rocket className="h-4 w-4 mr-1" />
+                              )}
+                              Register
+                            </Button>
                           ) : (
-                            <FileText className="h-4 w-4" />
+                            <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                              <ShieldCheck className="h-3 w-3 mr-1" />
+                              Registered
+                            </Badge>
                           )}
-                        </Button>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(entry)} title="Edit">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => { setDeletingEntry(entry); setDeleteDialogOpen(true); }}
-                          title="Delete"
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          {entry.entryType === "provider" &&
+                            (entry.config?.docsUrl ||
+                              entry.config?.baseUrl) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  refreshDocsMutation.mutate({
+                                    entryId: entry.id,
+                                  })
+                                }
+                                disabled={refreshDocsMutation.isPending}
+                                title="Refresh tech docs metadata"
+                              >
+                                {refreshDocsMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <FileText className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(entry)}
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDeletingEntry(entry);
+                              setDeleteDialogOpen(true);
+                            }}
+                            title="Delete"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
-                        <Badge variant="outline" className="text-xs">
-                          <Icon className="h-3 w-3 mr-1" />
-                          {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {(() => {
+                          const Icon = TYPE_ICONS[entry.entryType] || Package;
+                          return (
+                            <Badge variant="outline" className="text-xs">
+                              <Icon className="h-3 w-3 mr-1" />
+                              {ENTRY_TYPE_DEFS[entry.entryType as EntryType]
+                                ?.label || entry.entryType}
+                            </Badge>
+                          );
+                        })()}
+                        <Badge
+                          className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}
+                        >
+                          {entry.status}
                         </Badge>
-                      ); })()}
-                      <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
-                      <Badge
-                        className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "register")] || ""}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openReviewDialog(entry, "register");
-                        }}
-                        title="Click to review registration criteria"
-                      >
-                        {getStageReviewState(entry, "register") === "approved" ? (
-                          <ShieldCheck className="h-3 w-3 mr-1" />
-                        ) : (
-                          <Shield className="h-3 w-3 mr-1" />
-                        )}
-                        {getStageReviewState(entry, "register") === "approved" ? "Reviewed" : "Review"}
-                      </Badge>
-                    </div>
-                    {entry.description && (
-                      <p className="text-xs text-muted-foreground">{entry.description}</p>
-                    )}
+                        <Badge
+                          className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "register")] || ""}`}
+                          onClick={e => {
+                            e.stopPropagation();
+                            openReviewDialog(entry, "register");
+                          }}
+                          title="Click to review registration criteria"
+                        >
+                          {getStageReviewState(entry, "register") ===
+                          "approved" ? (
+                            <ShieldCheck className="h-3 w-3 mr-1" />
+                          ) : (
+                            <Shield className="h-3 w-3 mr-1" />
+                          )}
+                          {getStageReviewState(entry, "register") === "approved"
+                            ? "Reviewed"
+                            : "Review"}
+                        </Badge>
+                      </div>
+                      {entry.description && (
+                        <p className="text-xs text-muted-foreground">
+                          {entry.description}
+                        </p>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}
+                      >
                         {entry.origin}
                       </Badge>
                       <ClassificationBadges entryId={entry.id} />
-                      {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
-                        <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
-                      ))}
+                      {(entry.tags || [])
+                        .slice(0, 3)
+                        .map((tag: string, i: number) => (
+                          <Badge
+                            key={i}
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
                       <span className="text-xs text-muted-foreground ml-auto">
                         Updated {new Date(entry.updatedAt).toLocaleDateString()}
                       </span>
@@ -898,11 +1067,21 @@ export default function CandidatePage() {
                   {/* Governance Stage Review Checklist */}
                   {stageReviewResults[entry.id] && (
                     <CardContent className="pt-0">
-                      <Collapsible open={openChecklists.has(entry.id)} onOpenChange={() => toggleChecklist(entry.id)}>
+                      <Collapsible
+                        open={openChecklists.has(entry.id)}
+                        onOpenChange={() => toggleChecklist(entry.id)}
+                      >
                         <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full">
                           <Shield className="h-3 w-3" />
-                          <span>Stage Review: {stageReviewResults[entry.id].passed ? "PASSED" : "BLOCKED"}</span>
-                          <Badge className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}>
+                          <span>
+                            Stage Review:{" "}
+                            {stageReviewResults[entry.id].passed
+                              ? "PASSED"
+                              : "BLOCKED"}
+                          </span>
+                          <Badge
+                            className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}
+                          >
                             {stageReviewResults[entry.id].score}%
                           </Badge>
                           <ChevronDown className="h-3 w-3 ml-auto" />
@@ -910,27 +1089,45 @@ export default function CandidatePage() {
                         <CollapsibleContent className="mt-2">
                           {!stageReviewResults[entry.id].passed && (
                             <div className="mb-2 p-2 rounded-md bg-orange-950/20 border border-orange-900/30">
-                              <p className="text-xs font-medium text-orange-400">Governance gate blocked this transition</p>
+                              <p className="text-xs font-medium text-orange-400">
+                                Governance gate blocked this transition
+                              </p>
                             </div>
                           )}
                           <div className="space-y-1">
-                            {stageReviewResults[entry.id].items.map((item: any) => (
-                              <div key={item.itemId} className="flex items-start gap-2 text-xs">
-                                {item.passed ? (
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
-                                ) : (
-                                  <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
-                                )}
-                                <div className="min-w-0">
-                                  <span className="font-medium">{item.name}</span>
-                                  <Badge variant="outline" className="text-[9px] ml-1 px-1 py-0">{item.category}</Badge>
-                                  <p className="text-muted-foreground">{item.details}</p>
-                                  {item.remediation && (
-                                    <p className="text-orange-400/80 italic">{item.remediation}</p>
+                            {stageReviewResults[entry.id].items.map(
+                              (item: any) => (
+                                <div
+                                  key={item.itemId}
+                                  className="flex items-start gap-2 text-xs"
+                                >
+                                  {item.passed ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                                  ) : (
+                                    <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
                                   )}
+                                  <div className="min-w-0">
+                                    <span className="font-medium">
+                                      {item.name}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[9px] ml-1 px-1 py-0"
+                                    >
+                                      {item.category}
+                                    </Badge>
+                                    <p className="text-muted-foreground">
+                                      {toUserSafeGovernanceDetail(item.details)}
+                                    </p>
+                                    {item.remediation && (
+                                      <p className="text-orange-400/80 italic">
+                                        {item.remediation}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              )
+                            )}
                           </div>
                         </CollapsibleContent>
                       </Collapsible>
@@ -945,10 +1142,15 @@ export default function CandidatePage() {
         <TabsContent value="validation" className="mt-4">
           {/* Test prompt toggle */}
           <div className="flex items-center gap-3 mb-4 p-3 rounded-md border bg-muted/30">
-            <Switch checked={runTestPrompt} onCheckedChange={setRunTestPrompt} />
+            <Switch
+              checked={runTestPrompt}
+              onCheckedChange={setRunTestPrompt}
+            />
             <div>
               <p className="text-sm font-medium">Run Test Prompt</p>
-              <p className="text-xs text-muted-foreground">Send a test prompt to verify model inference works</p>
+              <p className="text-xs text-muted-foreground">
+                Send a test prompt to verify model inference works
+              </p>
             </div>
           </div>
 
@@ -956,7 +1158,9 @@ export default function CandidatePage() {
             <div className="text-center py-12 text-muted-foreground">
               <Activity className="h-10 w-10 mx-auto mb-3 opacity-50" />
               <p className="text-lg font-medium">No entries to validate</p>
-              <p className="text-sm mt-1">Register entries first, then they appear here for validation</p>
+              <p className="text-sm mt-1">
+                Register entries first, then they appear here for validation
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -969,78 +1173,133 @@ export default function CandidatePage() {
                     <CardHeader className="pb-3">
                       <div className="space-y-2">
                         <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-base break-words cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>{entry.displayName || entry.name}</CardTitle>
-                          <div className="flex gap-1 shrink-0">
-                          {(entry.tags || []).includes("registered") && !(entry.tags || []).includes("validated") ? (
-                          <Button
-                            size="sm"
-                            onClick={() => governedTransition(entry, "validate")}
-                            disabled={stageTransitionMutation.isPending || updateMutation.isPending || getStageReviewState(entry, "validate") !== "approved"}
-                            title={getStageReviewState(entry, "validate") !== "approved" ? "Review must be approved first" : "Advance to Publish stage"}
+                          <CardTitle
+                            className="text-base break-words cursor-pointer"
+                            onDoubleClick={() => openEditDialog(entry)}
                           >
-                            {stageTransitionMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Rocket className="h-4 w-4 mr-1" />}
-                            Validate
-                          </Button>
-                          ) : (
-                          <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Validated
-                          </Badge>
-                          )}
+                            {entry.displayName || entry.name}
+                          </CardTitle>
+                          <div className="flex gap-1 shrink-0">
+                            {(entry.tags || []).includes("registered") &&
+                            !(entry.tags || []).includes("validated") ? (
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  governedTransition(entry, "validate")
+                                }
+                                disabled={
+                                  stageTransitionMutation.isPending ||
+                                  updateMutation.isPending ||
+                                  getStageReviewState(entry, "validate") !==
+                                    "approved"
+                                }
+                                title={
+                                  getStageReviewState(entry, "validate") !==
+                                  "approved"
+                                    ? "Review must be approved first"
+                                    : "Advance to Publish stage"
+                                }
+                              >
+                                {stageTransitionMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                ) : (
+                                  <Rocket className="h-4 w-4 mr-1" />
+                                )}
+                                Validate
+                              </Button>
+                            ) : (
+                              <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Validated
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5">
-                          {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
-                            <Badge variant="outline" className="text-xs">
-                              <Icon className="h-3 w-3 mr-1" />
-                              {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
-                            </Badge>
-                          ); })()}
-                          <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
+                          {(() => {
+                            const Icon = TYPE_ICONS[entry.entryType] || Package;
+                            return (
+                              <Badge variant="outline" className="text-xs">
+                                <Icon className="h-3 w-3 mr-1" />
+                                {ENTRY_TYPE_DEFS[entry.entryType as EntryType]
+                                  ?.label || entry.entryType}
+                              </Badge>
+                            );
+                          })()}
+                          <Badge
+                            className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}
+                          >
+                            {entry.status}
+                          </Badge>
                           <Badge
                             className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "validate")] || ""}`}
-                            onClick={(e) => {
+                            onClick={e => {
                               e.stopPropagation();
                               openReviewDialog(entry, "validate");
                             }}
                             title="Click to review validation criteria"
                           >
-                            {getStageReviewState(entry, "validate") === "approved" ? (
+                            {getStageReviewState(entry, "validate") ===
+                            "approved" ? (
                               <ShieldCheck className="h-3 w-3 mr-1" />
                             ) : (
                               <Shield className="h-3 w-3 mr-1" />
                             )}
-                            {getStageReviewState(entry, "validate") === "approved" ? "Reviewed" : "Review"}
+                            {getStageReviewState(entry, "validate") ===
+                            "approved"
+                              ? "Reviewed"
+                              : "Review"}
                           </Badge>
                           {entry.validationStatus && (
-                            <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
-                              {entry.validationStatus === "passed" ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                            <Badge
+                              className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}
+                            >
+                              {entry.validationStatus === "passed" ? (
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                              ) : (
+                                <XCircle className="h-3 w-3 mr-1" />
+                              )}
                               {entry.validationStatus}
                             </Badge>
                           )}
                         </div>
                         {entry.description && (
-                          <p className="text-xs text-muted-foreground">{entry.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {entry.description}
+                          </p>
                         )}
                       </div>
                       {entry.lastValidatedAt && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                           <Clock className="h-3 w-3" />
-                          Last validated: {new Date(entry.lastValidatedAt).toLocaleString()}
+                          Last validated:{" "}
+                          {new Date(entry.lastValidatedAt).toLocaleString()}
                         </p>
                       )}
                     </CardHeader>
                     <CardContent className="pt-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}
+                        >
                           {entry.origin}
                         </Badge>
                         <ClassificationBadges entryId={entry.id} />
-                        {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
-                          <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
-                        ))}
+                        {(entry.tags || [])
+                          .slice(0, 3)
+                          .map((tag: string, i: number) => (
+                            <Badge
+                              key={i}
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {tag}
+                            </Badge>
+                          ))}
                         <span className="text-xs text-muted-foreground ml-auto">
-                          Updated {new Date(entry.updatedAt).toLocaleDateString()}
+                          Updated{" "}
+                          {new Date(entry.updatedAt).toLocaleDateString()}
                         </span>
                       </div>
                     </CardContent>
@@ -1048,11 +1307,21 @@ export default function CandidatePage() {
                     {/* Governance Stage Review Checklist (Validate tab) */}
                     {stageReviewResults[entry.id] && (
                       <CardContent className="pt-0">
-                        <Collapsible open={openChecklists.has(entry.id)} onOpenChange={() => toggleChecklist(entry.id)}>
+                        <Collapsible
+                          open={openChecklists.has(entry.id)}
+                          onOpenChange={() => toggleChecklist(entry.id)}
+                        >
                           <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full">
                             <Shield className="h-3 w-3" />
-                            <span>Stage Review: {stageReviewResults[entry.id].passed ? "PASSED" : "BLOCKED"}</span>
-                            <Badge className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}>
+                            <span>
+                              Stage Review:{" "}
+                              {stageReviewResults[entry.id].passed
+                                ? "PASSED"
+                                : "BLOCKED"}
+                            </span>
+                            <Badge
+                              className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}
+                            >
                               {stageReviewResults[entry.id].score}%
                             </Badge>
                             <ChevronDown className="h-3 w-3 ml-auto" />
@@ -1060,27 +1329,47 @@ export default function CandidatePage() {
                           <CollapsibleContent className="mt-2">
                             {!stageReviewResults[entry.id].passed && (
                               <div className="mb-2 p-2 rounded-md bg-orange-950/20 border border-orange-900/30">
-                                <p className="text-xs font-medium text-orange-400">Governance gate blocked this transition</p>
+                                <p className="text-xs font-medium text-orange-400">
+                                  Governance gate blocked this transition
+                                </p>
                               </div>
                             )}
                             <div className="space-y-1">
-                              {stageReviewResults[entry.id].items.map((item: any) => (
-                                <div key={item.itemId} className="flex items-start gap-2 text-xs">
-                                  {item.passed ? (
-                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
-                                  ) : (
-                                    <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
-                                  )}
-                                  <div className="min-w-0">
-                                    <span className="font-medium">{item.name}</span>
-                                    <Badge variant="outline" className="text-[9px] ml-1 px-1 py-0">{item.category}</Badge>
-                                    <p className="text-muted-foreground">{item.details}</p>
-                                    {item.remediation && (
-                                      <p className="text-orange-400/80 italic">{item.remediation}</p>
+                              {stageReviewResults[entry.id].items.map(
+                                (item: any) => (
+                                  <div
+                                    key={item.itemId}
+                                    className="flex items-start gap-2 text-xs"
+                                  >
+                                    {item.passed ? (
+                                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                                    ) : (
+                                      <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
                                     )}
+                                    <div className="min-w-0">
+                                      <span className="font-medium">
+                                        {item.name}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[9px] ml-1 px-1 py-0"
+                                      >
+                                        {item.category}
+                                      </Badge>
+                                      <p className="text-muted-foreground">
+                                        {toUserSafeGovernanceDetail(
+                                          item.details
+                                        )}
+                                      </p>
+                                      {item.remediation && (
+                                        <p className="text-orange-400/80 italic">
+                                          {item.remediation}
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                )
+                              )}
                             </div>
                           </CollapsibleContent>
                         </Collapsible>
@@ -1095,44 +1384,75 @@ export default function CandidatePage() {
                           <div className="border rounded-md p-3">
                             <div className="flex items-center gap-2 mb-1">
                               <Activity className="h-4 w-4" />
-                              <span className="text-sm font-medium">Health</span>
-                              {result.results.health.passed
-                                ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
-                                : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
+                              <span className="text-sm font-medium">
+                                Health
+                              </span>
+                              {result.results.health.passed ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-red-500 ml-auto" />
+                              )}
                             </div>
-                            <p className="text-xs text-muted-foreground">{result.results.health.message}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{result.results.health.latencyMs}ms</p>
+                            <p className="text-xs text-muted-foreground">
+                              {result.results.health.message}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {result.results.health.latencyMs}ms
+                            </p>
                           </div>
 
                           {/* Capabilities */}
                           <div className="border rounded-md p-3">
                             <div className="flex items-center gap-2 mb-1">
                               <Cpu className="h-4 w-4" />
-                              <span className="text-sm font-medium">Capabilities</span>
-                              {result.results.capabilities.passed
-                                ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
-                                : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
+                              <span className="text-sm font-medium">
+                                Capabilities
+                              </span>
+                              {result.results.capabilities.passed ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-red-500 ml-auto" />
+                              )}
                             </div>
-                            <p className="text-xs text-muted-foreground">{result.results.capabilities.message}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {result.results.capabilities.message}
+                            </p>
                           </div>
 
                           {/* Models */}
                           <div className="border rounded-md p-3">
                             <div className="flex items-center gap-2 mb-1">
                               <Layers className="h-4 w-4" />
-                              <span className="text-sm font-medium">Models</span>
-                              {result.results.models.passed
-                                ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
-                                : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
+                              <span className="text-sm font-medium">
+                                Models
+                              </span>
+                              {result.results.models.passed ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-red-500 ml-auto" />
+                              )}
                             </div>
-                            <p className="text-xs text-muted-foreground">{result.results.models.message}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {result.results.models.message}
+                            </p>
                             {result.results.models.models.length > 0 && (
                               <div className="flex gap-1 flex-wrap mt-1">
-                                {result.results.models.models.slice(0, 5).map((m: string, i: number) => (
-                                  <Badge key={i} variant="secondary" className="text-xs">{m}</Badge>
-                                ))}
+                                {result.results.models.models
+                                  .slice(0, 5)
+                                  .map((m: string, i: number) => (
+                                    <Badge
+                                      key={i}
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {m}
+                                    </Badge>
+                                  ))}
                                 {result.results.models.models.length > 5 && (
-                                  <span className="text-xs text-muted-foreground">+{result.results.models.models.length - 5} more</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    +{result.results.models.models.length - 5}{" "}
+                                    more
+                                  </span>
                                 )}
                               </div>
                             )}
@@ -1143,18 +1463,26 @@ export default function CandidatePage() {
                             <div className="border rounded-md p-3">
                               <div className="flex items-center gap-2 mb-1">
                                 <MessageSquare className="h-4 w-4" />
-                                <span className="text-sm font-medium">Test Prompt</span>
-                                {result.results.testPrompt.passed
-                                  ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
-                                  : <XCircle className="h-4 w-4 text-red-500 ml-auto" />}
+                                <span className="text-sm font-medium">
+                                  Test Prompt
+                                </span>
+                                {result.results.testPrompt.passed ? (
+                                  <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                                ) : (
+                                  <XCircle className="h-4 w-4 text-red-500 ml-auto" />
+                                )}
                               </div>
-                              <p className="text-xs text-muted-foreground">{result.results.testPrompt.message}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {result.results.testPrompt.message}
+                              </p>
                               {result.results.testPrompt.response && (
                                 <p className="text-xs font-mono bg-muted/50 rounded p-1.5 mt-1 truncate">
                                   {result.results.testPrompt.response}
                                 </p>
                               )}
-                              <p className="text-xs text-muted-foreground mt-1">{result.results.testPrompt.latencyMs}ms</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {result.results.testPrompt.latencyMs}ms
+                              </p>
                             </div>
                           )}
                         </div>
@@ -1162,9 +1490,13 @@ export default function CandidatePage() {
                         {/* Errors */}
                         {result.errors && result.errors.length > 0 && (
                           <div className="mt-3 p-2 rounded-md bg-red-950/20 border border-red-900/30">
-                            <p className="text-xs font-medium text-red-400 mb-1">Errors:</p>
+                            <p className="text-xs font-medium text-red-400 mb-1">
+                              Errors:
+                            </p>
                             {result.errors.map((err: string, i: number) => (
-                              <p key={i} className="text-xs text-red-400/80">- {err}</p>
+                              <p key={i} className="text-xs text-red-400/80">
+                                - {err}
+                              </p>
                             ))}
                           </div>
                         )}
@@ -1182,12 +1514,17 @@ export default function CandidatePage() {
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3">Ready to Publish</h3>
             {(() => {
-              if (publishEntries.length === 0) return (
-                <div className="text-center py-8 text-muted-foreground border rounded-md">
-                  <p className="text-sm">No validated entries ready for publishing</p>
-                  <p className="text-xs mt-1">Validate entries first, then they appear here</p>
-                </div>
-              );
+              if (publishEntries.length === 0)
+                return (
+                  <div className="text-center py-8 text-muted-foreground border rounded-md">
+                    <p className="text-sm">
+                      No validated entries ready for publishing
+                    </p>
+                    <p className="text-xs mt-1">
+                      Validate entries first, then they appear here
+                    </p>
+                  </div>
+                );
               return (
                 <div className="space-y-4">
                   {publishEntries.map((entry: any) => (
@@ -1195,65 +1532,127 @@ export default function CandidatePage() {
                       <CardHeader className="pb-3">
                         <div className="space-y-2">
                           <div className="flex items-start justify-between gap-2">
-                            <CardTitle className="text-base break-words cursor-pointer" onDoubleClick={() => openEditDialog(entry)}>{entry.displayName || entry.name}</CardTitle>
+                            <CardTitle
+                              className="text-base break-words cursor-pointer"
+                              onDoubleClick={() => openEditDialog(entry)}
+                            >
+                              {entry.displayName || entry.name}
+                            </CardTitle>
                             <div className="flex gap-1 shrink-0">
-                            {(entry.tags || []).includes("validated") && !(entry.tags || []).includes("published") ? (
-                            <Button size="sm" onClick={() => governedTransition(entry, "publish")}
-                              disabled={stageTransitionMutation.isPending || updateMutation.isPending || getStageReviewState(entry, "publish") !== "approved"}
-                              title={getStageReviewState(entry, "publish") !== "approved" ? "Review must be approved first" : "Publish this entry"}>
-                              {stageTransitionMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Rocket className="h-4 w-4 mr-1" />}
-                              Publish
-                            </Button>
-                            ) : (
-                            <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
-                              <Rocket className="h-3 w-3 mr-1" />
-                              Published
-                            </Badge>
-                            )}
+                              {(entry.tags || []).includes("validated") &&
+                              !(entry.tags || []).includes("published") ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    governedTransition(entry, "publish")
+                                  }
+                                  disabled={
+                                    stageTransitionMutation.isPending ||
+                                    updateMutation.isPending ||
+                                    getStageReviewState(entry, "publish") !==
+                                      "approved"
+                                  }
+                                  title={
+                                    getStageReviewState(entry, "publish") !==
+                                    "approved"
+                                      ? "Review must be approved first"
+                                      : "Publish this entry"
+                                  }
+                                >
+                                  {stageTransitionMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                  ) : (
+                                    <Rocket className="h-4 w-4 mr-1" />
+                                  )}
+                                  Publish
+                                </Button>
+                              ) : (
+                                <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                                  <Rocket className="h-3 w-3 mr-1" />
+                                  Published
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5">
-                            {(() => { const Icon = TYPE_ICONS[entry.entryType] || Package; return (
-                              <Badge variant="outline" className="text-xs">
-                                <Icon className="h-3 w-3 mr-1" />
-                                {ENTRY_TYPE_DEFS[entry.entryType as EntryType]?.label || entry.entryType}
-                              </Badge>
-                            ); })()}
-                            <Badge className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}>{entry.status}</Badge>
+                            {(() => {
+                              const Icon =
+                                TYPE_ICONS[entry.entryType] || Package;
+                              return (
+                                <Badge variant="outline" className="text-xs">
+                                  <Icon className="h-3 w-3 mr-1" />
+                                  {ENTRY_TYPE_DEFS[entry.entryType as EntryType]
+                                    ?.label || entry.entryType}
+                                </Badge>
+                              );
+                            })()}
+                            <Badge
+                              className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}
+                            >
+                              {entry.status}
+                            </Badge>
                             <Badge
                               className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "publish")] || ""}`}
-                              onClick={(e) => {
+                              onClick={e => {
                                 e.stopPropagation();
                                 openReviewDialog(entry, "publish");
                               }}
                               title="Click to review publication criteria"
                             >
-                              {getStageReviewState(entry, "publish") === "approved" ? <ShieldCheck className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
-                              {getStageReviewState(entry, "publish") === "approved" ? "Reviewed" : "Review"}
+                              {getStageReviewState(entry, "publish") ===
+                              "approved" ? (
+                                <ShieldCheck className="h-3 w-3 mr-1" />
+                              ) : (
+                                <Shield className="h-3 w-3 mr-1" />
+                              )}
+                              {getStageReviewState(entry, "publish") ===
+                              "approved"
+                                ? "Reviewed"
+                                : "Review"}
                             </Badge>
                             {entry.validationStatus && (
-                              <Badge className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}>
-                                {entry.validationStatus === "passed" ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                              <Badge
+                                className={`text-xs ${entry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"}`}
+                              >
+                                {entry.validationStatus === "passed" ? (
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                ) : (
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                )}
                                 {entry.validationStatus}
                               </Badge>
                             )}
                           </div>
                           {entry.description && (
-                            <p className="text-xs text-muted-foreground">{entry.description}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {entry.description}
+                            </p>
                           )}
                         </div>
                       </CardHeader>
                       <CardContent className="pt-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline" className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${ORIGIN_COLORS[entry.origin] || ""}`}
+                          >
                             {entry.origin}
                           </Badge>
                           <ClassificationBadges entryId={entry.id} />
-                          {(entry.tags || []).slice(0, 3).map((tag: string, i: number) => (
-                            <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
-                          ))}
+                          {(entry.tags || [])
+                            .slice(0, 3)
+                            .map((tag: string, i: number) => (
+                              <Badge
+                                key={i}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {tag}
+                              </Badge>
+                            ))}
                           <span className="text-xs text-muted-foreground ml-auto">
-                            Updated {new Date(entry.updatedAt).toLocaleDateString()}
+                            Updated{" "}
+                            {new Date(entry.updatedAt).toLocaleDateString()}
                           </span>
                         </div>
                       </CardContent>
@@ -1261,11 +1660,21 @@ export default function CandidatePage() {
                       {/* Governance Stage Review Checklist (Publish tab) */}
                       {stageReviewResults[entry.id] && (
                         <CardContent className="pt-0">
-                          <Collapsible open={openChecklists.has(entry.id)} onOpenChange={() => toggleChecklist(entry.id)}>
+                          <Collapsible
+                            open={openChecklists.has(entry.id)}
+                            onOpenChange={() => toggleChecklist(entry.id)}
+                          >
                             <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground w-full">
                               <Shield className="h-3 w-3" />
-                              <span>Stage Review: {stageReviewResults[entry.id].passed ? "PASSED" : "BLOCKED"}</span>
-                              <Badge className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}>
+                              <span>
+                                Stage Review:{" "}
+                                {stageReviewResults[entry.id].passed
+                                  ? "PASSED"
+                                  : "BLOCKED"}
+                              </span>
+                              <Badge
+                                className={`text-[10px] ml-1 ${stageReviewResults[entry.id].passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}
+                              >
                                 {stageReviewResults[entry.id].score}%
                               </Badge>
                               <ChevronDown className="h-3 w-3 ml-auto" />
@@ -1273,27 +1682,47 @@ export default function CandidatePage() {
                             <CollapsibleContent className="mt-2">
                               {!stageReviewResults[entry.id].passed && (
                                 <div className="mb-2 p-2 rounded-md bg-orange-950/20 border border-orange-900/30">
-                                  <p className="text-xs font-medium text-orange-400">Governance gate blocked this transition</p>
+                                  <p className="text-xs font-medium text-orange-400">
+                                    Governance gate blocked this transition
+                                  </p>
                                 </div>
                               )}
                               <div className="space-y-1">
-                                {stageReviewResults[entry.id].items.map((item: any) => (
-                                  <div key={item.itemId} className="flex items-start gap-2 text-xs">
-                                    {item.passed ? (
-                                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
-                                    ) : (
-                                      <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
-                                    )}
-                                    <div className="min-w-0">
-                                      <span className="font-medium">{item.name}</span>
-                                      <Badge variant="outline" className="text-[9px] ml-1 px-1 py-0">{item.category}</Badge>
-                                      <p className="text-muted-foreground">{item.details}</p>
-                                      {item.remediation && (
-                                        <p className="text-orange-400/80 italic">{item.remediation}</p>
+                                {stageReviewResults[entry.id].items.map(
+                                  (item: any) => (
+                                    <div
+                                      key={item.itemId}
+                                      className="flex items-start gap-2 text-xs"
+                                    >
+                                      {item.passed ? (
+                                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                                      ) : (
+                                        <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
                                       )}
+                                      <div className="min-w-0">
+                                        <span className="font-medium">
+                                          {item.name}
+                                        </span>
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[9px] ml-1 px-1 py-0"
+                                        >
+                                          {item.category}
+                                        </Badge>
+                                        <p className="text-muted-foreground">
+                                          {toUserSafeGovernanceDetail(
+                                            item.details
+                                          )}
+                                        </p>
+                                        {item.remediation && (
+                                          <p className="text-orange-400/80 italic">
+                                            {item.remediation}
+                                          </p>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  )
+                                )}
                               </div>
                             </CollapsibleContent>
                           </Collapsible>
@@ -1334,17 +1763,30 @@ export default function CandidatePage() {
                       return (
                         <TableRow key={bundle.id}>
                           <TableCell>
-                            <span className="font-medium text-sm">{snap?.displayName || snap?.name || `Entry #${bundle.catalogEntryId}`}</span>
+                            <span className="font-medium text-sm">
+                              {snap?.displayName ||
+                                snap?.name ||
+                                `Entry #${bundle.catalogEntryId}`}
+                            </span>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs font-mono">{bundle.versionLabel}</Badge>
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-mono"
+                            >
+                              {bundle.versionLabel}
+                            </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge className={`text-xs ${
-                              bundle.status === "active" ? "bg-green-600/20 text-green-400 border-green-600/30" :
-                              bundle.status === "recalled" ? "bg-red-600/20 text-red-400 border-red-600/30" :
-                              "bg-gray-600/20 text-gray-400 border-gray-600/30"
-                            }`}>
+                            <Badge
+                              className={`text-xs ${
+                                bundle.status === "active"
+                                  ? "bg-green-600/20 text-green-400 border-green-600/30"
+                                  : bundle.status === "recalled"
+                                    ? "bg-red-600/20 text-red-400 border-red-600/30"
+                                    : "bg-gray-600/20 text-gray-400 border-gray-600/30"
+                              }`}
+                            >
                               {bundle.status}
                             </Badge>
                           </TableCell>
@@ -1364,7 +1806,15 @@ export default function CandidatePage() {
                                 variant="ghost"
                                 size="sm"
                                 className="text-destructive hover:text-destructive"
-                                onClick={() => recallMutation.mutate({ bundleId: bundle.id, _evidence: { types: ["reason"], refs: ["user-recall"] } })}
+                                onClick={() =>
+                                  recallMutation.mutate({
+                                    bundleId: bundle.id,
+                                    _evidence: {
+                                      types: ["reason"],
+                                      refs: ["user-recall"],
+                                    },
+                                  })
+                                }
                                 disabled={recallMutation.isPending}
                               >
                                 Recall
@@ -1386,7 +1836,10 @@ export default function CandidatePage() {
             <div className="text-center py-12 text-muted-foreground border rounded-md">
               <History className="h-10 w-10 mx-auto mb-3 opacity-50" />
               <p className="text-sm">No audit events recorded yet</p>
-              <p className="text-xs mt-1">Events are logged when entries are created, validated, published, or recalled</p>
+              <p className="text-xs mt-1">
+                Events are logged when entries are created, validated,
+                published, or recalled
+              </p>
             </div>
           ) : (
             <div className="rounded-md border">
@@ -1418,8 +1871,10 @@ export default function CandidatePage() {
                             const p = evt.payload as any;
                             if (p?.name) return p.name;
                             if (p?.versionLabel) return `v${p.versionLabel}`;
-                            if (p?.passed !== undefined) return p.passed ? "Passed" : "Failed";
-                            if (p?.changes) return `Changed: ${p.changes.join(", ")}`;
+                            if (p?.passed !== undefined)
+                              return p.passed ? "Passed" : "Failed";
+                            if (p?.changes)
+                              return `Changed: ${p.changes.join(", ")}`;
                             if (p?.bundleId) return `Bundle #${p.bundleId}`;
                             return JSON.stringify(p).substring(0, 60);
                           })()}
@@ -1505,7 +1960,9 @@ export default function CandidatePage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>{editingEntry ? "Edit Entry" : "New Catalog Entry"}</DialogTitle>
+            <DialogTitle>
+              {editingEntry ? "Edit Entry" : "New Catalog Entry"}
+            </DialogTitle>
             <DialogDescription>
               {editingEntry
                 ? "Update this catalog entry's details"
@@ -1516,16 +1973,19 @@ export default function CandidatePage() {
             {!editingEntry && (
               <div className="grid gap-2">
                 <Label>Type</Label>
-                <Select value={formEntryType} onValueChange={(v) => {
-                  setFormEntryType(v as EntryType);
-                  setFormClassifications([]);
-                  setFormCapabilities([]);
-                }}>
+                <Select
+                  value={formEntryType}
+                  onValueChange={v => {
+                    setFormEntryType(v as EntryType);
+                    setFormClassifications([]);
+                    setFormCapabilities([]);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ENTRY_TYPES.map((t) => (
+                    {ENTRY_TYPES.map(t => (
                       <SelectItem key={t} value={t}>
                         {ENTRY_TYPE_DEFS[t].label}
                       </SelectItem>
@@ -1542,7 +2002,10 @@ export default function CandidatePage() {
                   <span className="text-sm font-medium">Classification</span>
                   <div className="flex items-center gap-2">
                     {formClassifications.length > 0 && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] px-1.5 py-0"
+                      >
                         {formClassifications.length}
                       </Badge>
                     )}
@@ -1568,7 +2031,10 @@ export default function CandidatePage() {
                   <span className="text-sm font-medium">Capabilities</span>
                   <div className="flex items-center gap-2">
                     {formCapabilities.length > 0 && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] px-1.5 py-0"
+                      >
                         {formCapabilities.length}
                       </Badge>
                     )}
@@ -1578,7 +2044,9 @@ export default function CandidatePage() {
                 <CollapsibleContent>
                   <div className="px-3 pb-3">
                     <div className="flex flex-wrap gap-1.5 pt-1">
-                      {Object.entries(getCapabilitiesForType(formEntryType)).map(([key, cap]) => {
+                      {Object.entries(
+                        getCapabilitiesForType(formEntryType)
+                      ).map(([key, cap]) => {
                         const selected = formCapabilities.includes(key);
                         return (
                           <Badge
@@ -1586,8 +2054,10 @@ export default function CandidatePage() {
                             variant={selected ? "default" : "outline"}
                             className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
                             onClick={() => {
-                              setFormCapabilities((prev) =>
-                                selected ? prev.filter((c) => c !== key) : [...prev, key]
+                              setFormCapabilities(prev =>
+                                selected
+                                  ? prev.filter(c => c !== key)
+                                  : [...prev, key]
                               );
                             }}
                           >
@@ -1610,123 +2080,180 @@ export default function CandidatePage() {
                       onClick={() => setCreateStep(i)}
                       className={`flex flex-col items-center gap-1 group`}
                     >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-colors ${
-                        i === createStep
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : i < createStep
-                          ? "bg-primary/20 text-primary border-primary/50"
-                          : "bg-muted text-muted-foreground border-muted-foreground/30"
-                      }`}>
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-colors ${
+                          i === createStep
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : i < createStep
+                              ? "bg-primary/20 text-primary border-primary/50"
+                              : "bg-muted text-muted-foreground border-muted-foreground/30"
+                        }`}
+                      >
                         {i + 1}
                       </div>
-                      <span className={`text-[10px] ${i === createStep ? "text-primary font-medium" : "text-muted-foreground"}`}>
+                      <span
+                        className={`text-[10px] ${i === createStep ? "text-primary font-medium" : "text-muted-foreground"}`}
+                      >
                         {label}
                       </span>
                     </button>
-                    {i < 4 && <div className={`w-6 h-0.5 mb-4 ${i < createStep ? "bg-primary/50" : "bg-muted-foreground/20"}`} />}
+                    {i < 4 && (
+                      <div
+                        className={`w-6 h-0.5 mb-4 ${i < createStep ? "bg-primary/50" : "bg-muted-foreground/20"}`}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
             )}
 
             {/* Discover from Website — only for new provider entries */}
-            {!editingEntry && formEntryType === "provider" && createStep === 0 && (
-              <DiscoverSection
-                discoverUrl={discoverUrl}
-                setDiscoverUrl={setDiscoverUrl}
-                discoverResult={discoverResult}
-                setDiscoverResult={setDiscoverResult}
-                showCandidates={showCandidates}
-                setShowCandidates={setShowCandidates}
-                preApplySnapshot={preApplySnapshot}
-                onApply={(result: any) => {
-                  // Capture snapshot before applying (for undo)
-                  setPreApplySnapshot({ formName, formDisplayName, formDescription, formConfig, formTags });
-                  const slug = result.registrySlug
-                    || result.domain.replace(/\.(com|ai|io|dev|org|net|co)$/i, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-                  setFormName(slug);
-                  if (result.name) setFormDisplayName(result.name);
-                  if (result.description) setFormDescription(result.description);
-                  try {
-                    const existing = JSON.parse(formConfig || "{}");
-                    existing.baseUrl = result.api.bestUrl;
-                    if (result.registrySlug) existing.registrySlug = result.registrySlug;
-                    // Store tech docs metadata from discovery
-                    if (result.docsUrl) existing.docsUrl = result.docsUrl;
-                    if (result.techDocs) {
-                      if (result.techDocs.authMethod) existing.authMethod = result.techDocs.authMethod;
-                      if (result.techDocs.rateLimits) existing.rateLimits = result.techDocs.rateLimits;
-                      if (result.techDocs.httpsOnly !== undefined) existing.httpsOnly = result.techDocs.httpsOnly;
+            {!editingEntry &&
+              formEntryType === "provider" &&
+              createStep === 0 && (
+                <DiscoverSection
+                  discoverUrl={discoverUrl}
+                  setDiscoverUrl={setDiscoverUrl}
+                  discoverResult={discoverResult}
+                  setDiscoverResult={setDiscoverResult}
+                  showCandidates={showCandidates}
+                  setShowCandidates={setShowCandidates}
+                  preApplySnapshot={preApplySnapshot}
+                  onApply={(result: any) => {
+                    // Capture snapshot before applying (for undo)
+                    setPreApplySnapshot({
+                      formName,
+                      formDisplayName,
+                      formDescription,
+                      formConfig,
+                      formTags,
+                    });
+                    const slug =
+                      result.registrySlug ||
+                      result.domain
+                        .replace(/\.(com|ai|io|dev|org|net|co)$/i, "")
+                        .replace(/[^a-z0-9]+/gi, "-")
+                        .toLowerCase();
+                    setFormName(slug);
+                    if (result.name) setFormDisplayName(result.name);
+                    if (result.description)
+                      setFormDescription(result.description);
+                    try {
+                      const existing = JSON.parse(formConfig || "{}");
+                      existing.baseUrl = result.api.bestUrl;
+                      if (result.registrySlug)
+                        existing.registrySlug = result.registrySlug;
+                      // Store tech docs metadata from discovery
+                      if (result.docsUrl) existing.docsUrl = result.docsUrl;
+                      if (result.techDocs) {
+                        if (result.techDocs.authMethod)
+                          existing.authMethod = result.techDocs.authMethod;
+                        if (result.techDocs.rateLimits)
+                          existing.rateLimits = result.techDocs.rateLimits;
+                        if (result.techDocs.httpsOnly !== undefined)
+                          existing.httpsOnly = result.techDocs.httpsOnly;
+                      }
+                      // Also use top-level authType from registry
+                      if (result.authType && !existing.authMethod)
+                        existing.authMethod = result.authType;
+                      setFormConfig(JSON.stringify(existing, null, 2));
+                    } catch {
+                      const cfg: Record<string, any> = {
+                        baseUrl: result.api.bestUrl,
+                      };
+                      if (result.docsUrl) cfg.docsUrl = result.docsUrl;
+                      if (result.techDocs?.authMethod)
+                        cfg.authMethod = result.techDocs.authMethod;
+                      if (result.techDocs?.rateLimits)
+                        cfg.rateLimits = result.techDocs.rateLimits;
+                      if (result.techDocs?.httpsOnly !== undefined)
+                        cfg.httpsOnly = result.techDocs.httpsOnly;
+                      if (result.authType)
+                        cfg.authMethod = cfg.authMethod || result.authType;
+                      setFormConfig(JSON.stringify(cfg, null, 2));
                     }
-                    // Also use top-level authType from registry
-                    if (result.authType && !existing.authMethod) existing.authMethod = result.authType;
-                    setFormConfig(JSON.stringify(existing, null, 2));
-                  } catch {
-                    const cfg: Record<string, any> = { baseUrl: result.api.bestUrl };
-                    if (result.docsUrl) cfg.docsUrl = result.docsUrl;
-                    if (result.techDocs?.authMethod) cfg.authMethod = result.techDocs.authMethod;
-                    if (result.techDocs?.rateLimits) cfg.rateLimits = result.techDocs.rateLimits;
-                    if (result.techDocs?.httpsOnly !== undefined) cfg.httpsOnly = result.techDocs.httpsOnly;
-                    if (result.authType) cfg.authMethod = cfg.authMethod || result.authType;
-                    setFormConfig(JSON.stringify(cfg, null, 2));
-                  }
-                  const currentTags = formTags ? formTags.split(",").map((t: string) => t.trim()) : [];
-                  if (!currentTags.includes(result.domain)) currentTags.push(result.domain);
-                  setFormTags(currentTags.join(", "));
-                  if (result.api?.bestUrl && result.authType !== "none") {
-                    toast.success("Provider API URL discovered! Enter your PAT key in the Configuration JSON to connect.", { duration: 6000 });
-                  }
-                }}
-                onUndo={() => {
-                  if (preApplySnapshot) {
-                    setFormName(preApplySnapshot.formName);
-                    setFormDisplayName(preApplySnapshot.formDisplayName);
-                    setFormDescription(preApplySnapshot.formDescription);
-                    setFormConfig(preApplySnapshot.formConfig);
-                    setFormTags(preApplySnapshot.formTags);
-                    setPreApplySnapshot(null);
-                  }
-                }}
-                onApplyCandidate={(url: string) => {
-                  if (!preApplySnapshot) {
-                    setPreApplySnapshot({ formName, formDisplayName, formDescription, formConfig, formTags });
-                  }
-                  try {
-                    const existing = JSON.parse(formConfig || "{}");
-                    existing.baseUrl = url;
-                    setFormConfig(JSON.stringify(existing, null, 2));
-                  } catch {
-                    setFormConfig(JSON.stringify({ baseUrl: url }, null, 2));
-                  }
-                }}
-              />
-            )}
+                    const currentTags = formTags
+                      ? formTags.split(",").map((t: string) => t.trim())
+                      : [];
+                    if (!currentTags.includes(result.domain))
+                      currentTags.push(result.domain);
+                    setFormTags(currentTags.join(", "));
+                    if (result.api?.bestUrl && result.authType !== "none") {
+                      toast.success(
+                        "Provider API URL discovered! Enter your PAT key in the Configuration JSON to connect.",
+                        { duration: 6000 }
+                      );
+                    }
+                  }}
+                  onUndo={() => {
+                    if (preApplySnapshot) {
+                      setFormName(preApplySnapshot.formName);
+                      setFormDisplayName(preApplySnapshot.formDisplayName);
+                      setFormDescription(preApplySnapshot.formDescription);
+                      setFormConfig(preApplySnapshot.formConfig);
+                      setFormTags(preApplySnapshot.formTags);
+                      setPreApplySnapshot(null);
+                    }
+                  }}
+                  onApplyCandidate={(url: string) => {
+                    if (!preApplySnapshot) {
+                      setPreApplySnapshot({
+                        formName,
+                        formDisplayName,
+                        formDescription,
+                        formConfig,
+                        formTags,
+                      });
+                    }
+                    try {
+                      const existing = JSON.parse(formConfig || "{}");
+                      existing.baseUrl = url;
+                      setFormConfig(JSON.stringify(existing, null, 2));
+                    } catch {
+                      setFormConfig(JSON.stringify({ baseUrl: url }, null, 2));
+                    }
+                  }}
+                />
+              )}
 
             {/* Step 1: Details (existing form) */}
             {(editingEntry || createStep === 0) && (
               <>
                 {!editingEntry && (
                   <div className="grid gap-2">
-                    <Label>{formEntryType === "provider" ? "Base Provider" : "Linked Provider"}</Label>
+                    <Label>
+                      {formEntryType === "provider"
+                        ? "Base Provider"
+                        : "Linked Provider"}
+                    </Label>
                     <CatalogSelect
                       entryType="provider"
                       value={formProviderId === "none" ? "" : formProviderId}
-                      onValueChange={(v) => {
+                      onValueChange={v => {
                         setFormProviderId(v || "none");
                         if (v) {
                           const all = getStaticCatalogEntries();
-                          const match = all.find((e) => String(e.id) === v);
+                          const match = all.find(e => String(e.id) === v);
                           if (match) {
                             setFormName(match.name);
                             setFormDisplayName(match.displayName);
-                            setFormDescription(match.entryType + " — " + match.category);
-                            setFormConfig(JSON.stringify(match.config, null, 2));
+                            setFormDescription(
+                              match.entryType + " — " + match.category
+                            );
+                            setFormConfig(
+                              JSON.stringify(match.config, null, 2)
+                            );
                             setFormTags(match.tags.join(", "));
-                            if (match.capabilities.length > 0) setFormCapabilities(match.capabilities);
+                            if (match.capabilities.length > 0)
+                              setFormCapabilities(match.capabilities);
                           }
                         }
                       }}
-                      placeholder={formEntryType === "provider" ? "Select a provider to auto-fill..." : "Select provider (for validation)..."}
+                      placeholder={
+                        formEntryType === "provider"
+                          ? "Select a provider to auto-fill..."
+                          : "Select provider (for validation)..."
+                      }
                     />
                     <p className="text-xs text-muted-foreground">
                       {formEntryType === "provider"
@@ -1737,28 +2264,54 @@ export default function CandidatePage() {
                 )}
                 <div className="grid gap-2">
                   <Label>Name</Label>
-                  <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g., my-ollama-provider" />
+                  <Input
+                    value={formName}
+                    onChange={e => setFormName(e.target.value)}
+                    placeholder="e.g., my-ollama-provider"
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>Display Name</Label>
-                  <Input value={formDisplayName} onChange={(e) => setFormDisplayName(e.target.value)} placeholder="e.g., My Ollama Provider" />
+                  <Input
+                    value={formDisplayName}
+                    onChange={e => setFormDisplayName(e.target.value)}
+                    placeholder="e.g., My Ollama Provider"
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>Description</Label>
-                  <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="What this entry does..." rows={2} />
+                  <Textarea
+                    value={formDescription}
+                    onChange={e => setFormDescription(e.target.value)}
+                    placeholder="What this entry does..."
+                    rows={2}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>Tags (comma-separated)</Label>
-                  <Input value={formTags} onChange={(e) => setFormTags(e.target.value)} placeholder="local, ollama, inference" />
+                  <Input
+                    value={formTags}
+                    onChange={e => setFormTags(e.target.value)}
+                    placeholder="local, ollama, inference"
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label className="flex items-center gap-2">
                     Configuration (JSON)
-                    {(() => { try { const c = JSON.parse(formConfig); return c.baseUrl ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : null; } catch { return null; } })()}
+                    {(() => {
+                      try {
+                        const c = JSON.parse(formConfig);
+                        return c.baseUrl ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        ) : null;
+                      } catch {
+                        return null;
+                      }
+                    })()}
                   </Label>
                   <Textarea
                     value={formConfig}
-                    onChange={(e) => setFormConfig(e.target.value)}
+                    onChange={e => setFormConfig(e.target.value)}
                     placeholder="{}"
                     rows={4}
                     className="font-mono text-xs"
@@ -1773,9 +2326,12 @@ export default function CandidatePage() {
                 <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
                   <Loader2 className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <p className="text-sm font-medium text-muted-foreground">Coming Soon</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Coming Soon
+                </p>
                 <p className="text-xs text-muted-foreground/70 mt-1">
-                  Advanced configuration steps are available for Provider &gt; Cloud API &gt; Enterprise Managed entries.
+                  Advanced configuration steps are available for Provider &gt;
+                  Cloud API &gt; Enterprise Managed entries.
                 </p>
               </div>
             )}
@@ -1790,20 +2346,35 @@ export default function CandidatePage() {
 
                 {/* Authentication & Authorization */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Authentication &amp; Authorization</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Authentication &amp; Authorization
+                  </Label>
                   <div className="flex flex-wrap gap-1.5">
-                    {["OAuth 2.0", "OIDC", "JWT", "AWS IAM", "Azure AD", "API Key", "mTLS"].map((proto) => {
+                    {[
+                      "OAuth 2.0",
+                      "OIDC",
+                      "JWT",
+                      "AWS IAM",
+                      "Azure AD",
+                      "API Key",
+                      "mTLS",
+                    ].map(proto => {
                       const selected = authProtocols.includes(proto);
                       return (
                         <Badge
                           key={proto}
                           variant={selected ? "default" : "outline"}
                           className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
-                          onClick={() => setAuthProtocols((prev) =>
-                            selected ? prev.filter((p) => p !== proto) : [...prev, proto]
-                          )}
+                          onClick={() =>
+                            setAuthProtocols(prev =>
+                              selected
+                                ? prev.filter(p => p !== proto)
+                                : [...prev, proto]
+                            )
+                          }
                         >
-                          <Lock className="h-3 w-3 mr-1" />{proto}
+                          <Lock className="h-3 w-3 mr-1" />
+                          {proto}
                         </Badge>
                       );
                     })}
@@ -1812,7 +2383,9 @@ export default function CandidatePage() {
 
                 {/* Data Protection */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Data Protection</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Data Protection
+                  </Label>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
                       <Label className="text-xs">TLS Version</Label>
@@ -1828,27 +2401,45 @@ export default function CandidatePage() {
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Encryption at Rest</Label>
-                      <Switch checked={encryptionAtRest} onCheckedChange={setEncryptionAtRest} />
+                      <Switch
+                        checked={encryptionAtRest}
+                        onCheckedChange={setEncryptionAtRest}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Compliance Standards */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Compliance Standards</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Compliance Standards
+                  </Label>
                   <div className="flex flex-wrap gap-1.5">
-                    {["SOC 2 Type II", "GDPR", "HIPAA", "PCI DSS", "ISO 27001", "FedRAMP", "CCPA"].map((cert) => {
+                    {[
+                      "SOC 2 Type II",
+                      "GDPR",
+                      "HIPAA",
+                      "PCI DSS",
+                      "ISO 27001",
+                      "FedRAMP",
+                      "CCPA",
+                    ].map(cert => {
                       const selected = complianceCerts.includes(cert);
                       return (
                         <Badge
                           key={cert}
                           variant={selected ? "default" : "outline"}
                           className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
-                          onClick={() => setComplianceCerts((prev) =>
-                            selected ? prev.filter((c) => c !== cert) : [...prev, cert]
-                          )}
+                          onClick={() =>
+                            setComplianceCerts(prev =>
+                              selected
+                                ? prev.filter(c => c !== cert)
+                                : [...prev, cert]
+                            )
+                          }
                         >
-                          <ShieldCheck className="h-3 w-3 mr-1" />{cert}
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                          {cert}
                         </Badge>
                       );
                     })}
@@ -1857,19 +2448,30 @@ export default function CandidatePage() {
 
                 {/* Threat Protection */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Threat Protection</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Threat Protection
+                  </Label>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Rate Limiting</Label>
-                      <Switch checked={rateLimiting} onCheckedChange={setRateLimiting} />
+                      <Switch
+                        checked={rateLimiting}
+                        onCheckedChange={setRateLimiting}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Throttling</Label>
-                      <Switch checked={throttling} onCheckedChange={setThrottling} />
+                      <Switch
+                        checked={throttling}
+                        onCheckedChange={setThrottling}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">WAF</Label>
-                      <Switch checked={wafEnabled} onCheckedChange={setWafEnabled} />
+                      <Switch
+                        checked={wafEnabled}
+                        onCheckedChange={setWafEnabled}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1886,7 +2488,9 @@ export default function CandidatePage() {
 
                 {/* SLA & Targets */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">SLA &amp; Targets</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    SLA &amp; Targets
+                  </Label>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Uptime SLA (%)</Label>
@@ -1904,32 +2508,52 @@ export default function CandidatePage() {
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Max Latency (ms)</Label>
-                      <Input className="h-8 text-xs" value={maxLatencyMs} onChange={(e) => setMaxLatencyMs(e.target.value)} />
+                      <Input
+                        className="h-8 text-xs"
+                        value={maxLatencyMs}
+                        onChange={e => setMaxLatencyMs(e.target.value)}
+                      />
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Throughput (req/s)</Label>
-                      <Input className="h-8 text-xs" value={throughputRps} onChange={(e) => setThroughputRps(e.target.value)} />
+                      <Input
+                        className="h-8 text-xs"
+                        value={throughputRps}
+                        onChange={e => setThroughputRps(e.target.value)}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Scaling & Load */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Scaling &amp; Load Balancing</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Scaling &amp; Load Balancing
+                  </Label>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Auto-Scaling</Label>
-                      <Switch checked={autoScaling} onCheckedChange={setAutoScaling} />
+                      <Switch
+                        checked={autoScaling}
+                        onCheckedChange={setAutoScaling}
+                      />
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Load Balancing</Label>
-                      <Select value={loadBalancing} onValueChange={setLoadBalancing}>
+                      <Select
+                        value={loadBalancing}
+                        onValueChange={setLoadBalancing}
+                      >
                         <SelectTrigger className="h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="round-robin">Round Robin</SelectItem>
-                          <SelectItem value="least-connections">Least Connections</SelectItem>
+                          <SelectItem value="round-robin">
+                            Round Robin
+                          </SelectItem>
+                          <SelectItem value="least-connections">
+                            Least Connections
+                          </SelectItem>
                           <SelectItem value="weighted">Weighted</SelectItem>
                           <SelectItem value="ip-hash">IP Hash</SelectItem>
                         </SelectContent>
@@ -1940,21 +2564,33 @@ export default function CandidatePage() {
 
                 {/* Caching & Resilience */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Caching &amp; Resilience</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Caching &amp; Resilience
+                  </Label>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Caching</Label>
-                      <Switch checked={cachingEnabled} onCheckedChange={setCachingEnabled} />
+                      <Switch
+                        checked={cachingEnabled}
+                        onCheckedChange={setCachingEnabled}
+                      />
                     </div>
                     {cachingEnabled && (
                       <div className="grid gap-1.5">
                         <Label className="text-xs">Cache TTL (s)</Label>
-                        <Input className="h-8 text-xs" value={cacheTtl} onChange={(e) => setCacheTtl(e.target.value)} />
+                        <Input
+                          className="h-8 text-xs"
+                          value={cacheTtl}
+                          onChange={e => setCacheTtl(e.target.value)}
+                        />
                       </div>
                     )}
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Circuit Breaker</Label>
-                      <Switch checked={circuitBreaker} onCheckedChange={setCircuitBreaker} />
+                      <Switch
+                        checked={circuitBreaker}
+                        onCheckedChange={setCircuitBreaker}
+                      />
                     </div>
                   </div>
                   <div className="grid gap-1.5">
@@ -1966,8 +2602,12 @@ export default function CandidatePage() {
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
                         <SelectItem value="fixed">Fixed Delay</SelectItem>
-                        <SelectItem value="exponential">Exponential Backoff</SelectItem>
-                        <SelectItem value="jitter">Exponential + Jitter</SelectItem>
+                        <SelectItem value="exponential">
+                          Exponential Backoff
+                        </SelectItem>
+                        <SelectItem value="jitter">
+                          Exponential + Jitter
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1985,11 +2625,16 @@ export default function CandidatePage() {
 
                 {/* API Standards */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">API Standards</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    API Standards
+                  </Label>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Primary API</Label>
-                      <Select value={apiStandard} onValueChange={setApiStandard}>
+                      <Select
+                        value={apiStandard}
+                        onValueChange={setApiStandard}
+                      >
                         <SelectTrigger className="h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
@@ -2003,12 +2648,17 @@ export default function CandidatePage() {
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs">API Versioning</Label>
-                      <Select value={apiVersioning} onValueChange={setApiVersioning}>
+                      <Select
+                        value={apiVersioning}
+                        onValueChange={setApiVersioning}
+                      >
                         <SelectTrigger className="h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="url-path">URL Path (/v1/)</SelectItem>
+                          <SelectItem value="url-path">
+                            URL Path (/v1/)
+                          </SelectItem>
                           <SelectItem value="header">Header-based</SelectItem>
                           <SelectItem value="query">Query Param</SelectItem>
                         </SelectContent>
@@ -2019,41 +2669,70 @@ export default function CandidatePage() {
 
                 {/* Protocol Support */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Protocol Support</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Protocol Support
+                  </Label>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Streaming (SSE)</Label>
-                      <Switch checked={streamingSupport} onCheckedChange={setStreamingSupport} />
+                      <Switch
+                        checked={streamingSupport}
+                        onCheckedChange={setStreamingSupport}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Batch Requests</Label>
-                      <Switch checked={batchSupport} onCheckedChange={setBatchSupport} />
+                      <Switch
+                        checked={batchSupport}
+                        onCheckedChange={setBatchSupport}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Webhooks</Label>
-                      <Switch checked={webhooksEnabled} onCheckedChange={setWebhooksEnabled} />
+                      <Switch
+                        checked={webhooksEnabled}
+                        onCheckedChange={setWebhooksEnabled}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">gRPC</Label>
-                      <Switch checked={grpcSupport} onCheckedChange={setGrpcSupport} />
+                      <Switch
+                        checked={grpcSupport}
+                        onCheckedChange={setGrpcSupport}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* SDK Languages */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">SDK &amp; Client Libraries</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    SDK &amp; Client Libraries
+                  </Label>
                   <div className="flex flex-wrap gap-1.5">
-                    {["Python", "TypeScript", "Java", "Go", "C#", "Ruby", "Rust", "Swift"].map((lang) => {
+                    {[
+                      "Python",
+                      "TypeScript",
+                      "Java",
+                      "Go",
+                      "C#",
+                      "Ruby",
+                      "Rust",
+                      "Swift",
+                    ].map(lang => {
                       const selected = sdkLanguages.includes(lang);
                       return (
                         <Badge
                           key={lang}
                           variant={selected ? "default" : "outline"}
                           className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
-                          onClick={() => setSdkLanguages((prev) =>
-                            selected ? prev.filter((l) => l !== lang) : [...prev, lang]
-                          )}
+                          onClick={() =>
+                            setSdkLanguages(prev =>
+                              selected
+                                ? prev.filter(l => l !== lang)
+                                : [...prev, lang]
+                            )
+                          }
                         >
                           {lang}
                         </Badge>
@@ -2076,13 +2755,40 @@ export default function CandidatePage() {
                 <CardContent className="px-4 pb-3 space-y-3 text-xs">
                   {/* Step 1 summary */}
                   <div>
-                    <span className="font-medium text-muted-foreground uppercase tracking-wide">Details</span>
+                    <span className="font-medium text-muted-foreground uppercase tracking-wide">
+                      Details
+                    </span>
                     <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5">
-                      <span>Name: <span className="text-foreground">{formName || "—"}</span></span>
-                      <span>Display: <span className="text-foreground">{formDisplayName || "—"}</span></span>
-                      <span>Type: <span className="text-foreground">{ENTRY_TYPE_DEFS[formEntryType]?.label}</span></span>
-                      <span>Classifications: <span className="text-foreground">{formClassifications.length || "—"}</span></span>
-                      {formTags && <span className="col-span-2">Tags: <span className="text-foreground">{formTags}</span></span>}
+                      <span>
+                        Name:{" "}
+                        <span className="text-foreground">
+                          {formName || "—"}
+                        </span>
+                      </span>
+                      <span>
+                        Display:{" "}
+                        <span className="text-foreground">
+                          {formDisplayName || "—"}
+                        </span>
+                      </span>
+                      <span>
+                        Type:{" "}
+                        <span className="text-foreground">
+                          {ENTRY_TYPE_DEFS[formEntryType]?.label}
+                        </span>
+                      </span>
+                      <span>
+                        Classifications:{" "}
+                        <span className="text-foreground">
+                          {formClassifications.length || "—"}
+                        </span>
+                      </span>
+                      {formTags && (
+                        <span className="col-span-2">
+                          Tags:{" "}
+                          <span className="text-foreground">{formTags}</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                   <Separator />
@@ -2090,30 +2796,141 @@ export default function CandidatePage() {
                   {isEnterprise && (
                     <>
                       <div>
-                        <span className="font-medium text-muted-foreground uppercase tracking-wide">Security</span>
+                        <span className="font-medium text-muted-foreground uppercase tracking-wide">
+                          Security
+                        </span>
                         <div className="mt-1 space-y-0.5">
-                          <div>Auth: <span className="text-foreground">{authProtocols.join(", ") || "None"}</span></div>
-                          <div>TLS: <span className="text-foreground">{tlsVersion}</span> | Encryption at Rest: <span className="text-foreground">{encryptionAtRest ? "Yes" : "No"}</span></div>
-                          <div>Compliance: <span className="text-foreground">{complianceCerts.join(", ") || "None"}</span></div>
-                          <div>Rate Limiting: <span className="text-foreground">{rateLimiting ? "Yes" : "No"}</span> | Throttling: <span className="text-foreground">{throttling ? "Yes" : "No"}</span> | WAF: <span className="text-foreground">{wafEnabled ? "Yes" : "No"}</span></div>
+                          <div>
+                            Auth:{" "}
+                            <span className="text-foreground">
+                              {authProtocols.join(", ") || "None"}
+                            </span>
+                          </div>
+                          <div>
+                            TLS:{" "}
+                            <span className="text-foreground">
+                              {tlsVersion}
+                            </span>{" "}
+                            | Encryption at Rest:{" "}
+                            <span className="text-foreground">
+                              {encryptionAtRest ? "Yes" : "No"}
+                            </span>
+                          </div>
+                          <div>
+                            Compliance:{" "}
+                            <span className="text-foreground">
+                              {complianceCerts.join(", ") || "None"}
+                            </span>
+                          </div>
+                          <div>
+                            Rate Limiting:{" "}
+                            <span className="text-foreground">
+                              {rateLimiting ? "Yes" : "No"}
+                            </span>{" "}
+                            | Throttling:{" "}
+                            <span className="text-foreground">
+                              {throttling ? "Yes" : "No"}
+                            </span>{" "}
+                            | WAF:{" "}
+                            <span className="text-foreground">
+                              {wafEnabled ? "Yes" : "No"}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <Separator />
                       <div>
-                        <span className="font-medium text-muted-foreground uppercase tracking-wide">Performance</span>
+                        <span className="font-medium text-muted-foreground uppercase tracking-wide">
+                          Performance
+                        </span>
                         <div className="mt-1 space-y-0.5">
-                          <div>SLA: <span className="text-foreground">{slaUptime}%</span> | Latency: <span className="text-foreground">{maxLatencyMs}ms</span> | Throughput: <span className="text-foreground">{throughputRps} rps</span></div>
-                          <div>Auto-Scale: <span className="text-foreground">{autoScaling ? "Yes" : "No"}</span> | LB: <span className="text-foreground">{loadBalancing}</span> | Circuit Breaker: <span className="text-foreground">{circuitBreaker ? "Yes" : "No"}</span></div>
-                          <div>Retry: <span className="text-foreground">{retryPolicy}</span>{cachingEnabled && <> | Cache TTL: <span className="text-foreground">{cacheTtl}s</span></>}</div>
+                          <div>
+                            SLA:{" "}
+                            <span className="text-foreground">
+                              {slaUptime}%
+                            </span>{" "}
+                            | Latency:{" "}
+                            <span className="text-foreground">
+                              {maxLatencyMs}ms
+                            </span>{" "}
+                            | Throughput:{" "}
+                            <span className="text-foreground">
+                              {throughputRps} rps
+                            </span>
+                          </div>
+                          <div>
+                            Auto-Scale:{" "}
+                            <span className="text-foreground">
+                              {autoScaling ? "Yes" : "No"}
+                            </span>{" "}
+                            | LB:{" "}
+                            <span className="text-foreground">
+                              {loadBalancing}
+                            </span>{" "}
+                            | Circuit Breaker:{" "}
+                            <span className="text-foreground">
+                              {circuitBreaker ? "Yes" : "No"}
+                            </span>
+                          </div>
+                          <div>
+                            Retry:{" "}
+                            <span className="text-foreground">
+                              {retryPolicy}
+                            </span>
+                            {cachingEnabled && (
+                              <>
+                                {" "}
+                                | Cache TTL:{" "}
+                                <span className="text-foreground">
+                                  {cacheTtl}s
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <Separator />
                       <div>
-                        <span className="font-medium text-muted-foreground uppercase tracking-wide">Integration</span>
+                        <span className="font-medium text-muted-foreground uppercase tracking-wide">
+                          Integration
+                        </span>
                         <div className="mt-1 space-y-0.5">
-                          <div>API: <span className="text-foreground">{apiStandard}</span> | Versioning: <span className="text-foreground">{apiVersioning}</span></div>
-                          <div>Streaming: <span className="text-foreground">{streamingSupport ? "Yes" : "No"}</span> | Batch: <span className="text-foreground">{batchSupport ? "Yes" : "No"}</span> | Webhooks: <span className="text-foreground">{webhooksEnabled ? "Yes" : "No"}</span> | gRPC: <span className="text-foreground">{grpcSupport ? "Yes" : "No"}</span></div>
-                          {sdkLanguages.length > 0 && <div>SDKs: <span className="text-foreground">{sdkLanguages.join(", ")}</span></div>}
+                          <div>
+                            API:{" "}
+                            <span className="text-foreground">
+                              {apiStandard}
+                            </span>{" "}
+                            | Versioning:{" "}
+                            <span className="text-foreground">
+                              {apiVersioning}
+                            </span>
+                          </div>
+                          <div>
+                            Streaming:{" "}
+                            <span className="text-foreground">
+                              {streamingSupport ? "Yes" : "No"}
+                            </span>{" "}
+                            | Batch:{" "}
+                            <span className="text-foreground">
+                              {batchSupport ? "Yes" : "No"}
+                            </span>{" "}
+                            | Webhooks:{" "}
+                            <span className="text-foreground">
+                              {webhooksEnabled ? "Yes" : "No"}
+                            </span>{" "}
+                            | gRPC:{" "}
+                            <span className="text-foreground">
+                              {grpcSupport ? "Yes" : "No"}
+                            </span>
+                          </div>
+                          {sdkLanguages.length > 0 && (
+                            <div>
+                              SDKs:{" "}
+                              <span className="text-foreground">
+                                {sdkLanguages.join(", ")}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </>
@@ -2122,28 +2939,114 @@ export default function CandidatePage() {
                   {isSaas && (
                     <>
                       <div>
-                        <span className="font-medium text-muted-foreground uppercase tracking-wide">API Architecture</span>
+                        <span className="font-medium text-muted-foreground uppercase tracking-wide">
+                          API Architecture
+                        </span>
                         <div className="mt-1 space-y-0.5">
-                          <div>Style: <span className="text-foreground">{saasApiStyle}</span> | Versioning: <span className="text-foreground">{saasVersioning}</span></div>
-                          <div>Multi-Tenancy: <span className="text-foreground">{saasMultiTenancy}</span> | JSON: <span className="text-foreground">{saasJsonMode ? "Yes" : "No"}</span> | Streaming: <span className="text-foreground">{saasStreaming ? "Yes" : "No"}</span></div>
-                          <div>Webhooks: <span className="text-foreground">{saasWebhooks ? "Yes" : "No"}</span>{saasWebhooks && saasEventTypes.length > 0 && <> ({saasEventTypes.join(", ")})</>}</div>
+                          <div>
+                            Style:{" "}
+                            <span className="text-foreground">
+                              {saasApiStyle}
+                            </span>{" "}
+                            | Versioning:{" "}
+                            <span className="text-foreground">
+                              {saasVersioning}
+                            </span>
+                          </div>
+                          <div>
+                            Multi-Tenancy:{" "}
+                            <span className="text-foreground">
+                              {saasMultiTenancy}
+                            </span>{" "}
+                            | JSON:{" "}
+                            <span className="text-foreground">
+                              {saasJsonMode ? "Yes" : "No"}
+                            </span>{" "}
+                            | Streaming:{" "}
+                            <span className="text-foreground">
+                              {saasStreaming ? "Yes" : "No"}
+                            </span>
+                          </div>
+                          <div>
+                            Webhooks:{" "}
+                            <span className="text-foreground">
+                              {saasWebhooks ? "Yes" : "No"}
+                            </span>
+                            {saasWebhooks && saasEventTypes.length > 0 && (
+                              <> ({saasEventTypes.join(", ")})</>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <Separator />
                       <div>
-                        <span className="font-medium text-muted-foreground uppercase tracking-wide">Security</span>
+                        <span className="font-medium text-muted-foreground uppercase tracking-wide">
+                          Security
+                        </span>
                         <div className="mt-1 space-y-0.5">
-                          <div>Auth: <span className="text-foreground">{saasAuthMethods.join(", ")}</span></div>
-                          <div>Transit: <span className="text-foreground">{saasEncryptionTransit}</span> | At Rest: <span className="text-foreground">{saasEncryptionRest}</span> | RBAC: <span className="text-foreground">{saasRbac ? "Yes" : "No"}</span></div>
-                          <div>Compliance: <span className="text-foreground">{saasCompliance.join(", ") || "None"}</span></div>
+                          <div>
+                            Auth:{" "}
+                            <span className="text-foreground">
+                              {saasAuthMethods.join(", ")}
+                            </span>
+                          </div>
+                          <div>
+                            Transit:{" "}
+                            <span className="text-foreground">
+                              {saasEncryptionTransit}
+                            </span>{" "}
+                            | At Rest:{" "}
+                            <span className="text-foreground">
+                              {saasEncryptionRest}
+                            </span>{" "}
+                            | RBAC:{" "}
+                            <span className="text-foreground">
+                              {saasRbac ? "Yes" : "No"}
+                            </span>
+                          </div>
+                          <div>
+                            Compliance:{" "}
+                            <span className="text-foreground">
+                              {saasCompliance.join(", ") || "None"}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <Separator />
                       <div>
-                        <span className="font-medium text-muted-foreground uppercase tracking-wide">Reliability</span>
+                        <span className="font-medium text-muted-foreground uppercase tracking-wide">
+                          Reliability
+                        </span>
                         <div className="mt-1 space-y-0.5">
-                          <div>SLA: <span className="text-foreground">{saasSla}%</span> | Rate Limit: <span className="text-foreground">{saasRateLimiting ? "Yes" : "No"}</span> | Throttle: <span className="text-foreground">{saasThrottling ? "Yes" : "No"}</span></div>
-                          <div>CDN: <span className="text-foreground">{saasCdn ? "Yes" : "No"}</span> | Multi-Region: <span className="text-foreground">{saasMultiRegion ? "Yes" : "No"}</span>{saasMultiRegion && saasRegions.length > 0 && <> ({saasRegions.join(", ")})</>} | Auto-Scale: <span className="text-foreground">{saasAutoScaling ? "Yes" : "No"}</span></div>
+                          <div>
+                            SLA:{" "}
+                            <span className="text-foreground">{saasSla}%</span>{" "}
+                            | Rate Limit:{" "}
+                            <span className="text-foreground">
+                              {saasRateLimiting ? "Yes" : "No"}
+                            </span>{" "}
+                            | Throttle:{" "}
+                            <span className="text-foreground">
+                              {saasThrottling ? "Yes" : "No"}
+                            </span>
+                          </div>
+                          <div>
+                            CDN:{" "}
+                            <span className="text-foreground">
+                              {saasCdn ? "Yes" : "No"}
+                            </span>{" "}
+                            | Multi-Region:{" "}
+                            <span className="text-foreground">
+                              {saasMultiRegion ? "Yes" : "No"}
+                            </span>
+                            {saasMultiRegion && saasRegions.length > 0 && (
+                              <> ({saasRegions.join(", ")})</>
+                            )}{" "}
+                            | Auto-Scale:{" "}
+                            <span className="text-foreground">
+                              {saasAutoScaling ? "Yes" : "No"}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </>
@@ -2162,11 +3065,16 @@ export default function CandidatePage() {
 
                 {/* Logging */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Logging</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Logging
+                  </Label>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Log Level</Label>
-                      <Select value={loggingLevel} onValueChange={setLoggingLevel}>
+                      <Select
+                        value={loggingLevel}
+                        onValueChange={setLoggingLevel}
+                      >
                         <SelectTrigger className="h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
@@ -2180,48 +3088,73 @@ export default function CandidatePage() {
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Audit Logging</Label>
-                      <Switch checked={auditLogging} onCheckedChange={setAuditLogging} />
+                      <Switch
+                        checked={auditLogging}
+                        onCheckedChange={setAuditLogging}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Metrics */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Metrics &amp; Tracing</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Metrics &amp; Tracing
+                  </Label>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Metrics</Label>
-                      <Switch checked={metricsEnabled} onCheckedChange={setMetricsEnabled} />
+                      <Switch
+                        checked={metricsEnabled}
+                        onCheckedChange={setMetricsEnabled}
+                      />
                     </div>
                     {metricsEnabled && (
                       <div className="grid gap-1.5">
                         <Label className="text-xs">Exporter</Label>
-                        <Select value={metricsExporter} onValueChange={setMetricsExporter}>
+                        <Select
+                          value={metricsExporter}
+                          onValueChange={setMetricsExporter}
+                        >
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="prometheus">Prometheus</SelectItem>
+                            <SelectItem value="prometheus">
+                              Prometheus
+                            </SelectItem>
                             <SelectItem value="datadog">Datadog</SelectItem>
-                            <SelectItem value="cloudwatch">CloudWatch</SelectItem>
-                            <SelectItem value="stackdriver">Stackdriver</SelectItem>
+                            <SelectItem value="cloudwatch">
+                              CloudWatch
+                            </SelectItem>
+                            <SelectItem value="stackdriver">
+                              Stackdriver
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     )}
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Distributed Tracing</Label>
-                      <Switch checked={tracingEnabled} onCheckedChange={setTracingEnabled} />
+                      <Switch
+                        checked={tracingEnabled}
+                        onCheckedChange={setTracingEnabled}
+                      />
                     </div>
                     {tracingEnabled && (
                       <div className="grid gap-1.5">
                         <Label className="text-xs">Protocol</Label>
-                        <Select value={tracingProtocol} onValueChange={setTracingProtocol}>
+                        <Select
+                          value={tracingProtocol}
+                          onValueChange={setTracingProtocol}
+                        >
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="opentelemetry">OpenTelemetry</SelectItem>
+                            <SelectItem value="opentelemetry">
+                              OpenTelemetry
+                            </SelectItem>
                             <SelectItem value="jaeger">Jaeger</SelectItem>
                             <SelectItem value="zipkin">Zipkin</SelectItem>
                           </SelectContent>
@@ -2233,15 +3166,23 @@ export default function CandidatePage() {
 
                 {/* Alerting & Cost */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Alerting &amp; Cost Management</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Alerting &amp; Cost Management
+                  </Label>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Alerting</Label>
-                      <Switch checked={alertingEnabled} onCheckedChange={setAlertingEnabled} />
+                      <Switch
+                        checked={alertingEnabled}
+                        onCheckedChange={setAlertingEnabled}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Cost Tracking</Label>
-                      <Switch checked={costTracking} onCheckedChange={setCostTracking} />
+                      <Switch
+                        checked={costTracking}
+                        onCheckedChange={setCostTracking}
+                      />
                     </div>
                   </div>
                 </div>
@@ -2260,25 +3201,41 @@ export default function CandidatePage() {
 
                 {/* API Style & Versioning */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">RESTful Standards &amp; Versioning</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    RESTful Standards &amp; Versioning
+                  </Label>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
                       <Label className="text-xs">API Style</Label>
-                      <Select value={saasApiStyle} onValueChange={setSaasApiStyle}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <Select
+                        value={saasApiStyle}
+                        onValueChange={setSaasApiStyle}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="REST">RESTful (JSON)</SelectItem>
-                          <SelectItem value="REST+GraphQL">REST + GraphQL</SelectItem>
+                          <SelectItem value="REST+GraphQL">
+                            REST + GraphQL
+                          </SelectItem>
                           <SelectItem value="gRPC">gRPC</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Versioning Strategy</Label>
-                      <Select value={saasVersioning} onValueChange={setSaasVersioning}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <Select
+                        value={saasVersioning}
+                        onValueChange={setSaasVersioning}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="url-path">URL Path (/v1/)</SelectItem>
+                          <SelectItem value="url-path">
+                            URL Path (/v1/)
+                          </SelectItem>
                           <SelectItem value="header">Header-based</SelectItem>
                           <SelectItem value="query">Query Param</SelectItem>
                           <SelectItem value="none">No Versioning</SelectItem>
@@ -2290,16 +3247,29 @@ export default function CandidatePage() {
 
                 {/* Multi-Tenancy */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Multi-Tenancy Support</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Multi-Tenancy Support
+                  </Label>
                   <div className="grid gap-1.5">
                     <Label className="text-xs">Isolation Model</Label>
-                    <Select value={saasMultiTenancy} onValueChange={setSaasMultiTenancy}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <Select
+                      value={saasMultiTenancy}
+                      onValueChange={setSaasMultiTenancy}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="tenant-id">Tenant ID Header</SelectItem>
-                        <SelectItem value="subdomain">Subdomain-based</SelectItem>
+                        <SelectItem value="tenant-id">
+                          Tenant ID Header
+                        </SelectItem>
+                        <SelectItem value="subdomain">
+                          Subdomain-based
+                        </SelectItem>
                         <SelectItem value="schema">Schema Isolation</SelectItem>
-                        <SelectItem value="database">Database per Tenant</SelectItem>
+                        <SelectItem value="database">
+                          Database per Tenant
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -2307,23 +3277,37 @@ export default function CandidatePage() {
 
                 {/* Protocols & Features */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Protocols &amp; Features</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Protocols &amp; Features
+                  </Label>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">JSON Mode</Label>
-                      <Switch checked={saasJsonMode} onCheckedChange={setSaasJsonMode} />
+                      <Switch
+                        checked={saasJsonMode}
+                        onCheckedChange={setSaasJsonMode}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Streaming (SSE)</Label>
-                      <Switch checked={saasStreaming} onCheckedChange={setSaasStreaming} />
+                      <Switch
+                        checked={saasStreaming}
+                        onCheckedChange={setSaasStreaming}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">GraphQL</Label>
-                      <Switch checked={saasGraphql} onCheckedChange={setSaasGraphql} />
+                      <Switch
+                        checked={saasGraphql}
+                        onCheckedChange={setSaasGraphql}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Webhooks</Label>
-                      <Switch checked={saasWebhooks} onCheckedChange={setSaasWebhooks} />
+                      <Switch
+                        checked={saasWebhooks}
+                        onCheckedChange={setSaasWebhooks}
+                      />
                     </div>
                   </div>
                 </div>
@@ -2331,18 +3315,32 @@ export default function CandidatePage() {
                 {/* Webhook Events */}
                 {saasWebhooks && (
                   <div className="space-y-3">
-                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Webhook Event Types</Label>
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Webhook Event Types
+                    </Label>
                     <div className="flex flex-wrap gap-1.5">
-                      {["completion.done", "job.started", "job.failed", "model.updated", "usage.threshold", "error.rate_limit", "billing.alert"].map((evt) => {
+                      {[
+                        "completion.done",
+                        "job.started",
+                        "job.failed",
+                        "model.updated",
+                        "usage.threshold",
+                        "error.rate_limit",
+                        "billing.alert",
+                      ].map(evt => {
                         const selected = saasEventTypes.includes(evt);
                         return (
                           <Badge
                             key={evt}
                             variant={selected ? "default" : "outline"}
                             className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
-                            onClick={() => setSaasEventTypes((prev) =>
-                              selected ? prev.filter((e) => e !== evt) : [...prev, evt]
-                            )}
+                            onClick={() =>
+                              setSaasEventTypes(prev =>
+                                selected
+                                  ? prev.filter(e => e !== evt)
+                                  : [...prev, evt]
+                              )
+                            }
                           >
                             {evt}
                           </Badge>
@@ -2364,20 +3362,33 @@ export default function CandidatePage() {
 
                 {/* Authentication */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Authentication Protocols</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Authentication Protocols
+                  </Label>
                   <div className="flex flex-wrap gap-1.5">
-                    {["API Key", "OAuth 2.0", "JWT", "Bearer Token", "mTLS"].map((method) => {
+                    {[
+                      "API Key",
+                      "OAuth 2.0",
+                      "JWT",
+                      "Bearer Token",
+                      "mTLS",
+                    ].map(method => {
                       const selected = saasAuthMethods.includes(method);
                       return (
                         <Badge
                           key={method}
                           variant={selected ? "default" : "outline"}
                           className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
-                          onClick={() => setSaasAuthMethods((prev) =>
-                            selected ? prev.filter((m) => m !== method) : [...prev, method]
-                          )}
+                          onClick={() =>
+                            setSaasAuthMethods(prev =>
+                              selected
+                                ? prev.filter(m => m !== method)
+                                : [...prev, method]
+                            )
+                          }
                         >
-                          <Lock className="h-3 w-3 mr-1" />{method}
+                          <Lock className="h-3 w-3 mr-1" />
+                          {method}
                         </Badge>
                       );
                     })}
@@ -2386,22 +3397,38 @@ export default function CandidatePage() {
 
                 {/* Encryption */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Encryption</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Encryption
+                  </Label>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
                       <Label className="text-xs">In Transit</Label>
-                      <Select value={saasEncryptionTransit} onValueChange={setSaasEncryptionTransit}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <Select
+                        value={saasEncryptionTransit}
+                        onValueChange={setSaasEncryptionTransit}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="TLS 1.2">TLS 1.2 / HTTPS</SelectItem>
-                          <SelectItem value="TLS 1.3">TLS 1.3 / HTTPS</SelectItem>
+                          <SelectItem value="TLS 1.2">
+                            TLS 1.2 / HTTPS
+                          </SelectItem>
+                          <SelectItem value="TLS 1.3">
+                            TLS 1.3 / HTTPS
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs">At Rest</Label>
-                      <Select value={saasEncryptionRest} onValueChange={setSaasEncryptionRest}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <Select
+                        value={saasEncryptionRest}
+                        onValueChange={setSaasEncryptionRest}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="AES-256">AES-256</SelectItem>
                           <SelectItem value="AES-128">AES-128</SelectItem>
@@ -2414,29 +3441,48 @@ export default function CandidatePage() {
 
                 {/* Access Control */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Access Control</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Access Control
+                  </Label>
                   <div className="flex items-center justify-between p-2 border rounded-md">
-                    <Label className="text-xs">Role-Based Access Control (RBAC)</Label>
+                    <Label className="text-xs">
+                      Role-Based Access Control (RBAC)
+                    </Label>
                     <Switch checked={saasRbac} onCheckedChange={setSaasRbac} />
                   </div>
                 </div>
 
                 {/* Compliance */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Compliance Certifications</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Compliance Certifications
+                  </Label>
                   <div className="flex flex-wrap gap-1.5">
-                    {["GDPR", "SOC 2 Type II", "ISO 27001", "HIPAA", "CCPA", "PCI DSS", "FedRAMP"].map((cert) => {
+                    {[
+                      "GDPR",
+                      "SOC 2 Type II",
+                      "ISO 27001",
+                      "HIPAA",
+                      "CCPA",
+                      "PCI DSS",
+                      "FedRAMP",
+                    ].map(cert => {
                       const selected = saasCompliance.includes(cert);
                       return (
                         <Badge
                           key={cert}
                           variant={selected ? "default" : "outline"}
                           className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
-                          onClick={() => setSaasCompliance((prev) =>
-                            selected ? prev.filter((c) => c !== cert) : [...prev, cert]
-                          )}
+                          onClick={() =>
+                            setSaasCompliance(prev =>
+                              selected
+                                ? prev.filter(c => c !== cert)
+                                : [...prev, cert]
+                            )
+                          }
                         >
-                          <ShieldCheck className="h-3 w-3 mr-1" />{cert}
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                          {cert}
                         </Badge>
                       );
                     })}
@@ -2455,11 +3501,15 @@ export default function CandidatePage() {
 
                 {/* SLA */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Service Level Agreement</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Service Level Agreement
+                  </Label>
                   <div className="grid gap-1.5">
                     <Label className="text-xs">Uptime Guarantee</Label>
                     <Select value={saasSla} onValueChange={setSaasSla}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="99.0">99.0%</SelectItem>
                         <SelectItem value="99.9">99.9%</SelectItem>
@@ -2472,22 +3522,32 @@ export default function CandidatePage() {
 
                 {/* Rate Limiting & Throttling */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Rate Limiting &amp; Throttling</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Rate Limiting &amp; Throttling
+                  </Label>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Rate Limiting</Label>
-                      <Switch checked={saasRateLimiting} onCheckedChange={setSaasRateLimiting} />
+                      <Switch
+                        checked={saasRateLimiting}
+                        onCheckedChange={setSaasRateLimiting}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Throttling</Label>
-                      <Switch checked={saasThrottling} onCheckedChange={setSaasThrottling} />
+                      <Switch
+                        checked={saasThrottling}
+                        onCheckedChange={setSaasThrottling}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Global Infrastructure */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Global Infrastructure</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Global Infrastructure
+                  </Label>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">CDN Integration</Label>
@@ -2495,23 +3555,38 @@ export default function CandidatePage() {
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Multi-Region</Label>
-                      <Switch checked={saasMultiRegion} onCheckedChange={setSaasMultiRegion} />
+                      <Switch
+                        checked={saasMultiRegion}
+                        onCheckedChange={setSaasMultiRegion}
+                      />
                     </div>
                   </div>
                   {saasMultiRegion && (
                     <div className="flex flex-wrap gap-1.5">
-                      {["us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1", "ap-northeast-1"].map((region) => {
+                      {[
+                        "us-east-1",
+                        "us-west-2",
+                        "eu-west-1",
+                        "eu-central-1",
+                        "ap-southeast-1",
+                        "ap-northeast-1",
+                      ].map(region => {
                         const selected = saasRegions.includes(region);
                         return (
                           <Badge
                             key={region}
                             variant={selected ? "default" : "outline"}
                             className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
-                            onClick={() => setSaasRegions((prev) =>
-                              selected ? prev.filter((r) => r !== region) : [...prev, region]
-                            )}
+                            onClick={() =>
+                              setSaasRegions(prev =>
+                                selected
+                                  ? prev.filter(r => r !== region)
+                                  : [...prev, region]
+                              )
+                            }
                           >
-                            <Globe className="h-3 w-3 mr-1" />{region}
+                            <Globe className="h-3 w-3 mr-1" />
+                            {region}
                           </Badge>
                         );
                       })}
@@ -2521,10 +3596,17 @@ export default function CandidatePage() {
 
                 {/* Auto-Scaling */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Auto-Scaling</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Auto-Scaling
+                  </Label>
                   <div className="flex items-center justify-between p-2 border rounded-md">
-                    <Label className="text-xs">Automatic Resource Scaling</Label>
-                    <Switch checked={saasAutoScaling} onCheckedChange={setSaasAutoScaling} />
+                    <Label className="text-xs">
+                      Automatic Resource Scaling
+                    </Label>
+                    <Switch
+                      checked={saasAutoScaling}
+                      onCheckedChange={setSaasAutoScaling}
+                    />
                   </div>
                 </div>
               </div>
@@ -2540,58 +3622,97 @@ export default function CandidatePage() {
 
                 {/* Documentation */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Documentation &amp; Testing</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Documentation &amp; Testing
+                  </Label>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">API Docs</Label>
-                      <Switch checked={saasDocumentation} onCheckedChange={setSaasDocumentation} />
+                      <Switch
+                        checked={saasDocumentation}
+                        onCheckedChange={setSaasDocumentation}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Code Samples</Label>
-                      <Switch checked={saasCodeSamples} onCheckedChange={setSaasCodeSamples} />
+                      <Switch
+                        checked={saasCodeSamples}
+                        onCheckedChange={setSaasCodeSamples}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Sandbox</Label>
-                      <Switch checked={saasSandbox} onCheckedChange={setSaasSandbox} />
+                      <Switch
+                        checked={saasSandbox}
+                        onCheckedChange={setSaasSandbox}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Observability */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Observability Tools</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Observability Tools
+                  </Label>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Monitoring</Label>
-                      <Switch checked={saasMonitoring} onCheckedChange={setSaasMonitoring} />
+                      <Switch
+                        checked={saasMonitoring}
+                        onCheckedChange={setSaasMonitoring}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Logging</Label>
-                      <Switch checked={saasLogging} onCheckedChange={setSaasLogging} />
+                      <Switch
+                        checked={saasLogging}
+                        onCheckedChange={setSaasLogging}
+                      />
                     </div>
                     <div className="flex items-center justify-between p-2 border rounded-md">
                       <Label className="text-xs">Analytics</Label>
-                      <Switch checked={saasAnalytics} onCheckedChange={setSaasAnalytics} />
+                      <Switch
+                        checked={saasAnalytics}
+                        onCheckedChange={setSaasAnalytics}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Client SDKs */}
                 <div className="space-y-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Official Client SDKs</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Official Client SDKs
+                  </Label>
                   <div className="flex flex-wrap gap-1.5">
-                    {["Python", "JavaScript/TypeScript", "Go", "Java", "C#/.NET", "Ruby", "Rust", "Swift", "Kotlin"].map((lang) => {
+                    {[
+                      "Python",
+                      "JavaScript/TypeScript",
+                      "Go",
+                      "Java",
+                      "C#/.NET",
+                      "Ruby",
+                      "Rust",
+                      "Swift",
+                      "Kotlin",
+                    ].map(lang => {
                       const selected = saasSdkLanguages.includes(lang);
                       return (
                         <Badge
                           key={lang}
                           variant={selected ? "default" : "outline"}
                           className={`text-xs cursor-pointer select-none ${selected ? "" : "opacity-60 hover:opacity-100"}`}
-                          onClick={() => setSaasSdkLanguages((prev) =>
-                            selected ? prev.filter((l) => l !== lang) : [...prev, lang]
-                          )}
+                          onClick={() =>
+                            setSaasSdkLanguages(prev =>
+                              selected
+                                ? prev.filter(l => l !== lang)
+                                : [...prev, lang]
+                            )
+                          }
                         >
-                          <Code className="h-3 w-3 mr-1" />{lang}
+                          <Code className="h-3 w-3 mr-1" />
+                          {lang}
                         </Badge>
                       );
                     })}
@@ -2605,9 +3726,19 @@ export default function CandidatePage() {
           )}
           <div className="flex items-center justify-end gap-2 pt-2">
             {!editingEntry && createStep > 0 && (
-              <Button variant="outline" onClick={() => { setStepError(null); setCreateStep(createStep - 1); }}>Back</Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStepError(null);
+                  setCreateStep(createStep - 1);
+                }}
+              >
+                Back
+              </Button>
             )}
-            <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+            <Button variant="outline" onClick={closeDialog}>
+              Cancel
+            </Button>
             {editingEntry && (
               <Button onClick={handleSave} disabled={!formName || saving}>
                 {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -2633,18 +3764,35 @@ export default function CandidatePage() {
           <DialogHeader>
             <DialogTitle>Delete Entry</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{deletingEntry?.displayName || deletingEntry?.name}"?
-              This will remove all version history and cannot be undone.
+              Are you sure you want to delete "
+              {deletingEntry?.displayName || deletingEntry?.name}"? This will
+              remove all version history and cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
             <Button
               variant="destructive"
-              onClick={() => deletingEntry && deleteMutation.mutate({ id: deletingEntry.id, _evidence: { types: ["reason"], refs: ["user-requested-delete"] } })}
+              onClick={() =>
+                deletingEntry &&
+                deleteMutation.mutate({
+                  id: deletingEntry.id,
+                  _evidence: {
+                    types: ["reason"],
+                    refs: ["user-requested-delete"],
+                  },
+                })
+              }
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {deleteMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
               Delete
             </Button>
           </DialogFooter>
@@ -2662,19 +3810,25 @@ export default function CandidatePage() {
           </DialogHeader>
           <div className="max-h-[400px] overflow-y-auto">
             {versions.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No versions found</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No versions found
+              </p>
             ) : (
               <div className="space-y-3">
                 {versions.map((v: any) => (
                   <div key={v.id} className="border rounded-md p-3">
                     <div className="flex items-center justify-between mb-1">
-                      <Badge variant="outline" className="text-xs">v{v.version}</Badge>
+                      <Badge variant="outline" className="text-xs">
+                        v{v.version}
+                      </Badge>
                       <span className="text-xs text-muted-foreground">
                         {new Date(v.createdAt).toLocaleString()}
                       </span>
                     </div>
                     {v.changeNotes && (
-                      <p className="text-xs text-muted-foreground">{v.changeNotes}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {v.changeNotes}
+                      </p>
                     )}
                     <p className="text-xs font-mono text-muted-foreground mt-1 truncate">
                       Hash: {v.configHash?.substring(0, 16)}...
@@ -2688,19 +3842,31 @@ export default function CandidatePage() {
       </Dialog>
 
       {/* Publish Wizard Dialog */}
-      <Dialog open={publishDialogOpen} onOpenChange={(open) => {
-        if (!open) { setPublishDialogOpen(false); setPublishEntry(null); setWizardStep(0); }
-      }}>
+      <Dialog
+        open={publishDialogOpen}
+        onOpenChange={open => {
+          if (!open) {
+            setPublishDialogOpen(false);
+            setPublishEntry(null);
+            setWizardStep(0);
+          }
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {wizardStep === 3 ? "Published!" : `Publish — Step ${wizardStep + 1} of 3`}
+              {wizardStep === 3
+                ? "Published!"
+                : `Publish — Step ${wizardStep + 1} of 3`}
             </DialogTitle>
             <DialogDescription>
-              {wizardStep === 0 && "Review the entry configuration before publishing"}
-              {wizardStep === 1 && "Set a version label for this publish bundle"}
+              {wizardStep === 0 &&
+                "Review the entry configuration before publishing"}
+              {wizardStep === 1 &&
+                "Set a version label for this publish bundle"}
               {wizardStep === 2 && "Confirm and publish the immutable snapshot"}
-              {wizardStep === 3 && "The bundle has been published to the registry"}
+              {wizardStep === 3 &&
+                "The bundle has been published to the registry"}
             </DialogDescription>
           </DialogHeader>
 
@@ -2709,26 +3875,33 @@ export default function CandidatePage() {
             <div className="space-y-3 py-2">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="text-muted-foreground">Name</div>
-                <div className="font-medium">{publishEntry.displayName || publishEntry.name}</div>
+                <div className="font-medium">
+                  {publishEntry.displayName || publishEntry.name}
+                </div>
                 <div className="text-muted-foreground">Type</div>
                 <div>{publishEntry.entryType}</div>
                 <div className="text-muted-foreground">Scope</div>
                 <div>{publishEntry.scope}</div>
                 <div className="text-muted-foreground">Validation</div>
                 <div>
-                  <Badge className={`text-xs ${publishEntry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-yellow-600/20 text-yellow-400"}`}>
+                  <Badge
+                    className={`text-xs ${publishEntry.validationStatus === "passed" ? "bg-green-600/20 text-green-400" : "bg-yellow-600/20 text-yellow-400"}`}
+                  >
                     {publishEntry.validationStatus || "unknown"}
                   </Badge>
                 </div>
               </div>
-              {publishEntry.config && Object.keys(publishEntry.config).length > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Configuration:</p>
-                  <pre className="text-xs font-mono bg-muted/50 rounded p-2 max-h-[150px] overflow-y-auto">
-                    {JSON.stringify(publishEntry.config, null, 2)}
-                  </pre>
-                </div>
-              )}
+              {publishEntry.config &&
+                Object.keys(publishEntry.config).length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Configuration:
+                    </p>
+                    <pre className="text-xs font-mono bg-muted/50 rounded p-2 max-h-[150px] overflow-y-auto">
+                      {JSON.stringify(publishEntry.config, null, 2)}
+                    </pre>
+                  </div>
+                )}
             </div>
           )}
 
@@ -2739,7 +3912,7 @@ export default function CandidatePage() {
                 <Label>Version Label</Label>
                 <Input
                   value={publishVersion}
-                  onChange={(e) => setPublishVersion(e.target.value)}
+                  onChange={e => setPublishVersion(e.target.value)}
                   placeholder="e.g., 1.0.0 or v2024.02.17"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -2750,7 +3923,7 @@ export default function CandidatePage() {
                 <Label>Change Notes (optional)</Label>
                 <Textarea
                   value={publishNotes}
-                  onChange={(e) => setPublishNotes(e.target.value)}
+                  onChange={e => setPublishNotes(e.target.value)}
                   placeholder="What changed in this version..."
                   rows={3}
                 />
@@ -2762,7 +3935,9 @@ export default function CandidatePage() {
           {wizardStep === 2 && publishEntry && (
             <div className="space-y-3 py-2">
               <div className="p-3 border rounded-md bg-muted/30">
-                <p className="text-sm font-medium mb-2">You are about to publish:</p>
+                <p className="text-sm font-medium mb-2">
+                  You are about to publish:
+                </p>
                 <div className="grid grid-cols-2 gap-1 text-xs">
                   <span className="text-muted-foreground">Entry:</span>
                   <span>{publishEntry.displayName || publishEntry.name}</span>
@@ -2777,7 +3952,8 @@ export default function CandidatePage() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                This will create an immutable snapshot that cannot be edited. Previous active bundles will be superseded.
+                This will create an immutable snapshot that cannot be edited.
+                Previous active bundles will be superseded.
               </p>
             </div>
           )}
@@ -2788,7 +3964,8 @@ export default function CandidatePage() {
               <CheckCircle2 className="h-12 w-12 text-green-500 mb-3" />
               <p className="text-lg font-medium">Successfully Published</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Version <span className="font-mono">{publishVersion}</span> is now active in the registry
+                Version <span className="font-mono">{publishVersion}</span> is
+                now active in the registry
               </p>
             </div>
           )}
@@ -2796,27 +3973,52 @@ export default function CandidatePage() {
           <DialogFooter>
             {wizardStep === 0 && (
               <>
-                <Button variant="outline" onClick={() => setPublishDialogOpen(false)}>Cancel</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setPublishDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
                 <Button onClick={() => setWizardStep(1)}>Next</Button>
               </>
             )}
             {wizardStep === 1 && (
               <>
-                <Button variant="outline" onClick={() => setWizardStep(0)}>Back</Button>
-                <Button onClick={() => setWizardStep(2)} disabled={!publishVersion}>Next</Button>
+                <Button variant="outline" onClick={() => setWizardStep(0)}>
+                  Back
+                </Button>
+                <Button
+                  onClick={() => setWizardStep(2)}
+                  disabled={!publishVersion}
+                >
+                  Next
+                </Button>
               </>
             )}
             {wizardStep === 2 && (
               <>
-                <Button variant="outline" onClick={() => setWizardStep(1)}>Back</Button>
-                <Button onClick={handlePublish} disabled={publishMutation.isPending}>
-                  {publishMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Button variant="outline" onClick={() => setWizardStep(1)}>
+                  Back
+                </Button>
+                <Button
+                  onClick={handlePublish}
+                  disabled={publishMutation.isPending}
+                >
+                  {publishMutation.isPending && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
                   Publish
                 </Button>
               </>
             )}
             {wizardStep === 3 && (
-              <Button onClick={() => { setPublishDialogOpen(false); setPublishEntry(null); setWizardStep(0); }}>
+              <Button
+                onClick={() => {
+                  setPublishDialogOpen(false);
+                  setPublishEntry(null);
+                  setWizardStep(0);
+                }}
+              >
                 Done
               </Button>
             )}
@@ -2845,15 +4047,25 @@ export default function CandidatePage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              {reviewStage === "register" ? "Registration Review" : reviewStage === "validate" ? "Validation Review" : reviewStage === "publish" ? "Publication Review" : "Governance Review"}
+              {reviewStage === "register"
+                ? "Registration Review"
+                : reviewStage === "validate"
+                  ? "Validation Review"
+                  : reviewStage === "publish"
+                    ? "Publication Review"
+                    : "Governance Review"}
             </DialogTitle>
             <DialogDescription>
               {reviewEntry && (
                 <span>
-                  {reviewStage === "register" && "Verify this entry meets registration requirements before catalog admission."}
-                  {reviewStage === "validate" && "Verify security policies, secrets management, and operational compliance."}
-                  {reviewStage === "publish" && "Final review — cross-doc consistency, CI protections, and no blocking findings."}
-                  {" "}<strong>{reviewEntry.displayName || reviewEntry.name}</strong> ({reviewEntry.entryType})
+                  {reviewStage === "register" &&
+                    "Verify this entry meets registration requirements before catalog admission."}
+                  {reviewStage === "validate" &&
+                    "Verify security policies, secrets management, and operational compliance."}
+                  {reviewStage === "publish" &&
+                    "Final review — cross-doc consistency, CI protections, and no blocking findings."}{" "}
+                  <strong>{reviewEntry.displayName || reviewEntry.name}</strong>{" "}
+                  ({reviewEntry.entryType})
                 </span>
               )}
             </DialogDescription>
@@ -2863,29 +4075,41 @@ export default function CandidatePage() {
             {reviewLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-sm text-muted-foreground">Loading governance criteria...</span>
+                <span className="ml-2 text-sm text-muted-foreground">
+                  Loading governance criteria...
+                </span>
               </div>
             ) : reviewChecklist ? (
               <>
                 {/* Score summary */}
-                <div className={`p-3 rounded-md border ${reviewChecklist.passed ? "bg-emerald-950/20 border-emerald-900/30" : "bg-orange-950/20 border-orange-900/30"}`}>
+                <div
+                  className={`p-3 rounded-md border ${reviewChecklist.passed ? "bg-emerald-950/20 border-emerald-900/30" : "bg-orange-950/20 border-orange-900/30"}`}
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
-                      {reviewChecklist.passed ? "All checks passed" : "Some checks need attention"}
+                      {reviewChecklist.passed
+                        ? "All checks passed"
+                        : "Some checks need attention"}
                     </span>
-                    <Badge className={`text-xs ${reviewChecklist.passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}>
+                    <Badge
+                      className={`text-xs ${reviewChecklist.passed ? "bg-emerald-600/20 text-emerald-400" : "bg-orange-600/20 text-orange-400"}`}
+                    >
                       {reviewChecklist.score}%
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Stage: {reviewChecklist.stage} — {reviewChecklist.items?.length || 0} criteria evaluated
+                    Stage: {reviewChecklist.stage} —{" "}
+                    {reviewChecklist.items?.length || 0} criteria evaluated
                   </p>
                 </div>
 
                 {/* Criteria list */}
                 <div className="space-y-2">
                   {(reviewChecklist.items || []).map((item: any) => (
-                    <div key={item.itemId} className="flex items-start gap-2 p-2 rounded-md bg-muted/30">
+                    <div
+                      key={item.itemId}
+                      className="flex items-start gap-2 p-2 rounded-md bg-muted/30"
+                    >
                       {item.passed ? (
                         <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
                       ) : (
@@ -2893,12 +4117,23 @@ export default function CandidatePage() {
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-medium">{item.name}</span>
-                          <Badge variant="outline" className="text-[9px] px-1 py-0">{item.category}</Badge>
+                          <span className="text-sm font-medium">
+                            {item.name}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] px-1 py-0"
+                          >
+                            {item.category}
+                          </Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{item.details}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {toUserSafeGovernanceDetail(item.details)}
+                        </p>
                         {!item.passed && item.remediation && (
-                          <p className="text-xs text-orange-400/80 italic mt-0.5">{item.remediation}</p>
+                          <p className="text-xs text-orange-400/80 italic mt-0.5">
+                            {item.remediation}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -2909,29 +4144,50 @@ export default function CandidatePage() {
           </div>
 
           <DialogFooter className="pt-2 border-t">
-            <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setReviewDialogOpen(false)}
+            >
               Close
             </Button>
-            {reviewEntry && getStageReviewState(reviewEntry, reviewStage) !== "approved" && (
-              <Button
-                onClick={() => approveMutation.mutate({ id: reviewEntry.id, stage: reviewStage as any, activateNow: false, _evidence: { types: ["reason"], refs: ["stage-review-approved"] } })}
-                disabled={approveMutation.isPending}
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                {approveMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
+            {reviewEntry &&
+              getStageReviewState(reviewEntry, reviewStage) !== "approved" && (
+                <Button
+                  onClick={() =>
+                    approveMutation.mutate({
+                      id: reviewEntry.id,
+                      stage: reviewStage as any,
+                      activateNow: false,
+                      _evidence: {
+                        types: ["reason"],
+                        refs: ["stage-review-approved"],
+                      },
+                    })
+                  }
+                  disabled={approveMutation.isPending}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  {approveMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="h-4 w-4 mr-1" />
+                  )}
+                  {reviewStage === "register"
+                    ? "Approve Registration"
+                    : reviewStage === "validate"
+                      ? "Approve Validation"
+                      : reviewStage === "publish"
+                        ? "Approve Publication"
+                        : "Approve"}
+                </Button>
+              )}
+            {reviewEntry &&
+              getStageReviewState(reviewEntry, reviewStage) === "approved" && (
+                <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30 px-3 py-1.5">
                   <ShieldCheck className="h-4 w-4 mr-1" />
-                )}
-                {reviewStage === "register" ? "Approve Registration" : reviewStage === "validate" ? "Approve Validation" : reviewStage === "publish" ? "Approve Publication" : "Approve"}
-              </Button>
-            )}
-            {reviewEntry && getStageReviewState(reviewEntry, reviewStage) === "approved" && (
-              <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30 px-3 py-1.5">
-                <ShieldCheck className="h-4 w-4 mr-1" />
-                Reviewed
-              </Badge>
-            )}
+                  Reviewed
+                </Badge>
+              )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2976,7 +4232,9 @@ function DiscoverSection({
     if (!discoverUrl.trim()) return;
     setDiscoverResult(null);
     try {
-      const result = await discoverMutation.mutateAsync({ websiteUrl: normalizeUrl(discoverUrl) });
+      const result = await discoverMutation.mutateAsync({
+        websiteUrl: normalizeUrl(discoverUrl),
+      });
       setDiscoverResult(result);
     } catch (e: any) {
       setDiscoverResult({ error: e.message, status: "failed" });
@@ -2990,15 +4248,23 @@ function DiscoverSection({
       `Domain: ${discoverResult.domain || "unknown"}`,
       `Normalized URL: ${debug.normalizedUrl || discoverResult.domain || "unknown"}`,
       `Status: ${discoverResult.status || "unknown"}`,
-      discoverResult.failureReason ? `Failure Reason: ${discoverResult.failureReason}` : null,
+      discoverResult.failureReason
+        ? `Failure Reason: ${discoverResult.failureReason}`
+        : null,
       `Timestamp: ${new Date().toISOString()}`,
-      debug.redirectHops?.length ? `Redirect Hops: ${JSON.stringify(debug.redirectHops)}` : null,
-      debug.resolvedIPs?.length ? `Resolved IPs: ${JSON.stringify(debug.resolvedIPs)}` : null,
+      debug.redirectHops?.length
+        ? `Redirect Hops: ${JSON.stringify(debug.redirectHops)}`
+        : null,
+      debug.resolvedIPs?.length
+        ? `Resolved IPs: ${JSON.stringify(debug.resolvedIPs)}`
+        : null,
       discoverResult.api?.candidates?.length
         ? `Probe Statuses: ${JSON.stringify(discoverResult.api.candidates.map((c: any) => ({ url: c.url, status: c.probe?.status ?? null })))}`
         : null,
       debug.timingsMs ? `Timings: ${JSON.stringify(debug.timingsMs)}` : null,
-      discoverResult.warnings?.length ? `Warnings: ${discoverResult.warnings.join("; ")}` : null,
+      discoverResult.warnings?.length
+        ? `Warnings: ${discoverResult.warnings.join("; ")}`
+        : null,
     ].filter(Boolean);
     navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
   };
@@ -3006,22 +4272,26 @@ function DiscoverSection({
   const status = discoverResult?.status;
   const isFailed = status === "failed";
   const isPartial = status === "partial";
-  const hasResult = discoverResult && (discoverResult.name || discoverResult.status);
-  const hasError = discoverResult?.error && !discoverResult?.name && !discoverResult?.status;
+  const hasResult =
+    discoverResult && (discoverResult.name || discoverResult.status);
+  const hasError =
+    discoverResult?.error && !discoverResult?.name && !discoverResult?.status;
 
   return (
     <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
       <Label className="flex items-center gap-2">
         <Globe className="h-4 w-4" />
         Discover from Website
-        <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+        <span className="text-xs text-muted-foreground font-normal">
+          (optional)
+        </span>
       </Label>
       <div className="flex gap-2">
         <Input
           placeholder="https://fireworks.ai"
           value={discoverUrl}
-          onChange={(e) => setDiscoverUrl(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleDiscover()}
+          onChange={e => setDiscoverUrl(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleDiscover()}
         />
         <Button
           variant="outline"
@@ -3057,11 +4327,18 @@ function DiscoverSection({
           </div>
           {discoverResult.warnings?.length > 0 && (
             <div className="text-xs text-red-300/70">
-              {discoverResult.warnings.map((w: string, i: number) => <p key={i}>{w}</p>)}
+              {discoverResult.warnings.map((w: string, i: number) => (
+                <p key={i}>{w}</p>
+              ))}
             </div>
           )}
           <div className="flex gap-2 pt-1">
-            <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground" onClick={handleCopyDebug}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs text-muted-foreground"
+              onClick={handleCopyDebug}
+            >
               Copy debug details
             </Button>
           </div>
@@ -3077,7 +4354,9 @@ function DiscoverSection({
           </div>
           {discoverResult.warnings?.length > 0 && (
             <div className="text-xs text-yellow-300/70">
-              {discoverResult.warnings.map((w: string, i: number) => <p key={i}>{w}</p>)}
+              {discoverResult.warnings.map((w: string, i: number) => (
+                <p key={i}>{w}</p>
+              ))}
             </div>
           )}
           {/* Show candidates even on partial */}
@@ -3085,15 +4364,29 @@ function DiscoverSection({
             <div className="space-y-1 pt-1">
               <p className="text-xs text-yellow-400">Available candidates:</p>
               {discoverResult.api.candidates.map((c: any, i: number) => (
-                <div key={i} className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5">
+                <div
+                  key={i}
+                  className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5"
+                >
                   <div className="flex items-center gap-2">
                     <code>{c.url}</code>
-                    {c.probe && <Badge variant="outline" className="text-[10px]">{c.probe.status}</Badge>}
+                    {c.probe && (
+                      <Badge variant="outline" className="text-[10px]">
+                        {c.probe.status}
+                      </Badge>
+                    )}
                     {c.probeType === "openai-shape-best-effort" && (
-                      <span className="text-muted-foreground">(best-effort)</span>
+                      <span className="text-muted-foreground">
+                        (best-effort)
+                      </span>
                     )}
                   </div>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => onApplyCandidate(c.url)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => onApplyCandidate(c.url)}
+                  >
                     Use this
                   </Button>
                 </div>
@@ -3101,7 +4394,12 @@ function DiscoverSection({
             </div>
           )}
           <div className="flex gap-2 pt-1">
-            <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground" onClick={handleCopyDebug}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs text-muted-foreground"
+              onClick={handleCopyDebug}
+            >
               Copy debug details
             </Button>
           </div>
@@ -3123,102 +4421,182 @@ function DiscoverSection({
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-green-500" />
               <span className="font-medium">{discoverResult.name}</span>
-              <Badge variant="outline" className={discoverResult.source === "registry" ? "border-green-600/30 text-green-400" : "border-blue-600/30 text-blue-400"}>
+              <Badge
+                variant="outline"
+                className={
+                  discoverResult.source === "registry"
+                    ? "border-green-600/30 text-green-400"
+                    : "border-blue-600/30 text-blue-400"
+                }
+              >
                 {discoverResult.source === "registry" ? "Registry" : "Website"}
               </Badge>
             </div>
           </div>
 
           {discoverResult.description && (
-            <p className="text-sm text-muted-foreground">{discoverResult.description}</p>
+            <p className="text-sm text-muted-foreground">
+              {discoverResult.description}
+            </p>
           )}
 
           {discoverResult.api?.bestUrl && (
             <div className="flex items-center gap-2 text-sm min-w-0">
               <span className="text-muted-foreground shrink-0">API:</span>
-              <code className="bg-muted px-2 py-0.5 rounded text-xs truncate" title={discoverResult.api.bestUrl}>{discoverResult.api.bestUrl}</code>
+              <code
+                className="bg-muted px-2 py-0.5 rounded text-xs truncate"
+                title={discoverResult.api.bestUrl}
+              >
+                {discoverResult.api.bestUrl}
+              </code>
               {discoverResult.api.candidates?.[0] && (
-                <Badge variant="outline" className={
-                  discoverResult.api.candidates[0].confidenceLabel === "high" ? "border-green-600/30 text-green-400" :
-                  discoverResult.api.candidates[0].confidenceLabel === "medium" ? "border-yellow-600/30 text-yellow-400" :
-                  "border-gray-600/30 text-gray-400"
-                }>
-                  {discoverResult.api.candidates[0].confidence} {discoverResult.api.candidates[0].confidenceLabel}
+                <Badge
+                  variant="outline"
+                  className={
+                    discoverResult.api.candidates[0].confidenceLabel === "high"
+                      ? "border-green-600/30 text-green-400"
+                      : discoverResult.api.candidates[0].confidenceLabel ===
+                          "medium"
+                        ? "border-yellow-600/30 text-yellow-400"
+                        : "border-gray-600/30 text-gray-400"
+                  }
+                >
+                  {discoverResult.api.candidates[0].confidence}{" "}
+                  {discoverResult.api.candidates[0].confidenceLabel}
                 </Badge>
               )}
             </div>
           )}
 
-          {!discoverResult.api?.bestUrl && discoverResult.api?.candidates?.length > 0 && (
-            <p className="text-sm text-yellow-400">No confirmed API URL. Choose a candidate to apply:</p>
-          )}
+          {!discoverResult.api?.bestUrl &&
+            discoverResult.api?.candidates?.length > 0 && (
+              <p className="text-sm text-yellow-400">
+                No confirmed API URL. Choose a candidate to apply:
+              </p>
+            )}
 
           {/* Best-effort probe note */}
-          {discoverResult.api?.candidates?.some((c: any) => c.probeType === "openai-shape-best-effort") && (
-            <p className="text-xs text-muted-foreground italic">Probed as OpenAI-compatible (best effort)</p>
+          {discoverResult.api?.candidates?.some(
+            (c: any) => c.probeType === "openai-shape-best-effort"
+          ) && (
+            <p className="text-xs text-muted-foreground italic">
+              Probed as OpenAI-compatible (best effort)
+            </p>
           )}
 
           {/* Candidates */}
           {discoverResult.api?.candidates?.length > 1 && (
             <Collapsible open={showCandidates} onOpenChange={setShowCandidates}>
               <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-                <ChevronDown className={`h-3 w-3 transition-transform ${showCandidates ? "rotate-180" : ""}`} />
-                {discoverResult.api.candidates.length - 1} other candidate{discoverResult.api.candidates.length > 2 ? "s" : ""}
+                <ChevronDown
+                  className={`h-3 w-3 transition-transform ${showCandidates ? "rotate-180" : ""}`}
+                />
+                {discoverResult.api.candidates.length - 1} other candidate
+                {discoverResult.api.candidates.length > 2 ? "s" : ""}
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-1 pt-2">
-                {discoverResult.api.candidates.slice(1).map((c: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5 gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <code className="truncate" title={c.url}>{c.url}</code>
-                      {c.probe && <Badge variant="outline" className="text-[10px]">{c.probe.status}</Badge>}
-                      {c.probeType === "openai-shape-best-effort" && (
-                        <span className="text-muted-foreground">(best-effort)</span>
-                      )}
+                {discoverResult.api.candidates
+                  .slice(1)
+                  .map((c: any, i: number) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5 gap-2"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <code className="truncate" title={c.url}>
+                          {c.url}
+                        </code>
+                        {c.probe && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {c.probe.status}
+                          </Badge>
+                        )}
+                        {c.probeType === "openai-shape-best-effort" && (
+                          <span className="text-muted-foreground">
+                            (best-effort)
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={() => onApplyCandidate(c.url)}
+                      >
+                        Use this
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => onApplyCandidate(c.url)}>
-                      Use this
-                    </Button>
-                  </div>
-                ))}
+                  ))}
               </CollapsibleContent>
             </Collapsible>
           )}
 
           {/* When bestUrl is null but candidates exist — show all as clickable */}
-          {!discoverResult.api?.bestUrl && discoverResult.api?.candidates?.length === 1 && (
-            <div className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5 gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <code className="truncate" title={discoverResult.api.candidates[0].url}>{discoverResult.api.candidates[0].url}</code>
-                {discoverResult.api.candidates[0].probe && (
-                  <Badge variant="outline" className="text-[10px]">{discoverResult.api.candidates[0].probe.status}</Badge>
-                )}
+          {!discoverResult.api?.bestUrl &&
+            discoverResult.api?.candidates?.length === 1 && (
+              <div className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <code
+                    className="truncate"
+                    title={discoverResult.api.candidates[0].url}
+                  >
+                    {discoverResult.api.candidates[0].url}
+                  </code>
+                  {discoverResult.api.candidates[0].probe && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {discoverResult.api.candidates[0].probe.status}
+                    </Badge>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() =>
+                    onApplyCandidate(discoverResult.api.candidates[0].url)
+                  }
+                >
+                  Use this
+                </Button>
               </div>
-              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => onApplyCandidate(discoverResult.api.candidates[0].url)}>
-                Use this
-              </Button>
-            </div>
-          )}
+            )}
 
           {/* Warnings */}
           {discoverResult.warnings?.length > 0 && (
             <div className="text-xs text-yellow-400">
-              {discoverResult.warnings.map((w: string, i: number) => <p key={i}>{w}</p>)}
+              {discoverResult.warnings.map((w: string, i: number) => (
+                <p key={i}>{w}</p>
+              ))}
             </div>
           )}
 
           <div className="flex items-center justify-between pt-1">
             <div className="flex gap-2">
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={handleCopyDebug}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground"
+                onClick={handleCopyDebug}
+              >
                 Copy debug details
               </Button>
             </div>
             <div className="flex gap-2">
               {preApplySnapshot && (
-                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onUndo}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={onUndo}
+                >
                   Undo Apply
                 </Button>
               )}
-              <Button size="sm" variant="outline" onClick={() => onApply(discoverResult)}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onApply(discoverResult)}
+              >
                 Apply to Form
               </Button>
             </div>

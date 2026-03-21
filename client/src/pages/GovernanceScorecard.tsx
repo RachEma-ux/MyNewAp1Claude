@@ -1,9 +1,25 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  toUserSafeGovernanceDetail,
+  toUserSafeGovernanceMessage,
+} from "@shared/error-presentation";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Shield,
   CheckCircle2,
@@ -45,7 +61,13 @@ export default function GovernanceScorecard() {
 
   const score = scorecard?.scorecard?.score?.score ?? 0;
   const gatePassed = scorecard?.scorecard?.gateStatus?.passed ?? false;
-  const risk = scorecard?.scorecard?.riskBreakdown ?? { critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+  const risk = scorecard?.scorecard?.riskBreakdown ?? {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    total: 0,
+  };
   const results = scorecard?.scorecard?.controlResults ?? [];
   const evidence = scorecard?.evidence;
   const packResolution = scorecard?.packResolution;
@@ -95,7 +117,10 @@ export default function GovernanceScorecard() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Select value={selectedStage} onValueChange={(v) => setSelectedStage(v as Stage)}>
+          <Select
+            value={selectedStage}
+            onValueChange={v => setSelectedStage(v as Stage)}
+          >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Stage" />
             </SelectTrigger>
@@ -112,7 +137,9 @@ export default function GovernanceScorecard() {
             onClick={() => scorecardQuery.refetch()}
             disabled={scorecardQuery.isFetching}
           >
-            <RefreshCw className={`h-4 w-4 mr-1 ${scorecardQuery.isFetching ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-4 w-4 mr-1 ${scorecardQuery.isFetching ? "animate-spin" : ""}`}
+            />
             Re-scan
           </Button>
         </div>
@@ -124,9 +151,12 @@ export default function GovernanceScorecard() {
           <CardContent className="py-3 flex items-center gap-3">
             <Lock className="h-5 w-5 text-red-400" />
             <div>
-              <span className="text-red-400 font-bold">GOVERNANCE FREEZE ACTIVE</span>
+              <span className="text-red-400 font-bold">
+                GOVERNANCE FREEZE ACTIVE
+              </span>
               <span className="text-sm text-muted-foreground ml-2">
-                {frozenQuery.data?.length} subject(s) frozen — transitions blocked
+                {frozenQuery.data?.length} subject(s) frozen — transitions
+                blocked
               </span>
             </div>
           </CardContent>
@@ -139,9 +169,13 @@ export default function GovernanceScorecard() {
           <CardContent className="py-3 flex items-center gap-3">
             <Ban className="h-5 w-5 text-orange-400" />
             <div>
-              <span className="text-orange-400 font-bold">HTTP 409 — TRANSITION BLOCKED</span>
+              <span className="text-orange-400 font-bold">
+                HTTP 409 — TRANSITION BLOCKED
+              </span>
               <span className="text-sm text-muted-foreground ml-2">
-                {scorecard?.scorecard?.gateStatus?.reason}
+                {toUserSafeGovernanceMessage(
+                  scorecard?.scorecard?.gateStatus?.reason
+                )}
               </span>
             </div>
           </CardContent>
@@ -153,7 +187,9 @@ export default function GovernanceScorecard() {
         {/* Overall Score */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Overall Score</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Overall Score
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className={`text-5xl font-bold ${getScoreColor(score)}`}>
@@ -162,7 +198,8 @@ export default function GovernanceScorecard() {
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {scorecard?.controlsEvaluated ?? 0} controls evaluated
-              {scorecard?.runnersInvoked && ` via ${scorecard.runnersInvoked.length} runners`}
+              {scorecard?.runnersInvoked &&
+                ` via ${scorecard.runnersInvoked.length} runners`}
             </p>
           </CardContent>
         </Card>
@@ -182,16 +219,26 @@ export default function GovernanceScorecard() {
                 <XCircle className="h-10 w-10 text-red-400" />
               )}
               <div>
-                <span className={`text-3xl font-bold ${gatePassed ? "text-green-400" : "text-red-400"}`}>
-                  {scorecardQuery.isLoading ? "..." : gatePassed ? "PASS" : "FAIL"}
+                <span
+                  className={`text-3xl font-bold ${gatePassed ? "text-green-400" : "text-red-400"}`}
+                >
+                  {scorecardQuery.isLoading
+                    ? "..."
+                    : gatePassed
+                      ? "PASS"
+                      : "FAIL"}
                 </span>
                 {isBlocked && (
-                  <span className="text-xs text-orange-400 block">409 Conflict</span>
+                  <span className="text-xs text-orange-400 block">
+                    409 Conflict
+                  </span>
                 )}
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {scorecard?.scorecard?.gateStatus?.reason || "Loading..."}
+              {toUserSafeGovernanceMessage(
+                scorecard?.scorecard?.gateStatus?.reason || "Loading..."
+              )}
             </p>
           </CardContent>
         </Card>
@@ -199,29 +246,41 @@ export default function GovernanceScorecard() {
         {/* Risk Breakdown */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Risk Summary</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Risk Summary
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-4 gap-2 text-center">
               <div>
-                <div className="text-2xl font-bold text-red-400">{risk.critical}</div>
+                <div className="text-2xl font-bold text-red-400">
+                  {risk.critical}
+                </div>
                 <div className="text-xs text-muted-foreground">Critical</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-orange-400">{risk.high}</div>
+                <div className="text-2xl font-bold text-orange-400">
+                  {risk.high}
+                </div>
                 <div className="text-xs text-muted-foreground">High</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-yellow-400">{risk.medium}</div>
+                <div className="text-2xl font-bold text-yellow-400">
+                  {risk.medium}
+                </div>
                 <div className="text-xs text-muted-foreground">Medium</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-blue-400">{risk.low}</div>
+                <div className="text-2xl font-bold text-blue-400">
+                  {risk.low}
+                </div>
                 <div className="text-xs text-muted-foreground">Low</div>
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2 text-center">
-              {results.filter((r: any) => r.status === "pass").length} passed / {results.filter((r: any) => r.status === "fail").length} failed / {results.filter((r: any) => r.status === "skip").length} skipped
+              {results.filter((r: any) => r.status === "pass").length} passed /{" "}
+              {results.filter((r: any) => r.status === "fail").length} failed /{" "}
+              {results.filter((r: any) => r.status === "skip").length} skipped
             </p>
           </CardContent>
         </Card>
@@ -247,27 +306,37 @@ export default function GovernanceScorecard() {
                     <XCircle className="h-4 w-4 text-red-400" />
                   )}
                   <span className="text-sm">
-                    {packResolution.resolved ? "Packs resolved" : "Pack resolution FAILED"}
+                    {packResolution.resolved
+                      ? "Packs resolved"
+                      : "Pack resolution FAILED"}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {(packResolution.loadedPacks ?? []).map((pack: string) => (
-                    <span key={pack} className={`text-xs px-1.5 py-0.5 rounded ${getPackBadge(pack)}`}>
+                    <span
+                      key={pack}
+                      className={`text-xs px-1.5 py-0.5 rounded ${getPackBadge(pack)}`}
+                    >
                       {pack}
                     </span>
                   ))}
                 </div>
                 {(packResolution.missingPacks ?? []).length > 0 && (
                   <div className="text-xs text-red-400">
-                    Missing: {(packResolution.missingPacks as string[]).join(", ")}
+                    Missing:{" "}
+                    {(packResolution.missingPacks as string[]).join(", ")}
                   </div>
                 )}
                 {packResolution.error && (
-                  <div className="text-xs text-red-400 mt-1">{packResolution.error}</div>
+                  <div className="text-xs text-red-400 mt-1">
+                    {toUserSafeGovernanceMessage(packResolution.error)}
+                  </div>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No subject — base pack only</p>
+              <p className="text-sm text-muted-foreground">
+                No subject — base pack only
+              </p>
             )}
           </CardContent>
         </Card>
@@ -290,26 +359,34 @@ export default function GovernanceScorecard() {
                     <XCircle className="h-4 w-4 text-red-400" />
                   )}
                   <span className="text-sm">
-                    {subjectValidation.valid ? "GovernedSubject contract valid" : "Contract validation FAILED"}
+                    {subjectValidation.valid
+                      ? "GovernedSubject contract valid"
+                      : "Contract validation FAILED"}
                   </span>
                 </div>
                 {(subjectValidation.errors ?? []).length > 0 && (
                   <div className="text-xs text-red-400 space-y-1">
-                    {(subjectValidation.errors as string[]).map((e: string, i: number) => (
-                      <div key={i}>- {e}</div>
-                    ))}
+                    {(subjectValidation.errors as string[]).map(
+                      (e: string, i: number) => (
+                        <div key={i}>- {e}</div>
+                      )
+                    )}
                   </div>
                 )}
                 {(subjectValidation.warnings ?? []).length > 0 && (
                   <div className="text-xs text-yellow-400 space-y-1">
-                    {(subjectValidation.warnings as string[]).map((w: string, i: number) => (
-                      <div key={i}>- {w}</div>
-                    ))}
+                    {(subjectValidation.warnings as string[]).map(
+                      (w: string, i: number) => (
+                        <div key={i}>- {w}</div>
+                      )
+                    )}
                   </div>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No subject — system-wide check</p>
+              <p className="text-sm text-muted-foreground">
+                No subject — system-wide check
+              </p>
             )}
           </CardContent>
         </Card>
@@ -323,13 +400,26 @@ export default function GovernanceScorecard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {Object.entries(scorecard.scorecard.score.domainScores).map(([domain, data]: [string, any]) => (
-                <div key={domain} className="text-center p-3 rounded-lg bg-muted/50">
-                  <div className={`text-2xl font-bold ${getScoreColor(data.score)}`}>{data.score}%</div>
-                  <div className="text-xs text-muted-foreground capitalize">{domain}</div>
-                  <div className="text-xs text-muted-foreground">{data.achievedWeight}/{data.maxWeight} weight</div>
-                </div>
-              ))}
+              {Object.entries(scorecard.scorecard.score.domainScores).map(
+                ([domain, data]: [string, any]) => (
+                  <div
+                    key={domain}
+                    className="text-center p-3 rounded-lg bg-muted/50"
+                  >
+                    <div
+                      className={`text-2xl font-bold ${getScoreColor(data.score)}`}
+                    >
+                      {data.score}%
+                    </div>
+                    <div className="text-xs text-muted-foreground capitalize">
+                      {domain}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {data.achievedWeight}/{data.maxWeight} weight
+                    </div>
+                  </div>
+                )
+              )}
             </div>
           </CardContent>
         </Card>
@@ -364,11 +454,17 @@ export default function GovernanceScorecard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{result.controlId}</code>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${getSeverityBadge(result.severity)}`}>
+                    <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
+                      {result.controlId}
+                    </code>
+                    <span
+                      className={`text-xs px-1.5 py-0.5 rounded ${getSeverityBadge(result.severity)}`}
+                    >
                       {result.severity}
                     </span>
-                    <span className="text-sm">{result.details}</span>
+                    <span className="text-sm">
+                      {toUserSafeGovernanceDetail(result.details)}
+                    </span>
                   </div>
                   {result.status === "fail" && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -390,7 +486,8 @@ export default function GovernanceScorecard() {
             Drift Detection
           </CardTitle>
           <CardDescription>
-            {driftStatusQuery.data?.active ? "Active" : "Inactive"} — monitors governance posture changes
+            {driftStatusQuery.data?.active ? "Active" : "Inactive"} — monitors
+            governance posture changes
             {(driftStatusQuery.data?.frozenCount ?? 0) > 0 && (
               <span className="text-red-400 ml-2">
                 ({driftStatusQuery.data?.frozenCount} frozen)
@@ -402,28 +499,43 @@ export default function GovernanceScorecard() {
           {driftQuery.data ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
-                <div className={`text-xl font-bold ${driftQuery.data.scoreDelta >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  {driftQuery.data.scoreDelta > 0 ? "+" : ""}{driftQuery.data.scoreDelta}
+                <div
+                  className={`text-xl font-bold ${driftQuery.data.scoreDelta >= 0 ? "text-green-400" : "text-red-400"}`}
+                >
+                  {driftQuery.data.scoreDelta > 0 ? "+" : ""}
+                  {driftQuery.data.scoreDelta}
                 </div>
                 <div className="text-xs text-muted-foreground">Score Delta</div>
               </div>
               <div className="text-center">
-                <div className="text-xl font-bold">{driftQuery.data.currentScore}</div>
-                <div className="text-xs text-muted-foreground">Current Score</div>
+                <div className="text-xl font-bold">
+                  {driftQuery.data.currentScore}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Current Score
+                </div>
               </div>
               <div className="text-center">
-                <div className="text-xl font-bold">{driftQuery.data.newViolations?.length ?? 0}</div>
-                <div className="text-xs text-muted-foreground">New Violations</div>
+                <div className="text-xl font-bold">
+                  {driftQuery.data.newViolations?.length ?? 0}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  New Violations
+                </div>
               </div>
               <div className="text-center">
-                <div className={`text-xl font-bold ${driftQuery.data.escalationNeeded ? "text-red-400" : "text-green-400"}`}>
+                <div
+                  className={`text-xl font-bold ${driftQuery.data.escalationNeeded ? "text-red-400" : "text-green-400"}`}
+                >
                   {driftQuery.data.escalationNeeded ? "YES" : "NO"}
                 </div>
                 <div className="text-xs text-muted-foreground">Escalation</div>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No drift data yet. Run a scorecard first.</p>
+            <p className="text-sm text-muted-foreground">
+              No drift data yet. Run a scorecard first.
+            </p>
           )}
         </CardContent>
       </Card>
@@ -441,12 +553,15 @@ export default function GovernanceScorecard() {
             )}
           </CardTitle>
           <CardDescription>
-            Frozen subjects have all lifecycle transitions blocked until explicitly unfrozen
+            Frozen subjects have all lifecycle transitions blocked until
+            explicitly unfrozen
           </CardDescription>
         </CardHeader>
         <CardContent>
           {(frozenQuery.data?.length ?? 0) === 0 ? (
-            <p className="text-sm text-muted-foreground">No frozen subjects. Governance posture is clean.</p>
+            <p className="text-sm text-muted-foreground">
+              No frozen subjects. Governance posture is clean.
+            </p>
           ) : (
             <div className="space-y-2">
               {frozenQuery.data?.map((subject: any) => (
@@ -458,19 +573,28 @@ export default function GovernanceScorecard() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm">
-                        {subject.subjectId === 0 ? "System-wide freeze" : `#${subject.subjectId}`}
+                        {subject.subjectId === 0
+                          ? "System-wide freeze"
+                          : `#${subject.subjectId}`}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {subject.subjectName}
                       </span>
-                      <Badge variant="outline" className="text-xs bg-red-500/10 text-red-400 border-red-500/30">
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-red-500/10 text-red-400 border-red-500/30"
+                      >
                         Score: {subject.scoreAtFreeze}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">{subject.reason}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {subject.reason}
+                    </p>
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       <span>Frozen by: {subject.frozenBy}</span>
-                      <span>At: {new Date(subject.frozenAt).toLocaleString()}</span>
+                      <span>
+                        At: {new Date(subject.frozenAt).toLocaleString()}
+                      </span>
                     </div>
                   </div>
                   <Button
@@ -478,7 +602,9 @@ export default function GovernanceScorecard() {
                     size="sm"
                     className="shrink-0 border-red-500/30 hover:bg-red-500/10"
                     disabled={unfreezeMutation.isPending}
-                    onClick={() => unfreezeMutation.mutate({ subjectId: subject.subjectId })}
+                    onClick={() =>
+                      unfreezeMutation.mutate({ subjectId: subject.subjectId })
+                    }
                   >
                     <Unlock className="h-3 w-3 mr-1" />
                     Unfreeze
@@ -495,7 +621,9 @@ export default function GovernanceScorecard() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Evidence Bundle</CardTitle>
-            <CardDescription>Immutable audit artifact with SHA-256 integrity hash</CardDescription>
+            <CardDescription>
+              Immutable audit artifact with SHA-256 integrity hash
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -505,7 +633,9 @@ export default function GovernanceScorecard() {
               </div>
               <div>
                 <span className="text-muted-foreground">Commit: </span>
-                <code className="text-xs">{evidence.commitRef?.slice(0, 12)}</code>
+                <code className="text-xs">
+                  {evidence.commitRef?.slice(0, 12)}
+                </code>
               </div>
               <div>
                 <span className="text-muted-foreground">Timestamp: </span>
@@ -513,7 +643,9 @@ export default function GovernanceScorecard() {
               </div>
               <div>
                 <span className="text-muted-foreground">Hash: </span>
-                <code className="text-xs break-all">{evidence.integrityHash?.slice(0, 24)}...</code>
+                <code className="text-xs break-all">
+                  {evidence.integrityHash?.slice(0, 24)}...
+                </code>
               </div>
             </div>
           </CardContent>
@@ -526,7 +658,8 @@ export default function GovernanceScorecard() {
           <CardHeader>
             <CardTitle className="text-base">Control Catalog</CardTitle>
             <CardDescription>
-              {catalog.activeControls?.length ?? 0} active controls across {catalog.availablePacks?.length ?? 0} packs,{" "}
+              {catalog.activeControls?.length ?? 0} active controls across{" "}
+              {catalog.availablePacks?.length ?? 0} packs,{" "}
               {catalog.runners?.length ?? 0} runners
             </CardDescription>
           </CardHeader>
@@ -535,8 +668,16 @@ export default function GovernanceScorecard() {
               {/* Pack summary */}
               <div className="flex flex-wrap gap-2">
                 {(catalog.availablePacks ?? []).map((pack: string) => (
-                  <span key={pack} className={`text-xs px-2 py-1 rounded ${getPackBadge(pack)}`}>
-                    {pack}: {(catalog.activeControls ?? []).filter((c: any) => c.pack === pack).length}
+                  <span
+                    key={pack}
+                    className={`text-xs px-2 py-1 rounded ${getPackBadge(pack)}`}
+                  >
+                    {pack}:{" "}
+                    {
+                      (catalog.activeControls ?? []).filter(
+                        (c: any) => c.pack === pack
+                      ).length
+                    }
                   </span>
                 ))}
               </div>
@@ -544,16 +685,27 @@ export default function GovernanceScorecard() {
               {/* Controls */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 {(catalog.activeControls ?? []).map((control: any) => (
-                  <div key={control.id} className="flex items-center gap-2 p-2 rounded border">
-                    <code className="text-xs font-mono bg-muted px-1 rounded">{control.id}</code>
-                    <span className={`text-xs px-1 rounded ${getPackBadge(control.pack)}`}>
+                  <div
+                    key={control.id}
+                    className="flex items-center gap-2 p-2 rounded border"
+                  >
+                    <code className="text-xs font-mono bg-muted px-1 rounded">
+                      {control.id}
+                    </code>
+                    <span
+                      className={`text-xs px-1 rounded ${getPackBadge(control.pack)}`}
+                    >
                       {control.pack}
                     </span>
-                    <span className={`text-xs px-1 rounded ${getSeverityBadge(control.severity)}`}>
+                    <span
+                      className={`text-xs px-1 rounded ${getSeverityBadge(control.severity)}`}
+                    >
                       {control.severity}
                     </span>
                     <span className="text-xs truncate">{control.name}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">w:{control.weight}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      w:{control.weight}
+                    </span>
                   </div>
                 ))}
               </div>

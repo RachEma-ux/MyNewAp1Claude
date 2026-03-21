@@ -5,10 +5,12 @@ import {
   isAppBlockerPayload,
   type AppBlockerPayload,
 } from "@shared/blockers";
+import { toUserSafeText } from "@shared/error-presentation";
 
 export function getAppBlocker(error: unknown): AppBlockerPayload {
   if (error instanceof TRPCClientError) {
-    const blocker = (error.data as { appBlocker?: unknown } | undefined)?.appBlocker;
+    const blocker = (error.data as { appBlocker?: unknown } | undefined)
+      ?.appBlocker;
     if (isAppBlockerPayload(blocker)) {
       return blocker;
     }
@@ -17,7 +19,10 @@ export function getAppBlocker(error: unknown): AppBlockerPayload {
       code: "trpc_unknown_failure",
       category: "technical_error",
       title: "Something went wrong",
-      summary: error.message || "Something went wrong while processing this request. No changes were made.",
+      summary: toUserSafeText(
+        error.message,
+        "Something went wrong while processing this request. No changes were made."
+      ),
       recommendedActions: ["Try again in a moment."],
       retryable: true,
       technicalDetails: error.message,
@@ -29,7 +34,10 @@ export function getAppBlocker(error: unknown): AppBlockerPayload {
       code: "client_unknown_failure",
       category: "technical_error",
       title: "Something went wrong",
-      summary: error.message || "Something went wrong while processing this request. No changes were made.",
+      summary: toUserSafeText(
+        error.message,
+        "Something went wrong while processing this request. No changes were made."
+      ),
       recommendedActions: ["Try again in a moment."],
       retryable: true,
       technicalDetails: error.message,
@@ -40,13 +48,16 @@ export function getAppBlocker(error: unknown): AppBlockerPayload {
     code: "unknown_failure",
     category: "technical_error",
     title: "Something went wrong",
-    summary: "Something went wrong while processing this request. No changes were made.",
+    summary:
+      "Something went wrong while processing this request. No changes were made.",
     recommendedActions: ["Try again in a moment."],
     retryable: true,
   });
 }
 
-export function getBlockerDescription(blocker: AppBlockerPayload): string | undefined {
+export function getBlockerDescription(
+  blocker: AppBlockerPayload
+): string | undefined {
   const nextStep = blocker.recommendedActions[0];
   if (nextStep) {
     return `${blocker.summary} ${nextStep}`;
@@ -64,5 +75,7 @@ export function showBlockerToast(error: unknown, fallbackTitle?: string) {
 
 export function isAuthRequiredError(error: unknown): boolean {
   const blocker = getAppBlocker(error);
-  return blocker.category === "permission_error" && blocker.code === "auth_required";
+  return (
+    blocker.category === "permission_error" && blocker.code === "auth_required"
+  );
 }
