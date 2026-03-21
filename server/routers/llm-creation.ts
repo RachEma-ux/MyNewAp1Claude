@@ -8,9 +8,33 @@
 
 import { z } from "zod";
 import { protectedProcedure, governedProcedure } from "../_core/trpc";
-import { createLLM } from "../db";
 import { jobQueue } from "../services/job-queue";
 import { getAuditLogger } from "../services/auditLogger";
+import { registerProjectOutputAsLLMVersionCandidate } from "../llm/project-output-registration";
+
+const environmentSchema = z.enum(["sandbox", "governed", "production"]);
+const governedVersionConfigSchema = z.object({
+  runtime: z.object({
+    type: z.enum(["local", "cloud", "remote"]),
+    provider: z.string().optional(),
+    endpoint: z.string().optional(),
+  }),
+  model: z.object({
+    name: z.string(),
+    version: z.string().optional(),
+    contextLength: z.number().optional(),
+  }),
+  parameters: z.object({
+    temperature: z.number().min(0).max(2).optional(),
+    maxTokens: z.number().positive().optional(),
+    topP: z.number().min(0).max(1).optional(),
+    streaming: z.boolean().optional(),
+  }).optional(),
+  capabilities: z.object({
+    tools: z.array(z.string()).optional(),
+    functions: z.array(z.string()).optional(),
+  }).optional(),
+});
 
 /**
  * Procedure map for LLM creation & training routes.
@@ -132,63 +156,8 @@ export const llmCreationProcedures = {
         metadata: { name: input.name, path: input.path },
       });
 
-      // Auto-register LLM identity in the registry
-      try {
-        const useCaseRoleMap: Record<string, string> = {
-          chat_assistant: "executor",
-          enterprise_doc_qa: "executor",
-          coding_helper: "executor",
-          router: "router",
-          agent: "planner",
-        };
-        const target = input.target as any;
-        const role = useCaseRoleMap[target?.useCase] || "executor";
-
-        const pathLabel = input.path === "PATH_A" ? "Fine-tuning" : "Pre-training";
-        const baseModel = input.baseModel as any;
-        const baseModelInfo = baseModel
-          ? `Base model: ${baseModel.name || "TBD"}${baseModel.size ? ` (${baseModel.size})` : ""}`
-          : "Base model: TBD";
-
-        const description = [
-          `[Creation Project] ${pathLabel}`,
-          baseModelInfo,
-          `Use case: ${target?.useCase || "general"}`,
-          `Deployment: ${target?.deployment || "local"}`,
-          target?.contextLength ? `Context: ${target.contextLength}` : null,
-          `Phase: phase_0_planning | Status: draft`,
-        ].filter(Boolean).join(" | ");
-
-        const llm = await createLLM({
-          name: input.name,
-          description,
-          role: role as any,
-          ownerTeam: null,
-          createdBy: ctx.user.id,
-        });
-
-        await updateTable(llmCreationProjects)
-          .set({ llmId: llm.id })
-          .where(eq(llmCreationProjects.id, project.id));
-
-        project.llmId = llm.id;
-
-        try {
-          await insertInto(llmCreationAuditEvents).values({
-            eventType: "llm.auto_registered",
-            projectId: project.id,
-            actor: ctx.user.id,
-            phase: "phase_0_planning",
-            action: "auto_register_llm",
-            payload: { llmId: llm.id, role, name: input.name },
-            status: "success",
-          });
-        } catch (_) {}
-
-        console.log(`[LLM Create] Auto-registered LLM identity #${llm.id} for project #${project.id}`);
-      } catch (regErr) {
-        console.warn("[LLM Create] Auto-registration of LLM identity failed:", regErr);
-      }
+      // LLM identity is created at governance handoff time, not at project creation.
+      // See registerProjectOutputAsLLMVersionCandidate for the handoff flow.
 
       return project;
     }),
@@ -674,6 +643,35 @@ export const llmCreationProcedures = {
         .returning();
 
       return updated;
+    }),
+
+  registerProjectOutputAsLLMVersion: governedProcedure
+    .input(
+      z.object({
+        projectId: z.number().int().positive(),
+        environment: environmentSchema.default("sandbox"),
+        config: governedVersionConfigSchema,
+        evaluationThreshold: z.number().min(0).max(1).default(0.75),
+        explicitApprovalReason: z.string().min(1).optional(),
+        useQuantizedArtifact: z.boolean().default(false),
+        policyBundleRef: z.string().max(512).optional(),
+        policyHash: z.string().length(64).optional(),
+        changeNotes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      return await registerProjectOutputAsLLMVersionCandidate({
+        projectId: input.projectId,
+        actorId: ctx.user.id,
+        environment: input.environment,
+        config: input.config,
+        evaluationThreshold: input.evaluationThreshold,
+        explicitApprovalReason: input.explicitApprovalReason,
+        useQuantizedArtifact: input.useQuantizedArtifact,
+        policyBundleRef: input.policyBundleRef,
+        policyHash: input.policyHash,
+        changeNotes: input.changeNotes,
+      });
     }),
 
   getCreationAuditTrail: protectedProcedure

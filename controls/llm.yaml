@@ -25,13 +25,13 @@ controls:
     enabled: true
 
   - id: TYPE-L003
-    name: LLM inference routing policy set
+    name: LLM Catalog runtime authority set
     domain: type_specific
     riskCategory: missing_policy_mapping
     severity: medium
     blocksStages: [publish]
     weight: 5
-    runnerId: llm-routing-validator
-    remediation: "LLM must have an inference routing policy (local-only, cloud-allowed, or auto) before publication."
-    rationale: "Unrouted LLMs may send sensitive data to unintended providers."
+    runnerId: llm-catalog-authority-validator
+    remediation: "LLM runtime use must resolve from an active published Catalog entry via resolveCatalogLLMRuntimeAuthority; raw LLM versions are only internal catalog-eligibility state until Catalog approval, publication, activation, and runtime enablement are complete. The policy engine must be invoked on all version-creation paths."
+    rationale: "Catalog must be the runtime authority so internal LLM lifecycle state cannot bypass publication and activation governance. Version creation paths must evaluate policy rather than stamping policyDecision: pass."
     enabled: true

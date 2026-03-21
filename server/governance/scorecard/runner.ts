@@ -1029,25 +1029,29 @@ registerRunner({
 });
 
 registerRunner({
-  id: "llm-routing-validator",
-  name: "LLM Inference Routing Policy Validator",
+  id: "llm-catalog-authority-validator",
+  name: "LLM Catalog Runtime Authority Validator",
   async run(ctx, controls) {
-    const control = controls.find((c) => c.runnerId === "llm-routing-validator");
+    const control = controls.find((c) => c.runnerId === "llm-catalog-authority-validator");
     if (!control) return [];
-    if (!ctx.entry) return [buildSkip(control, "llm-routing-validator", "No entry context")];
+    if (!ctx.entry) return [buildSkip(control, "llm-catalog-authority-validator", "No entry context")];
 
     const config = ctx.entry.config || {};
-    const hasRoutingPolicy = !!config.routingPolicy || !!config.inferenceRoute || !!config.dataSensitivity;
+    const hasCatalogAuthority =
+      config.runtimeAuthority === "catalog_entry" ||
+      (config.catalogEligible === true || config.callable === true) &&
+      typeof config.sourceLLMId === "number" &&
+      typeof config.sourceLLMVersionId === "number";
     return [
-      buildResult(control, "llm-routing-validator", hasRoutingPolicy,
-        hasRoutingPolicy
-          ? "LLM has inference routing policy configured"
-          : "LLM has no routing policy — may send sensitive data to unintended providers",
+      buildResult(control, "llm-catalog-authority-validator", hasCatalogAuthority,
+        hasCatalogAuthority
+          ? "LLM has Catalog runtime authority configured"
+          : "LLM is missing Catalog runtime authority — raw LLM versions cannot authorize runtime use",
         {
-          check: "LLM inference routing policy",
-          finding: hasRoutingPolicy ? "configured" : "missing",
-          targets: ["config.routingPolicy"],
-          data: { routingPolicy: config.routingPolicy, inferenceRoute: config.inferenceRoute },
+          check: "LLM Catalog runtime authority",
+          finding: hasCatalogAuthority ? "configured" : "missing",
+          targets: ["config.runtimeAuthority", "config.catalogEligible", "config.sourceLLMId"],
+          data: { runtimeAuthority: config.runtimeAuthority, catalogEligible: config.catalogEligible, sourceLLMId: config.sourceLLMId },
         }
       ),
     ];

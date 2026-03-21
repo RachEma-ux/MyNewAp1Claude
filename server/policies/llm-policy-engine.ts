@@ -1,8 +1,10 @@
 /**
  * LLM Policy Engine - Rule-based policy evaluation and admission control
  *
- * Validates LLM configurations against local policy rules (no external
- * OPA dependency). All rules are evaluated deterministically in-process.
+ * Authoritative for the current LLM path: local deterministic policy engine.
+ * This module is the real enforcement layer for LLM configuration decisions;
+ * the LLM control-plane does not depend on shared OPA enforcement today.
+ * All rules are evaluated deterministically in-process.
  *
  * Checks:
  * - Naming conventions
@@ -75,6 +77,8 @@ export interface LLMPolicyInput {
 // ============================================================================
 // Policy Rules
 // ============================================================================
+
+export const LLM_POLICY_AUTHORITY = "local_deterministic_policy_engine" as const;
 
 /**
  * Policy Rules - locally defined rule constants

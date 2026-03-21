@@ -20,18 +20,23 @@ import {
   createLLMVersion,
   getLLMVersions,
   getLLMVersion,
-  getLatestCallableVersion,
+  getLatestCatalogEligibleVersion,
   updateLLMVersionCallable,
   createPromotion,
   getPromotions,
   approvePromotion,
   rejectPromotion,
+  executePromotion as executeLLMPromotion,
   getLLMAuditEvents,
 } from "../db";
 import "../services/training-executor"; // Initialize training executor
 
 import { llmProvidersProcedures } from "./llm-providers";
 import { llmCreationProcedures } from "./llm-creation";
+import {
+  onboardLLMVersionToCatalogCandidate,
+  resolveCatalogLLMRuntimeAuthority,
+} from "../llm/authority";
 
 // ============================================================================
 // Input Validation Schemas
@@ -91,6 +96,12 @@ const createPromotionSchema = z.object({
   llmVersionId: z.number().int().positive(),
   fromEnvironment: environmentSchema,
   toEnvironment: environmentSchema,
+});
+
+const onboardCatalogSchema = z.object({
+  versionId: z.number().int().positive(),
+  displayName: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).optional(),
 });
 
 // ============================================================================
@@ -163,19 +174,24 @@ export const llmRouter = router({
       }
 
       const [sandboxVersion, governedVersion, productionVersion, allVersions] = await Promise.all([
-        getLatestCallableVersion(input.id, "sandbox"),
-        getLatestCallableVersion(input.id, "governed"),
-        getLatestCallableVersion(input.id, "production"),
+        getLatestCatalogEligibleVersion(input.id, "sandbox"),
+        getLatestCatalogEligibleVersion(input.id, "governed"),
+        getLatestCatalogEligibleVersion(input.id, "production"),
         getLLMVersions(input.id),
       ]);
 
+      const latestCatalogEligibleVersions = {
+        sandbox: sandboxVersion,
+        governed: governedVersion,
+        production: productionVersion,
+      };
+
       return {
         ...llm,
-        latestVersions: {
-          sandbox: sandboxVersion,
-          governed: governedVersion,
-          production: productionVersion,
-        },
+        latestVersions: latestCatalogEligibleVersions,
+        latestCatalogEligibleVersions,
+        callableMeaning: "internal_catalog_eligibility_only",
+        runtimeAuthority: "catalog_entry",
         versionCount: allVersions.length,
       };
     }),
@@ -194,13 +210,28 @@ export const llmRouter = router({
   createVersion: governedProcedure
     .input(createVersionSchema)
     .mutation(async ({ ctx, input }) => {
+      const llm = await getLLMById(input.llmId);
+      if (!llm) throw new Error("LLM not found");
+
+      const { LLMPolicyEngine } = await import("../policies/llm-policy-engine");
+      const policyResult = await LLMPolicyEngine.evaluate({
+        identity: { name: llm.name, role: llm.role },
+        configuration: input.config,
+        environment: input.environment,
+      });
+
+      if (policyResult.decision === "deny") {
+        throw new Error("Policy evaluation denied: " + policyResult.violations.map(v => v.message).join("; "));
+      }
+
       const version = await createLLMVersion({
         ...input,
         createdBy: ctx.user.id,
-        policyDecision: "pass",
+        policyDecision: policyResult.decision === "allow" ? "pass" : "warn",
+        policyHash: policyResult.policyHash,
         attestationStatus: "pending",
         driftStatus: "none",
-        callable: input.environment === "sandbox",
+        callable: false,
       });
 
       return version;
@@ -231,9 +262,63 @@ export const llmRouter = router({
         reason: z.string(),
       })
     )
-    .mutation(async ({ input }) => {
-      await updateLLMVersionCallable(input.versionId, input.callable, input.reason);
+    .mutation(async ({ ctx, input }) => {
+      // Non-sandbox versions require the promotion workflow to enable catalog eligibility
+      if (input.callable === true) {
+        const version = await getLLMVersion(input.versionId);
+        if (!version) throw new Error("Version not found");
+        if (version.environment !== "sandbox") {
+          throw new Error("Non-sandbox versions require the promotion workflow to enable catalog eligibility");
+        }
+      }
+
+      await updateLLMVersionCallable(input.versionId, input.callable, input.reason, {
+        actorId: ctx.user.id,
+        actorType: "user",
+      });
       return { success: true };
+    }),
+
+  onboardVersionToCatalog: governedProcedure
+    .input(onboardCatalogSchema)
+    .mutation(async ({ ctx, input }) => {
+      const entry = await onboardLLMVersionToCatalogCandidate({
+        llmVersionId: input.versionId,
+        actorId: ctx.user.id,
+        displayName: input.displayName,
+        description: input.description,
+      });
+
+      return entry;
+    }),
+
+  getCatalogRuntimeAuthority: protectedProcedure
+    .input(z.object({ catalogEntryId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const authority = await resolveCatalogLLMRuntimeAuthority(input.catalogEntryId);
+      return {
+        catalogEntryId: authority.entry.id,
+        bundleId: authority.bundle.id,
+        sourceLLMId: authority.sourceLLMId,
+        sourceLLMVersionId: authority.sourceLLMVersionId,
+        runtimeAuthority: "catalog_entry",
+        reviewState: authority.entry.reviewState,
+        status: authority.entry.status,
+      };
+    }),
+
+  enforceCatalogRuntimeAuthority: governedProcedure
+    .input(z.object({ catalogEntryId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const authority = await resolveCatalogLLMRuntimeAuthority(input.catalogEntryId);
+      return {
+        catalogEntryId: authority.entry.id,
+        bundleId: authority.bundle.id,
+        sourceLLMId: authority.sourceLLMId,
+        sourceLLMVersionId: authority.sourceLLMVersionId,
+        runtimeAuthority: "catalog_entry",
+        enforced: true,
+      };
     }),
 
   // ============================================================================
@@ -305,52 +390,7 @@ export const llmRouter = router({
   executePromotion: governedProcedure
     .input(z.object({ promotionId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
-      const [promotion] = await getPromotions({ llmVersionId: input.promotionId });
-
-      if (!promotion) {
-        throw new Error("Promotion not found");
-      }
-
-      if (promotion.status !== "approved") {
-        throw new Error("Promotion must be approved before execution");
-      }
-
-      const sourceVersion = await getLLMVersion(promotion.llmVersionId);
-      if (!sourceVersion) {
-        throw new Error("Source version not found");
-      }
-
-      const newVersion = await createLLMVersion({
-        llmId: sourceVersion.llmId,
-        environment: promotion.toEnvironment,
-        config: sourceVersion.config,
-        policyBundleRef: sourceVersion.policyBundleRef,
-        policyHash: sourceVersion.policyHash,
-        policyDecision: sourceVersion.policyDecision,
-        policyViolations: sourceVersion.policyViolations,
-        attestationContract: sourceVersion.attestationContract,
-        attestationStatus: "pending",
-        driftStatus: "none",
-        callable: false,
-        createdBy: ctx.user.id,
-        changeNotes: `Promoted from ${promotion.fromEnvironment} (promotion #${promotion.id})`,
-        promotionRequestId: promotion.id,
-      });
-
-      const { getDb } = await import("../db");
-      const { llmPromotions } = await import("../../drizzle/schema");
-      const { eq } = await import("drizzle-orm");
-      const db = getDb();
-      if (db) {
-        await db.update(llmPromotions)
-          .set({
-            status: "executed",
-            executedAt: new Date(),
-            newVersionId: newVersion.id,
-          })
-          .where(eq(llmPromotions.id, promotion.id));
-      }
-
+      const newVersion = await executeLLMPromotion(input.promotionId, ctx.user.id);
       return { success: true, newVersion };
     }),
 

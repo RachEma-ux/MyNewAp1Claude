@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 import { createHash } from "crypto";
 import {
   llms,
@@ -16,12 +16,42 @@ import {
 } from "../../drizzle/schema";
 import { getDb } from "./connection";
 
+const VALID_LLM_ENVIRONMENTS = new Set(["sandbox", "governed", "production"]);
+
+// Accepts both the full db instance and transaction objects (both share the same
+// insert/select/update interface via PgDatabase base class in drizzle-orm)
+type AuditExecutor = Pick<NonNullable<ReturnType<typeof getDb>>, "insert" | "select" | "update">;
+type AuditActorType = "user" | "system";
+
+function assertValidEnvironment(environment: string, label: string): void {
+  if (!VALID_LLM_ENVIRONMENTS.has(environment)) {
+    throw new Error(`Invalid ${label}: ${environment}`);
+  }
+}
+
+async function insertLLMAuditEvent(
+  executor: AuditExecutor,
+  data: Omit<InsertLLMAuditEvent, "timestamp" | "createdAt">
+): Promise<void> {
+  await executor.insert(llmAuditEvents).values({
+    ...data,
+    timestamp: new Date(),
+  });
+}
+
+async function requiredLLMAuditEvent(
+  executor: AuditExecutor,
+  data: Omit<InsertLLMAuditEvent, "timestamp" | "createdAt">
+): Promise<void> {
+  await insertLLMAuditEvent(executor, data);
+}
+
 export async function createLLM(data: InsertLLM): Promise<LLM> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  try {
-    const [created] = await db.insert(llms).values({
+  return await db.transaction(async (tx) => {
+    const [created] = await tx.insert(llms).values({
       name: data.name,
       description: data.description ?? null,
       role: data.role,
@@ -32,7 +62,7 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
       updatedAt: data.updatedAt ?? new Date(),
     }).returning();
 
-    await emitLLMAuditEvent({
+    await requiredLLMAuditEvent(tx, {
       eventType: "llm.created",
       llmId: created.id,
       actor: data.createdBy,
@@ -41,10 +71,7 @@ export async function createLLM(data: InsertLLM): Promise<LLM> {
     });
 
     return created;
-  } catch (error: any) {
-    console.error('[createLLM] Insert failed:', error.message);
-    throw new Error(`Failed to create LLM: ${error.message}`);
-  }
+  });
 }
 
 export async function updateLLM(
@@ -55,22 +82,18 @@ export async function updateLLM(
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  console.log('[updateLLM] Updating LLM ID:', id, 'with data:', JSON.stringify(data));
-
-  try {
+  return await db.transaction(async (tx) => {
     const updateData: Record<string, unknown> = {
       ...data,
       updatedAt: new Date(),
     };
 
-    await db
+    await tx
       .update(llms)
       .set(updateData)
       .where(eq(llms.id, id));
 
-    console.log('[updateLLM] Successfully updated LLM ID:', id);
-
-    await emitLLMAuditEvent({
+    await requiredLLMAuditEvent(tx, {
       eventType: "llm.updated",
       llmId: id,
       actor: updatedBy,
@@ -78,19 +101,12 @@ export async function updateLLM(
       payload: { changes: data },
     });
 
-    const updated = await db.select().from(llms).where(eq(llms.id, id)).limit(1);
+    const updated = await tx.select().from(llms).where(eq(llms.id, id)).limit(1);
     if (!updated || updated.length === 0) {
       throw new Error(`LLM with ID ${id} not found after update`);
     }
     return updated[0];
-  } catch (error: any) {
-    console.error('[updateLLM] Update failed:', error);
-    console.error('[updateLLM] Error details:', {
-      message: error.message,
-      code: error.code,
-    });
-    throw new Error(`Failed to update LLM: ${error.message}`);
-  }
+  });
 }
 
 export async function getLLMs(filter?: {
@@ -102,7 +118,7 @@ export async function getLLMs(filter?: {
 
   let query = db.select().from(llms);
 
-  const conditions = [];
+  const conditions: any[] = [];
   if (filter?.role) {
     conditions.push(eq(llms.role, filter.role as any));
   }
@@ -129,14 +145,16 @@ export async function archiveLLM(id: number, userId: number): Promise<void> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(llms).set({ archived: true }).where(eq(llms.id, id));
+  await db.transaction(async (tx) => {
+    await tx.update(llms).set({ archived: true }).where(eq(llms.id, id));
 
-  await emitLLMAuditEvent({
-    eventType: "llm.archived",
-    llmId: id,
-    actor: userId,
-    actorType: "user",
-    payload: {},
+    await requiredLLMAuditEvent(tx, {
+      eventType: "llm.archived",
+      llmId: id,
+      actor: userId,
+      actorType: "user",
+      payload: {},
+    });
   });
 }
 
@@ -146,18 +164,19 @@ function computeConfigHash(config: any): string {
   return hash.digest("hex");
 }
 
-export async function createLLMVersion(data: Omit<InsertLLMVersion, "configHash" | "version">): Promise<LLMVersion> {
-  const db = getDb();
-  if (!db) throw new Error("Database not available");
+export async function createLLMVersionWithExecutor(
+  executor: AuditExecutor,
+  data: Omit<InsertLLMVersion, "configHash" | "version">
+): Promise<LLMVersion> {
+  assertValidEnvironment(data.environment, "LLM version environment");
 
-  const existingVersions = await db
+  const existingVersions = await executor
     .select()
     .from(llmVersions)
     .where(eq(llmVersions.llmId, data.llmId))
     .orderBy(desc(llmVersions.version));
 
   const nextVersion = existingVersions.length > 0 ? existingVersions[0].version + 1 : 1;
-
   const configHash = computeConfigHash(data.config);
 
   const insertData: InsertLLMVersion = {
@@ -166,21 +185,32 @@ export async function createLLMVersion(data: Omit<InsertLLMVersion, "configHash"
     configHash,
   };
 
-  const [version] = await db.insert(llmVersions).values(insertData).returning({ id: llmVersions.id });
+  const [version] = await executor.insert(llmVersions).values(insertData).returning();
 
-  await emitLLMAuditEvent({
+  await requiredLLMAuditEvent(executor, {
     eventType: "llm.version.created",
     llmId: data.llmId,
     llmVersionId: version.id,
     actor: data.createdBy,
     actorType: "user",
-    payload: { version: nextVersion, environment: data.environment },
+    payload: {
+      version: nextVersion,
+      environment: data.environment,
+      callableMeaning: "internal_catalog_eligibility_only",
+    },
     configHash,
-    policyHash: data.policyHash,
+    policyHash: data.policyHash ?? undefined,
     environment: data.environment,
   });
 
-  return (await db.select().from(llmVersions).where(eq(llmVersions.id, version.id)))[0];
+  return version;
+}
+
+export async function createLLMVersion(data: Omit<InsertLLMVersion, "configHash" | "version">): Promise<LLMVersion> {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.transaction(async (tx) => createLLMVersionWithExecutor(tx, data));
 }
 
 export async function getLLMVersions(llmId: number): Promise<LLMVersion[]> {
@@ -206,6 +236,13 @@ export async function getLatestCallableVersion(
   llmId: number,
   environment: "sandbox" | "governed" | "production"
 ): Promise<LLMVersion | null> {
+  return getLatestCatalogEligibleVersion(llmId, environment);
+}
+
+export async function getLatestCatalogEligibleVersion(
+  llmId: number,
+  environment: "sandbox" | "governed" | "production"
+): Promise<LLMVersion | null> {
   const db = getDb();
   if (!db) return null;
 
@@ -228,53 +265,77 @@ export async function getLatestCallableVersion(
 export async function updateLLMVersionCallable(
   versionId: number,
   callable: boolean,
-  reason: string
+  reason: string,
+  actor: { actorId: number; actorType: AuditActorType }
 ): Promise<void> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  await db
-    .update(llmVersions)
-    .set({ callable })
-    .where(eq(llmVersions.id, versionId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(llmVersions)
+      .set({ callable })
+      .where(eq(llmVersions.id, versionId));
 
-  const version = await getLLMVersion(versionId);
-  if (version) {
-    await emitLLMAuditEvent({
-      eventType: callable ? "llm.version.enabled" : "llm.version.disabled",
+    const [version] = await tx.select().from(llmVersions).where(eq(llmVersions.id, versionId));
+    if (!version) {
+      throw new Error(`LLM version ${versionId} not found`);
+    }
+
+    await requiredLLMAuditEvent(tx, {
+      eventType: callable ? "llm.version.catalog_eligibility_enabled" : "llm.version.catalog_eligibility_disabled",
       llmId: version.llmId,
       llmVersionId: versionId,
-      actorType: "system",
-      payload: { reason },
+      actor: actor.actorId,
+      actorType: actor.actorType,
+      payload: {
+        reason,
+        callableMeaning: "internal_catalog_eligibility_only",
+        catalogRuntimeAuthority: "catalog_entry",
+      },
+      environment: version.environment,
+      configHash: version.configHash,
+      policyHash: version.policyHash ?? undefined,
     });
-  }
+  });
 }
 
 export async function createPromotion(data: Omit<InsertLLMPromotion, "requestedAt">): Promise<LLMPromotion> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  const [promotion] = await db.insert(llmPromotions).values({
-    ...data,
-    requestedAt: new Date(),
-  }).returning({ id: llmPromotions.id });
+  assertValidEnvironment(data.fromEnvironment, "promotion source environment");
+  assertValidEnvironment(data.toEnvironment, "promotion target environment");
 
-  const version = await getLLMVersion(data.llmVersionId);
+  return await db.transaction(async (tx) => {
+    const [version] = await tx.select().from(llmVersions).where(eq(llmVersions.id, data.llmVersionId));
+    if (!version) {
+      throw new Error(`LLM version ${data.llmVersionId} not found`);
+    }
 
-  await emitLLMAuditEvent({
-    eventType: "llm.promotion.requested",
-    llmId: version?.llmId,
-    llmVersionId: data.llmVersionId,
-    promotionId: promotion.id,
-    actor: data.requestedBy,
-    actorType: "user",
-    payload: {
-      from: data.fromEnvironment,
-      to: data.toEnvironment,
-    },
+    const [promotion] = await tx.insert(llmPromotions).values({
+      ...data,
+      requestedAt: new Date(),
+    }).returning();
+
+    await requiredLLMAuditEvent(tx, {
+      eventType: "llm.promotion.requested",
+      llmId: version.llmId,
+      llmVersionId: data.llmVersionId,
+      promotionId: promotion.id,
+      actor: data.requestedBy,
+      actorType: "user",
+      payload: {
+        from: data.fromEnvironment,
+        to: data.toEnvironment,
+      },
+      environment: data.toEnvironment,
+      configHash: version.configHash,
+      policyHash: version.policyHash ?? undefined,
+    });
+
+    return promotion;
   });
-
-  return (await db.select().from(llmPromotions).where(eq(llmPromotions.id, promotion.id)))[0];
 }
 
 export async function getPromotions(filter?: {
@@ -286,7 +347,7 @@ export async function getPromotions(filter?: {
 
   let query = db.select().from(llmPromotions);
 
-  const conditions = [];
+  const conditions: any[] = [];
   if (filter?.status) {
     conditions.push(eq(llmPromotions.status, filter.status as any));
   }
@@ -301,6 +362,14 @@ export async function getPromotions(filter?: {
   return await query.orderBy(desc(llmPromotions.createdAt));
 }
 
+export async function getPromotionById(promotionId: number): Promise<LLMPromotion | null> {
+  const db = getDb();
+  if (!db) return null;
+
+  const [promotion] = await db.select().from(llmPromotions).where(eq(llmPromotions.id, promotionId));
+  return promotion ?? null;
+}
+
 export async function approvePromotion(
   promotionId: number,
   approverId: number,
@@ -309,30 +378,41 @@ export async function approvePromotion(
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  await db
-    .update(llmPromotions)
-    .set({
-      status: "approved",
-      approvedBy: approverId,
-      approvedAt: new Date(),
-      approvalComment: comment,
-    })
-    .where(eq(llmPromotions.id, promotionId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(llmPromotions)
+      .set({
+        status: "approved",
+        approvedBy: approverId,
+        approvedAt: new Date(),
+        approvalComment: comment,
+        updatedAt: new Date(),
+      })
+      .where(eq(llmPromotions.id, promotionId));
 
-  const promotion = (await db.select().from(llmPromotions).where(eq(llmPromotions.id, promotionId)))[0];
+    const [promotion] = await tx.select().from(llmPromotions).where(eq(llmPromotions.id, promotionId));
+    if (!promotion) {
+      throw new Error(`Promotion ${promotionId} not found`);
+    }
 
-  if (promotion) {
-    const version = await getLLMVersion(promotion.llmVersionId);
-    await emitLLMAuditEvent({
+    const [version] = await tx.select().from(llmVersions).where(eq(llmVersions.id, promotion.llmVersionId));
+    if (!version) {
+      throw new Error(`LLM version ${promotion.llmVersionId} not found`);
+    }
+
+    await requiredLLMAuditEvent(tx, {
       eventType: "llm.promotion.approved",
-      llmId: version?.llmId,
+      llmId: version.llmId,
       llmVersionId: promotion.llmVersionId,
       promotionId,
       actor: approverId,
       actorType: "user",
       payload: { comment },
+      environment: promotion.toEnvironment,
+      configHash: version.configHash,
+      policyHash: version.policyHash ?? undefined,
     });
-  }
+  });
 }
 
 export async function rejectPromotion(
@@ -343,44 +423,148 @@ export async function rejectPromotion(
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
-  await db
-    .update(llmPromotions)
-    .set({
-      status: "rejected",
-      rejectedBy: rejecterId,
-      rejectedAt: new Date(),
-      rejectionReason: reason,
-    })
-    .where(eq(llmPromotions.id, promotionId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(llmPromotions)
+      .set({
+        status: "rejected",
+        rejectedBy: rejecterId,
+        rejectedAt: new Date(),
+        rejectionReason: reason,
+        updatedAt: new Date(),
+      })
+      .where(eq(llmPromotions.id, promotionId));
 
-  const promotion = (await db.select().from(llmPromotions).where(eq(llmPromotions.id, promotionId)))[0];
+    const [promotion] = await tx.select().from(llmPromotions).where(eq(llmPromotions.id, promotionId));
+    if (!promotion) {
+      throw new Error(`Promotion ${promotionId} not found`);
+    }
 
-  if (promotion) {
-    const version = await getLLMVersion(promotion.llmVersionId);
-    await emitLLMAuditEvent({
+    const [version] = await tx.select().from(llmVersions).where(eq(llmVersions.id, promotion.llmVersionId));
+    if (!version) {
+      throw new Error(`LLM version ${promotion.llmVersionId} not found`);
+    }
+
+    await requiredLLMAuditEvent(tx, {
       eventType: "llm.promotion.rejected",
-      llmId: version?.llmId,
+      llmId: version.llmId,
       llmVersionId: promotion.llmVersionId,
       promotionId,
       actor: rejecterId,
       actorType: "user",
       payload: { reason },
+      environment: promotion.toEnvironment,
+      configHash: version.configHash,
+      policyHash: version.policyHash ?? undefined,
     });
-  }
+  });
 }
 
-async function emitLLMAuditEvent(data: Omit<InsertLLMAuditEvent, "timestamp" | "createdAt">): Promise<void> {
+export async function executePromotion(
+  promotionId: number,
+  actorId: number
+): Promise<LLMVersion> {
   const db = getDb();
-  if (!db) return;
+  if (!db) throw new Error("Database not available");
 
-  try {
-    await db.insert(llmAuditEvents).values({
-      ...data,
-      timestamp: new Date(),
-    });
-  } catch (error) {
-    console.error("[LLM Audit] Failed to emit event:", error);
+  const promotionRecord = await getPromotionById(promotionId);
+  if (!promotionRecord) {
+    throw new Error("Promotion not found");
   }
+
+  return await db.transaction(async (tx) => {
+    const lockedPromotions = await tx
+      .update(llmPromotions)
+      .set({
+        status: "executing",
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(llmPromotions.id, promotionRecord.id),
+        eq(llmPromotions.status, "approved"),
+        isNull(llmPromotions.executedAt),
+        isNull(llmPromotions.newVersionId),
+      ))
+      .returning();
+
+    if (lockedPromotions.length === 0) {
+      const [currentPromotion] = await tx.select().from(llmPromotions).where(eq(llmPromotions.id, promotionRecord.id));
+      if (!currentPromotion) {
+        throw new Error("Promotion not found");
+      }
+      if (currentPromotion.executedAt || currentPromotion.newVersionId || currentPromotion.status === "executed") {
+        throw new Error("Promotion has already been executed");
+      }
+      throw new Error("Promotion must be approved before execution");
+    }
+
+    const promotion = lockedPromotions[0];
+
+    assertValidEnvironment(promotion.toEnvironment, "promotion target environment");
+
+    const [sourceVersion] = await tx.select().from(llmVersions).where(eq(llmVersions.id, promotion.llmVersionId));
+    if (!sourceVersion) {
+      throw new Error("Source version not found");
+    }
+
+    const existingVersions = await tx
+      .select()
+      .from(llmVersions)
+      .where(eq(llmVersions.llmId, sourceVersion.llmId))
+      .orderBy(desc(llmVersions.version));
+
+    const nextVersion = existingVersions.length > 0 ? existingVersions[0].version + 1 : 1;
+
+    const [newVersion] = await tx.insert(llmVersions).values({
+      llmId: sourceVersion.llmId,
+      version: nextVersion,
+      environment: promotion.toEnvironment,
+      config: sourceVersion.config,
+      configHash: sourceVersion.configHash,
+      policyBundleRef: sourceVersion.policyBundleRef,
+      policyHash: sourceVersion.policyHash,
+      policyDecision: sourceVersion.policyDecision,
+      policyViolations: sourceVersion.policyViolations,
+      attestationContract: sourceVersion.attestationContract,
+      attestationStatus: "pending",
+      driftStatus: "none",
+      callable: false,
+      createdBy: actorId,
+      changeNotes: `Promoted from ${promotion.fromEnvironment} via promotion #${promotion.id}`,
+      promotionRequestId: promotion.id,
+    }).returning();
+
+    await tx
+      .update(llmPromotions)
+      .set({
+        status: "executed",
+        executedAt: new Date(),
+        executionError: null,
+        newVersionId: newVersion.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(llmPromotions.id, promotion.id));
+
+    await requiredLLMAuditEvent(tx, {
+      eventType: "llm.promotion.executed",
+      llmId: sourceVersion.llmId,
+      llmVersionId: newVersion.id,
+      promotionId: promotion.id,
+      actor: actorId,
+      actorType: "user",
+      payload: {
+        sourceVersionId: sourceVersion.id,
+        targetEnvironment: promotion.toEnvironment,
+        newVersionId: newVersion.id,
+        callableMeaning: "internal_catalog_eligibility_only",
+      },
+      environment: promotion.toEnvironment,
+      configHash: newVersion.configHash,
+      policyHash: newVersion.policyHash ?? undefined,
+    });
+
+    return newVersion;
+  });
 }
 
 export async function getLLMAuditEvents(filter: {
@@ -392,7 +576,7 @@ export async function getLLMAuditEvents(filter: {
   const db = getDb();
   if (!db) return [];
 
-  const conditions = [];
+  const conditions: any[] = [];
   if (filter.llmId) {
     conditions.push(eq(llmAuditEvents.llmId, filter.llmId));
   }

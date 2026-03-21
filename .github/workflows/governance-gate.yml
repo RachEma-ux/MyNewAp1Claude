@@ -297,6 +297,9 @@ jobs:
       - name: Check governance coverage
         run: npx tsx scripts/governance/coverage-map.ts
 
+      - name: Check LLM governance invariants
+        run: npx tsx scripts/governance/check-llm-governance-invariants.ts
+
       # ── YAML Control Validation ─────────────────────────────────
       - name: Validate control catalog
         run: npx tsx scripts/governance/validate-controls.ts
