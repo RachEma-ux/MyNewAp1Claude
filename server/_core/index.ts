@@ -11,6 +11,7 @@ import { serveStatic, setupVite } from "./vite";
 import { initializeProviders } from "../providers/init";
 import { handleChatStream } from "../chat/stream";
 import { handleAgentChatStream, handleCatalogAgentChatStream } from "../agents/stream";
+import { executeCatalogChatStream, catalogExecutionQuerySchema } from "../catalog/execution";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
 import { getDb, ensureDefaultWorkspace } from "../db";
@@ -463,6 +464,76 @@ async function startServer() {
   app.get("/api/agents/:agentId/chat/stream", handleAgentChatStream);
   // Catalog-authoritative agent chat streaming endpoint
   app.get("/api/catalog/agents/:catalogEntryId/chat/stream", handleCatalogAgentChatStream);
+  // Catalog-first execution streaming endpoint
+  app.get("/api/catalog/:catalogEntryId/chat/stream", async (req, res) => {
+    try {
+      let user;
+      if (process.env.DEV_MODE === "true") {
+        user = {
+          id: 1,
+          openId: "dev-user-001",
+          name: "Dev User",
+          email: "dev@example.com",
+          loginMethod: "dev-mode",
+          role: "user" as const,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastSignedIn: new Date(),
+        };
+      } else {
+        user = await sdk.authenticateRequest(req);
+        if (!user) {
+          res.status(401).json({ error: "Unauthorized" });
+          return;
+        }
+      }
+
+      const catalogEntryId = Number.parseInt(String(req.params.catalogEntryId), 10);
+      if (!Number.isInteger(catalogEntryId) || catalogEntryId <= 0) {
+        res.status(400).json({ error: "Invalid catalogEntryId" });
+        return;
+      }
+
+      const parsed = catalogExecutionQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid request query",
+          details: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`),
+        });
+        return;
+      }
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      for await (const event of executeCatalogChatStream({
+        catalogEntryId,
+        actorUserId: user.id,
+        message: parsed.data.message,
+        conversationId: parsed.data.conversationId,
+        triggerSource: parsed.data.triggerSource,
+      })) {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      }
+
+      res.end();
+    } catch (error) {
+      console.error("[CatalogChatStream] Request error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Internal server error" });
+        return;
+      }
+      res.write(`data: ${JSON.stringify({
+        type: "error",
+        runId: 0,
+        error: error instanceof Error ? error.message : "Internal server error",
+      })}\n\n`);
+      res.end();
+    }
+  });
 
   // Governance audit artifact download
   app.get("/api/governance/audit/:runId/artifacts/:kind", async (req, res) => {

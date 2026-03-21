@@ -136,10 +136,10 @@
       "breakpoints": true
     },
     {
-      "idx": 19,
+      "idx": 20,
       "version": "7",
-      "when": 1774043800575,
-      "tag": "0019_complex_lila_cheney",
+      "when": 1774051200000,
+      "tag": "0020_catalog_execution_observability",
       "breakpoints": true
     }
   ]
