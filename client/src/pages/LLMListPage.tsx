@@ -50,43 +50,134 @@ interface LLMRow {
   source: "registered" | "created";
   status: DerivedStatus;
   readiness: string;
+  blockedReason: string | null;
   catalogState: "not_imported" | "candidate" | "imported" | "published";
   catalogEntryId: number | null;
   updatedAt: string;
   creationProjectId: number | null;
+  /** For building status: current pipeline phase */
+  currentPhase: string | null;
+  /** For building status: progress 0–100 */
+  progress: number | null;
 }
 
 // ── Status computation ───────────────────────────────────────────────
 
+interface ComputedStatus {
+  status: DerivedStatus;
+  readiness: string;
+  blockedReason: string | null;
+  catalogState: LLMRow["catalogState"];
+  currentPhase: string | null;
+  progress: number | null;
+}
+
+/** Phase label for human-readable display */
+function phaseLabel(phase: string | null): string {
+  if (!phase) return "In progress";
+  const map: Record<string, string> = {
+    phase_0_planning: "Planning",
+    phase_1_base_model: "Base model selection",
+    phase_2_dataset: "Dataset preparation",
+    phase_3_fine_tune: "Fine-tuning (SFT)",
+    phase_4_alignment: "Alignment (DPO)",
+    phase_5_tool_tuning: "Tool tuning",
+    phase_6_evaluation: "Evaluation",
+    phase_7_quantization: "Quantization",
+    phase_8_packaging: "Packaging",
+    phase_9_governance: "Governance handoff",
+  };
+  return map[phase] || phase.replace(/_/g, " ");
+}
+
 function computeStatus(
-  llm: any,
+  llm: any | null,
   versions: any[],
   creationProject: any | null,
   catalogEntry: any | null
-): { status: DerivedStatus; readiness: string; catalogState: LLMRow["catalogState"] } {
+): ComputedStatus {
+  const base: Pick<ComputedStatus, "blockedReason" | "currentPhase" | "progress"> = {
+    blockedReason: null,
+    currentPhase: null,
+    progress: null,
+  };
+
   // Check catalog import state first
   if (catalogEntry) {
     const tags: string[] = catalogEntry.tags || [];
     if (tags.includes("published")) {
-      return { status: "imported", readiness: "Published in Catalog", catalogState: "published" };
+      return { ...base, status: "imported", readiness: "Published in Catalog", catalogState: "published" };
     }
     if (catalogEntry.status === "active" || catalogEntry.reviewState === "approved") {
-      return { status: "imported", readiness: "Imported to Catalog", catalogState: "imported" };
+      return { ...base, status: "imported", readiness: "Imported to Catalog", catalogState: "imported" };
     }
     if (catalogEntry.reviewState === "needs_review") {
-      return { status: "imported", readiness: "Catalog candidate", catalogState: "candidate" };
+      return { ...base, status: "imported", readiness: "Catalog candidate", catalogState: "candidate" };
     }
   }
 
   // Check creation pipeline
   if (creationProject) {
     const pStatus = creationProject.status;
+    const phase = creationProject.currentPhase || null;
+    const prog = typeof creationProject.progress === "number" ? creationProject.progress : null;
+
+    // Active building phases
     if (["training", "evaluating", "quantizing", "in_progress"].includes(pStatus)) {
-      const phase = creationProject.currentPhase || pStatus;
-      return { status: "building", readiness: `${phase} in progress`, catalogState: "not_imported" };
+      return {
+        status: "building",
+        readiness: phaseLabel(phase),
+        blockedReason: null,
+        catalogState: "not_imported",
+        currentPhase: phase,
+        progress: prog,
+      };
     }
+
+    // Draft creation project — still in early phases
+    if (pStatus === "draft") {
+      return {
+        status: "building",
+        readiness: phaseLabel(phase),
+        blockedReason: null,
+        catalogState: "not_imported",
+        currentPhase: phase,
+        progress: prog ?? 0,
+      };
+    }
+
+    // Failed — derive richer blocked reason from phase
     if (pStatus === "failed") {
-      return { status: "blocked", readiness: "Creation pipeline failed", catalogState: "not_imported" };
+      let reason = "Creation pipeline failed";
+      if (phase) {
+        const label = phaseLabel(phase);
+        reason = `Failed at: ${label}`;
+      }
+      return {
+        status: "blocked",
+        readiness: reason,
+        blockedReason: reason,
+        catalogState: "not_imported",
+        currentPhase: phase,
+        progress: prog,
+      };
+    }
+
+    // Completed creation project — deployable if linked to an LLM identity
+    if (pStatus === "completed") {
+      if (creationProject.llmId) {
+        // Governance handoff done: LLM identity exists, creation complete → deployable
+        return { ...base, status: "deployable", readiness: "Creation complete — eligible for Catalog import", catalogState: "not_imported" };
+      }
+      // Completed but no LLM identity yet → still needs governance handoff
+      return {
+        status: "building",
+        readiness: "Awaiting governance handoff",
+        blockedReason: null,
+        catalogState: "not_imported",
+        currentPhase: "phase_9_governance",
+        progress: 95,
+      };
     }
   }
 
@@ -103,21 +194,20 @@ function computeStatus(
       if (blockedVersion?.policyDecision === "deny") reason = "Policy denied";
       if (blockedVersion?.attestationStatus === "failed") reason = "Attestation failed";
       if (blockedVersion?.attestationStatus === "revoked") reason = "Attestation revoked";
-      return { status: "blocked", readiness: reason, catalogState: "not_imported" };
+      return { ...base, status: "blocked", readiness: reason, blockedReason: reason, catalogState: "not_imported" };
     }
 
-    const hasCallableVersion = versions.some((v) => v.callable === true);
     const hasPassedPolicy = versions.some((v) => v.policyDecision === "pass" || v.policyDecision === "warn");
-    if (hasCallableVersion || hasPassedPolicy) {
-      return { status: "deployable", readiness: "Eligible for Catalog import", catalogState: "not_imported" };
+    if (hasPassedPolicy) {
+      return { ...base, status: "deployable", readiness: "Eligible for Catalog import", catalogState: "not_imported" };
     }
 
-    // Has versions but none are callable yet
-    return { status: "draft", readiness: "Versions pending review", catalogState: "not_imported" };
+    // Has versions but none passed yet
+    return { ...base, status: "draft", readiness: "Versions pending review", catalogState: "not_imported" };
   }
 
   // No versions, no creation project — pure draft
-  return { status: "draft", readiness: "Identity only — no versions", catalogState: "not_imported" };
+  return { ...base, status: "draft", readiness: "Identity only — no versions", catalogState: "not_imported" };
 }
 
 // ── Badge helpers ────────────────────────────────────────────────────
@@ -167,8 +257,8 @@ export default function LLMListPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
 
-  // Data queries
-  const llmsQuery = trpc.llm.list.useQuery({ archived: false });
+  // Data queries — listEnriched returns LLMs with per-LLM version summaries
+  const llmsQuery = trpc.llm.listEnriched.useQuery({ archived: false });
   const projectsQuery = trpc.llm.listCreationProjects.useQuery({});
   const catalogQuery = trpc.catalogManage.list.useQuery({ entryType: "llm" });
 
@@ -183,9 +273,12 @@ export default function LLMListPage() {
 
     // Index projects by linked llmId
     const projectByLlmId = new Map<number, any>();
+    const orphanProjects: any[] = [];
     for (const p of projects) {
       if ((p as any).llmId) {
         projectByLlmId.set((p as any).llmId, p);
+      } else {
+        orphanProjects.push(p);
       }
     }
 
@@ -198,14 +291,33 @@ export default function LLMListPage() {
       }
     }
 
-    return llms.map((llm: any): LLMRow => {
+    // 1. Rows from registered/linked LLMs
+    const llmRows: LLMRow[] = llms.map((llm: any): LLMRow => {
       const project = projectByLlmId.get(llm.id) ?? null;
       const catalogEntry = catalogByName.get(llm.name.toLowerCase()) ?? null;
       const source: "registered" | "created" = project ? "created" : "registered";
 
-      // We don't have per-LLM versions in the list query, so derive from available data
-      // For a real implementation we'd batch-fetch versions; here we use catalog state as proxy
-      const { status, readiness, catalogState } = computeStatus(llm, [], project, catalogEntry);
+      // Build synthetic version indicators from the enriched versionSummary
+      const vs = llm.versionSummary;
+      const syntheticVersions: any[] = [];
+      if (vs && vs.count > 0) {
+        if (vs.hasBlockedVersion) {
+          syntheticVersions.push({
+            policyDecision: vs.blockedReason === "Policy denied" ? "deny" : "pass",
+            attestationStatus: vs.blockedReason === "Attestation failed" ? "failed"
+              : vs.blockedReason === "Attestation revoked" ? "revoked" : "pending",
+          });
+        }
+        if (vs.hasPassingPolicy) {
+          syntheticVersions.push({ policyDecision: "pass", attestationStatus: "pending" });
+        }
+        if (syntheticVersions.length === 0) {
+          // Has versions but none passing or blocked — pending review
+          syntheticVersions.push({ policyDecision: null, attestationStatus: "pending" });
+        }
+      }
+
+      const computed = computeStatus(llm, syntheticVersions, project, catalogEntry);
 
       return {
         id: llm.id,
@@ -214,14 +326,42 @@ export default function LLMListPage() {
         description: llm.description,
         role: llm.role,
         source,
-        status,
-        readiness,
-        catalogState,
+        status: computed.status,
+        readiness: computed.readiness,
+        blockedReason: computed.blockedReason,
+        catalogState: computed.catalogState,
         catalogEntryId: catalogEntry?.id ?? null,
         updatedAt: llm.updatedAt,
         creationProjectId: project?.id ?? null,
+        currentPhase: computed.currentPhase,
+        progress: computed.progress,
       };
     });
+
+    // 2. Orphan creation projects (no llmId yet — still in pipeline)
+    const orphanRows: LLMRow[] = orphanProjects.map((p: any): LLMRow => {
+      const computed = computeStatus(null, [], p, null);
+
+      return {
+        id: -(p.id),  // negative ID to distinguish from LLM IDs
+        name: p.name,
+        displayName: p.name,
+        description: p.description ?? null,
+        role: "—",
+        source: "created",
+        status: computed.status,
+        readiness: computed.readiness,
+        blockedReason: computed.blockedReason,
+        catalogState: "not_imported",
+        catalogEntryId: null,
+        updatedAt: p.updatedAt,
+        creationProjectId: p.id,
+        currentPhase: computed.currentPhase,
+        progress: computed.progress,
+      };
+    });
+
+    return [...llmRows, ...orphanRows];
   }, [llmsQuery.data, projectsQuery.data, catalogQuery.data]);
 
   // Apply filters
@@ -268,10 +408,20 @@ export default function LLMListPage() {
         handleImport(row);
         break;
       case "blocked":
-        navigate(`/llm/${row.id}`);
+        // Orphan projects (negative id) go to wizard; linked LLMs go to detail
+        if (row.id < 0 && row.creationProjectId) {
+          navigate(`/llm/wizard`);
+        } else {
+          navigate(`/llm/${row.id}`);
+        }
         break;
       case "building":
-        navigate(`/llm/wizard`);
+        // Navigate to wizard for creation projects, or training monitor
+        if (row.creationProjectId) {
+          navigate(`/llm/wizard`);
+        } else {
+          navigate(`/llm/training`);
+        }
         break;
       case "imported":
         if (row.catalogEntryId) {
@@ -279,7 +429,12 @@ export default function LLMListPage() {
         }
         break;
       default:
-        navigate(`/llm/${row.id}`);
+        // Orphan projects go to wizard; linked LLMs go to detail
+        if (row.id < 0 && row.creationProjectId) {
+          navigate(`/llm/wizard`);
+        } else {
+          navigate(`/llm/${row.id}`);
+        }
     }
   };
 
@@ -429,7 +584,7 @@ export default function LLMListPage() {
                 <tbody>
                   {filtered.map((row) => (
                     <tr
-                      key={row.id}
+                      key={row.id < 0 ? `proj-${row.creationProjectId}` : `llm-${row.id}`}
                       className="border-b border-border/30 hover:bg-muted/20 transition-colors"
                     >
                       {/* LLM */}
@@ -439,7 +594,11 @@ export default function LLMListPage() {
                           {row.name !== row.displayName && (
                             <p className="text-xs text-muted-foreground truncate">{row.name}</p>
                           )}
-                          <p className="text-xs text-muted-foreground capitalize">{row.role}</p>
+                          {row.id < 0 ? (
+                            <p className="text-xs text-muted-foreground italic">Creation project (no LLM identity yet)</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground capitalize">{row.role}</p>
+                          )}
                         </div>
                       </td>
 
@@ -455,10 +614,23 @@ export default function LLMListPage() {
 
                       {/* Readiness / Blocker */}
                       <td className="py-3 px-3">
-                        <div className="flex items-center gap-1.5">
-                          {row.status === "blocked" && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
-                          {row.status === "deployable" && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />}
-                          <span className="text-xs text-muted-foreground">{row.readiness}</span>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            {row.status === "blocked" && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
+                            {row.status === "deployable" && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />}
+                            <span className="text-xs text-muted-foreground">{row.readiness}</span>
+                          </div>
+                          {row.status === "building" && row.progress !== null && (
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 w-20 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-blue-500 rounded-full transition-all"
+                                  style={{ width: `${Math.min(row.progress, 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">{row.progress}%</span>
+                            </div>
+                          )}
                         </div>
                       </td>
 

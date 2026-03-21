@@ -28,6 +28,7 @@ import {
   archiveLLM,
   createLLMVersion,
   getLLMVersions,
+  getAllLLMVersions,
   getLLMVersion,
   getLatestCatalogEligibleVersion,
   updateLLMVersionCallable,
@@ -174,6 +175,69 @@ export const llmRouter = router({
     .query(async ({ input }) => {
       const llms = await getLLMs(input);
       return llms;
+    }),
+
+  /**
+   * Enriched list: LLMs + per-LLM version summary for list page status computation.
+   * Single batch query for versions avoids N+1. Returns summary fields, not full version objects.
+   */
+  listEnriched: protectedProcedure
+    .input(
+      z.object({
+        role: llmRoleSchema.optional(),
+        archived: z.boolean().optional(),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      const [llms, allVersions] = await Promise.all([
+        getLLMs(input),
+        getAllLLMVersions(),
+      ]);
+
+      // Group versions by llmId
+      const versionsByLlmId = new Map<number, typeof allVersions>();
+      for (const v of allVersions) {
+        const arr = versionsByLlmId.get(v.llmId) ?? [];
+        arr.push(v);
+        versionsByLlmId.set(v.llmId, arr);
+      }
+
+      return llms.map((llm) => {
+        const versions = versionsByLlmId.get(llm.id) ?? [];
+
+        const hasPassingPolicy = versions.some(
+          (v) => v.policyDecision === "pass" || v.policyDecision === "warn"
+        );
+        const hasBlockedVersion = versions.some(
+          (v) =>
+            v.policyDecision === "deny" ||
+            v.attestationStatus === "failed" ||
+            v.attestationStatus === "revoked"
+        );
+        let blockedReason: string | null = null;
+        if (hasBlockedVersion) {
+          const bv = versions.find(
+            (v) =>
+              v.policyDecision === "deny" ||
+              v.attestationStatus === "failed" ||
+              v.attestationStatus === "revoked"
+          );
+          if (bv?.policyDecision === "deny") blockedReason = "Policy denied";
+          else if (bv?.attestationStatus === "failed") blockedReason = "Attestation failed";
+          else if (bv?.attestationStatus === "revoked") blockedReason = "Attestation revoked";
+          else blockedReason = "Governance blocker";
+        }
+
+        return {
+          ...llm,
+          versionSummary: {
+            count: versions.length,
+            hasPassingPolicy,
+            hasBlockedVersion,
+            blockedReason,
+          },
+        };
+      });
     }),
 
   getById: protectedProcedure

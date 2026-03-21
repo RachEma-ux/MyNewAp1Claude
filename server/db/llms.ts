@@ -224,6 +224,20 @@ export async function getLLMVersions(llmId: number): Promise<LLMVersion[]> {
     .orderBy(desc(llmVersions.version));
 }
 
+/**
+ * Fetch ALL versions across ALL LLMs in a single query.
+ * Used by the list-enriched endpoint to avoid N+1 queries.
+ */
+export async function getAllLLMVersions(): Promise<LLMVersion[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(llmVersions)
+    .orderBy(desc(llmVersions.version));
+}
+
 export async function getLLMVersion(versionId: number): Promise<LLMVersion | null> {
   const db = getDb();
   if (!db) return null;
