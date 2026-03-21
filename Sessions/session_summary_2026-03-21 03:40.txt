@@ -1,0 +1,44 @@
+Session Summary — 2026-03-21 03:40
+
+## Goals
+- Fix 27 TypeScript compilation errors (`npx tsc --noEmit`)
+- Fix runtime crash: ENOENT for `discovery-artifact.schema.json`
+- Fix client-side 404 on `/governance` route
+- Deploy app locally from GitHub release
+
+## Changes Made
+
+### TypeScript Fixes (commit c7a079b)
+- `z.record(z.unknown())` → `z.record(z.string(), z.unknown())` across 7 files (Zod v4 compat)
+- `z.record(z.string())` → `z.record(z.string(), z.string())` in syscall/schemas.ts
+- Added missing `ingest: []` to `STAGE_CHECKS` Record in governance/stage-review.ts
+- `[...Set]` → `Array.from(Set)` in project-lifecycle.ts and loaders.ts (downlevelIteration fix)
+- Files: agents/router.ts, custom-actions-router.ts, standalone-router.ts, templates-router.ts,
+  wizard-router.ts, orchestrator/router.ts, syscall/schemas.ts, stage-review.ts, project-lifecycle.ts, loaders.ts
+
+### Runtime Schema Path Fix (commit cab47c9)
+- `discovery-artifact.ts`: Changed `path.resolve(__dirname, "../../schemas/...")` to
+  `path.resolve(process.cwd(), "schemas/...")` — __dirname breaks in esbuild bundle (dist/index.js)
+- Removed unused `fileURLToPath` import
+
+### Governance Route Fix (commit f4a1427)
+- Added `<Route path="/governance" component={() => <Redirect to="/governance/overview" />} />`
+  in App.tsx — bare `/governance` was showing client-side 404
+
+### Local Deployment
+- Downloaded v3.0.442 release zip from GitHub
+- Extracted dist/ to project root
+- Symlinked dist/public → server/_core/public for static file serving
+- Started PostgreSQL, ran production server on port 3000
+- Server healthy: API + full frontend UI running locally
+
+## CI Status
+- Type check: PASS
+- Build: PASS
+- Governance Enforcement Harness: FAIL (pre-existing P03 Freeze Block issue, not related to changes)
+
+## Current State
+- App running locally on http://localhost:3000 (PID 31689)
+- Build: v3.0.442 from GitHub release
+- Database: PostgreSQL connected
+- Auth: DEV_MODE (bypassed)
