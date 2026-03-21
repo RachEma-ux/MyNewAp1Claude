@@ -25,7 +25,7 @@ import type { DiscoverResult } from "../routers/discover-provider";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const discoveryArtifactSchema = JSON.parse(
-  fs.readFileSync(path.resolve(__dirname, "../../schemas/discovery-artifact.schema.json"), "utf8")
+  fs.readFileSync(path.resolve(__dirname, "./schemas/discovery-artifact.schema.json"), "utf8")
 );
 
 // ============================================================================
