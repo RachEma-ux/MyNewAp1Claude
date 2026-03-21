@@ -76,6 +76,7 @@ const ProvidersComingSoonPage = lazy(() => import("@/pages/ProvidersComingSoonPa
 const ProviderWizardPage = lazy(() => import("@/pages/ProviderWizardPage"));
 const ModelsComingSoonPage = lazy(() => import("@/pages/ModelsComingSoonPage"));
 const LLMListPage = lazy(() => import("@/pages/LLMListPage"));
+const ModelListPage = lazy(() => import("@/pages/ModelListPage"));
 const AutoRemediationPage = lazy(() => import("@/pages/AutoRemediationPage"));
 const ToolsManagementPage = lazy(() => import("@/pages/ToolsManagementPage"));
 const WikiPage = lazy(() => import("@/pages/WikiPage"));
@@ -262,6 +263,8 @@ function Router() {
       <Route path="/policies" component={() => <ProtectedRoute component={PolicyManagement} />} />
       {/* /list/llms — real LLM inventory list page */}
       <Route path="/list/llms" component={() => <ProtectedRoute component={LLMListPage} />} />
+      {/* /list/models — real model inventory list page */}
+      <Route path="/list/models" component={() => <ProtectedRoute component={ModelListPage} />} />
       {/* Coming Soon list pages */}
       <Route path="/list/:type" component={() => <ProtectedRoute component={ComingSoonListPage} />} />
       {/* Bots — governed bot lifecycle */}

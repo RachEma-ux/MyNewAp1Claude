@@ -18,8 +18,6 @@ import {
   Layers,
   Plus,
   CheckCircle,
-  XCircle,
-  Clock,
   Shield,
   ChevronRight,
   ChevronLeft,
@@ -81,17 +79,17 @@ function ModelsDashboard() {
         </Card>
       </div>
 
-      {/* By Category */}
-      {stats?.byCategory && Object.keys(stats.byCategory).length > 0 && (
+      {/* By Type */}
+      {stats?.byType && Object.keys(stats.byType).length > 0 && (
         <Card>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-semibold">Models by Category</CardTitle>
+            <CardTitle className="text-sm font-semibold">Models by Type</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="flex flex-wrap gap-2">
-              {Object.entries(stats.byCategory).map(([cat, count]) => (
-                <Badge key={cat} variant="secondary" className="text-xs">
-                  {cat}: {count}
+              {Object.entries(stats.byType).map(([t, count]) => (
+                <Badge key={t} variant="secondary" className="text-xs capitalize">
+                  {t}: {count}
                 </Badge>
               ))}
             </div>
@@ -199,7 +197,7 @@ function ModelsControlPanel() {
   const models = modelsQuery.data ?? [];
   const isLoading = modelsQuery.isLoading;
 
-  const handleStatusChange = async (id: number, status: "draft" | "active" | "deprecated" | "disabled") => {
+  const handleStatusChange = async (id: number, status: "draft" | "ready" | "active" | "deprecated" | "disabled") => {
     try {
       await updateStatus.mutateAsync({ id, status });
       utils.models.list.invalidate();
@@ -233,17 +231,15 @@ function ModelsControlPanel() {
                 <thead>
                   <tr className="border-b border-border/50">
                     <th className="text-left py-2 px-2 font-medium text-muted-foreground">Model</th>
-                    <th className="text-left py-2 px-2 font-medium text-muted-foreground">Category</th>
+                    <th className="text-left py-2 px-2 font-medium text-muted-foreground">Type</th>
                     <th className="text-left py-2 px-2 font-medium text-muted-foreground">Status</th>
-                    <th className="text-left py-2 px-2 font-medium text-muted-foreground">Review</th>
-                    <th className="text-left py-2 px-2 font-medium text-muted-foreground">Validation</th>
-                    <th className="text-left py-2 px-2 font-medium text-muted-foreground">Provider</th>
+                    <th className="text-left py-2 px-2 font-medium text-muted-foreground">Params</th>
+                    <th className="text-left py-2 px-2 font-medium text-muted-foreground">Context</th>
                     <th className="text-right py-2 px-2 font-medium text-muted-foreground">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {models.map((m: any) => {
-                    const config = (m.config as Record<string, any>) || {};
                     return (
                       <tr key={m.id} className="border-b border-border/30 hover:bg-muted/20">
                         <td className="py-2 px-2">
@@ -253,25 +249,33 @@ function ModelsControlPanel() {
                           </div>
                         </td>
                         <td className="py-2 px-2">
-                          <Badge variant="outline" className="text-xs">
-                            {m.category || "uncategorized"}
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {m.modelType || "uncategorized"}
                           </Badge>
                         </td>
                         <td className="py-2 px-2">
                           <StatusBadge status={m.status} />
                         </td>
-                        <td className="py-2 px-2">
-                          <ReviewBadge state={m.reviewState} />
-                        </td>
-                        <td className="py-2 px-2">
-                          <ValidationBadge status={m.validationStatus} />
+                        <td className="py-2 px-2 text-xs text-muted-foreground">
+                          {m.parameterCount || "—"}
                         </td>
                         <td className="py-2 px-2 text-xs text-muted-foreground">
-                          {config.providerName || (m.providerId ? `#${m.providerId}` : "—")}
+                          {m.contextLength ? m.contextLength.toLocaleString() : "—"}
                         </td>
                         <td className="py-2 px-2 text-right">
                           <div className="flex items-center justify-end gap-1">
                             {m.status === "draft" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => handleStatusChange(m.id, "ready")}
+                                disabled={updateStatus.isPending}
+                              >
+                                Mark Ready
+                              </Button>
+                            )}
+                            {m.status === "ready" && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -373,7 +377,7 @@ function ModelWizard() {
         category: form.category,
       });
       utils.models.invalidate();
-      navigate("/models/dashboard");
+      navigate("/list/models");
     } catch {
       // trpc error toast
     }
@@ -660,8 +664,8 @@ function ModelWizard() {
               <div className="mt-4 p-3 rounded bg-yellow-500/10 border border-yellow-500/20 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 shrink-0" />
                 <p className="text-xs text-yellow-500">
-                  The model will be created in <strong>draft</strong> status with{" "}
-                  <strong>needs_review</strong> state. An admin must approve it before activation.
+                  The model will be created in <strong>draft</strong> status.
+                  Set it to <strong>ready</strong> or <strong>active</strong> to make it eligible for Catalog import.
                 </p>
               </div>
             </>
@@ -709,43 +713,10 @@ function ModelWizard() {
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     active: "bg-green-500/10 text-green-500 border-green-500/20",
+    ready: "bg-blue-500/10 text-blue-500 border-blue-500/20",
     draft: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
     deprecated: "bg-gray-500/10 text-gray-400 border-gray-500/20",
     disabled: "bg-red-500/10 text-red-500 border-red-500/20",
-  };
-  return (
-    <Badge variant="outline" className={`text-xs ${colors[status] || ""}`}>
-      {status}
-    </Badge>
-  );
-}
-
-function ReviewBadge({ state }: { state?: string | null }) {
-  if (!state) return <span className="text-xs text-muted-foreground">—</span>;
-  const colors: Record<string, string> = {
-    approved: "text-green-500",
-    needs_review: "text-yellow-500",
-    rejected: "text-red-500",
-  };
-  const icons: Record<string, typeof CheckCircle> = {
-    approved: CheckCircle,
-    needs_review: Clock,
-    rejected: XCircle,
-  };
-  const Icon = icons[state] || Clock;
-  return (
-    <span className={`flex items-center gap-1 text-xs ${colors[state] || ""}`}>
-      <Icon className="w-3.5 h-3.5" />
-      {state.replace("_", " ")}
-    </span>
-  );
-}
-
-function ValidationBadge({ status }: { status?: string | null }) {
-  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
-  const colors: Record<string, string> = {
-    passed: "text-green-500",
-    failed: "text-red-500",
   };
   return (
     <Badge variant="outline" className={`text-xs ${colors[status] || ""}`}>

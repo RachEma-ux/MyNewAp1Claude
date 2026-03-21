@@ -100,6 +100,7 @@ import {
   Wand2,
   Brain,
   Workflow,
+  Package,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -732,6 +733,14 @@ export function CatalogImportWizard({
                 >
                   <Brain className="h-4 w-4 mr-1" />
                   LLM Creation
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { onOpenChange(false); navigate("/list/models?mode=catalog-import&deployableOnly=1&returnTo=/llm/catalogue/candidate"); }}
+                >
+                  <Package className="h-4 w-4 mr-1" />
+                  Model Select
                 </Button>
                 <Button
                   variant="outline"
