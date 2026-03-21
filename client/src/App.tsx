@@ -75,6 +75,7 @@ const ProviderControlPanelPage = lazy(() => import("@/pages/ProviderControlPanel
 const ProvidersComingSoonPage = lazy(() => import("@/pages/ProvidersComingSoonPage"));
 const ProviderWizardPage = lazy(() => import("@/pages/ProviderWizardPage"));
 const ModelsComingSoonPage = lazy(() => import("@/pages/ModelsComingSoonPage"));
+const LLMListPage = lazy(() => import("@/pages/LLMListPage"));
 const AutoRemediationPage = lazy(() => import("@/pages/AutoRemediationPage"));
 const ToolsManagementPage = lazy(() => import("@/pages/ToolsManagementPage"));
 const WikiPage = lazy(() => import("@/pages/WikiPage"));
@@ -259,8 +260,8 @@ function Router() {
       <Route path="/infrastructure/software/:item" component={() => <ProtectedRoute component={SoftwarePage} />} />
       <Route path="/error-analysis" component={() => <ProtectedRoute component={ErrorAnalysisDashboard} />} />
       <Route path="/policies" component={() => <ProtectedRoute component={PolicyManagement} />} />
-      {/* /list/llms — Coming Soon, consistent with other /list/:type pages */}
-      <Route path="/list/llms" component={() => <ProtectedRoute component={ComingSoonListPage} />} />
+      {/* /list/llms — real LLM inventory list page */}
+      <Route path="/list/llms" component={() => <ProtectedRoute component={LLMListPage} />} />
       {/* Coming Soon list pages */}
       <Route path="/list/:type" component={() => <ProtectedRoute component={ComingSoonListPage} />} />
       {/* Bots — governed bot lifecycle */}
