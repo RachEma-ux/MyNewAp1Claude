@@ -116,7 +116,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           children: [
             { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/providers/dashboard" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/providers/control-panel" },
-            { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/llm/provider-wizard" },
+            { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/providers/wizard" },
             { label: "Providers List", icon: <List className="w-3 h-3" />, href: "/list/providers" },
           ]
         },
@@ -125,7 +125,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           icon: <Database className="w-4 h-4" />,
           children: [
             { label: "Dashboard", icon: <LayoutDashboard className="w-3 h-3" />, href: "/llm" },
-            { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/llm/control-plane" },
+            { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/llm/control-panel" },
             { label: "LLMs Register", icon: <FileStack className="w-3 h-3" />, href: "/llm/register" },
             { label: "LLM Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/llm/wizard" },
             { label: "LLMs List", icon: <List className="w-3 h-3" />, href: "/list/llms" },
@@ -146,7 +146,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           label: "Agents",
           icon: <Bot className="w-4 h-4" />,
           children: [
-            { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/agent-dashboard" },
+            { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/agents/dashboard" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/agents/control-panel" },
             { label: "Agent Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/agents/wizard" },
             { label: "Agents List", icon: <List className="w-3 h-3" />, href: "/list/agents" },
