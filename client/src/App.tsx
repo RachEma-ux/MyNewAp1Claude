@@ -259,8 +259,8 @@ function Router() {
       <Route path="/infrastructure/software/:item" component={() => <ProtectedRoute component={SoftwarePage} />} />
       <Route path="/error-analysis" component={() => <ProtectedRoute component={ErrorAnalysisDashboard} />} />
       <Route path="/policies" component={() => <ProtectedRoute component={PolicyManagement} />} />
-      {/* /list/llms shows governed LLMs — must precede catch-all */}
-      <Route path="/list/llms" component={() => <ProtectedRoute component={LLMDashboard} />} />
+      {/* /list/llms — Coming Soon, consistent with other /list/:type pages */}
+      <Route path="/list/llms" component={() => <ProtectedRoute component={ComingSoonListPage} />} />
       {/* Coming Soon list pages */}
       <Route path="/list/:type" component={() => <ProtectedRoute component={ComingSoonListPage} />} />
       {/* Bots — governed bot lifecycle */}
