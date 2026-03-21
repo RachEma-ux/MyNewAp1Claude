@@ -85,7 +85,7 @@ export const wizardRouter = router({
   save: protectedProcedure
     .input(z.object({
       projectId: z.number(),
-      data: z.record(z.unknown()), // partial WizardData fields
+      data: z.record(z.string(), z.unknown()), // partial WizardData fields
       currentStep: z.string().optional(),
     }))
     .mutation(async ({ input }) => {

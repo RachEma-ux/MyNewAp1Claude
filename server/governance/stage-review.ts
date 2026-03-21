@@ -726,6 +726,7 @@ const POST_PUBLISH_CHECKS: ReviewCheckItem[] = [
 // ============================================================================
 
 const STAGE_CHECKS: Record<LifecycleStage, ReviewCheckItem[]> = {
+  ingest: [],
   submit: SUBMIT_CHECKS,
   register: REGISTER_CHECKS,
   validate: VALIDATE_CHECKS,

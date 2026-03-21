@@ -692,7 +692,7 @@ const shellGatesRouter = router({
     .input(z.object({
       gateRequestId: z.number(),
       passed: z.boolean(),
-      verdict: z.record(z.unknown()).optional(),
+      verdict: z.record(z.string(), z.unknown()).optional(),
       reason: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -947,7 +947,7 @@ const shellArtifactsRouter = router({
       projectId: z.number(),
       name: z.string().min(1).max(255),
       artifactType: z.enum(ARTIFACT_TYPES as unknown as [string, ...string[]]),
-      content: z.record(z.unknown()),
+      content: z.record(z.string(), z.unknown()),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();

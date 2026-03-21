@@ -28,8 +28,8 @@ export const customActionsRouter = router({
       workspaceId: z.number(),
       name: z.string().min(1).max(255),
       description: z.string().optional(),
-      conditions: z.record(z.unknown()),
-      changes: z.record(z.unknown()),
+      conditions: z.record(z.string(), z.unknown()),
+      changes: z.record(z.string(), z.unknown()),
       position: z.number(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -54,8 +54,8 @@ export const customActionsRouter = router({
       workspaceId: z.number(),
       name: z.string().min(1).max(255).optional(),
       description: z.string().optional(),
-      conditions: z.record(z.unknown()).optional(),
-      changes: z.record(z.unknown()).optional(),
+      conditions: z.record(z.string(), z.unknown()).optional(),
+      changes: z.record(z.string(), z.unknown()).optional(),
       position: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {

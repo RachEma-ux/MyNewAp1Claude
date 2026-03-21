@@ -348,7 +348,7 @@ export function getAvailableEvents(currentState: ProjectState): LifecycleEvent[]
   for (const t of TRANSITION_TABLE) {
     if (t.fromState === currentState) events.add(t.event);
   }
-  return [...events];
+  return Array.from(events);
 }
 
 // ── Backward-compatible validation ──────────────────────────────────────────

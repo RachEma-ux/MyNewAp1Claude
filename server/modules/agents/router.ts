@@ -43,9 +43,9 @@ const agentsRouter = router({
       name: z.string().min(1).max(255),
       description: z.string().optional(),
       type: z.enum(["assistant", "autonomous", "reviewer", "orchestrator"]).optional(),
-      config: z.record(z.unknown()).optional(),
+      config: z.record(z.string(), z.unknown()).optional(),
       tools: z.array(z.string()).optional(),
-      scopePolicy: z.record(z.unknown()).optional(),
+      scopePolicy: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireModule(input.workspaceId, "agents");
@@ -71,9 +71,9 @@ const agentsRouter = router({
       name: z.string().optional(),
       description: z.string().optional(),
       status: z.string().optional(),
-      config: z.record(z.unknown()).optional(),
+      config: z.record(z.string(), z.unknown()).optional(),
       tools: z.array(z.string()).optional(),
-      scopePolicy: z.record(z.unknown()).optional(),
+      scopePolicy: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireModule(input.workspaceId, "agents");
@@ -133,7 +133,7 @@ const runsRouter = router({
     .input(z.object({
       workspaceId: z.number(),
       agentId: z.number(),
-      input: z.record(z.unknown()).optional(),
+      input: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireModule(input.workspaceId, "agents");
@@ -168,7 +168,7 @@ const runsRouter = router({
       id: z.number(),
       workspaceId: z.number(),
       status: z.enum(["completed", "failed"]),
-      output: z.record(z.unknown()).optional(),
+      output: z.record(z.string(), z.unknown()).optional(),
       errorMessage: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {

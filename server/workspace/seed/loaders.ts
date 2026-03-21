@@ -76,7 +76,7 @@ export function loadCapabilitiesCatalog(rootDir?: string): CapabilitiesCatalog {
   const keys = parsed.capabilities.map((c) => c.key);
   const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
   if (dupes.length > 0) {
-    throw new Error(`Duplicate capability keys: ${[...new Set(dupes)].join(", ")}`);
+    throw new Error(`Duplicate capability keys: ${Array.from(new Set(dupes)).join(", ")}`);
   }
 
   return parsed;

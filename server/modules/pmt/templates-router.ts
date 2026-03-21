@@ -623,7 +623,7 @@ const projectTemplatesRouter = router({
       workspaceId: z.number(),
       name: z.string().min(1).max(255),
       description: z.string().optional(),
-      templateData: z.record(z.unknown()),
+      templateData: z.record(z.string(), z.unknown()),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireModule(input.workspaceId, "pmt");
@@ -646,7 +646,7 @@ const projectTemplatesRouter = router({
       workspaceId: z.number(),
       name: z.string().min(1).max(255).optional(),
       description: z.string().optional(),
-      templateData: z.record(z.unknown()).optional(),
+      templateData: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireModule(input.workspaceId, "pmt");
@@ -855,7 +855,7 @@ const workItemTemplatesRouter = router({
       workspaceId: z.number(),
       name: z.string().min(1).max(255),
       description: z.string().optional(),
-      templateData: z.record(z.unknown()),
+      templateData: z.record(z.string(), z.unknown()),
       typeId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -880,7 +880,7 @@ const workItemTemplatesRouter = router({
       workspaceId: z.number(),
       name: z.string().min(1).max(255).optional(),
       description: z.string().optional(),
-      templateData: z.record(z.unknown()).optional(),
+      templateData: z.record(z.string(), z.unknown()).optional(),
       typeId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {

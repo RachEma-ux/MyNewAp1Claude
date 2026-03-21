@@ -80,24 +80,24 @@ const dbQuerySchema = z.object({
 
 const dbInsertSchema = z.object({
   table: z.string().min(1).max(128).regex(/^[a-z_][a-z0-9_]*$/),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 
 const dbUpdateSchema = z.object({
   table: z.string().min(1).max(128).regex(/^[a-z_][a-z0-9_]*$/),
-  where: z.record(z.unknown()),
-  data: z.record(z.unknown()),
+  where: z.record(z.string(), z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 
 const dbDeleteSchema = z.object({
   table: z.string().min(1).max(128).regex(/^[a-z_][a-z0-9_]*$/),
-  where: z.record(z.unknown()),
+  where: z.record(z.string(), z.unknown()),
 });
 
 const ciTriggerSchema = z.object({
   workflow: z.string().min(1).max(256),
   ref: z.string().max(128).default("main"),
-  inputs: z.record(z.string()).default({}),
+  inputs: z.record(z.string(), z.string()).default({}),
 });
 
 const ciStatusSchema = z.object({
@@ -107,7 +107,7 @@ const ciStatusSchema = z.object({
 const artifactGenerateSchema = z.object({
   type: z.enum(["report", "diff", "plan", "summary", "code"]),
   content: z.string().max(500_000),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
 const artifactUploadSchema = z.object({
@@ -118,14 +118,14 @@ const artifactUploadSchema = z.object({
 
 const workflowTriggerSchema = z.object({
   workflowId: z.string().min(1).max(128),
-  inputs: z.record(z.unknown()).default({}),
+  inputs: z.record(z.string(), z.unknown()).default({}),
 });
 
 const notificationSendSchema = z.object({
   channel: z.enum(["log", "webhook", "internal"]),
   message: z.string().min(1).max(4000),
   severity: z.enum(["info", "warning", "error", "critical"]).default("info"),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
 // ============================================================================

@@ -24,7 +24,7 @@ export const orchestratorRouter = router({
     .input(
       z.object({
         description: z.string().min(1).max(4000),
-        context: z.record(z.unknown()).default({}),
+        context: z.record(z.string(), z.unknown()).default({}),
         workspaceId: z.number().optional(),
         autonomyLevel: z.number().min(0).max(5).default(0),
         operator: z.enum(["builder", "auditor", "governance", "deploy"]).optional(),
