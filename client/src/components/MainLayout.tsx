@@ -126,7 +126,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           children: [
             { label: "Dashboard", icon: <LayoutDashboard className="w-3 h-3" />, href: "/llm" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/llm/control-plane" },
-            { label: "LLMs Register", icon: <FileStack className="w-3 h-3" />, href: "/llm/create" },
+            { label: "LLMs Register", icon: <FileStack className="w-3 h-3" />, href: "/llm/register" },
             { label: "LLM Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/llm/wizard" },
             { label: "LLMs List", icon: <List className="w-3 h-3" />, href: "/list/llms" },
           ]

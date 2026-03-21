@@ -273,8 +273,9 @@ function Router() {
       {/* LLM Control Plane Routes */}
       <Route path="/llm" component={() => <ProtectedRoute component={LLMDashboard} />} />
       <Route path="/llm/control-plane" component={() => <ProtectedRoute component={LLMControlPlane} />} />
-      <Route path="/llm/wizard" component={() => <ProtectedRoute component={LLMWizard} />} />
+      <Route path="/llm/register" component={() => <ProtectedRoute component={LLMCreationWizard} />} />
       <Route path="/llm/create" component={() => <ProtectedRoute component={LLMCreationWizard} />} />
+      <Route path="/llm/wizard" component={() => <ProtectedRoute component={LLMWizard} />} />
       <Route path="/llm/training" component={() => <ProtectedRoute component={LLMTrainingDashboard} />} />
       <Route path="/llm/promotions" component={() => <ProtectedRoute component={LLMPromotions} />} />
       {/* Provider Configuration Wizard */}
