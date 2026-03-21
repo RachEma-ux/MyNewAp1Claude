@@ -706,7 +706,7 @@ export function CatalogImportWizard({
                 From Wizard
               </div>
               <p className="text-xs text-muted-foreground">
-                Create entries through guided wizards — outputs are auto-registered in the catalog
+                Create entries through guided wizards, or choose an existing callable agent for Catalog onboarding
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -728,7 +728,7 @@ export function CatalogImportWizard({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { onOpenChange(false); navigate("/agents"); }}
+                  onClick={() => { onOpenChange(false); navigate("/governance/agents?mode=catalog-import&callableOnly=1&returnTo=/llm/catalogue/candidate"); }}
                 >
                   <Workflow className="h-4 w-4 mr-1" />
                   Agent Wizard

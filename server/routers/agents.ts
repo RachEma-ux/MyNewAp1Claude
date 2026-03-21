@@ -16,7 +16,7 @@ import {
   isCatalogImportEligible,
   type AgentStatus,
 } from "@shared/agent-lifecycle";
-import { createCatalogEntry, createCatalogAuditEvent } from "../db/catalog";
+import { createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
 import { createAgentDefinition, SYSTEM_WORKSPACE_ID } from "../agents/create-definition";
 
 
@@ -44,7 +44,7 @@ function buildCatalogAgentConfig(agent: any) {
     hasDocumentAccess: agent.hasDocumentAccess ?? false,
     hasToolAccess: agent.hasToolAccess ?? false,
     allowedTools: Array.isArray(agent.allowedTools) ? agent.allowedTools : [],
-    callable: true,
+    callable: false,
   };
 }
 
@@ -54,10 +54,29 @@ export const agentsRouter = router({
   list: protectedProcedure.query(async () => {
     const db = getDb();
 
-    return await db
-      .select()
-      .from(agents)
-      .where(ne(agents.status, "archived"));
+    const [agentRows, catalogAgentRows] = await Promise.all([
+      db.select().from(agents).where(ne(agents.status, "archived")),
+      db.select({ id: catalogEntries.id, config: catalogEntries.config })
+        .from(catalogEntries)
+        .where(eq(catalogEntries.entryType, "agent")),
+    ]);
+
+    const catalogEntryByAgentId = new Map<number, number>();
+    for (const entry of catalogAgentRows) {
+      const sourceAgentId = Number((entry.config as Record<string, any> | null)?.sourceAgentId);
+      if (!Number.isFinite(sourceAgentId)) continue;
+      catalogEntryByAgentId.set(sourceAgentId, entry.id);
+    }
+
+    return agentRows.map((agent) => {
+      const status = getAgentStatus(agent.status);
+      const catalogEntryId = catalogEntryByAgentId.get(agent.id) ?? null;
+      return {
+        ...agent,
+        callable: isCatalogImportEligible(status) && !catalogEntryId,
+        catalogEntryId,
+      };
+    });
   }),
 
   // Get single agent by ID
@@ -532,25 +551,37 @@ export const agentsRouter = router({
         description: agent.description ?? null,
         entryType: "agent",
         scope: "app",
-        status: "active",
+        status: "draft",
         origin: "admin",
-        reviewState: "approved",
+        reviewState: "needs_review",
         config: buildCatalogAgentConfig(agent),
-        tags: ["agent", "catalog-import", status],
+        tags: ["candidate", "agent", "catalog-import", status],
         category: null,
         subCategory: null,
         capabilities: Array.isArray(agent.allowedTools) ? agent.allowedTools : [],
         createdBy: ctx.user.id,
       });
 
+      try {
+        const axisNodes = await getTaxonomyNodes({ entryType: "agent", level: "axis" });
+        if (axisNodes.length > 0) {
+          await setEntryClassifications(entry.id, [axisNodes[0].id]);
+        }
+      } catch (error) {
+        console.warn(`[Agents] Auto-classify failed for imported agent catalog entry ${entry.id}:`, (error as Error).message);
+      }
+
       await createCatalogAuditEvent({
-        eventType: "catalog.agent.imported",
+        eventType: "catalog.agent.submitted",
         catalogEntryId: entry.id,
         actor: ctx.user.id,
         actorType: "user",
         payload: {
           sourceAgentId: agent.id,
           sourceStatus: status,
+          reviewState: "needs_review",
+          status: "draft",
+          tags: ["candidate", "agent", "catalog-import", status],
         },
       });
 

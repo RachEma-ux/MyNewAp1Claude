@@ -98,7 +98,11 @@ export default function AgentsPage() {
 
   const importMutation = trpc.agents.importToCatalog.useMutation({
     onSuccess: async (result) => {
-      toast({ title: result.imported ? "Agent imported to Catalog" : "Agent already imported to Catalog" });
+      toast({
+        title: result.imported
+          ? "Agent added to the Catalog candidate pipeline"
+          : "Agent is already in the Catalog pipeline",
+      });
       await utils.agents.list.invalidate();
     },
     onError: (error) => {
