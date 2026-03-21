@@ -478,17 +478,11 @@ jobs:
           echo "  JWT_SECRET: ${JWT_SECRET:+(configured)}"
           echo "  APP_ID: ${VITE_APP_ID:-(not set)}"
 
-          # Always use NODE_ENV=production to serve pre-built static files
+          # Always use NODE_ENV=production so the server serves built static files
           # DEV_MODE controls auth bypass independently of NODE_ENV
           EFFECTIVE_NODE_ENV="production"
 
-          echo "Runtime environment:"
-          echo "  NODE_ENV: ${EFFECTIVE_NODE_ENV}"
-          echo "  DEV_MODE: ${{ github.event.inputs.dev_mode }}"
-          echo "  ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY && '(from secret)' || '(using built-in dev fallback)' }}"
-
-          # Start the Node.js server
-          # Always use ENCRYPTION_KEY secret if available, otherwise rely on built-in fallback
+          # Start the Node.js server with all auth environment variables
           PORT=3000 \
           NODE_ENV="${EFFECTIVE_NODE_ENV}" \
           DATABASE_URL="${EFFECTIVE_DB_URL}" \
