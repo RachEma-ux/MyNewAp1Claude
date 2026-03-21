@@ -18,6 +18,8 @@ export interface ProviderLimits {
   costTier?: CostTier;
 }
 
+export type ProviderLifecycleStatus = "configured" | "authenticated" | "validated" | "healthy" | "active" | "suspended";
+
 export const providers = pgTable("providers", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -26,6 +28,7 @@ export const providers = pgTable("providers", {
   // Provider status
   enabled: boolean("enabled").default(true),
   priority: integer("priority").default(50),
+  lifecycleStatus: varchar("lifecycleStatus", { length: 30 }).default("configured").$type<ProviderLifecycleStatus>(),
 
   // Configuration
   config: json("config").notNull(),

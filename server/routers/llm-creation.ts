@@ -13,27 +13,17 @@ import { getAuditLogger } from "../services/auditLogger";
 import { registerProjectOutputAsLLMVersionCandidate } from "../llm/project-output-registration";
 
 const environmentSchema = z.enum(["sandbox", "governed", "production"]);
+/**
+ * Governed version config — artifact metadata only.
+ * Runtime binding (provider, endpoint, type) is NOT part of the creation handoff.
+ * Runtime configuration belongs in governance / catalog / control-plane layers.
+ */
 const governedVersionConfigSchema = z.object({
-  runtime: z.object({
-    type: z.enum(["local", "cloud", "remote"]),
-    provider: z.string().optional(),
-    endpoint: z.string().optional(),
-  }),
   model: z.object({
     name: z.string(),
     version: z.string().optional(),
     contextLength: z.number().optional(),
   }),
-  parameters: z.object({
-    temperature: z.number().min(0).max(2).optional(),
-    maxTokens: z.number().positive().optional(),
-    topP: z.number().min(0).max(1).optional(),
-    streaming: z.boolean().optional(),
-  }).optional(),
-  capabilities: z.object({
-    tools: z.array(z.string()).optional(),
-    functions: z.array(z.string()).optional(),
-  }).optional(),
 });
 
 /**

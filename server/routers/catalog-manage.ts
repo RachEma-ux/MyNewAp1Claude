@@ -852,13 +852,22 @@ export const catalogManageRouter = router({
           .update(JSON.stringify(snapshot))
           .digest("hex");
 
+        const bundlePolicyDecision = review.passed ? "pass" : "fail";
+        const bundlePolicyViolations = review.passed
+          ? null
+          : review.blockers.map((blocker) => ({
+              name: blocker.name,
+              details: blocker.details ?? null,
+            }));
+
         const bundle = await createPublishBundle({
           catalogEntryId: input.catalogEntryId,
           versionLabel: input.versionLabel,
           snapshot,
           snapshotHash,
           publishedBy: 1,
-          policyDecision: "pass",
+          policyDecision: bundlePolicyDecision,
+          policyViolations: bundlePolicyViolations,
         });
 
         // Restore to active after publishing

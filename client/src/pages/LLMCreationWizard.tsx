@@ -2,6 +2,9 @@
  * LLM Creation Wizard — 10-Phase Pipeline
  * Route: /llm/wizard
  *
+ * This wizard creates NEW LLM artifacts through a multi-phase build pipeline.
+ * For onboarding EXISTING models into governance, use /llm/register (LLMWizard).
+ *
  * Phases:
  *  1. Project Definition    → createCreationProject (server-side)
  *  2. Base Model Strategy   → updateCreationProject
@@ -145,6 +148,62 @@ const defaultTrainingConfig: TrainingConfig = {
 };
 
 // ============================================================================
+// Artifact Package & Lifecycle Types
+// ============================================================================
+
+/** Explicit lifecycle states for creation projects */
+type ProjectLifecycleState =
+  | "draft"
+  | "training"
+  | "evaluation"
+  | "quantization"
+  | "ready_for_governance"
+  | "submitted_to_governance"
+  | "governance_failed";
+
+/**
+ * Explicit artifact package — the handoff payload from the build pipeline.
+ * This captures what the wizard produced, NOT runtime configuration.
+ */
+interface ArtifactPackage {
+  sourceProjectId: number;
+  sourceProjectName: string;
+  selectedArtifactPath: string | null;
+  isQuantized: boolean;
+  trainingRunIds: number[];
+  evaluationSummary: {
+    bestScore: number | null;
+    threshold: number;
+    passed: boolean;
+    evaluationIds: number[];
+  };
+  quantizationId: number | null;
+  datasetCount: number;
+  allDatasetsValidated: boolean;
+  governanceReadiness: ProjectLifecycleState;
+}
+
+/** Evaluation gate result */
+interface EvalGateResult {
+  status: "pass" | "fail" | "no_data";
+  bestScore: number | null;
+  threshold: number;
+}
+
+function computeEvalGate(evaluations: any[], threshold: number): EvalGateResult {
+  const completed = evaluations.filter(
+    (e: any) => e.status === "completed" && e.overallScore != null
+  );
+  if (completed.length === 0) return { status: "no_data", bestScore: null, threshold };
+  const bestScore = Math.max(...completed.map((e: any) => Number(e.overallScore)));
+  return {
+    status: bestScore >= threshold * 100 ? "pass" : "fail",
+    bestScore,
+    threshold,
+  };
+}
+
+// ============================================================================
 // Main Wizard Component
 // ============================================================================
 
@@ -162,9 +221,6 @@ export default function LLMCreationWizard() {
   });
   const [govConfig, setGovConfig] = useState({
     environment: "sandbox" as "sandbox" | "governed" | "production",
-    runtimeType: "local" as "local" | "cloud" | "remote",
-    provider: "",
-    endpoint: "",
     evaluationThreshold: 0.75,
     useQuantizedArtifact: false,
     changeNotes: "",
@@ -211,6 +267,50 @@ export default function LLMCreationWizard() {
   const phaseIndex = PHASE_ORDER.indexOf(currentPhase);
   const progress = ((phaseIndex + 1) / PHASE_ORDER.length) * 100;
   const isPreGovernance = phaseIndex < 9;
+
+  // Artifact readiness: all prerequisites for governance handoff
+  const hasCompletedTraining = trainingRuns.some((r: any) => r.status === "completed");
+  const hasCompletedEval = evaluations.some((e: any) => e.status === "completed");
+  const allDatasetsValidated = datasets.length > 0 && datasets.every((d: any) => d.validated);
+  const isReadyForGovernance = hasCompletedTraining && hasCompletedEval && allDatasetsValidated;
+
+  // Evaluation gate computation
+  const evalGate = computeEvalGate(evaluations, govConfig.evaluationThreshold);
+
+  // Compute explicit project lifecycle state
+  const computedLifecycleState: ProjectLifecycleState = (() => {
+    if (!projectId) return "draft";
+    if (!hasCompletedTraining) return "training";
+    if (!hasCompletedEval) return "evaluation";
+    if (!isReadyForGovernance) return "quantization";
+    return "ready_for_governance";
+  })();
+
+  // Assemble explicit artifact package for handoff
+  const artifactPackage: ArtifactPackage | null = projectId ? {
+    sourceProjectId: projectId,
+    sourceProjectName: project?.name || draft.name,
+    selectedArtifactPath: (() => {
+      if (govConfig.useQuantizedArtifact) {
+        const q = quantizations.find((q: any) => q.status === "completed" && q.outputPath);
+        return q?.outputPath || null;
+      }
+      const r = trainingRuns.find((r: any) => r.status === "completed");
+      return (r as any)?.checkpointPath || (r as any)?.loraAdapterPath || null;
+    })(),
+    isQuantized: govConfig.useQuantizedArtifact,
+    trainingRunIds: trainingRuns.filter((r: any) => r.status === "completed").map((r: any) => r.id),
+    evaluationSummary: {
+      bestScore: evalGate.bestScore,
+      threshold: govConfig.evaluationThreshold,
+      passed: evalGate.status === "pass",
+      evaluationIds: evaluations.filter((e: any) => e.status === "completed").map((e: any) => e.id),
+    },
+    quantizationId: quantizations.find((q: any) => q.status === "completed")?.id || null,
+    datasetCount: datasets.length,
+    allDatasetsValidated: allDatasetsValidated,
+    governanceReadiness: computedLifecycleState,
+  } : null;
 
   // ---- Phase transition handlers ----
 
@@ -364,17 +464,25 @@ export default function LLMCreationWizard() {
   };
 
   const handleGovernanceHandoff = async () => {
+    if (!artifactPackage) {
+      toast.error("Artifact package not assembled. Complete all build phases first.");
+      return;
+    }
+    if (computedLifecycleState !== "ready_for_governance") {
+      toast.error("Project must reach ready_for_governance state before submission.");
+      return;
+    }
+    // Enforce eval gate: must pass OR have explicit override reason
+    if (evalGate.status === "fail" && !govConfig.approvalReason.trim()) {
+      toast.error("Evaluation failed threshold. Provide an explicit override reason or re-run evaluation.");
+      return;
+    }
     const ctxLen = parseInt(draft.target.contextLength) || 8192;
     try {
       await registerOutputMut.mutateAsync({
         projectId: projectId!,
         environment: govConfig.environment,
         config: {
-          runtime: {
-            type: govConfig.runtimeType,
-            provider: govConfig.provider || undefined,
-            endpoint: govConfig.endpoint || undefined,
-          },
           model: {
             name: project?.name || draft.name,
             version: "1.0.0",
@@ -386,7 +494,7 @@ export default function LLMCreationWizard() {
         changeNotes: govConfig.changeNotes || undefined,
         explicitApprovalReason: govConfig.approvalReason || undefined,
       });
-      toast.success("Submitted to governance!");
+      toast.success("Artifact submitted to governance pipeline. Governance → Catalog → Runtime.");
       setLocation("/llm");
     } catch (e: any) { toast.error(e.message || "Governance handoff failed"); }
   };
@@ -405,7 +513,7 @@ export default function LLMCreationWizard() {
           <div>
             <h1 className="text-3xl font-bold">LLM Creation Wizard</h1>
             <p className="text-muted-foreground mt-1">
-              Full lifecycle: Project → Training → Evaluation → Governance
+              Build Pipeline: Project → Training → Evaluation → Artifact → Governance Handoff
             </p>
           </div>
           <Button variant="outline" onClick={() => setLocation("/llm")}>
@@ -419,8 +527,10 @@ export default function LLMCreationWizard() {
           <Alert variant="destructive" className="mb-4">
             <ShieldAlert className="h-4 w-4" />
             <AlertDescription>
-              <strong>NOT governed / NOT runtime-ready.</strong> All outputs in phases 1–9
-              are build artifacts only. They become governed after Phase 10.
+              <strong>BUILD ARTIFACTS ONLY — NOT governed, NOT published, NOT runtime-ready.</strong>{" "}
+              All outputs in phases 1–9 are build artifacts. They become a governed LLM version
+              candidate only after Phase 10 governance handoff. No provider or runtime binding
+              occurs in this wizard.
             </AlertDescription>
           </Alert>
         )}
@@ -554,6 +664,9 @@ export default function LLMCreationWizard() {
               trainingRuns={trainingRuns}
               evaluations={evaluations}
               quantizations={quantizations}
+              artifactPackage={artifactPackage}
+              lifecycleState={computedLifecycleState}
+              evalGate={evalGate}
             />
           )}
 
@@ -565,6 +678,8 @@ export default function LLMCreationWizard() {
               setConfig={setGovConfig}
               evaluations={evaluations}
               quantizations={quantizations}
+              evalGate={evalGate}
+              artifactPackage={artifactPackage}
             />
           )}
 
@@ -622,8 +737,29 @@ export default function LLMCreationWizard() {
               </Button>
             )}
             {currentPhase === "artifact_review" && (
-              <Button onClick={() => setCurrentPhase("governance_handoff")} className="bg-amber-600 hover:bg-amber-700">
-                <Shield className="mr-2 h-4 w-4" /> Governance Handoff
+              <Button
+                onClick={async () => {
+                  if (!isReadyForGovernance) {
+                    toast.error("Project is not ready for governance. Complete all required phases first.");
+                    return;
+                  }
+                  try {
+                    await updateProjectMut.mutateAsync({
+                      projectId: projectId!,
+                      status: "ready_for_governance",
+                      currentPhase: "phase_9_governance_handoff",
+                    });
+                    setCurrentPhase("governance_handoff");
+                  } catch (e: any) {
+                    toast.error(e.message || "Failed to update project status");
+                  }
+                }}
+                disabled={!isReadyForGovernance || updateProjectMut.isPending}
+                className="bg-amber-600 hover:bg-amber-700"
+              >
+                {updateProjectMut.isPending
+                  ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Preparing...</>
+                  : <><Shield className="mr-2 h-4 w-4" /> Governance Handoff</>}
               </Button>
             )}
             {currentPhase === "governance_handoff" && (
@@ -1253,16 +1389,38 @@ function Phase6TrainingExecution({
         <div className="space-y-3">
           <Label>Training Runs ({trainingRuns.length})</Label>
           {trainingRuns.map((run: any) => (
-            <Card key={run.id}>
+            <Card key={run.id} className={run.status === "failed" ? "border-destructive" : ""}>
               <CardContent className="py-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">Run #{run.id}</span>
                     <Badge variant="outline">{run.trainingType}</Badge>
                   </div>
-                  <StatusBadge status={run.status} />
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={run.status} />
+                    {run.status === "failed" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onStart(run.trainingType)}
+                        disabled={isStarting}
+                      >
+                        <RefreshCw className="mr-1 h-3 w-3" /> Retry
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                {run.progress != null && (
+                {run.status === "failed" && (
+                  <Alert variant="destructive" className="mt-2">
+                    <XCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Training failed.</strong>{" "}
+                      {run.errorMessage || "Check logs for details."}{" "}
+                      Click Retry to start a new {run.trainingType.toUpperCase()} run.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {run.progress != null && run.status !== "failed" && (
                   <div className="space-y-1">
                     <Progress value={run.progress} className="h-2" />
                     <p className="text-xs text-muted-foreground">{run.progress}% complete</p>
@@ -1338,12 +1496,34 @@ function Phase7Evaluation({
         <div className="space-y-3">
           <Label>Evaluations ({evaluations.length})</Label>
           {evaluations.map((ev: any) => (
-            <Card key={ev.id}>
+            <Card key={ev.id} className={ev.status === "failed" ? "border-destructive" : ""}>
               <CardContent className="py-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium">Evaluation #{ev.id}</span>
-                  <StatusBadge status={ev.status} />
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={ev.status} />
+                    {ev.status === "failed" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={onStart}
+                        disabled={isStarting}
+                      >
+                        <RefreshCw className="mr-1 h-3 w-3" /> Retry
+                      </Button>
+                    )}
+                  </div>
                 </div>
+                {ev.status === "failed" && (
+                  <Alert variant="destructive" className="mt-2">
+                    <XCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Evaluation failed.</strong>{" "}
+                      {ev.errorMessage || "Check logs for details."}{" "}
+                      Click Retry to start a new evaluation run.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 {ev.overallScore && (
                   <div className="grid grid-cols-3 gap-4 mt-2">
                     <div className="text-center">
@@ -1464,15 +1644,37 @@ function Phase8Quantization({
         <div className="space-y-3">
           <Label>Quantizations ({quantizations.length})</Label>
           {quantizations.map((q: any) => (
-            <Card key={q.id}>
+            <Card key={q.id} className={q.status === "failed" ? "border-destructive" : ""}>
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="font-medium">Quantization #{q.id}</span>
                     <Badge variant="outline" className="ml-2">{q.quantizationType}</Badge>
                   </div>
-                  <StatusBadge status={q.status} />
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={q.status} />
+                    {q.status === "failed" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={onStart}
+                        disabled={isStarting}
+                      >
+                        <RefreshCw className="mr-1 h-3 w-3" /> Retry
+                      </Button>
+                    )}
+                  </div>
                 </div>
+                {q.status === "failed" && (
+                  <Alert variant="destructive" className="mt-2">
+                    <XCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Quantization failed.</strong>{" "}
+                      {q.errorMessage || "Check logs for details."}{" "}
+                      Click Retry to start a new quantization run.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 {q.compressionRatio && (
                   <p className="text-sm text-muted-foreground mt-1">
                     Compression: {q.compressionRatio}x
@@ -1498,26 +1700,112 @@ function Phase9ArtifactReview({
   trainingRuns,
   evaluations,
   quantizations,
+  artifactPackage,
+  lifecycleState,
+  evalGate,
 }: {
   project: any;
   datasets: any[];
   trainingRuns: any[];
   evaluations: any[];
   quantizations: any[];
+  artifactPackage: ArtifactPackage | null;
+  lifecycleState: ProjectLifecycleState;
+  evalGate: EvalGateResult;
 }) {
   const completedRuns = trainingRuns.filter((r: any) => r.status === "completed");
   const completedEvals = evaluations.filter((e: any) => e.status === "completed");
   const completedQuants = quantizations.filter((q: any) => q.status === "completed");
+  const isReady = lifecycleState === "ready_for_governance";
 
   return (
     <div className="space-y-6">
       <Alert variant="destructive">
         <ShieldAlert className="h-4 w-4" />
         <AlertDescription>
-          <strong>BUILD ARTIFACT REVIEW — NOT runtime-ready.</strong> Review all outputs below.
-          Proceed to Phase 10 to submit to governance for approval.
+          <strong>BUILD ARTIFACT REVIEW — NOT runtime-ready.</strong> This is an artifact-only
+          review. These outputs are not governed, not published, and not callable until they
+          pass through the governance pipeline.
         </AlertDescription>
       </Alert>
+
+      {/* Governance Readiness Status */}
+      <Card className={isReady ? "border-green-500 dark:border-green-600" : "border-amber-500 dark:border-amber-600"}>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              {isReady ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <AlertTriangle className="h-5 w-5 text-amber-600" />}
+              Project Lifecycle State
+            </CardTitle>
+            <Badge className={isReady ? "bg-green-600" : "bg-amber-600"}>
+              {lifecycleState.replace(/_/g, " ").toUpperCase()}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              {artifactPackage?.allDatasetsValidated ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-500" />}
+              <span>Datasets validated ({datasets.filter((d: any) => d.validated).length}/{datasets.length})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {completedRuns.length > 0 ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-500" />}
+              <span>Training completed ({completedRuns.length})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {completedEvals.length > 0 ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-500" />}
+              <span>Evaluation completed ({completedEvals.length})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {evalGate.status === "pass" ? (
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              ) : evalGate.status === "fail" ? (
+                <XCircle className="h-4 w-4 text-red-500" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+              )}
+              <span>
+                Eval gate: {evalGate.status === "pass" ? "PASS" : evalGate.status === "fail" ? "FAIL" : "NO DATA"}
+                {evalGate.bestScore != null && ` (${evalGate.bestScore}% vs ${evalGate.threshold * 100}%)`}
+              </span>
+            </div>
+          </div>
+          {!isReady && (
+            <Alert className="mt-4">
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Complete all required items above before proceeding to governance handoff.
+                {evalGate.status === "fail" && " Evaluation score is below threshold — you may provide an override reason in Phase 10."}
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Artifact Package Summary */}
+      {artifactPackage && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" /> Artifact Package
+            </CardTitle>
+            <CardDescription>
+              This is the explicit build output that will be submitted for governance review.
+              It is NOT a runtime configuration.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <Row label="Source Project" value={`#${artifactPackage.sourceProjectId} — ${artifactPackage.sourceProjectName}`} />
+            <Row label="Artifact Path" value={artifactPackage.selectedArtifactPath || "Not yet determined"} />
+            <Row label="Quantized" value={artifactPackage.isQuantized ? "Yes" : "No"} />
+            <Row label="Training Runs" value={`${artifactPackage.trainingRunIds.length} completed`} />
+            <Row label="Best Eval Score" value={artifactPackage.evaluationSummary.bestScore != null ? `${artifactPackage.evaluationSummary.bestScore}%` : "N/A"} />
+            <Row label="Eval Threshold" value={`${artifactPackage.evaluationSummary.threshold * 100}%`} />
+            <Row label="Eval Gate" value={artifactPackage.evaluationSummary.passed ? "PASSED" : "NOT PASSED"} />
+            <Row label="Datasets" value={`${artifactPackage.datasetCount} (${artifactPackage.allDatasetsValidated ? "all validated" : "validation incomplete"})`} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Project Summary */}
       <Card>
@@ -1598,24 +1886,30 @@ function Phase10Governance({
   setConfig,
   evaluations,
   quantizations,
+  evalGate,
+  artifactPackage,
 }: {
   project: any;
   config: any;
   setConfig: (c: any) => void;
   evaluations: any[];
   quantizations: any[];
+  evalGate: EvalGateResult;
+  artifactPackage: ArtifactPackage | null;
 }) {
   const hasEvals = evaluations.some((e: any) => e.status === "completed");
   const hasQuants = quantizations.some((q: any) => q.status === "completed");
+  const isOverride = evalGate.status === "fail" && config.approvalReason?.trim();
 
   return (
     <div className="space-y-6">
       <Alert className="bg-amber-50 border-amber-300 dark:bg-amber-900/20 dark:border-amber-700">
         <Shield className="h-4 w-4 text-amber-600" />
         <AlertDescription className="text-amber-800 dark:text-amber-300">
-          <strong>Governance Handoff.</strong> This submits your build artifact to the governance
-          pipeline. The output becomes a governed LLM version candidate — NOT directly runtime-ready.
-          Governance → Catalog → Runtime.
+          <strong>Governance Handoff — Artifact Submission Only.</strong> This submits the build
+          artifact to the governance pipeline. The output becomes a governed LLM version candidate.
+          It is NOT runtime-ready until it passes: Governance → Catalog → Runtime.
+          No provider, endpoint, or runtime binding is configured here.
         </AlertDescription>
       </Alert>
 
@@ -1623,15 +1917,70 @@ function Phase10Governance({
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            No completed evaluations found. Governance will likely reject submissions
+            No completed evaluations found. Governance will reject submissions
             without evaluation results.
           </AlertDescription>
         </Alert>
       )}
 
+      {/* Evaluation Gate Status — explicit pass/fail/override */}
+      <Card className={
+        evalGate.status === "pass" ? "border-green-500 dark:border-green-600" :
+        evalGate.status === "fail" ? "border-red-500 dark:border-red-600" :
+        "border-muted"
+      }>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            {evalGate.status === "pass" ? (
+              <><CheckCircle2 className="h-5 w-5 text-green-600" /> Evaluation Gate: PASSED</>
+            ) : evalGate.status === "fail" ? (
+              <><XCircle className="h-5 w-5 text-red-500" /> Evaluation Gate: FAILED</>
+            ) : (
+              <><AlertTriangle className="h-5 w-5 text-amber-500" /> Evaluation Gate: NO DATA</>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          {evalGate.bestScore != null && (
+            <div className="flex items-center gap-4">
+              <div>
+                <span className="text-muted-foreground">Best Score: </span>
+                <span className={`font-bold ${evalGate.status === "pass" ? "text-green-600" : "text-red-500"}`}>
+                  {evalGate.bestScore}%
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Threshold: </span>
+                <span className="font-bold">{evalGate.threshold * 100}%</span>
+              </div>
+            </div>
+          )}
+          {evalGate.status === "fail" && (
+            <Alert variant="destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertDescription>
+                Evaluation score ({evalGate.bestScore}%) is below the required threshold ({evalGate.threshold * 100}%).
+                You must either re-run evaluation to improve the score, or provide an <strong>explicit
+                governance override reason</strong> below. Overrides are audited and flagged for review.
+              </AlertDescription>
+            </Alert>
+          )}
+          {isOverride && (
+            <Alert className="bg-amber-50 border-amber-400 dark:bg-amber-900/30 dark:border-amber-600">
+              <ShieldAlert className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 dark:text-amber-300">
+                <strong>GOVERNANCE OVERRIDE ACTIVE.</strong> This submission will be flagged as
+                an override of the evaluation gate. The override reason will be recorded in the
+                audit trail and subject to governance review.
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label>Target Environment</Label>
+          <Label>Governance Environment</Label>
           <Select value={config.environment} onValueChange={(v: any) => setConfig({ ...config, environment: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -1640,37 +1989,9 @@ function Phase10Governance({
               <SelectItem value="production">Production</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Runtime Type</Label>
-          <Select value={config.runtimeType} onValueChange={(v: any) => setConfig({ ...config, runtimeType: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="local">Local</SelectItem>
-              <SelectItem value="cloud">Cloud</SelectItem>
-              <SelectItem value="remote">Remote</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Provider (optional)</Label>
-            <Input
-              value={config.provider}
-              onChange={(e) => setConfig({ ...config, provider: e.target.value })}
-              placeholder="ollama, openai, etc."
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Endpoint (optional)</Label>
-            <Input
-              value={config.endpoint}
-              onChange={(e) => setConfig({ ...config, endpoint: e.target.value })}
-              placeholder="http://localhost:11434"
-            />
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Governance environment for the version candidate. This is NOT a runtime deployment target.
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -1681,13 +2002,17 @@ function Phase10Governance({
             onChange={(e) => setConfig({ ...config, evaluationThreshold: parseFloat(e.target.value) || 0.75 })}
           />
           <p className="text-xs text-muted-foreground">
-            Minimum evaluation score required for governance approval (default: 0.75)
+            Minimum evaluation score required for automatic approval. Submissions below this
+            threshold require an explicit override reason.
           </p>
         </div>
 
         {hasQuants && (
           <div className="flex items-center justify-between">
-            <Label>Use quantized artifact</Label>
+            <div>
+              <Label>Use quantized artifact</Label>
+              <p className="text-xs text-muted-foreground">Select the quantized build output instead of the full-precision artifact.</p>
+            </div>
             <input
               type="checkbox"
               checked={config.useQuantizedArtifact}
@@ -1702,18 +2027,35 @@ function Phase10Governance({
           <Textarea
             value={config.changeNotes}
             onChange={(e) => setConfig({ ...config, changeNotes: e.target.value })}
-            placeholder="Describe what this LLM version does and why it should be approved..."
+            placeholder="Describe what this LLM artifact does and why it should be approved for governance..."
             rows={3}
           />
         </div>
 
+        <Separator />
+
         <div className="space-y-2">
-          <Label>Approval Reason (optional)</Label>
-          <Input
+          <Label className={evalGate.status === "fail" ? "text-amber-600 font-semibold" : ""}>
+            {evalGate.status === "fail"
+              ? "Governance Override Reason (REQUIRED — eval gate failed)"
+              : "Governance Override Reason (optional)"}
+          </Label>
+          <Textarea
             value={config.approvalReason}
             onChange={(e) => setConfig({ ...config, approvalReason: e.target.value })}
-            placeholder="Explicit reason for approval (bypasses auto-checks if provided)"
+            placeholder={
+              evalGate.status === "fail"
+                ? "REQUIRED: Explain why this artifact should proceed despite failing the evaluation threshold..."
+                : "Only needed if bypassing evaluation threshold. Leave blank for standard approval flow."
+            }
+            rows={evalGate.status === "fail" ? 3 : 2}
+            className={evalGate.status === "fail" && !config.approvalReason?.trim() ? "border-red-500" : ""}
           />
+          {evalGate.status === "fail" && !config.approvalReason?.trim() && (
+            <p className="text-xs text-red-500 font-medium">
+              Override reason is required because the evaluation gate failed.
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -34,6 +34,22 @@ function parseScore(value: unknown): number | null {
   return null;
 }
 
+/**
+ * Registers a creation project's output as a governed LLM version candidate.
+ *
+ * Completion Gate — the following must ALL be true before handoff:
+ *  1. Project status === "completed" with a completedAt timestamp
+ *  2. At least one validated dataset (no failed datasets)
+ *  3. At least one completed training run
+ *  4. At least one completed evaluation meeting the score threshold (or explicit approval)
+ *  5. If useQuantizedArtifact, a completed quantization with output path
+ *  6. LLMPolicyEngine.evaluate() must not deny the configuration
+ *
+ * The resulting version is created with callable=false (NOT catalog-eligible).
+ * Catalog eligibility requires the promotion workflow or explicit updateCallable.
+ * Artifact provenance (project, datasets, training run, evaluation, quantization)
+ * is embedded in the version config for full traceability.
+ */
 export async function registerProjectOutputAsLLMVersionCandidate(
   input: RegisterProjectOutputInput
 ): Promise<LLMVersion> {
@@ -48,6 +64,7 @@ export async function registerProjectOutputAsLLMVersionCandidate(
   if (!project) {
     throw new Error("Creation project not found");
   }
+  // Completion gate: project must be fully completed before handoff
   if (project.status !== "completed" || !project.completedAt) {
     throw new Error("Creation project must be completed before registering a governed LLM version");
   }

@@ -1,6 +1,12 @@
 /**
  * LLM Policy Engine - Rule-based policy evaluation and admission control
  *
+ * ===== AUTHORITATIVE POLICY EVALUATION PATH =====
+ * This module is the canonical and sole authority for LLM policy evaluation.
+ * All LLM version creation (both direct via llm.ts createVersion and via
+ * project-output-registration.ts handoff) MUST pass through
+ * LLMPolicyEngine.evaluate() before a version is persisted.
+ *
  * Authoritative for the current LLM path: local deterministic policy engine.
  * This module is the real enforcement layer for LLM configuration decisions;
  * the LLM control-plane does not depend on shared OPA enforcement today.

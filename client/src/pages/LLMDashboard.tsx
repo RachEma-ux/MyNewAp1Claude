@@ -38,12 +38,12 @@ export default function LLMDashboard() {
   // Fetch dashboard statistics
   const { data: stats, isLoading } = trpc.llm.getDashboardStats.useQuery();
 
-  const openQuickSetup = () => {
-    setLocation("/llm/wizard");
+  const openRegister = () => {
+    setLocation("/llm/register");
   };
 
-  const openFullLifecycle = () => {
-    setLocation("/llm/create");
+  const openCreationWizard = () => {
+    setLocation("/llm/wizard");
   };
 
   const openControlPlane = () => {
@@ -81,15 +81,11 @@ export default function LLMDashboard() {
             <Settings className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
             Control Plane
           </Button>
-          <Button variant="outline" size="lg" onClick={() => setLocation("/llm/create")} className="w-full sm:w-auto">
+          <Button variant="outline" size="lg" onClick={openRegister} className="w-full sm:w-auto">
             <Wand2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-            Wizard
+            Register
           </Button>
-          <Button variant="outline" size="lg" onClick={openQuickSetup} className="w-full sm:w-auto">
-            <Wand2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-            Quick Setup
-          </Button>
-          <Button size="lg" onClick={openFullLifecycle} className="w-full sm:w-auto">
+          <Button size="lg" onClick={openCreationWizard} className="w-full sm:w-auto">
             <Cpu className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
             Train Model
           </Button>
@@ -214,10 +210,10 @@ export default function LLMDashboard() {
                 <Activity className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-muted-foreground">No recent activity</p>
                 <div className="flex gap-2 justify-center mt-2">
-                  <Button variant="link" onClick={openQuickSetup}>
-                    Quick Setup
+                  <Button variant="link" onClick={openRegister}>
+                    Register LLM
                   </Button>
-                  <Button variant="link" onClick={openFullLifecycle}>
+                  <Button variant="link" onClick={openCreationWizard}>
                     Train Model
                   </Button>
                 </div>
@@ -233,11 +229,11 @@ export default function LLMDashboard() {
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full" onClick={openQuickSetup}>
+              <Button className="w-full" onClick={openRegister}>
                 <Wand2 className="mr-2 h-4 w-4" />
-                Quick Setup
+                Register LLM
               </Button>
-              <Button className="w-full" onClick={openFullLifecycle}>
+              <Button className="w-full" onClick={openCreationWizard}>
                 <Cpu className="mr-2 h-4 w-4" />
                 Train Custom Model
               </Button>
@@ -269,8 +265,9 @@ export default function LLMDashboard() {
             <AlertDescription>
               <strong>Governance Active</strong>
               <p className="text-sm mt-1">
-                All LLMs are policy-validated, attested, and auditable. Only compliant versions can
-                execute.
+                All LLM versions are policy-validated, attested, and auditable.
+                Catalog eligibility is granted through the promotion workflow.
+                Runtime authority is resolved via published Catalog entries, not raw version flags.
               </p>
             </AlertDescription>
           </Alert>

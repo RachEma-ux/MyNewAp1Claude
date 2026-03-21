@@ -4,6 +4,15 @@
  * Provides tRPC endpoints for managing LLMs, versions, and promotions
  * Following RFC-001 specifications for governed, auditable LLM lifecycle
  *
+ * ===== REFERENCE IMPLEMENTATION =====
+ * This router is the canonical governance pattern for all governed domains.
+ * Other domain routers (agents, models, bots, providers) should follow:
+ * - governedProcedure on all mutations
+ * - blocking `await getAuditLogger().log()` on critical mutations
+ * - LLMPolicyEngine.evaluate() or domain-specific policy evaluation
+ * - Catalog onboarding for runtime authority
+ * - Promotion workflow with approval gates
+ *
  * Sub-routers (merged via spread to keep flat namespace):
  *  - llm-providers.ts: Provider registry, policy validation, device detection
  *  - llm-creation.ts: LLM creation & training pipeline
@@ -29,6 +38,7 @@ import {
   executePromotion as executeLLMPromotion,
   getLLMAuditEvents,
 } from "../db";
+import { getAuditLogger } from "../services/auditLogger";
 import "../services/training-executor"; // Initialize training executor
 
 import { llmProvidersProcedures } from "./llm-providers";
@@ -63,7 +73,8 @@ const updateLLMSchema = z.object({
 const llmConfigSchema = z.object({
   runtime: z.object({
     type: z.enum(["local", "cloud", "remote"]),
-    provider: z.string().optional(),
+    provider: z.string().optional(), // Legacy string reference (backward compat)
+    providerId: z.number().int().positive().optional(), // FK to providers table
     endpoint: z.string().optional(),
   }),
   model: z.object({
@@ -224,6 +235,10 @@ export const llmRouter = router({
         throw new Error("Policy evaluation denied: " + policyResult.violations.map(v => v.message).join("; "));
       }
 
+      // `callable` on llm_versions is an internal catalog eligibility flag, NOT runtime authority.
+      // New versions start as callable=false (not catalog-eligible).
+      // Catalog eligibility is granted via the promotion workflow or explicit updateCallable.
+      // Runtime authority is resolved through the Catalog entry, not this flag.
       const version = await createLLMVersion({
         ...input,
         createdBy: ctx.user.id,
@@ -232,6 +247,21 @@ export const llmRouter = router({
         attestationStatus: "pending",
         driftStatus: "none",
         callable: false,
+      });
+
+      // Blocking audit write — version creation is a critical lifecycle event
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "llm_version",
+        target_id: String(version.id),
+        decision_result: "success",
+        metadata: {
+          llmId: input.llmId,
+          environment: input.environment,
+          policyDecision: policyResult.decision,
+          catalogEligible: false,
+        },
       });
 
       return version;
@@ -276,6 +306,17 @@ export const llmRouter = router({
         actorId: ctx.user.id,
         actorType: "user",
       });
+
+      // Blocking audit write — catalog eligibility change
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_CHANGE",
+        target_type: "llm_version",
+        target_id: String(input.versionId),
+        decision_result: "success",
+        metadata: { catalogEligible: input.callable, reason: input.reason },
+      });
+
       return { success: true };
     }),
 
@@ -348,6 +389,20 @@ export const llmRouter = router({
         status: "pending",
       });
 
+      // Blocking audit write — promotion request is a critical lifecycle event
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "llm_promotion",
+        target_id: String(promotion.id),
+        decision_result: "success",
+        metadata: {
+          llmVersionId: input.llmVersionId,
+          fromEnvironment: input.fromEnvironment,
+          toEnvironment: input.toEnvironment,
+        },
+      });
+
       return promotion;
     }),
 
@@ -372,6 +427,17 @@ export const llmRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await approvePromotion(input.promotionId, ctx.user.id, input.comment);
+
+      // Blocking audit write — promotion approval
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "llm_promotion",
+        target_id: String(input.promotionId),
+        decision_result: "success",
+        metadata: { action: "approve", comment: input.comment },
+      });
+
       return { success: true };
     }),
 
@@ -384,13 +450,46 @@ export const llmRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await rejectPromotion(input.promotionId, ctx.user.id, input.reason);
+
+      // Blocking audit write — promotion rejection
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "llm_promotion",
+        target_id: String(input.promotionId),
+        decision_result: "denied",
+        metadata: { action: "reject", reason: input.reason },
+      });
+
       return { success: true };
     }),
 
   executePromotion: governedProcedure
     .input(z.object({ promotionId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
+      // Guard: fetch promotion to check current status before executing
+      const promotions = await getPromotions({ status: undefined });
+      const promotion = promotions.find(p => p.id === input.promotionId);
+      if (!promotion) throw new Error("Promotion not found");
+      if (promotion.status === "executed") {
+        throw new Error("Promotion already executed — duplicate execution blocked");
+      }
+      if (promotion.status !== "approved") {
+        throw new Error(`Promotion must be approved before execution (current: ${promotion.status})`);
+      }
+
       const newVersion = await executeLLMPromotion(input.promotionId, ctx.user.id);
+
+      // Blocking audit write — promotion execution
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "llm_promotion",
+        target_id: String(input.promotionId),
+        decision_result: "success",
+        metadata: { action: "execute", newVersionId: newVersion?.id },
+      });
+
       return { success: true, newVersion };
     }),
 

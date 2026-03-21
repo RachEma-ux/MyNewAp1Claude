@@ -1,3 +1,7 @@
+// Provider domain is infrastructure-backed (own `providers` table).
+// Providers are NOT catalog-first entities — they are the foundation layer
+// that Models, LLMs, and Bots depend on. Governed via lifecycle status.
+
 // Provider Hub - tRPC Router
 
 import { z } from "zod";
@@ -90,6 +94,13 @@ export const providerRouter = router({
       costPer1kTokens: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
+      // Provider policy evaluation
+      const namePattern = /^[a-z][a-z0-9-]*[a-z0-9]$/;
+      if (!namePattern.test(input.name.toLowerCase().replace(/\s+/g, '-'))) {
+        // Warn but don't block — providers need flexible naming
+        console.warn(`[ProviderPolicy] Name "${input.name}" doesn't follow kebab-case pattern`);
+      }
+
       // Create provider in database
       const provider = await providerDb.createProvider(input);
 
@@ -146,7 +157,7 @@ export const providerRouter = router({
         console.warn(`[ProviderRouter] Model auto-discovery failed for ${provider.name}: ${err.message}`);
       }
 
-      getAuditLogger().log({
+      await getAuditLogger().log({
         action_type: "PROVIDER_CONNECT",
         target_type: "provider",
         target_id: String(provider.id),
@@ -182,12 +193,57 @@ export const providerRouter = router({
         }
       }
 
-      getAuditLogger().log({
+      await getAuditLogger().log({
         action_type: "PROVIDER_UPDATE",
         target_type: "provider",
         target_id: String(id),
         decision_result: "success",
         metadata: { updatedFields: Object.keys(data) },
+      });
+
+      return { success: true };
+    }),
+
+  // Update provider lifecycle status
+  updateLifecycleStatus: governedProcedure
+    .input(z.object({
+      id: z.number(),
+      lifecycleStatus: z.enum(["configured", "authenticated", "validated", "healthy", "active", "suspended"]),
+    }))
+    .mutation(async ({ input }) => {
+      // Lifecycle transition validation
+      const VALID_TRANSITIONS: Record<string, string[]> = {
+        configured: ["authenticated"],
+        authenticated: ["validated"],
+        validated: ["healthy"],
+        healthy: ["active"],
+        active: ["suspended"],
+        suspended: ["active"], // re-activation
+      };
+
+      const currentProvider = await providerDb.getProviderById(input.id);
+      if (!currentProvider) {
+        throw new Error(`Provider ${input.id} not found`);
+      }
+
+      const currentStatus = (currentProvider as any).lifecycleStatus || "configured";
+      const allowedNextStates = VALID_TRANSITIONS[currentStatus] || [];
+
+      if (!allowedNextStates.includes(input.lifecycleStatus)) {
+        throw new Error(
+          `Invalid lifecycle transition: ${currentStatus} → ${input.lifecycleStatus}. ` +
+          `Allowed transitions from "${currentStatus}": [${allowedNextStates.join(", ")}]`
+        );
+      }
+
+      await providerDb.updateProviderLifecycleStatus(input.id, input.lifecycleStatus);
+
+      await getAuditLogger().log({
+        action_type: "PROVIDER_LIFECYCLE_UPDATE",
+        target_type: "provider",
+        target_id: String(input.id),
+        decision_result: "success",
+        metadata: { lifecycleStatus: input.lifecycleStatus },
       });
 
       return { success: true };
@@ -206,7 +262,7 @@ export const providerRouter = router({
       // Delete from database
       await providerDb.deleteProvider(input.id);
 
-      getAuditLogger().log({
+      await getAuditLogger().log({
         action_type: "PROVIDER_DELETE",
         target_type: "provider",
         target_id: String(input.id),

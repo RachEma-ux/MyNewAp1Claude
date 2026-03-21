@@ -39,6 +39,16 @@ function getRuntimeConfig(entryConfig: unknown, bundleSnapshot: unknown): Record
   return Object.keys(snapshotConfig).length > 0 ? snapshotConfig : baseConfig;
 }
 
+/**
+ * Canonical check: is this LLM version eligible for catalog onboarding?
+ *
+ * `callable` on llm_versions is an internal catalog eligibility flag,
+ * NOT a runtime authority grant. Runtime authority is resolved through
+ * the Catalog entry (see resolveCatalogLLMRuntimeAuthority).
+ *
+ * This is the single authoritative predicate for catalog eligibility.
+ * All code paths that need to check eligibility must use this function.
+ */
 export function isLLMVersionCatalogEligible(version: Pick<LLMVersion, "callable">): boolean {
   return version.callable === true;
 }

@@ -88,6 +88,15 @@ export async function deleteProvider(id: number): Promise<void> {
   await db.delete(providers).where(eq(providers.id, id));
 }
 
+export async function updateProviderLifecycleStatus(id: number, lifecycleStatus: string): Promise<void> {
+  const db = getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  await db.update(providers).set({ lifecycleStatus: lifecycleStatus as any, updatedAt: new Date() }).where(eq(providers.id, id));
+}
+
 // ============================================================================
 // Workspace Provider Assignments
 // ============================================================================

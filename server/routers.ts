@@ -39,10 +39,12 @@ import { catalogRegistryRouter } from "./routers/catalog-registry";
 import { catalogImportRouter } from "./catalog-import/router";
 import { providerConnectionsRouter } from "./provider-connections/router";
 import { discoveryOpsRouter } from "./routers/discovery-ops";
+import { modelsRouter } from "./routers/models";
 import { governanceRouter } from "./governance/router";
 import { hqRouter } from "./hq/router";
 import { modulesRouter } from "./modules/router";
 import { orchestratorRouter } from "./orchestrator/router";
+import { botsRouter } from "./routers/bots";
 import { seedWorkspaceModules } from "./modules/registry";
 
 export const appRouter = router({
@@ -84,6 +86,8 @@ export const appRouter = router({
   hq: hqRouter, // Digital HQ aggregation
   modules: modulesRouter, // Platform Engines (PMT, Knowledge, Agents, Collaboration, Reporting)
   orchestrator: orchestratorRouter, // Multi-Operator Autonomous Runtime
+  models: modelsRouter, // Model Registry (governed)
+  bots: botsRouter, // Bot Domain (governed lifecycle)
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -220,109 +224,6 @@ export const appRouter = router({
         }
         await db.deleteWorkspace(input.id);
         return { success: true };
-      }),
-  }),
-
-  // ============================================================================
-  // Model Management
-  // ============================================================================
-  
-  models: router({
-    list: protectedProcedure
-      .input(z.object({ type: z.enum(["llm", "embedding", "reranker"]).optional() }))
-      .query(async ({ input }) => {
-        if (input.type) {
-          return await db.getModelsByType(input.type);
-        }
-        return await db.getAllModels();
-      }),
-
-    get: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getModelById(input.id);
-      }),
-
-    create: governedProcedure
-      .input(
-        z.object({
-          name: z.string(),
-          displayName: z.string(),
-          modelType: z.enum(["llm", "embedding", "reranker"]),
-          huggingFaceId: z.string().optional(),
-          architecture: z.string().optional(),
-          parameterCount: z.string().optional(),
-          quantization: z.string().optional(),
-          contextLength: z.number().optional(),
-          fileSize: z.string().optional(),
-          filePath: z.string().optional(),
-        })
-      )
-      .mutation(async ({ input }) => {
-        return await db.createModel(input);
-      }),
-
-    update: governedProcedure
-      .input(
-        z.object({
-          id: z.number(),
-          status: z.enum(["downloading", "converting", "ready", "error"]).optional(),
-          downloadProgress: z.number().optional(),
-          filePath: z.string().optional(),
-          tokensPerSecond: z.number().optional(),
-          memoryUsageMb: z.number().optional(),
-        })
-      )
-      .mutation(async ({ input }) => {
-        const { id, ...updates } = input;
-        await db.updateModel(id, updates);
-        return { success: true };
-      }),
-
-    delete: governedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        await db.deleteModel(input.id);
-        return { success: true };
-      }),
-
-    // Start model download
-    startDownload: governedProcedure
-      .input(
-        z.object({
-          huggingFaceId: z.string(),
-          displayName: z.string(),
-          modelType: z.enum(["llm", "embedding", "reranker"]),
-          quantization: z.string().optional(),
-        })
-      )
-      .mutation(async ({ input }) => {
-        // Create model record with downloading status
-        const model = await db.createModel({
-          name: input.huggingFaceId,
-          displayName: input.displayName,
-          modelType: input.modelType,
-          huggingFaceId: input.huggingFaceId,
-          quantization: input.quantization,
-          status: "downloading",
-          downloadProgress: 0,
-        });
-
-        // TODO: Implement actual download logic with background job
-        // For now, simulate progress updates
-        setTimeout(async () => {
-          await db.updateModel(model.id, { downloadProgress: 50 });
-        }, 2000);
-
-        setTimeout(async () => {
-          await db.updateModel(model.id, { 
-            downloadProgress: 100,
-            status: "ready",
-            filePath: `/models/${input.huggingFaceId}`,
-          });
-        }, 5000);
-
-        return model;
       }),
   }),
 

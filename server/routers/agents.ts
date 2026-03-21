@@ -18,6 +18,7 @@ import {
 } from "@shared/agent-lifecycle";
 import { createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
 import { createAgentDefinition, SYSTEM_WORKSPACE_ID } from "../agents/create-definition";
+import { getAuditLogger } from "../services/auditLogger";
 
 
 function getAgentStatus(status: string | null | undefined): AgentStatus {
@@ -107,6 +108,15 @@ export const agentsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const createdAgent = await createAgentDefinition(input, ctx.user.id);
 
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "agent",
+        target_id: String(createdAgent.id),
+        decision_result: "success",
+        metadata: { action: "create", name: input.name },
+      });
+
       return {
         success: true,
         agent: createdAgent,
@@ -157,7 +167,16 @@ export const agentsRouter = router({
         .update(agents)
         .set(updateData)
         .where(eq(agents.id, input.id));
-      
+
+      await getAuditLogger().log({
+        actor_id: "system",
+        action_type: "LIFECYCLE_CHANGE",
+        target_type: "agent",
+        target_id: String(input.id),
+        decision_result: "success",
+        metadata: { action: "update", updatedFields: Object.keys(updateData) },
+      });
+
       return { success: true };
     }),
 
@@ -189,7 +208,16 @@ export const agentsRouter = router({
           updatedAt: new Date(),
         })
         .where(eq(agents.id, input.id));
-      
+
+      await getAuditLogger().log({
+        actor_id: "system",
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "agent",
+        target_id: String(input.id),
+        decision_result: "success",
+        metadata: { action: "archive" },
+      });
+
       return { success: true };
     }),
 
@@ -438,7 +466,16 @@ export const agentsRouter = router({
           updatedAt: new Date(),
         })
         .where(eq(agents.id, input.agentId));
-      
+
+      await getAuditLogger().log({
+        actor_id: "system",
+        action_type: "LIFECYCLE_CHANGE",
+        target_type: "agent",
+        target_id: String(input.agentId),
+        decision_result: "success",
+        metadata: { action: "autoRemediate" },
+      });
+
       return {
         success: true,
         agentId: agent[0].id,
@@ -474,13 +511,22 @@ export const agentsRouter = router({
         description: `Deployed from template ${input.templateId}`,
         roleClass: "assistant",
         systemPrompt: "You are a helpful assistant.",
-        modelId: "gpt-4",
+        modelId: input.customizations?.modelId ?? "default",
         hasDocumentAccess: false,
         hasToolAccess: false,
         allowedTools: [],
         status: "draft",
         lifecycle: { state: "draft", creationMode: "template" },
         createdBy: ctx.user.id,
+      });
+
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "agent",
+        target_id: input.name,
+        decision_result: "success",
+        metadata: { action: "deployTemplate", templateId: input.templateId },
       });
 
       return {
@@ -583,6 +629,15 @@ export const agentsRouter = router({
           status: "draft",
           tags: ["candidate", "agent", "catalog-import", status],
         },
+      });
+
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "agent",
+        target_id: String(agent.id),
+        decision_result: "success",
+        metadata: { action: "importToCatalog", catalogEntryId: entry.id },
       });
 
       return {
@@ -718,6 +773,15 @@ export const agentsRouter = router({
           updatedAt: new Date(),
         })
         .where(eq(agents.id, input.id));
+
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "agent",
+        target_id: String(input.id),
+        decision_result: "success",
+        metadata: { action: "promote", from: currentStatus, to: targetStatus },
+      });
 
       return {
         success: true,
