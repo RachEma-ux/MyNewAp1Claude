@@ -20,6 +20,7 @@ interface AgentListItem {
   roleClass: string;
   status: string;
   temperature?: string;
+  modelId?: string | null;
   hasDocumentAccess: boolean;
   hasToolAccess: boolean;
   allowedTools?: string[];
@@ -162,7 +163,7 @@ export function AgentList() {
                   </div>
 
                   <div className="text-sm text-gray-600">
-                    <p>Model: {agent.temperature ? `${agent.temperature} temp` : 'Configured'}</p>
+                    <p>Model: {agent.modelId || 'Configured'}</p>
                     <p>Document access: {agent.hasDocumentAccess ? 'Yes' : 'No'}</p>
                     <p>Tool access: {agent.hasToolAccess ? 'Yes' : 'No'}</p>
                   </div>
