@@ -18,8 +18,9 @@
 
 import { getWorkspaceById, hasWorkspaceAccess } from "../db/workspaces";
 import { getUserWorkspaceRole, getWorkspacePermissions, type WorkspacePermissions } from "../workspaces/permissions-service";
+import { resolveWorkspaceCapabilities } from "./capability-resolver";
 import { getWorkspaceModules } from "../modules/registry";
-import type { Workspace } from "../../drizzle/tables/users";
+import type { Workspace, WorkspaceStatus, WorkspacePurposeType } from "../../drizzle/tables/users";
 
 // ============================================================================
 // Canonical WorkspaceContext — the execution contract shape
@@ -28,18 +29,26 @@ import type { Workspace } from "../../drizzle/tables/users";
 export interface WorkspaceContext {
   /** Workspace primary key */
   workspaceId: number;
+  /** Workspace display name (convenience — avoids workspace.name lookups) */
+  workspaceName: string;
   /** Authenticated user ID */
   userId: number;
   /** User's resolved role in this workspace (null = no access) */
   role: string | null;
   /** Effective permissions for this user in this workspace */
   permissions: WorkspacePermissions;
+  /** Effective capabilities resolved from RBAC (WS-02) */
+  effectiveCapabilities: Set<string>;
   /** List of enabled module keys for this workspace */
   enabledModules: string[];
   /** Workspace routing profile (provider routing config) */
   routingProfile: unknown;
   /** Workspace type (personal, team, enterprise, sandbox, etc.) */
   workspaceType: string | null;
+  /** Workspace lifecycle status (WS-04) */
+  status: WorkspaceStatus;
+  /** Workspace purpose type (WS-05) */
+  purposeType: WorkspacePurposeType | null;
   /** The full workspace record for convenience */
   workspace: Workspace;
 }
@@ -72,10 +81,19 @@ export async function resolveWorkspaceContext(
   // 3. Resolve role
   const role = await getUserWorkspaceRole(workspaceId, userId);
 
-  // 4. Resolve permissions
+  // 4. Resolve capabilities (WS-02)
+  let effectiveCapabilities = new Set<string>();
+  try {
+    effectiveCapabilities = await resolveWorkspaceCapabilities(userId, workspaceId);
+  } catch {
+    // If RBAC tables aren't available, capabilities will be empty — permissions
+    // still resolve via legacy fallback in getWorkspacePermissions.
+  }
+
+  // 5. Resolve permissions
   const permissions = await getWorkspacePermissions(workspaceId, userId);
 
-  // 5. Load enabled modules
+  // 6. Load enabled modules
   let enabledModules: string[] = [];
   try {
     const modules = await getWorkspaceModules(workspaceId);
@@ -87,17 +105,25 @@ export async function resolveWorkspaceContext(
     enabledModules = [];
   }
 
-  // 6. Extract routing profile
+  // 7. Extract routing profile
   const routingProfile = (workspace as Record<string, unknown>)?.routingProfile ?? null;
+
+  // 8. Extract lifecycle fields (WS-04, WS-05)
+  const status = ((workspace as any).status as WorkspaceStatus) ?? "active";
+  const purposeType = ((workspace as any).purposeType as WorkspacePurposeType) ?? null;
 
   return {
     workspaceId,
+    workspaceName: workspace.name,
     userId,
     role,
     permissions,
+    effectiveCapabilities,
     enabledModules,
     routingProfile,
     workspaceType: workspace.type ?? null,
+    status,
+    purposeType,
     workspace,
   };
 }

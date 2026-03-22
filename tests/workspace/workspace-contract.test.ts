@@ -27,6 +27,7 @@ describe("WS-01: WorkspaceContext contract shape", () => {
     // Type-level check: verify the shape compiles correctly
     const mockCtx: WorkspaceContext = {
       workspaceId: 1,
+      workspaceName: "Test",
       userId: 1,
       role: "owner",
       permissions: {
@@ -36,15 +37,21 @@ describe("WS-01: WorkspaceContext contract shape", () => {
         canManageMembers: true,
         canManageSettings: true,
       },
+      effectiveCapabilities: new Set(["workspace.manage", "models.view"]),
       enabledModules: ["pmt", "knowledge", "agents"],
       routingProfile: { defaultRoute: "AUTO" },
       workspaceType: "team",
+      status: "active",
+      purposeType: "team",
       workspace: {
         id: 1,
         name: "Test",
         description: null,
         type: "team",
         ownerId: 1,
+        status: "active",
+        purposeType: "team",
+        purposeRef: null,
         embeddingModel: "bge-small-en-v1.5",
         chunkingStrategy: "semantic",
         chunkSize: 512,
@@ -58,16 +65,21 @@ describe("WS-01: WorkspaceContext contract shape", () => {
     };
 
     expect(mockCtx.workspaceId).toBe(1);
+    expect(mockCtx.workspaceName).toBe("Test");
     expect(mockCtx.userId).toBe(1);
     expect(mockCtx.role).toBe("owner");
     expect(mockCtx.permissions.canRead).toBe(true);
+    expect(mockCtx.effectiveCapabilities).toBeInstanceOf(Set);
     expect(mockCtx.enabledModules).toContain("pmt");
     expect(mockCtx.workspaceType).toBe("team");
+    expect(mockCtx.status).toBe("active");
+    expect(mockCtx.purposeType).toBe("team");
   });
 
   it("WorkspaceContext with null role represents no-access state", () => {
     const noAccess: WorkspaceContext = {
       workspaceId: 1,
+      workspaceName: "Denied",
       userId: 999,
       role: null,
       permissions: {
@@ -77,15 +89,19 @@ describe("WS-01: WorkspaceContext contract shape", () => {
         canManageMembers: false,
         canManageSettings: false,
       },
+      effectiveCapabilities: new Set(),
       enabledModules: [],
       routingProfile: null,
       workspaceType: null,
+      status: "active",
+      purposeType: null,
       workspace: {} as any,
     };
 
     expect(noAccess.role).toBeNull();
     expect(noAccess.permissions.canRead).toBe(false);
     expect(noAccess.enabledModules).toHaveLength(0);
+    expect(noAccess.effectiveCapabilities.size).toBe(0);
   });
 
   it("WorkspaceContext permissions cover all 5 boolean fields", () => {
@@ -141,6 +157,7 @@ describe("WS-01: WorkspaceContext helper functions", () => {
 
     const ctx: WorkspaceContext = {
       workspaceId: 1,
+      workspaceName: "Test",
       userId: 1,
       role: "member",
       permissions: {
@@ -150,9 +167,12 @@ describe("WS-01: WorkspaceContext helper functions", () => {
         canManageMembers: false,
         canManageSettings: false,
       },
+      effectiveCapabilities: new Set(["models.view", "chat.send"]),
       enabledModules: ["pmt"],
       routingProfile: null,
       workspaceType: "team",
+      status: "active",
+      purposeType: "team",
       workspace: {} as any,
     };
 
@@ -169,6 +189,7 @@ describe("WS-01: WorkspaceContext helper functions", () => {
 
     const ctx: WorkspaceContext = {
       workspaceId: 1,
+      workspaceName: "Test",
       userId: 1,
       role: "owner",
       permissions: {
@@ -178,9 +199,12 @@ describe("WS-01: WorkspaceContext helper functions", () => {
         canManageMembers: true,
         canManageSettings: true,
       },
+      effectiveCapabilities: new Set(["workspace.manage"]),
       enabledModules: ["pmt", "knowledge", "agents"],
       routingProfile: null,
       workspaceType: "team",
+      status: "active",
+      purposeType: "team",
       workspace: {} as any,
     };
 

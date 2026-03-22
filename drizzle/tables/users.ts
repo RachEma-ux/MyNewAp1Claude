@@ -32,12 +32,27 @@ export interface RoutingProfile {
   pinnedProviderId?: number;
 }
 
+// Workspace lifecycle statuses
+export const WORKSPACE_STATUSES = ["created", "configured", "active", "paused", "archived", "deleted"] as const;
+export type WorkspaceStatus = typeof WORKSPACE_STATUSES[number];
+
+// Workspace purpose types — what the workspace is organized around
+export const WORKSPACE_PURPOSE_TYPES = ["goal", "mission", "project", "team", "strategy", "other"] as const;
+export type WorkspacePurposeType = typeof WORKSPACE_PURPOSE_TYPES[number];
+
 export const workspaces = pgTable("workspaces", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   type: varchar("type", { length: 50 }).default("generic"),
   ownerId: integer("ownerId").notNull().references(() => users.id),
+
+  // Workspace lifecycle status (SR-04)
+  status: varchar("status", { length: 50 }).default("active").notNull(),
+
+  // Workspace purpose (SR-05) — what this workspace is organized around
+  purposeType: varchar("purposeType", { length: 50 }).default("other"),
+  purposeRef: text("purposeRef"), // Optional reference to the purpose (project ID, goal name, etc.)
 
   // Workspace settings
   embeddingModel: varchar("embeddingModel", { length: 255 }).default("bge-small-en-v1.5"),
