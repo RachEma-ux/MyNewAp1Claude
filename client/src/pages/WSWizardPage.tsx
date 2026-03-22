@@ -120,6 +120,7 @@ export default function WSWizardPage() {
     [isAdmin]
   );
   const [currentStage, setCurrentStage] = useState<WizardStage>("identity");
+  const [draftId, setDraftId] = useState<number | null>(null);
   const [data, setData] = useState<WizardData>({
     name: "",
     description: "",
@@ -151,13 +152,51 @@ export default function WSWizardPage() {
     setNewCrewName(match?.label || "");
   };
 
+  const buildCrewPayload = () =>
+    data.crewAgents.length > 0
+      ? data.crewAgents.map((c) => ({
+          participantType: c.participantType as "agent" | "bot",
+          participantId: Number(c.participantId) || 0,
+          participantName: c.participantName,
+          role: c.crewRole,
+          note: c.note || undefined,
+        }))
+      : undefined;
+
   const createMutation = trpc.workspaces.createDraft.useMutation({
     onSuccess: (ws: any) => {
-      toast.success("Workspace created successfully");
+      setDraftId(ws.id);
+      toast.success("Draft saved");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateMutation = trpc.workspaces.updateDraft.useMutation({
+    onSuccess: () => {
+      toast.success("Draft saved");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const createAndSubmitMutation = trpc.workspaces.createDraft.useMutation({
+    onSuccess: (ws: any) => {
+      setDraftId(ws.id);
+      toast.success("Workspace submitted for review");
       navigate(`/ws/list`);
     },
     onError: (err) => toast.error(err.message),
   });
+
+  const submitForReviewMutation = trpc.workspaces.submitForReview.useMutation({
+    onSuccess: () => {
+      toast.success("Workspace submitted for review");
+      navigate(`/ws/list`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const isSaving = createMutation.isPending || updateMutation.isPending
+    || createAndSubmitMutation.isPending || submitForReviewMutation.isPending;
 
   const currentIndex = visibleStages.indexOf(currentStage);
   const isFirst = currentIndex === 0;
@@ -175,29 +214,71 @@ export default function WSWizardPage() {
     }
   };
 
-  const saveDraft = (andSubmitForReview = false) => {
+  const saveDraft = () => {
     if (!data.name.trim()) {
       toast.error("Workspace name is required");
       return;
     }
-    const crewPayload = data.crewAgents.length > 0
-      ? data.crewAgents.map((c) => ({
-          participantType: c.participantType as "agent" | "bot",
-          participantId: Number(c.participantId) || 0,
-          participantName: c.participantName,
-          role: c.crewRole,
-          note: c.note || undefined,
-        }))
-      : undefined;
-    createMutation.mutate({
-      name: data.name,
-      description: data.description,
-      type: data.type,
-      purposeType: data.purposeType as any,
-      purposeRef: data.purposeRef,
-      crew: crewPayload,
-      submitForReview: andSubmitForReview || undefined,
-    });
+    if (draftId) {
+      // Update existing draft
+      updateMutation.mutate({
+        id: draftId,
+        name: data.name,
+        description: data.description,
+        type: data.type,
+        purposeType: data.purposeType as any,
+        purposeRef: data.purposeRef,
+        embeddingModel: data.embeddingModel,
+        chunkingStrategy: data.chunkingStrategy as any,
+        crew: buildCrewPayload(),
+      });
+    } else {
+      // Create new draft
+      createMutation.mutate({
+        name: data.name,
+        description: data.description,
+        type: data.type,
+        purposeType: data.purposeType as any,
+        purposeRef: data.purposeRef,
+        crew: buildCrewPayload(),
+      });
+    }
+  };
+
+  const saveAndSubmitForReview = () => {
+    if (!data.name.trim()) {
+      toast.error("Workspace name is required");
+      return;
+    }
+    if (draftId) {
+      // Update existing draft then submit for review
+      updateMutation.mutate({
+        id: draftId,
+        name: data.name,
+        description: data.description,
+        type: data.type,
+        purposeType: data.purposeType as any,
+        purposeRef: data.purposeRef,
+        embeddingModel: data.embeddingModel,
+        chunkingStrategy: data.chunkingStrategy as any,
+        crew: buildCrewPayload(),
+      }, {
+        onSuccess: () => {
+          submitForReviewMutation.mutate({ id: draftId! });
+        },
+      });
+    } else {
+      // Create draft and submit in one action
+      createAndSubmitMutation.mutate({
+        name: data.name,
+        description: data.description,
+        type: data.type,
+        purposeType: data.purposeType as any,
+        purposeRef: data.purposeRef,
+        crew: buildCrewPayload(),
+        submitForReview: true,
+      });
+    }
   };
 
   const getStagePhase = (stage: WizardStage): string => {
@@ -656,33 +737,24 @@ export default function WSWizardPage() {
         </CardContent>
       </Card>
 
-      {/* Navigation */}
+      {/* Navigation — always: Previous | Save as Draft | Next */}
       <div className="flex items-center justify-between">
         <Button variant="outline" onClick={goPrev} disabled={isFirst}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Previous
         </Button>
         <div className="flex gap-2">
-          {!isLast && (
-            <Button onClick={goNext}>
-              Next <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          )}
-          {isLast && !isAdmin && (
-            <Button onClick={() => saveDraft(false)} disabled={createMutation.isPending}>
-              <Save className="h-4 w-4 mr-1" /> Save as Draft
-            </Button>
-          )}
+          <Button variant="outline" onClick={saveDraft} disabled={isSaving}>
+            <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving..." : "Save as Draft"}
+          </Button>
           {isLast && isAdmin && (
-            <>
-              <Button variant="outline" onClick={() => saveDraft(false)} disabled={createMutation.isPending}>
-                <Save className="h-4 w-4 mr-1" /> Save as Draft
-              </Button>
-              <Button onClick={() => saveDraft(true)} disabled={createMutation.isPending}>
-                <Shield className="h-4 w-4 mr-1" /> Save & Submit for Review
-              </Button>
-            </>
+            <Button onClick={saveAndSubmitForReview} disabled={isSaving}>
+              <Shield className="h-4 w-4 mr-1" /> Save & Submit for Review
+            </Button>
           )}
         </div>
+        <Button onClick={goNext} disabled={isLast}>
+          Next <ArrowRight className="h-4 w-4 ml-1" />
+        </Button>
       </div>
     </PageShell>
   );

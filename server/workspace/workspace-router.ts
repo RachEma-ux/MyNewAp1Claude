@@ -277,12 +277,40 @@ export const workspaceRouter = router({
         chunkingStrategy: z.enum(["semantic", "fixed", "recursive"]).optional(),
         chunkSize: z.number().optional(),
         chunkOverlap: z.number().optional(),
+        crew: z.array(z.object({
+          participantType: z.enum(["agent", "bot"]).default("agent"),
+          participantId: z.number(),
+          participantName: z.string(),
+          role: z.string().default("executor"),
+          note: z.string().optional(),
+        })).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await requireWorkspaceAccess(ctx.user.id, input.id);
-      const { id, ...updates } = input;
+      const { id, crew, ...updates } = input;
       await db.updateWorkspace(id, { ...updates, updatedAt: new Date() } as any);
+      // Sync crew if provided: delete existing, re-insert
+      if (crew !== undefined) {
+        const dbConn = getDb();
+        if (dbConn) {
+          await dbConn.delete(workspaceCrew).where(eq(workspaceCrew.workspaceId, id));
+          if (crew.length > 0) {
+            await dbConn.insert(workspaceCrew).values(
+              crew.map((c) => ({
+                workspaceId: id,
+                agentId: c.participantId,
+                agentName: c.participantName,
+                participantType: c.participantType || "agent",
+                role: c.role || "executor",
+                note: c.note || null,
+                capabilities: [] as string[],
+                constraints: {} as Record<string, unknown>,
+              }))
+            );
+          }
+        }
+      }
       await logActivity({ workspaceId: id, actorId: ctx.user.id, action: "workspace.update", metadata: updates }).catch(() => {});
       return { success: true };
     }),
