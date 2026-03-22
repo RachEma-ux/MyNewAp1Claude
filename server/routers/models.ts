@@ -240,6 +240,8 @@ export const modelsRouter = router({
         displayName: model.displayName,
         description: null,
         entryType: "model",
+        sourceType: "model",
+        sourceId: model.id,
         scope: "app",
         status: "draft",
         origin: "admin",

@@ -12,8 +12,13 @@ export const catalogEntries = pgTable("catalog_entries", {
   displayName: varchar("displayName", { length: 255 }),
   description: text("description"),
 
-  // Type: provider or model
+  // Type: llm | model | bot | agent | provider
   entryType: varchar("entryType", { length: 50 }).notNull(),
+
+  // Source domain linkage — structured FK to source entity
+  // Replaces ad-hoc config.sourceModelId / config.sourceProviderId / etc.
+  sourceType: varchar("sourceType", { length: 50 }),
+  sourceId: integer("sourceId"),
 
   // Taxonomy classification
   category: varchar("category", { length: 100 }),
@@ -64,6 +69,7 @@ export const catalogEntries = pgTable("catalog_entries", {
   entryTypeIdx: index("idx_catalog_entry_type").on(table.entryType),
   statusIdx: index("idx_catalog_entry_status").on(table.status),
   scopeIdx: index("idx_catalog_entry_scope").on(table.scope),
+  sourceIdx: index("idx_catalog_entry_source").on(table.sourceType, table.sourceId),
 }));
 
 export type CatalogEntry = typeof catalogEntries.$inferSelect;

@@ -77,6 +77,8 @@ const ProviderWizardPage = lazy(() => import("@/pages/ProviderWizardPage"));
 const ModelsComingSoonPage = lazy(() => import("@/pages/ModelsComingSoonPage"));
 const LLMListPage = lazy(() => import("@/pages/LLMListPage"));
 const ModelListPage = lazy(() => import("@/pages/ModelListPage"));
+const BotListPage = lazy(() => import("@/pages/BotListPage"));
+const ProviderListPage = lazy(() => import("@/pages/ProviderListPage"));
 const AutoRemediationPage = lazy(() => import("@/pages/AutoRemediationPage"));
 const ToolsManagementPage = lazy(() => import("@/pages/ToolsManagementPage"));
 const WikiPage = lazy(() => import("@/pages/WikiPage"));
@@ -265,6 +267,10 @@ function Router() {
       <Route path="/list/llms" component={() => <ProtectedRoute component={LLMListPage} />} />
       {/* /list/models — real model inventory list page */}
       <Route path="/list/models" component={() => <ProtectedRoute component={ModelListPage} />} />
+      {/* /list/bots — real bot inventory list page */}
+      <Route path="/list/bots" component={() => <ProtectedRoute component={BotListPage} />} />
+      {/* /list/providers — real provider inventory list page */}
+      <Route path="/list/providers" component={() => <ProtectedRoute component={ProviderListPage} />} />
       {/* Coming Soon list pages */}
       <Route path="/list/:type" component={() => <ProtectedRoute component={ComingSoonListPage} />} />
       {/* Bots — governed bot lifecycle */}

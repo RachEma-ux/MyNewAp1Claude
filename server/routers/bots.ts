@@ -1,25 +1,27 @@
 /**
- * Bot Domain Router
+ * Bot Domain Router — governed domain-first pattern
  *
- * tRPC endpoints for managing bots — governed domain entities
- * that bind agents + LLMs to channels with lifecycle governance.
+ * Bots live in the `bots` DB table. The Catalog is a separate concern:
+ * `importToCatalog` creates a catalog candidate from a deployable bot.
  *
- * Uses catalog_entries with entryType="bot" as the storage layer.
+ * Bot lifecycle: draft → configured → validated → deployable → archived
+ * "Deployable" = configured + validated + no blockers.
+ * Catalog import requires deployable status.
  *
- * Bot lifecycle: draft → bound → reviewed → approved → active → suspended
- * Bots are catalog-first (entryType="bot" in catalog_entries).
- * activate requires reviewState="approved" (governance gate).
- * Runtime authority requires catalog publication + activation.
+ * This router does NOT directly create catalog_entries as its canonical
+ * creation path. That is the responsibility of Catalog intake.
  */
 
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
-import { getCatalogEntries, getCatalogEntryById, createCatalogEntry, updateCatalogEntry } from "../db";
+import { createBot, getAllBots, getBotById, updateBot, isDeployable, getBlockingReasons } from "../db/bots";
+import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
 import { getAuditLogger } from "../services/auditLogger";
 
-const botStatusSchema = z.enum(["draft", "bound", "reviewed", "approved", "active", "suspended"]);
+const botStatusSchema = z.enum(["draft", "configured", "validated", "deployable", "archived"]);
 
 export const botsRouter = router({
+  /** List all bots from the bots domain table */
   list: protectedProcedure
     .input(
       z.object({
@@ -27,18 +29,23 @@ export const botsRouter = router({
       }).optional()
     )
     .query(async ({ input }) => {
-      const entries = await getCatalogEntries({ entryType: "bot", ...input });
-      return entries;
+      let bots = await getAllBots();
+      if (input?.status) {
+        bots = bots.filter((b) => b.status === input.status);
+      }
+      return bots;
     }),
 
+  /** Get bot details by ID from the bots domain table */
   getById: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input }) => {
-      const entry = await getCatalogEntryById(input.id);
-      if (!entry || entry.entryType !== "bot") throw new Error("Bot not found");
-      return entry;
+      const bot = await getBotById(input.id);
+      if (!bot) throw new Error("Bot not found");
+      return bot;
     }),
 
+  /** Create a new bot (domain entity only — NOT a catalog entry) */
   create: governedProcedure
     .input(
       z.object({
@@ -60,7 +67,7 @@ export const botsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Bot creation policy evaluation
+      // Bot creation policy: name validation
       const namePattern = /^[a-z][a-z0-9-]*[a-z0-9]$/;
       if (input.name.length >= 3 && !namePattern.test(input.name.toLowerCase())) {
         throw new Error(`Bot name "${input.name}" must be lowercase alphanumeric with hyphens`);
@@ -88,28 +95,18 @@ export const botsRouter = router({
         }
       }
 
-      const entry = await createCatalogEntry({
+      // Create domain entity — NOT a catalog entry
+      const bot = await createBot({
         name: input.name,
         displayName: input.displayName ?? input.name,
         description: input.description ?? null,
-        entryType: "bot",
+        agentId: input.agentId ?? null,
+        llmId: input.llmId ?? null,
+        channels: input.channels ?? [],
+        behaviorConfig: input.behaviorConfig ?? {},
+        rateLimit: input.rateLimit ?? null,
         scope: input.scope ?? "app",
         status: "draft",
-        origin: "admin",
-        reviewState: "needs_review",
-        providerId: null,
-        config: {
-          agentId: input.agentId ?? null,
-          llmId: input.llmId ?? null,
-          channels: input.channels ?? [],
-          behaviorConfig: input.behaviorConfig ?? {},
-          rateLimit: input.rateLimit ?? null,
-          lifecycleStatus: "draft",
-        },
-        tags: ["candidate", "bot"],
-        category: "bot",
-        subCategory: null,
-        capabilities: input.channels ?? null,
         createdBy: ctx.user.id,
       });
 
@@ -117,14 +114,15 @@ export const botsRouter = router({
         actor_id: String(ctx.user.id),
         action_type: "LIFECYCLE_TRANSITION",
         target_type: "bot",
-        target_id: String(entry.id),
+        target_id: String(bot.id),
         decision_result: "success",
         metadata: { name: input.name, action: "create" },
       });
 
-      return entry;
+      return bot;
     }),
 
+  /** Update bot lifecycle status */
   updateStatus: governedProcedure
     .input(
       z.object({
@@ -133,24 +131,10 @@ export const botsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const entry = await getCatalogEntryById(input.id);
-      if (!entry || entry.entryType !== "bot") throw new Error("Bot not found");
+      const bot = await getBotById(input.id);
+      if (!bot) throw new Error("Bot not found");
 
-      const config = (entry.config as Record<string, any>) || {};
-      const updatedConfig = { ...config, lifecycleStatus: input.status };
-
-      const catalogStatus =
-        input.status === "active"
-          ? "active"
-          : input.status === "suspended"
-            ? "disabled"
-            : "draft";
-
-      const updated = await updateCatalogEntry(
-        input.id,
-        { config: updatedConfig, status: catalogStatus },
-        ctx.user.id
-      );
+      const updated = await updateBot(input.id, { status: input.status });
 
       await getAuditLogger().log({
         actor_id: String(ctx.user.id),
@@ -158,88 +142,156 @@ export const botsRouter = router({
         target_type: "bot",
         target_id: String(input.id),
         decision_result: "success",
-        metadata: { action: "updateStatus", newStatus: input.status },
+        metadata: { action: "updateStatus", from: bot.status, to: input.status },
       });
 
       return updated;
     }),
 
-  activate: governedProcedure
-    .input(z.object({ id: z.number().int().positive() }))
-    .mutation(async ({ input, ctx }) => {
-      const entry = await getCatalogEntryById(input.id);
-      if (!entry || entry.entryType !== "bot") throw new Error("Bot not found");
-      if (entry.reviewState !== "approved")
-        throw new Error("Bot must be approved before activation");
-
-      const config = (entry.config as Record<string, any>) || {};
-      const result = await updateCatalogEntry(
-        input.id,
-        { status: "active", config: { ...config, lifecycleStatus: "active" } },
-        ctx.user.id
-      );
-
-      await getAuditLogger().log({
-        actor_id: String(ctx.user.id),
-        action_type: "LIFECYCLE_TRANSITION",
-        target_type: "bot",
-        target_id: String(input.id),
-        decision_result: "success",
-        metadata: { action: "activate" },
-      });
-
-      return result;
-    }),
-
-  suspend: governedProcedure
-    .input(z.object({ id: z.number().int().positive() }))
-    .mutation(async ({ input, ctx }) => {
-      const entry = await getCatalogEntryById(input.id);
-      if (!entry || entry.entryType !== "bot") throw new Error("Bot not found");
-
-      const config = (entry.config as Record<string, any>) || {};
-      const result = await updateCatalogEntry(
-        input.id,
-        { status: "disabled", config: { ...config, lifecycleStatus: "suspended" } },
-        ctx.user.id
-      );
-
-      await getAuditLogger().log({
-        actor_id: String(ctx.user.id),
-        action_type: "LIFECYCLE_TRANSITION",
-        target_type: "bot",
-        target_id: String(input.id),
-        decision_result: "success",
-        metadata: { action: "suspend" },
-      });
-
-      return result;
-    }),
-
+  /** Get bot stats for dashboard */
   getStats: protectedProcedure.query(async () => {
-    const bots = await getCatalogEntries({ entryType: "bot" });
-    const byLifecycle: Record<string, number> = {
-      draft: 0,
-      bound: 0,
-      reviewed: 0,
-      approved: 0,
-      active: 0,
-      suspended: 0,
-    };
-    for (const b of bots) {
-      const config = (b.config as Record<string, any>) || {};
-      const ls = config.lifecycleStatus || "draft";
-      if (ls in byLifecycle) byLifecycle[ls]++;
-      else byLifecycle.draft++;
-    }
+    const bots = await getAllBots();
     return {
       total: bots.length,
       byStatus: {
         draft: bots.filter((b) => b.status === "draft").length,
-        active: bots.filter((b) => b.status === "active").length,
-        disabled: bots.filter((b) => b.status === "disabled").length,
+        configured: bots.filter((b) => b.status === "configured").length,
+        validated: bots.filter((b) => b.status === "validated").length,
+        deployable: bots.filter((b) => b.status === "deployable").length,
+        archived: bots.filter((b) => b.status === "archived").length,
       },
-      byLifecycle,
     };
   }),
+
+  /** List bots enriched with catalog state and deployability */
+  listEnriched: protectedProcedure.query(async () => {
+    const bots = await getAllBots();
+    const catalogEntries = await getCatalogEntries({ entryType: "bot" });
+
+    // Index catalog entries by sourceBotId or name
+    const catalogByBotId = new Map<number, any>();
+    const catalogByName = new Map<string, any>();
+    for (const entry of catalogEntries) {
+      const config = (entry.config as Record<string, any>) || {};
+      if (config.sourceBotId) {
+        catalogByBotId.set(config.sourceBotId, entry);
+      }
+      catalogByName.set(entry.name.toLowerCase(), entry);
+    }
+
+    return bots.map((bot) => {
+      const catalogEntry = catalogByBotId.get(bot.id) ?? catalogByName.get(bot.name.toLowerCase()) ?? null;
+
+      let catalogState: "not_imported" | "candidate" | "imported" | "published" = "not_imported";
+      if (catalogEntry) {
+        const tags: string[] = catalogEntry.tags || [];
+        if (tags.includes("published")) {
+          catalogState = "published";
+        } else if (catalogEntry.status === "active" || catalogEntry.reviewState === "approved") {
+          catalogState = "imported";
+        } else {
+          catalogState = "candidate";
+        }
+      }
+
+      return {
+        ...bot,
+        catalogState,
+        catalogEntryId: catalogEntry?.id ?? null,
+        isDeployable: isDeployable(bot),
+        blockingReasons: getBlockingReasons(bot),
+      };
+    });
+  }),
+
+  /**
+   * Import a deployable bot into the Catalog as a candidate.
+   * Mirrors models.importToCatalog and agents.importToCatalog.
+   */
+  importToCatalog: governedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const bot = await getBotById(input.id);
+      if (!bot) throw new Error("Bot not found");
+
+      if (!isDeployable(bot)) {
+        const reasons = getBlockingReasons(bot);
+        throw new Error(
+          `Bot is not deployable and cannot be imported into the Catalog. ${reasons.join("; ")}`
+        );
+      }
+
+      // Duplicate prevention
+      const existingEntries = await getCatalogEntries({ entryType: "bot" });
+      const duplicate = existingEntries.find((entry) => {
+        const config = (entry.config as Record<string, any>) || {};
+        return config.sourceBotId === input.id;
+      });
+      if (duplicate) {
+        return { success: true, entry: duplicate, imported: false };
+      }
+
+      const config: Record<string, unknown> = {
+        sourceBotId: bot.id,
+        agentId: bot.agentId,
+        llmId: bot.llmId,
+        channels: bot.channels,
+        behaviorConfig: bot.behaviorConfig,
+        rateLimit: bot.rateLimit,
+        runtimeAuthority: "catalog_entry",
+        catalogEligible: true,
+      };
+
+      const entry = await createCatalogEntry({
+        name: bot.name,
+        displayName: bot.displayName ?? bot.name,
+        description: bot.description ?? null,
+        entryType: "bot",
+        sourceType: "bot",
+        sourceId: bot.id,
+        scope: bot.scope,
+        status: "draft",
+        origin: "admin",
+        reviewState: "needs_review",
+        config,
+        tags: ["candidate", "bot", "catalog-import"],
+        category: "bot",
+        subCategory: null,
+        capabilities: bot.channels ?? null,
+        createdBy: ctx.user.id,
+      });
+
+      // Auto-classify
+      try {
+        const axisNodes = await getTaxonomyNodes({ entryType: "bot", level: "axis" });
+        if (axisNodes.length > 0) {
+          await setEntryClassifications(entry.id, [axisNodes[0].id]);
+        }
+      } catch (e: any) {
+        console.warn(`[Bots] Auto-classify failed for imported catalog entry ${entry.id}:`, e.message);
+      }
+
+      await createCatalogAuditEvent({
+        eventType: "catalog.bot.submitted",
+        catalogEntryId: entry.id,
+        actor: ctx.user.id,
+        actorType: "user",
+        payload: {
+          sourceBotId: bot.id,
+          reviewState: "needs_review",
+          status: "draft",
+        },
+      });
+
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "bot",
+        target_id: String(bot.id),
+        decision_result: "success",
+        metadata: { action: "importToCatalog", catalogEntryId: entry.id },
+      });
+
+      return { success: true, entry, imported: true };
+    }),
 });

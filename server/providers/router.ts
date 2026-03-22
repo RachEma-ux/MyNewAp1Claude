@@ -17,6 +17,30 @@ import { routingAuditLogs } from "../../drizzle/schema";
 import { desc, eq, and, gte } from "drizzle-orm";
 import { decrypt, isEncrypted } from "../_core/encryption";
 import { getAuditLogger } from "../services/auditLogger";
+import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
+import type { Provider } from "../../drizzle/schema";
+
+// ── Deployability checks ──────────────────────────────────────────────
+
+/** A provider is deployable if it's enabled and lifecycle status is healthy or active */
+function isDeployable(provider: Provider): boolean {
+  return getBlockingReasons(provider).length === 0 &&
+    ["healthy", "active"].includes(provider.lifecycleStatus ?? "configured");
+}
+
+/** Returns blocking reasons preventing a provider from being catalog-importable */
+function getBlockingReasons(provider: Provider): string[] {
+  const reasons: string[] = [];
+  if (!provider.name) reasons.push("Provider name is required");
+  if (!provider.type) reasons.push("Provider type is required");
+  if (!provider.enabled) reasons.push("Provider is disabled");
+  const status = provider.lifecycleStatus ?? "configured";
+  if (status === "configured") reasons.push("Provider is still in initial configured state — authenticate and validate it first");
+  if (status === "authenticated") reasons.push("Provider is authenticated but not yet validated");
+  if (status === "validated") reasons.push("Provider is validated but not yet healthy");
+  if (status === "suspended") reasons.push("Provider is suspended");
+  return reasons;
+}
 
 // Strip sensitive keys (apiKey, apiSecret, etc.) from provider config before returning to clients
 function redactProviderConfig(provider: any) {
@@ -744,4 +768,144 @@ export const providerRouter = router({
         };
       }),
   }),
+
+  // ============================================================================
+  // Governed Domain-First: List Enriched + Import to Catalog
+  // ============================================================================
+
+  /** List providers enriched with catalog state and deployability */
+  listEnriched: protectedProcedure.query(async () => {
+    const providers = await providerDb.getAllProviders();
+    const catalogEntries = await getCatalogEntries({ entryType: "provider" });
+
+    // Index catalog entries by sourceProviderId or name
+    const catalogByProviderId = new Map<number, any>();
+    const catalogByName = new Map<string, any>();
+    for (const entry of catalogEntries) {
+      const config = (entry.config as Record<string, any>) || {};
+      if (config.sourceProviderId) {
+        catalogByProviderId.set(config.sourceProviderId, entry);
+      }
+      catalogByName.set(entry.name.toLowerCase(), entry);
+    }
+
+    return providers.map((provider) => {
+      const catalogEntry = catalogByProviderId.get(provider.id) ?? catalogByName.get(provider.name.toLowerCase()) ?? null;
+
+      let catalogState: "not_imported" | "candidate" | "imported" | "published" = "not_imported";
+      if (catalogEntry) {
+        const tags: string[] = catalogEntry.tags || [];
+        if (tags.includes("published")) {
+          catalogState = "published";
+        } else if (catalogEntry.status === "active" || catalogEntry.reviewState === "approved") {
+          catalogState = "imported";
+        } else {
+          catalogState = "candidate";
+        }
+      }
+
+      // Redact config before returning
+      const redacted = redactProviderConfig(provider);
+
+      return {
+        ...redacted,
+        catalogState,
+        catalogEntryId: catalogEntry?.id ?? null,
+        isDeployable: isDeployable(provider),
+        blockingReasons: getBlockingReasons(provider),
+      };
+    });
+  }),
+
+  /**
+   * Import a deployable provider into the Catalog as a candidate.
+   * Mirrors models.importToCatalog, bots.importToCatalog, agents.importToCatalog.
+   */
+  importToCatalog: governedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const provider = await providerDb.getProviderById(input.id);
+      if (!provider) throw new Error("Provider not found");
+
+      if (!isDeployable(provider)) {
+        const reasons = getBlockingReasons(provider);
+        throw new Error(
+          `Provider is not deployable and cannot be imported into the Catalog. ${reasons.join("; ")}`
+        );
+      }
+
+      // Duplicate prevention
+      const existingEntries = await getCatalogEntries({ entryType: "provider" });
+      const duplicate = existingEntries.find((entry) => {
+        const config = (entry.config as Record<string, any>) || {};
+        return config.sourceProviderId === input.id;
+      });
+      if (duplicate) {
+        return { success: true, entry: duplicate, imported: false };
+      }
+
+      const config: Record<string, unknown> = {
+        sourceProviderId: provider.id,
+        providerType: provider.type,
+        kind: provider.kind,
+        capabilities: provider.capabilities,
+        policyTags: provider.policyTags,
+        limits: provider.limits,
+        runtimeAuthority: "catalog_entry",
+        catalogEligible: true,
+      };
+
+      const entry = await createCatalogEntry({
+        name: provider.name,
+        displayName: provider.name,
+        description: null,
+        entryType: "provider",
+        sourceType: "provider",
+        sourceId: provider.id,
+        scope: "app",
+        status: "draft",
+        origin: "admin",
+        reviewState: "needs_review",
+        config,
+        tags: ["candidate", "provider", "catalog-import"],
+        category: provider.type,
+        subCategory: null,
+        capabilities: provider.capabilities ?? null,
+        createdBy: ctx.user.id,
+      });
+
+      // Auto-classify
+      try {
+        const axisNodes = await getTaxonomyNodes({ entryType: "provider", level: "axis" });
+        if (axisNodes.length > 0) {
+          await setEntryClassifications(entry.id, [axisNodes[0].id]);
+        }
+      } catch (e: any) {
+        console.warn(`[Providers] Auto-classify failed for imported catalog entry ${entry.id}:`, e.message);
+      }
+
+      await createCatalogAuditEvent({
+        eventType: "catalog.provider.submitted",
+        catalogEntryId: entry.id,
+        actor: ctx.user.id,
+        actorType: "user",
+        payload: {
+          sourceProviderId: provider.id,
+          providerType: provider.type,
+          reviewState: "needs_review",
+          status: "draft",
+        },
+      });
+
+      await getAuditLogger().log({
+        actor_id: String(ctx.user.id),
+        action_type: "LIFECYCLE_TRANSITION",
+        target_type: "provider",
+        target_id: String(provider.id),
+        decision_result: "success",
+        metadata: { action: "importToCatalog", catalogEntryId: entry.id },
+      });
+
+      return { success: true, entry, imported: true };
+    }),
 });

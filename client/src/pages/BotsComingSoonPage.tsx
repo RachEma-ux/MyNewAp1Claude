@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CatalogAgentSelect, CatalogLLMSelect } from "@/components/catalog-selectors";
+import { useCatalogAvailableAgents, useCatalogAvailableLLMs } from "@/hooks/useCatalogAvailable";
 import {
   Bot,
   Plus,
@@ -412,8 +414,9 @@ function BotWizard() {
     rateLimit: 60,
   });
 
-  const { data: agents } = trpc.agents.list.useQuery();
-  const { data: llms } = trpc.catalogManage.list.useQuery({ entryType: "llm" });
+  // Catalog-backed selectors: only approved+active assets from Catalog
+  const { options: agentOptions, isLoading: agentsLoading } = useCatalogAvailableAgents();
+  const { options: llmOptions, isLoading: llmsLoading } = useCatalogAvailableLLMs();
   const utils = trpc.useUtils();
 
   const createBot = trpc.bots.create.useMutation({
@@ -530,28 +533,19 @@ function BotWizard() {
             </>
           )}
 
-          {/* Step 2: Agent Binding */}
+          {/* Step 2: Agent Binding (Catalog-backed) */}
           {step === 1 && (
             <>
               <p className="text-sm text-muted-foreground">
-                Select an agent to power this bot. The agent provides reasoning and tool capabilities.
+                Select an agent to power this bot. Only Catalog-available agents are shown.
               </p>
-              <Select
+              <CatalogAgentSelect
                 value={form.agentId ? String(form.agentId) : "none"}
                 onValueChange={(v) => setForm({ ...form, agentId: v === "none" ? null : Number(v) })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select agent..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No agent (configure later)</SelectItem>
-                  {(agents || []).map((a: any) => (
-                    <SelectItem key={a.id} value={String(a.id)}>
-                      {a.name} — {a.roleClass || "general"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                allowNone
+                noneLabel="No agent (configure later)"
+                searchable={agentOptions.length > 5}
+              />
               {form.agentId && (
                 <Badge variant="secondary">
                   <Cpu className="w-3 h-3 mr-1" /> Agent #{form.agentId} bound
@@ -560,28 +554,19 @@ function BotWizard() {
             </>
           )}
 
-          {/* Step 3: LLM Binding */}
+          {/* Step 3: LLM Binding (Catalog-backed) */}
           {step === 2 && (
             <>
               <p className="text-sm text-muted-foreground">
-                Optionally override the agent's default LLM with a specific model from the catalog.
+                Optionally override the agent's default LLM. Only Catalog-available LLMs are shown.
               </p>
-              <Select
+              <CatalogLLMSelect
                 value={form.llmId ? String(form.llmId) : "none"}
                 onValueChange={(v) => setForm({ ...form, llmId: v === "none" ? null : Number(v) })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select LLM..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Use agent default</SelectItem>
-                  {(llms || []).map((m: any) => (
-                    <SelectItem key={m.id} value={String(m.id)}>
-                      {m.displayName || m.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                allowNone
+                noneLabel="Use agent default"
+                searchable={llmOptions.length > 5}
+              />
               {form.llmId && (
                 <Badge variant="secondary">
                   <Zap className="w-3 h-3 mr-1" /> LLM #{form.llmId} selected

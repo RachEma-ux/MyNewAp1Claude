@@ -1,4 +1,4 @@
-import { integer, serial, varchar, pgTable, text, timestamp, boolean, json, decimal, index, pgEnum } from "drizzle-orm/pg-core";
+import { integer, serial, varchar, pgTable, text, timestamp, boolean, json, decimal, index, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
 import { workspaces } from "./users";
 
 // ============================================================================
@@ -48,6 +48,38 @@ export const providers = pgTable("providers", {
 
 export type Provider = typeof providers.$inferSelect;
 export type InsertProvider = typeof providers.$inferInsert;
+
+// ============================================================================
+// Provider Versions — Audit trail and rollback (mirrors llmVersions, agentVersions)
+// ============================================================================
+
+export const providerVersions = pgTable("provider_versions", {
+  id: serial("id").primaryKey(),
+  providerId: integer("providerId").notNull().references(() => providers.id),
+
+  // Version metadata
+  version: integer("version").notNull(),
+  createdBy: integer("createdBy").notNull(),
+  changeNotes: text("changeNotes"),
+
+  // Full snapshot
+  providerSnapshot: json("providerSnapshot").notNull(),
+
+  // Policy state at this version
+  policyHash: varchar("policyHash", { length: 64 }),
+  policyDecision: varchar("policyDecision", { length: 50 }).default("pending"),
+
+  // Lifecycle status at version time
+  lifecycleStatus: varchar("lifecycleStatusAtVersion", { length: 30 }),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  providerIdIdx: index("idx_provider_version_provider_id").on(table.providerId),
+  uniqueProviderVersion: uniqueIndex("unique_provider_version").on(table.providerId, table.version),
+}));
+
+export type ProviderVersion = typeof providerVersions.$inferSelect;
+export type InsertProviderVersion = typeof providerVersions.$inferInsert;
 
 export const workspaceProviders = pgTable("workspace_providers", {
   id: serial("id").primaryKey(),

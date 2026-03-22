@@ -32,20 +32,29 @@ import {
 } from "../db";
 import { createHash } from "crypto";
 
-/** Helper to emit audit events without blocking the response */
-function audit(eventType: string, catalogEntryId: number | null, payload: any, bundleId?: number, actor: number = 0) {
-  // Legacy DB audit
-  createCatalogAuditEvent({
-    eventType,
-    catalogEntryId,
-    publishBundleId: bundleId ?? null,
-    actor,
-    actorType: actor === 0 ? "system" : "user",
-    payload,
-  }).catch((e) => console.warn(`[CatalogAudit] Failed to log ${eventType}:`, e.message));
+/**
+ * Blocking audit — MUST be awaited at all call sites.
+ * Critical governance mutations require audit persistence before returning.
+ * Failure to persist audit is logged but does NOT block the operation
+ * (audit DB unavailability should not break catalog operations).
+ */
+async function audit(eventType: string, catalogEntryId: number | null, payload: any, bundleId?: number, actor: number = 0) {
+  // Legacy DB audit — blocking with graceful fallback
+  try {
+    await createCatalogAuditEvent({
+      eventType,
+      catalogEntryId,
+      publishBundleId: bundleId ?? null,
+      actor,
+      actorType: actor === 0 ? "system" : "user",
+      payload,
+    });
+  } catch (e: any) {
+    console.error(`[CatalogAudit] BLOCKING AUDIT FAILED for ${eventType}:`, e.message);
+  }
 
-  // Unified audit logger
-  getAuditLogger().log({
+  // Unified audit logger — blocking
+  await getAuditLogger().log({
     actor_id: actor ? String(actor) : null,
     principal_type: actor === 0 ? "system" : "human",
     action_type: eventType.startsWith("catalog.bundle") ? "PUBLICATION_GATE" : "LIFECYCLE_TRANSITION",
@@ -256,7 +265,7 @@ export const catalogManageRouter = router({
         createdBy: ctx.user.id,
       });
 
-      audit("catalog.entry.submitted_from_discovery", entry.id, {
+      await audit("catalog.entry.submitted_from_discovery", entry.id, {
         name: entry.name,
         artifactId: input.discoveryArtifactId,
         stage: "submit",
@@ -268,7 +277,7 @@ export const catalogManageRouter = router({
         const axisNodes = await getTaxonomyNodes({ entryType: "provider", level: "axis" });
         if (axisNodes.length > 0) {
           await setEntryClassifications(entry.id, [axisNodes[0].id]);
-          audit("catalog.entry.auto-classified", entry.id, { nodeIds: [axisNodes[0].id], label: axisNodes[0].label });
+          await audit("catalog.entry.auto-classified", entry.id, { nodeIds: [axisNodes[0].id], label: axisNodes[0].label });
         }
       } catch (e: any) {
         console.warn(`[CatalogManage] Auto-classify failed for discovery entry ${entry.id}:`, e.message);
@@ -329,14 +338,14 @@ export const catalogManageRouter = router({
         capabilities: input.capabilities ?? null,
         createdBy: ctx.user.id,
       });
-      audit("catalog.entry.created", entry.id, { name: entry.name, entryType: entry.entryType, origin, reviewState });
+      await audit("catalog.entry.created", entry.id, { name: entry.name, entryType: entry.entryType, origin, reviewState });
 
       // Auto-classify: assign the first axis node for this entry type
       try {
         const axisNodes = await getTaxonomyNodes({ entryType: input.entryType, level: "axis" });
         if (axisNodes.length > 0) {
           await setEntryClassifications(entry.id, [axisNodes[0].id]);
-          audit("catalog.entry.auto-classified", entry.id, { nodeIds: [axisNodes[0].id], label: axisNodes[0].label });
+          await audit("catalog.entry.auto-classified", entry.id, { nodeIds: [axisNodes[0].id], label: axisNodes[0].label });
         }
       } catch (e: any) {
         console.warn(`[CatalogManage] Auto-classify failed for entry ${entry.id}:`, e.message);
@@ -354,7 +363,7 @@ export const catalogManageRouter = router({
       const { id, ...data } = input;
 
       const entry = await updateCatalogEntry(id, data, ctx.user.id);
-      audit("catalog.entry.updated", id, { changes: Object.keys(data) });
+      await audit("catalog.entry.updated", id, { changes: Object.keys(data) });
       return entry;
     }),
 
@@ -366,7 +375,7 @@ export const catalogManageRouter = router({
     .mutation(async ({ input }) => {
       const entry = await getCatalogEntryById(input.id);
       await deleteCatalogEntry(input.id);
-      audit("catalog.entry.deleted", input.id, { name: entry?.name || "unknown" });
+      await audit("catalog.entry.deleted", input.id, { name: entry?.name || "unknown" });
       return { success: true };
     }),
 
@@ -574,7 +583,7 @@ export const catalogManageRouter = router({
           }).where(eq(catalogEntries.id, input.id));
         }
 
-        audit("catalog.entry.validated", input.id, { passed: allPassed, validationStatus, errors });
+        await audit("catalog.entry.validated", input.id, { passed: allPassed, validationStatus, errors });
         return { success: allPassed, results, errors };
       } catch (e: any) {
         errors.push(`Unexpected error: ${e.message}`);
@@ -672,7 +681,7 @@ export const catalogManageRouter = router({
 
       await updateCatalogEntry(input.id, updates as any, 1);
 
-      audit("catalog.entry.approved", input.id, {
+      await audit("catalog.entry.approved", input.id, {
         name: entry.name,
         stage,
         activateNow: input.activateNow ?? false,
@@ -695,7 +704,7 @@ export const catalogManageRouter = router({
 
       await updateCatalogEntry(input.id, { reviewState: "rejected" }, 1);
 
-      audit("catalog.entry.rejected", input.id, { name: entry.name });
+      await audit("catalog.entry.rejected", input.id, { name: entry.name });
 
       const updated = await getCatalogEntryById(input.id);
       return updated!;
@@ -744,7 +753,7 @@ export const catalogManageRouter = router({
 
       await updateCatalogEntry(input.id, { status: "active" }, 1);
 
-      audit("catalog.entry.activated", input.id, { name: entry.name });
+      await audit("catalog.entry.activated", input.id, { name: entry.name });
 
       const updated = await getCatalogEntryById(input.id);
       return updated!;
@@ -873,7 +882,7 @@ export const catalogManageRouter = router({
         // Restore to active after publishing
         await updateCatalogEntry(input.catalogEntryId, { status: "active" }, 1);
 
-        audit("catalog.bundle.published", input.catalogEntryId, {
+        await audit("catalog.bundle.published", input.catalogEntryId, {
           bundleId: bundle.id, versionLabel: input.versionLabel, snapshotHash: snapshotHash,
         }, bundle.id);
 
@@ -936,7 +945,7 @@ export const catalogManageRouter = router({
         created++;
       }
 
-      audit("catalog.providers.synced", null, { created, total: allProviders.length });
+      await audit("catalog.providers.synced", null, { created, total: allProviders.length });
       return { created, total: allProviders.length };
     }),
 
@@ -1022,7 +1031,7 @@ export const catalogManageRouter = router({
         }
       }
 
-      audit("catalog.registry.synced", null, { providersCreated, modelsCreated });
+      await audit("catalog.registry.synced", null, { providersCreated, modelsCreated });
       return { providersCreated, modelsCreated, totalProviders: Object.keys(PROVIDERS).length };
     }),
 
@@ -1035,7 +1044,7 @@ export const catalogManageRouter = router({
     }))
     .mutation(async ({ input }) => {
       await recallPublishBundle(input.bundleId);
-      audit("catalog.bundle.recalled", null, { bundleId: input.bundleId }, input.bundleId);
+      await audit("catalog.bundle.recalled", null, { bundleId: input.bundleId }, input.bundleId);
       return { success: true };
     }),
 
@@ -1060,7 +1069,7 @@ export const catalogManageRouter = router({
   taxonomySeed: adminProcedure
     .mutation(async () => {
       const result = await seedTaxonomy();
-      audit("catalog.taxonomy.seeded", null, result);
+      await audit("catalog.taxonomy.seeded", null, result);
       return result;
     }),
 
@@ -1084,7 +1093,7 @@ export const catalogManageRouter = router({
     }))
     .mutation(async ({ input }) => {
       await setEntryClassifications(input.catalogEntryId, input.nodeIds);
-      audit("catalog.entry.classified", input.catalogEntryId, { nodeIds: input.nodeIds });
+      await audit("catalog.entry.classified", input.catalogEntryId, { nodeIds: input.nodeIds });
       return { success: true };
     }),
 
@@ -1129,10 +1138,93 @@ export const catalogManageRouter = router({
       };
 
       await updateCatalogEntry(input.entryId, { config: updatedConfig }, 1);
-      audit("catalog.entry.docs_refreshed", input.entryId, { docsUrl, techDocs });
+      await audit("catalog.entry.docs_refreshed", input.entryId, { docsUrl, techDocs });
 
       const updated = await getCatalogEntryById(input.entryId);
       return updated!;
+    }),
+
+  // ============================================================================
+  // Catalog Availability Endpoints (App-Usage Selectors)
+  // ============================================================================
+
+  /**
+   * Return only Catalog-authoritative available assets for app usage.
+   *
+   * Availability = status:"active" AND reviewState:"approved".
+   * This is the ONLY endpoint that app-usage selectors should consume.
+   * It does NOT return raw source-domain entities.
+   *
+   * Returns a normalized CatalogAvailableOption[] payload.
+   */
+  available: protectedProcedure
+    .input(
+      z.object({
+        entryType: entryTypeSchema.optional(),
+        search: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        limit: z.number().int().positive().max(200).optional(),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      const entries = await getCatalogEntries({
+        ...(input?.entryType && { entryType: input.entryType }),
+        status: "active",
+        reviewState: "approved",
+      });
+
+      let result = entries;
+
+      // Search filter
+      if (input?.search) {
+        const q = input.search.toLowerCase();
+        result = result.filter(
+          (e) =>
+            e.name.toLowerCase().includes(q) ||
+            (e.displayName || "").toLowerCase().includes(q) ||
+            (e.description || "").toLowerCase().includes(q)
+        );
+      }
+
+      // Tag filter
+      if (input?.tags?.length) {
+        result = result.filter((e) => {
+          const entryTags = (e.tags as string[]) || [];
+          return input.tags!.some((t) => entryTags.includes(t));
+        });
+      }
+
+      // Limit
+      if (input?.limit) {
+        result = result.slice(0, input.limit);
+      }
+
+      // Return normalized payload
+      return result.map((e) => {
+        const config = (e.config as Record<string, any>) || {};
+        return {
+          id: e.id,
+          sourceType: e.entryType as string,
+          sourceId:
+            config.sourceModelId ??
+            config.sourceLLMId ??
+            config.sourceBotId ??
+            config.sourceAgentId ??
+            null,
+          name: e.name,
+          displayName: e.displayName || e.name,
+          description: e.description,
+          status: e.status,
+          tags: (e.tags as string[]) || [],
+          category: e.category,
+          subCategory: e.subCategory,
+          metadata: {
+            providerId: e.providerId,
+            config,
+            capabilities: e.capabilities,
+          },
+        };
+      });
     }),
 
 });

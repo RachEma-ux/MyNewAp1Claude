@@ -20,3 +20,4 @@ export * from './tables/workspace-rbac';
 export * from './tables/workspace-modules';
 export * from './tables/platform-audit';
 export * from './tables/operator-runtime';
+export * from './tables/bots';

@@ -596,6 +596,8 @@ export const agentsRouter = router({
         displayName: agent.name,
         description: agent.description ?? null,
         entryType: "agent",
+        sourceType: "agent",
+        sourceId: agent.id,
         scope: "app",
         status: "draft",
         origin: "admin",
