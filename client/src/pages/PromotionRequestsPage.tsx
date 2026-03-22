@@ -114,9 +114,7 @@ export default function PromotionRequestsPage() {
     }
   };
 
-  if (isLoading) {
-    return <div className="p-8">Loading promotion requests...</div>;
-  }
+  // isLoading handled inline below
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -149,7 +147,10 @@ export default function PromotionRequestsPage() {
 
       {/* Requests List */}
       <div className="space-y-4">
-        {requests && requests.length === 0 && (
+        {isLoading && (
+          <p className="text-sm text-muted-foreground py-2">Loading promotion requests...</p>
+        )}
+        {!isLoading && requests && requests.length === 0 && (
           <Card className="p-8 text-center">
             <p className="text-muted-foreground">No promotion requests found</p>
           </Card>

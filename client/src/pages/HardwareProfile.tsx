@@ -20,17 +20,7 @@ export default function HardwareProfile() {
   // Fetch all benchmarks
   const { data: benchmarks, isLoading: benchmarksLoading } = trpc.modelBenchmarks.getAll.useQuery();
 
-  if (isLoading) {
-    return (
-      <div className="container py-8">
-        <div className="flex items-center justify-center h-64">
-          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!profile) {
+  if (!isLoading && !profile) {
     return (
       <div className="container py-8">
         <Card className="border-dashed">
@@ -44,6 +34,17 @@ export default function HardwareProfile() {
             </CardDescription>
           </CardHeader>
         </Card>
+      </div>
+    );
+  }
+
+  if (isLoading || !profile) {
+    return (
+      <div className="container py-8 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Hardware Profile</h1>
+          <p className="text-muted-foreground mt-2">Detecting system capabilities...</p>
+        </div>
       </div>
     );
   }

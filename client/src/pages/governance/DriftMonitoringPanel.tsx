@@ -10,14 +10,6 @@ export default function DriftMonitoringPanel() {
 
   const isLoading = statusLoading || latestLoading || historyLoading;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   const driftActive = status?.active ?? false;
   const frozenCount = status?.frozenCount ?? 0;
   const historyList = Array.isArray(history) ? history : [];

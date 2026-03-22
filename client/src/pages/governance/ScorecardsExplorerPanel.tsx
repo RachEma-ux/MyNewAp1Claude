@@ -20,14 +20,6 @@ export default function ScorecardsExplorerPanel() {
 
   const isLoading = histLoading || latestLoading;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   const runs = Array.isArray(history) ? history : [];
   const selectedRun = selectedIndex !== null ? runs[selectedIndex] : null;
 

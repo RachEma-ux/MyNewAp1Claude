@@ -37,22 +37,12 @@ export default function DownloadAnalytics() {
     return `${hours}h ${minutes}m`;
   };
 
-  if (statsLoading) {
-    return (
-      <div className="container py-8">
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading analytics...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Download Analytics</h1>
         <p className="text-muted-foreground mt-2">
-          Track bandwidth usage, download speeds, and usage patterns
+          {statsLoading ? "Loading analytics..." : "Track bandwidth usage, download speeds, and usage patterns"}
         </p>
       </div>
 

@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, Search, Cloud, Server, Package, Bot } from "lucide-react";
 import { AgentStatusBadge } from "@/components/agents/AgentStatusBadge";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
 
 const meta: Record<string, { title: string; description: string }> = {
@@ -34,16 +33,6 @@ function AgentsListView() {
       String(agent.modelId ?? "").toLowerCase().includes(query)
     );
   }, [agents, searchQuery]);
-
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {[1, 2, 3].map((item) => (
-          <Skeleton key={item} className="h-48 rounded-xl" />
-        ))}
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -126,16 +115,6 @@ function ProvidersListView() {
       p.type.toLowerCase().includes(query)
     );
   }, [providers, searchQuery]);
-
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {[1, 2, 3].map((item) => (
-          <Skeleton key={item} className="h-40 rounded-xl" />
-        ))}
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -234,16 +213,6 @@ function ModelsListView() {
     );
   }, [models, searchQuery]);
 
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {[1, 2, 3].map((item) => (
-          <Skeleton key={item} className="h-40 rounded-xl" />
-        ))}
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <Card className="border-destructive/30">
@@ -336,16 +305,6 @@ function BotsListView() {
       (b.description ?? "").toLowerCase().includes(query)
     );
   }, [bots, searchQuery]);
-
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {[1, 2, 3].map((item) => (
-          <Skeleton key={item} className="h-40 rounded-xl" />
-        ))}
-      </div>
-    );
-  }
 
   if (error) {
     return (

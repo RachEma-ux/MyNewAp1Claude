@@ -17,7 +17,6 @@ import { trpc } from "@/lib/trpc";
 import {
   ArrowLeft,
   FolderOpen,
-  Loader2,
   Users,
   Activity,
   Settings,
@@ -75,15 +74,7 @@ export default function WorkspaceHome() {
     { enabled: workspaceId > 0, retry: 1 }
   );
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (!workspace) {
+  if (!isLoading && !workspace) {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold mb-2">Workspace not found</h2>
@@ -95,11 +86,11 @@ export default function WorkspaceHome() {
     );
   }
 
-  const wsStatus = (workspace as any).status || "active";
-  const wsPurpose = (workspace as any).purposeType || "other";
+  const wsStatus = (workspace as any)?.status || "active";
+  const wsPurpose = (workspace as any)?.purposeType || "other";
   const enabledModules = (modules as any[] || []).filter((m: any) => m.enabled);
   const disabledModules = (modules as any[] || []).filter((m: any) => !m.enabled);
-  const routingProfile = (workspace as any).routingProfile;
+  const routingProfile = (workspace as any)?.routingProfile;
   const memberCount = (members as any[] || []).length;
   const isArchived = wsStatus === "archived";
   const isPaused = wsStatus === "paused";
@@ -117,13 +108,13 @@ export default function WorkspaceHome() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold tracking-tight">{workspace.name}</h1>
+              <h1 className="text-3xl font-bold tracking-tight">{workspace?.name || "Workspace"}</h1>
               <Badge variant="outline" className={STATUS_COLORS[wsStatus] || ""}>
                 {wsStatus}
               </Badge>
             </div>
-            {workspace.description && (
-              <p className="text-muted-foreground mt-1">{workspace.description}</p>
+            {workspace?.description && (
+              <p className="text-muted-foreground mt-1">{workspace?.description}</p>
             )}
           </div>
         </div>
@@ -173,7 +164,7 @@ export default function WorkspaceHome() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Type</span>
-              <span className="capitalize">{workspace.type || "generic"}</span>
+              <span className="capitalize">{workspace?.type || "generic"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Status</span>
@@ -185,7 +176,7 @@ export default function WorkspaceHome() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Created</span>
-              <span>{new Date(workspace.createdAt).toLocaleDateString()}</span>
+              <span>{workspace?.createdAt ? new Date(workspace.createdAt).toLocaleDateString() : "—"}</span>
             </div>
           </CardContent>
         </Card>

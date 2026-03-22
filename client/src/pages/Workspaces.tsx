@@ -25,7 +25,7 @@ import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { trpc } from "@/lib/trpc";
 import { AppBlockerAlert } from "@/components/errors/AppBlockerAlert";
 import { getAppBlocker, showBlockerToast } from "@/lib/appBlockers";
-import { Plus, FolderOpen, Settings, Trash2, Loader2, ExternalLink, User, Target, Microscope } from "lucide-react";
+import { Plus, FolderOpen, Settings, Trash2, ExternalLink, User, Target, Microscope } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import type { AppBlockerPayload } from "@shared/blockers";
@@ -130,14 +130,6 @@ export default function Workspaces() {
       },
     );
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   return (
     <PageShell
@@ -254,7 +246,9 @@ export default function Workspaces() {
         </Dialog>
       }
     >
-      {workspaces && workspaces.length > 0 ? (
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading workspaces...</p>
+      ) : workspaces && workspaces.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {workspaces.map((workspace: any) => (
             <Card key={workspace.id} className="group hover:border-primary/50 transition-colors">

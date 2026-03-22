@@ -66,18 +66,18 @@ export default function AgentEditorPage() {
     },
   });
 
-  if (isLoading) {
+  if (!isLoading && !agent) {
     return (
       <div className="container py-8">
-        <div className="text-center">Loading agent...</div>
+        <div className="text-center">Agent not found</div>
       </div>
     );
   }
 
-  if (!agent) {
+  if (isLoading || !agent) {
     return (
       <div className="container py-8">
-        <div className="text-center">Agent not found</div>
+        <p className="text-sm text-muted-foreground">Loading agent...</p>
       </div>
     );
   }

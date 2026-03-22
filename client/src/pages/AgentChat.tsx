@@ -132,8 +132,13 @@ export default function AgentChat() {
 
   if (!agent) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="flex flex-col h-full">
+        <div className="border-b bg-card p-4 flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/agents")}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <p className="text-sm text-muted-foreground">Loading agent...</p>
+        </div>
       </div>
     );
   }

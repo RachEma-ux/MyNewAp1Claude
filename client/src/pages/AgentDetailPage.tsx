@@ -127,24 +127,24 @@ export default function AgentDetailPage() {
 
   const hasChanges = JSON.stringify(config) !== JSON.stringify(originalConfig);
 
-  if (isLoading) {
-    return (
-      <div className="container py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/3"></div>
-          <div className="h-64 bg-muted rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!agent || !config) {
+  if (!isLoading && (!agent || !config)) {
     return (
       <div className="container py-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Agent Not Found</h1>
           <Button onClick={() => navigate("/agents")}>Back to Agents</Button>
         </div>
+      </div>
+    );
+  }
+
+  if (isLoading || !agent || !config) {
+    return (
+      <div className="container py-8">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/agents")}>
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back
+        </Button>
+        <p className="text-sm text-muted-foreground mt-4">Loading agent details...</p>
       </div>
     );
   }

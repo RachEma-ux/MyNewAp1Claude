@@ -21,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search,
   Brain,
@@ -209,18 +208,6 @@ export default function ModelListPage() {
 
   // ── Render ──────────────────────────────────────────────────────────
 
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-6 max-w-6xl mx-auto">
-        <Skeleton className="h-10 w-48" />
-        <div className="grid grid-cols-5 gap-3">
-          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-16 rounded-lg" />)}
-        </div>
-        <Skeleton className="h-64 rounded-lg" />
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       {/* Header */}
@@ -334,8 +321,9 @@ export default function ModelListPage() {
         </Card>
       )}
 
-      {/* Empty state */}
-      {!isError && filtered.length === 0 && (
+      {/* Loading / Empty state */}
+      {isLoading && <p className="text-sm text-muted-foreground py-4">Loading models...</p>}
+      {!isLoading && !isError && filtered.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Package className="h-12 w-12 text-muted-foreground mb-4" />

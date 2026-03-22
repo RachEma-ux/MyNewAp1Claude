@@ -98,17 +98,8 @@ export default function WorkspaceShell() {
     { enabled: workspaceId > 0, retry: 2 }
   );
 
-  // Loading state — only block on workspace, not modules
-  if (wsLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  // Workspace not found
-  if (!workspace) {
+  // Workspace not found (after loading completes)
+  if (!wsLoading && !workspace) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-2">
@@ -160,7 +151,7 @@ export default function WorkspaceShell() {
         {/* Collapsible Sidebar */}
         <WorkspaceSidebar
           workspaceId={workspaceId}
-          workspaceName={workspace.name}
+          workspaceName={workspace?.name || "Workspace"}
           enabledModules={enabledModules}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -451,7 +442,7 @@ export default function WorkspaceShell() {
       <div className="flex flex-col flex-1 rounded-lg border border-border bg-background shadow-sm overflow-hidden">
         {/* ─── Thin Title Bar ─── */}
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/40 shrink-0">
-          <span className="text-xs font-medium text-muted-foreground truncate">{workspace.name}</span>
+          <span className="text-xs font-medium text-muted-foreground truncate">{workspace?.name || "Workspace"}</span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setPinned(true)}

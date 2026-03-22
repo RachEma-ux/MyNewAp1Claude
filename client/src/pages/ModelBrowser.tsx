@@ -209,9 +209,7 @@ export default function ModelBrowser() {
 
       {/* Model Catalog */}
       {catalogLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
+        <p className="text-sm text-muted-foreground py-12 text-center">Loading models...</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {models?.map((model) => {

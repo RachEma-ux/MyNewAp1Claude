@@ -48,14 +48,6 @@ export default function TemplatesPage() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-8 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
@@ -75,7 +67,9 @@ export default function TemplatesPage() {
         </TabsList>
 
         <TabsContent value={selectedCategory || "all"}>
-          {templates.length === 0 ? (
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground py-4">Loading templates...</p>
+          ) : templates.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <FileText className="h-16 w-16 text-muted-foreground mb-4" />

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Loader2, TrendingUp, DollarSign, Zap, Activity } from "lucide-react";
+import { TrendingUp, DollarSign, Zap, Activity } from "lucide-react";
 
 export default function Analytics() {
   const [selectedWorkspace, setSelectedWorkspace] = useState<number>(1); // Default workspace
@@ -127,9 +127,7 @@ export default function Analytics() {
         </CardHeader>
         <CardContent>
           {usageLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
+            <p className="text-sm text-muted-foreground p-8 text-center">Loading usage data...</p>
           ) : providerStats.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
               <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -194,9 +192,7 @@ export default function Analytics() {
         </CardHeader>
         <CardContent>
           {usageLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
+            <p className="text-sm text-muted-foreground p-8 text-center">Loading recent usage...</p>
           ) : !workspaceUsage || workspaceUsage.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
               <p>No recent usage</p>

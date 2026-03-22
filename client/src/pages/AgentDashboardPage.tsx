@@ -7,14 +7,6 @@ import { Shield, CheckCircle2, AlertTriangle, XCircle, TrendingUp, Activity } fr
 export default function AgentDashboardPage() {
   const { data: agents, isLoading } = trpc.agents.list.useQuery();
 
-  if (isLoading) {
-    return (
-      <div className="container py-8">
-        <div className="text-center">Loading dashboard...</div>
-      </div>
-    );
-  }
-
   const agentList = agents || [];
 
   // Calculate metrics

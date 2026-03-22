@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { AgentStatusBadge } from '@/components/agents/AgentStatusBadge';
 import { AppBlockerAlert } from '@/components/errors/AppBlockerAlert';
@@ -132,7 +131,7 @@ export function AgentList() {
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-64" />)}</div>
+        <p className="text-sm text-muted-foreground py-8 text-center">Loading agents...</p>
       ) : filteredAgents.length === 0 ? (
         <Card>
           <CardContent className="pt-8 text-center">

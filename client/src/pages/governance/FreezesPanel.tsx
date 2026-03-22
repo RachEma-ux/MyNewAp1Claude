@@ -9,14 +9,6 @@ export default function FreezesPanel() {
 
   const isLoading = frozenLoading || driftLoading;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   const frozenList = Array.isArray(frozen) ? frozen : [];
   const systemFrozenCount = drift?.frozenCount ?? frozenList.length;
 
@@ -25,7 +17,7 @@ export default function FreezesPanel() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Freeze Management</h1>
         <p className="text-muted-foreground mt-2">
-          View and manage frozen subjects and system-wide freeze status
+          {isLoading ? "Loading freeze data..." : "View and manage frozen subjects and system-wide freeze status"}
         </p>
       </div>
 

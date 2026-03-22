@@ -27,8 +27,12 @@ export default function WCPExecutionDetails() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-muted-foreground">Loading execution details...</div>
+      <div className="container mx-auto py-8">
+        <Button variant="ghost" onClick={() => setLocation("/wcp/executions")} className="mb-4">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Executions
+        </Button>
+        <p className="text-sm text-muted-foreground">Loading execution details...</p>
       </div>
     );
   }

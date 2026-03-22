@@ -11,14 +11,6 @@ export default function GovernanceOverviewPanel() {
 
   const isLoading = scLoading || driftLoading || scorecardLoading || metricsLoading;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   const frozenCount = drift?.frozenCount ?? 0;
   const driftActive = drift?.active ?? false;
   const score = scorecard?.scorecard?.score ?? null;

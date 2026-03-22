@@ -27,17 +27,6 @@ export default function WCPExecutions() {
     return new Date(timestamp).toLocaleTimeString();
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading executions...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-6">
@@ -93,7 +82,9 @@ export default function WCPExecutions() {
         </div>
 
         {/* Executions List */}
-        {executions.length === 0 ? (
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground py-4">Loading executions...</p>
+        ) : executions.length === 0 ? (
           <Card className="p-12 text-center">
             <div className="max-w-md mx-auto">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">

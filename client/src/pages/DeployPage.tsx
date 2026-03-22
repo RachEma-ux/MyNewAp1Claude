@@ -223,15 +223,7 @@ export default function DeployPage() {
   };
 
   // Check if GitHub is configured
-  if (configQuery.isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (!configQuery.data?.configured) {
+  if (!configQuery.isLoading && !configQuery.data?.configured) {
     return (
       <div className="container mx-auto py-8 max-w-4xl">
         <Alert variant="destructive">
@@ -263,9 +255,10 @@ export default function DeployPage() {
           Deployments
         </h1>
         <p className="text-muted-foreground mt-1">
-          Deploy and manage your application via GitHub Actions
+          {configQuery.isLoading ? "Checking deployment configuration..." : "Deploy and manage your application via GitHub Actions"}
         </p>
       </div>
+      {configQuery.isLoading ? null : (<>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
@@ -677,6 +670,7 @@ export default function DeployPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      </>)}
     </div>
   );
 }

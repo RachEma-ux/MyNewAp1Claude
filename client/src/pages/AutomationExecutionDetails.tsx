@@ -31,18 +31,7 @@ export default function AutomationExecutionDetails() {
     { enabled: !!executionId }
   );
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading execution details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!execution) {
+  if (!isLoading && !execution) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -56,6 +45,17 @@ export default function AutomationExecutionDetails() {
             Back to Executions
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  if (isLoading || !execution) {
+    return (
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <Button variant="ghost" onClick={() => setLocation("/automation/executions")} className="mb-4">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Executions
+        </Button>
+        <p className="text-sm text-muted-foreground">Loading execution details...</p>
       </div>
     );
   }

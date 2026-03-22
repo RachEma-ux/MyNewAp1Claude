@@ -195,7 +195,7 @@ export function AgentEditor({ agentId }: { agentId?: string }) {
   };
 
   if (isLoadingAgent) {
-    return <div className="container mx-auto py-8">Loading...</div>;
+    return <div className="container mx-auto py-8"><p className="text-sm text-muted-foreground">Loading agent...</p></div>;
   }
 
   return (

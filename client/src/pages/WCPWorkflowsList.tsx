@@ -32,17 +32,6 @@ export default function WCPWorkflowsList() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading workflows...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <PageShell
       title="WCP Workflows"
@@ -66,7 +55,9 @@ export default function WCPWorkflowsList() {
     >
 
         {/* Workflows Grid */}
-        {workflows.length === 0 ? (
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground py-4">Loading workflows...</p>
+        ) : workflows.length === 0 ? (
           <EmptyState
             icon={Plus}
             title="No workflows yet"

@@ -520,9 +520,7 @@ export default function Providers() {
 
         <TabsContent value="all" className="space-y-4">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
+            <p className="text-sm text-muted-foreground py-12 text-center">Loading providers...</p>
           ) : providers?.length === 0 ? (
             <EmptyState
               icon={Settings}

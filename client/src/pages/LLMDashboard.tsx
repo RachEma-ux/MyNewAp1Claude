@@ -54,17 +54,6 @@ export default function LLMDashboard() {
     setLocation("/providers/wizard");
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <Clock className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading LLM Dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto py-4 sm:py-8 px-4 max-w-7xl">
       {/* Header */}

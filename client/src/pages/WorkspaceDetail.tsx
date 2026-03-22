@@ -78,15 +78,7 @@ export default function WorkspaceDetail() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (!workspace) {
+  if (!isLoading && !workspace) {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold mb-2">Workspace not found</h2>

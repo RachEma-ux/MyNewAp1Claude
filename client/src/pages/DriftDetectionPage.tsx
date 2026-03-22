@@ -70,16 +70,6 @@ export default function DriftDetectionPage() {
     };
   });
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading drift detection data...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8 flex items-center justify-between">

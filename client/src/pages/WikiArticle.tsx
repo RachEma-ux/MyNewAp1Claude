@@ -54,15 +54,7 @@ export default function WikiArticle() {
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (error || !page) {
+  if (!isLoading && (error || !page)) {
     return (
       <div className="min-h-screen bg-background">
         <div className="container max-w-4xl mx-auto px-4 py-8">
@@ -85,6 +77,19 @@ export default function WikiArticle() {
               Back to Wiki
             </Button>
           </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading || !page) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container max-w-4xl mx-auto px-4 py-8">
+          <Button variant="ghost" onClick={() => setLocation('/wiki')} className="gap-2 mb-8">
+            <ArrowLeft className="w-4 h-4" /> Back to Wiki
+          </Button>
+          <p className="text-sm text-muted-foreground">Loading article...</p>
         </div>
       </div>
     );

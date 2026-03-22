@@ -171,9 +171,7 @@ export default function Documents() {
           description="Choose a workspace from the dropdown above to view and manage its documents"
         />
       ) : isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <p className="text-sm text-muted-foreground py-12 text-center">Loading documents...</p>
       ) : !documents || documents.length === 0 ? (
         <EmptyState
           icon={File}
