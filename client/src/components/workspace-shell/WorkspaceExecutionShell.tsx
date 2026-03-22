@@ -110,8 +110,8 @@ export default function WorkspaceExecutionShell() {
 
   // Context sidebar ALWAYS starts open on desktop — context-first
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  // Tools sidebar starts expanded on desktop, collapsed state tracked separately
-  const [toolsCollapsed, setToolsCollapsed] = useState(false);
+  // Tools sidebar starts collapsed (icons-only) by default
+  const [toolsCollapsed, setToolsCollapsed] = useState(true);
   const [toolsMobileOpen, setToolsMobileOpen] = useState(false);
   const [managerDrawerOpen, setManagerDrawerOpen] = useState(false);
 
