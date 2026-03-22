@@ -414,7 +414,6 @@ function ProjectsPanel() {
             )}
           </div>
         </>
-      )}
 
       {/* Create Project Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -1320,7 +1319,6 @@ function ReportsPanel() {
             </CardContent>
           </Card>
         </div>
-      )}
     </div>
   );
 }
