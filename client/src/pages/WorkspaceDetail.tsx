@@ -48,7 +48,11 @@ export default function WorkspaceDetail() {
     { enabled: !!workspaceId }
   );
 
-  const { data: agents } = trpc.agents.list.useQuery();
+  // WS-03: Use workspace-scoped agent query instead of global list
+  const { data: agents } = trpc.modules.agentOrch.agents.list.useQuery(
+    { workspaceId: workspaceId! },
+    { enabled: !!workspaceId }
+  );
 
   const utils = trpc.useUtils();
   const updateMutation = trpc.workspaces.update.useMutation({

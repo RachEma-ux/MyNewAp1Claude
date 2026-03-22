@@ -1,11 +1,23 @@
 /**
  * Workspace Permissions Service
  * Handles workspace access control and permissions
+ *
+ * WORKSPACE INVARIANT WS-02:
+ *   All workspace access decisions must resolve through the workspace capability model.
+ *
+ * This service preserves its existing API surface (getUserWorkspaceRole, getWorkspacePermissions,
+ * hasPermission) while routing through the capability resolver where available.
+ * The capability resolver falls back to legacy role→boolean mapping when RBAC
+ * tables are not seeded, ensuring zero regression.
  */
 
 import { getDb } from "../db";
 import { workspaces, workspaceMembers } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
+import {
+  resolveWorkspaceCapabilities,
+  capabilitiesToPermissions,
+} from "../workspace/capability-resolver";
 
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 
@@ -18,7 +30,8 @@ export interface WorkspacePermissions {
 }
 
 /**
- * Get user's role in a workspace
+ * Get user's role in a workspace.
+ * This remains unchanged — role resolution is separate from capability resolution.
  */
 export async function getUserWorkspaceRole(
   workspaceId: number,
@@ -26,18 +39,18 @@ export async function getUserWorkspaceRole(
 ): Promise<WorkspaceRole | null> {
   const db = getDb();
   if (!db) return null;
-  
+
   // Check if user is owner
   const [workspace] = await db
     .select()
     .from(workspaces)
     .where(eq(workspaces.id, workspaceId))
     .limit(1);
-  
+
   if (workspace?.ownerId === userId) {
     return "owner";
   }
-  
+
   // Check workspace members
   const [member] = await db
     .select()
@@ -49,26 +62,52 @@ export async function getUserWorkspaceRole(
       )
     )
     .limit(1);
-  
+
   if (!member) return null;
-  
+
   // Map database role to WorkspaceRole
   if (member.role === "owner") return "owner";
   if (member.role === "editor") return "member";
   if (member.role === "viewer") return "viewer";
-  
+
   return null;
 }
 
 /**
- * Get permissions for a user in a workspace
+ * Get permissions for a user in a workspace.
+ *
+ * WS-02: Routes through the capability resolver which reads from RBAC tables
+ * when seeded, and falls back to legacy role→boolean mapping otherwise.
+ * The returned WorkspacePermissions shape is unchanged for all consumers.
  */
 export async function getWorkspacePermissions(
   workspaceId: number,
   userId: number
 ): Promise<WorkspacePermissions> {
+  try {
+    const caps = await resolveWorkspaceCapabilities(userId, workspaceId);
+    if (caps.size > 0) {
+      return capabilitiesToPermissions(caps);
+    }
+  } catch {
+    // If capability resolver fails (e.g., RBAC tables not yet created),
+    // fall through to legacy path silently.
+  }
+
+  // Legacy fallback — preserves existing behavior exactly
+  return legacyGetWorkspacePermissions(workspaceId, userId);
+}
+
+/**
+ * Legacy permission resolution — the original hardcoded role→boolean mapping.
+ * Kept as internal fallback for when RBAC tables are not available.
+ */
+async function legacyGetWorkspacePermissions(
+  workspaceId: number,
+  userId: number
+): Promise<WorkspacePermissions> {
   const role = await getUserWorkspaceRole(workspaceId, userId);
-  
+
   if (!role) {
     return {
       canRead: false,
@@ -78,8 +117,7 @@ export async function getWorkspacePermissions(
       canManageSettings: false,
     };
   }
-  
-  // Define permissions by role
+
   switch (role) {
     case "owner":
       return {
@@ -89,16 +127,14 @@ export async function getWorkspacePermissions(
         canManageMembers: true,
         canManageSettings: true,
       };
-    
     case "admin":
       return {
         canRead: true,
         canWrite: true,
         canDelete: true,
         canManageMembers: true,
-        canManageSettings: false, // Only owner can change settings
+        canManageSettings: false,
       };
-    
     case "member":
       return {
         canRead: true,
@@ -107,7 +143,6 @@ export async function getWorkspacePermissions(
         canManageMembers: false,
         canManageSettings: false,
       };
-    
     case "viewer":
       return {
         canRead: true,
@@ -116,7 +151,6 @@ export async function getWorkspacePermissions(
         canManageMembers: false,
         canManageSettings: false,
       };
-    
     default:
       return {
         canRead: false,
@@ -129,7 +163,8 @@ export async function getWorkspacePermissions(
 }
 
 /**
- * Check if user has permission
+ * Check if user has permission.
+ * Routes through getWorkspacePermissions which now uses the capability model.
  */
 export async function hasPermission(
   workspaceId: number,
