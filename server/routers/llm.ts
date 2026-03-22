@@ -433,9 +433,10 @@ export const llmRouter = router({
         );
       }
 
-      // Check for existing catalog entry to prevent duplicates
+      // Check for existing catalog entry to prevent duplicates (structured FK first, then legacy)
       const existingEntries = await getCatalogEntries({ entryType: "llm" });
       const duplicate = existingEntries.find((entry) => {
+        if (entry.sourceType === "llm" && entry.sourceId === input.id) return true;
         const config = (entry.config as Record<string, any>) || {};
         return config.sourceLLMId === input.id;
       });

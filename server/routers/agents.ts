@@ -57,16 +57,28 @@ export const agentsRouter = router({
 
     const [agentRows, catalogAgentRows] = await Promise.all([
       db.select().from(agents).where(ne(agents.status, "archived")),
-      db.select({ id: catalogEntries.id, config: catalogEntries.config })
+      db.select({
+        id: catalogEntries.id,
+        sourceType: catalogEntries.sourceType,
+        sourceId: catalogEntries.sourceId,
+        config: catalogEntries.config,
+      })
         .from(catalogEntries)
         .where(eq(catalogEntries.entryType, "agent")),
     ]);
 
+    // Index by structured FK first, then legacy config.sourceAgentId
     const catalogEntryByAgentId = new Map<number, number>();
     for (const entry of catalogAgentRows) {
+      if (entry.sourceType === "agent" && entry.sourceId) {
+        catalogEntryByAgentId.set(entry.sourceId, entry.id);
+        continue;
+      }
       const sourceAgentId = Number((entry.config as Record<string, any> | null)?.sourceAgentId);
       if (!Number.isFinite(sourceAgentId)) continue;
-      catalogEntryByAgentId.set(sourceAgentId, entry.id);
+      if (!catalogEntryByAgentId.has(sourceAgentId)) {
+        catalogEntryByAgentId.set(sourceAgentId, entry.id);
+      }
     }
 
     return agentRows.map((agent) => {
@@ -572,7 +584,28 @@ export const agentsRouter = router({
         }, "BAD_REQUEST");
       }
 
-      const [existingEntry] = await db
+      // Duplicate prevention (structured FK first, then legacy JSON path)
+      const [existingByFK] = await db
+        .select()
+        .from(catalogEntries)
+        .where(
+          and(
+            eq(catalogEntries.sourceType, "agent"),
+            eq(catalogEntries.sourceId, agent.id)
+          )
+        )
+        .limit(1);
+
+      if (existingByFK) {
+        return {
+          success: true,
+          entry: existingByFK,
+          imported: false,
+        };
+      }
+
+      // Legacy fallback: check config JSON for older entries without structured FK
+      const [existingByLegacy] = await db
         .select()
         .from(catalogEntries)
         .where(
@@ -583,10 +616,10 @@ export const agentsRouter = router({
         )
         .limit(1);
 
-      if (existingEntry) {
+      if (existingByLegacy) {
         return {
           success: true,
-          entry: existingEntry,
+          entry: existingByLegacy,
           imported: false,
         };
       }

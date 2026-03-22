@@ -124,13 +124,11 @@ const STATUS_MAP: Record<string, NormalizedStatus> = {
   // Model
   ready: "deployable",
   downloading: "configuring",
-  // Bot
+  // Bot + Provider (shared status name)
   configured: "configuring",
   validated: "validating",
   deployable: "deployable",
-  // Agent (reuses LLM pattern)
   // Provider
-  configured: "configuring",
   authenticated: "configuring",
   healthy: "deployable",
   active: "deployable",
