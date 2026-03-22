@@ -20,6 +20,8 @@ export async function ensureDefaultWorkspace(): Promise<void> {
       name: "Default",
       description: "Auto-created default workspace",
       ownerId: 1,
+      status: "active",
+      purposeType: "other",
     });
     console.log("[Workspace] Created default workspace");
   } catch (error: any) {

@@ -124,10 +124,27 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         const workspaceType = input.template || input.type || "team";
+        // WS-05: Derive purposeType from workspace type
+        const PURPOSE_TYPE_MAP: Record<string, string> = {
+          personal: "goal",
+          project: "project",
+          research: "mission",
+          team: "team",
+          enterprise: "strategy",
+          sandbox: "other",
+          generic: "other",
+        };
         const workspace = await db.createWorkspace({
-          ...input,
+          name: input.name,
+          description: input.description,
           type: workspaceType,
           ownerId: ctx.user.id,
+          status: "created",
+          purposeType: PURPOSE_TYPE_MAP[workspaceType] || "other",
+          embeddingModel: input.embeddingModel,
+          chunkingStrategy: input.chunkingStrategy,
+          chunkSize: input.chunkSize,
+          chunkOverlap: input.chunkOverlap,
           collectionName: `workspace_${Date.now()}`,
         });
         // Seed module bindings based on workspace type
