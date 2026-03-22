@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, ShieldAlert, ShieldCheck, Lock } from "lucide-react";
 
 const GATE_INFO = [
   { id: "G0", name: "Intake Review", description: "Validates project charter, sponsor approval, and initial risk assessment" },
@@ -19,7 +18,6 @@ export default function GateCenterPanel({ projectId }: { projectId: number }) {
   const gates = gatesQuery.data ?? [];
   const project = projectQuery.data;
 
-  if (gatesQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   // Build gate status map (latest request per gate)
   const gateMap: Record<string, any> = {};

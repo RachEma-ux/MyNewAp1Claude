@@ -120,7 +120,7 @@ export default function LocalInference() {
           ) : (
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm text-muted-foreground">Loading hardware info...</span>
+              <span className="text-sm text-muted-foreground">No hardware info yet</span>
             </div>
           )}
         </CardContent>

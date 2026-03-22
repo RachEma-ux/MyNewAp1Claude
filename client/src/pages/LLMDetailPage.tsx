@@ -257,16 +257,6 @@ export default function LLMDetailPage() {
     );
   }
 
-  if (llmLoading || versionsLoading) {
-    return (
-      <div className="container mx-auto py-4 sm:py-8 px-4 max-w-7xl">
-        <div className="text-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Loading LLM details...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (!llm) {
     return (

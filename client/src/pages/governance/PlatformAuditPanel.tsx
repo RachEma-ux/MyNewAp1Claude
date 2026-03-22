@@ -310,11 +310,7 @@ export default function PlatformAuditPanel() {
           </div>
 
           {/* Table */}
-          {historyQuery.isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : (historyQuery.data as any[])?.length === 0 ? (
+          {(historyQuery.data as any[])?.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">No audit runs yet</p>
           ) : (
             <div className="overflow-x-auto">

@@ -785,11 +785,7 @@ export default function CatalogManagePage() {
           </div>
 
           {/* Table */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredEntries.length === 0 ? (
+          {filteredEntries.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-10 w-10 mx-auto mb-3 opacity-50" />
               <p className="text-lg font-medium">No published entries yet</p>

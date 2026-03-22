@@ -116,9 +116,7 @@ export default function Models() {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground py-4">Loading models...</p>
-          ) : !models || models.length === 0 ? (
+          {!models || models.length === 0 ? (
             <Card className="border-dashed">
               <CardHeader className="text-center py-12">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">

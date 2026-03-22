@@ -83,7 +83,7 @@ export function OversightDrawer({ open, onOpenChange, workspaceId }: OversightDr
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Loading...</p>
+                <p className="text-sm text-muted-foreground">No data available</p>
               )}
             </div>
 

@@ -101,10 +101,6 @@ export function PMTProjectHomePage({ workspaceId }: { workspaceId: number }) {
         <div className="text-center py-12 text-muted-foreground">
           No projects available.
         </div>
-      ) : isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Task Status */}

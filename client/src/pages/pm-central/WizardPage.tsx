@@ -175,12 +175,8 @@ export default function WizardPage() {
     return <div className="text-muted-foreground text-center py-20">Invalid project ID</div>;
   }
 
-  if (wizardQuery.isLoading || !wizardData) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (!wizardData) {
+    return <div className="text-muted-foreground text-center py-20">Project data not available</div>;
   }
 
   return (

@@ -193,7 +193,7 @@ export default function GovernanceScorecard() {
           </CardHeader>
           <CardContent>
             <div className={`text-5xl font-bold ${getScoreColor(score)}`}>
-              {scorecardQuery.isLoading ? "..." : score}
+              {scorecardQuery.score}
               <span className="text-lg text-muted-foreground">/100</span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -237,7 +237,7 @@ export default function GovernanceScorecard() {
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {toUserSafeGovernanceMessage(
-                scorecard?.scorecard?.gateStatus?.reason || "Loading..."
+                scorecard?.scorecard?.gateStatus?.reason || "Awaiting data"
               )}
             </p>
           </CardContent>

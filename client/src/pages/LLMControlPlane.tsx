@@ -165,12 +165,7 @@ export default function LLMControlPlane() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="text-center py-12">
-              <Clock className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Loading LLMs...</p>
-            </div>
-          ) : filteredLLMs && filteredLLMs.length > 0 ? (
+          {filteredLLMs && filteredLLMs.length > 0 ? (
             <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>

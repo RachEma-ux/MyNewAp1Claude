@@ -273,10 +273,6 @@ export function PMTTablePage({ workspaceId }: { workspaceId: number }) {
         <div className="text-center py-12 text-muted-foreground">
           No projects available. Create a project first.
         </div>
-      ) : isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No work items found. Create your first task.

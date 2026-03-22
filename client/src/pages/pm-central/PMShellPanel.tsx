@@ -57,11 +57,7 @@ export default function PMShellPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : draftProjects.length === 0 ? (
+          {draftProjects.length === 0 ? (
             <div className="text-center py-4">
               <p className="text-muted-foreground">No draft projects. Open the PM Shell to create one.</p>
             </div>

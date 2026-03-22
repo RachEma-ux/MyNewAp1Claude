@@ -26,11 +26,7 @@ export function PMTPortfolioPage({ workspaceId }: { workspaceId: number }) {
         </h1>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : !projects || projects.length === 0 ? (
+      {!projects || projects.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No projects found.
         </div>

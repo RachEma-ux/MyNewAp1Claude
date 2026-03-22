@@ -78,11 +78,7 @@ export default function ProjectsPanel() {
           <FolderOpen className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : activeProjects.length === 0 ? (
+          {activeProjects.length === 0 ? (
             <p className="text-muted-foreground">No active projects yet. Create a project in PM Shell to get started.</p>
           ) : (
             <div className="space-y-2">

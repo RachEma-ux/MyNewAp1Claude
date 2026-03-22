@@ -115,11 +115,7 @@ export function PMTTypesConfigPage({ workspaceId }: { workspaceId: number }) {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : !types || types.length === 0 ? (
+      {!types || types.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No types configured. Add your first work item type.
         </div>

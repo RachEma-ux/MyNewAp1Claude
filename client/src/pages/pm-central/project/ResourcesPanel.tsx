@@ -1,13 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Users, BarChart3, Calendar } from "lucide-react";
 
 export default function ResourcesPanel({ projectId }: { projectId: number }) {
   const tasksQuery = trpc.modules.pmt.shell.tasks.list.useQuery({ projectId });
   const allTasks = tasksQuery.data ?? [];
 
-  if (tasksQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   // Aggregate resource allocation from tasks
   const assigneeMap: Record<number, { count: number; done: number; name: string }> = {};

@@ -89,7 +89,7 @@ export default function WikiArticle() {
           <Button variant="ghost" onClick={() => setLocation('/wiki')} className="gap-2 mb-8">
             <ArrowLeft className="w-4 h-4" /> Back to Wiki
           </Button>
-          <p className="text-sm text-muted-foreground">Loading article...</p>
+          <p className="text-sm text-muted-foreground">No article yet</p>
         </div>
       </div>
     );

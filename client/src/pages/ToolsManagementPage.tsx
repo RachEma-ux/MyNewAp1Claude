@@ -135,9 +135,7 @@ export default function ToolsManagementPage() {
       </Card>
 
       {/* Tools Grid */}
-      {toolsQuery.isLoading ? (
-        <div className="text-center py-12 text-gray-500">Loading tools...</div>
-      ) : filteredTools.length > 0 ? (
+      {filteredTools.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredTools.map((tool) => {
             const isEnabled = enabledTools.has(tool.id) || tool.enabled;

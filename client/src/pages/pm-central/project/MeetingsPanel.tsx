@@ -1,13 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Calendar } from "lucide-react";
 
 export default function MeetingsPanel({ projectId }: { projectId: number }) {
   const query = trpc.modules.pmt.shell.tools.meetings.list.useQuery({ projectId });
   const meetings = query.data ?? [];
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-4">

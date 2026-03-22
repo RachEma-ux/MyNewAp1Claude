@@ -77,7 +77,7 @@ export default function AgentEditorPage() {
   if (isLoading || !agent) {
     return (
       <div className="container py-8">
-        <p className="text-sm text-muted-foreground">Loading agent...</p>
+        <p className="text-sm text-muted-foreground">No agent yet</p>
       </div>
     );
   }

@@ -1,13 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, ListChecks } from "lucide-react";
 
 export default function ActionItemsPanel({ projectId }: { projectId: number }) {
   const query = trpc.modules.pmt.shell.tools.actionItems.list.useQuery({ projectId });
   const items = query.data ?? [];
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   const open = items.filter((a: any) => a.status !== "done" && a.status !== "cancelled");
   const done = items.filter((a: any) => a.status === "done" || a.status === "cancelled");

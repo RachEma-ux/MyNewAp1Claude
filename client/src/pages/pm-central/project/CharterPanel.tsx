@@ -1,13 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, FileText, User, Calendar, Target } from "lucide-react";
 
 export default function CharterPanel({ projectId }: { projectId: number }) {
   const query = trpc.modules.pmt.shell.projects.get.useQuery({ id: projectId });
   const project = query.data;
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (!project) return <div className="text-center py-20 text-muted-foreground">Project not found</div>;
 
   return (

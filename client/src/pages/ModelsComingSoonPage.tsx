@@ -49,7 +49,7 @@ function ModelsDashboard() {
           <CardHeader className="p-4 pb-2">
             <CardDescription className="text-xs">Total Models</CardDescription>
             <CardTitle className="text-2xl">
-              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : stats?.total ?? 0}
+              {stats?.total ?? 0}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -57,7 +57,7 @@ function ModelsDashboard() {
           <CardHeader className="p-4 pb-2">
             <CardDescription className="text-xs">Active</CardDescription>
             <CardTitle className="text-2xl text-green-500">
-              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : stats?.byStatus.active ?? 0}
+              {stats?.byStatus.active ?? 0}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -65,7 +65,7 @@ function ModelsDashboard() {
           <CardHeader className="p-4 pb-2">
             <CardDescription className="text-xs">Draft</CardDescription>
             <CardTitle className="text-2xl text-yellow-500">
-              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : stats?.byStatus.draft ?? 0}
+              {stats?.byStatus.draft ?? 0}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -73,7 +73,7 @@ function ModelsDashboard() {
           <CardHeader className="p-4 pb-2">
             <CardDescription className="text-xs">Deprecated</CardDescription>
             <CardTitle className="text-2xl text-muted-foreground">
-              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : stats?.byStatus.deprecated ?? 0}
+              {stats?.byStatus.deprecated ?? 0}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -149,11 +149,7 @@ function ModelsDashboard() {
           <CardTitle className="text-sm font-semibold">Recent Registrations</CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : stats?.recentRegistrations && stats.recentRegistrations.length > 0 ? (
+          {stats?.recentRegistrations && stats.recentRegistrations.length > 0 ? (
             <div className="space-y-2">
               {stats.recentRegistrations.map((m: any) => (
                 <div
@@ -217,11 +213,7 @@ function ModelsControlPanel() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 pt-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : models.length === 0 ? (
+          {models.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
               No models in the catalog yet.
             </p>
@@ -487,12 +479,7 @@ function ModelWizard() {
                 Select the provider this model runs on, or leave blank to assign later.
               </p>
               <div className="space-y-3">
-                {providersQuery.isLoading ? (
-                  <div className="flex items-center gap-2 py-4">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Loading providers...</span>
-                  </div>
-                ) : providers.length === 0 ? (
+                {providers.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-4">
                     No providers registered yet. You can assign a provider later.
                   </p>

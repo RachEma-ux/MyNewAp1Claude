@@ -38,9 +38,7 @@ export function WSTeamPage() {
         </div>
       </div>
 
-      {isLoading ? (
-        <p className="text-muted-foreground text-sm">Loading team...</p>
-      ) : !members?.length ? (
+      {!members?.length ? (
         <Card>
           <CardContent className="py-8 text-center">
             <Users className="h-8 w-8 mx-auto text-muted-foreground mb-2" />

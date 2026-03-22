@@ -108,15 +108,6 @@ export function MultiAxisPanel({
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 py-4 text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        <span className="text-sm">Loading taxonomy...</span>
-      </div>
-    );
-  }
-
   if (axes.length === 0) {
     return (
       <div className="text-sm text-muted-foreground py-2">

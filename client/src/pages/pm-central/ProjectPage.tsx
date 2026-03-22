@@ -7,7 +7,7 @@
 
 import { useRoute, useLocation } from "wouter";
 import { lazy, Suspense } from "react";
-import { Loader2, Copy } from "lucide-react";
+import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import PMProjectSidebar from "@/components/pm/PMProjectSidebar";
@@ -56,11 +56,7 @@ const ProjectReportsPanel = lazy(() => import("./project/ProjectReportsPanel"));
 const PolicyPanel = lazy(() => import("./project/PolicyPanel"));
 
 function ToolPanel({ tool, projectId }: { tool: string; projectId: number }) {
-  const fallback = (
-    <div className="flex items-center justify-center py-20">
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-    </div>
-  );
+  const fallback = null;
 
   const panelMap: Record<string, React.ReactNode> = {
     // Project

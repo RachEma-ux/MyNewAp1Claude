@@ -130,9 +130,7 @@ export function AgentList() {
         <Input placeholder="Search agents..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
       </div>
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Loading agents...</p>
-      ) : filteredAgents.length === 0 ? (
+      {filteredAgents.length === 0 ? (
         <Card>
           <CardContent className="pt-8 text-center">
             <p className="text-gray-500">

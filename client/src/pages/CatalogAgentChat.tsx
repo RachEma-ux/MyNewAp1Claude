@@ -140,14 +140,6 @@ export default function CatalogAgentChat() {
     }
   };
 
-  if (executionTargetQuery.isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   if (!executionTargetQuery.data) {
     return (
       <div className="mx-auto max-w-3xl p-6 space-y-4">

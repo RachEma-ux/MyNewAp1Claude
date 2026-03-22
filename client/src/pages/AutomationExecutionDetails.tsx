@@ -55,7 +55,7 @@ export default function AutomationExecutionDetails() {
         <Button variant="ghost" onClick={() => setLocation("/automation/executions")} className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to Executions
         </Button>
-        <p className="text-sm text-muted-foreground">Loading execution details...</p>
+        <p className="text-sm text-muted-foreground">No execution details yet</p>
       </div>
     );
   }

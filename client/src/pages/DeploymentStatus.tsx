@@ -32,7 +32,7 @@ export default function DeploymentStatus() {
           {/* Provider Count */}
           <div className="flex items-center justify-between p-3 border rounded">
             <span className="font-medium">Total Providers:</span>
-            <Badge variant="outline">{isLoading ? "Loading..." : providers.length}</Badge>
+            <Badge variant="outline">{providers.length}</Badge>
           </div>
 
           {/* Ollama Provider */}

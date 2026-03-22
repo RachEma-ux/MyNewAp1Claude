@@ -163,11 +163,7 @@ export function PMTTeamPlannerPage({ workspaceId }: { workspaceId: number }) {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : plannerData.assignees.length === 0 ? (
+      {plannerData.assignees.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No tasks with assignees or dates found.
         </div>

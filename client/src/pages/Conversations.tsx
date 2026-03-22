@@ -202,13 +202,7 @@ export default function Conversations() {
       </Card>
 
       {/* Conversations List */}
-      {isLoading ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Loading conversations...</p>
-          </CardContent>
-        </Card>
-      ) : filteredConversations.length === 0 ? (
+      {filteredConversations.length === 0 ? (
         <EmptyState
           icon={MessageSquare}
           title="No conversations found"

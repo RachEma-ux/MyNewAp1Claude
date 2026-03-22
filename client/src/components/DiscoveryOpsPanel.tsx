@@ -390,7 +390,7 @@ function PromotionReviewDrawer({
           <SheetDescription className="text-xs">
             {candidate
               ? `Detected: ${new Date(candidate.firstDetectedAt).toLocaleDateString()} · Last: ${new Date(candidate.lastSeenAt).toLocaleDateString()}`
-              : "Loading..."}
+              : ""}
           </SheetDescription>
         </SheetHeader>
 

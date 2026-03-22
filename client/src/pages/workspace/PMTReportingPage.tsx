@@ -139,11 +139,7 @@ export function PMTReportingPage({ workspaceId }: { workspaceId: number }) {
         )}
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
+      {(
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Status Distribution */}
           <Card>

@@ -226,12 +226,7 @@ export default function LLMPromotions() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="text-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Loading promotions...</p>
-            </div>
-          ) : promotions && promotions.length > 0 ? (
+          {promotions && promotions.length > 0 ? (
             <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>

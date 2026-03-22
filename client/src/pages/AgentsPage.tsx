@@ -265,7 +265,7 @@ export default function AgentsPage() {
         </div>
       )}
 
-      {isLoading ? null : filteredAgents.length === 0 ? (
+      {filteredAgents.length === 0 ? (
         <Card className="p-12 text-center">
           <Shield className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
           <h3 className="mb-2 text-lg font-semibold">No agents found</h3>

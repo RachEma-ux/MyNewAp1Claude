@@ -37,14 +37,12 @@ import {
   Clock,
   ChevronRight,
   CheckCircle2,
-  Loader2,
 } from "lucide-react";
 import type { ShellViewData } from "./types";
 import { classifyParticipant } from "./types";
 
 interface ContextSidebarProps {
   shell: ShellViewData;
-  isLoading: boolean;
   open: boolean;
   onClose: () => void;
 }
@@ -70,7 +68,7 @@ function ZoneDivider({ label }: { label: string }) {
   );
 }
 
-function SidebarContent({ shell, isLoading }: { shell: ShellViewData; isLoading: boolean }) {
+function SidebarContent({ shell }: { shell: ShellViewData }) {
   const basePath = `/w/${shell.workspaceId}`;
   const participantType = classifyParticipant(shell.participantRole, shell.isManager);
 
@@ -96,11 +94,7 @@ function SidebarContent({ shell, isLoading }: { shell: ShellViewData; isLoading:
         {/* ── Identity ── */}
         <div className="px-4 pt-4 pb-3">
           <SectionLabel icon={<Target className="h-3.5 w-3.5" />} label="Identity" />
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" /> Loading...
-            </div>
-          ) : (
+          {(
             <div className="space-y-2">
               <p className="text-base font-semibold leading-tight">{shell.workspaceName}</p>
               <div className="flex flex-wrap items-center gap-1.5">
@@ -121,9 +115,6 @@ function SidebarContent({ shell, isLoading }: { shell: ShellViewData; isLoading:
         {/* ── Global Purpose ── */}
         <div className="px-4 pb-3">
           <SectionLabel icon={<Compass className="h-3.5 w-3.5" />} label="Global Purpose" />
-          {isLoading ? (
-            <div className="h-4 w-24 bg-muted rounded animate-pulse" />
-          ) : (
             <div className="space-y-1.5">
               {shell.purposeType ? (
                 <p className="text-sm">
@@ -142,9 +133,7 @@ function SidebarContent({ shell, isLoading }: { shell: ShellViewData; isLoading:
         {/* ── Participant Mission ── */}
         <div className="px-4 pb-3">
           <SectionLabel icon={<Crosshair className="h-3.5 w-3.5" />} label="Your Mission" />
-          {isLoading ? (
-            <div className="h-4 w-32 bg-muted rounded animate-pulse" />
-          ) : shell.missionEmphasis ? (
+          {shell.missionEmphasis ? (
             <div className="rounded-md border border-primary/30 bg-primary/5 p-2.5">
               <p className="text-xs font-medium text-primary leading-relaxed">{shell.missionEmphasis}</p>
             </div>
@@ -233,7 +222,7 @@ function SidebarContent({ shell, isLoading }: { shell: ShellViewData; isLoading:
         )}
 
         {/* ── Quick Actions ── */}
-        {shell.sidebar.showQuickActions && !isLoading && (
+        {shell.sidebar.showQuickActions && (
           <div className="px-4 pb-3">
             <SectionLabel icon={<Zap className="h-3.5 w-3.5" />} label="Quick Actions" />
             <div className="space-y-0.5">
@@ -298,8 +287,8 @@ function SidebarContent({ shell, isLoading }: { shell: ShellViewData; isLoading:
   );
 }
 
-export function WorkspaceContextSidebar({ shell, isLoading, open, onClose }: ContextSidebarProps) {
-  const content = <SidebarContent shell={shell} isLoading={isLoading} />;
+export function WorkspaceContextSidebar({ shell, open, onClose }: ContextSidebarProps) {
+  const content = <SidebarContent shell={shell} />;
 
   return (
     <>

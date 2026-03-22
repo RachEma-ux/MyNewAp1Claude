@@ -101,9 +101,9 @@ export function PMTTaskDetailDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-[min(32rem,100vw)] flex flex-col overflow-y-auto">
-        {isLoading || !task ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        {!task ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            Task not found
           </div>
         ) : (
           <>
@@ -298,9 +298,6 @@ function CommentThread({ workspaceId, workItemId }: { workspaceId: number; workI
 
   const [draft, setDraft] = useState("");
 
-  if (isLoading) {
-    return <Loader2 className="h-4 w-4 animate-spin mx-auto" />;
-  }
 
   // Group comments: top-level vs replies
   const topLevel = (comments || []).filter((c) => !c.parentId);
@@ -370,9 +367,6 @@ function AttachmentList({ workspaceId, workItemId }: { workspaceId: number; work
     workItemId,
   });
 
-  if (isLoading) {
-    return <Loader2 className="h-4 w-4 animate-spin mx-auto" />;
-  }
 
   return (
     <div className="space-y-2">
@@ -408,9 +402,6 @@ function DependencyList({ workspaceId, taskId }: { workspaceId: number; taskId: 
     taskId,
   });
 
-  if (isLoading) {
-    return <Loader2 className="h-4 w-4 animate-spin mx-auto" />;
-  }
 
   return (
     <div className="space-y-2">

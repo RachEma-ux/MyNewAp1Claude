@@ -54,7 +54,7 @@ export default function AgentRunDetailPanel() {
   if (!run && runQuery.isLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">
-        Loading run...
+        Run not found
       </div>
     );
   }

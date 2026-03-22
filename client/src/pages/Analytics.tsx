@@ -126,9 +126,7 @@ export default function Analytics() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {usageLoading ? (
-            <p className="text-sm text-muted-foreground p-8 text-center">Loading usage data...</p>
-          ) : providerStats.length === 0 ? (
+          {providerStats.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
               <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No usage data available</p>
@@ -191,9 +189,7 @@ export default function Analytics() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {usageLoading ? (
-            <p className="text-sm text-muted-foreground p-8 text-center">Loading recent usage...</p>
-          ) : !workspaceUsage || workspaceUsage.length === 0 ? (
+          {!workspaceUsage || workspaceUsage.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
               <p>No recent usage</p>
             </div>

@@ -170,8 +170,6 @@ export default function Documents() {
           title="Select a Workspace"
           description="Choose a workspace from the dropdown above to view and manage its documents"
         />
-      ) : isLoading ? (
-        <p className="text-sm text-muted-foreground py-12 text-center">Loading documents...</p>
       ) : !documents || documents.length === 0 ? (
         <EmptyState
           icon={File}

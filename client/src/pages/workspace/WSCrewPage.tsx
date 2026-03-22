@@ -110,9 +110,7 @@ export function WSCrewPage() {
         </Card>
       )}
 
-      {isLoading ? (
-        <p className="text-muted-foreground text-sm">Loading crew...</p>
-      ) : !(crew as any[])?.length ? (
+      {!(crew as any[])?.length ? (
         <Card>
           <CardContent className="py-8 text-center">
             <Bot className="h-8 w-8 mx-auto text-muted-foreground mb-2" />

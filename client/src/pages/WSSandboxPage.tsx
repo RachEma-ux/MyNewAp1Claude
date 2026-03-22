@@ -55,11 +55,7 @@ export default function WSSandboxPage() {
       </div>
 
       <div className="p-4">
-        <Suspense fallback={
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        }>
+        <Suspense fallback={null}>
           <Switch>
             <Route path="/ws/dashboard" component={WSDashboardPage} />
             <Route path="/ws/control-panel" component={WSControlPanelPage} />

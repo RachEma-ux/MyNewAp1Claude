@@ -70,11 +70,7 @@ export function PreflightModal({
           </DialogDescription>
         </DialogHeader>
 
-        {isLoading ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            Checking governance requirements...
-          </div>
-        ) : preflight ? (
+        {preflight ? (
           <div className="space-y-4">
             {/* Action + Risk Level */}
             <div className="flex items-center justify-between">

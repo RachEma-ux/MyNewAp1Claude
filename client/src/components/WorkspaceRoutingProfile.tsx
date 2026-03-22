@@ -95,14 +95,6 @@ export function WorkspaceRoutingProfile({ workspaceId, onSave }: Props) {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Route Selection */}

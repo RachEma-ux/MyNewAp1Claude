@@ -1,13 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Stamp } from "lucide-react";
 
 export default function DecisionsPanel({ projectId }: { projectId: number }) {
   const query = trpc.modules.pmt.shell.tools.decisions.list.useQuery({ projectId });
   const decisions = query.data ?? [];
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-4">

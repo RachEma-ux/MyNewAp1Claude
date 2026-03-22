@@ -156,10 +156,6 @@ export function PMTCalendarPage({ workspaceId }: { workspaceId: number }) {
         <div className="text-center py-12 text-muted-foreground">
           No projects available. Create a project first.
         </div>
-      ) : isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
       ) : (
         <div className="border rounded-md overflow-hidden">
           {/* Day header */}

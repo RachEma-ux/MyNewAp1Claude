@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { BarChart3, Clock, ShieldCheck, Activity, TrendingUp, Loader2 } from "lucide-react";
+import { BarChart3, Clock, ShieldCheck, Activity, TrendingUp } from "lucide-react";
 
 export default function ReportsPanel() {
   const projectsQuery = trpc.modules.pmt.shell.projects.list.useQuery();
@@ -28,13 +28,6 @@ export default function ReportsPanel() {
           Portfolio analytics — gate throughput, lifecycle timing, and project status distribution
         </p>
       </div>
-
-      {projectsQuery.isLoading && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading...
-        </div>
-      )}
 
       {/* Top-level metrics */}
       <div className="grid gap-4 md:grid-cols-4">

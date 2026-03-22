@@ -77,7 +77,7 @@ import { WSRulesPage } from "@/pages/workspace/WSRulesPage";
 function makeLoadingShell(workspaceId: number): ShellViewData {
   return {
     workspaceId,
-    workspaceName: "Loading...",
+    workspaceName: "",
     workspaceDescription: null,
     workspaceType: null,
     purposeType: null,
@@ -186,7 +186,6 @@ export default function WorkspaceExecutionShell() {
         {/* Context Sidebar (left) — ALWAYS VISIBLE on desktop */}
         <WorkspaceContextSidebar
           shell={shell}
-          isLoading={isLoading}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />

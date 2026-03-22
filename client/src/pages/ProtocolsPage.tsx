@@ -224,9 +224,7 @@ export default function ProtocolsPage() {
       </div>
 
       {/* Protocols List */}
-      {isLoading ? (
-        <div className="text-center py-12">Loading protocols...</div>
-      ) : protocols && protocols.length > 0 ? (
+      {protocols && protocols.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {protocols.map((protocol) => (
             <Card key={protocol.id} className="p-4">

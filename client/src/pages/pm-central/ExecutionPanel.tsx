@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { Play, ShieldCheck, AlertTriangle, Pause, Loader2 } from "lucide-react";
+import { Play, ShieldCheck, AlertTriangle, Pause } from "lucide-react";
 
 const EXECUTION_STATES = ["authorized", "executing", "control_hold"];
 
@@ -59,14 +59,7 @@ export default function ExecutionPanel() {
         </Card>
       </div>
 
-      {projectsQuery.isLoading && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading projects...
-        </div>
-      )}
-
-      {!projectsQuery.isLoading && projects.length === 0 && (
+      {projects.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <Play className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

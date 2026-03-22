@@ -55,9 +55,7 @@ export default function WCPWorkflowsList() {
     >
 
         {/* Workflows Grid */}
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground py-4">Loading workflows...</p>
-        ) : workflows.length === 0 ? (
+        {workflows.length === 0 ? (
           <EmptyState
             icon={Plus}
             title="No workflows yet"

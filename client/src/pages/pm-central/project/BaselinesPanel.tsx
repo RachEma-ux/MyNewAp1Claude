@@ -1,13 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Lock, Hash, Calendar } from "lucide-react";
 
 export default function BaselinesPanel({ projectId }: { projectId: number }) {
   const artifactsQuery = trpc.modules.pmt.shell.artifacts.list.useQuery({ projectId });
   const artifacts = artifactsQuery.data ?? [];
 
-  if (artifactsQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   // Baselines are versioned artifact snapshots
   const baselines = artifacts.filter((a: any) => a.sha256);

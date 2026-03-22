@@ -1,7 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, AlertTriangle } from "lucide-react";
 
 const PROB_LABEL: Record<string, string> = { very_low: "Very Low", low: "Low", medium: "Medium", high: "High", very_high: "Very High" };
 const IMPACT_COLORS: Record<string, string> = { very_high: "text-red-600", high: "text-orange-500", medium: "text-yellow-500", low: "text-green-500", very_low: "text-gray-400" };
@@ -10,7 +9,6 @@ export default function ProjectRisksPanel({ projectId }: { projectId: number }) 
   const query = trpc.modules.pmt.shell.tools.risks.list.useQuery({ projectId });
   const risks = query.data ?? [];
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   const openRisks = risks.filter((r: any) => r.status === "open" || r.status === "mitigating");
   const closedRisks = risks.filter((r: any) => r.status === "closed" || r.status === "accepted");

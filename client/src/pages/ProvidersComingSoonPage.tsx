@@ -192,7 +192,7 @@ export default function ProvidersComingSoonPage() {
 
   if (section === "wizard") {
     return (
-      <Suspense fallback={<div className="p-6 flex justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+      <Suspense fallback={null}>
         <ProviderWizardPage />
       </Suspense>
     );

@@ -25,9 +25,7 @@ export function AgentRunsPage({ workspaceId }: { workspaceId: number }) {
         Agent Runs
       </h1>
 
-      {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
-      ) : runs && runs.length > 0 ? (
+      {runs && runs.length > 0 ? (
         <div className="space-y-2">
           {runs.map((run) => (
             <Link key={run.id} href={`/w/${workspaceId}/agents/runs/${run.id}`}>

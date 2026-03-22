@@ -38,12 +38,12 @@ export default function HardwareProfile() {
     );
   }
 
-  if (isLoading || !profile) {
+  if (!profile) {
     return (
       <div className="container py-8 space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Hardware Profile</h1>
-          <p className="text-muted-foreground mt-2">Detecting system capabilities...</p>
+          <p className="text-muted-foreground mt-2">No hardware profile available</p>
         </div>
       </div>
     );
@@ -316,11 +316,7 @@ export default function HardwareProfile() {
           </div>
         </CardHeader>
         <CardContent>
-          {benchmarksLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : benchmarks && benchmarks.length > 0 ? (
+          {benchmarks && benchmarks.length > 0 ? (
             <div className="space-y-4">
               <div className="overflow-x-auto">
                 <table className="w-full">

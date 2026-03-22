@@ -40,7 +40,7 @@ export function AgentRunDetailPage({ workspaceId }: { workspaceId: number }) {
   if (!run) {
     return (
       <div className="p-6 text-muted-foreground">
-        {runId > 0 ? "Loading..." : "Run not found"}
+        Run not found
       </div>
     );
   }

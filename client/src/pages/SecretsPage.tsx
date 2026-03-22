@@ -245,9 +245,7 @@ export default function SecretsPage() {
             />
           </div>
 
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading secrets...</div>
-          ) : filteredSecrets.length === 0 ? (
+          {filteredSecrets.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {searchQuery ? "No secrets found" : "No secrets yet. Create your first secret to get started."}
             </div>

@@ -519,7 +519,7 @@ export default function Providers() {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {!providers?.length && !isLoading ? (
+          {!providers?.length ? (
             <EmptyState
               icon={Settings}
               title="No Providers Configured"

@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Lock, ShieldAlert, CheckCircle2, AlertTriangle } from "lucide-react";
 
 export default function FreezeHoldsPanel({ projectId }: { projectId: number }) {
   const projectQuery = trpc.modules.pmt.shell.projects.get.useQuery({ id: projectId });
@@ -12,7 +11,6 @@ export default function FreezeHoldsPanel({ projectId }: { projectId: number }) {
   const gates = gatesQuery.data ?? [];
   const transitions = historyQuery.data ?? [];
 
-  if (projectQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   const isFrozen = project?.status === "control_hold";
   const failedGates = gates.filter((g: any) => g.status === "failed");

@@ -215,9 +215,7 @@ export function CollabThreadsPage({ workspaceId }: { workspaceId: number }) {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
-      ) : threads && threads.length > 0 ? (
+      {threads && threads.length > 0 ? (
         <div className="space-y-2">
           {threads.map((thread) => (
             <Card

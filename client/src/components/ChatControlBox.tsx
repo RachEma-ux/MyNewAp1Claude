@@ -314,8 +314,7 @@ export function ChatControlBox({
               {showProvDD && (<>
                 <div className="fixed inset-0 z-[199]" onClick={() => setShowProvDD(false)} />
                 <div className="absolute top-full left-0 right-0 mt-1 z-[200] bg-popover border border-border rounded-lg shadow-lg max-h-[300px] overflow-y-auto">
-                  {providersLoading ? <div className="flex justify-center p-4"><Loader2 className="h-4 w-4 animate-spin" /></div> :
-                    providers && providers.length > 0 ? providers.map((p) => (
+                  {providers && providers.length > 0 ? providers.map((p) => (
                       <button key={p.id} onClick={() => { onProviderSelect?.(p.id); onModelSelect?.(null); setShowProvDD(false); setShowModelDD(false); }}
                         className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted text-left transition-colors ${p.id === selectedProviderId ? "bg-primary/10 text-primary" : "text-popover-foreground"}`}>
                         <div className={`w-2 h-2 rounded-full ${pcolor(p.type)}`} /><span>{p.name}</span>
@@ -336,8 +335,7 @@ export function ChatControlBox({
                 {showModelDD && (<>
                   <div className="fixed inset-0 z-[199]" onClick={() => setShowModelDD(false)} />
                   <div className="absolute top-full left-0 right-0 mt-1 z-[200] bg-popover border border-border rounded-lg shadow-lg max-h-[300px] overflow-y-auto">
-                    {modelsLoading ? <div className="flex justify-center p-4"><Loader2 className="h-4 w-4 animate-spin" /></div> :
-                      providerModels && providerModels.length > 0 ? providerModels.map((m) => (
+                    {providerModels && providerModels.length > 0 ? providerModels.map((m) => (
                         <button key={m.id} onClick={() => { onModelSelect?.(m.id); setShowModelDD(false); }}
                           className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted text-left transition-colors ${m.id === selectedModelId ? "bg-primary/10 text-primary" : "text-popover-foreground"}`}>
                           <span>{m.name}</span>

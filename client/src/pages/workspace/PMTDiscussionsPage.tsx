@@ -96,11 +96,7 @@ export function PMTDiscussionsPage({ workspaceId }: { workspaceId: number }) {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : sorted.length === 0 ? (
+      {sorted.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No discussions yet. Start a new one.
         </div>

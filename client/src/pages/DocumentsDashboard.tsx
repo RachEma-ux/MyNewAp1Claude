@@ -108,7 +108,7 @@ export default function DocumentsDashboard() {
   };
 
   // Fetch real chunks when preview modal is open
-  const { data: chunks, isLoading: chunksLoading } = trpc.documents.getChunks.useQuery(
+  const { data: chunks } = trpc.documents.getChunks.useQuery(
     { documentId: previewDocumentId! },
     { enabled: !!previewDocumentId && showPreviewModal }
   );
@@ -327,13 +327,7 @@ export default function DocumentsDashboard() {
       </Card>
 
       {/* Documents List */}
-      {documentsLoading ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Loading documents...</p>
-          </CardContent>
-        </Card>
-      ) : filteredDocuments.length === 0 ? (
+      {filteredDocuments.length === 0 ? (
         <EmptyState
           icon={FileText}
           title="No documents found"
@@ -475,14 +469,7 @@ export default function DocumentsDashboard() {
               <div>
                 <h4 className="text-sm font-medium mb-2">Chunk Preview</h4>
                 <div className="space-y-2">
-                  {chunksLoading ? (
-                    <Card>
-                      <CardContent className="p-4 text-center">
-                        <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground">Loading chunks...</p>
-                      </CardContent>
-                    </Card>
-                  ) : chunks && chunks.length > 0 ? (
+                  {chunks && chunks.length > 0 ? (
                     chunks.slice(0, 5).map((chunk: any, idx: number) => (
                       <Card key={chunk.id}>
                         <CardContent className="p-4">

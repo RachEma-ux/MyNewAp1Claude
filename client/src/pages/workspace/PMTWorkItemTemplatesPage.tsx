@@ -103,11 +103,7 @@ export function PMTWorkItemTemplatesPage({ workspaceId }: { workspaceId: number 
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : !templates || (templates as any[]).length === 0 ? (
+      {!templates || (templates as any[]).length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No work item templates. Create your first template.
         </div>

@@ -186,11 +186,7 @@ export default function ProviderConnectionsPage() {
       </div>
 
       {/* Connection Cards */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : total === 0 ? (
+      {total === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Plug className="h-12 w-12 text-muted-foreground mb-4" />

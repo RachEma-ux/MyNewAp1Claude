@@ -67,9 +67,7 @@ export default function TemplatesPage() {
         </TabsList>
 
         <TabsContent value={selectedCategory || "all"}>
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground py-4">Loading templates...</p>
-          ) : templates.length === 0 ? (
+          {templates.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <FileText className="h-16 w-16 text-muted-foreground mb-4" />

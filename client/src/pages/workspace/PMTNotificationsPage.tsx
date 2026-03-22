@@ -57,11 +57,7 @@ export function PMTNotificationsPage({ workspaceId }: { workspaceId: number }) {
         )}
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : !notifications || (notifications as any[]).length === 0 ? (
+      {!notifications || (notifications as any[]).length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No notifications.
         </div>

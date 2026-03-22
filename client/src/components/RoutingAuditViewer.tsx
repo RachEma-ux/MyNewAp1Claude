@@ -178,11 +178,7 @@ export function RoutingAuditViewer({ workspaceId }: Props) {
           <CardDescription>Detailed log of provider routing decisions</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : !logs || logs.length === 0 ? (
+          {!logs || logs.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No routing decisions recorded in this time period
             </div>

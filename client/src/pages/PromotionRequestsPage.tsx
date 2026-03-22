@@ -148,7 +148,7 @@ export default function PromotionRequestsPage() {
       {/* Requests List */}
       <div className="space-y-4">
         {isLoading && (
-          <p className="text-sm text-muted-foreground py-2">Loading promotion requests...</p>
+          <p className="text-sm text-muted-foreground py-2">No promotion requests yet</p>
         )}
         {!isLoading && requests && requests.length === 0 && (
           <Card className="p-8 text-center">

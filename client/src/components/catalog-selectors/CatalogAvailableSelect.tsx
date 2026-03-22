@@ -75,17 +75,6 @@ export function CatalogAvailableSelect({
     );
   }, [options, search, searchable]);
 
-  if (isLoading) {
-    return (
-      <Select disabled>
-        <SelectTrigger className={className}>
-          <Loader2 className="size-4 animate-spin mr-2" />
-          <SelectValue placeholder="Loading..." />
-        </SelectTrigger>
-      </Select>
-    );
-  }
-
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger className={className}>

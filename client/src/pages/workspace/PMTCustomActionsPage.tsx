@@ -100,11 +100,7 @@ export function PMTCustomActionsPage({ workspaceId }: { workspaceId: number }) {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : !actions || (actions as any[]).length === 0 ? (
+      {!actions || (actions as any[]).length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No custom actions defined. Create your first action.
         </div>

@@ -2,13 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Repeat, Calendar, CheckCircle2 } from "lucide-react";
 
 export default function IterationsPanel({ projectId }: { projectId: number }) {
   const sprintsQuery = trpc.modules.pmt.shell.sprints.list.useQuery({ projectId });
   const sprints = sprintsQuery.data ?? [];
 
-  if (sprintsQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   const now = new Date();
   const active = sprints.find((s: any) => s.status === "active" || (s.startDate && s.endDate && new Date(s.startDate) <= now && new Date(s.endDate) >= now));

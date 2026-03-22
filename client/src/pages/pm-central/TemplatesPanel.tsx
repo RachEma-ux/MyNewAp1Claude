@@ -24,11 +24,7 @@ export default function TemplatesPanel({ defaultTab }: { defaultTab?: string }) 
         </p>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : !workspaceId ? (
+      {!workspaceId ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground mb-3">No project workspace found. Create one first to use templates.</p>
           <Button variant="outline" onClick={() => setLocation("/workspaces")}>

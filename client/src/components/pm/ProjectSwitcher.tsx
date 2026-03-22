@@ -78,11 +78,7 @@ export default function ProjectSwitcher({ currentProjectId, currentProjectName }
           </div>
         </div>
         <DropdownMenuSeparator />
-        {projectsQuery.isLoading ? (
-          <div className="flex items-center justify-center py-3">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="px-2 py-3 text-center text-xs text-muted-foreground">
             {search ? "No matching projects" : "No projects yet"}
           </div>

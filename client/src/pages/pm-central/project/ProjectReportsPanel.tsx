@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Loader2, BarChart3 } from "lucide-react";
 
 export default function ProjectReportsPanel({ projectId }: { projectId: number }) {
   const tasksQuery = trpc.modules.pmt.shell.tasks.list.useQuery({ projectId });
@@ -12,7 +11,6 @@ export default function ProjectReportsPanel({ projectId }: { projectId: number }
   const total = tasks.length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-  if (tasksQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-4">

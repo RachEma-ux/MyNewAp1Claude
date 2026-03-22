@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import {
-  Loader2, Inbox, CheckSquare, ShieldCheck, AlertTriangle,
+  Inbox, CheckSquare, ShieldCheck, AlertTriangle,
   Lock, Clock, ListChecks, ArrowRight,
 } from "lucide-react";
 
@@ -18,10 +18,6 @@ export default function InboxPage() {
   const [, setLocation] = useLocation();
   const projectsQuery = trpc.modules.pmt.shell.projects.list.useQuery();
   const allProjects = projectsQuery.data ?? [];
-
-  if (projectsQuery.isLoading) {
-    return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-  }
 
   // Categorize projects needing attention
   const frozenProjects = allProjects.filter((p: any) => p.status === "control_hold");

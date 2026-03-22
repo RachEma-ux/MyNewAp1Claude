@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { GitBranch, Plus, ShieldCheck, Clock, Loader2 } from "lucide-react";
+import { GitBranch, Plus, ShieldCheck, Clock } from "lucide-react";
 
 const CHANGE_TYPES = [
   { value: "scope", label: "Scope" },
@@ -171,14 +171,7 @@ export default function ChangesPanel() {
         ))}
       </div>
 
-      {projectsQuery.isLoading && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading...
-        </div>
-      )}
-
-      {changeRequests.length === 0 && !projectsQuery.isLoading && (
+      {changeRequests.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <GitBranch className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

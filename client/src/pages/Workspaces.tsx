@@ -251,9 +251,7 @@ export default function Workspaces() {
         </div>
       }
     >
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading workspaces...</p>
-      ) : workspaces && workspaces.length > 0 ? (
+      {workspaces && workspaces.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {workspaces.map((workspace: any) => (
             <Card key={workspace.id} className="group hover:border-primary/50 transition-colors">

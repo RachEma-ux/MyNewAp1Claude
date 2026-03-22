@@ -90,12 +90,7 @@ export default function AITypesPage() {
       </div>
 
       {/* Content */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
-          <span className="ml-3 text-muted-foreground">Loading catalog entries...</span>
-        </div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center">
             {meta.icon}

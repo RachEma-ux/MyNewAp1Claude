@@ -151,11 +151,7 @@ export function PMTBurndownChart({ workspaceId }: { workspaceId: number }) {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : !activeSprint ? (
+      {!activeSprint ? (
         <div className="text-center py-12 text-muted-foreground">
           No sprint selected. Create a sprint to see the burndown chart.
         </div>

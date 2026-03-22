@@ -255,10 +255,10 @@ export default function DeployPage() {
           Deployments
         </h1>
         <p className="text-muted-foreground mt-1">
-          {configQuery.isLoading ? "Checking deployment configuration..." : "Deploy and manage your application via GitHub Actions"}
+          Deploy and manage your application via GitHub Actions
         </p>
       </div>
-      {configQuery.isLoading ? null : (<>
+      {(<>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
@@ -382,13 +382,6 @@ export default function DeployPage() {
                 <p className="text-sm">
                   Trigger a new deployment or select one from history
                 </p>
-              </CardContent>
-            </Card>
-          ) : statusQuery.isLoading ? (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
-                <p className="mt-2 text-muted-foreground">Loading deployment status...</p>
               </CardContent>
             </Card>
           ) : statusQuery.error ? (
@@ -602,11 +595,7 @@ export default function DeployPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {historyQuery.isLoading ? (
-                <div className="py-8 text-center">
-                  <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
-                </div>
-              ) : historyQuery.error ? (
+              {historyQuery.error ? (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>

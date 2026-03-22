@@ -57,14 +57,6 @@ export default function ShellClonePage() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   if (!source) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">

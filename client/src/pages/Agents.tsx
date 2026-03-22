@@ -321,8 +321,6 @@ export default function Agents() {
           title="Select a Workspace"
           description="Choose a workspace from the dropdown above to view and manage its agents"
         />
-      ) : agentsQuery.isLoading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading agents...</div>
       ) : agentsQuery.data && agentsQuery.data.length === 0 ? (
         <EmptyState
           icon={Bot}

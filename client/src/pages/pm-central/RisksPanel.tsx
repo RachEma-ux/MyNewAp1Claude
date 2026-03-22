@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { AlertTriangle, ShieldCheck, Lock, Activity, Loader2 } from "lucide-react";
+import { AlertTriangle, ShieldCheck, Lock, Activity } from "lucide-react";
 
 const RISK_COLORS: Record<string, string> = {
   low: "bg-green-500/10 text-green-600 border-green-500/30",
@@ -36,13 +36,6 @@ export default function RisksPanel() {
           Project risk overview — risk levels, gate failures, freezes, and compliance status
         </p>
       </div>
-
-      {projectsQuery.isLoading && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading...
-        </div>
-      )}
 
       {/* Risk summary cards */}
       <div className="grid gap-4 md:grid-cols-4">

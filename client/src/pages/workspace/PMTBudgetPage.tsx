@@ -99,11 +99,7 @@ export function PMTBudgetPage({ workspaceId }: { workspaceId: number }) {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : !budgets || (budgets as any[]).length === 0 ? (
+      {!budgets || (budgets as any[]).length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No budgets defined. Create your first budget.
         </div>

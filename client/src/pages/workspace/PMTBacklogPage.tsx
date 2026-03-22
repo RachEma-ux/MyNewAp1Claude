@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Plus, ArrowRight, ArrowLeft, List } from "lucide-react";
+import { Plus, ArrowRight, ArrowLeft, List } from "lucide-react";
 import { toast } from "sonner";
 
 const typeColors: Record<string, string> = {
@@ -50,7 +50,7 @@ export function PMTBacklogPage({ workspaceId }: { workspaceId: number }) {
   const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
   const projectId = selectedProject || projects?.[0]?.id;
 
-  const { data: tasks, isLoading: tasksLoading } = trpc.modules.pmt.tasks.list.useQuery(
+  const { data: tasks } = trpc.modules.pmt.tasks.list.useQuery(
     { workspaceId, projectId: projectId! },
     { enabled: !!projectId }
   );
@@ -153,10 +153,6 @@ export function PMTBacklogPage({ workspaceId }: { workspaceId: number }) {
       {!projectId ? (
         <div className="text-center py-12 text-muted-foreground">
           No projects available. Create a project first.
-        </div>
-      ) : tasksLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
         <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">

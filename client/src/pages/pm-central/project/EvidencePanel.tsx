@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Package } from "lucide-react";
 
 export default function EvidencePanel({ projectId }: { projectId: number }) {
   const artifactsQuery = trpc.modules.pmt.shell.artifacts.list.useQuery({ projectId });
@@ -10,7 +9,6 @@ export default function EvidencePanel({ projectId }: { projectId: number }) {
   const gates = gatesQuery.data ?? [];
   const gatesWithVerdicts = gates.filter((g: any) => g.verdict);
 
-  if (artifactsQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-4">

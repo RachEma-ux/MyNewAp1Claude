@@ -160,11 +160,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : !templates || (templates as any[]).length === 0 ? (
+      {!templates || (templates as any[]).length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No project templates. Click "Seed PM Templates" to create 5 reusable templates (PM² Lifecycle, Scrum, Kanban, Product Launch, SDLC), or create your own.
         </div>

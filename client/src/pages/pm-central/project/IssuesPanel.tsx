@@ -1,7 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, AlertCircle } from "lucide-react";
 
 const SEV_COLORS: Record<string, string> = { critical: "bg-red-500", high: "bg-orange-500", medium: "bg-yellow-500", low: "bg-gray-400" };
 
@@ -9,7 +8,6 @@ export default function IssuesPanel({ projectId }: { projectId: number }) {
   const query = trpc.modules.pmt.shell.tools.issues.list.useQuery({ projectId });
   const issues = query.data ?? [];
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   const open = issues.filter((i: any) => i.status !== "closed" && i.status !== "resolved");
   const resolved = issues.filter((i: any) => i.status === "closed" || i.status === "resolved");

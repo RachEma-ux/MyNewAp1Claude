@@ -82,9 +82,7 @@ export default function WCPExecutions() {
         </div>
 
         {/* Executions List */}
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground py-4">Loading executions...</p>
-        ) : executions.length === 0 ? (
+        {executions.length === 0 ? (
           <Card className="p-12 text-center">
             <div className="max-w-md mx-auto">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">

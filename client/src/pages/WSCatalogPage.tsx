@@ -21,7 +21,7 @@ export default function WSCatalogPage() {
       title="Workspace Catalog"
       subtitle="Discover and join available workspaces"
     >
-      {!published?.length && !isLoading ? (
+      {!published?.length ? (
         <div className="text-center py-12">
           <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">No workspaces are currently published</p>

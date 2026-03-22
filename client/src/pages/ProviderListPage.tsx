@@ -341,7 +341,7 @@ export default function ProviderListPage() {
       )}
 
       {/* Loading / Empty state */}
-      {isLoading && <p className="text-sm text-muted-foreground py-4">Loading providers...</p>}
+      {isLoading && <p className="text-sm text-muted-foreground py-4">No providers yet</p>}
       {!isLoading && !isError && filtered.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">

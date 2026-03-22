@@ -137,7 +137,7 @@ export default function AgentChat() {
           <Button variant="ghost" size="icon" onClick={() => setLocation("/agents")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <p className="text-sm text-muted-foreground">Loading agent...</p>
+          <p className="text-sm text-muted-foreground">No agent yet</p>
         </div>
       </div>
     );

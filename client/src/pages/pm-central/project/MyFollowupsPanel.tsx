@@ -1,13 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Bell, CheckSquare, ShieldCheck, AlertTriangle, Clock, ListChecks } from "lucide-react";
 
 export default function MyFollowupsPanel({ projectId }: { projectId: number }) {
   const summaryQuery = trpc.modules.pmt.shell.tools.sidebarSummary.get.useQuery({ projectId });
   const s = summaryQuery.data;
 
-  if (summaryQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   if (!s) return <div className="text-center py-20 text-muted-foreground">Project data unavailable</div>;
 

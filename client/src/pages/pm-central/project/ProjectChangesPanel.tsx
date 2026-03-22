@@ -1,7 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, GitBranch } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-500", submitted: "bg-blue-500", under_review: "bg-yellow-500",
@@ -12,7 +11,6 @@ export default function ProjectChangesPanel({ projectId }: { projectId: number }
   const query = trpc.modules.pmt.shell.changes.list.useQuery({ projectId });
   const changes = query.data ?? [];
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-4">

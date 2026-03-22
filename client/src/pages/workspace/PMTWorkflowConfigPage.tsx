@@ -162,11 +162,7 @@ export function PMTWorkflowConfigPage({ workspaceId }: { workspaceId: number }) 
       </div>
 
       {/* Transitions table */}
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No workflow transitions configured. Add transitions above.
         </div>

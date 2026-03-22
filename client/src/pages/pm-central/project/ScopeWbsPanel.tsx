@@ -1,13 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Network, CheckCircle2, Circle, Clock } from "lucide-react";
 
 export default function ScopeWbsPanel({ projectId }: { projectId: number }) {
   const tasksQuery = trpc.modules.pmt.shell.tasks.list.useQuery({ projectId });
   const allTasks = tasksQuery.data ?? [];
 
-  if (tasksQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   // Group tasks by parent (simulate WBS hierarchy)
   const topLevel = allTasks.filter((t: any) => !t.parentId);

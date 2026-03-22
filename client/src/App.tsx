@@ -143,11 +143,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return null;
   }
 
   if (!isAuthenticated) {
@@ -174,11 +170,7 @@ function ShellRoute({ component: Component }: { component: React.ComponentType }
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return null;
   }
 
   if (!isAuthenticated) {
@@ -376,11 +368,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <InstallPrompt />
-          <Suspense fallback={
-            <div className="min-h-screen flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          }>
+          <Suspense fallback={null}>
             <Router />
           </Suspense>
         </TooltipProvider>

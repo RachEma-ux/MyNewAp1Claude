@@ -1,13 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Clock, BarChart3 } from "lucide-react";
 
 export default function WorklogPanel({ projectId }: { projectId: number }) {
   const query = trpc.modules.pmt.shell.tools.budget.list.useQuery({ projectId });
   // Work logs would normally come from a dedicated endpoint; reusing budget as proxy for now
   const items = query.data ?? [];
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-4">

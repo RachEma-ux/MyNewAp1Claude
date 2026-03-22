@@ -159,11 +159,7 @@ export function PMTCustomFieldsPage({ workspaceId }: { workspaceId: number }) {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : sortedFields.length === 0 ? (
+      {sortedFields.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No custom fields defined. Add your first custom field.
         </div>

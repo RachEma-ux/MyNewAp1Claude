@@ -26,7 +26,7 @@ export default function AutoRemediationPage() {
   const [isRemediating, setIsRemediating] = useState(false);
 
   // Catalog-backed agents — only approved + active agents are usable for remediation
-  const { options: catalogAgents, isLoading: agentsLoading } = useCatalogAvailableAgents();
+  const { options: catalogAgents } = useCatalogAvailableAgents();
 
   // Mutations
   const remediateMutation = trpc.agents.autoRemediate.useMutation({
@@ -139,12 +139,7 @@ export default function AutoRemediationPage() {
       {/* Available Agents — Catalog-backed (only approved + active) */}
       <Card className="p-6">
         <h2 className="text-lg font-semibold mb-4">Create Remediation Tasks</h2>
-        {agentsLoading ? (
-          <div className="flex items-center justify-center gap-2 py-8 text-gray-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading available agents...
-          </div>
-        ) : catalogAgents.length > 0 ? (
+        {catalogAgents.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {catalogAgents.map((agent) => (
               <div

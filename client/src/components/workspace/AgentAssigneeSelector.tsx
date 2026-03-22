@@ -55,12 +55,7 @@ export function AgentAssigneeSelector({ value, onChange }: AssigneeSelectorProps
         <div className="px-2 py-1 mt-1 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider border-t">
           AI Agents
         </div>
-        {isLoading ? (
-          <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Loading agents...
-          </div>
-        ) : agents.length === 0 ? (
+        {agents.length === 0 ? (
           <div className="px-2 py-2 text-xs text-muted-foreground">
             No agents available in Catalog
           </div>

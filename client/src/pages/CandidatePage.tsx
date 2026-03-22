@@ -893,11 +893,7 @@ export default function CandidatePage() {
           </div>
 
           {/* Cards */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredEntries.length === 0 ? (
+          {filteredEntries.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-10 w-10 mx-auto mb-3 opacity-50" />
               <p className="text-lg font-medium">No candidate entries yet</p>
@@ -4076,7 +4072,7 @@ export default function CandidatePage() {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 <span className="ml-2 text-sm text-muted-foreground">
-                  Loading governance criteria...
+                  No governance criteria
                 </span>
               </div>
             ) : reviewChecklist ? (

@@ -87,9 +87,7 @@ export function AgentsRosterPage({ workspaceId }: { workspaceId: number }) {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
-      ) : agents && agents.length > 0 ? (
+      {agents && agents.length > 0 ? (
         <div className="grid gap-3 md:grid-cols-2">
           {agents.map((agent) => (
             <Card key={agent.id}>

@@ -95,17 +95,6 @@ export function CatalogSelect({
     return groups;
   }, [filtered, singleType]);
 
-  if (isLoading) {
-    return (
-      <Select disabled>
-        <SelectTrigger className={className}>
-          <Loader2 className="size-4 animate-spin mr-2" />
-          <SelectValue placeholder="Loading..." />
-        </SelectTrigger>
-      </Select>
-    );
-  }
-
   const handleValueChange = (val: string) => {
     if (val === "__custom__" && onCustom) {
       onCustom();

@@ -106,9 +106,7 @@ export function KnowledgeDocsPage({ workspaceId }: { workspaceId: number }) {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
-      ) : docs && docs.length > 0 ? (
+      {docs && docs.length > 0 ? (
         <div className="space-y-2">
           {docs.map((doc) => (
             <Card

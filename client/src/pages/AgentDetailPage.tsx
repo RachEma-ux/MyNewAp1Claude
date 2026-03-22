@@ -144,7 +144,7 @@ export default function AgentDetailPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/agents")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Button>
-        <p className="text-sm text-muted-foreground mt-4">Loading agent details...</p>
+        <p className="text-sm text-muted-foreground mt-4">No agent details yet</p>
       </div>
     );
   }

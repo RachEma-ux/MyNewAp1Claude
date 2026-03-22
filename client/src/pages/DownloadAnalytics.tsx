@@ -9,7 +9,7 @@ import { Download, TrendingUp, Clock, HardDrive } from "lucide-react";
  */
 
 export default function DownloadAnalytics() {
-  const { data: stats, isLoading: statsLoading } = trpc.downloadAnalytics.getStats.useQuery();
+  const { data: stats } = trpc.downloadAnalytics.getStats.useQuery();
   const { data: peakTimes } = trpc.downloadAnalytics.getPeakTimes.useQuery();
   const { data: bandwidthPerModel } = trpc.downloadAnalytics.getBandwidthPerModel.useQuery();
 
@@ -42,7 +42,7 @@ export default function DownloadAnalytics() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Download Analytics</h1>
         <p className="text-muted-foreground mt-2">
-          {statsLoading ? "Loading analytics..." : "Track bandwidth usage, download speeds, and usage patterns"}
+          Track bandwidth usage, download speeds, and usage patterns
         </p>
       </div>
 

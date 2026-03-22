@@ -23,9 +23,9 @@ export function KeyRotationPage() {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Query data
-  const { data: rotationSummary, isLoading: summaryLoading } =
+  const { data: rotationSummary } =
     trpc.keyRotation.rotations.getStatusSummary.useQuery();
-  const { data: rotations, isLoading: rotationsLoading } = trpc.keyRotation.rotations.list.useQuery();
+  const { data: rotations } = trpc.keyRotation.rotations.list.useQuery();
   const { data: policies, isLoading: policiesLoading } =
     trpc.keyRotation.policies.list.useQuery();
   const { data: certs, isLoading: certsLoading } = trpc.keyRotation.serviceCertificates.list.useQuery(
@@ -60,11 +60,7 @@ export function KeyRotationPage() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          {summaryLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <p className="text-muted-foreground">Loading rotation status...</p>
-            </div>
-          ) : rotationSummary?.summary ? (
+          {rotationSummary?.summary ? (
             <>
               {/* Status Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -133,9 +129,7 @@ export function KeyRotationPage() {
                   <CardDescription>Latest key rotation events</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {rotationsLoading ? (
-                    <p className="text-muted-foreground">Loading rotations...</p>
-                  ) : rotations?.rotations && rotations.rotations.length > 0 ? (
+                  {rotations?.rotations && rotations.rotations.length > 0 ? (
                     <div className="space-y-4">
                       {rotations.rotations.slice(0, 5).map((rotation) => (
                         <div
@@ -188,9 +182,7 @@ export function KeyRotationPage() {
               <CardDescription>Manage TLS and mTLS certificates</CardDescription>
             </CardHeader>
             <CardContent>
-              {certsLoading ? (
-                <p className="text-muted-foreground">Loading certificates...</p>
-              ) : certs?.certificates && certs.certificates.length > 0 ? (
+              {certs?.certificates && certs.certificates.length > 0 ? (
                 <div className="space-y-4">
                   {certs.certificates.map((cert) => (
                     <div key={cert.id} className="p-4 border rounded-lg">
@@ -237,9 +229,7 @@ export function KeyRotationPage() {
               <CardDescription>Keys used for signing agent attestations</CardDescription>
             </CardHeader>
             <CardContent>
-              {keysLoading ? (
-                <p className="text-muted-foreground">Loading keys...</p>
-              ) : keys?.keys && keys.keys.length > 0 ? (
+              {keys?.keys && keys.keys.length > 0 ? (
                 <div className="space-y-4">
                   {keys.keys.map((key) => (
                     <div key={key.id} className="p-4 border rounded-lg">
@@ -292,9 +282,7 @@ export function KeyRotationPage() {
               <CardDescription>Automatic rotation policies</CardDescription>
             </CardHeader>
             <CardContent>
-              {policiesLoading ? (
-                <p className="text-muted-foreground">Loading policies...</p>
-              ) : policies?.policies && policies.policies.length > 0 ? (
+              {policies?.policies && policies.policies.length > 0 ? (
                 <div className="space-y-4">
                   {policies.policies.map((policy) => (
                     <div key={policy.id} className="p-4 border rounded-lg">

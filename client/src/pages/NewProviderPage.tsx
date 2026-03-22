@@ -560,11 +560,7 @@ export default function NewProviderPage() {
             {showCatalogPicker && (
               <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
                 <p className="text-sm font-medium">Select from Hub Catalog</p>
-                {catalogQuery.isLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />Loading catalog...
-                  </div>
-                ) : (
+                {(
                   <div className="grid gap-1 max-h-48 overflow-y-auto">
                     {catalogQuery.data?.map((model) => (
                       <button

@@ -91,7 +91,7 @@ export function GovernancePage({ workspaceId }: { workspaceId: number }) {
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Loading...</p>
+              <p className="text-sm text-muted-foreground">No data yet</p>
             )}
           </CardContent>
         </Card>
@@ -126,7 +126,7 @@ export function GovernancePage({ workspaceId }: { workspaceId: number }) {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Loading...</p>
+              <p className="text-sm text-muted-foreground">No data yet</p>
             )}
           </CardContent>
         </Card>

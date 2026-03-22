@@ -333,11 +333,6 @@ function ProjectsPanel() {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
         <>
           {/* Draft projects */}
           <div>
@@ -742,8 +737,6 @@ function BacklogPanel() {
 
       {!projectId ? (
         <div className="text-center py-12 text-muted-foreground">No projects available. Create a project first.</div>
-      ) : isLoading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
           {/* Backlog panel */}
@@ -1006,8 +999,6 @@ function TimelinePanel() {
 
       {!projectId ? (
         <div className="text-center py-12 text-muted-foreground">No projects available.</div>
-      ) : isLoading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : !timeline ? (
         <div className="text-center py-12 text-muted-foreground">No tasks with dates. Set start or due dates on tasks.</div>
       ) : (
@@ -1146,8 +1137,6 @@ function CalendarPanel() {
 
       {!projectId ? (
         <div className="text-center py-12 text-muted-foreground">No projects available.</div>
-      ) : isLoading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="border rounded-md overflow-hidden">
           <div className="grid grid-cols-7 bg-muted/50">
@@ -1263,9 +1252,6 @@ function ReportsPanel() {
         <ProjectSelector projects={projects} projectId={projectId || null} onChange={setSelectedProject} />
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-      ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Status Distribution</CardTitle></CardHeader>

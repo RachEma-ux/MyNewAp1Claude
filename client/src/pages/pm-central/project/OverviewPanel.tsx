@@ -6,7 +6,7 @@ import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import {
   FolderKanban, CheckSquare, AlertTriangle, ShieldCheck,
-  Clock, ArrowRight, Loader2, Activity,
+  Clock, ArrowRight, Activity,
 } from "lucide-react";
 
 const STATE_LABELS: Record<string, string> = {
@@ -29,7 +29,6 @@ export default function OverviewPanel({ projectId }: { projectId: number }) {
   const totalTasks = allTasks.length;
   const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
-  if (projectQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (!project) return <div className="text-muted-foreground text-center py-20">Project not found</div>;
 
   const base = `/pm-central/p/${projectId}`;

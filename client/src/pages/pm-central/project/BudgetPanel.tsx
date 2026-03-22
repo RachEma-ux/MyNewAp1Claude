@@ -1,12 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Loader2, DollarSign } from "lucide-react";
 
 export default function BudgetPanel({ projectId }: { projectId: number }) {
   const query = trpc.modules.pmt.shell.tools.budget.list.useQuery({ projectId });
   const items = query.data ?? [];
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   const totalPlanned = items.reduce((sum: number, i: any) => sum + (i.planned || 0), 0);
   const totalActual = items.reduce((sum: number, i: any) => sum + (i.actual || 0), 0);

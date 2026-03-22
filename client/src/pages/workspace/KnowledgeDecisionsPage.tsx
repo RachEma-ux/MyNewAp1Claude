@@ -74,9 +74,7 @@ export function KnowledgeDecisionsPage({ workspaceId }: { workspaceId: number })
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
-      ) : decisions && decisions.length > 0 ? (
+      {decisions && decisions.length > 0 ? (
         <div className="space-y-2">
           {decisions.map((d) => (
             <Card key={d.id}>

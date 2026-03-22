@@ -302,9 +302,8 @@ export default function BotListPage() {
         </Card>
       )}
 
-      {/* Loading / Empty state */}
-      {isLoading && <p className="text-sm text-muted-foreground py-4">Loading bots...</p>}
-      {!isLoading && !isError && filtered.length === 0 && (
+      {/* Empty state */}
+      {!isError && filtered.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Bot className="h-12 w-12 text-muted-foreground mb-4" />

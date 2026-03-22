@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Calendar, ArrowRight } from "lucide-react";
 
 export default function TimelinePanel({ projectId }: { projectId: number }) {
   const projectQuery = trpc.modules.pmt.shell.projects.get.useQuery({ id: projectId });
@@ -13,7 +12,6 @@ export default function TimelinePanel({ projectId }: { projectId: number }) {
   const sprints = sprintsQuery.data ?? [];
   const milestoneTasks = tasks.filter((t: any) => t.type === "milestone");
 
-  if (projectQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-6">

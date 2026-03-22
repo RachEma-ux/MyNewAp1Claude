@@ -959,11 +959,7 @@ function Phase2BaseModel({
         <AlertDescription>Select the foundation model for fine-tuning.</AlertDescription>
       </Alert>
 
-      {catalogQuery.isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading catalog...
-        </div>
-      ) : (
+      {(
         <div className="grid gap-3 max-h-96 overflow-y-auto">
           {models.map((model: any, idx: number) => (
             <Card

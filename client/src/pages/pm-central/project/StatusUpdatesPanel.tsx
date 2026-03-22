@@ -1,7 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, FileBarChart } from "lucide-react";
 
 const HEALTH_COLORS: Record<string, string> = { green: "bg-green-500", yellow: "bg-yellow-500", red: "bg-red-500" };
 
@@ -9,7 +8,6 @@ export default function StatusUpdatesPanel({ projectId }: { projectId: number })
   const query = trpc.modules.pmt.shell.tools.statusUpdates.list.useQuery({ projectId });
   const updates = query.data ?? [];
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-4">

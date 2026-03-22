@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, ShieldCheck } from "lucide-react";
 
 const GATE_LABELS: Record<string, string> = { G0: "Intake", G1: "Planning Auth", G2: "Change Control", G3: "Compliance", G4: "Closure" };
 const STATUS_COLORS: Record<string, string> = { pending: "bg-yellow-500", evaluating: "bg-blue-500", passed: "bg-green-500", failed: "bg-red-500", waived: "bg-gray-500" };
@@ -10,7 +9,6 @@ export default function ApprovalsPanel({ projectId }: { projectId: number }) {
   const query = trpc.modules.pmt.shell.gates.list.useQuery({ projectId });
   const gates = query.data ?? [];
 
-  if (query.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   const pending = gates.filter((g: any) => g.status === "pending" || g.status === "evaluating");
   const completed = gates.filter((g: any) => g.status !== "pending" && g.status !== "evaluating");

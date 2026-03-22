@@ -25,17 +25,6 @@ export default function WCPExecutionDetails() {
   // Parse logs if available
   const logs = execution?.executionLog ? JSON.parse(execution.executionLog) : [];
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-8">
-        <Button variant="ghost" onClick={() => setLocation("/wcp/executions")} className="mb-4">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Executions
-        </Button>
-        <p className="text-sm text-muted-foreground">Loading execution details...</p>
-      </div>
-    );
-  }
 
   if (!execution) {
     return (

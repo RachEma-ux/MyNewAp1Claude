@@ -345,13 +345,6 @@ export default function ProjectWorkspaceShell() {
   const { data: workspace, isLoading } = trpc.workspaces.get.useQuery({ id: workspaceId }, { enabled: workspaceId > 0 });
   const { data: modules = [] } = trpc.modules.manage.list.useQuery({ workspaceId }, { enabled: workspaceId > 0, retry: 2 });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   if (!workspace) {
     return (

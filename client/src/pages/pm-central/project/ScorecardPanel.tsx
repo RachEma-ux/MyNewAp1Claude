@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, BarChart3, TrendingUp, TrendingDown, Minus, ShieldCheck } from "lucide-react";
 
 export default function ScorecardPanel({ projectId }: { projectId: number }) {
   const gatesQuery = trpc.modules.pmt.shell.gates.list.useQuery({ projectId });
@@ -9,7 +8,6 @@ export default function ScorecardPanel({ projectId }: { projectId: number }) {
   const gates = gatesQuery.data ?? [];
   const project = projectQuery.data;
 
-  if (gatesQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   // Compute scorecard from gate results
   const passed = gates.filter((g: any) => g.status === "passed").length;

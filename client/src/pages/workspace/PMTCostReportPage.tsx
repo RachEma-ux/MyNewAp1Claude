@@ -85,11 +85,7 @@ export function PMTCostReportPage({ workspaceId }: { workspaceId: number }) {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : filteredEntries.length === 0 ? (
+      {filteredEntries.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No cost entries found.
         </div>

@@ -1,13 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, ShieldCheck } from "lucide-react";
 
 export default function PolicyPanel({ projectId }: { projectId: number }) {
   const lifecycleQuery = trpc.modules.pmt.shell.lifecycle.history.useQuery({ projectId });
   const transitions = lifecycleQuery.data ?? [];
 
-  if (lifecycleQuery.isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-4">

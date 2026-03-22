@@ -36,16 +36,6 @@ export default function ResourceMonitor() {
     }
   };
 
-  if (hardwareLoading || allocationLoading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Resource Monitor</h1>
-          <p className="text-muted-foreground mt-1">Loading hardware and resource information...</p>
-        </div>
-      </div>
-    );
-  }
 
   const memoryUsagePercent = allocation ? (allocation.usedMemoryGB / allocation.totalMemoryGB) * 100 : 0;
   const requestUtilization = allocation && allocation.maxConcurrentRequests > 0

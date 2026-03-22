@@ -81,9 +81,7 @@ export function PMTProjectsPage({ workspaceId }: { workspaceId: number }) {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading projects...</div>
-      ) : projects && projects.length > 0 ? (
+      {projects && projects.length > 0 ? (
         <div className="grid gap-3">
           {projects.map((p) => (
             <Link key={p.id} href={`/w/${workspaceId}/projects/${p.id}`}>
