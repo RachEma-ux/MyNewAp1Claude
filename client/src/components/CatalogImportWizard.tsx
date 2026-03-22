@@ -101,6 +101,8 @@ import {
   Brain,
   Workflow,
   Package,
+  Server,
+  Bot,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -700,14 +702,14 @@ export function CatalogImportWizard({
               </Button>
             </div>
 
-            {/* Card 3: From Wizard */}
+            {/* Card 3: From Domain — select existing deployable assets */}
             <div className="border rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2 font-medium text-sm">
                 <Wand2 className="h-4 w-4" />
-                From Wizard
+                From Domain
               </div>
               <p className="text-xs text-muted-foreground">
-                Select a deployable LLM or callable Agent for Catalog onboarding, or create entries through guided wizards
+                Select an existing deployable asset to continue Catalog candidate creation
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -721,18 +723,10 @@ export function CatalogImportWizard({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { onOpenChange(false); navigate("/llm/wizard"); }}
+                  onClick={() => { onOpenChange(false); navigate("/list/providers?mode=catalog-import&deployableOnly=1&returnTo=/llm/catalogue/candidate"); }}
                 >
-                  <Brain className="h-4 w-4 mr-1" />
-                  LLM Quick Setup
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { onOpenChange(false); navigate("/llm/create"); }}
-                >
-                  <Brain className="h-4 w-4 mr-1" />
-                  LLM Creation
+                  <Server className="h-4 w-4 mr-1" />
+                  Provider Select
                 </Button>
                 <Button
                   variant="outline"
@@ -745,20 +739,20 @@ export function CatalogImportWizard({
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => { onOpenChange(false); navigate("/list/bots?mode=catalog-import&deployableOnly=1&returnTo=/llm/catalogue/candidate"); }}
+                >
+                  <Bot className="h-4 w-4 mr-1" />
+                  Bot Select
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => { onOpenChange(false); navigate("/governance/agents?mode=catalog-import&callableOnly=1&returnTo=/llm/catalogue/candidate"); }}
                 >
                   <Workflow className="h-4 w-4 mr-1" />
-                  Agent Wizard
+                  Agent Select
                 </Button>
               </div>
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={() => { onOpenChange(false); navigate("/llm/catalogue/candidate"); }}
-              >
-                <Search className="h-4 w-4 mr-1" />
-                Discover
-              </Button>
             </div>
 
             {error && (
