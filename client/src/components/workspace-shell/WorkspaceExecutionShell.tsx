@@ -3,12 +3,12 @@
  *
  * Layout:
  *   WorkspaceShellHeader (top)
- *   [ContextSidebar (left) | Main Content | ToolsSidebar (right, collapsible)]
+ *   [ContextSidebar (left) | ToolsSidebar (left, collapsible) | Main Content]
  *   WorkspaceManagerControls (right drawer, manager-only)
  *
  * CRITICAL: No blocking spinner. Shell structure renders immediately.
  * Context sidebar is always-open on desktop to answer "what is this?" first.
- * Tools sidebar is collapsible on the right — icon-only when collapsed.
+ * Tools sidebar is collapsible on the left (after context sidebar) — icon-only when collapsed.
  */
 
 import { useState, useEffect } from "react";
@@ -182,7 +182,7 @@ export default function WorkspaceExecutionShell() {
         basePath={basePath}
       />
 
-      {/* ─── Body: Context Sidebar + Main Content + Tools Sidebar ─── */}
+      {/* ─── Body: Context Sidebar + Tools Sidebar + Main Content ─── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Context Sidebar (left) — ALWAYS VISIBLE on desktop */}
         <WorkspaceContextSidebar
@@ -192,7 +192,17 @@ export default function WorkspaceExecutionShell() {
         />
 
         {/* Main Execution Area */}
-        <main className="flex-1 overflow-auto bg-background">
+        <main className="flex-1 relative overflow-auto bg-background">
+          {/* Tools Toolbar — top-left corner of main area */}
+          <WorkspaceToolsToolbar
+            shell={shell}
+            basePath={basePath}
+            open={toolsMobileOpen}
+            collapsed={toolsCollapsed}
+            onToggle={() => setToolsCollapsed(!toolsCollapsed)}
+            onClose={() => setToolsMobileOpen(false)}
+          />
+
           <Switch>
             {/* ─── PMT Engine ─── */}
             <Route path={`${basePath}/projects/board`}><ModuleGate moduleKey="pmt" moduleName="Project Management"><PMTKanbanPage workspaceId={workspaceId} /></ModuleGate></Route>
@@ -259,16 +269,6 @@ export default function WorkspaceExecutionShell() {
             <Route><WorkspaceMainFrame shell={shell} basePath={basePath} /></Route>
           </Switch>
         </main>
-
-        {/* Tools Sidebar (right) — collapsible */}
-        <WorkspaceToolsToolbar
-          shell={shell}
-          basePath={basePath}
-          open={toolsMobileOpen}
-          collapsed={toolsCollapsed}
-          onToggle={() => setToolsCollapsed(!toolsCollapsed)}
-          onClose={() => setToolsMobileOpen(false)}
-        />
       </div>
 
       {/* ─── Manager Controls Drawer (right) ─── */}

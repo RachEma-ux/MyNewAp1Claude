@@ -1,11 +1,11 @@
 /**
  * WorkspaceToolsSidebar — Collapsible right sidebar for workspace tools
  *
- * Vertical tool navigation panel on the right edge of the shell.
+ * Vertical tool navigation panel on the left side (after context sidebar).
  * Answers: "What tools can I use here?"
  *
- * Desktop: inline collapsible panel (240px open, icon-only 48px collapsed)
- * Mobile: slide-out drawer from the right
+ * Desktop: inline collapsible panel (220px open, icon-only 48px collapsed)
+ * Mobile: slide-out drawer from the left
  *
  * Visual signals:
  *   - "TOOLS" header with toggle
@@ -38,8 +38,8 @@ import {
   ShieldCheck,
   Wrench,
   LayoutDashboard,
-  PanelRightClose,
-  PanelRightOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import type { ShellViewData } from "./types";
 
@@ -152,7 +152,7 @@ function ToolLink({
     return (
       <Tooltip>
         <TooltipTrigger asChild>{inner}</TooltipTrigger>
-        <TooltipContent side="left" className="text-xs">{label}</TooltipContent>
+        <TooltipContent side="right" className="text-xs">{label}</TooltipContent>
       </Tooltip>
     );
   }
@@ -198,9 +198,9 @@ function SidebarContent({
           title={collapsed ? "Expand tools panel" : "Collapse tools panel"}
         >
           {collapsed ? (
-            <PanelRightOpen className="h-3.5 w-3.5" />
+            <PanelLeftOpen className="h-3.5 w-3.5" />
           ) : (
-            <PanelRightClose className="h-3.5 w-3.5" />
+            <PanelLeftClose className="h-3.5 w-3.5" />
           )}
         </Button>
       </div>
@@ -276,10 +276,10 @@ export function WorkspaceToolsToolbar({
 }: ToolsSidebarProps) {
   return (
     <>
-      {/* Desktop: inline collapsible panel */}
+      {/* Desktop: floating panel at top-left of main area */}
       <aside
         className={cn(
-          "hidden md:flex flex-col border-l bg-card/80 backdrop-blur-sm transition-all duration-200 shrink-0 overflow-hidden",
+          "hidden md:flex flex-col absolute top-0 left-0 z-20 border-r border-b rounded-br-lg bg-card/95 backdrop-blur-sm shadow-md transition-all duration-200 overflow-hidden max-h-[calc(100%-1rem)]",
           collapsed ? "w-[48px]" : "w-[220px]"
         )}
       >
@@ -291,9 +291,9 @@ export function WorkspaceToolsToolbar({
         />
       </aside>
 
-      {/* Mobile: drawer from right */}
+      {/* Mobile: drawer from left */}
       <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-        <SheetContent side="right" className="w-[260px] p-0 md:hidden">
+        <SheetContent side="left" className="w-[260px] p-0 md:hidden">
           <SidebarContent
             shell={shell}
             basePath={basePath}
