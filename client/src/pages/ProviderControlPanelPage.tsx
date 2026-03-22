@@ -97,11 +97,7 @@ export default function ProviderControlPanelPage() {
       </div>
 
       {/* Provider Health Table */}
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : total === 0 ? (
+      {!providers?.length && !isLoading ? (
         <Card>
           <CardContent className="py-8 text-center">
             <Cloud className="h-10 w-10 text-muted-foreground mx-auto mb-3" />

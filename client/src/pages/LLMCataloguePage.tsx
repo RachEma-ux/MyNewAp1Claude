@@ -275,11 +275,7 @@ export default function LLMCataloguePage() {
       <Separator className="mb-6" />
 
       {/* Entry Cards */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : filteredEntries.length > 0 ? (
+      {filteredEntries.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredEntries.map((entry) => {
             const entryType = entry.entryType as EntryType;

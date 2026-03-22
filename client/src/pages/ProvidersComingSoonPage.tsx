@@ -45,14 +45,6 @@ function ProviderDashboard() {
     { label: "Provider List", description: "Browse all registered providers", icon: Cloud, href: "/providers", color: "text-orange-500" },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <div className="flex items-start justify-between">

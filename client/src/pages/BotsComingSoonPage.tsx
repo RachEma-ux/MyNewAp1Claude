@@ -42,14 +42,6 @@ function BotDashboard() {
   const { data: bots, isLoading: botsLoading } = trpc.bots.list.useQuery();
   const [, navigate] = useLocation();
 
-  if (statsLoading || botsLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   const botList = bots || [];
   const total = stats?.total ?? 0;
   const byLifecycle = stats?.byLifecycle ?? {};
@@ -186,14 +178,6 @@ function BotControlPanel() {
     },
   });
   const [, navigate] = useLocation();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   const botList = bots || [];
 

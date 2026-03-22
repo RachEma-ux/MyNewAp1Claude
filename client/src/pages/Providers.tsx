@@ -519,9 +519,7 @@ export default function Providers() {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground py-12 text-center">Loading providers...</p>
-          ) : providers?.length === 0 ? (
+          {!providers?.length && !isLoading ? (
             <EmptyState
               icon={Settings}
               title="No Providers Configured"

@@ -153,7 +153,7 @@ export default function WSWizardPage() {
 
   const createMutation = trpc.workspaces.createDraft.useMutation({
     onSuccess: (ws: any) => {
-      toast.success("Workspace draft created");
+      toast.success("Workspace created successfully");
       navigate(`/ws/list`);
     },
     onError: (err) => toast.error(err.message),
@@ -175,17 +175,28 @@ export default function WSWizardPage() {
     }
   };
 
-  const saveDraft = () => {
+  const saveDraft = (andSubmitForReview = false) => {
     if (!data.name.trim()) {
       toast.error("Workspace name is required");
       return;
     }
+    const crewPayload = data.crewAgents.length > 0
+      ? data.crewAgents.map((c) => ({
+          participantType: c.participantType as "agent" | "bot",
+          participantId: Number(c.participantId) || 0,
+          participantName: c.participantName,
+          role: c.crewRole,
+          note: c.note || undefined,
+        }))
+      : undefined;
     createMutation.mutate({
       name: data.name,
       description: data.description,
       type: data.type,
       purposeType: data.purposeType as any,
       purposeRef: data.purposeRef,
+      crew: crewPayload,
+      submitForReview: andSubmitForReview || undefined,
     });
   };
 
@@ -656,10 +667,20 @@ export default function WSWizardPage() {
               Next <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           )}
-          {isLast && (
-            <Button onClick={saveDraft} disabled={createMutation.isPending}>
+          {isLast && !isAdmin && (
+            <Button onClick={() => saveDraft(false)} disabled={createMutation.isPending}>
               <Save className="h-4 w-4 mr-1" /> Save as Draft
             </Button>
+          )}
+          {isLast && isAdmin && (
+            <>
+              <Button variant="outline" onClick={() => saveDraft(false)} disabled={createMutation.isPending}>
+                <Save className="h-4 w-4 mr-1" /> Save as Draft
+              </Button>
+              <Button onClick={() => saveDraft(true)} disabled={createMutation.isPending}>
+                <Shield className="h-4 w-4 mr-1" /> Save & Submit for Review
+              </Button>
+            </>
           )}
         </div>
       </div>

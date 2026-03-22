@@ -80,6 +80,14 @@ export const workspaceRouter = router({
         chunkingStrategy: z.enum(["semantic", "fixed", "recursive"]).optional(),
         chunkSize: z.number().optional(),
         chunkOverlap: z.number().optional(),
+        crew: z.array(z.object({
+          participantType: z.enum(["agent", "bot"]).default("agent"),
+          participantId: z.number(),
+          participantName: z.string(),
+          role: z.string().default("executor"),
+          note: z.string().optional(),
+        })).optional(),
+        submitForReview: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -108,17 +116,48 @@ export const workspaceRouter = router({
         collectionName: `workspace_${Date.now()}`,
       });
       if (workspace && typeof workspace === "object" && "id" in workspace) {
+        const wsId = (workspace as any).id;
         try {
-          await seedWorkspaceModules((workspace as any).id, workspaceType);
+          await seedWorkspaceModules(wsId, workspaceType);
         } catch (err) {
           console.warn(`[Workspace] Failed to seed modules: ${(err as Error).message}`);
         }
+        // Persist crew entries if provided
+        if (input.crew && input.crew.length > 0) {
+          const dbConn = getDb();
+          if (dbConn) {
+            try {
+              await dbConn.insert(workspaceCrew).values(
+                input.crew.map((c) => ({
+                  workspaceId: wsId,
+                  agentId: c.participantId,
+                  agentName: c.participantName,
+                  participantType: c.participantType || "agent",
+                  role: c.role || "executor",
+                  note: c.note || null,
+                  capabilities: [],
+                  constraints: {},
+                }))
+              );
+            } catch (err) {
+              console.warn(`[Workspace] Failed to persist crew: ${(err as Error).message}`);
+            }
+          }
+        }
         await logActivity({
-          workspaceId: (workspace as any).id,
+          workspaceId: wsId,
           actorId: ctx.user.id,
           action: "workspace.create",
-          metadata: { workspaceType },
+          metadata: { workspaceType, crewCount: input.crew?.length ?? 0 },
         }).catch(() => {});
+        // Admin shortcut: create draft + submit for review in one action
+        if (input.submitForReview) {
+          try {
+            await submitForReview(wsId, ctx.user.id);
+          } catch (err) {
+            console.warn(`[Workspace] Auto-submit for review failed: ${(err as Error).message}`);
+          }
+        }
       }
       return workspace;
     }),
@@ -427,7 +466,9 @@ export const workspaceRouter = router({
         workspaceId: z.number(),
         agentId: z.number(),
         agentName: z.string(),
+        participantType: z.enum(["agent", "bot"]).default("agent"),
         role: z.string().optional(),
+        note: z.string().optional(),
         capabilities: z.array(z.string()).optional(),
         constraints: z.record(z.unknown()).optional(),
       }))
@@ -441,12 +482,14 @@ export const workspaceRouter = router({
             workspaceId: input.workspaceId,
             agentId: input.agentId,
             agentName: input.agentName,
+            participantType: input.participantType || "agent",
             role: input.role || "executor",
+            note: input.note || null,
             capabilities: input.capabilities || [],
             constraints: input.constraints || {},
           })
           .returning();
-        await logActivity({ workspaceId: input.workspaceId, actorId: ctx.user.id, action: "workspace.crew.add", metadata: { agentId: input.agentId, agentName: input.agentName } }).catch(() => {});
+        await logActivity({ workspaceId: input.workspaceId, actorId: ctx.user.id, action: "workspace.crew.add", metadata: { agentId: input.agentId, agentName: input.agentName, participantType: input.participantType } }).catch(() => {});
         return crew;
       }),
 
