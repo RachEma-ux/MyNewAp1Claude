@@ -662,8 +662,8 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* Configuration Stage (Admin) */}
-          {currentStage === "configuration" && (
+          {/* Configuration Stage (Admin only) */}
+          {currentStage === "configuration" && isAdmin && (
             <>
               <div>
                 <label className="text-sm font-medium mb-1 block">Embedding Model</label>
@@ -690,8 +690,8 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* Review Stage (Governance) */}
-          {currentStage === "review" && (
+          {/* Review Stage (Admin only — Governance) */}
+          {currentStage === "review" && isAdmin && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-muted-foreground">Name:</span> {data.name || "—"}</div>
@@ -737,24 +737,28 @@ export default function WSWizardPage() {
         </CardContent>
       </Card>
 
-      {/* Navigation — always: Previous | Save as Draft | Next */}
+      {/* Navigation — Previous | Save as Draft | Right action */}
+      {/* Right action is mutually exclusive: Next OR Submit for Review OR empty */}
       <div className="flex items-center justify-between">
         <Button variant="outline" onClick={goPrev} disabled={isFirst}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Previous
         </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={saveDraft} disabled={isSaving}>
-            <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving..." : "Save as Draft"}
-          </Button>
-          {isLast && isAdmin && (
-            <Button onClick={saveAndSubmitForReview} disabled={isSaving}>
-              <Shield className="h-4 w-4 mr-1" /> Save & Submit for Review
-            </Button>
-          )}
-        </div>
-        <Button onClick={goNext} disabled={isLast}>
-          Next <ArrowRight className="h-4 w-4 ml-1" />
+        <Button variant="outline" onClick={saveDraft} disabled={isSaving}>
+          <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving..." : "Save as Draft"}
         </Button>
+        {isLast && isAdmin ? (
+          <Button onClick={saveAndSubmitForReview} disabled={isSaving}>
+            <Shield className="h-4 w-4 mr-1" /> Save & Submit for Review
+          </Button>
+        ) : isLast ? (
+          <Button variant="outline" disabled className="invisible">
+            <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        ) : (
+          <Button onClick={goNext}>
+            Next <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        )}
       </div>
     </PageShell>
   );
