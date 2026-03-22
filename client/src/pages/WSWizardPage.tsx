@@ -6,10 +6,11 @@
  * Governance: Review → Approve/Reject → Publish → Activate
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { PageShell } from "@/components/app";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ import {
   Sparkles,
   Workflow,
   AlertCircle,
+  Lock,
 } from "lucide-react";
 import { CatalogAgentSelect, CatalogBotSelect } from "@/components/catalog-selectors";
 import { useCatalogAvailableAgents, useCatalogAvailableBots } from "@/hooks/useCatalogAvailable";
@@ -111,6 +113,12 @@ interface WizardData {
 
 export default function WSWizardPage() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const visibleStages = useMemo<WizardStage[]>(
+    () => isAdmin ? ALL_STAGES : MANAGER_STAGES,
+    [isAdmin]
+  );
   const [currentStage, setCurrentStage] = useState<WizardStage>("identity");
   const [data, setData] = useState<WizardData>({
     name: "",
@@ -151,20 +159,19 @@ export default function WSWizardPage() {
     onError: (err) => toast.error(err.message),
   });
 
-  const currentIndex = ALL_STAGES.indexOf(currentStage);
+  const currentIndex = visibleStages.indexOf(currentStage);
   const isFirst = currentIndex === 0;
-  const isManagerDone = currentStage === "needs";
-  const isLast = currentIndex === ALL_STAGES.length - 1;
+  const isLast = currentIndex === visibleStages.length - 1;
 
   const goNext = () => {
-    if (currentIndex < ALL_STAGES.length - 1) {
-      setCurrentStage(ALL_STAGES[currentIndex + 1]);
+    if (currentIndex < visibleStages.length - 1) {
+      setCurrentStage(visibleStages[currentIndex + 1]);
     }
   };
 
   const goPrev = () => {
     if (currentIndex > 0) {
-      setCurrentStage(ALL_STAGES[currentIndex - 1]);
+      setCurrentStage(visibleStages[currentIndex - 1]);
     }
   };
 
@@ -192,7 +199,7 @@ export default function WSWizardPage() {
     <PageShell title="Workspace Wizard" subtitle="Create a new workspace through the guided flow">
       {/* Progress bar */}
       <div className="flex items-center gap-1 mb-6 overflow-x-auto pb-2">
-        {ALL_STAGES.map((stage, i) => {
+        {visibleStages.map((stage, i) => {
           const isActive = stage === currentStage;
           const isPast = i < currentIndex;
           return (
@@ -212,12 +219,24 @@ export default function WSWizardPage() {
             </button>
           );
         })}
+        {/* Show locked admin/governance stages to non-admin users */}
+        {!isAdmin && [...ADMIN_STAGES, ...GOVERNANCE_STAGES].map((stage) => (
+          <span
+            key={stage}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-muted/50 text-muted-foreground/50 cursor-not-allowed"
+            title={`${STAGE_LABELS[stage]} — Admin only`}
+          >
+            <Lock className="h-3 w-3" />
+            {STAGE_LABELS[stage]}
+          </span>
+        ))}
       </div>
 
       <div className="flex items-center gap-2 mb-4">
         <Badge variant="outline">{getStagePhase(currentStage)} Phase</Badge>
         <span className="text-sm text-muted-foreground">
-          Step {currentIndex + 1} of {ALL_STAGES.length}
+          Step {currentIndex + 1} of {visibleStages.length}
+          {!isAdmin && <span className="text-muted-foreground/60"> (Manager)</span>}
         </span>
       </div>
 
@@ -632,11 +651,6 @@ export default function WSWizardPage() {
           <ArrowLeft className="h-4 w-4 mr-1" /> Previous
         </Button>
         <div className="flex gap-2">
-          {isManagerDone && (
-            <Button variant="secondary" onClick={saveDraft}>
-              <Save className="h-4 w-4 mr-1" /> Save as Draft
-            </Button>
-          )}
           {!isLast && (
             <Button onClick={goNext}>
               Next <ArrowRight className="h-4 w-4 ml-1" />
@@ -644,7 +658,7 @@ export default function WSWizardPage() {
           )}
           {isLast && (
             <Button onClick={saveDraft} disabled={createMutation.isPending}>
-              <Check className="h-4 w-4 mr-1" /> Create Workspace
+              <Save className="h-4 w-4 mr-1" /> Save as Draft
             </Button>
           )}
         </div>
