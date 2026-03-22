@@ -323,10 +323,12 @@ export default function Workspaces() {
           icon={FolderOpen}
           title="No workspaces yet"
           description="Create your first workspace to start organizing your AI projects"
-          action={{
-            label: "Create Workspace",
-            onClick: () => setCreateDialogOpen(true),
-          }}
+          action={
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Workspace
+            </Button>
+          }
         />
       )}
       <ConfirmDialog />
