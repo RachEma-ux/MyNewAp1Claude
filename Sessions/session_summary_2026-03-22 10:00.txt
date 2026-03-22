@@ -1,0 +1,66 @@
+Session Summary — 2026-03-22 10:00
+===================================
+
+## Objective
+Continue and complete the canonical workspace system v2 implementation that was started in the previous session. The previous session ran out of context after completing Agents 1-8, with Agent 9 (Tester) in progress and Agent 10 (Reviewer/Governance) pending.
+
+## Work Completed
+
+### Agent 9: Tester (Completed)
+- Verified workspace-lifecycle.test.ts was complete with comprehensive tests:
+  - Status classification (executable, readable, published, deleted, setup-mutable)
+  - Lifecycle transitions (success path, failure path, end-of-life path)
+  - Transition validation (invalid transitions rejected)
+  - Publication logic (WS List vs WS Catalog distinction)
+  - Lifecycle completeness (all statuses defined, no orphan targets)
+
+### Agent 10: Reviewer/Governance Audit (Completed)
+Verified all 15 workspace invariants:
+- WS-01 through WS-15 all pass
+- Publication is distinct from activation (approved → published → active)
+- WS List ≠ WS Catalog (separate endpoints, separate pages)
+- Team (human) vs Crew (AI) properly separated
+- Lifecycle gates execution correctly
+- Shell makes workspace intelligible before navigable
+- Manager-configurable participant visibility implemented
+- Backward compatibility maintained (create, update, getActivity, getMembers, getModules aliases)
+
+### Integration Work (Completed)
+- Added WSTeamPage, WSCrewPage, WSRulesPage routes to WorkspaceShell.tsx
+- Added Team, Crew (AI), Rules navigation items to WorkspaceSidebar.tsx
+- Added Users, Cpu, Scale icons to sidebar imports
+
+## Files Modified (This Session)
+- client/src/pages/WorkspaceShell.tsx — Added Team/Crew/Rules imports and routes
+- client/src/components/workspace/WorkspaceSidebar.tsx — Added Team/Crew/Rules nav entries + icons
+
+## Commit
+- Hash: a31f2d8
+- Message: "Implement canonical workspace system v2: 9-status lifecycle, WS Sandbox, Team/Crew"
+- 26 files changed, 3592 insertions(+), 257 deletions(-)
+- Pushed to main
+
+## Full Implementation Summary (Both Sessions)
+
+### Schema & Migration
+- 9-status lifecycle: draft, ready_for_review, under_review, approved, published, active, rejected, archived, deleted
+- workspaceCrew table for AI participation
+- shellConfig, resourceProfile columns
+- Migration: drizzle/0022_workspace_system_v2.sql
+
+### Backend (6 files)
+- server/workspace/workspace-lifecycle.ts — 9-status lifecycle engine
+- server/workspace/lifecycle-service.ts — Transition domain service
+- server/workspace/workspace-router.ts — Full tRPC router (replaced inline routes)
+- server/workspace/shell-view-resolver.ts — Participant-aware shell view
+- server/workspace/workspace-guards.ts — Updated guards (setup-mutable, published)
+- server/workspace/workspace-contract.ts — Enhanced WorkspaceContext
+
+### Frontend (14 files)
+- WS Sandbox: Dashboard, Control Panel, Wizard, List, Catalog, Sandbox entry
+- Shell: WorkspaceContextSidebar, WorkspaceToolbar
+- Workspace pages: Team, Crew, Rules
+- Integration: App.tsx routes, WorkspaceShell routes, WorkspaceSidebar nav
+
+### Tests (1 file)
+- server/workspace/workspace-lifecycle.test.ts
