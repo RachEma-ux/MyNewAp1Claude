@@ -91,16 +91,19 @@ const LLMCreationWizard = lazy(() => import("@/pages/LLMCreationWizard"));
 const LLMProviderConfigWizard = lazy(() => import("@/pages/LLMProviderConfigWizard"));
 const NewProviderPage = lazy(() => import("@/pages/NewProviderPage"));
 const LLMCataloguePage = lazy(() => import("@/pages/LLMCataloguePage"));
-const WorkspaceShell = lazy(() => import("@/pages/WorkspaceShell"));
+// Legacy shell preserved in codebase but no longer mounted as primary
+// const WorkspaceShellLegacy = lazy(() => import("@/pages/WorkspaceShell"));
+const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
 const WSDashboardPage = lazy(() => import("@/pages/WSDashboardPage"));
 const WSControlPanelPage = lazy(() => import("@/pages/WSControlPanelPage"));
 const WSWizardPage = lazy(() => import("@/pages/WSWizardPage"));
 const WSListPage = lazy(() => import("@/pages/WSListPage"));
 const WSCatalogPage = lazy(() => import("@/pages/WSCatalogPage"));
-const PersonalWorkspaceShell = lazy(() => import("@/pages/PersonalWorkspaceShell"));
-const ProjectWorkspaceShell = lazy(() => import("@/pages/ProjectWorkspaceShell"));
-const ResearchWorkspaceShell = lazy(() => import("@/pages/ResearchWorkspaceShell"));
+// Legacy template shells — replaced by WorkspaceExecutionShell
+// const PersonalWorkspaceShell = lazy(() => import("@/pages/PersonalWorkspaceShell"));
+// const ProjectWorkspaceShell = lazy(() => import("@/pages/ProjectWorkspaceShell"));
+// const ResearchWorkspaceShell = lazy(() => import("@/pages/ResearchWorkspaceShell"));
 const LLMPromotions = lazy(() => import("@/pages/LLMPromotions"));
 const LLMDetailPage = lazy(() => import("@/pages/LLMDetailPage"));
 const LLMTrainingDashboard = lazy(() => import("@/pages/LLMTrainingDashboard"));
@@ -202,16 +205,16 @@ function Router() {
       <Route path="/ws/catalog" component={() => <ProtectedRoute component={WSCatalogPage} />} />
       <Route path="/workspaces/:id/home" component={() => <ProtectedRoute component={WorkspaceHome} />} />
       <Route path="/workspaces/:id" component={() => <ProtectedRoute component={WorkspaceDetail} />} />
-      {/* Workspace Shell — floating detachable container inside MainLayout */}
-      <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceShell} />} />
-      <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceShell} />} />
-      {/* Template workspace shells */}
-      <Route path="/personal/:workspaceId/*" component={() => <ProtectedRoute component={PersonalWorkspaceShell} />} />
-      <Route path="/personal/:workspaceId" component={() => <ProtectedRoute component={PersonalWorkspaceShell} />} />
-      <Route path="/project/:workspaceId/*" component={() => <ProtectedRoute component={ProjectWorkspaceShell} />} />
-      <Route path="/project/:workspaceId" component={() => <ProtectedRoute component={ProjectWorkspaceShell} />} />
-      <Route path="/research/:workspaceId/*" component={() => <ProtectedRoute component={ResearchWorkspaceShell} />} />
-      <Route path="/research/:workspaceId" component={() => <ProtectedRoute component={ResearchWorkspaceShell} />} />
+      {/* Workspace Execution Shell — NEW context-first shell architecture */}
+      <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
+      <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
+      {/* Template workspace shells — all use new WorkspaceExecutionShell */}
+      <Route path="/personal/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
+      <Route path="/personal/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
+      <Route path="/project/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
+      <Route path="/project/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
+      <Route path="/research/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
+      <Route path="/research/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
       {/* Models — governed model registry */}
       <Route path="/models/dashboard" component={() => <ProtectedRoute component={ModelsComingSoonPage} />} />
       <Route path="/models/control-panel" component={() => <ProtectedRoute component={ModelsComingSoonPage} />} />
