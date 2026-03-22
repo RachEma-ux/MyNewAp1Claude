@@ -1,0 +1,36 @@
+# Governance-Critical Paths
+# Changes to these paths require governance review.
+# See: docs/governance/GOVERNANCE_CONTRACT.md
+
+# Availability authority — single source of truth
+server/catalog/availability.ts                    @RachEma-ux
+
+# Catalog lifecycle router — intake, review, publish, activate
+server/routers/catalog-manage.ts                  @RachEma-ux
+
+# Domain routers — must NOT create catalog_entries
+server/routers/agents.ts                          @RachEma-ux
+server/routers/llm.ts                             @RachEma-ux
+server/routers/models.ts                          @RachEma-ux
+server/routers/bots.ts                            @RachEma-ux
+server/routers/llm-providers.ts                   @RachEma-ux
+
+# Governance contracts and documentation
+docs/governance/                                  @RachEma-ux
+docs/architecture/AI_TYPES_GOVERNANCE_STANDARD.md @RachEma-ux
+
+# Static governance guard
+scripts/governance/                               @RachEma-ux
+
+# Test infrastructure for governance invariants
+tests/contracts/                                  @RachEma-ux
+tests/governance/                                 @RachEma-ux
+tests/integration/runtime-db/                     @RachEma-ux
+tests/helpers/governance-harness.ts               @RachEma-ux
+
+# CI governance enforcement
+.github/workflows/run-tests.yml                   @RachEma-ux
+.github/workflows/governance-gate.yml             @RachEma-ux
+
+# This file itself
+.github/CODEOWNERS                                @RachEma-ux

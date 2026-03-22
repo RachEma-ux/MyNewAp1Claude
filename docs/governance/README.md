@@ -20,6 +20,7 @@ No governance documentation should exist outside this folder (except archived hi
 | File | Purpose |
 |------|---------|
 | `GOVERNANCE_CONTRACT.md` | **AI Types Governance Contract (LOCKED).** Formal invariants, allowed/forbidden patterns, test suite enforcement, violation examples. Binding for all AI Types changes. |
+| `GOVERNANCE_FREEZE.md` | **Governance Freeze Record.** Documents what is frozen at `v1.0.0-governance-locked`: governed files, invariants, enforcement layers, test coverage, and post-freeze rules. |
 | `REVIEW_GUIDELINES.md` | Code review criteria for governance-relevant PRs. Rejection and approval rules. |
 | `GOVERNANCE_BIBLE.md` | Canonical governance and security standard (CGT v2). Defines all rules, compliance matrices, risk classification, and the YAML enforcement spec. Primary governance authority. |
 | `ENFORCEMENT_RULES.md` | Non-negotiable governance invariants. Absolute rules that override convenience, velocity, and developer preference. |
