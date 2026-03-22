@@ -3,12 +3,12 @@
  *
  * Layout:
  *   WorkspaceShellHeader (top)
- *   WorkspaceToolsToolbar (horizontal tools bar)
- *   [WorkspaceContextSidebar (left, always open on desktop) | Main Content Area]
+ *   [ContextSidebar (left) | Main Content | ToolsSidebar (right, collapsible)]
  *   WorkspaceManagerControls (right drawer, manager-only)
  *
  * CRITICAL: No blocking spinner. Shell structure renders immediately.
  * Context sidebar is always-open on desktop to answer "what is this?" first.
+ * Tools sidebar is collapsible on the right — icon-only when collapsed.
  */
 
 import { useState, useEffect } from "react";
@@ -108,8 +108,11 @@ export default function WorkspaceExecutionShell() {
   const workspaceId = parseInt(params.workspaceId || "0", 10);
   const [location, navigate] = useLocation();
 
-  // Sidebar ALWAYS starts open on desktop — context-first
+  // Context sidebar ALWAYS starts open on desktop — context-first
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Tools sidebar starts expanded on desktop, collapsed state tracked separately
+  const [toolsCollapsed, setToolsCollapsed] = useState(false);
+  const [toolsMobileOpen, setToolsMobileOpen] = useState(false);
   const [managerDrawerOpen, setManagerDrawerOpen] = useState(false);
 
   // Fetch the resolved shell view from backend — NON-BLOCKING
@@ -175,13 +178,11 @@ export default function WorkspaceExecutionShell() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         onManagerOpen={() => setManagerDrawerOpen(true)}
+        onToolsToggle={() => setToolsMobileOpen(!toolsMobileOpen)}
         basePath={basePath}
       />
 
-      {/* ─── Tools Toolbar (horizontal, visually distinct, labeled) ─── */}
-      <WorkspaceToolsToolbar shell={shell} basePath={basePath} />
-
-      {/* ─── Body: Context Sidebar + Main Content ─── */}
+      {/* ─── Body: Context Sidebar + Main Content + Tools Sidebar ─── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Context Sidebar (left) — ALWAYS VISIBLE on desktop */}
         <WorkspaceContextSidebar
@@ -258,6 +259,16 @@ export default function WorkspaceExecutionShell() {
             <Route><WorkspaceMainFrame shell={shell} basePath={basePath} /></Route>
           </Switch>
         </main>
+
+        {/* Tools Sidebar (right) — collapsible */}
+        <WorkspaceToolsToolbar
+          shell={shell}
+          basePath={basePath}
+          open={toolsMobileOpen}
+          collapsed={toolsCollapsed}
+          onToggle={() => setToolsCollapsed(!toolsCollapsed)}
+          onClose={() => setToolsMobileOpen(false)}
+        />
       </div>
 
       {/* ─── Manager Controls Drawer (right) ─── */}

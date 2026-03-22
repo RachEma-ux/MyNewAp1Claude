@@ -14,6 +14,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   SlidersHorizontal,
+  Wrench,
 } from "lucide-react";
 
 interface ShellHeaderProps {
@@ -24,6 +25,7 @@ interface ShellHeaderProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   onManagerOpen: () => void;
+  onToolsToggle: () => void;
   basePath: string;
 }
 
@@ -46,6 +48,7 @@ export function WorkspaceShellHeader({
   sidebarOpen,
   onToggleSidebar,
   onManagerOpen,
+  onToolsToggle,
   basePath,
 }: ShellHeaderProps) {
   return (
@@ -87,6 +90,17 @@ export function WorkspaceShellHeader({
           {status.replace(/_/g, " ")}
         </Badge>
       </div>
+
+      {/* Mobile: tools sidebar toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 shrink-0 md:hidden"
+        onClick={onToolsToggle}
+        title="Toggle tools panel"
+      >
+        <Wrench className="h-4 w-4" />
+      </Button>
 
       {/* Manager controls drawer trigger */}
       {isManager && (
