@@ -21,7 +21,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
+import { WorkspaceUnifiedSidebar } from "@/components/workspace/WorkspaceUnifiedSidebar";
 import { WorkspaceStatusBar } from "@/components/workspace/WorkspaceStatusBar";
 import { OversightDrawer } from "@/components/workspace/OversightDrawer";
 import { ModuleDisabled } from "@/components/workspace/ModuleDisabled";
@@ -152,10 +152,19 @@ export default function WorkspaceShell() {
       {/* ─── Main Body: Sidebar + Content ─── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Collapsible Sidebar */}
-        <WorkspaceSidebar
+        <WorkspaceUnifiedSidebar
           workspaceId={workspaceId}
           workspaceName={workspace?.name || "Workspace"}
+          workspaceType={(workspace as any)?.type}
+          status={(workspace as any)?.status || "draft"}
           enabledModules={enabledModules}
+          isManager={true}
+          participantRole={(workspace as any)?.participantRole || "owner"}
+          teamCount={(workspace as any)?.teamCount ?? 0}
+          crewCount={(workspace as any)?.crewCount ?? 0}
+          purposeType={(workspace as any)?.purposeType}
+          purposeRef={(workspace as any)?.purposeRef}
+          missionEmphasis={(workspace as any)?.missionEmphasis}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
           onOversightOpen={() => setOversightOpen(true)}
