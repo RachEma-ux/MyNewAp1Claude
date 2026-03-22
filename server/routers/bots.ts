@@ -168,19 +168,23 @@ export const botsRouter = router({
     const bots = await getAllBots();
     const catalogEntries = await getCatalogEntries({ entryType: "bot" });
 
-    // Index catalog entries by sourceBotId or name
-    const catalogByBotId = new Map<number, any>();
+    // Index catalog entries by sourceId (new structured FK) or legacy config.sourceBotId
+    const catalogBySourceId = new Map<number, any>();
+    const catalogByLegacyId = new Map<number, any>();
     const catalogByName = new Map<string, any>();
     for (const entry of catalogEntries) {
+      if (entry.sourceType === "bot" && entry.sourceId) {
+        catalogBySourceId.set(entry.sourceId, entry);
+      }
       const config = (entry.config as Record<string, any>) || {};
       if (config.sourceBotId) {
-        catalogByBotId.set(config.sourceBotId, entry);
+        catalogByLegacyId.set(config.sourceBotId, entry);
       }
       catalogByName.set(entry.name.toLowerCase(), entry);
     }
 
     return bots.map((bot) => {
-      const catalogEntry = catalogByBotId.get(bot.id) ?? catalogByName.get(bot.name.toLowerCase()) ?? null;
+      const catalogEntry = catalogBySourceId.get(bot.id) ?? catalogByLegacyId.get(bot.id) ?? catalogByName.get(bot.name.toLowerCase()) ?? null;
 
       let catalogState: "not_imported" | "candidate" | "imported" | "published" = "not_imported";
       if (catalogEntry) {
@@ -221,9 +225,10 @@ export const botsRouter = router({
         );
       }
 
-      // Duplicate prevention
+      // Duplicate prevention (structured FK first, then legacy config)
       const existingEntries = await getCatalogEntries({ entryType: "bot" });
       const duplicate = existingEntries.find((entry) => {
+        if (entry.sourceType === "bot" && entry.sourceId === input.id) return true;
         const config = (entry.config as Record<string, any>) || {};
         return config.sourceBotId === input.id;
       });

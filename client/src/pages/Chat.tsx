@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CatalogSelect } from "@/components/CatalogSelect";
-import { useCatalogEntries } from "@/hooks/useCatalogEntries";
+import { CatalogProviderSelect, CatalogModelSelect } from "@/components/catalog-selectors";
+import { useCatalogAvailableProviders } from "@/hooks/useCatalogAvailable";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { trpc } from "@/lib/trpc";
 import { Loader2, MessageSquare, Bot, User as UserIcon, Sparkles, BookOpen, Route, History, Archive, Trash2, PenLine, BarChart3, Upload, Download, Zap } from "lucide-react";
@@ -188,9 +188,9 @@ function ChatInner() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [catalogProvider, setCatalogProvider] = useState<string>("");
   const [catalogModel, setCatalogModel] = useState<string>("");
-  const { entries: catalogProviders } = useCatalogEntries({ entryType: "provider" });
+  const { raw: availableProviders } = useCatalogAvailableProviders();
   const selectedCatalogProvider = catalogProvider
-    ? catalogProviders.find((e) => String(e.id) === catalogProvider)
+    ? availableProviders.find((e: any) => String(e.id) === catalogProvider)
     : null;
   const selectedCatalogProviderName = selectedCatalogProvider?.name ?? "";
   const [isStreaming, setIsStreaming] = useState(false);
@@ -597,10 +597,9 @@ function ChatInner() {
             </Select>
           )}
 
-          {/* Provider Selection (hidden when unified routing is enabled) */}
+          {/* Provider Selection — Catalog-available only (hidden when unified routing is enabled) */}
           {!useUnifiedRouting && (
-            <CatalogSelect
-              entryType="provider"
+            <CatalogProviderSelect
               value={catalogProvider}
               onValueChange={(id) => {
                 setCatalogProvider(id);
@@ -612,18 +611,15 @@ function ChatInner() {
             />
           )}
 
-          {/* Model Selection (shown when a provider is selected and not using unified routing) */}
+          {/* Model Selection — Catalog-available only (shown when provider is selected) */}
           {!useUnifiedRouting && catalogProvider && (
-            <CatalogSelect
-              entryType="model"
+            <CatalogModelSelect
               value={catalogModel}
               onValueChange={(id) => {
                 setCatalogModel(id);
               }}
               placeholder="Select model"
               className="w-[240px]"
-              linkedProvider={selectedCatalogProviderName}
-              valueField="name"
             />
           )}
 

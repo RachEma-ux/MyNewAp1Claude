@@ -162,19 +162,23 @@ export const modelsRouter = router({
     const models = await getAllModels();
     const catalogEntries = await getCatalogEntries({ entryType: "model" });
 
-    // Index catalog entries by sourceModelId
-    const catalogByModelId = new Map<number, any>();
+    // Index catalog entries by sourceId (new structured FK) or legacy config.sourceModelId
+    const catalogBySourceId = new Map<number, any>();
+    const catalogByLegacyId = new Map<number, any>();
     const catalogByName = new Map<string, any>();
     for (const entry of catalogEntries) {
+      if (entry.sourceType === "model" && entry.sourceId) {
+        catalogBySourceId.set(entry.sourceId, entry);
+      }
       const config = (entry.config as Record<string, any>) || {};
       if (config.sourceModelId) {
-        catalogByModelId.set(config.sourceModelId, entry);
+        catalogByLegacyId.set(config.sourceModelId, entry);
       }
       catalogByName.set(entry.name.toLowerCase(), entry);
     }
 
     return models.map((model) => {
-      const catalogEntry = catalogByModelId.get(model.id) ?? catalogByName.get(model.name.toLowerCase()) ?? null;
+      const catalogEntry = catalogBySourceId.get(model.id) ?? catalogByLegacyId.get(model.id) ?? catalogByName.get(model.name.toLowerCase()) ?? null;
 
       let catalogState: "not_imported" | "candidate" | "imported" | "published" = "not_imported";
       if (catalogEntry) {
@@ -215,9 +219,10 @@ export const modelsRouter = router({
         );
       }
 
-      // Check for existing catalog entry to prevent duplicates
+      // Check for existing catalog entry to prevent duplicates (structured FK first, then legacy)
       const existingEntries = await getCatalogEntries({ entryType: "model" });
       const duplicate = existingEntries.find((entry) => {
+        if (entry.sourceType === "model" && entry.sourceId === input.id) return true;
         const config = (entry.config as Record<string, any>) || {};
         return config.sourceModelId === input.id;
       });

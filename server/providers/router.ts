@@ -778,19 +778,23 @@ export const providerRouter = router({
     const providers = await providerDb.getAllProviders();
     const catalogEntries = await getCatalogEntries({ entryType: "provider" });
 
-    // Index catalog entries by sourceProviderId or name
-    const catalogByProviderId = new Map<number, any>();
+    // Index catalog entries by sourceId (new structured FK) or legacy config.sourceProviderId
+    const catalogBySourceId = new Map<number, any>();
+    const catalogByLegacyId = new Map<number, any>();
     const catalogByName = new Map<string, any>();
     for (const entry of catalogEntries) {
+      if (entry.sourceType === "provider" && entry.sourceId) {
+        catalogBySourceId.set(entry.sourceId, entry);
+      }
       const config = (entry.config as Record<string, any>) || {};
       if (config.sourceProviderId) {
-        catalogByProviderId.set(config.sourceProviderId, entry);
+        catalogByLegacyId.set(config.sourceProviderId, entry);
       }
       catalogByName.set(entry.name.toLowerCase(), entry);
     }
 
     return providers.map((provider) => {
-      const catalogEntry = catalogByProviderId.get(provider.id) ?? catalogByName.get(provider.name.toLowerCase()) ?? null;
+      const catalogEntry = catalogBySourceId.get(provider.id) ?? catalogByLegacyId.get(provider.id) ?? catalogByName.get(provider.name.toLowerCase()) ?? null;
 
       let catalogState: "not_imported" | "candidate" | "imported" | "published" = "not_imported";
       if (catalogEntry) {
@@ -834,9 +838,10 @@ export const providerRouter = router({
         );
       }
 
-      // Duplicate prevention
+      // Duplicate prevention (check structured FK first, then legacy config)
       const existingEntries = await getCatalogEntries({ entryType: "provider" });
       const duplicate = existingEntries.find((entry) => {
+        if (entry.sourceType === "provider" && entry.sourceId === input.id) return true;
         const config = (entry.config as Record<string, any>) || {};
         return config.sourceProviderId === input.id;
       });

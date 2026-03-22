@@ -1,5 +1,8 @@
 /**
- * AgentAssigneeSelector — Dropdown showing workspace members + AI agents
+ * AgentAssigneeSelector — Dropdown showing workspace members + Catalog-available AI agents.
+ *
+ * Team Members section: hardcoded workspace members (future: query workspace members API).
+ * AI Agents section: sourced from Catalog-available agents (status=active, reviewState=approved).
  */
 
 import {
@@ -10,28 +13,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Bot, User } from "lucide-react";
+import { Bot, User, Loader2 } from "lucide-react";
+import { useCatalogAvailableAgents } from "@/hooks/useCatalogAvailable";
 
 interface AssigneeSelectorProps {
   value: string;
   onChange: (value: string, type: "human" | "ai") => void;
 }
 
-const MOCK_MEMBERS = [
-  { id: "1", name: "User #1", type: "human" as const },
-  { id: "2", name: "User #2", type: "human" as const },
-  { id: "3", name: "User #3", type: "human" as const },
-];
-
-const MOCK_AGENTS = [
-  { id: "ai-1", name: "Task Planner Agent", type: "ai" as const, model: "claude-3.5-sonnet" },
-  { id: "ai-2", name: "Code Review Agent", type: "ai" as const, model: "gpt-4o" },
-  { id: "ai-3", name: "QA Tester Agent", type: "ai" as const, model: "claude-3-haiku" },
+const WORKSPACE_MEMBERS = [
+  { id: "1", name: "User #1" },
+  { id: "2", name: "User #2" },
+  { id: "3", name: "User #3" },
 ];
 
 export function AgentAssigneeSelector({ value, onChange }: AssigneeSelectorProps) {
+  const { options: agents, isLoading } = useCatalogAvailableAgents();
+
   const handleChange = (val: string) => {
-    const isAi = val.startsWith("ai-");
+    const isAi = val.startsWith("agent-");
     onChange(val, isAi ? "ai" : "human");
   };
 
@@ -44,7 +44,7 @@ export function AgentAssigneeSelector({ value, onChange }: AssigneeSelectorProps
         <div className="px-2 py-1 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
           Team Members
         </div>
-        {MOCK_MEMBERS.map((m) => (
+        {WORKSPACE_MEMBERS.map((m) => (
           <SelectItem key={m.id} value={m.id}>
             <div className="flex items-center gap-2">
               <User className="h-3 w-3" />
@@ -55,15 +55,28 @@ export function AgentAssigneeSelector({ value, onChange }: AssigneeSelectorProps
         <div className="px-2 py-1 mt-1 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider border-t">
           AI Agents
         </div>
-        {MOCK_AGENTS.map((a) => (
-          <SelectItem key={a.id} value={a.id}>
-            <div className="flex items-center gap-2">
-              <Bot className="h-3 w-3 text-purple-500" />
-              <span>{a.name}</span>
-              <Badge variant="outline" className="text-[8px] ml-1">{a.model}</Badge>
-            </div>
-          </SelectItem>
-        ))}
+        {isLoading ? (
+          <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Loading agents...
+          </div>
+        ) : agents.length === 0 ? (
+          <div className="px-2 py-2 text-xs text-muted-foreground">
+            No agents available in Catalog
+          </div>
+        ) : (
+          agents.map((agent) => (
+            <SelectItem key={agent.id} value={`agent-${agent.id}`}>
+              <div className="flex items-center gap-2">
+                <Bot className="h-3 w-3 text-purple-500" />
+                <span>{agent.label}</span>
+                {agent.badge && (
+                  <Badge variant="outline" className="text-[8px] ml-1">{agent.badge}</Badge>
+                )}
+              </div>
+            </SelectItem>
+          ))
+        )}
       </SelectContent>
     </Select>
   );

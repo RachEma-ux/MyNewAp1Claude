@@ -463,6 +463,8 @@ export const llmRouter = router({
         displayName: llm.name,
         description: llm.description ?? null,
         entryType: "llm",
+        sourceType: "llm",
+        sourceId: llm.id,
         scope: "app",
         status: "draft",
         origin: "admin",
