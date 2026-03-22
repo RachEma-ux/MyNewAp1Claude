@@ -127,7 +127,6 @@ function SidebarContent({ shell }: { shell: ShellViewData }) {
                 <p className="text-xs text-muted-foreground italic">Purpose not yet defined</p>
               )}
             </div>
-          )}
         </div>
 
         {/* ── Participant Mission ── */}
