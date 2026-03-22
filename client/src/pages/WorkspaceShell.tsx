@@ -21,7 +21,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { WorkspaceUnifiedSidebar } from "@/components/workspace/WorkspaceUnifiedSidebar";
+import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
+import { WorkspaceUnifiedSidebarV2 } from "@/components/workspace/WorkspaceUnifiedSidebarV2";
 import { WorkspaceStatusBar } from "@/components/workspace/WorkspaceStatusBar";
 import { OversightDrawer } from "@/components/workspace/OversightDrawer";
 import { ModuleDisabled } from "@/components/workspace/ModuleDisabled";
@@ -152,19 +153,10 @@ export default function WorkspaceShell() {
       {/* ─── Main Body: Sidebar + Content ─── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Collapsible Sidebar */}
-        <WorkspaceUnifiedSidebar
+        <WorkspaceSidebar
           workspaceId={workspaceId}
           workspaceName={workspace?.name || "Workspace"}
-          workspaceType={(workspace as any)?.type}
-          status={(workspace as any)?.status || "draft"}
           enabledModules={enabledModules}
-          isManager={true}
-          participantRole={(workspace as any)?.participantRole || "owner"}
-          teamCount={(workspace as any)?.teamCount ?? 0}
-          crewCount={(workspace as any)?.crewCount ?? 0}
-          purposeType={(workspace as any)?.purposeType}
-          purposeRef={(workspace as any)?.purposeRef}
-          missionEmphasis={(workspace as any)?.missionEmphasis}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
           onOversightOpen={() => setOversightOpen(true)}
@@ -425,6 +417,22 @@ export default function WorkspaceShell() {
             </Route>
           </Switch>
         </main>
+
+        {/* ─── NEW SIDEBAR PROTOTYPE (right side for validation) ─── */}
+        <WorkspaceUnifiedSidebarV2
+          workspaceId={workspaceId}
+          workspaceName={workspace?.name || "Workspace"}
+          workspaceType={(workspace as any)?.type}
+          status={(workspace as any)?.status || "draft"}
+          isManager={true}
+          participantRole={(workspace as any)?.participantRole || "owner"}
+          teamCount={(workspace as any)?.teamCount ?? 0}
+          crewCount={(workspace as any)?.crewCount ?? 0}
+          purposeType={(workspace as any)?.purposeType}
+          purposeRef={(workspace as any)?.purposeRef}
+          missionEmphasis={(workspace as any)?.missionEmphasis}
+          onOversightOpen={() => setOversightOpen(true)}
+        />
       </div>
 
       {/* ─── Bottom Status Bar ─── */}
