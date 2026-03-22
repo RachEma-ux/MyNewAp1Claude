@@ -11,7 +11,7 @@
 
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
-import { createModel, getAllModels, getModelById, updateModel } from "../db/models";
+import { createModel, getAllModels, getModelById, updateModel, isDeployable, getBlockingReasons } from "../db/models";
 import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
 import { getAuditLogger } from "../services/auditLogger";
 
@@ -188,13 +188,12 @@ export const modelsRouter = router({
         }
       }
 
-      const isDeployable = model.status === "ready" || model.status === "active";
-
       return {
         ...model,
         catalogState,
         catalogEntryId: catalogEntry?.id ?? null,
-        isDeployable,
+        isDeployable: isDeployable(model),
+        blockingReasons: getBlockingReasons(model),
       };
     });
   }),
@@ -209,10 +208,10 @@ export const modelsRouter = router({
       const model = await getModelById(input.id);
       if (!model) throw new Error("Model not found");
 
-      // Only deployable models (ready or active) can be imported
-      if (model.status !== "ready" && model.status !== "active") {
+      if (!isDeployable(model)) {
+        const reasons = getBlockingReasons(model);
         throw new Error(
-          "Only deployable models (status: ready or active) can be imported into the Catalog."
+          `Model is not deployable and cannot be imported into the Catalog. ${reasons.join("; ")}`
         );
       }
 

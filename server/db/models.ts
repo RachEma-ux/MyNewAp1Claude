@@ -45,3 +45,22 @@ export async function deleteModel(modelId: number): Promise<void> {
 
   await db.delete(models).where(eq(models.id, modelId));
 }
+
+// ── Deployability checks ──────────────────────────────────────────────
+
+/** A model is deployable if its status is "ready" or "active" */
+export function isDeployable(model: Model): boolean {
+  return model.status === "ready" || model.status === "active";
+}
+
+/** Returns blocking reasons preventing a model from being catalog-importable */
+export function getBlockingReasons(model: Model): string[] {
+  const reasons: string[] = [];
+  if (!model.name) reasons.push("Model name is required");
+  if (!model.displayName) reasons.push("Display name is required");
+  if (!model.modelType) reasons.push("Model type is required");
+  if (model.status === "draft") reasons.push("Model is still in draft — set to ready or active");
+  if (model.status === "deprecated") reasons.push("Model is deprecated");
+  if (model.status === "disabled") reasons.push("Model is disabled");
+  return reasons;
+}

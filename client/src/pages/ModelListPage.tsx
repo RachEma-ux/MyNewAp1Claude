@@ -52,6 +52,7 @@ interface ModelRow {
   parameterCount: string | null;
   contextLength: number | null;
   architecture: string | null;
+  blockingReasons: string[];
   updatedAt: string;
 }
 
@@ -139,6 +140,7 @@ export default function ModelListPage() {
         parameterCount: model.parameterCount,
         contextLength: model.contextLength,
         architecture: model.architecture,
+        blockingReasons: model.blockingReasons ?? [],
         updatedAt: model.updatedAt,
       };
     });
