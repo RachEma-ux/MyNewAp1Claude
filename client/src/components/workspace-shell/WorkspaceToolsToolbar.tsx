@@ -20,10 +20,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Sheet,
-  SheetContent,
-} from "@/components/ui/sheet";
+// Sheet import removed — toolbar is always inline now
 import {
   Package,
   Users,
@@ -275,33 +272,18 @@ export function WorkspaceToolsToolbar({
   onClose,
 }: ToolsSidebarProps) {
   return (
-    <>
-      {/* Desktop: inline panel, full height of main area */}
-      <aside
-        className={cn(
-          "hidden md:flex flex-col h-full border-r bg-card/80 backdrop-blur-sm transition-all duration-200 shrink-0 overflow-hidden",
-          collapsed ? "w-[48px]" : "w-[220px]"
-        )}
-      >
-        <SidebarContent
-          shell={shell}
-          basePath={basePath}
-          collapsed={collapsed}
-          onToggle={onToggle}
-        />
-      </aside>
-
-      {/* Mobile: drawer from left */}
-      <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-        <SheetContent side="left" className="w-[260px] p-0 md:hidden">
-          <SidebarContent
-            shell={shell}
-            basePath={basePath}
-            collapsed={false}
-            onToggle={onClose}
-          />
-        </SheetContent>
-      </Sheet>
-    </>
+    <aside
+      className={cn(
+        "flex flex-col h-full border-r bg-card/80 backdrop-blur-sm transition-all duration-200 shrink-0 overflow-hidden",
+        collapsed ? "w-[48px]" : "w-[220px]"
+      )}
+    >
+      <SidebarContent
+        shell={shell}
+        basePath={basePath}
+        collapsed={collapsed}
+        onToggle={onToggle}
+      />
+    </aside>
   );
 }
