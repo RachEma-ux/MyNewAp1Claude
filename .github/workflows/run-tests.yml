@@ -12,6 +12,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testuser"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,5 +40,12 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Apply database schema
+        run: npx drizzle-kit push --force
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+
       - name: Run tests
         run: npx vitest run ${{ github.event.inputs.test_path }} --reporter=verbose
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
