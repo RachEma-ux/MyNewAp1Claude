@@ -158,10 +158,7 @@ export default function WSControlPanelPage() {
         </Card>
       )}
 
-      {isLoading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading...</div>
-      ) : (
-        <div className="space-y-3">
+      <div className="space-y-3">
           {filtered.map((ws: any) => {
             const actions = TRANSITION_ACTIONS[ws.status] || [];
             return (
@@ -195,7 +192,6 @@ export default function WSControlPanelPage() {
             );
           })}
         </div>
-      )}
     </PageShell>
   );
 }

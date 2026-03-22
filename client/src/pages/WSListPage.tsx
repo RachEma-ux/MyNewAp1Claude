@@ -98,9 +98,7 @@ export default function WSListPage() {
       </div>
 
       {/* Workspace cards */}
-      {isLoading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading workspaces...</div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 && !isLoading ? (
         <div className="text-center py-12">
           <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">No workspaces found</p>

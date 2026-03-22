@@ -91,6 +91,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [softwareMenuOpen, setSoftwareMenuOpen] = useState(false);
   const [aiTypesMenuOpen, setAiTypesMenuOpen] = useState(false);
   const [pmCentralMenuOpen, setPmCentralMenuOpen] = useState(false);
+  const [wsSandboxMenuOpen, setWsSandboxMenuOpen] = useState(false);
   const [aiTypesSubMenus, setAiTypesSubMenus] = useState<Record<string, boolean>>({});
   const logoutMutation = trpc.auth.logout.useMutation();
 
@@ -104,6 +105,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { label: "Chat", icon: <MessageSquare className="w-5 h-5" />, href: "/chat" },
     { label: "Conversations", icon: <MessagesSquare className="w-5 h-5" />, href: "/conversations" },
     { label: "Workspaces", icon: <FolderOpen className="w-5 h-5" />, href: "/workspaces" },
+    {
+      label: "WS Sandbox",
+      icon: <Sparkles className="w-5 h-5" />,
+      children: [
+        { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/ws/dashboard" },
+        { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/ws/control-panel" },
+        { label: "Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/ws/wizard" },
+        { label: "WS List", icon: <List className="w-4 h-4" />, href: "/ws/list" },
+        { label: "WS Catalog", icon: <BookOpen className="w-4 h-4" />, href: "/ws/catalog" },
+      ]
+    },
     { label: "Documents", icon: <FileText className="w-5 h-5" />, href: "/documents/dashboard" },
     {
       label: "AI Types",
@@ -325,6 +337,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setGovernanceCenterMenuOpen(!governanceCenterMenuOpen);
                       } else if (item.label === "PM Central") {
                         setPmCentralMenuOpen(!pmCentralMenuOpen);
+                      } else if (item.label === "WS Sandbox") {
+                        setWsSandboxMenuOpen(!wsSandboxMenuOpen);
                       }
                     }}
                     className="flex w-full items-center justify-between space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -333,10 +347,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* Automation / Digital HQ menus (2-level) */}
-                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen)) && (
+                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>

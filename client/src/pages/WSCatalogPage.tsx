@@ -21,9 +21,7 @@ export default function WSCatalogPage() {
       title="Workspace Catalog"
       subtitle="Discover and join available workspaces"
     >
-      {isLoading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading catalog...</div>
-      ) : !published?.length ? (
+      {!published?.length && !isLoading ? (
         <div className="text-center py-12">
           <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">No workspaces are currently published</p>
@@ -33,7 +31,7 @@ export default function WSCatalogPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {published.map((ws: any) => (
+          {(published || []).map((ws: any) => (
             <Card
               key={ws.id}
               className="hover:border-primary/30 transition-colors cursor-pointer group"
