@@ -141,6 +141,13 @@
       "when": 1774051200000,
       "tag": "0020_catalog_execution_observability",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1774310400000,
+      "tag": "0021_workspace_lifecycle",
+      "breakpoints": true
     }
   ]
 }
