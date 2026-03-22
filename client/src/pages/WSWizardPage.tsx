@@ -35,7 +35,11 @@ import {
   Settings,
   Shield,
   Sparkles,
+  Workflow,
+  AlertCircle,
 } from "lucide-react";
+import { CatalogAgentSelect, CatalogBotSelect } from "@/components/catalog-selectors";
+import { useCatalogAvailableAgents, useCatalogAvailableBots } from "@/hooks/useCatalogAvailable";
 
 type WizardStage =
   | "identity"
@@ -71,6 +75,26 @@ const STAGE_ICONS: Record<WizardStage, React.ReactNode> = {
   review: <Shield className="h-4 w-4" />,
 };
 
+type CrewParticipantType = "agent" | "bot";
+type CrewRole = "executor" | "analyst" | "reviewer" | "monitor" | "coordinator" | "advisor";
+
+const CREW_ROLES: { value: CrewRole; label: string }[] = [
+  { value: "executor", label: "Executor" },
+  { value: "analyst", label: "Analyst" },
+  { value: "reviewer", label: "Reviewer" },
+  { value: "monitor", label: "Monitor" },
+  { value: "coordinator", label: "Coordinator" },
+  { value: "advisor", label: "Advisor" },
+];
+
+interface CrewEntry {
+  participantType: CrewParticipantType;
+  participantId: string;
+  participantName: string;
+  crewRole: CrewRole;
+  note: string;
+}
+
 interface WizardData {
   name: string;
   description: string;
@@ -78,7 +102,7 @@ interface WizardData {
   purposeType: string;
   purposeRef: string;
   teamMembers: string[];
-  crewAgents: { name: string; role: string }[];
+  crewAgents: CrewEntry[];
   activities: string[];
   needs: string[];
   embeddingModel: string;
@@ -103,8 +127,21 @@ export default function WSWizardPage() {
   });
   const [newActivity, setNewActivity] = useState("");
   const [newNeed, setNewNeed] = useState("");
+  const [newCrewType, setNewCrewType] = useState<CrewParticipantType>("agent");
+  const [newCrewId, setNewCrewId] = useState("");
   const [newCrewName, setNewCrewName] = useState("");
-  const [newCrewRole, setNewCrewRole] = useState("executor");
+  const [newCrewRole, setNewCrewRole] = useState<CrewRole>("executor");
+  const [newCrewNote, setNewCrewNote] = useState("");
+
+  const { options: agentOptions } = useCatalogAvailableAgents();
+  const { options: botOptions } = useCatalogAvailableBots();
+
+  const handleCrewSelect = (id: string) => {
+    setNewCrewId(id);
+    const opts = newCrewType === "agent" ? agentOptions : botOptions;
+    const match = opts.find((o) => String(o.id) === id);
+    setNewCrewName(match?.label || "");
+  };
 
   const createMutation = trpc.workspaces.createDraft.useMutation({
     onSuccess: (ws: any) => {
@@ -282,47 +319,142 @@ export default function WSWizardPage() {
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
                   <Bot className="h-4 w-4" /> Crew (AI Participants)
                 </h4>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    value={newCrewName}
-                    onChange={(e) => setNewCrewName(e.target.value)}
-                    placeholder="Agent name"
-                    className="flex-1"
-                  />
-                  <Select value={newCrewRole} onValueChange={setNewCrewRole}>
-                    <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="executor">Executor</SelectItem>
-                      <SelectItem value="advisor">Advisor</SelectItem>
-                      <SelectItem value="monitor">Monitor</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Select AI participants from your governed catalog. Only Agents and Bots that have been approved and activated in AI Types are available.
+                </p>
+
+                {/* Step 1: Participant Type */}
+                <div className="space-y-3 rounded-md border p-3 mb-3">
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">AI Participant Type</label>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant={newCrewType === "agent" ? "default" : "outline"}
+                        onClick={() => { setNewCrewType("agent"); setNewCrewId(""); setNewCrewName(""); }}
+                      >
+                        <Workflow className="h-3 w-3 mr-1" /> Agent
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={newCrewType === "bot" ? "default" : "outline"}
+                        onClick={() => { setNewCrewType("bot"); setNewCrewId(""); setNewCrewName(""); }}
+                      >
+                        <Bot className="h-3 w-3 mr-1" /> Bot
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Step 2: Catalog-backed selection */}
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">
+                      {newCrewType === "agent" ? "Select Agent" : "Select Bot"}
+                    </label>
+                    {newCrewType === "agent" ? (
+                      <CatalogAgentSelect
+                        value={newCrewId}
+                        onValueChange={handleCrewSelect}
+                        searchable
+                      />
+                    ) : (
+                      <CatalogBotSelect
+                        value={newCrewId}
+                        onValueChange={handleCrewSelect}
+                        searchable
+                      />
+                    )}
+                  </div>
+
+                  {/* Step 3: Crew Role */}
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Crew Role</label>
+                    <Select value={newCrewRole} onValueChange={(v) => setNewCrewRole(v as CrewRole)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CREW_ROLES.map((r) => (
+                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Step 4: Optional note */}
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Mission Note (optional)</label>
+                    <Input
+                      value={newCrewNote}
+                      onChange={(e) => setNewCrewNote(e.target.value)}
+                      placeholder="e.g., Handle code review for PRs"
+                    />
+                  </div>
+
                   <Button
                     size="sm"
-                    variant="outline"
                     onClick={() => {
-                      if (newCrewName.trim()) {
-                        setData({ ...data, crewAgents: [...data.crewAgents, { name: newCrewName, role: newCrewRole }] });
-                        setNewCrewName("");
+                      if (!newCrewId) {
+                        toast.error(`Select ${newCrewType === "agent" ? "an Agent" : "a Bot"} from the catalog`);
+                        return;
                       }
+                      if (data.crewAgents.some((c) => c.participantId === newCrewId && c.participantType === newCrewType)) {
+                        toast.error("This participant is already in the crew");
+                        return;
+                      }
+                      setData({
+                        ...data,
+                        crewAgents: [...data.crewAgents, {
+                          participantType: newCrewType,
+                          participantId: newCrewId,
+                          participantName: newCrewName,
+                          crewRole: newCrewRole,
+                          note: newCrewNote,
+                        }],
+                      });
+                      setNewCrewId("");
+                      setNewCrewName("");
+                      setNewCrewRole("executor");
+                      setNewCrewNote("");
                     }}
                   >
-                    Add
+                    Add to Crew
                   </Button>
                 </div>
-                {data.crewAgents.map((agent, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm py-1">
-                    <Bot className="h-3 w-3 text-muted-foreground" />
-                    <span>{agent.name}</span>
-                    <Badge variant="secondary" className="text-xs">{agent.role}</Badge>
-                    <button
-                      className="text-xs text-destructive ml-auto"
-                      onClick={() => setData({ ...data, crewAgents: data.crewAgents.filter((_, j) => j !== i) })}
-                    >
-                      Remove
-                    </button>
+
+                {/* Crew list */}
+                {data.crewAgents.length === 0 ? (
+                  <div className="flex items-start gap-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>
+                      No AI participants added yet. Select an Agent or Bot from your catalog above.
+                      If none are available, first add and approve them in AI Types / Catalog.
+                    </span>
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-1">
+                    {data.crewAgents.map((entry, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm py-1.5 px-2 rounded hover:bg-muted/50">
+                        {entry.participantType === "agent" ? (
+                          <Workflow className="h-3 w-3 text-muted-foreground shrink-0" />
+                        ) : (
+                          <Bot className="h-3 w-3 text-muted-foreground shrink-0" />
+                        )}
+                        <span className="truncate">{entry.participantName || `#${entry.participantId}`}</span>
+                        <Badge variant="outline" className="text-[10px]">{entry.participantType}</Badge>
+                        <Badge variant="secondary" className="text-[10px]">{entry.crewRole}</Badge>
+                        {entry.note && (
+                          <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={entry.note}>
+                            {entry.note}
+                          </span>
+                        )}
+                        <button
+                          className="text-xs text-destructive ml-auto shrink-0"
+                          onClick={() => setData({ ...data, crewAgents: data.crewAgents.filter((_, j) => j !== i) })}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -463,8 +595,18 @@ export default function WSWizardPage() {
               )}
               {data.crewAgents.length > 0 && (
                 <div className="text-sm">
-                  <span className="text-muted-foreground">Crew:</span>{" "}
-                  {data.crewAgents.map((a) => `${a.name} (${a.role})`).join(", ")}
+                  <span className="text-muted-foreground block mb-1">Crew:</span>
+                  <div className="space-y-1 ml-2">
+                    {data.crewAgents.map((a, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-xs">
+                        {a.participantType === "agent" ? <Workflow className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
+                        <span>{a.participantName || `#${a.participantId}`}</span>
+                        <Badge variant="outline" className="text-[10px]">{a.participantType}</Badge>
+                        <Badge variant="secondary" className="text-[10px]">{a.crewRole}</Badge>
+                        {a.note && <span className="text-muted-foreground">— {a.note}</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               {data.activities.length > 0 && (
