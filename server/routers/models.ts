@@ -14,6 +14,7 @@ import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { createModel, getAllModels, getModelById, updateModel, isDeployable, getBlockingReasons } from "../db/models";
 import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
 import { getAuditLogger } from "../services/auditLogger";
+import { getCatalogState } from "@shared/catalog-state";
 
 export const modelsRouter = router({
   /** List all models from the models table */
@@ -180,21 +181,16 @@ export const modelsRouter = router({
     return models.map((model) => {
       const catalogEntry = catalogBySourceId.get(model.id) ?? catalogByLegacyId.get(model.id) ?? catalogByName.get(model.name.toLowerCase()) ?? null;
 
-      let catalogState: "not_imported" | "candidate" | "imported" | "published" = "not_imported";
-      if (catalogEntry) {
-        const tags: string[] = catalogEntry.tags || [];
-        if (tags.includes("published")) {
-          catalogState = "published";
-        } else if (catalogEntry.status === "active" || catalogEntry.reviewState === "approved") {
-          catalogState = "imported";
-        } else {
-          catalogState = "candidate";
-        }
-      }
+      const catalogStateResult = getCatalogState(catalogEntry ? {
+        status: catalogEntry.status,
+        reviewState: catalogEntry.reviewState,
+        tags: catalogEntry.tags as string[] ?? [],
+      } : null);
 
       return {
         ...model,
-        catalogState,
+        catalogState: catalogStateResult.label,
+        catalogStateDetail: catalogStateResult,
         catalogEntryId: catalogEntry?.id ?? null,
         isDeployable: isDeployable(model),
         blockingReasons: getBlockingReasons(model),

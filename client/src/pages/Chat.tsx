@@ -209,7 +209,6 @@ function ChatInner() {
   const saveConversationMutation = trpc.chat.saveConversation.useMutation();
 
   const { data: workspaces } = trpc.workspaces.list.useQuery();
-  const { data: allProviders } = trpc.providers.list.useQuery();
 
   // Fetch routing profile when unified routing is enabled and workspace is selected
   const { data: routingProfile } = trpc.workspaces.getRoutingProfile.useQuery(
@@ -217,22 +216,25 @@ function ChatInner() {
     { enabled: useUnifiedRouting && !!selectedWorkspace }
   );
 
-  // Update client-side router with providers and workspace profile
+  // Update client-side router with Catalog-available providers (governance-backed)
   useEffect(() => {
-    if (allProviders) {
+    if (availableProviders && availableProviders.length > 0) {
       clientProviderRouter.updateLocalProviders(
-        allProviders.map(p => ({
-          id: p.id,
-          name: p.name,
-          type: p.type,
-          kind: (p as any).kind || 'cloud',
-          enabled: p.enabled ?? true,
-          baseUrl: (p.config as any)?.baseURL,
-          capabilities: (p as any).capabilities || [],
-        }))
+        availableProviders.map((p: any) => {
+          const config = p.metadata?.config ?? {};
+          return {
+            id: p.metadata?.providerId ?? p.sourceId ?? p.id,
+            name: p.name,
+            type: config.registryId ?? config.type ?? p.name,
+            kind: config.kind ?? (p.category === "local_runtime" ? "local" : "cloud"),
+            enabled: true, // Catalog-available = approved + active
+            baseUrl: config.baseUrl ?? config.baseURL ?? undefined,
+            capabilities: p.metadata?.capabilities ?? [],
+          };
+        })
       );
     }
-  }, [allProviders]);
+  }, [availableProviders]);
 
   useEffect(() => {
     if (selectedWorkspace && routingProfile) {
@@ -240,29 +242,18 @@ function ChatInner() {
     }
   }, [selectedWorkspace, routingProfile]);
 
-  // Map catalog provider selection to DB provider ID
-  // Uses config.providerId and tags for stable matching (not fragile name comparison)
+  // Map Catalog provider selection to DB provider ID (Catalog-backed resolution)
   useEffect(() => {
-    if (selectedCatalogProvider && allProviders) {
-      const catalogId = (selectedCatalogProvider.config as any)?.providerId ?? "";
-      const catalogTags = (selectedCatalogProvider.tags as string[] | null) ?? [];
-      const catalogName = selectedCatalogProvider.name.toLowerCase();
-
-      const match = allProviders.find((p) => {
-        const pType = p.type.toLowerCase();
-        const pName = p.name.toLowerCase();
-        // Match by config.providerId → provider.type (most stable)
-        if (catalogId && pType === catalogId.toLowerCase()) return true;
-        // Match by tags containing the provider type
-        if (catalogTags.some((t) => t.toLowerCase() === pType)) return true;
-        // Last resort: name match
-        return pName === catalogName;
-      });
-      setSelectedProvider(match?.id ?? null);
+    if (selectedCatalogProvider) {
+      // Resolve via Catalog metadata — providerId is the domain FK
+      const providerId = (selectedCatalogProvider as any).metadata?.providerId
+        ?? (selectedCatalogProvider as any).sourceId
+        ?? null;
+      setSelectedProvider(providerId ? Number(providerId) : null);
     } else if (!catalogProvider) {
       setSelectedProvider(null);
     }
-  }, [catalogProvider, selectedCatalogProvider, allProviders]);
+  }, [catalogProvider, selectedCatalogProvider]);
 
   // Map catalog model selection to selectedModel
   useEffect(() => {

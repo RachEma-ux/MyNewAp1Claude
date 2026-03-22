@@ -18,6 +18,7 @@ import { desc, eq, and, gte } from "drizzle-orm";
 import { decrypt, isEncrypted } from "../_core/encryption";
 import { getAuditLogger } from "../services/auditLogger";
 import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
+import { getCatalogState } from "@shared/catalog-state";
 import type { Provider } from "../../drizzle/schema";
 
 // ── Deployability checks ──────────────────────────────────────────────
@@ -796,24 +797,19 @@ export const providerRouter = router({
     return providers.map((provider) => {
       const catalogEntry = catalogBySourceId.get(provider.id) ?? catalogByLegacyId.get(provider.id) ?? catalogByName.get(provider.name.toLowerCase()) ?? null;
 
-      let catalogState: "not_imported" | "candidate" | "imported" | "published" = "not_imported";
-      if (catalogEntry) {
-        const tags: string[] = catalogEntry.tags || [];
-        if (tags.includes("published")) {
-          catalogState = "published";
-        } else if (catalogEntry.status === "active" || catalogEntry.reviewState === "approved") {
-          catalogState = "imported";
-        } else {
-          catalogState = "candidate";
-        }
-      }
+      const catalogStateResult = getCatalogState(catalogEntry ? {
+        status: catalogEntry.status,
+        reviewState: catalogEntry.reviewState,
+        tags: catalogEntry.tags as string[] ?? [],
+      } : null);
 
       // Redact config before returning
       const redacted = redactProviderConfig(provider);
 
       return {
         ...redacted,
-        catalogState,
+        catalogState: catalogStateResult.label,
+        catalogStateDetail: catalogStateResult,
         catalogEntryId: catalogEntry?.id ?? null,
         isDeployable: isDeployable(provider),
         blockingReasons: getBlockingReasons(provider),

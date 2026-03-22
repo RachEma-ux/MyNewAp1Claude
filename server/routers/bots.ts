@@ -17,6 +17,7 @@ import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { createBot, getAllBots, getBotById, updateBot, isDeployable, getBlockingReasons } from "../db/bots";
 import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
 import { getAuditLogger } from "../services/auditLogger";
+import { getCatalogState } from "@shared/catalog-state";
 
 const botStatusSchema = z.enum(["draft", "configured", "validated", "deployable", "archived"]);
 
@@ -186,21 +187,16 @@ export const botsRouter = router({
     return bots.map((bot) => {
       const catalogEntry = catalogBySourceId.get(bot.id) ?? catalogByLegacyId.get(bot.id) ?? catalogByName.get(bot.name.toLowerCase()) ?? null;
 
-      let catalogState: "not_imported" | "candidate" | "imported" | "published" = "not_imported";
-      if (catalogEntry) {
-        const tags: string[] = catalogEntry.tags || [];
-        if (tags.includes("published")) {
-          catalogState = "published";
-        } else if (catalogEntry.status === "active" || catalogEntry.reviewState === "approved") {
-          catalogState = "imported";
-        } else {
-          catalogState = "candidate";
-        }
-      }
+      const catalogStateResult = getCatalogState(catalogEntry ? {
+        status: catalogEntry.status,
+        reviewState: catalogEntry.reviewState,
+        tags: catalogEntry.tags as string[] ?? [],
+      } : null);
 
       return {
         ...bot,
-        catalogState,
+        catalogState: catalogStateResult.label,
+        catalogStateDetail: catalogStateResult,
         catalogEntryId: catalogEntry?.id ?? null,
         isDeployable: isDeployable(bot),
         blockingReasons: getBlockingReasons(bot),

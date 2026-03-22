@@ -3,8 +3,9 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle2, Zap, Clock, AlertCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Zap, Clock, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCatalogAvailableAgents } from "@/hooks/useCatalogAvailable";
 
 interface RemediationTask {
   id: string;
@@ -24,8 +25,8 @@ export default function AutoRemediationPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isRemediating, setIsRemediating] = useState(false);
 
-  // Queries
-  const agentsQuery = trpc.agents.list.useQuery();
+  // Catalog-backed agents — only approved + active agents are usable for remediation
+  const { options: catalogAgents, isLoading: agentsLoading } = useCatalogAvailableAgents();
 
   // Mutations
   const remediateMutation = trpc.agents.autoRemediate.useMutation({
@@ -135,30 +136,33 @@ export default function AutoRemediationPage() {
         </div>
       )}
 
-      {/* Available Agents */}
+      {/* Available Agents — Catalog-backed (only approved + active) */}
       <Card className="p-6">
         <h2 className="text-lg font-semibold mb-4">Create Remediation Tasks</h2>
-        {agentsQuery.isLoading ? (
-          <div className="text-center py-8 text-gray-500">Loading agents...</div>
-        ) : agentsQuery.data && agentsQuery.data.length > 0 ? (
+        {agentsLoading ? (
+          <div className="flex items-center justify-center gap-2 py-8 text-gray-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading available agents...
+          </div>
+        ) : catalogAgents.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {agentsQuery.data.map((agent) => (
+            {catalogAgents.map((agent) => (
               <div
                 key={agent.id}
                 className="p-4 border rounded-lg hover:border-blue-300 transition-all"
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h3 className="font-semibold">{agent.name}</h3>
+                    <h3 className="font-semibold">{agent.label}</h3>
                     <p className="text-sm text-gray-600">
-                      Status: {agent.status}
+                      Catalog-approved
                     </p>
                   </div>
-                  <Badge variant="outline">{agent.roleClass}</Badge>
+                  {agent.badge && <Badge variant="outline">{agent.badge}</Badge>}
                 </div>
                 <Button
                   onClick={() =>
-                    handleCreateRemediationTask(agent.id, agent.name)
+                    handleCreateRemediationTask(agent.id, agent.label)
                   }
                   size="sm"
                   className="w-full"
@@ -171,7 +175,7 @@ export default function AutoRemediationPage() {
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500">
-            No agents available
+            No agents available in Catalog
           </div>
         )}
       </Card>
