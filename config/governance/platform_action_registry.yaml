@@ -50,9 +50,145 @@ actions:
     approval: none
     evidence: { required: false }
 
+  workspace.createDraft:
+    domain: workspace
+    risk: R1
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   workspace.update:
     domain: workspace
     risk: R1
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.updateDraft:
+    domain: workspace
+    risk: R1
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.submitForReview:
+    domain: workspace
+    risk: R2
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.review:
+    domain: workspace
+    risk: R2
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.approve:
+    domain: workspace
+    risk: R3
+    capability: workspace.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  workspace.publish:
+    domain: workspace
+    risk: R2
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.activate:
+    domain: workspace
+    risk: R2
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.reject:
+    domain: workspace
+    risk: R2
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.archive:
+    domain: workspace
+    risk: R2
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.returnToDraft:
+    domain: workspace
+    risk: R1
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.members.add:
+    domain: workspace
+    risk: R1
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.members.remove:
+    domain: workspace
+    risk: R2
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.members.updateRole:
+    domain: workspace
+    risk: R2
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.crew.add:
+    domain: workspace
+    risk: R1
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.crew.remove:
+    domain: workspace
+    risk: R1
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.crew.update:
+    domain: workspace
+    risk: R1
+    capability: workspace.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  workspace.modules.updateConfig:
+    domain: workspace
+    risk: R2
     capability: workspace.manage
     stage: mutate
     approval: none

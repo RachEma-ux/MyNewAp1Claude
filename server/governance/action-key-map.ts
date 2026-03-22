@@ -17,9 +17,26 @@ export const ACTION_KEY_MAP: Record<string, string> = {
 
   // ── Workspace ────────────────────────────────────────────────────────────
   "workspaces.create": "workspace.create",
+  "workspaces.createDraft": "workspace.createDraft",
   "workspaces.update": "workspace.update",
+  "workspaces.updateDraft": "workspace.updateDraft",
+  "workspaces.submitForReview": "workspace.submitForReview",
+  "workspaces.review": "workspace.review",
+  "workspaces.approve": "workspace.approve",
+  "workspaces.publish": "workspace.publish",
+  "workspaces.activate": "workspace.activate",
+  "workspaces.reject": "workspace.reject",
+  "workspaces.archive": "workspace.archive",
+  "workspaces.returnToDraft": "workspace.returnToDraft",
   "workspaces.updateRoutingProfile": "workspace.updateRoutingProfile",
   "workspaces.delete": "workspace.delete",
+  "workspaces.members.add": "workspace.members.add",
+  "workspaces.members.remove": "workspace.members.remove",
+  "workspaces.members.updateRole": "workspace.members.updateRole",
+  "workspaces.crew.add": "workspace.crew.add",
+  "workspaces.crew.remove": "workspace.crew.remove",
+  "workspaces.crew.update": "workspace.crew.update",
+  "workspaces.modules.updateConfig": "workspace.modules.updateConfig",
 
   // ── Models ───────────────────────────────────────────────────────────────
   "models.create": "model.create",
