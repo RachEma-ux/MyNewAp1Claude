@@ -1,56 +1,71 @@
 /**
- * Workspace Lifecycle — Status enforcement helpers
+ * Workspace Lifecycle — Canonical 9-status lifecycle enforcement
  *
- * WORKSPACE INVARIANT WS-04:
- *   Every workspace has a lifecycle status that gates execution.
- *   Archived/deleted workspaces must block mutating operations.
+ * Lifecycle statuses:
+ *   draft → ready_for_review → under_review → approved → published → active
+ *   under_review → rejected → archived
+ *   active → archived → deleted
  *
- * WORKSPACE INVARIANT WS-06:
- *   Non-executable workspaces must reject write operations
- *   but may allow read-only access.
- *
- * Status progression:
- *   created → configured → active → paused → archived → deleted
- *
- * Execution rules:
- *   - "active" and "configured" allow all operations
- *   - "created" allows all operations (initial setup phase)
- *   - "paused" allows reads but blocks mutations
- *   - "archived" allows reads but blocks all mutations except unarchive
- *   - "deleted" blocks everything
+ * WORKSPACE INVARIANTS:
+ *   WS-04: Every workspace has a lifecycle status that gates execution
+ *   WS-06: Non-executable workspaces reject write operations
  */
 
 import type { WorkspaceStatus } from "../../drizzle/tables/users";
 import type { WorkspaceContext } from "./workspace-contract";
 
 // ============================================================================
-// Executable Status Sets
+// Allowed Transitions — the canonical lifecycle graph
+// ============================================================================
+
+export const LIFECYCLE_TRANSITIONS: Record<WorkspaceStatus, WorkspaceStatus[]> = {
+  draft: ["ready_for_review", "deleted"],
+  ready_for_review: ["under_review", "draft"],
+  under_review: ["approved", "rejected"],
+  approved: ["published", "archived"],
+  published: ["active", "archived"],
+  active: ["archived"],
+  rejected: ["draft", "archived"],
+  archived: ["deleted", "draft"],
+  deleted: [],
+};
+
+// ============================================================================
+// Status Classification Sets
 // ============================================================================
 
 /** Statuses that allow full read+write execution */
 const FULLY_EXECUTABLE: ReadonlySet<WorkspaceStatus> = new Set([
-  "created",
-  "configured",
   "active",
 ]);
 
+/** Statuses that allow setup/draft modifications (not full execution) */
+const SETUP_MUTABLE: ReadonlySet<WorkspaceStatus> = new Set([
+  "draft",
+  "ready_for_review",
+  "rejected",
+]);
+
 /** Statuses that allow read-only access */
-const READ_ONLY_EXECUTABLE: ReadonlySet<WorkspaceStatus> = new Set([
-  "paused",
+const READ_ONLY: ReadonlySet<WorkspaceStatus> = new Set([
+  "under_review",
+  "approved",
+  "published",
   "archived",
 ]);
 
 /** Statuses that block all access */
-const NON_EXECUTABLE: ReadonlySet<WorkspaceStatus> = new Set([
+const NON_ACCESSIBLE: ReadonlySet<WorkspaceStatus> = new Set([
   "deleted",
 ]);
 
-/** Actions permitted even on archived workspaces (escape hatch) */
+/** Actions permitted even on archived/non-executable workspaces */
 export const ARCHIVED_ALLOWED_ACTIONS: ReadonlySet<string> = new Set([
   "workspace.unarchive",
   "workspace.get",
   "workspace.list",
   "workspace.export",
+  "workspace.transition",
 ]);
 
 // ============================================================================
@@ -58,17 +73,36 @@ export const ARCHIVED_ALLOWED_ACTIONS: ReadonlySet<string> = new Set([
 // ============================================================================
 
 /**
- * Check if a workspace status allows full execution (read + write).
+ * Check if a workspace status allows full execution (active only).
  */
 export function isWorkspaceExecutable(status: WorkspaceStatus): boolean {
   return FULLY_EXECUTABLE.has(status);
 }
 
 /**
- * Check if a workspace status allows read-only access.
+ * Check if a workspace is in a setup-mutable state (draft/ready_for_review/rejected).
+ * These statuses allow modifications but not full operational execution.
+ */
+export function isWorkspaceSetupMutable(status: WorkspaceStatus): boolean {
+  return SETUP_MUTABLE.has(status);
+}
+
+/**
+ * Check if a workspace status allows read access.
  */
 export function isWorkspaceReadable(status: WorkspaceStatus): boolean {
-  return FULLY_EXECUTABLE.has(status) || READ_ONLY_EXECUTABLE.has(status);
+  return (
+    FULLY_EXECUTABLE.has(status) ||
+    SETUP_MUTABLE.has(status) ||
+    READ_ONLY.has(status)
+  );
+}
+
+/**
+ * Check if a workspace is published (visible in WS Catalog).
+ */
+export function isWorkspacePublished(status: WorkspaceStatus): boolean {
+  return status === "published" || status === "active";
 }
 
 /**
@@ -79,16 +113,41 @@ export function isWorkspaceDeleted(status: WorkspaceStatus): boolean {
 }
 
 /**
+ * Check if a transition from currentStatus to targetStatus is allowed.
+ */
+export function isTransitionAllowed(
+  currentStatus: WorkspaceStatus,
+  targetStatus: WorkspaceStatus
+): boolean {
+  const allowed = LIFECYCLE_TRANSITIONS[currentStatus];
+  return allowed?.includes(targetStatus) ?? false;
+}
+
+/**
+ * Get the list of statuses that can be transitioned to from the current status.
+ */
+export function getAllowedTransitions(currentStatus: WorkspaceStatus): WorkspaceStatus[] {
+  return LIFECYCLE_TRANSITIONS[currentStatus] ?? [];
+}
+
+// ============================================================================
+// Enforcement Helpers
+// ============================================================================
+
+/**
  * Require that a workspace is in an executable state.
- * Throws if the workspace is paused, archived, or deleted.
- *
- * Use this guard before any mutating operation in workspace-scoped routes.
+ * Throws if the workspace is not active.
  */
 export function requireExecutableWorkspace(
   ctx: WorkspaceContext,
   action?: string
 ): void {
   if (isWorkspaceExecutable(ctx.status)) return;
+
+  // Check setup-mutable — allow draft operations
+  if (isWorkspaceSetupMutable(ctx.status) && action?.startsWith("workspace.")) {
+    return;
+  }
 
   // Check archived escape hatch
   if (ctx.status === "archived" && action && ARCHIVED_ALLOWED_ACTIONS.has(action)) {
@@ -121,16 +180,32 @@ export function requireReadableWorkspace(ctx: WorkspaceContext): void {
 
 /**
  * Check if a specific action is allowed given workspace status.
- * Returns true/false without throwing.
  */
 export function isActionAllowed(
   status: WorkspaceStatus,
   action: string,
   isRead: boolean
 ): boolean {
-  if (NON_EXECUTABLE.has(status)) return false;
+  if (NON_ACCESSIBLE.has(status)) return false;
   if (isRead) return isWorkspaceReadable(status);
   if (FULLY_EXECUTABLE.has(status)) return true;
-  // Paused/archived — only allow escape-hatch actions
+  if (SETUP_MUTABLE.has(status) && action.startsWith("workspace.")) return true;
   return ARCHIVED_ALLOWED_ACTIONS.has(action);
+}
+
+/**
+ * Validate and execute a lifecycle transition.
+ * Returns the new status if allowed, throws if not.
+ */
+export function validateTransition(
+  currentStatus: WorkspaceStatus,
+  targetStatus: WorkspaceStatus
+): WorkspaceStatus {
+  if (!isTransitionAllowed(currentStatus, targetStatus)) {
+    throw new Error(
+      `Lifecycle transition from '${currentStatus}' to '${targetStatus}' is not allowed. ` +
+      `Valid transitions: ${getAllowedTransitions(currentStatus).join(", ") || "none"}`
+    );
+  }
+  return targetStatus;
 }

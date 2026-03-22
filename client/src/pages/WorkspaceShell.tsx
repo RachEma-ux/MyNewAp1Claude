@@ -70,6 +70,9 @@ import { AgentRunDetailPage } from "./workspace/AgentRunDetailPage";
 import { CollabThreadsPage } from "./workspace/CollabThreadsPage";
 import { ReportingDashboardPage } from "./workspace/ReportingDashboardPage";
 import { GovernancePage } from "./workspace/GovernancePage";
+import { WSTeamPage } from "./workspace/WSTeamPage";
+import { WSCrewPage } from "./workspace/WSCrewPage";
+import { WSRulesPage } from "./workspace/WSRulesPage";
 
 const moduleIcons: Record<string, React.ReactNode> = {
   pmt: <FolderKanban className="h-5 w-5" />,
@@ -384,6 +387,17 @@ export default function WorkspaceShell() {
               <ModuleGate moduleKey="reporting" moduleName="Reporting">
                 <ReportingDashboardPage workspaceId={workspaceId} />
               </ModuleGate>
+            </Route>
+
+            {/* ─── Team / Crew / Rules ─── */}
+            <Route path={`${basePath}/team`}>
+              <WSTeamPage />
+            </Route>
+            <Route path={`${basePath}/crew`}>
+              <WSCrewPage />
+            </Route>
+            <Route path={`${basePath}/rules`}>
+              <WSRulesPage />
             </Route>
 
             {/* ─── Governance ─── */}

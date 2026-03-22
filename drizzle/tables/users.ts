@@ -32,13 +32,69 @@ export interface RoutingProfile {
   pinnedProviderId?: number;
 }
 
-// Workspace lifecycle statuses
-export const WORKSPACE_STATUSES = ["created", "configured", "active", "paused", "archived", "deleted"] as const;
+// Workspace lifecycle statuses — canonical 9-status lifecycle
+export const WORKSPACE_STATUSES = [
+  "draft",
+  "ready_for_review",
+  "under_review",
+  "approved",
+  "published",
+  "active",
+  "rejected",
+  "archived",
+  "deleted",
+] as const;
 export type WorkspaceStatus = typeof WORKSPACE_STATUSES[number];
+
+// Legacy status mapping (for migration compatibility)
+export const LEGACY_STATUS_MAP: Record<string, WorkspaceStatus> = {
+  created: "draft",
+  configured: "ready_for_review",
+  active: "active",
+  paused: "archived",
+  archived: "archived",
+  deleted: "deleted",
+};
 
 // Workspace purpose types — what the workspace is organized around
 export const WORKSPACE_PURPOSE_TYPES = ["goal", "mission", "project", "team", "strategy", "other"] as const;
 export type WorkspacePurposeType = typeof WORKSPACE_PURPOSE_TYPES[number];
+
+// Shell configuration — manager-defined participant visibility
+export interface WorkspaceShellConfig {
+  sidebar: {
+    showIdentity: boolean;
+    showPurpose: boolean;
+    showMission: boolean;
+    showCurrentWork: boolean;
+    showActivityLog: boolean;
+    showAlerts: boolean;
+    showQuickActions: boolean;
+    showGuide: boolean;
+    showHealth: boolean;
+  };
+  toolbar: {
+    visibleItems: string[];
+    priorityItems: string[];
+  };
+  quickActions: string[];
+  alertsEnabled: boolean;
+  missionEmphasis: string | null;
+  participantVisibility: Record<string, {
+    sidebarSections: string[];
+    toolbarItems: string[];
+    canSeeAlerts: boolean;
+  }>;
+}
+
+// Resource profile (optional accountable resource allocation)
+export interface ResourceProfile {
+  budgetLimit?: number;
+  computeQuota?: number;
+  storageQuota?: number;
+  apiCallQuota?: number;
+  currency?: string;
+}
 
 export const workspaces = pgTable("workspaces", {
   id: serial("id").primaryKey(),
@@ -47,12 +103,12 @@ export const workspaces = pgTable("workspaces", {
   type: varchar("type", { length: 50 }).default("generic"),
   ownerId: integer("ownerId").notNull().references(() => users.id),
 
-  // Workspace lifecycle status (SR-04)
-  status: varchar("status", { length: 50 }).default("active").notNull(),
+  // Workspace lifecycle status — canonical 9-status model
+  status: varchar("status", { length: 50 }).default("draft").notNull(),
 
-  // Workspace purpose (SR-05) — what this workspace is organized around
+  // Workspace purpose — what this workspace is organized around
   purposeType: varchar("purposeType", { length: 50 }).default("other"),
-  purposeRef: text("purposeRef"), // Optional reference to the purpose (project ID, goal name, etc.)
+  purposeRef: text("purposeRef"),
 
   // Workspace settings
   embeddingModel: varchar("embeddingModel", { length: 255 }).default("bge-small-en-v1.5"),
@@ -66,6 +122,12 @@ export const workspaces = pgTable("workspaces", {
 
   // Provider Routing Profile
   routingProfile: json("routingProfile").$type<RoutingProfile>(),
+
+  // Resource Profile (optional accountable resource allocation)
+  resourceProfile: json("resourceProfile").$type<ResourceProfile>(),
+
+  // Shell Configuration — manager-defined visibility and emphasis
+  shellConfig: json("shellConfig").$type<WorkspaceShellConfig>(),
 
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -85,3 +147,23 @@ export const workspaceMembers = pgTable("workspace_members", {
 
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type InsertWorkspaceMember = typeof workspaceMembers.$inferInsert;
+
+// ============================================================================
+// Workspace Crew — AI participant bindings (distinct from Team/human members)
+// ============================================================================
+
+export const workspaceCrew = pgTable("workspace_crew", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
+  agentId: integer("agentId").notNull(),
+  agentName: varchar("agentName", { length: 255 }).notNull(),
+  role: varchar("role", { length: 50 }).default("executor").notNull(),
+  capabilities: json("capabilities").$type<string[]>(),
+  constraints: json("constraints").$type<Record<string, unknown>>(),
+  enabled: boolean("enabled").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type WorkspaceCrew = typeof workspaceCrew.$inferSelect;
+export type InsertWorkspaceCrew = typeof workspaceCrew.$inferInsert;

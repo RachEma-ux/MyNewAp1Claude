@@ -22,6 +22,9 @@ import {
   Settings,
   Home,
   Shield,
+  Users,
+  Cpu,
+  Scale,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -132,6 +135,27 @@ export function WorkspaceSidebar({
       label: "Reports",
       icon: <BarChart3 className="h-4 w-4" />,
       path: `${base}/reports`,
+    },
+    {
+      key: "team",
+      label: "Team",
+      icon: <Users className="h-4 w-4" />,
+      path: `${base}/team`,
+      always: true,
+    },
+    {
+      key: "crew",
+      label: "Crew (AI)",
+      icon: <Cpu className="h-4 w-4" />,
+      path: `${base}/crew`,
+      always: true,
+    },
+    {
+      key: "rules",
+      label: "Rules",
+      icon: <Scale className="h-4 w-4" />,
+      path: `${base}/rules`,
+      always: true,
     },
     {
       key: "governance",

@@ -18,6 +18,8 @@ import {
   isWorkspaceExecutable,
   isWorkspaceReadable,
   isWorkspaceDeleted,
+  isWorkspacePublished,
+  isWorkspaceSetupMutable,
   ARCHIVED_ALLOWED_ACTIONS,
 } from "./workspace-lifecycle";
 import { hasCapability } from "./capability-resolver";
@@ -88,8 +90,9 @@ export async function requireReadableWorkspaceRoute(
 }
 
 /**
- * Require that a workspace is in an executable state (active, configured, created).
- * Paused, archived, and deleted workspaces are blocked for mutations.
+ * Require that a workspace is in an executable state (active only in v2 lifecycle).
+ * Draft/review/archived/deleted workspaces are blocked for mutations.
+ * Setup-mutable workspaces (draft, ready_for_review, rejected) allow workspace.* actions.
  * Optional: pass an action name to allow archived escape-hatch actions.
  */
 export async function requireExecutableWorkspaceRoute(
@@ -103,6 +106,11 @@ export async function requireExecutableWorkspaceRoute(
     return { workspace, status };
   }
 
+  // Setup-mutable workspaces allow workspace.* operations
+  if (isWorkspaceSetupMutable(status) && action?.startsWith("workspace.")) {
+    return { workspace, status };
+  }
+
   // Check archived escape hatch
   if (status === "archived" && action && ARCHIVED_ALLOWED_ACTIONS.has(action)) {
     return { workspace, status };
@@ -112,6 +120,26 @@ export async function requireExecutableWorkspaceRoute(
     code: "PRECONDITION_FAILED",
     message: `Workspace is ${status} — mutating operations are blocked`,
   });
+}
+
+/**
+ * Require that a workspace is published (visible in WS Catalog).
+ * Only published or active workspaces pass.
+ */
+export async function requirePublishedWorkspaceRoute(
+  userId: number,
+  workspaceId: number
+): Promise<{ workspace: any; status: WorkspaceStatus }> {
+  const { workspace, status } = await requireWorkspaceAccess(userId, workspaceId);
+
+  if (!isWorkspacePublished(status)) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: `Workspace is ${status} — not published for participant access`,
+    });
+  }
+
+  return { workspace, status };
 }
 
 // ============================================================================

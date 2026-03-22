@@ -136,21 +136,25 @@ export default function Workspaces() {
       title="Workspaces"
       subtitle="Organize your AI projects with isolated workspaces"
       actions={
-        <Dialog
-          open={createDialogOpen}
-          onOpenChange={(open) => {
-            setCreateDialogOpen(open);
-            if (!open) {
-              setCreateBlocker(null);
-            }
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Workspace
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setLocation("/ws/dashboard")}>
+            <FolderOpen className="mr-2 h-4 w-4" /> WS Dashboard
+          </Button>
+          <Dialog
+            open={createDialogOpen}
+            onOpenChange={(open) => {
+              setCreateDialogOpen(open);
+              if (!open) {
+                setCreateBlocker(null);
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Workspace
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Create New Workspace</DialogTitle>
@@ -244,6 +248,7 @@ export default function Workspaces() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       }
     >
       {isLoading ? (

@@ -92,6 +92,12 @@ const LLMProviderConfigWizard = lazy(() => import("@/pages/LLMProviderConfigWiza
 const NewProviderPage = lazy(() => import("@/pages/NewProviderPage"));
 const LLMCataloguePage = lazy(() => import("@/pages/LLMCataloguePage"));
 const WorkspaceShell = lazy(() => import("@/pages/WorkspaceShell"));
+const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
+const WSDashboardPage = lazy(() => import("@/pages/WSDashboardPage"));
+const WSControlPanelPage = lazy(() => import("@/pages/WSControlPanelPage"));
+const WSWizardPage = lazy(() => import("@/pages/WSWizardPage"));
+const WSListPage = lazy(() => import("@/pages/WSListPage"));
+const WSCatalogPage = lazy(() => import("@/pages/WSCatalogPage"));
 const PersonalWorkspaceShell = lazy(() => import("@/pages/PersonalWorkspaceShell"));
 const ProjectWorkspaceShell = lazy(() => import("@/pages/ProjectWorkspaceShell"));
 const ResearchWorkspaceShell = lazy(() => import("@/pages/ResearchWorkspaceShell"));
@@ -188,6 +194,12 @@ function Router() {
     <Switch>
       <Route path="/" component={() => <ProtectedRoute component={Home} />} />
       <Route path="/workspaces" component={() => <ProtectedRoute component={Workspaces} />} />
+      {/* WS Sandbox — workspace management surfaces */}
+      <Route path="/ws/dashboard" component={() => <ProtectedRoute component={WSDashboardPage} />} />
+      <Route path="/ws/control-panel" component={() => <ProtectedRoute component={WSControlPanelPage} />} />
+      <Route path="/ws/wizard" component={() => <ProtectedRoute component={WSWizardPage} />} />
+      <Route path="/ws/list" component={() => <ProtectedRoute component={WSListPage} />} />
+      <Route path="/ws/catalog" component={() => <ProtectedRoute component={WSCatalogPage} />} />
       <Route path="/workspaces/:id/home" component={() => <ProtectedRoute component={WorkspaceHome} />} />
       <Route path="/workspaces/:id" component={() => <ProtectedRoute component={WorkspaceDetail} />} />
       {/* Workspace Shell — floating detachable container inside MainLayout */}

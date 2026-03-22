@@ -54,6 +54,7 @@ export const workspaceActivityLog = pgTable("workspace_activity_log", {
   workspaceId: integer("workspaceId").notNull().references(() => workspaces.id),
   moduleKey: varchar("moduleKey", { length: 50 }),
   actorId: integer("actorId"),
+  actorType: varchar("actorType", { length: 20 }).default("user"), // "user" | "agent" | "system"
   action: varchar("action", { length: 100 }).notNull(),
   targetType: varchar("targetType", { length: 50 }),
   targetId: integer("targetId"),

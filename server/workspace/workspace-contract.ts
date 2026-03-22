@@ -35,6 +35,8 @@ export interface WorkspaceContext {
   userId: number;
   /** User's resolved role in this workspace (null = no access) */
   role: string | null;
+  /** Effective role label (UX-facing) */
+  effectiveRole: string | null;
   /** Effective permissions for this user in this workspace */
   permissions: WorkspacePermissions;
   /** Effective capabilities resolved from RBAC (WS-02) */
@@ -43,9 +45,11 @@ export interface WorkspaceContext {
   enabledModules: string[];
   /** Workspace routing profile (provider routing config) */
   routingProfile: unknown;
+  /** Resource profile (optional accountable allocation) */
+  resourceProfile: unknown;
   /** Workspace type (personal, team, enterprise, sandbox, etc.) */
   workspaceType: string | null;
-  /** Workspace lifecycle status (WS-04) */
+  /** Workspace lifecycle status — canonical 9-status model (WS-04) */
   status: WorkspaceStatus;
   /** Workspace purpose type (WS-05) */
   purposeType: WorkspacePurposeType | null;
@@ -112,15 +116,20 @@ export async function resolveWorkspaceContext(
   const status = ((workspace as any).status as WorkspaceStatus) ?? "active";
   const purposeType = ((workspace as any).purposeType as WorkspacePurposeType) ?? null;
 
+  // 9. Extract resource profile
+  const resourceProfile = (workspace as Record<string, unknown>)?.resourceProfile ?? null;
+
   return {
     workspaceId,
     workspaceName: workspace.name,
     userId,
     role,
+    effectiveRole: role,
     permissions,
     effectiveCapabilities,
     enabledModules,
     routingProfile,
+    resourceProfile,
     workspaceType: workspace.type ?? null,
     status,
     purposeType,
