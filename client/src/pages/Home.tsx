@@ -32,7 +32,7 @@ export default function Home() {
       title: "Workspaces",
       value: workspaces?.length || 0,
       icon: <FolderOpen className="h-5 w-5" />,
-      href: "/workspaces",
+      href: "/ws/list",
       color: "text-blue-500",
     },
     {
@@ -70,7 +70,7 @@ export default function Home() {
       title: "Create Workspace",
       description: "Set up a new project workspace",
       icon: <FolderOpen className="h-6 w-6" />,
-      href: "/workspaces",
+      href: "/ws/list",
       color: "bg-green-500/10 text-green-500",
     },
     {
@@ -193,7 +193,7 @@ export default function Home() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => setLocation("/workspaces")}>
+            <Button onClick={() => setLocation("/ws/list")}>
               <Plus className="mr-2 h-4 w-4" />
               Create Your First Workspace
             </Button>

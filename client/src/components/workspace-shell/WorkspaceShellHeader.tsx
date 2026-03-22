@@ -69,7 +69,7 @@ export function WorkspaceShellHeader({
       </Button>
 
       {/* Back to workspaces */}
-      <Link href="/workspaces">
+      <Link href="/ws/list">
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
           <ArrowLeft className="h-4 w-4" />
         </Button>

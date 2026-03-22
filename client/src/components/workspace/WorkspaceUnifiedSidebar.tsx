@@ -278,7 +278,7 @@ export function WorkspaceUnifiedSidebar({
     <aside className="flex flex-col border-r bg-card w-64 shrink-0 overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 border-b px-3 h-10 shrink-0 bg-muted/30">
-        <Link href="/workspaces">
+        <Link href="/ws/list">
           <Home className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-pointer" />
         </Link>
         <span className="text-sm font-semibold truncate flex-1">{workspaceName}</span>

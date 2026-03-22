@@ -205,7 +205,7 @@ export function WorkspaceSidebar({
 
       {/* All Workspaces link */}
       <div className="px-2 pt-2 pb-1">
-        <Link href="/workspaces">
+        <Link href="/ws/list">
           <button
             onClick={handleNav}
             className={cn(

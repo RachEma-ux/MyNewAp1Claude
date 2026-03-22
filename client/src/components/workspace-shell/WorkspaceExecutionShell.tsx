@@ -21,6 +21,7 @@ import { WorkspaceContextSidebar } from "./WorkspaceContextSidebar";
 import { WorkspaceToolsToolbar } from "./WorkspaceToolsToolbar";
 import { WorkspaceMainFrame } from "./WorkspaceMainFrame";
 import { WorkspaceManagerControls } from "./WorkspaceManagerControls";
+import { WorkspaceUnifiedSidebarV2 } from "@/components/workspace/WorkspaceUnifiedSidebarV2";
 import type { ShellViewData } from "./types";
 
 // Module page imports — reuse existing workspace module pages
@@ -150,7 +151,7 @@ export default function WorkspaceExecutionShell() {
           <p className="text-sm text-muted-foreground">
             {error ? "Access denied or workspace does not exist." : "Unable to load workspace."}
           </p>
-          <Link href="/workspaces">
+          <Link href="/ws/list">
             <Button variant="outline">Back to Workspaces</Button>
           </Link>
         </div>
@@ -272,6 +273,22 @@ export default function WorkspaceExecutionShell() {
           </Switch>
           </div>
         </main>
+
+        {/* ─── NEW SIDEBAR V2 PROTOTYPE (right side for validation) ─── */}
+        <WorkspaceUnifiedSidebarV2
+          workspaceId={workspaceId}
+          workspaceName={shell.workspaceName || "Workspace"}
+          workspaceType={shell.workspaceType}
+          status={shell.status || "draft"}
+          isManager={shell.isManager}
+          participantRole={shell.participantRole}
+          teamCount={shell.teamCount ?? 0}
+          crewCount={shell.crewCount ?? 0}
+          purposeType={shell.purposeType}
+          purposeRef={shell.purposeRef}
+          missionEmphasis={shell.missionEmphasis}
+          onOversightOpen={() => setManagerDrawerOpen(true)}
+        />
       </div>
 
       {/* ─── Manager Controls Drawer (right) ─── */}

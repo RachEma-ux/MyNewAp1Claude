@@ -104,7 +104,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/" },
     { label: "Chat", icon: <MessageSquare className="w-5 h-5" />, href: "/chat" },
     { label: "Conversations", icon: <MessagesSquare className="w-5 h-5" />, href: "/conversations" },
-    { label: "Workspaces", icon: <FolderOpen className="w-5 h-5" />, href: "/workspaces" },
     {
       label: "WS Sandbox",
       icon: <Sparkles className="w-5 h-5" />,

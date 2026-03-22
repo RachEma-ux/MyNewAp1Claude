@@ -13,9 +13,7 @@ import { Loader2 } from "lucide-react";
 
 // Lazy-loaded page components (code splitting)
 const Home = lazy(() => import("./pages/Home"));
-const Workspaces = lazy(() => import("./pages/Workspaces"));
-const WorkspaceDetail = lazy(() => import("./pages/WorkspaceDetail"));
-const WorkspaceHome = lazy(() => import("./pages/WorkspaceHome"));
+// Old workspace pages removed — use WorkspaceExecutionShell via /w/:id
 const Models = lazy(() => import("./pages/Models"));
 const Documents = lazy(() => import("./pages/Documents"));
 // Agents page replaced by AgentsPage (governance-aware)
@@ -92,7 +90,6 @@ const LLMProviderConfigWizard = lazy(() => import("@/pages/LLMProviderConfigWiza
 const NewProviderPage = lazy(() => import("@/pages/NewProviderPage"));
 const LLMCataloguePage = lazy(() => import("@/pages/LLMCataloguePage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
-// const WorkspaceShellLegacy = lazy(() => import("@/pages/WorkspaceShell"));
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
 const WSDashboardPage = lazy(() => import("@/pages/WSDashboardPage"));
@@ -101,9 +98,6 @@ const WSWizardPage = lazy(() => import("@/pages/WSWizardPage"));
 const WSListPage = lazy(() => import("@/pages/WSListPage"));
 const WSCatalogPage = lazy(() => import("@/pages/WSCatalogPage"));
 // Legacy template shells — replaced by WorkspaceExecutionShell
-// const PersonalWorkspaceShell = lazy(() => import("@/pages/PersonalWorkspaceShell"));
-// const ProjectWorkspaceShell = lazy(() => import("@/pages/ProjectWorkspaceShell"));
-// const ResearchWorkspaceShell = lazy(() => import("@/pages/ResearchWorkspaceShell"));
 const LLMPromotions = lazy(() => import("@/pages/LLMPromotions"));
 const LLMDetailPage = lazy(() => import("@/pages/LLMDetailPage"));
 const LLMTrainingDashboard = lazy(() => import("@/pages/LLMTrainingDashboard"));
@@ -188,15 +182,12 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={() => <ProtectedRoute component={Home} />} />
-      <Route path="/workspaces" component={() => <ProtectedRoute component={Workspaces} />} />
       {/* WS Sandbox — workspace management surfaces */}
       <Route path="/ws/dashboard" component={() => <ProtectedRoute component={WSDashboardPage} />} />
       <Route path="/ws/control-panel" component={() => <ProtectedRoute component={WSControlPanelPage} />} />
       <Route path="/ws/wizard" component={() => <ProtectedRoute component={WSWizardPage} />} />
       <Route path="/ws/list" component={() => <ProtectedRoute component={WSListPage} />} />
       <Route path="/ws/catalog" component={() => <ProtectedRoute component={WSCatalogPage} />} />
-      <Route path="/workspaces/:id/home" component={() => <ProtectedRoute component={WorkspaceHome} />} />
-      <Route path="/workspaces/:id" component={() => <ProtectedRoute component={WorkspaceDetail} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
       <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
