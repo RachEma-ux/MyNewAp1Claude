@@ -10,12 +10,14 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
 import { requireModule, logActivity } from "../registry";
+import { requireWorkspaceAccess } from "../../workspace/workspace-guards";
 import { knowledgeDocuments, documentVersions, decisions } from "./schema";
 
 const documentsRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.number(), status: z.string().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) return [];
@@ -26,7 +28,8 @@ const documentsRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -46,6 +49,7 @@ const documentsRouter = router({
       tags: z.array(z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -81,6 +85,7 @@ const documentsRouter = router({
       changeNote: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -110,6 +115,7 @@ const documentsRouter = router({
   delete: governedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -122,7 +128,8 @@ const documentsRouter = router({
 
   versions: protectedProcedure
     .input(z.object({ documentId: z.number(), workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) return [];
@@ -135,7 +142,8 @@ const documentsRouter = router({
 const decisionsRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) return [];
@@ -146,7 +154,8 @@ const decisionsRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -166,6 +175,7 @@ const decisionsRouter = router({
       evidenceRefs: z.array(z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -191,6 +201,7 @@ const decisionsRouter = router({
       outcome: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -207,7 +218,8 @@ const decisionsRouter = router({
 const searchRouter = router({
   query: protectedProcedure
     .input(z.object({ workspaceId: z.number(), q: z.string().min(1) }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "knowledge");
       const db = getDb();
       if (!db) return [];

@@ -10,12 +10,14 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
 import { requireModule, logActivity } from "../registry";
+import { requireWorkspaceAccess } from "../../workspace/workspace-guards";
 import { threads, threadMessages, threadMentions } from "./schema";
 
 const threadsRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.number(), type: z.string().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "collaboration");
       const db = getDb();
       if (!db) return [];
@@ -26,7 +28,8 @@ const threadsRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "collaboration");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -46,6 +49,7 @@ const threadsRouter = router({
       linkedId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "collaboration");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -69,6 +73,7 @@ const threadsRouter = router({
       status: z.enum(["open", "closed", "archived"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "collaboration");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -82,6 +87,7 @@ const threadsRouter = router({
   delete: governedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "collaboration");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -102,7 +108,8 @@ const threadsRouter = router({
 const messagesRouter = router({
   list: protectedProcedure
     .input(z.object({ threadId: z.number(), workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "collaboration");
       const db = getDb();
       if (!db) return [];
@@ -123,6 +130,7 @@ const messagesRouter = router({
       })).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "collaboration");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -156,6 +164,7 @@ const messagesRouter = router({
       content: z.string().min(1),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "collaboration");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -168,6 +177,7 @@ const messagesRouter = router({
   delete: governedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "collaboration");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });

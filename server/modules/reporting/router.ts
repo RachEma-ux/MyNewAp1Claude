@@ -9,6 +9,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { router, protectedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
 import { requireModule } from "../registry";
+import { requireWorkspaceAccess } from "../../workspace/workspace-guards";
 import { projects, tasks } from "../pmt/schema";
 import { agentRuns } from "../agents/schema";
 import { threads } from "../collaboration/schema";
@@ -18,7 +19,8 @@ import { workspaceActivityLog } from "../../../drizzle/tables/workspace-modules"
 export const reportingRouter = router({
   velocity: protectedProcedure
     .input(z.object({ workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "reporting");
       const db = getDb();
       if (!db) return { total: 0, byStatus: {} };
@@ -37,7 +39,8 @@ export const reportingRouter = router({
 
   agentReliability: protectedProcedure
     .input(z.object({ workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "reporting");
       const db = getDb();
       if (!db) return { total: 0, completed: 0, failed: 0, successRate: 0 };
@@ -57,7 +60,8 @@ export const reportingRouter = router({
 
   activityTimeline: protectedProcedure
     .input(z.object({ workspaceId: z.number(), limit: z.number().default(50) }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "reporting");
       const db = getDb();
       if (!db) return [];
@@ -69,7 +73,8 @@ export const reportingRouter = router({
 
   riskHeatmap: protectedProcedure
     .input(z.object({ workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "reporting");
       const db = getDb();
       if (!db) return { projects: [], tasks: [] };
@@ -92,7 +97,8 @@ export const reportingRouter = router({
 
   summary: protectedProcedure
     .input(z.object({ workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "reporting");
       const db = getDb();
       if (!db) return { projects: 0, tasks: 0, agents: 0, threads: 0, documents: 0 };

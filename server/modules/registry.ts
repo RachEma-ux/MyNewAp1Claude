@@ -6,10 +6,12 @@
  */
 
 import { eq, and } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { getDb } from "../db/connection";
 import {
   workspaceModules,
   workspaceActivityLog,
+  workspaces,
   MODULE_KEYS,
   type ModuleKey,
   type WorkspaceModule,
@@ -136,5 +138,28 @@ export async function requireModule(workspaceId: number, moduleKey: ModuleKey): 
       context: { workspaceId, moduleKey },
       technicalDetails: `Module \"${moduleKey}\" is not enabled for workspace ${workspaceId}`,
     }, "CONFLICT");
+  }
+  // WS-04: Workspace lifecycle check — block deleted workspaces on all module routes
+  await requireWorkspaceNotDeleted(workspaceId);
+}
+
+/**
+ * Block access to deleted workspaces from module routes.
+ * Called within requireModule to provide lifecycle enforcement
+ * across all 220+ module procedures with zero sub-router changes.
+ */
+async function requireWorkspaceNotDeleted(workspaceId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  const [ws] = await db
+    .select({ status: workspaces.status })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .limit(1);
+  if (!ws) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Workspace not found" });
+  }
+  if (ws.status === "deleted") {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Workspace is deleted" });
   }
 }

@@ -121,6 +121,30 @@ describe("Phase 5 — UI ModuleGate Enforcement", () => {
 // Distinction: visible vs enabled vs usable
 // ============================================================================
 
+// ============================================================================
+// WS-11: Enhanced requireModule — Lifecycle Enforcement
+// ============================================================================
+
+describe("Phase 5 — requireModule Lifecycle Enforcement", () => {
+  it("requireModule calls requireWorkspaceNotDeleted for lifecycle blocking", () => {
+    const registryPath = path.resolve(process.cwd(), "server/modules/registry.ts");
+    const content = fs.readFileSync(registryPath, "utf-8");
+    expect(content).toContain("requireWorkspaceNotDeleted");
+  });
+
+  it("requireModule checks workspace status for deleted state", () => {
+    const registryPath = path.resolve(process.cwd(), "server/modules/registry.ts");
+    const content = fs.readFileSync(registryPath, "utf-8");
+    expect(content).toContain('ws.status === "deleted"');
+  });
+
+  it("requireModule throws NOT_FOUND for deleted workspaces", () => {
+    const registryPath = path.resolve(process.cwd(), "server/modules/registry.ts");
+    const content = fs.readFileSync(registryPath, "utf-8");
+    expect(content).toContain('"Workspace is deleted"');
+  });
+});
+
 describe("Phase 5 — Module State Semantics", () => {
   it("workspace_modules table has enabled column", () => {
     const schemaPath = path.resolve(process.cwd(), "drizzle/tables/workspace-modules.ts");

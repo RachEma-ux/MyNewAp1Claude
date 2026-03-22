@@ -168,6 +168,23 @@ export async function requireModuleEnabled(
 // ============================================================================
 
 /**
+ * Combined guard for module routes: access + lifecycle + module enablement.
+ * Use this for routes that need full workspace enforcement before module checks.
+ */
+export async function guardModuleRoute(params: {
+  userId: number;
+  workspaceId: number;
+  moduleKey: ModuleKey;
+  requireExecutable?: boolean;
+}): Promise<{ workspace: any; status: WorkspaceStatus }> {
+  const result = params.requireExecutable
+    ? await requireExecutableWorkspaceRoute(params.userId, params.workspaceId)
+    : await requireReadableWorkspaceRoute(params.userId, params.workspaceId);
+  await requireModuleEnabled(params.workspaceId, params.moduleKey);
+  return result;
+}
+
+/**
  * Full workspace route guard: access + lifecycle + optional capability + optional module.
  * Use this for comprehensive route protection in one call.
  */

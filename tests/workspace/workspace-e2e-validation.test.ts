@@ -166,6 +166,22 @@ describe("E2E — RBAC (Capability-Based Allow/Deny)", () => {
     const mod = await import("../../server/workspace/workspace-guards");
     expect(typeof mod.requireCapability).toBe("function");
   });
+
+  it("workspace mutations enforce requireCapability in routers.ts", () => {
+    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const content = fs.readFileSync(routersPath, "utf-8");
+    const capMatches = content.match(/requireCapability/g);
+    expect(capMatches).not.toBeNull();
+    expect(capMatches!.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("module management enforces requireCapability in modules/router.ts", () => {
+    const modulesPath = path.resolve(process.cwd(), "server/modules/router.ts");
+    const content = fs.readFileSync(modulesPath, "utf-8");
+    const capMatches = content.match(/requireCapability/g);
+    expect(capMatches).not.toBeNull();
+    expect(capMatches!.length).toBeGreaterThanOrEqual(2);
+  });
 });
 
 // ============================================================================

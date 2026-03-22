@@ -10,6 +10,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
 import { requireModule, logActivity } from "../registry";
+import { requireWorkspaceAccess } from "../../workspace/workspace-guards";
 import { projects, tasks, taskDependencies } from "./schema";
 import { commentsRouter } from "./comments-router";
 import { attachmentsRouter } from "./attachments-router";
@@ -39,7 +40,8 @@ import { standaloneRouter } from "./standalone-router";
 const projectsRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) return [];
@@ -50,7 +52,8 @@ const projectsRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -71,6 +74,7 @@ const projectsRouter = router({
       targetDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -98,6 +102,7 @@ const projectsRouter = router({
       governanceStage: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -111,6 +116,7 @@ const projectsRouter = router({
   delete: governedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -133,7 +139,8 @@ const tasksRouter = router({
       limit: z.number().min(1).max(200).default(50).optional(),
       offset: z.number().min(0).default(0).optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) return [];
@@ -151,7 +158,8 @@ const tasksRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -185,6 +193,7 @@ const tasksRouter = router({
       position: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -222,6 +231,7 @@ const tasksRouter = router({
       position: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -238,6 +248,7 @@ const tasksRouter = router({
   delete: governedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -250,6 +261,7 @@ const tasksRouter = router({
   duplicate: governedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -279,6 +291,7 @@ const tasksRouter = router({
       }),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -296,6 +309,7 @@ const tasksRouter = router({
       ids: z.array(z.number()).min(1),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -313,6 +327,7 @@ const tasksRouter = router({
       targetProjectId: z.number(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -326,7 +341,8 @@ const tasksRouter = router({
 const dependenciesRouter = router({
   list: protectedProcedure
     .input(z.object({ taskId: z.number(), workspaceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) return [];
@@ -341,6 +357,7 @@ const dependenciesRouter = router({
       type: z.enum(["blocks", "required_by"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -357,6 +374,7 @@ const dependenciesRouter = router({
   remove: governedProcedure
     .input(z.object({ id: z.number(), workspaceId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });

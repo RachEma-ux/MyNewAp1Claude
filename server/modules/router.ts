@@ -15,6 +15,7 @@ import { MODULE_KEYS, type ModuleKey } from "../../drizzle/tables/workspace-modu
 import {
   requireReadableWorkspaceRoute,
   requireExecutableWorkspaceRoute,
+  requireCapability,
 } from "../workspace/workspace-guards";
 import { pmtRouter } from "./pmt/router";
 import { knowledgeRouter } from "./knowledge/router";
@@ -41,6 +42,8 @@ const moduleManageRouter = router({
     .mutation(async ({ ctx, input }) => {
       // WS-04/WS-06: Executable workspace check — paused/archived/deleted blocked
       await requireExecutableWorkspaceRoute(ctx.user.id, input.workspaceId, "module.setEnabled");
+      // WS-10: Capability enforcement — require workspace.settings for module toggling
+      await requireCapability(ctx.user.id, input.workspaceId, "workspace.settings");
       await setModuleEnabled(input.workspaceId, input.moduleKey as ModuleKey, input.enabled);
       await logActivity({
         workspaceId: input.workspaceId,
@@ -60,6 +63,8 @@ const moduleManageRouter = router({
     .mutation(async ({ ctx, input }) => {
       // WS-04/WS-06: Executable workspace check
       await requireExecutableWorkspaceRoute(ctx.user.id, input.workspaceId, "modules.seed");
+      // WS-10: Capability enforcement — require workspace.manage for module seeding
+      await requireCapability(ctx.user.id, input.workspaceId, "workspace.manage");
       await seedWorkspaceModules(input.workspaceId, input.workspaceType);
       await logActivity({
         workspaceId: input.workspaceId,

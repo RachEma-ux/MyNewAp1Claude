@@ -47,7 +47,7 @@ import { orchestratorRouter } from "./orchestrator/router";
 import { botsRouter } from "./routers/bots";
 import { seedWorkspaceModules, logActivity, getWorkspaceModules } from "./modules/registry";
 import { isWorkspaceExecutable, isWorkspaceDeleted, isWorkspaceReadable } from "./workspace/workspace-lifecycle";
-import { requireReadableWorkspaceRoute, requireExecutableWorkspaceRoute } from "./workspace/workspace-guards";
+import { requireReadableWorkspaceRoute, requireExecutableWorkspaceRoute, requireCapability } from "./workspace/workspace-guards";
 import type { WorkspaceStatus } from "../drizzle/tables/users";
 
 export const appRouter = router({
@@ -166,6 +166,8 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         // WS-04/WS-06: Lifecycle guard — block mutations on non-executable workspaces
         await requireExecutableWorkspaceRoute(ctx.user.id, input.id, "workspace.update");
+        // WS-10: Capability enforcement — require workspace.manage for updates
+        await requireCapability(ctx.user.id, input.id, "workspace.manage");
         const { id, ...updates } = input;
         await db.updateWorkspace(id, { ...updates, updatedAt: new Date() });
         // WS-13: Activity traceability
@@ -207,6 +209,8 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         // WS-04/WS-06: Lifecycle guard — block on non-executable
         await requireExecutableWorkspaceRoute(ctx.user.id, input.id, "workspace.updateRoutingProfile");
+        // WS-10: Capability enforcement — require workspace.settings for routing config
+        await requireCapability(ctx.user.id, input.id, "workspace.settings");
         await db.updateWorkspace(input.id, {
           routingProfile: input.routingProfile,
         } as Record<string, unknown>);
@@ -261,6 +265,8 @@ export const appRouter = router({
         if (!workspace || workspace.ownerId !== ctx.user.id) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
+        // WS-10: Capability enforcement — require workspace.manage for deletion
+        await requireCapability(ctx.user.id, input.id, "workspace.manage");
         // WS-04: Cannot delete an already-deleted workspace
         const wsStatus = ((workspace as any).status as WorkspaceStatus) || "active";
         if (isWorkspaceDeleted(wsStatus)) {
