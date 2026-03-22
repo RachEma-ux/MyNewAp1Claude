@@ -1,10 +1,25 @@
 /**
+ * GOVERNANCE CONTRACT (LOCKED)
+ *
+ * This module participates in the AI Types governance system.
+ *
+ * Invariants:
+ * - Catalog owns intake and lifecycle
+ * - Domain creates entities but does NOT create catalog_entries
+ * - Runtime authority comes ONLY from Catalog
+ * - Availability must use shared authority rules
+ *
+ * Any change must preserve these invariants.
+ * See: docs/architecture/AI_TYPES_GOVERNANCE_STANDARD.md
+ */
+
+/**
  * Bot Domain Router — governed domain-first pattern
  *
  * Bots live in the `bots` DB table. The Catalog is a separate concern:
  * `importToCatalog` creates a catalog candidate from a deployable bot.
  *
- * Bot lifecycle: draft → configured → validated → deployable → archived
+ * Bot lifecycle: draft -> configured -> validated -> deployable -> archived
  * "Deployable" = configured + validated + no blockers.
  * Catalog import requires deployable status.
  *

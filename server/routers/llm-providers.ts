@@ -1,4 +1,19 @@
 /**
+ * GOVERNANCE CONTRACT (LOCKED)
+ *
+ * This module participates in the AI Types governance system.
+ *
+ * Invariants:
+ * - Catalog owns intake and lifecycle
+ * - Domain creates entities but does NOT create catalog_entries
+ * - Runtime authority comes ONLY from Catalog
+ * - Availability must use shared authority rules
+ *
+ * Any change must preserve these invariants.
+ * See: docs/architecture/AI_TYPES_GOVERNANCE_STANDARD.md
+ */
+
+/**
  * LLM Provider Registry, Policy Validation & Device Detection
  *
  * Extracted from llm.ts — provides provider browsing, configuration,

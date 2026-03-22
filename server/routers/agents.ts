@@ -1,3 +1,18 @@
+/**
+ * GOVERNANCE CONTRACT (LOCKED)
+ *
+ * This module participates in the AI Types governance system.
+ *
+ * Invariants:
+ * - Catalog owns intake and lifecycle
+ * - Domain creates entities but does NOT create catalog_entries
+ * - Runtime authority comes ONLY from Catalog
+ * - Availability must use shared authority rules
+ *
+ * Any change must preserve these invariants.
+ * See: docs/architecture/AI_TYPES_GOVERNANCE_STANDARD.md
+ */
+
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, protectedProcedure, governedProcedure, router } from "../_core/trpc";

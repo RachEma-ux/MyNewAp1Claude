@@ -1,10 +1,25 @@
 /**
+ * GOVERNANCE CONTRACT (LOCKED)
+ *
+ * This module participates in the AI Types governance system.
+ *
+ * Invariants:
+ * - Catalog owns intake and lifecycle
+ * - Domain creates entities but does NOT create catalog_entries
+ * - Runtime authority comes ONLY from Catalog
+ * - Availability must use shared authority rules
+ *
+ * Any change must preserve these invariants.
+ * See: docs/architecture/AI_TYPES_GOVERNANCE_STANDARD.md
+ */
+
+/**
  * Models Router — governed model management (domain-first)
  *
  * Models live in the `models` DB table. The Catalog is a separate concern:
  * `importToCatalog` creates a catalog candidate from a deployable model.
  *
- * Model lifecycle: draft → ready → active → deprecated → disabled
+ * Model lifecycle: draft -> ready -> active -> deprecated -> disabled
  * "Deployable" = status is "ready" or "active".
  * Catalog import requires deployable status.
  */

@@ -1,12 +1,16 @@
 name: Run Tests
 
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       test_path:
         description: 'Test path pattern (e.g. server/workspace/seed/)'
         required: false
-        default: 'server/workspace/seed/'
+        default: ''
 
 jobs:
   test:
@@ -45,7 +49,49 @@ jobs:
         env:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
 
-      - name: Run tests
+      # ── Layer 1: Contract Tests ───────────────────────────────────────
+      # Domain, Catalog, and Runtime contract validation.
+      - name: Contract tests (Layer 1)
+        run: npx vitest run tests/contracts/ --reporter=verbose
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+
+      # ── Layer 2: Governance Tests ───────────────────────────────────
+      # Policy blocking, audit enforcement, invalid transition detection.
+      - name: Governance tests (Layer 2)
+        run: npx vitest run tests/governance/ --reporter=verbose
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+
+      # ── Layer 3: Integration Tests — Scenarios ─────────────────────
+      # 7 real-world scenarios with step-by-step invariant checks.
+      - name: Scenario tests (Layer 3a)
+        run: npx vitest run tests/integration/ai-types/ --reporter=verbose
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+
+      # ── Layer 3: Integration Tests — DB Integrity ──────────────────
+      # FK integrity, fallback, dedup, state constraints, availability.
+      - name: DB integrity tests (Layer 3b)
+        run: npx vitest run tests/integration/runtime-db/ --reporter=verbose
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+
+      # ── Layer 4: UI Selector Tests ─────────────────────────────────
+      # Intake selectors, app selectors, chat selectors, bot wizard.
+      - name: UI selector tests (Layer 4)
+        run: npx vitest run tests/ui/ --reporter=verbose
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+
+      # ── Static Governance Guard ─────────────────────────────────────
+      # Scans source code for forbidden patterns that violate governance invariants.
+      - name: Static governance invariant scan
+        run: npx tsx scripts/governance/check-invariants.ts
+
+      # ── Additional Tests (manual trigger) ───────────────────────────
+      - name: Run additional tests
+        if: ${{ github.event.inputs.test_path != '' }}
         run: npx vitest run ${{ github.event.inputs.test_path }} --reporter=verbose
         env:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
