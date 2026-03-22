@@ -276,10 +276,10 @@ export function WorkspaceToolsToolbar({
 }: ToolsSidebarProps) {
   return (
     <>
-      {/* Desktop: floating panel at top-left of main area */}
+      {/* Desktop: inline panel, full height of main area */}
       <aside
         className={cn(
-          "hidden md:flex flex-col absolute top-0 left-0 z-20 border-r border-b rounded-br-lg bg-card/95 backdrop-blur-sm shadow-md transition-all duration-200 overflow-hidden max-h-[calc(100%-1rem)]",
+          "hidden md:flex flex-col h-full border-r bg-card/80 backdrop-blur-sm transition-all duration-200 shrink-0 overflow-hidden",
           collapsed ? "w-[48px]" : "w-[220px]"
         )}
       >

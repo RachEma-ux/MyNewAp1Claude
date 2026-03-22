@@ -191,9 +191,9 @@ export default function WorkspaceExecutionShell() {
           onClose={() => setSidebarOpen(false)}
         />
 
-        {/* Main Execution Area */}
-        <main className="flex-1 relative overflow-auto bg-background">
-          {/* Tools Toolbar — top-left corner of main area */}
+        {/* Main Execution Area — flex row: [ToolsToolbar | content] */}
+        <main className="flex-1 flex overflow-hidden bg-background">
+          {/* Tools Toolbar — left edge of main, full height, never exceeds main */}
           <WorkspaceToolsToolbar
             shell={shell}
             basePath={basePath}
@@ -203,6 +203,8 @@ export default function WorkspaceExecutionShell() {
             onClose={() => setToolsMobileOpen(false)}
           />
 
+          {/* Scrollable route content */}
+          <div className="flex-1 overflow-auto">
           <Switch>
             {/* ─── PMT Engine ─── */}
             <Route path={`${basePath}/projects/board`}><ModuleGate moduleKey="pmt" moduleName="Project Management"><PMTKanbanPage workspaceId={workspaceId} /></ModuleGate></Route>
@@ -268,6 +270,7 @@ export default function WorkspaceExecutionShell() {
             {/* ─── Default: Mission-driven landing ─── */}
             <Route><WorkspaceMainFrame shell={shell} basePath={basePath} /></Route>
           </Switch>
+          </div>
         </main>
       </div>
 
