@@ -45,7 +45,10 @@ import { hqRouter } from "./hq/router";
 import { modulesRouter } from "./modules/router";
 import { orchestratorRouter } from "./orchestrator/router";
 import { botsRouter } from "./routers/bots";
-import { seedWorkspaceModules } from "./modules/registry";
+import { seedWorkspaceModules, logActivity, getWorkspaceModules } from "./modules/registry";
+import { isWorkspaceExecutable, isWorkspaceDeleted, isWorkspaceReadable } from "./workspace/workspace-lifecycle";
+import { requireReadableWorkspaceRoute, requireExecutableWorkspaceRoute } from "./workspace/workspace-guards";
+import type { WorkspaceStatus } from "../drizzle/tables/users";
 
 export const appRouter = router({
   system: systemRouter,
@@ -134,6 +137,8 @@ export const appRouter = router({
           } catch (err) {
             console.warn(`[Workspace] Failed to seed modules: ${(err as Error).message}`);
           }
+          // WS-13: Activity traceability
+          await logActivity({ workspaceId: (workspace as any).id, actorId: ctx.user.id, action: "workspace.create", metadata: { workspaceType } }).catch(() => {});
         }
         return workspace;
       }),
@@ -141,11 +146,9 @@ export const appRouter = router({
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.id);
-        if (!hasAccess) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
-        return await db.getWorkspaceById(input.id);
+        // WS-01/WS-04: Lifecycle guard — deleted workspaces are blocked
+        const { workspace } = await requireReadableWorkspaceRoute(ctx.user.id, input.id);
+        return workspace;
       }),
 
     update: governedProcedure
@@ -161,12 +164,12 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.id);
-        if (!hasAccess) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        // WS-04/WS-06: Lifecycle guard — block mutations on non-executable workspaces
+        await requireExecutableWorkspaceRoute(ctx.user.id, input.id, "workspace.update");
         const { id, ...updates } = input;
-        await db.updateWorkspace(id, updates);
+        await db.updateWorkspace(id, { ...updates, updatedAt: new Date() });
+        // WS-13: Activity traceability
+        await logActivity({ workspaceId: id, actorId: ctx.user.id, action: "workspace.update", metadata: updates }).catch(() => {});
         return { success: true };
       }),
 
@@ -174,11 +177,8 @@ export const appRouter = router({
     getRoutingProfile: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.id);
-        if (!hasAccess) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
-        const workspace = await db.getWorkspaceById(input.id);
+        // WS-01/WS-04: Lifecycle guard — readable check (deleted blocked)
+        const { workspace } = await requireReadableWorkspaceRoute(ctx.user.id, input.id);
         return (workspace as Record<string, unknown>)?.routingProfile || {
           defaultRoute: 'AUTO',
           dataSensitivity: 'LOW',
@@ -205,14 +205,53 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const hasAccess = await db.hasWorkspaceAccess(ctx.user.id, input.id);
-        if (!hasAccess) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-        }
+        // WS-04/WS-06: Lifecycle guard — block on non-executable
+        await requireExecutableWorkspaceRoute(ctx.user.id, input.id, "workspace.updateRoutingProfile");
         await db.updateWorkspace(input.id, {
           routingProfile: input.routingProfile,
         } as Record<string, unknown>);
+        // WS-13: Activity traceability
+        await logActivity({ workspaceId: input.id, actorId: ctx.user.id, action: "workspace.updateRoutingProfile" }).catch(() => {});
         return { success: true };
+      }),
+
+    // WS-12: Get recent workspace activity log
+    getActivity: protectedProcedure
+      .input(z.object({ workspaceId: z.number(), limit: z.number().min(1).max(100).default(20) }))
+      .query(async ({ ctx, input }) => {
+        await requireReadableWorkspaceRoute(ctx.user.id, input.workspaceId);
+        const { getDb } = await import("./db/connection");
+        const dbConn = getDb();
+        if (!dbConn) return [];
+        try {
+          const { workspaceActivityLog } = await import("../drizzle/schema");
+          const { eq, desc } = await import("drizzle-orm");
+          return await dbConn
+            .select()
+            .from(workspaceActivityLog)
+            .where(eq(workspaceActivityLog.workspaceId, input.workspaceId))
+            .orderBy(desc(workspaceActivityLog.createdAt))
+            .limit(input.limit);
+        } catch {
+          return [];
+        }
+      }),
+
+    // WS-09: Get workspace members
+    getMembers: protectedProcedure
+      .input(z.object({ workspaceId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        await requireReadableWorkspaceRoute(ctx.user.id, input.workspaceId);
+        const { getWorkspaceMembers } = await import("./workspaces/permissions-service");
+        return getWorkspaceMembers(input.workspaceId);
+      }),
+
+    // WS-11: Get workspace module bindings
+    getModules: protectedProcedure
+      .input(z.object({ workspaceId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        await requireReadableWorkspaceRoute(ctx.user.id, input.workspaceId);
+        return getWorkspaceModules(input.workspaceId);
       }),
 
     delete: governedProcedure
@@ -222,6 +261,13 @@ export const appRouter = router({
         if (!workspace || workspace.ownerId !== ctx.user.id) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
         }
+        // WS-04: Cannot delete an already-deleted workspace
+        const wsStatus = ((workspace as any).status as WorkspaceStatus) || "active";
+        if (isWorkspaceDeleted(wsStatus)) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Workspace is already deleted" });
+        }
+        // WS-13: Activity traceability — log before deletion
+        await logActivity({ workspaceId: input.id, actorId: ctx.user.id, action: "workspace.delete" }).catch(() => {});
         await db.deleteWorkspace(input.id);
         return { success: true };
       }),
