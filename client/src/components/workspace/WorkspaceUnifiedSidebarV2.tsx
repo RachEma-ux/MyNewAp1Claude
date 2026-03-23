@@ -198,12 +198,12 @@ export function WorkspaceUnifiedSidebarV2({
           </Button>
         </div>
 
-        {/* Tools section — clickable dropdown */}
-        <div className="flex-1 flex flex-col items-center justify-center border-b">
+        {/* Tools section — dropdown header + item icons */}
+        <div className="flex-1 flex flex-col items-center gap-1 py-2 border-b">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="p-2 rounded-md hover:bg-blue-500/10 transition-colors cursor-pointer">
-                <Wrench className="h-4 w-4 text-blue-400" />
+              <button className="p-1 rounded-md hover:bg-blue-500/10 transition-colors cursor-pointer">
+                <Wrench className="h-3.5 w-3.5 text-blue-400" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="right" align="start" className="w-56 max-h-80 overflow-y-auto">
@@ -231,14 +231,23 @@ export function WorkspaceUnifiedSidebarV2({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/settings`}><Button variant={isActive(`${base}/settings`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><LayoutDashboard className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="right">Dashboard</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/team`}><Button variant={isActive(`${base}/team`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Users className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="right">Team</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/crew`}><Button variant={isActive(`${base}/crew`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Cpu className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="right">Crew</TooltipContent></Tooltip>
         </div>
 
-        {/* Context section — clickable dropdown */}
-        <div className="flex-1 flex flex-col items-center justify-center border-b">
+        {/* Context section — dropdown header + item icons */}
+        <div className="flex-1 flex flex-col items-center gap-1 py-2 border-b">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="p-2 rounded-md hover:bg-emerald-500/10 transition-colors cursor-pointer">
-                <Info className="h-4 w-4 text-emerald-400" />
+              <button className="p-1 rounded-md hover:bg-emerald-500/10 transition-colors cursor-pointer">
+                <Info className="h-3.5 w-3.5 text-emerald-400" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="right" align="start" className="w-56 max-h-80 overflow-y-auto">
@@ -264,14 +273,23 @@ export function WorkspaceUnifiedSidebarV2({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Tooltip><TooltipTrigger asChild>
+            <div className="h-8 w-8 flex items-center justify-center"><Target className="h-4 w-4 text-muted-foreground" /></div>
+          </TooltipTrigger><TooltipContent side="right">{shell.workspaceName}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <div className="h-8 w-8 flex items-center justify-center"><Activity className="h-4 w-4 text-muted-foreground" /></div>
+          </TooltipTrigger><TooltipContent side="right">{shell.status.replace(/_/g, " ")}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <div className="h-8 w-8 flex items-center justify-center"><Compass className="h-4 w-4 text-muted-foreground" /></div>
+          </TooltipTrigger><TooltipContent side="right">{shell.purposeType || "Purpose"}</TooltipContent></Tooltip>
         </div>
 
-        {/* Settings section — clickable dropdown */}
-        <div className="flex-1 flex flex-col items-center justify-center">
+        {/* Settings section — dropdown header + item icons */}
+        <div className="flex-1 flex flex-col items-center gap-1 py-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="p-2 rounded-md hover:bg-orange-500/10 transition-colors cursor-pointer">
-                <Settings className="h-4 w-4 text-orange-400" />
+              <button className="p-1 rounded-md hover:bg-orange-500/10 transition-colors cursor-pointer">
+                <Settings className="h-3.5 w-3.5 text-orange-400" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="right" align="start" className="w-56 max-h-80 overflow-y-auto">
@@ -290,6 +308,15 @@ export function WorkspaceUnifiedSidebarV2({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/oversight`}><Button variant={isActive(`${base}/oversight`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Shield className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="right">Oversight</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/rules`}><Button variant={isActive(`${base}/rules`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Scale className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="right">Rules</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/governance`}><Button variant={isActive(`${base}/governance`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><ShieldCheck className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="right">Governance</TooltipContent></Tooltip>
         </div>
       </aside>
     );
