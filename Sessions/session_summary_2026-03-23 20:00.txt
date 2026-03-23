@@ -1,0 +1,70 @@
+Session Summary — 2026-03-23 20:00
+====================================
+Task: HR Phase 6 — Security Hardening (Permission Enforcement, Masking, Audit)
+
+Context:
+Continuation of Phase 6 HR Hardening work from a previous session that ran out of
+context. The previous session had completed the Planner phase, added checkHrAccess()
+to permissions.ts, fully hardened the compensation router, and partially hardened
+the relations router (grievance list/get only).
+
+Work Completed (Builder → Reviewer → Tester → Governance):
+
+1. Relations Router — Full hardening (16 endpoints):
+   - All policy endpoints: POLICY_READ / POLICY_WRITE / POLICY_MANAGE
+   - All grievance endpoints: RELATIONS_READ + RELATIONS_READ_SENSITIVE with masking
+   - All disciplinary endpoints: RELATIONS_READ + masking + logSensitiveRead
+   - All investigation endpoints: RELATIONS_READ + masking + logSensitiveRead
+   - All mutation endpoints: RELATIONS_WRITE / RELATIONS_MANAGE
+
+2. Analytics Router — Full hardening (8 endpoints):
+   - getDashboardSummary, getWorkforceBreakdown, getReminders: ANALYTICS_READ
+   - listReportDefinitions, listMetricSnapshots: ANALYTICS_READ
+   - createReportDefinition, updateReportDefinition: ANALYTICS_MANAGE
+   - createMetricSnapshot: ANALYTICS_WRITE
+
+3. Seed Data Fixes:
+   - Goal statuses: "in_progress" → "active", "not_started" → "draft"
+   - Leave totalDays: numeric 10/2 → string "10"/"2"
+
+4. Lifecycle Double-Count Bug Fix:
+   - Removed manual +1 offset in updateOnboardingTask and updateOffboardingTask
+   - COUNT query already reflects the committed status change
+
+5. Router Version: 5.0.0 → 6.0.0, added feature flags
+
+6. Phase 6 Tests: 30+ assertions in hr-phase6.test.ts covering:
+   - checkHrAccess role-aware masking (admin, hrbp, manager, employee)
+   - Compensation router structure verification
+   - Relations router structure verification
+   - Analytics router structure verification
+   - Seed data enum/type correctness
+   - Lifecycle double-count pattern absence
+   - Role differentiation (P2-7)
+   - Audit coverage counts
+
+7. Reviewer pass: Verified all permission check counts match endpoint counts
+8. Governance pass: All 7 hardening items addressed
+
+Commit: 6413447
+Files Modified (9):
+- server/hr/permissions.ts — checkHrAccess() (from prior session)
+- server/hr/compensation/router.ts — 17 checkHrAccess + logSensitiveRead (from prior)
+- server/hr/relations/router.ts — 16 checkHrAccess + role-aware masking + audit
+- server/hr/analytics/router.ts — 8 checkHrAccess
+- server/hr/lifecycle/router.ts — removed double-count bug
+- server/hr/seed.ts — fixed enum + type mismatches
+- server/hr/router.ts — version 6.0.0 + feature flags
+- server/hr/__tests__/hr-phase5.test.ts — version label update
+- server/hr/__tests__/hr-phase6.test.ts — NEW: 30+ test assertions
+
+P1 Items (all fixed):
+- P1-1: Compensation masking ✅ (17 endpoints, role-aware)
+- P1-2: Relations masking ✅ (grievances, disciplinary, investigations)
+- P1-3: Permission enforcement ✅ (41 checkHrAccess calls across 3 routers)
+- P1-4: Audit coverage ✅ (logSensitiveRead on all sensitive reads)
+
+P2 Items (all fixed):
+- P2-5: Seed data ✅ (valid enums, correct types)
+- P2-6: Lifecycle double-count ✅ (removed +1 offset)
+- P2-7: Role differentiation ✅ (5-role matrix enforced)
