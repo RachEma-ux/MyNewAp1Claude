@@ -19,7 +19,7 @@ import {
   hrBenefitPlans,
   hrBenefitEnrollments,
 } from "../../../drizzle/schema";
-import { logHrAudit } from "../audit";
+import { logHrAudit, logSensitiveRead, logStatusChange } from "../audit";
 
 // ============================================================================
 // State machines
@@ -152,16 +152,18 @@ export const hrCompensationRouter = router({
       workerId: z.number().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.workerId) conditions.push(eq(hrCompensationRecords.workerId, input.workerId));
       if (input.status) conditions.push(eq(hrCompensationRecords.status, input.status));
-      return db.select().from(hrCompensationRecords)
+      const results = await db.select().from(hrCompensationRecords)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrCompensationRecords.effectiveFrom))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compensation", recordCount: results.length });
+      return results;
     }),
 
   createCompensationRecord: governedProcedure
@@ -244,6 +246,7 @@ export const hrCompensationRouter = router({
         actorId: ctx.user.id, action: "hr.compensation.review_cycle.transition",
         metadata: { cycleId: input.id, from: existing.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, domain: "compensation.review_cycle", entityId: input.id, fromStatus: existing.status, toStatus: input.status });
       return updated;
     }),
 
@@ -259,17 +262,19 @@ export const hrCompensationRouter = router({
       status: z.string().optional(),
       bonusType: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.workerId) conditions.push(eq(hrBonusRecords.workerId, input.workerId));
       if (input.status) conditions.push(eq(hrBonusRecords.status, input.status));
       if (input.bonusType) conditions.push(eq(hrBonusRecords.bonusType, input.bonusType));
-      return db.select().from(hrBonusRecords)
+      const results = await db.select().from(hrBonusRecords)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrBonusRecords.createdAt))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compensation.bonus", recordCount: results.length });
+      return results;
     }),
 
   createBonusRecord: governedProcedure
@@ -311,6 +316,7 @@ export const hrCompensationRouter = router({
         action: "hr.compensation.bonus.transition",
         metadata: { bonusId: input.id, from: existing.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, targetWorkerId: existing.workerId, domain: "compensation.bonus", entityId: input.id, fromStatus: existing.status, toStatus: input.status });
       return updated;
     }),
 
@@ -423,6 +429,7 @@ export const hrCompensationRouter = router({
         action: "hr.benefits.enrollment.transition",
         metadata: { enrollmentId: input.id, from: existing.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, targetWorkerId: existing.workerId, domain: "benefits.enrollment", entityId: input.id, fromStatus: existing.status, toStatus: input.status });
       return updated;
     }),
 });

@@ -86,7 +86,7 @@ export const hrAnalyticsRouter = router({
     const [pendingReviews] = await db.select({
       count: sql<number>`count(*)`,
     }).from(hrPerformanceReviews).where(
-      sql`${hrPerformanceReviews.status} in ('draft', 'in_progress')`
+      sql`${hrPerformanceReviews.status} in ('pending', 'self_review', 'manager_review')`
     );
 
     const [expiringCerts] = await db.select({

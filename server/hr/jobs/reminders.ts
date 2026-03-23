@@ -13,6 +13,7 @@ import {
   hrCertifications,
   hrLearningAssignments,
   hrPerformanceReviews,
+  hrPerformanceCycles,
   hrLeaveRequests,
   hrSalaryReviewCycles,
   hrComplianceObligations,
@@ -114,17 +115,19 @@ export async function checkReviewsDue(daysAhead: number = 14): Promise<Reminder[
     .select({
       id: hrPerformanceReviews.id,
       workerId: hrPerformanceReviews.workerId,
-      dueDate: hrPerformanceReviews.dueDate,
+      dueDate: hrPerformanceCycles.endDate,
     })
     .from(hrPerformanceReviews)
+    .innerJoin(hrPerformanceCycles, eq(hrPerformanceReviews.cycleId, hrPerformanceCycles.id))
     .where(
       and(
         or(
-          eq(hrPerformanceReviews.status, "draft"),
-          eq(hrPerformanceReviews.status, "in_progress"),
+          eq(hrPerformanceReviews.status, "pending"),
+          eq(hrPerformanceReviews.status, "self_review"),
+          eq(hrPerformanceReviews.status, "manager_review"),
         ),
-        sql`${hrPerformanceReviews.dueDate} IS NOT NULL`,
-        sql`${hrPerformanceReviews.dueDate} <= ${cutoff}`,
+        sql`${hrPerformanceCycles.endDate} IS NOT NULL`,
+        sql`${hrPerformanceCycles.endDate} <= ${cutoff}`,
       )
     )
     .limit(200);

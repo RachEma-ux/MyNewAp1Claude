@@ -284,9 +284,9 @@ describe("HR Phase 5 — Schema Barrel Exports", () => {
     // Staffing
     expect(schema.hrWorkspaceAssignments).toBeDefined();
     // Recruiting
-    expect(schema.hrJobRequisitions).toBeDefined();
+    expect(schema.hrRecruitmentRequests).toBeDefined();
     // Lifecycle
-    expect(schema.hrLifecycleCases).toBeDefined();
+    expect(schema.hrLifecycleEvents).toBeDefined();
     // Time
     expect(schema.hrTimeEntries).toBeDefined();
     expect(schema.hrLeaveRequests).toBeDefined();

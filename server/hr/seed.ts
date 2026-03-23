@@ -52,17 +52,17 @@ export async function seedHrDemoData(): Promise<{ seeded: boolean; message: stri
 
   // === Org Units ===
   const orgUnits = await db.insert(hrOrgUnits).values([
-    { name: "Engineering", code: "ENG", unitType: "department", status: "active" },
-    { name: "Human Resources", code: "HR", unitType: "department", status: "active" },
-    { name: "Sales", code: "SALES", unitType: "department", status: "active" },
+    { name: "Engineering", code: "ENG", type: "department", status: "active" },
+    { name: "Human Resources", code: "HR", type: "department", status: "active" },
+    { name: "Sales", code: "SALES", type: "department", status: "active" },
   ]).returning();
 
   // === Positions ===
   const positions = await db.insert(hrPositions).values([
-    { title: "Software Engineer", code: "SE-001", orgUnitId: orgUnits[0].id, jobLevel: "IC3", status: "active" },
-    { title: "HR Manager", code: "HR-MGR", orgUnitId: orgUnits[1].id, jobLevel: "M1", status: "active" },
-    { title: "Sales Rep", code: "SALES-REP", orgUnitId: orgUnits[2].id, jobLevel: "IC2", status: "active" },
-    { title: "Engineering Lead", code: "ENG-LEAD", orgUnitId: orgUnits[0].id, jobLevel: "M2", status: "active" },
+    { title: "Software Engineer", positionCode: "SE-001", orgUnitId: orgUnits[0].id, status: "active" },
+    { title: "HR Manager", positionCode: "HR-MGR", orgUnitId: orgUnits[1].id, status: "active" },
+    { title: "Sales Rep", positionCode: "SALES-REP", orgUnitId: orgUnits[2].id, status: "active" },
+    { title: "Engineering Lead", positionCode: "ENG-LEAD", orgUnitId: orgUnits[0].id, status: "active" },
   ]).returning();
 
   // === Worker Profiles ===
@@ -126,8 +126,8 @@ export async function seedHrDemoData(): Promise<{ seeded: boolean; message: stri
 
   // === Leave Types + Requests ===
   const leaveTypes = await db.insert(hrLeaveTypes).values([
-    { code: "ANNUAL", name: "Annual Leave", defaultDays: 20, isPaid: true },
-    { code: "SICK", name: "Sick Leave", defaultDays: 10, isPaid: true },
+    { code: "ANNUAL", name: "Annual Leave", defaultDaysPerYear: 20, isPaid: true },
+    { code: "SICK", name: "Sick Leave", defaultDaysPerYear: 10, isPaid: true },
     { code: "UNPAID", name: "Unpaid Leave", isPaid: false },
   ]).returning();
 
@@ -159,9 +159,9 @@ export async function seedHrDemoData(): Promise<{ seeded: boolean; message: stri
 
   // === Policies ===
   await db.insert(hrPolicies).values([
-    { title: "Code of Conduct", category: "general", status: "published", version: "2.0", effectiveDate: "2025-01-01" },
-    { title: "Remote Work Policy", category: "workplace", status: "published", version: "1.1", effectiveDate: "2024-06-01" },
-    { title: "Data Privacy Policy", category: "compliance", status: "published", version: "1.0", effectiveDate: "2024-01-01" },
+    { title: "Code of Conduct", category: "general", status: "published", version: 2, effectiveFrom: "2025-01-01" },
+    { title: "Remote Work Policy", category: "workplace", status: "published", version: 1, effectiveFrom: "2024-06-01" },
+    { title: "Data Privacy Policy", category: "compliance", status: "published", version: 1, effectiveFrom: "2024-01-01" },
   ]);
 
   // === Compliance Obligations ===

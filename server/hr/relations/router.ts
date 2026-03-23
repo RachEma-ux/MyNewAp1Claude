@@ -18,7 +18,7 @@ import {
   hrDisciplinaryActions,
   hrInvestigations,
 } from "../../../drizzle/schema";
-import { logHrAudit } from "../audit";
+import { logHrAudit, logSensitiveRead, logStatusChange } from "../audit";
 
 // ============================================================================
 // State machines
@@ -139,6 +139,7 @@ export const hrRelationsRouter = router({
         actorId: ctx.user.id, action: "hr.relations.policy.transition",
         metadata: { policyId: input.id, from: existing.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, domain: "relations.policy", entityId: input.id, fromStatus: existing.status, toStatus: input.status });
       return updated;
     }),
 
@@ -195,26 +196,29 @@ export const hrRelationsRouter = router({
       severity: z.string().optional(),
       category: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.status) conditions.push(eq(hrGrievances.status, input.status));
       if (input.severity) conditions.push(eq(hrGrievances.severity, input.severity));
       if (input.category) conditions.push(eq(hrGrievances.category, input.category));
-      return db.select().from(hrGrievances)
+      const results = await db.select().from(hrGrievances)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrGrievances.createdAt))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "relations.grievance", recordCount: results.length });
+      return results;
     }),
 
   getGrievance: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrGrievances).where(eq(hrGrievances.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Grievance not found" });
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "relations.grievance", recordCount: 1 });
       return row;
     }),
 
@@ -265,6 +269,7 @@ export const hrRelationsRouter = router({
         actorId: ctx.user.id, action: "hr.relations.grievance.transition",
         metadata: { grievanceId: input.id, from: existing.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, domain: "relations.grievance", entityId: input.id, fromStatus: existing.status, toStatus: input.status });
       return updated;
     }),
 
@@ -333,6 +338,7 @@ export const hrRelationsRouter = router({
         action: "hr.relations.disciplinary.transition",
         metadata: { actionId: input.id, from: existing.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, targetWorkerId: existing.workerId, domain: "relations.disciplinary", entityId: input.id, fromStatus: existing.status, toStatus: input.status });
       return updated;
     }),
 
@@ -347,16 +353,18 @@ export const hrRelationsRouter = router({
       status: z.string().optional(),
       category: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.status) conditions.push(eq(hrInvestigations.status, input.status));
       if (input.category) conditions.push(eq(hrInvestigations.category, input.category));
-      return db.select().from(hrInvestigations)
+      const results = await db.select().from(hrInvestigations)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrInvestigations.createdAt))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "relations.investigation", recordCount: results.length });
+      return results;
     }),
 
   createInvestigation: governedProcedure
@@ -405,6 +413,7 @@ export const hrRelationsRouter = router({
         actorId: ctx.user.id, action: "hr.relations.investigation.transition",
         metadata: { investigationId: input.id, from: existing.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, domain: "relations.investigation", entityId: input.id, fromStatus: existing.status, toStatus: input.status });
       return updated;
     }),
 });
