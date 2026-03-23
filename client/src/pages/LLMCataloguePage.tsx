@@ -285,7 +285,8 @@ export default function LLMCataloguePage() {
             const def = ENTRY_TYPE_DEFS[entryType];
             const categories = getCategoriesForType(entryType);
             const categoryLabel = entry.category ? categories[entry.category]?.label : null;
-            const caps = (entry.capabilities as string[] | null) ?? [];
+            const rawCaps = entry.capabilities;
+            const caps: string[] = Array.isArray(rawCaps) ? rawCaps : typeof rawCaps === "string" ? JSON.parse(rawCaps) : [];
 
             return (
               <Card
