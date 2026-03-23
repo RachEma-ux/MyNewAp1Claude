@@ -20,6 +20,7 @@ import {
   hrBenefitEnrollments,
 } from "../../../drizzle/schema";
 import { logHrAudit, logSensitiveRead, logStatusChange } from "../audit";
+import { maskCompensationFields } from "../permissions";
 
 // ============================================================================
 // State machines
@@ -163,7 +164,7 @@ export const hrCompensationRouter = router({
         .orderBy(desc(hrCompensationRecords.effectiveFrom))
         .limit(input.limit).offset(input.offset);
       await logSensitiveRead({ actorId: ctx.user.id, domain: "compensation", recordCount: results.length });
-      return results;
+      return results.map((r) => maskCompensationFields(r as Record<string, unknown>));
     }),
 
   createCompensationRecord: governedProcedure
@@ -274,7 +275,7 @@ export const hrCompensationRouter = router({
         .orderBy(desc(hrBonusRecords.createdAt))
         .limit(input.limit).offset(input.offset);
       await logSensitiveRead({ actorId: ctx.user.id, domain: "compensation.bonus", recordCount: results.length });
-      return results;
+      return results.map((r) => maskCompensationFields(r as Record<string, unknown>));
     }),
 
   createBonusRecord: governedProcedure

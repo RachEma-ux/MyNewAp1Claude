@@ -123,7 +123,7 @@ export const hrDirectoryRouter = router({
         .limit(1);
 
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Worker not found" });
-      return rows[0];
+      return maskDirectoryFields(rows[0]);
     }),
 
   getSummary: protectedProcedure

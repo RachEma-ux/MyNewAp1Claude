@@ -19,7 +19,7 @@ import {
   hrKnowledgeTransferItems,
   hrExitInterviews,
 } from "../../../drizzle/schema";
-import { logHrAudit } from "../audit";
+import { logHrAudit, logStatusChange } from "../audit";
 import { logLifecycleEvent } from "./event-logger";
 import { generateOnboardingTasks, generateOffboardingTasks } from "./task-generator";
 
@@ -178,6 +178,7 @@ export const hrLifecycleRouter = router({
         toStatus: input.status,
         actorId: ctx.user.id,
       });
+      await logStatusChange({ actorId: ctx.user.id, targetWorkerId: current.workerId ?? undefined, domain: "lifecycle.onboarding", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };
     }),
@@ -387,6 +388,7 @@ export const hrLifecycleRouter = router({
         toStatus: input.status,
         actorId: ctx.user.id,
       });
+      await logStatusChange({ actorId: ctx.user.id, targetWorkerId: current.workerId, domain: "lifecycle.offboarding", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };
     }),

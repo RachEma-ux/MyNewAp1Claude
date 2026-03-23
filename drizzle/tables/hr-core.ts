@@ -41,6 +41,7 @@ export const hrPeople = pgTable("hr_people", {
   emailIdx: index("hr_people_email_idx").on(table.primaryEmail),
   tenantIdx: index("hr_people_tenant_idx").on(table.tenantId),
   statusIdx: index("hr_people_status_idx").on(table.status),
+  emailUniq: unique("hr_people_email_uniq").on(table.tenantId, table.primaryEmail),
 }));
 
 export type HrPerson = typeof hrPeople.$inferSelect;
@@ -55,7 +56,7 @@ export const hrWorkerProfiles = pgTable("hr_worker_profiles", {
   personId: integer("person_id").notNull().references(() => hrPeople.id),
   employeeNumber: varchar("employee_number", { length: 50 }),
   workerType: varchar("worker_type", { length: 30 }).default("employee").notNull(), // employee | contractor | intern | consultant
-  managerWorkerId: integer("manager_worker_id"), // self-ref to hrWorkerProfiles.id
+  managerWorkerId: integer("manager_worker_id"), // self-ref (circular avoidance — FK enforced at DB level)
   homeOrgUnitId: integer("home_org_unit_id"), // FK to hrOrgUnits.id (deferred)
   primaryPositionId: integer("primary_position_id"), // FK to hrPositions.id (deferred)
   employmentCategory: varchar("employment_category", { length: 50 }).default("full_time"), // full_time | part_time | temporary
@@ -68,6 +69,7 @@ export const hrWorkerProfiles = pgTable("hr_worker_profiles", {
   employeeNumberIdx: index("hr_worker_emp_number_idx").on(table.employeeNumber),
   managerIdx: index("hr_worker_manager_idx").on(table.managerWorkerId),
   statusIdx: index("hr_worker_status_idx").on(table.status),
+  empNumberUniq: unique("hr_worker_emp_number_uniq").on(table.employeeNumber),
 }));
 
 export type HrWorkerProfile = typeof hrWorkerProfiles.$inferSelect;

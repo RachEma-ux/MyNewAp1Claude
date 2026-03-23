@@ -2,6 +2,8 @@
  * HR Permissions — Role and capability constants for HR module
  */
 
+import { TRPCError } from "@trpc/server";
+
 export const HR_ROLES = ["employee", "manager", "hrbp", "admin", "workspace_admin"] as const;
 export type HrRole = typeof HR_ROLES[number];
 
@@ -268,4 +270,37 @@ export function maskCompensationFields<T extends Record<string, unknown>>(record
 /** Strip sensitive relations fields for non-privileged users. */
 export function maskRelationsFields<T extends Record<string, unknown>>(record: T): T {
   return maskFields(record, MASKED_RELATIONS_FIELDS);
+}
+
+// ============================================================================
+// Runtime Permission Enforcement
+// ============================================================================
+
+/**
+ * Resolve the HR role for a user. Maps platform role to HR role.
+ * Wire to a dedicated user→HR-role mapping table in a future phase.
+ */
+export function getHrRoleForUser(user: { id: number; role?: string }): HrRole {
+  if (user.role === "admin") return "admin";
+  if (user.role === "workspace_admin") return "workspace_admin";
+  if (user.role === "hrbp") return "hrbp";
+  if (user.role === "manager") return "manager";
+  return "employee";
+}
+
+/**
+ * Enforce an HR permission check. Throws FORBIDDEN if the caller's
+ * HR role does not include the requested action.
+ */
+export function requireHrPermission(
+  user: { id: number; role?: string },
+  action: string,
+): void {
+  const hrRole = getHrRoleForUser(user);
+  if (!hasPermission(hrRole, action)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `HR permission denied: ${action}`,
+    });
+  }
 }

@@ -14,6 +14,7 @@ import {
   timestamp,
   pgTable,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
 import { hrWorkerProfiles } from "./hr-core";
 
@@ -36,6 +37,7 @@ export const hrOrgUnits = pgTable("hr_org_units", {
   parentIdx: index("hr_org_parent_idx").on(table.parentOrgUnitId),
   codeIdx: index("hr_org_code_idx").on(table.code),
   tenantIdx: index("hr_org_tenant_idx").on(table.tenantId),
+  codeUniq: unique("hr_org_code_uniq").on(table.tenantId, table.code),
 }));
 
 export type HrOrgUnit = typeof hrOrgUnits.$inferSelect;
@@ -100,6 +102,7 @@ export const hrPositions = pgTable("hr_positions", {
   orgUnitIdx: index("hr_position_org_idx").on(table.orgUnitId),
   codeIdx: index("hr_position_code_idx").on(table.positionCode),
   statusIdx: index("hr_position_status_idx").on(table.status),
+  positionCodeUniq: unique("hr_position_code_uniq").on(table.tenantId, table.positionCode),
 }));
 
 export type HrPosition = typeof hrPositions.$inferSelect;

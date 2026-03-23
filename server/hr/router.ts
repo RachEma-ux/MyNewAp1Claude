@@ -9,6 +9,7 @@
  * Phase 5: Stabilization — Cross-phase integration, hardened analytics, reminders
  */
 
+import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { hrDirectoryRouter } from "./directory/router";
 import { hrOrganizationRouter } from "./organization/router";
@@ -52,9 +53,14 @@ const hrSettingsRouter = router({
       sensitiveAuditLogging: true,
     },
   })),
-  seedDemo: governedProcedure.mutation(async () => {
-    return seedHrDemoData();
-  }),
+  seedDemo: governedProcedure
+    .input(z.object({ confirm: z.boolean().default(false) }).optional())
+    .mutation(async ({ input }) => {
+      if (!input?.confirm) {
+        return { seeded: false, message: "Confirmation required — pass { confirm: true } to seed demo data" };
+      }
+      return seedHrDemoData();
+    }),
 });
 
 export const hrRouter = router({

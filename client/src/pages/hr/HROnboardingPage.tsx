@@ -29,7 +29,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { trpc } from "@/lib/trpc";
-import { UserPlus, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { ArrowLeft, UserPlus, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 
 const statusColor = (s: string) => {
@@ -85,17 +85,34 @@ export default function HROnboardingPage() {
       : 0
     : 0;
 
+  if (casesQuery.isLoading) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-48" />
+          <div className="h-40 bg-muted rounded" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <Link href="/hr">
+          <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
+        </Link>
         <div>
           <h1 className="text-2xl font-bold">Onboarding</h1>
           <p className="text-muted-foreground">Track new hire onboarding workflows</p>
         </div>
-        <Link href="/hr">
-          <Button variant="outline" size="sm">Back to HR</Button>
-        </Link>
       </div>
+
+      {casesQuery.isError && (
+        <Card className="border-red-500/50">
+          <CardContent className="p-4 text-red-500 text-sm">Failed to load onboarding data.</CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

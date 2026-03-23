@@ -20,7 +20,7 @@ import {
   hrShiftPlans,
   hrShiftAssignments,
 } from "../../../drizzle/schema";
-import { logHrAudit } from "../audit";
+import { logHrAudit, logStatusChange } from "../audit";
 
 // ============================================================================
 // State machines
@@ -188,6 +188,10 @@ export const hrTimeRouter = router({
         metadata: { entryId: id, from: current.status, to: input.status },
       });
 
+      if (input.status && input.status !== current.status) {
+        await logStatusChange({ actorId: ctx.user.id, targetWorkerId: current.workerId, domain: "time.entry", entityId: id, fromStatus: current.status, toStatus: input.status });
+      }
+
       return { success: true };
     }),
 
@@ -354,6 +358,7 @@ export const hrTimeRouter = router({
         action: `hr.leave.request.${input.status}`,
         metadata: { requestId: input.id, from: current.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, targetWorkerId: current.workerId, domain: "time.leave", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };
     }),
@@ -483,6 +488,7 @@ export const hrTimeRouter = router({
         action: `hr.overtime.request.${input.status}`,
         metadata: { requestId: input.id, from: current.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, targetWorkerId: current.workerId, domain: "time.overtime", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };
     }),
@@ -583,6 +589,7 @@ export const hrTimeRouter = router({
         action: "hr.shift.plan.status_change",
         metadata: { planId: input.id, from: current.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, domain: "time.shift_plan", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };
     }),
@@ -667,6 +674,8 @@ export const hrTimeRouter = router({
 
       await db.update(hrShiftAssignments).set(updates)
         .where(eq(hrShiftAssignments.id, input.id));
+
+      await logStatusChange({ actorId: 0, targetWorkerId: current.workerId, domain: "time.shift_assignment", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };
     }),

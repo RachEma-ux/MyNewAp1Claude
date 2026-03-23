@@ -16,7 +16,7 @@ import {
   hrGoals,
   hrPerformanceReviews,
 } from "../../../drizzle/schema";
-import { logHrAudit } from "../audit";
+import { logHrAudit, logStatusChange } from "../audit";
 
 // ============================================================================
 // State machines
@@ -153,6 +153,7 @@ export const hrPerformanceRouter = router({
         action: "hr.performance.cycle.status_change",
         metadata: { cycleId: input.id, from: current.status, to: input.status },
       });
+      await logStatusChange({ actorId: ctx.user.id, domain: "performance.cycle", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };
     }),
@@ -271,6 +272,9 @@ export const hrPerformanceRouter = router({
         action: input.status ? "hr.performance.goal.status_change" : "hr.performance.goal.update",
         metadata: { goalId: id, from: current.status, to: input.status },
       });
+      if (input.status && input.status !== current.status) {
+        await logStatusChange({ actorId: ctx.user.id, targetWorkerId: current.workerId, domain: "performance.goal", entityId: id, fromStatus: current.status, toStatus: input.status });
+      }
 
       return { success: true };
     }),
@@ -458,6 +462,8 @@ export const hrPerformanceRouter = router({
 
       await db.update(hrPerformanceReviews).set(updates)
         .where(eq(hrPerformanceReviews.id, input.id));
+
+      await logStatusChange({ actorId: ctx.user.id, targetWorkerId: current.workerId, domain: "performance.review", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };
     }),

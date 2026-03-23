@@ -19,6 +19,7 @@ import {
   hrInvestigations,
 } from "../../../drizzle/schema";
 import { logHrAudit, logSensitiveRead, logStatusChange } from "../audit";
+import { maskRelationsFields } from "../permissions";
 
 // ============================================================================
 // State machines
@@ -208,7 +209,7 @@ export const hrRelationsRouter = router({
         .orderBy(desc(hrGrievances.createdAt))
         .limit(input.limit).offset(input.offset);
       await logSensitiveRead({ actorId: ctx.user.id, domain: "relations.grievance", recordCount: results.length });
-      return results;
+      return results.map((r) => maskRelationsFields(r as Record<string, unknown>));
     }),
 
   getGrievance: protectedProcedure
@@ -219,7 +220,7 @@ export const hrRelationsRouter = router({
       const [row] = await db.select().from(hrGrievances).where(eq(hrGrievances.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Grievance not found" });
       await logSensitiveRead({ actorId: ctx.user.id, domain: "relations.grievance", recordCount: 1 });
-      return row;
+      return maskRelationsFields(row as Record<string, unknown>);
     }),
 
   createGrievance: governedProcedure
@@ -364,7 +365,7 @@ export const hrRelationsRouter = router({
         .orderBy(desc(hrInvestigations.createdAt))
         .limit(input.limit).offset(input.offset);
       await logSensitiveRead({ actorId: ctx.user.id, domain: "relations.investigation", recordCount: results.length });
-      return results;
+      return results.map((r) => maskRelationsFields(r as Record<string, unknown>));
     }),
 
   createInvestigation: governedProcedure

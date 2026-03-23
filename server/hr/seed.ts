@@ -28,6 +28,14 @@ import {
   hrPolicies,
   hrComplianceObligations,
   hrReportDefinitions,
+  hrGrievances,
+  hrIncidentReports,
+  hrTalentReviews,
+  hrSuccessionPlans,
+  hrSuccessionCandidates,
+  hrEngagementPrograms,
+  hrSurveyCampaigns,
+  hrRiskItems,
 } from "../../drizzle/schema";
 
 export async function seedHrDemoData(): Promise<{ seeded: boolean; message: string }> {
@@ -175,6 +183,52 @@ export async function seedHrDemoData(): Promise<{ seeded: boolean; message: stri
     { name: "Monthly Headcount Report", reportType: "standard", category: "headcount", isActive: true },
     { name: "Quarterly Attrition Report", reportType: "scheduled", category: "attrition", isActive: true },
     { name: "Annual Compensation Review", reportType: "custom", category: "compensation", isActive: true },
+  ]);
+
+  // === Grievances ===
+  await db.insert(hrGrievances).values([
+    { filedByWorkerId: workers[1].id, category: "unfair_treatment", severity: "medium", subject: "Schedule change without notice", description: "Manager changed schedule without prior discussion", status: "filed" },
+    { filedByWorkerId: workers[4].id, againstWorkerId: workers[3].id, category: "harassment", severity: "high", subject: "Inappropriate comments", description: "Repeated inappropriate comments in meetings", status: "under_review" },
+  ]);
+
+  // === Incident Reports ===
+  await db.insert(hrIncidentReports).values([
+    { title: "Office slip hazard", description: "Water spill near entrance caused near-miss", category: "near_miss", severity: "low", incidentDate: "2026-03-10", location: "Building A - Lobby", reportedByWorkerId: workers[2].id, status: "reported" },
+    { title: "Data access anomaly", description: "Unexpected access pattern detected on HR records", category: "security", severity: "medium", incidentDate: "2026-03-15", reportedByWorkerId: workers[0].id, status: "under_investigation" },
+  ]);
+
+  // === Talent Reviews ===
+  await db.insert(hrTalentReviews).values([
+    { workerId: workers[0].id, reviewerId: workers[2].id, reviewDate: "2026-03-01", performanceRating: "strong", potentialRating: "high", nineBoxPosition: "star", readinessForPromotion: "ready_now", retentionRisk: "medium", status: "finalized" },
+    { workerId: workers[1].id, reviewerId: workers[0].id, reviewDate: "2026-03-01", performanceRating: "meets_expectations", potentialRating: "high", nineBoxPosition: "growth", readinessForPromotion: "ready_1yr", retentionRisk: "low", status: "submitted" },
+  ]);
+
+  // === Succession Plans ===
+  const [succPlan] = await db.insert(hrSuccessionPlans).values([
+    { positionId: positions[3].id, positionTitle: "Engineering Lead", criticality: "high", currentIncumbentId: workers[0].id, status: "active" },
+  ]).returning();
+
+  await db.insert(hrSuccessionCandidates).values([
+    { successionPlanId: succPlan.id, candidateWorkerId: workers[1].id, readiness: "ready_1yr", developmentNeeds: "Leadership training, cross-team collaboration", priority: 1, status: "developing" },
+    { successionPlanId: succPlan.id, candidateWorkerId: workers[4].id, readiness: "ready_2yr", priority: 2, status: "nominated" },
+  ]);
+
+  // === Engagement Programs ===
+  await db.insert(hrEngagementPrograms).values([
+    { name: "Mentorship Program", description: "Pair junior and senior engineers for mentoring", category: "mentorship", startDate: "2026-01-15", status: "active", participantCount: 12 },
+    { name: "Q2 Team Building", description: "Cross-department team building activities", category: "team_building", startDate: "2026-04-01", endDate: "2026-06-30", status: "planned" },
+  ]);
+
+  // === Survey Campaigns ===
+  await db.insert(hrSurveyCampaigns).values([
+    { title: "Q1 2026 Pulse Survey", surveyType: "pulse", startDate: "2026-03-01", endDate: "2026-03-15", isAnonymous: true, status: "closed", totalInvited: 5, totalResponses: 4 },
+    { title: "Q2 2026 Engagement Survey", surveyType: "engagement", startDate: "2026-04-01", endDate: "2026-04-15", isAnonymous: true, status: "draft", totalInvited: 0, totalResponses: 0 },
+  ]);
+
+  // === Risk Items ===
+  await db.insert(hrRiskItems).values([
+    { title: "Key person dependency — Engineering Lead", category: "retention", likelihood: "medium", impact: "high", riskScore: 6, ownerId: workers[2].id, mitigationPlan: "Succession plan in place, cross-training underway", status: "mitigating" },
+    { title: "Contractor compliance gap", category: "compliance", likelihood: "low", impact: "medium", riskScore: 2, status: "identified" },
   ]);
 
   return { seeded: true, message: `Seeded ${people.length} people, ${workers.length} workers, ${orgUnits.length} org units, ${positions.length} positions, and supporting data across all HR domains` };

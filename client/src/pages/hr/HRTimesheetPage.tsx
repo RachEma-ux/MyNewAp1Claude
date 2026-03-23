@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Clock, FileText, CheckCircle2, Send } from "lucide-react";
+import { ArrowLeft, Clock, FileText, CheckCircle2, Send } from "lucide-react";
 import { Link } from "wouter";
 
 const statusVariant = (s: string) => {
@@ -38,17 +38,34 @@ export default function HRTimesheetPage() {
   const summary = summaryQuery.data ?? { pendingLeave: 0, pendingOvertime: 0, activeShifts: 0, draftTimeEntries: 0 };
   const entries = entriesQuery.data ?? [];
 
+  if (entriesQuery.isLoading) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-48" />
+          <div className="h-40 bg-muted rounded" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <Link href="/hr">
+          <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
+        </Link>
         <div>
           <h1 className="text-2xl font-bold">Timesheet</h1>
           <p className="text-muted-foreground">Track daily time entries</p>
         </div>
-        <Link href="/hr">
-          <Button variant="outline" size="sm">Back to HR</Button>
-        </Link>
       </div>
+
+      {entriesQuery.isError && (
+        <Card className="border-red-500/50">
+          <CardContent className="p-4 text-red-500 text-sm">Failed to load timesheet data.</CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card>
