@@ -6,7 +6,7 @@
  *   - dropdown title header with full list
  *   - scrollable pinned content area
  *
- * Context section now contains the full WorkspaceContextSidebar content.
+ * Context section now contains the full WorkspaceContextManagerSidebar content.
  */
 
 import { Link, useLocation } from "wouter";

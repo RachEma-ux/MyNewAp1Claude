@@ -17,7 +17,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 
 import { WorkspaceShellHeader } from "./WorkspaceShellHeader";
-import { WorkspaceContextSidebar } from "./WorkspaceContextSidebar";
+import { WorkspaceContextManagerSidebar } from "./WorkspaceContextManagerSidebar";
 import { WorkspaceToolsToolbar } from "./WorkspaceToolsToolbar";
 import { WorkspaceMainFrame } from "./WorkspaceMainFrame";
 import { WorkspaceManagerControls } from "./WorkspaceManagerControls";
@@ -189,7 +189,7 @@ export default function WorkspaceExecutionShell() {
       {/* ─── Body: Context Sidebar + Tools Sidebar + Main Content ─── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Context Sidebar (left) — ALWAYS VISIBLE on desktop */}
-        <WorkspaceContextSidebar
+        <WorkspaceContextManagerSidebar
           shell={shell}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}

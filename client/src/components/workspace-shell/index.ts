@@ -1,6 +1,6 @@
 export { default as WorkspaceExecutionShell } from "./WorkspaceExecutionShell";
 export { WorkspaceShellHeader } from "./WorkspaceShellHeader";
-export { WorkspaceContextSidebar } from "./WorkspaceContextSidebar";
+export { WorkspaceContextManagerSidebar } from "./WorkspaceContextManagerSidebar";
 export { WorkspaceToolsToolbar } from "./WorkspaceToolsToolbar";
 export { WorkspaceMainFrame } from "./WorkspaceMainFrame";
 export { WorkspaceManagerControls } from "./WorkspaceManagerControls";

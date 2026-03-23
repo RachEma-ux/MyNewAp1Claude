@@ -1,5 +1,5 @@
 /**
- * WorkspaceContextSidebar — Context / Awareness Panel (NOT navigation)
+ * WorkspaceContextManagerSidebar — Context / Awareness Panel (NOT navigation)
  *
  * This makes the workspace INTELLIGIBLE before navigable.
  * It answers: What is this? Why does it exist? What is my mission?
@@ -286,7 +286,7 @@ function SidebarContent({ shell }: { shell: ShellViewData }) {
   );
 }
 
-export function WorkspaceContextSidebar({ shell, open, onClose }: ContextSidebarProps) {
+export function WorkspaceContextManagerSidebar({ shell, open, onClose }: ContextSidebarProps) {
   const content = <SidebarContent shell={shell} />;
 
   return (
