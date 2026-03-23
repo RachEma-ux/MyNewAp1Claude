@@ -1,0 +1,71 @@
+Session Summary — 2026-03-23 22:00
+====================================
+Task: HR Phase 7 — Seed Data Expansion (28 Employees, 9 Org Units)
+
+Context:
+Continuation of the seed expansion task started in the previous session that ran out
+of context. The Builder phase (writing seed.ts) was complete. This session completed
+Reviewer, Tester, Governance passes and committed.
+
+Work Completed (Reviewer → Tester → Governance → Commit):
+
+1. Reviewer Pass — Schema field verification across 14 HR table definitions:
+   - All 28 people fields match hr-core.ts schema
+   - All 9 org unit fields match hr-organization.ts schema
+   - All 28 position fields match hr-organization.ts schema
+   - All 28 worker profile fields match hr-core.ts schema
+   - All 28 employment record fields match hr-core.ts schema
+   - 23 worker skills match hr-staffing.ts schema
+   - Training, learning, certifications match hr-learning.ts schema
+   - Performance cycles and goals match hr-performance.ts schema
+   - Leave types/requests match hr-time.ts schema
+   - Salary bands/compensation match hr-compensation.ts schema
+   - Benefit plans match hr-compensation.ts schema
+   - Policies/grievances/incidents match hr-relations.ts and hr-compliance.ts
+   - Talent reviews/succession match hr-talent.ts schema
+   - Engagement/surveys match hr-engagement.ts schema
+   - Risk items match hr-compliance.ts schema
+   - FK chains verified: person → worker → position → orgUnit → employment
+   - Numeric fields (baseSalary, totalDays, etc.) correctly passed as strings
+   - Position status "filled" valid per schema enum
+   - Goal statuses "active"/"draft" valid per schema enum
+   - Idempotency guard present
+
+2. Test Expansion — 15 new test assertions in hr-phase6.test.ts (section J):
+   - 28 people entries verified
+   - 9 org units verified (by code)
+   - 28 positions verified (by positionCode count)
+   - 28 worker profiles verified (by employeeNumber count)
+   - 28 employment records verified (by costCenter count)
+   - 20+ worker skills verified
+   - 5 training courses + 10 learning assignments verified
+   - 4 certifications + 5 employee certifications verified
+   - 7 salary bands (IC1-E1) verified
+   - 13 compensation records verified
+   - Manager hierarchy + all 9 org unit managers verified
+   - Talent reviews, succession, engagement, surveys, risk items verified
+   - Status diversity (terminated, on_leave, inactive) verified
+   - Idempotency pattern verified
+   - .returning() usage for FK chains verified
+   - Numeric/monetary string values verified
+
+3. Router Version: 6.0.0 → 7.0.0, added expandedSeedDataset feature flag
+
+4. Governance Pass: seedDemo still uses governedProcedure with confirm gate
+
+5. Tester Pass: All 15 new tests structurally validated
+
+Commit: 3eba98f
+Files Modified (3):
+- server/hr/seed.ts — Expanded from 6 to 28 employees with full domain coverage
+- server/hr/router.ts — Version 7.0.0 + Phase 7 comment + feature flag
+- server/hr/__tests__/hr-phase6.test.ts — 15 new dataset validation test assertions
+
+Uncommitted Files (from prior incomplete session):
+- drizzle/tables/hr-core.ts — hrRoleAssignments table (Phase 7 governance)
+- server/hr/permissions.ts — async checkHrAccess + scope enforcement (incomplete: routers not updated)
+- HR/HR_GOVERNANCE_COMPLIANCE_AUDIT.md — untracked audit document
+
+Note: The permissions.ts changes make checkHrAccess async, but the routers that call
+it have not been updated to await it. These changes should NOT be committed until the
+callers are updated. Left unstaged intentionally.
