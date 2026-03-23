@@ -64,6 +64,8 @@ import {
   FileStack,
   Sparkles,
   Inbox,
+  Radio,
+  Video,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -92,6 +94,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [aiTypesMenuOpen, setAiTypesMenuOpen] = useState(false);
   const [pmCentralMenuOpen, setPmCentralMenuOpen] = useState(false);
   const [wsSandboxMenuOpen, setWsSandboxMenuOpen] = useState(false);
+  const [communicationMenuOpen, setCommunicationMenuOpen] = useState(false);
   const [aiTypesSubMenus, setAiTypesSubMenus] = useState<Record<string, boolean>>({});
   const logoutMutation = trpc.auth.logout.useMutation();
 
@@ -102,8 +105,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const navItems: NavItem[] = [
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/" },
-    { label: "Chat", icon: <MessageSquare className="w-5 h-5" />, href: "/chat" },
-    { label: "Conversations", icon: <MessagesSquare className="w-5 h-5" />, href: "/conversations" },
+    {
+      label: "Communication",
+      icon: <Radio className="w-5 h-5" />,
+      children: [
+        { label: "Chat", icon: <MessageSquare className="w-4 h-4" />, href: "/chat" },
+        { label: "Conversations", icon: <MessagesSquare className="w-4 h-4" />, href: "/conversations" },
+        { label: "Video Meeting", icon: <Video className="w-4 h-4" />, href: "/video-meeting" },
+      ]
+    },
     {
       label: "WS Sandbox",
       icon: <Sparkles className="w-5 h-5" />,
@@ -338,6 +348,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setPmCentralMenuOpen(!pmCentralMenuOpen);
                       } else if (item.label === "WS Sandbox") {
                         setWsSandboxMenuOpen(!wsSandboxMenuOpen);
+                      } else if (item.label === "Communication") {
+                        setCommunicationMenuOpen(!communicationMenuOpen);
                       }
                     }}
                     className="flex w-full items-center justify-between space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -346,10 +358,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* Automation / Digital HQ menus (2-level) */}
-                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen)) && (
+                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>
