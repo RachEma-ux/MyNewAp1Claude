@@ -102,6 +102,15 @@ const HRSettingsPage = lazy(() => import("@/pages/hr/HRSettingsPage"));
 const HRRecruitmentPage = lazy(() => import("@/pages/hr/HRRecruitmentPage"));
 const HROnboardingPage = lazy(() => import("@/pages/hr/HROnboardingPage"));
 const HROffboardingPage = lazy(() => import("@/pages/hr/HROffboardingPage"));
+// HR Module — Phase 3 pages (Workforce Operations)
+const HRTimesheetPage = lazy(() => import("@/pages/hr/HRTimesheetPage"));
+const HRLeavePage = lazy(() => import("@/pages/hr/HRLeavePage"));
+const HROvertimePage = lazy(() => import("@/pages/hr/HROvertimePage"));
+const HRShiftPlanningPage = lazy(() => import("@/pages/hr/HRShiftPlanningPage"));
+const HRTrainingPage = lazy(() => import("@/pages/hr/HRTrainingPage"));
+const HRCertificationsPage = lazy(() => import("@/pages/hr/HRCertificationsPage"));
+const HRGoalsPage = lazy(() => import("@/pages/hr/HRGoalsPage"));
+const HRPerformanceReviewsPage = lazy(() => import("@/pages/hr/HRPerformanceReviewsPage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
@@ -213,6 +222,15 @@ function Router() {
       <Route path="/hr/recruitment" component={() => <ProtectedRoute component={HRRecruitmentPage} />} />
       <Route path="/hr/onboarding" component={() => <ProtectedRoute component={HROnboardingPage} />} />
       <Route path="/hr/offboarding" component={() => <ProtectedRoute component={HROffboardingPage} />} />
+      {/* HR Module — Phase 3 routes (Workforce Operations) */}
+      <Route path="/hr/timesheet" component={() => <ProtectedRoute component={HRTimesheetPage} />} />
+      <Route path="/hr/leave" component={() => <ProtectedRoute component={HRLeavePage} />} />
+      <Route path="/hr/overtime" component={() => <ProtectedRoute component={HROvertimePage} />} />
+      <Route path="/hr/shifts" component={() => <ProtectedRoute component={HRShiftPlanningPage} />} />
+      <Route path="/hr/training" component={() => <ProtectedRoute component={HRTrainingPage} />} />
+      <Route path="/hr/certifications" component={() => <ProtectedRoute component={HRCertificationsPage} />} />
+      <Route path="/hr/goals" component={() => <ProtectedRoute component={HRGoalsPage} />} />
+      <Route path="/hr/reviews" component={() => <ProtectedRoute component={HRPerformanceReviewsPage} />} />
       <Route path="/hr" component={() => <ProtectedRoute component={HRHomePage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />

@@ -17,14 +17,38 @@ import {
   BarChart3,
   Settings,
   FileText,
+  Clock,
+  Calendar,
+  CalendarDays,
+  BookOpen,
+  ShieldCheck,
+  Target,
+  Star,
+  UserCheck,
+  UserMinus,
 } from "lucide-react";
 
 const sections = [
+  // Phase 1 — Workforce Backbone
   { label: "Directory", icon: Users, href: "/hr/directory", description: "Browse employee directory" },
   { label: "Organization", icon: Building2, href: "/hr/organization", description: "Org units and structure" },
   { label: "Positions", icon: Briefcase, href: "/hr/positions", description: "Position management" },
   { label: "Staffing", icon: UserPlus, href: "/hr/staffing", description: "Workspace assignments" },
   { label: "Skills", icon: Award, href: "/hr/skills", description: "Skills and certifications" },
+  // Phase 2 — Lifecycle
+  { label: "Recruitment", icon: FileText, href: "/hr/recruitment", description: "Recruitment pipeline" },
+  { label: "Onboarding", icon: UserCheck, href: "/hr/onboarding", description: "New hire onboarding" },
+  { label: "Offboarding", icon: UserMinus, href: "/hr/offboarding", description: "Exit workflows" },
+  // Phase 3 — Workforce Operations
+  { label: "Timesheet", icon: Clock, href: "/hr/timesheet", description: "Time entries and tracking" },
+  { label: "Leave", icon: Calendar, href: "/hr/leave", description: "Leave requests and approvals" },
+  { label: "Overtime", icon: CalendarDays, href: "/hr/overtime", description: "Overtime requests" },
+  { label: "Shift Planning", icon: CalendarDays, href: "/hr/shifts", description: "Shift plans and assignments" },
+  { label: "Training", icon: BookOpen, href: "/hr/training", description: "Training catalog and learning" },
+  { label: "Certifications", icon: ShieldCheck, href: "/hr/certifications", description: "Certification tracking" },
+  { label: "Goals", icon: Target, href: "/hr/goals", description: "Employee goals and objectives" },
+  { label: "Reviews", icon: Star, href: "/hr/reviews", description: "Performance reviews" },
+  // Config
   { label: "Reports", icon: BarChart3, href: "/hr/reports", description: "HR reports and analytics" },
   { label: "Settings", icon: Settings, href: "/hr/settings", description: "HR module configuration" },
 ];

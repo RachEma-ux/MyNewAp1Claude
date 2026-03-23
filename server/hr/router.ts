@@ -1,7 +1,8 @@
 /**
  * HR Root Router — Global HR namespace
  *
- * Composes directory, organization, staffing, recruiting, and lifecycle
+ * Composes directory, organization, staffing, recruiting, lifecycle,
+ * time & attendance, learning & development, and performance
  * sub-routers into the root `hr.*` tRPC namespace.
  */
 
@@ -11,21 +12,24 @@ import { hrOrganizationRouter } from "./organization/router";
 import { hrStaffingRouter } from "./staffing/router";
 import { hrRecruitingRouter } from "./recruiting/router";
 import { hrLifecycleRouter } from "./lifecycle/router";
+import { hrTimeRouter } from "./time/router";
+import { hrLearningRouter } from "./learning/router";
+import { hrPerformanceRouter } from "./performance/router";
 
 // Placeholder sub-routers for future phases
 const hrSettingsRouter = router({
   get: protectedProcedure.query(() => ({
     module: "hr",
-    version: "2.0.0",
+    version: "3.0.0",
     features: {
       directory: true,
       organization: true,
       staffing: true,
       recruiting: true,
       lifecycle: true,
-      time: false,
-      learning: false,
-      performance: false,
+      time: true,
+      learning: true,
+      performance: true,
       compensation: false,
       relations: false,
       analytics: false,
@@ -37,7 +41,7 @@ const hrSettingsRouter = router({
 
 const hrReportsRouter = router({
   summary: protectedProcedure.query(() => ({
-    message: "HR Reports — coming in Phase 3",
+    message: "HR Reports — coming in Phase 4",
     availableReports: [],
   })),
 });
@@ -48,6 +52,9 @@ export const hrRouter = router({
   staffing: hrStaffingRouter,
   recruiting: hrRecruitingRouter,
   lifecycle: hrLifecycleRouter,
+  time: hrTimeRouter,
+  learning: hrLearningRouter,
+  performance: hrPerformanceRouter,
   settings: hrSettingsRouter,
   reports: hrReportsRouter,
 });
