@@ -127,15 +127,145 @@ export const MASKED_RELATIONS_FIELDS = [
   "appealNotes",
 ] as const;
 
+// ============================================================================
+// Phase 5 — Role → Permission Matrix
+// ============================================================================
+
+/** Maps each HR role to the set of actions it can perform */
+export const HR_ROLE_PERMISSIONS: Record<HrRole, readonly string[]> = {
+  employee: [
+    HR_ACTIONS.DIRECTORY_READ_SELF,
+    HR_ACTIONS.TIME_READ_SELF,
+    HR_ACTIONS.TIME_WRITE,
+    HR_ACTIONS.LEAVE_READ_SELF,
+    HR_ACTIONS.LEAVE_WRITE,
+    HR_ACTIONS.LEARNING_READ_SELF,
+    HR_ACTIONS.CERTIFICATION_READ,
+    HR_ACTIONS.PERFORMANCE_READ_SELF,
+    HR_ACTIONS.BENEFITS_READ,
+    HR_ACTIONS.POLICY_READ,
+    HR_ACTIONS.ENGAGEMENT_READ,
+    HR_ACTIONS.SURVEY_READ,
+    HR_ACTIONS.RECOGNITION_READ,
+  ],
+  manager: [
+    HR_ACTIONS.DIRECTORY_READ_TEAM,
+    HR_ACTIONS.DIRECTORY_READ_SELF,
+    HR_ACTIONS.TIME_READ_TEAM,
+    HR_ACTIONS.TIME_READ_SELF,
+    HR_ACTIONS.TIME_WRITE,
+    HR_ACTIONS.TIME_APPROVE,
+    HR_ACTIONS.LEAVE_READ,
+    HR_ACTIONS.LEAVE_WRITE,
+    HR_ACTIONS.LEAVE_APPROVE,
+    HR_ACTIONS.OVERTIME_READ,
+    HR_ACTIONS.OVERTIME_APPROVE,
+    HR_ACTIONS.SHIFT_READ,
+    HR_ACTIONS.LEARNING_READ,
+    HR_ACTIONS.CERTIFICATION_READ,
+    HR_ACTIONS.PERFORMANCE_READ,
+    HR_ACTIONS.PERFORMANCE_WRITE,
+    HR_ACTIONS.BENEFITS_READ,
+    HR_ACTIONS.POLICY_READ,
+    HR_ACTIONS.ENGAGEMENT_READ,
+    HR_ACTIONS.SURVEY_READ,
+    HR_ACTIONS.RECOGNITION_READ,
+    HR_ACTIONS.RECOGNITION_WRITE,
+    HR_ACTIONS.TALENT_READ,
+  ],
+  hrbp: [
+    HR_ACTIONS.DIRECTORY_READ,
+    HR_ACTIONS.DIRECTORY_WRITE,
+    HR_ACTIONS.ORGANIZATION_READ,
+    HR_ACTIONS.STAFFING_READ,
+    HR_ACTIONS.RECRUITING_READ,
+    HR_ACTIONS.RECRUITING_WRITE,
+    HR_ACTIONS.LIFECYCLE_READ,
+    HR_ACTIONS.LIFECYCLE_WRITE,
+    HR_ACTIONS.ONBOARDING_READ,
+    HR_ACTIONS.ONBOARDING_MANAGE,
+    HR_ACTIONS.OFFBOARDING_READ,
+    HR_ACTIONS.OFFBOARDING_MANAGE,
+    HR_ACTIONS.TIME_READ,
+    HR_ACTIONS.TIME_APPROVE,
+    HR_ACTIONS.LEAVE_READ,
+    HR_ACTIONS.LEAVE_APPROVE,
+    HR_ACTIONS.OVERTIME_READ,
+    HR_ACTIONS.OVERTIME_APPROVE,
+    HR_ACTIONS.SHIFT_READ,
+    HR_ACTIONS.SHIFT_WRITE,
+    HR_ACTIONS.LEARNING_READ,
+    HR_ACTIONS.LEARNING_WRITE,
+    HR_ACTIONS.CERTIFICATION_READ,
+    HR_ACTIONS.CERTIFICATION_WRITE,
+    HR_ACTIONS.PERFORMANCE_READ,
+    HR_ACTIONS.PERFORMANCE_WRITE,
+    HR_ACTIONS.COMPENSATION_READ,
+    HR_ACTIONS.COMPENSATION_READ_SENSITIVE,
+    HR_ACTIONS.BENEFITS_READ,
+    HR_ACTIONS.BENEFITS_WRITE,
+    HR_ACTIONS.RELATIONS_READ,
+    HR_ACTIONS.RELATIONS_READ_SENSITIVE,
+    HR_ACTIONS.RELATIONS_WRITE,
+    HR_ACTIONS.POLICY_READ,
+    HR_ACTIONS.POLICY_WRITE,
+    HR_ACTIONS.ENGAGEMENT_READ,
+    HR_ACTIONS.ENGAGEMENT_WRITE,
+    HR_ACTIONS.SURVEY_READ,
+    HR_ACTIONS.SURVEY_WRITE,
+    HR_ACTIONS.RECOGNITION_READ,
+    HR_ACTIONS.RECOGNITION_WRITE,
+    HR_ACTIONS.COMPLIANCE_READ,
+    HR_ACTIONS.INCIDENT_READ,
+    HR_ACTIONS.INCIDENT_WRITE,
+    HR_ACTIONS.RISK_READ,
+    HR_ACTIONS.ANALYTICS_READ,
+    HR_ACTIONS.TALENT_READ,
+    HR_ACTIONS.TALENT_WRITE,
+    HR_ACTIONS.SUCCESSION_READ,
+  ],
+  admin: Object.values(HR_ACTIONS),
+  workspace_admin: Object.values(HR_ACTIONS),
+};
+
 /**
- * Strip sensitive fields from a directory DTO for public consumers.
+ * Check if a role has a specific permission.
  */
-export function maskDirectoryFields<T extends Record<string, unknown>>(record: T): T {
+export function hasPermission(role: HrRole, action: string): boolean {
+  return HR_ROLE_PERMISSIONS[role].includes(action);
+}
+
+// ============================================================================
+// Field Masking Utilities
+// ============================================================================
+
+/**
+ * Generic field masker — strips specified fields from a record.
+ */
+function maskFields<T extends Record<string, unknown>>(
+  record: T,
+  fields: readonly string[],
+): T {
   const masked = { ...record };
-  for (const field of MASKED_DIRECTORY_FIELDS) {
+  for (const field of fields) {
     if (field in masked) {
       (masked as Record<string, unknown>)[field] = undefined;
     }
   }
   return masked;
+}
+
+/** Strip sensitive fields from a directory DTO for public consumers. */
+export function maskDirectoryFields<T extends Record<string, unknown>>(record: T): T {
+  return maskFields(record, MASKED_DIRECTORY_FIELDS);
+}
+
+/** Strip sensitive compensation fields for non-privileged users. */
+export function maskCompensationFields<T extends Record<string, unknown>>(record: T): T {
+  return maskFields(record, MASKED_COMPENSATION_FIELDS);
+}
+
+/** Strip sensitive relations fields for non-privileged users. */
+export function maskRelationsFields<T extends Record<string, unknown>>(record: T): T {
+  return maskFields(record, MASKED_RELATIONS_FIELDS);
 }

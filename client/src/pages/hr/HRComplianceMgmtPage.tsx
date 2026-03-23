@@ -3,11 +3,14 @@
  */
 
 import { useState } from "react";
+import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
+import { ArrowLeft } from "lucide-react";
 
 const statusColor: Record<string, string> = {
   active: "bg-green-500/10 text-green-500",
@@ -45,11 +48,18 @@ export default function HRComplianceMgmtPage() {
     ...(riskStatusFilter ? { status: riskStatusFilter } : {}),
   });
 
+  if (obligations.isLoading) {
+    return <div className="p-6 max-w-7xl mx-auto"><div className="animate-pulse space-y-4"><div className="h-8 bg-muted rounded w-44" /><div className="h-40 bg-muted rounded" /></div></div>;
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Compliance & Risk</h1>
-        <p className="text-muted-foreground">Regulatory obligations, audit evidence, and risk management</p>
+      <div className="flex items-center gap-3">
+        <Link href="/hr"><Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
+        <div>
+          <h1 className="text-2xl font-bold">Compliance & Risk</h1>
+          <p className="text-muted-foreground">Regulatory obligations, audit evidence, and risk management</p>
+        </div>
       </div>
 
       <Tabs defaultValue="obligations">

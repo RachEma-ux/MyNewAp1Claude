@@ -1,12 +1,13 @@
 /**
- * HR Home Page — Landing page for the HR module
+ * HR Home Page — Landing page for the HR module (Phase 5 — normalized)
  *
- * Shows KPI summary tiles and quick navigation to HR sections.
+ * Shows KPI summary tiles sourced from analytics dashboard,
+ * quick navigation to HR sections, and an alert count for reminders.
  */
 
 import { Link } from "wouter";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import {
   Users,
@@ -36,6 +37,7 @@ import {
   Shield,
   PieChart,
   Gem,
+  Bell,
 } from "lucide-react";
 
 const sections = [
@@ -71,7 +73,7 @@ const sections = [
   { label: "Incidents", icon: AlertTriangle, href: "/hr/incidents", description: "Incident reports" },
   { label: "Compliance", icon: Shield, href: "/hr/compliance-mgmt", description: "Obligations and risk register" },
   // Phase 4 — Analytics & Talent
-  { label: "HR Analytics", icon: PieChart, href: "/hr/analytics", description: "Workforce metrics dashboard" },
+  { label: "HR Analytics", icon: PieChart, href: "/hr/analytics", description: "Workforce metrics and reminders" },
   { label: "Talent", icon: Gem, href: "/hr/talent", description: "Talent reviews and succession" },
   // Config
   { label: "Reports", icon: BarChart3, href: "/hr/reports", description: "HR reports and analytics" },
@@ -79,7 +81,23 @@ const sections = [
 ];
 
 export default function HRHomePage() {
-  const summary = trpc.hr.directory.getSummary.useQuery();
+  const dashboard = trpc.hr.analytics.getDashboardSummary.useQuery();
+  const reminders = trpc.hr.analytics.getReminders.useQuery();
+
+  const criticalCount = reminders.data?.filter((r) => r.urgency === "critical").length ?? 0;
+
+  if (dashboard.isLoading) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-56" />
+          <div className="grid grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 bg-muted rounded" />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -88,32 +106,47 @@ export default function HRHomePage() {
           <h1 className="text-2xl font-bold">Human Resources</h1>
           <p className="text-muted-foreground">Workforce backbone and staffing management</p>
         </div>
+        {criticalCount > 0 && (
+          <Link href="/hr/analytics">
+            <Badge className="bg-red-500/10 text-red-500 cursor-pointer gap-1">
+              <Bell className="w-3 h-3" /> {criticalCount} critical
+            </Badge>
+          </Link>
+        )}
       </div>
 
-      {/* KPI Tiles */}
+      {dashboard.isError && (
+        <Card className="border-red-500/50">
+          <CardContent className="p-4 text-red-500 text-sm">
+            Failed to load HR summary. {dashboard.error?.message}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* KPI Tiles — sourced from analytics dashboard */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-muted-foreground">Total Workers</div>
-            <div className="text-2xl font-bold">{summary.data?.total ?? "—"}</div>
+            <div className="text-2xl font-bold">{dashboard.data?.totalWorkers ?? "—"}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-muted-foreground">Active</div>
-            <div className="text-2xl font-bold text-green-500">{summary.data?.active ?? "—"}</div>
+            <div className="text-2xl font-bold text-green-500">{dashboard.data?.activeWorkers ?? "—"}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-muted-foreground">On Leave</div>
-            <div className="text-2xl font-bold text-yellow-500">{summary.data?.onLeave ?? "—"}</div>
+            <div className="text-2xl font-bold text-yellow-500">{dashboard.data?.onLeave ?? "—"}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-muted-foreground">Terminated</div>
-            <div className="text-2xl font-bold text-red-500">{summary.data?.terminated ?? "—"}</div>
+            <div className="text-2xl font-bold text-red-500">{dashboard.data?.terminated ?? "—"}</div>
           </CardContent>
         </Card>
       </div>

@@ -6,9 +6,10 @@
  * Phase 2: Recruiting, Lifecycle (Onboarding/Offboarding)
  * Phase 3: Time & Attendance, Learning, Performance
  * Phase 4: Compensation, Relations, Engagement, Compliance, Analytics, Talent
+ * Phase 5: Stabilization — Cross-phase integration, hardened analytics, reminders
  */
 
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { hrDirectoryRouter } from "./directory/router";
 import { hrOrganizationRouter } from "./organization/router";
 import { hrStaffingRouter } from "./staffing/router";
@@ -23,11 +24,12 @@ import { hrEngagementRouter } from "./engagement/router";
 import { hrComplianceRouter } from "./compliance/router";
 import { hrAnalyticsRouter } from "./analytics/router";
 import { hrTalentRouter } from "./talent/router";
+import { seedHrDemoData } from "./seed";
 
 const hrSettingsRouter = router({
   get: protectedProcedure.query(() => ({
     module: "hr",
-    version: "4.0.0",
+    version: "5.0.0",
     features: {
       directory: true,
       organization: true,
@@ -43,8 +45,16 @@ const hrSettingsRouter = router({
       compliance: true,
       analytics: true,
       talent: true,
+      // Phase 5 additions
+      reminders: true,
+      workforceBreakdown: true,
+      rolePermissionMatrix: true,
+      sensitiveAuditLogging: true,
     },
   })),
+  seedDemo: governedProcedure.mutation(async () => {
+    return seedHrDemoData();
+  }),
 });
 
 export const hrRouter = router({

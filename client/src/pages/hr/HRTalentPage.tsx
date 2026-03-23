@@ -3,11 +3,14 @@
  */
 
 import { useState } from "react";
+import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
+import { ArrowLeft } from "lucide-react";
 
 const statusColor: Record<string, string> = {
   draft: "bg-gray-500/10 text-gray-400",
@@ -52,12 +55,34 @@ export default function HRTalentPage() {
   });
   const candidates = trpc.hr.talent.listSuccessionCandidates.useQuery({ limit: 50 });
 
+  if (reviews.isLoading) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-48" />
+          <div className="h-40 bg-muted rounded" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Talent Management</h1>
-        <p className="text-muted-foreground">Talent reviews, 9-box positioning, and succession planning</p>
+      <div className="flex items-center gap-3">
+        <Link href="/hr">
+          <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold">Talent Management</h1>
+          <p className="text-muted-foreground">Talent reviews, 9-box positioning, and succession planning</p>
+        </div>
       </div>
+
+      {reviews.isError && (
+        <Card className="border-red-500/50">
+          <CardContent className="p-4 text-red-500 text-sm">Failed to load talent data.</CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="reviews">
         <TabsList>

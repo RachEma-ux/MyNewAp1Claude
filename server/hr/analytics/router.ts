@@ -1,7 +1,7 @@
 /**
- * HR Analytics & Reporting Router
+ * HR Analytics & Reporting Router (Phase 5 — Enhanced)
  *
- * Report definitions, metric snapshots, and dashboard data.
+ * Report definitions, metric snapshots, dashboard data, and reminders.
  * All reads are protected, all writes are governed + audited.
  */
 
@@ -18,24 +18,32 @@ import {
   hrGrievances,
   hrComplianceObligations,
   hrRiskItems,
+  hrLeaveRequests,
+  hrLearningAssignments,
+  hrPerformanceReviews,
+  hrEmployeeCertifications,
 } from "../../../drizzle/schema";
 import { logHrAudit } from "../audit";
+import { getAllReminders } from "../jobs/reminders";
 
 export const hrAnalyticsRouter = router({
   // ============================================================================
-  // Dashboard Summary — Aggregate HR metrics
+  // Dashboard Summary — Aggregate HR metrics from real data
   // ============================================================================
 
   getDashboardSummary: protectedProcedure.query(async () => {
     const db = getDb();
     if (!db) return {
-      totalWorkers: 0, activeWorkers: 0, openIncidents: 0,
-      openGrievances: 0, complianceItems: 0, openRisks: 0,
+      totalWorkers: 0, activeWorkers: 0, onLeave: 0, terminated: 0,
+      openIncidents: 0, openGrievances: 0, complianceItems: 0, openRisks: 0,
+      pendingLeave: 0, overdueTraining: 0, pendingReviews: 0, expiringCerts: 0,
     };
 
     const [workerCounts] = await db.select({
       total: sql<number>`count(*)`,
       active: sql<number>`count(*) filter (where ${hrWorkerProfiles.status} = 'active')`,
+      onLeave: sql<number>`count(*) filter (where ${hrWorkerProfiles.status} = 'on_leave')`,
+      terminated: sql<number>`count(*) filter (where ${hrWorkerProfiles.status} = 'terminated')`,
     }).from(hrWorkerProfiles);
 
     const [incidentCount] = await db.select({
@@ -60,14 +68,88 @@ export const hrAnalyticsRouter = router({
       sql`${hrRiskItems.status} not in ('mitigated', 'closed')`
     );
 
+    // Phase 5 — Additional operational metrics
+    const [pendingLeave] = await db.select({
+      count: sql<number>`count(*)`,
+    }).from(hrLeaveRequests).where(eq(hrLeaveRequests.status, "pending"));
+
+    const [overdueTraining] = await db.select({
+      count: sql<number>`count(*)`,
+    }).from(hrLearningAssignments).where(
+      and(
+        sql`${hrLearningAssignments.status} in ('assigned', 'in_progress')`,
+        sql`${hrLearningAssignments.dueDate} IS NOT NULL`,
+        sql`${hrLearningAssignments.dueDate} < CURRENT_DATE`,
+      )
+    );
+
+    const [pendingReviews] = await db.select({
+      count: sql<number>`count(*)`,
+    }).from(hrPerformanceReviews).where(
+      sql`${hrPerformanceReviews.status} in ('draft', 'in_progress')`
+    );
+
+    const [expiringCerts] = await db.select({
+      count: sql<number>`count(*)`,
+    }).from(hrEmployeeCertifications).where(
+      and(
+        eq(hrEmployeeCertifications.status, "active"),
+        sql`${hrEmployeeCertifications.expiryDate} IS NOT NULL`,
+        sql`${hrEmployeeCertifications.expiryDate} <= CURRENT_DATE + 30`,
+      )
+    );
+
     return {
       totalWorkers: workerCounts?.total ?? 0,
       activeWorkers: workerCounts?.active ?? 0,
+      onLeave: workerCounts?.onLeave ?? 0,
+      terminated: workerCounts?.terminated ?? 0,
       openIncidents: incidentCount?.count ?? 0,
       openGrievances: grievanceCount?.count ?? 0,
       complianceItems: complianceCount?.count ?? 0,
       openRisks: riskCount?.count ?? 0,
+      pendingLeave: pendingLeave?.count ?? 0,
+      overdueTraining: overdueTraining?.count ?? 0,
+      pendingReviews: pendingReviews?.count ?? 0,
+      expiringCerts: expiringCerts?.count ?? 0,
     };
+  }),
+
+  // ============================================================================
+  // Workforce Breakdown — Worker type and category distribution
+  // ============================================================================
+
+  getWorkforceBreakdown: protectedProcedure.query(async () => {
+    const db = getDb();
+    if (!db) return { byType: [], byCategory: [], byStatus: [] };
+
+    const byType = await db.select({
+      workerType: hrWorkerProfiles.workerType,
+      count: sql<number>`count(*)::int`,
+    }).from(hrWorkerProfiles)
+      .groupBy(hrWorkerProfiles.workerType);
+
+    const byCategory = await db.select({
+      category: hrWorkerProfiles.employmentCategory,
+      count: sql<number>`count(*)::int`,
+    }).from(hrWorkerProfiles)
+      .groupBy(hrWorkerProfiles.employmentCategory);
+
+    const byStatus = await db.select({
+      status: hrWorkerProfiles.status,
+      count: sql<number>`count(*)::int`,
+    }).from(hrWorkerProfiles)
+      .groupBy(hrWorkerProfiles.status);
+
+    return { byType, byCategory, byStatus };
+  }),
+
+  // ============================================================================
+  // Reminders — Due-date alerts across all HR domains
+  // ============================================================================
+
+  getReminders: protectedProcedure.query(async () => {
+    return getAllReminders();
   }),
 
   // ============================================================================
