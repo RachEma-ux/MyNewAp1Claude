@@ -22,6 +22,7 @@ import {
   hrLearningAssignments,
   hrPerformanceReviews,
   hrEmployeeCertifications,
+  hrAuditLog,
 } from "../../../drizzle/schema";
 import { logHrAudit } from "../audit";
 import { checkHrAccess, requireHrPermission, HR_ACTIONS } from "../permissions";
@@ -268,5 +269,37 @@ export const hrAnalyticsRouter = router({
         metadata: { metricId: created.id, name: input.metricName },
       });
       return created;
+    }),
+
+  // ============================================================================
+  // Unified Audit Log Query
+  // ============================================================================
+
+  listAuditLog: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(500).default(100),
+      offset: z.number().min(0).default(0),
+      actorId: z.number().optional(),
+      targetWorkerId: z.number().optional(),
+      action: z.string().optional(),
+      actionPrefix: z.string().optional(),
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ANALYTICS_MANAGE);
+      const db = getDb();
+      if (!db) return [];
+      const conditions = [];
+      if (input.actorId) conditions.push(eq(hrAuditLog.actorId, input.actorId));
+      if (input.targetWorkerId) conditions.push(eq(hrAuditLog.targetWorkerId, input.targetWorkerId));
+      if (input.action) conditions.push(eq(hrAuditLog.action, input.action));
+      if (input.actionPrefix) conditions.push(sql`${hrAuditLog.action} LIKE ${input.actionPrefix + '%'}`);
+      if (input.dateFrom) conditions.push(gte(hrAuditLog.createdAt, new Date(input.dateFrom)));
+      if (input.dateTo) conditions.push(lte(hrAuditLog.createdAt, new Date(input.dateTo)));
+      return db.select().from(hrAuditLog)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(hrAuditLog.createdAt))
+        .limit(input.limit).offset(input.offset);
     }),
 });

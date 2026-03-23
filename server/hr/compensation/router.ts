@@ -23,7 +23,7 @@ import {
   hrBenefitEnrollments,
 } from "../../../drizzle/schema";
 import { logHrAudit, logSensitiveRead, logStatusChange } from "../audit";
-import { checkHrAccess, maskCompensationFields, HR_ACTIONS } from "../permissions";
+import { checkHrAccess, requireHrPermission, maskCompensationFields, preventSelfApproval, getWorkerIdForUser, HR_ACTIONS } from "../permissions";
 
 // ============================================================================
 // State machines
@@ -76,7 +76,7 @@ export const hrCompensationRouter = router({
       isActive: z.boolean().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -94,7 +94,7 @@ export const hrCompensationRouter = router({
   getSalaryBand: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrSalaryBands).where(eq(hrSalaryBands.id, input.id)).limit(1);
@@ -118,7 +118,7 @@ export const hrCompensationRouter = router({
       effectiveTo: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrSalaryBands).values({
@@ -141,7 +141,7 @@ export const hrCompensationRouter = router({
       isActive: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...data } = input;
@@ -164,7 +164,7 @@ export const hrCompensationRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -191,7 +191,7 @@ export const hrCompensationRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_WRITE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPENSATION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrCompensationRecords).values({
@@ -215,7 +215,7 @@ export const hrCompensationRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -238,7 +238,7 @@ export const hrCompensationRouter = router({
       endDate: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrSalaryReviewCycles).values({
@@ -251,7 +251,7 @@ export const hrCompensationRouter = router({
   transitionSalaryReviewCycle: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrSalaryReviewCycles).where(eq(hrSalaryReviewCycles.id, input.id)).limit(1);
@@ -281,7 +281,7 @@ export const hrCompensationRouter = router({
       bonusType: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -306,7 +306,7 @@ export const hrCompensationRouter = router({
       reason: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_WRITE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPENSATION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrBonusRecords).values({
@@ -322,12 +322,19 @@ export const hrCompensationRouter = router({
   transitionBonusRecord: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrBonusRecords).where(eq(hrBonusRecords.id, input.id)).limit(1);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Bonus record not found" });
       validateTransition(existing.status, input.status, BONUS_STATUS_FLOW, "bonus record");
+
+      // Prevent self-approval of own bonus
+      if (input.status === "approved") {
+        const actorWorkerId = await getWorkerIdForUser(ctx.user.id);
+        preventSelfApproval(ctx.user.id, existing.workerId, actorWorkerId, "bonus approval");
+      }
+
       const updates: Record<string, unknown> = { status: input.status, updatedBy: ctx.user.id, updatedAt: new Date() };
       if (input.status === "approved") { updates.approvedBy = ctx.user.id; updates.approvedAt = new Date(); }
       if (input.status === "paid") { updates.paidAt = new Date(); }
@@ -353,7 +360,7 @@ export const hrCompensationRouter = router({
       isActive: z.boolean().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -380,7 +387,7 @@ export const hrCompensationRouter = router({
       enrollmentWindowEnd: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.BENEFITS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrBenefitPlans).values({
@@ -403,7 +410,7 @@ export const hrCompensationRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -429,7 +436,7 @@ export const hrCompensationRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_WRITE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.BENEFITS_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrBenefitEnrollments).values({
@@ -445,7 +452,7 @@ export const hrCompensationRouter = router({
   transitionBenefitEnrollment: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.BENEFITS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrBenefitEnrollments).where(eq(hrBenefitEnrollments.id, input.id)).limit(1);

@@ -22,7 +22,7 @@ import {
   hrInvestigations,
 } from "../../../drizzle/schema";
 import { logHrAudit, logSensitiveRead, logStatusChange } from "../audit";
-import { checkHrAccess, maskRelationsFields, HR_ACTIONS } from "../permissions";
+import { checkHrAccess, requireHrPermission, maskRelationsFields, HR_ACTIONS } from "../permissions";
 
 // ============================================================================
 // State machines
@@ -87,7 +87,7 @@ export const hrRelationsRouter = router({
       category: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.POLICY_READ);
+      await checkHrAccess(ctx.user, HR_ACTIONS.POLICY_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -102,7 +102,7 @@ export const hrRelationsRouter = router({
   getPolicy: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.POLICY_READ);
+      await checkHrAccess(ctx.user, HR_ACTIONS.POLICY_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrPolicies).where(eq(hrPolicies.id, input.id)).limit(1);
@@ -121,7 +121,7 @@ export const hrRelationsRouter = router({
       requiresAcknowledgement: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.POLICY_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.POLICY_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrPolicies).values({
@@ -134,7 +134,7 @@ export const hrRelationsRouter = router({
   transitionPolicy: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.POLICY_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.POLICY_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrPolicies).where(eq(hrPolicies.id, input.id)).limit(1);
@@ -164,7 +164,7 @@ export const hrRelationsRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.POLICY_READ);
+      await checkHrAccess(ctx.user, HR_ACTIONS.POLICY_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -180,7 +180,7 @@ export const hrRelationsRouter = router({
   acknowledgePolicy: governedProcedure
     .input(z.object({ policyId: z.number(), workerId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.POLICY_WRITE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.POLICY_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrPolicyAcknowledgements).values({
@@ -207,7 +207,7 @@ export const hrRelationsRouter = router({
       category: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_READ, HR_ACTIONS.RELATIONS_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_READ, HR_ACTIONS.RELATIONS_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -225,7 +225,7 @@ export const hrRelationsRouter = router({
   getGrievance: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_READ, HR_ACTIONS.RELATIONS_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_READ, HR_ACTIONS.RELATIONS_READ_SENSITIVE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrGrievances).where(eq(hrGrievances.id, input.id)).limit(1);
@@ -245,7 +245,7 @@ export const hrRelationsRouter = router({
       isConfidential: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_WRITE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.RELATIONS_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrGrievances).values({
@@ -266,7 +266,7 @@ export const hrRelationsRouter = router({
       resolutionNotes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.RELATIONS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrGrievances).where(eq(hrGrievances.id, input.id)).limit(1);
@@ -300,7 +300,7 @@ export const hrRelationsRouter = router({
       type: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_READ, HR_ACTIONS.RELATIONS_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_READ, HR_ACTIONS.RELATIONS_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -327,7 +327,7 @@ export const hrRelationsRouter = router({
       relatedGrievanceId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.RELATIONS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrDisciplinaryActions).values({
@@ -343,7 +343,7 @@ export const hrRelationsRouter = router({
   transitionDisciplinaryAction: governedProcedure
     .input(z.object({ id: z.number(), status: z.string(), appealNotes: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.RELATIONS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrDisciplinaryActions).where(eq(hrDisciplinaryActions.id, input.id)).limit(1);
@@ -373,7 +373,7 @@ export const hrRelationsRouter = router({
       category: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_READ, HR_ACTIONS.RELATIONS_READ_SENSITIVE);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_READ, HR_ACTIONS.RELATIONS_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -399,7 +399,7 @@ export const hrRelationsRouter = router({
       startedAt: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.RELATIONS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrInvestigations).values({
@@ -420,7 +420,7 @@ export const hrRelationsRouter = router({
       recommendation: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.RELATIONS_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.RELATIONS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrInvestigations).where(eq(hrInvestigations.id, input.id)).limit(1);

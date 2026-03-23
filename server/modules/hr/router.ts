@@ -18,6 +18,8 @@ import {
   hrWorkerProfiles,
   hrPeople,
 } from "../../../drizzle/schema";
+import { logHrAudit } from "../../hr/audit";
+import { requireHrPermission, HR_ACTIONS } from "../../hr/permissions";
 
 export const hrModuleRouter = router({
   /** List staff assigned to a workspace */
@@ -114,6 +116,7 @@ export const hrModuleRouter = router({
     .mutation(async ({ ctx, input }) => {
       await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "hr");
+      await requireHrPermission(ctx.user, HR_ACTIONS.STAFFING_ASSIGN);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -133,6 +136,13 @@ export const hrModuleRouter = router({
         targetId: input.workerId,
         metadata: { roleCode: input.roleCode },
       });
+      await logHrAudit({
+        actorId: ctx.user.id,
+        workspaceId: input.workspaceId,
+        targetWorkerId: input.workerId,
+        action: "hr.workspace.assignment.create",
+        metadata: { roleCode: input.roleCode, allocationPct: input.allocationPct },
+      });
 
       return created;
     }),
@@ -147,6 +157,7 @@ export const hrModuleRouter = router({
     .mutation(async ({ ctx, input }) => {
       await requireWorkspaceAccess(ctx.user.id, input.workspaceId);
       await requireModule(input.workspaceId, "hr");
+      await requireHrPermission(ctx.user, HR_ACTIONS.STAFFING_END);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -171,6 +182,13 @@ export const hrModuleRouter = router({
         action: "hr.staff.unassign",
         targetType: "worker",
         targetId: assignment.workerId,
+        metadata: { assignmentId: input.assignmentId, endDate: effectiveEndDate },
+      });
+      await logHrAudit({
+        actorId: ctx.user.id,
+        workspaceId: input.workspaceId,
+        targetWorkerId: assignment.workerId,
+        action: "hr.workspace.assignment.end",
         metadata: { assignmentId: input.assignmentId, endDate: effectiveEndDate },
       });
 

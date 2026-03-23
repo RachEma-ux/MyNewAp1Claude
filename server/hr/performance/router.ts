@@ -20,6 +20,8 @@ import { logHrAudit, logStatusChange, logSensitiveRead } from "../audit";
 import {
   checkHrAccess,
   requireHrPermission,
+  preventSelfApproval,
+  getWorkerIdForUser,
   HR_ACTIONS,
 } from "../permissions";
 
@@ -432,6 +434,10 @@ export const hrPerformanceRouter = router({
           message: `Cannot submit manager review when status is '${current.status}'`,
         });
       }
+
+      // Prevent manager from reviewing themselves
+      const actorWorkerId = await getWorkerIdForUser(ctx.user.id);
+      preventSelfApproval(ctx.user.id, current.workerId, actorWorkerId, "performance review");
 
       await db.update(hrPerformanceReviews).set({
         managerRating: input.managerRating,

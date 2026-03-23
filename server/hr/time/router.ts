@@ -24,6 +24,8 @@ import { logHrAudit, logStatusChange } from "../audit";
 import {
   checkHrAccess,
   requireHrPermission,
+  preventSelfApproval,
+  getWorkerIdForUser,
   HR_ACTIONS,
 } from "../permissions";
 
@@ -169,6 +171,7 @@ export const hrTimeRouter = router({
       status: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, input.status === "approved" ? HR_ACTIONS.TIME_APPROVE : HR_ACTIONS.TIME_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -178,6 +181,12 @@ export const hrTimeRouter = router({
 
       if (input.status && input.status !== current.status) {
         validateTransition(current.status, input.status, TIME_ENTRY_STATUS_FLOW, "time entry");
+      }
+
+      // Prevent self-approval of own time entry
+      if (input.status === "approved") {
+        const actorWorkerId = await getWorkerIdForUser(ctx.user.id);
+        preventSelfApproval(ctx.user.id, current.workerId, actorWorkerId, "time entry approval");
       }
 
       const { id, ...fields } = input;
@@ -224,6 +233,7 @@ export const hrTimeRouter = router({
       isPaid: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.LEAVE_APPROVE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -290,6 +300,7 @@ export const hrTimeRouter = router({
       reason: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.LEAVE_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -318,6 +329,7 @@ export const hrTimeRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.LEAVE_APPROVE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -326,6 +338,12 @@ export const hrTimeRouter = router({
       if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Leave request not found" });
 
       validateTransition(current.status, input.status, LEAVE_REQUEST_STATUS_FLOW, "leave request");
+
+      // Prevent self-approval of own leave request
+      if (input.status === "approved") {
+        const actorWorkerId = await getWorkerIdForUser(ctx.user.id);
+        preventSelfApproval(ctx.user.id, current.workerId, actorWorkerId, "leave approval");
+      }
 
       const updates: Record<string, unknown> = {
         status: input.status,
@@ -446,6 +464,7 @@ export const hrTimeRouter = router({
       reason: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.OVERTIME_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -473,6 +492,7 @@ export const hrTimeRouter = router({
       rejectionReason: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.OVERTIME_APPROVE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -481,6 +501,12 @@ export const hrTimeRouter = router({
       if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Overtime request not found" });
 
       validateTransition(current.status, input.status, OVERTIME_STATUS_FLOW, "overtime request");
+
+      // Prevent self-approval of own overtime request
+      if (input.status === "approved") {
+        const actorWorkerId = await getWorkerIdForUser(ctx.user.id);
+        preventSelfApproval(ctx.user.id, current.workerId, actorWorkerId, "overtime approval");
+      }
 
       const updates: Record<string, unknown> = {
         status: input.status,
@@ -560,6 +586,7 @@ export const hrTimeRouter = router({
       maxCapacity: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SHIFT_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -585,6 +612,7 @@ export const hrTimeRouter = router({
       status: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SHIFT_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -640,6 +668,7 @@ export const hrTimeRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SHIFT_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -674,6 +703,7 @@ export const hrTimeRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SHIFT_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -692,7 +722,7 @@ export const hrTimeRouter = router({
       await db.update(hrShiftAssignments).set(updates)
         .where(eq(hrShiftAssignments.id, input.id));
 
-      await logStatusChange({ actorId: 0, targetWorkerId: current.workerId, domain: "time.shift_assignment", entityId: input.id, fromStatus: current.status, toStatus: input.status });
+      await logStatusChange({ actorId: ctx.user.id, targetWorkerId: current.workerId, domain: "time.shift_assignment", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };
     }),

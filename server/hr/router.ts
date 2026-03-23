@@ -13,6 +13,7 @@
 
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
+import { getHrRoleForUser, HR_ROLE_PERMISSIONS, HR_ACTIONS } from "./permissions";
 import { hrDirectoryRouter } from "./directory/router";
 import { hrOrganizationRouter } from "./organization/router";
 import { hrStaffingRouter } from "./staffing/router";
@@ -29,10 +30,19 @@ import { hrAnalyticsRouter } from "./analytics/router";
 import { hrTalentRouter } from "./talent/router";
 import { seedHrDemoData } from "./seed";
 
+/** Returns current user's HR role and allowed actions — used by frontend for navigation gating */
+const hrMeRouter = router({
+  getRole: protectedProcedure.query(async ({ ctx }) => {
+    const role = await getHrRoleForUser(ctx.user);
+    const allowedActions = HR_ROLE_PERMISSIONS[role] ?? [];
+    return { role, allowedActions };
+  }),
+});
+
 const hrSettingsRouter = router({
   get: protectedProcedure.query(() => ({
     module: "hr",
-    version: "7.0.0",
+    version: "7.2.0",
     features: {
       directory: true,
       organization: true,
@@ -58,6 +68,13 @@ const hrSettingsRouter = router({
       apiPermissionEnforcement: true,
       // Phase 7 data expansion
       expandedSeedDataset: true,
+      // Phase 7.1 governance hardening
+      fullPermissionEnforcement: true,
+      frontendRoleGating: true,
+      workspaceHrHardening: true,
+      // Phase 7.2 SoD & audit
+      selfApprovalPrevention: true,
+      unifiedAuditQuery: true,
     },
   })),
   seedDemo: governedProcedure
@@ -91,4 +108,5 @@ export const hrRouter = router({
   talent: hrTalentRouter,
   // Config
   settings: hrSettingsRouter,
+  me: hrMeRouter,
 });
