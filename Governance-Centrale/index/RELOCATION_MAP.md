@@ -4,7 +4,7 @@ Files moved into Governance-Centrale and files intentionally left in place.
 
 ---
 
-## Moved Files
+## Moved Files (Previous Session)
 
 | Old Path | New Path | Type |
 |---|---|---|
@@ -47,47 +47,85 @@ Files moved into Governance-Centrale and files intentionally left in place.
 | `audit/freeze_verification.md` | `Governance-Centrale/reports/audit/freeze_verification.md` | real move |
 | `audit/next_governance_targets.md` | `Governance-Centrale/reports/audit/next_governance_targets.md` | real move |
 
+## New Files Created (This Session)
+
+| Path | Type |
+|---|---|
+| `Governance-Centrale/global/GOVERNANCE_MODEL.md` | new doc |
+| `Governance-Centrale/global/SECURITY_MODEL.md` | new doc |
+| `Governance-Centrale/global/AUDIT_MODEL.md` | new doc |
+| `Governance-Centrale/global/OPERATIONAL_COMPLIANCE_MODEL.md` | new doc |
+| `Governance-Centrale/global/CONTROL_MATRIX.md` | new doc |
+| `Governance-Centrale/global/POLICY_ENGINE_POSITION.md` | new doc |
+| `Governance-Centrale/global/GOVERNANCE_COVERAGE_MATRIX.md` | new doc |
+| `Governance-Centrale/global/THREAT_MODEL.md` | new doc |
+| `Governance-Centrale/modules/human-resources/README.md` | new doc |
+| `Governance-Centrale/modules/human-resources/MODULE_GOVERNANCE_PROFILE.md` | new doc |
+| `Governance-Centrale/modules/human-resources/MODULE_RUNTIME_REFERENCES.md` | new doc |
+| `Governance-Centrale/modules/ai-types/README.md` | new doc |
+| `Governance-Centrale/modules/workspace/README.md` | new doc |
+| `Governance-Centrale/modules/automation/README.md` | new doc |
+| `Governance-Centrale/modules/resources/README.md` | new doc |
+| `Governance-Centrale/modules/collaboration/README.md` | new doc |
+| `Governance-Centrale/modules/pm-central/README.md` | new doc |
+| `Governance-Centrale/modules/digital-hq/README.md` | new doc |
+| `Governance-Centrale/modules/governance-center/README.md` | new doc |
+| `Governance-Centrale/modules/infrastructure/README.md` | new doc |
+| `Governance-Centrale/platform-domains/governance-core/README.md` | new doc |
+| `Governance-Centrale/platform-domains/governance-core/DOMAIN_RUNTIME_REFERENCES.md` | new doc |
+| `Governance-Centrale/platform-domains/policy-engine/README.md` | new doc |
+| `Governance-Centrale/platform-domains/audit-core/README.md` | new doc |
+| `Governance-Centrale/platform-domains/identity-access/README.md` | new doc |
+| `Governance-Centrale/platform-domains/module-registry/README.md` | new doc |
+| `Governance-Centrale/platform-domains/publication-lifecycle/README.md` | new doc |
+| `Governance-Centrale/platform-domains/runtime-agents/README.md` | new doc |
+
 ## Deleted
 
 | Path | Reason |
 |---|---|
-| `Governance` | Empty file (0 bytes), removed |
+| `Governance` | Empty file (0 bytes), removed in previous session |
 
 ## Left in Place (runtime/build/CI-critical)
 
-| Path | Reason |
-|---|---|
-| `server/governance/*` | Live runtime governance engine -- imported by 15+ server files |
-| `server/middleware/governance.ts` | Live Express middleware |
-| `server/services/governanceLogger.ts` | Live service -- used by governance engine and policyGate |
-| `server/services/governanceMetrics.ts` | Live service -- used by governance engine |
-| `server/operators/governance-operator.ts` | Live operator in operator registry |
-| `server/syscall/governance-gate.ts` | Live syscall gate in kernel |
-| `server/policies/agent_governance.rego` | Runtime OPA policy loaded by server |
-| `server/policies/*-policy-engine.ts` | Runtime policy engines |
-| `server/modules/pmt/governance-schema.ts` | PMT module governance schema |
-| `config/governance/platform_action_registry.yaml` | Loaded at runtime by action-registry.ts |
-| `controls/*.yaml` | Loaded at runtime by yaml-loader.ts |
-| `schemas/governance/link_contract.schema.json` | Copied to dist/ by build script |
-| `schemas/discovery-artifact.schema.json` | Loaded at runtime by discovery-artifact.ts |
-| `scripts/governance/*` | Referenced by CI workflow governance-gate.yml |
-| `scripts/governance-validation/*` | Referenced by CI workflow |
-| `scripts/governance-pipeline.py` | CI script |
-| `scripts/add-governance-wiki.*` | Script files |
-| `scripts/populate-governance-wiki.mjs` | Script file |
-| `scripts/setup-governance-wiki.mjs` | Script file |
-| `scripts/generateGovernanceCoverageMap.ts` | Script file |
-| `.github/workflows/governance-gate.yml` | GitHub requires workflows in .github/workflows/ |
-| `.github/workflows/governance-validation.yml` | Same |
-| `client/src/pages/governance/*` | Vite build tree -- must stay in client/src/ |
-| `client/src/pages/GovernanceCenterPage.tsx` | Vite build tree |
-| `client/src/pages/GovernanceScorecard.tsx` | Vite build tree |
-| `client/src/components/GovernanceNav.tsx` | Vite build tree |
-| `drizzle/tables/governance.ts` | Drizzle ORM schema |
-| `drizzle/0010_governance_freeze.sql` | Drizzle migration |
-| `migrations/add_governance_fields.sql` | Migration file |
-| `tests/governance/*` | Test framework structure |
-| `tests/helpers/governance-harness.ts` | Shared test helper used by 25+ test files |
-| `artifacts/governance/` | Runtime artifact store base path |
-| `HR/GOVERNANCE_HR_*.md` | HR domain docs (cross-domain, not pure governance) |
-| `Template/Shell/Governance*.md` | Template domain docs (cross-domain) |
+| Path | Reason | Referenced In |
+|---|---|---|
+| `server/governance/*` | Live runtime engine — 40+ files, imported by 15+ modules | `platform-domains/governance-core/DOMAIN_RUNTIME_REFERENCES.md` |
+| `server/middleware/governance.ts` | Live Express middleware | `platform-domains/governance-core/DOMAIN_RUNTIME_REFERENCES.md` |
+| `server/services/governanceLogger.ts` | Live service — used by governance engine | `platform-domains/governance-core/DOMAIN_RUNTIME_REFERENCES.md` |
+| `server/services/governanceMetrics.ts` | Live service — used by governance engine | `platform-domains/governance-core/DOMAIN_RUNTIME_REFERENCES.md` |
+| `server/services/policyGate.ts` | Live service — RBAC policy gate | `platform-domains/governance-core/DOMAIN_RUNTIME_REFERENCES.md` |
+| `server/operators/governance-operator.ts` | Live operator in operator registry | `platform-domains/runtime-agents/README.md` |
+| `server/syscall/governance-gate.ts` | Live syscall gate in kernel | `platform-domains/runtime-agents/README.md` |
+| `server/policies/*.ts` | Runtime policy engines (6 files) | `platform-domains/policy-engine/README.md` |
+| `server/policies/agent_governance.rego` | Runtime OPA policy loaded by server | `platform-domains/policy-engine/README.md` |
+| `server/modules/pmt/governance-schema.ts` | PMT module governance schema | `modules/pm-central/README.md` |
+| `server/hr/` | HR governance implementation (14 sub-routers) | `modules/human-resources/MODULE_RUNTIME_REFERENCES.md` |
+| `config/governance/platform_action_registry.yaml` | Loaded at runtime by action-registry.ts | `platform-domains/governance-core/DOMAIN_RUNTIME_REFERENCES.md` |
+| `controls/*.yaml` | Loaded at runtime by yaml-loader.ts | `platform-domains/governance-core/DOMAIN_RUNTIME_REFERENCES.md` |
+| `schemas/governance/link_contract.schema.json` | Copied to dist/ by build script | `platform-domains/governance-core/DOMAIN_RUNTIME_REFERENCES.md` |
+| `schemas/discovery-artifact.schema.json` | Loaded at runtime by discovery-artifact.ts | `platform-domains/governance-core/DOMAIN_RUNTIME_REFERENCES.md` |
+| `scripts/governance/*` | Referenced by CI workflow governance-gate.yml | left in place |
+| `scripts/governance-validation/*` | Referenced by CI workflow | left in place |
+| `.github/workflows/governance-gate.yml` | GitHub requires workflows in .github/workflows/ | left in place |
+| `.github/workflows/governance-validation.yml` | GitHub requires workflows in .github/workflows/ | left in place |
+| `client/src/pages/governance/*` | Vite build tree — must stay in client/src/ | `modules/governance-center/README.md` |
+| `client/src/pages/GovernanceCenterPage.tsx` | Vite build tree | `modules/governance-center/README.md` |
+| `client/src/pages/GovernanceScorecard.tsx` | Vite build tree | `modules/governance-center/README.md` |
+| `client/src/components/GovernanceNav.tsx` | Vite build tree | `modules/governance-center/README.md` |
+| `drizzle/tables/governance.ts` | Drizzle ORM schema | left in place |
+| `drizzle/0010_governance_freeze.sql` | Drizzle migration | left in place |
+| `migrations/add_governance_fields.sql` | Migration file | left in place |
+| `tests/governance/*` | Test framework structure | left in place |
+| `tests/helpers/governance-harness.ts` | Shared test helper | left in place |
+| `artifacts/governance/` | Runtime artifact store base path | left in place |
+| `HR/GOVERNANCE_HR_COMPATIBILITY_ASSESSMENT.md` | HR domain doc (cross-domain) | `modules/human-resources/MODULE_RUNTIME_REFERENCES.md` |
+| `HR/HR_GOVERNANCE_COMPLIANCE_AUDIT.md` | HR domain doc (cross-domain) | `modules/human-resources/MODULE_RUNTIME_REFERENCES.md` |
+| `HR/HR_MODULE_AUDIT_REPORT.md` | HR domain doc (cross-domain) | `modules/human-resources/MODULE_RUNTIME_REFERENCES.md` |
+| `HR/HR_FINAL_ACCEPTANCE_AUDIT.md` | HR domain doc (cross-domain) | `modules/human-resources/MODULE_RUNTIME_REFERENCES.md` |
+| `HR/HR_V72_REAUDIT.md` | HR domain doc (cross-domain) | `modules/human-resources/MODULE_RUNTIME_REFERENCES.md` |
+| `Template/Shell/FederatedGovernanceModel.md` | Template domain doc (cross-domain) | `modules/workspace/README.md` |
+| `Template/Shell/GovernanceBible_v1.0.0.md` | Template domain doc (cross-domain) | `modules/workspace/README.md` |
+| `Template/Shell/GovernanceEnforcementMiddleware.md` | Template domain doc (cross-domain) | `modules/workspace/README.md` |
+| `docs/workspace/WORKSPACE_FOUNDATIONAL_CONTRACT.md` | Workspace domain doc | `modules/workspace/README.md` |
+| `docs/workspace/WORKSPACE_INVARIANTS.md` | Workspace domain doc | `modules/workspace/README.md` |

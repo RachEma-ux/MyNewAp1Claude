@@ -4,144 +4,110 @@ Navigational map of all governance-related content in this repository.
 
 ---
 
-## Centralized in Governance-Centrale/
+## Global Governance Doctrine (`global/`)
 
-### Core Governance Specification (docs/governance-bible/)
-- `GOVERNANCE_BIBLE.md` -- Master governance specification (CGT v2)
-- `GOVERNANCE_CONTRACT.md` -- Governance contract definitions
-- `GOVERNANCE_FREEZE.md` -- Freeze protocol specification
-- `ENFORCEMENT_RULES.md` -- Enforcement rule definitions
-- `ENFORCEMENT_VALIDATION.md` -- Enforcement validation criteria
-- `LINKING_FRAMEWORK.md` -- Governed linking framework
-- `MATURITY_LADDER.md` -- Governance maturity ladder
-- `NO_REGRESSION_POLICY.md` -- No-regression policy
-- `README.md` -- Governance docs overview
-- `RED_TEAM_PROTOCOL.md` -- Red team protocol
-- `REVIEW_GUIDELINES.md` -- Review guidelines
-
-### Architecture Standards (docs/architecture/)
-- `AI_TYPES_GOVERNANCE_STANDARD.md` -- AI types governance standard
-
-### Governance Design Documents (docs/)
-- `AI-Types-Governance-Alignment-Architecture.md` -- AI types alignment architecture
-- `Governance_Page_Content.md` -- Governance UI page content spec
-- `policies-README.md` -- Policies directory documentation
-
-### Archived Governance Docs (docs/archive/)
-- `AGENT_GOVERNANCE.md`
-- `AGENT_GOVERNANCE_COMPATIBILITY_CHECK.md`
-- `AGENT_GOVERNANCE_COMPLETE.md`
-- `AGENT_GOVERNANCE_FINAL.md`
-- `AGENT_GOVERNANCE_MAPPING.md`
-- `AGENT_GOVERNANCE_UI_IMPLEMENTATION.md`
-- `GOVERNANCE_ARCHITECTURE.md`
-- `GOVERNANCE_README.md`
-- `OPA_POLICY_GUIDE.md`
-
-### Reports (reports/)
-- `GOVERNANCE_COMPLIANCE_REPORT.md` -- Compliance report
-- `cross-domain-alignment-audit-2026-03-21.md` -- Cross-domain alignment audit
-
-### Audit Reports (reports/audit/)
-- `FINAL_REPORT.md` -- Platform audit final report
-- `01_mutation_entrypoints.md` -- Mutation entrypoint audit
-- `02_gate_coverage_report.md` -- Gate coverage report
-- `03_systemic_findings.md` -- Systemic findings
-- `04_governance_engine_usage.md` -- Governance engine usage audit
-- `05_freeze_drift_enforcement.md` -- Freeze/drift enforcement audit
-- `06_risk_matrix.md` -- Risk matrix
-- `compliance_checklist.md` -- Compliance checklist
-- `freeze_verification.md` -- Freeze verification report
-- `next_governance_targets.md` -- Next governance targets
-
-### Manifests (manifests/)
-- `wiki-governance-manifest.json` -- Wiki governance manifest
-- `agent_governance.rego` -- Agent governance OPA policy (reference copy)
+| Document | Purpose |
+|---|---|
+| [GOVERNANCE_MODEL.md](../global/GOVERNANCE_MODEL.md) | Platform governance architecture and enforcement layers |
+| [SECURITY_MODEL.md](../global/SECURITY_MODEL.md) | Implemented security controls (auth, RBAC, secrets, audit) |
+| [AUDIT_MODEL.md](../global/AUDIT_MODEL.md) | Audit systems, fragmentation, and unification plans |
+| [OPERATIONAL_COMPLIANCE_MODEL.md](../global/OPERATIONAL_COMPLIANCE_MODEL.md) | Review cadence, evidence, compliance ownership |
+| [CONTROL_MATRIX.md](../global/CONTROL_MATRIX.md) | Controls mapped to implementation, scope, fail mode, gaps |
+| [POLICY_ENGINE_POSITION.md](../global/POLICY_ENGINE_POSITION.md) | Rule-based vs OPA clarification |
+| [GOVERNANCE_COVERAGE_MATRIX.md](../global/GOVERNANCE_COVERAGE_MATRIX.md) | Mutation/read governance coverage per module |
+| [THREAT_MODEL.md](../global/THREAT_MODEL.md) | Threats and governance-security risks |
 
 ---
 
-## Runtime Implementation (not moved -- remains in original locations)
+## Module Governance Profiles (`modules/`)
 
-### Core Governance Engine
-- `server/governance/` -- Full governance runtime module
-  - `governance-engine.ts` -- Central enforcement engine
-  - `router.ts` -- tRPC governance API endpoints
-  - `index.ts` -- Public API barrel file
-  - `rbac-model.ts` -- Role-based access control
-  - `risk-classifier.ts` -- Risk severity classification
-  - `lifecycle-guard.ts` -- Lifecycle transition enforcement
-  - `publication-gate.ts` -- Publication gate validation
-  - `architecture-validator.ts` -- Architecture boundary validation
-  - `self-check.ts` -- Runtime health check
-  - `stage-review.ts` -- Stage review checklist
-  - `requireGate.ts` -- Gate enforcement
-  - `requireGovernedAction.ts` -- Governed action pipeline
-  - `action-registry.ts` -- Platform action registry loader
-  - `action-key-map.ts` -- tRPC path to action key mapping
-  - `artifact-store.ts` -- Evidence artifact storage
-  - `audit-router.ts` -- Audit tRPC endpoints
-  - `audit-runner.ts` -- Platform audit runner
-  - `catalog-lint.ts` -- Control catalog linting
-  - `gate-coverage.ts` -- Gate coverage analysis
-  - `production-hardening.ts` -- Production hardening checks
-  - `discovery-artifact.ts` -- Discovery artifact schema
-  - `evidence-emitter.ts` -- Evidence emission
-  - `drift-runner.ts` -- Drift detection runner
-  - `scorecard/` -- Scorecard engine subsystem
-    - `engine.ts`, `runner.ts`, `aggregator.ts`, `control-catalog.ts`
-    - `governed-subject.ts`, `pack-resolver.ts`, `evidence.ts`
-    - `drift-detector.ts`, `yaml-loader.ts`
+| Module | Governance Status | Key File |
+|---|---|---|
+| [Human Resources](../modules/human-resources/README.md) | Full | governedProcedure + permissions + SoD + masking |
+| [AI Types](../modules/ai-types/README.md) | Partial | governedProcedure + policy engines |
+| [Workspace](../modules/workspace/README.md) | Partial | hasWorkspaceAccess |
+| [Automation](../modules/automation/README.md) | Minimal | protectedProcedure only |
+| [Resources](../modules/resources/README.md) | Minimal | protectedProcedure + access checks |
+| [Collaboration](../modules/collaboration/README.md) | Minimal | protectedProcedure only |
+| [PM Central](../modules/pm-central/README.md) | Partial | PMT governance schema |
+| [Digital HQ](../modules/digital-hq/README.md) | Minimal | Dashboard display only |
+| [Governance Center](../modules/governance-center/README.md) | Full | Self-governed |
+| [Infrastructure](../modules/infrastructure/README.md) | Low | CRITICAL gaps (C2, C3) |
 
-### Governance Services
-- `server/services/governanceLogger.ts` -- Governance audit logger
-- `server/services/governanceMetrics.ts` -- Governance metrics
-- `server/services/policyGate.ts` -- Policy gate (uses RBAC)
+---
 
-### Governance Middleware
-- `server/middleware/governance.ts` -- Express enforcement middleware
+## Platform Domain Governance (`platform-domains/`)
 
-### Governance Operators / Syscalls
-- `server/operators/governance-operator.ts` -- Autonomous governance operator
-- `server/syscall/governance-gate.ts` -- Syscall deny-by-default gate
+| Domain | Key File |
+|---|---|
+| [Governance Core](../platform-domains/governance-core/README.md) | Core engine, RBAC, lifecycle, gates |
+| [Policy Engine](../platform-domains/policy-engine/README.md) | TypeScript policy engines, OPA reference |
+| [Audit Core](../platform-domains/audit-core/README.md) | Logging, evidence, scorecard, drift |
+| [Identity & Access](../platform-domains/identity-access/README.md) | Auth, RBAC, workspace membership |
+| [Module Registry](../platform-domains/module-registry/README.md) | Catalog/registry system |
+| [Publication & Lifecycle](../platform-domains/publication-lifecycle/README.md) | Lifecycle states, publication gates |
+| [Runtime Agents](../platform-domains/runtime-agents/README.md) | Autonomous agents, operators, syscalls |
 
-### Runtime Config (loaded at runtime)
-- `config/governance/platform_action_registry.yaml` -- Action registry YAML
-- `controls/*.yaml` -- YAML control catalog (base, provider, llm, model, agent, bot, schema, system)
-- `schemas/governance/link_contract.schema.json` -- Link contract schema
-- `schemas/discovery-artifact.schema.json` -- Discovery artifact schema
+---
 
-### Runtime Policy Engines
-- `server/policies/agent_governance.rego` -- Runtime OPA policy
-- `server/policies/*-policy-engine.ts` -- Domain policy engines
+## Core Governance Specification (`docs/governance-bible/`)
 
-### CI/CD Governance
-- `.github/workflows/governance-gate.yml` -- CI governance gate
-- `.github/workflows/governance-validation.yml` -- CI governance validation
-- `scripts/governance/` -- CI invariant checks
-- `scripts/governance-validation/` -- CI governance probes
+| Document | Purpose |
+|---|---|
+| [GOVERNANCE_BIBLE.md](../docs/governance-bible/GOVERNANCE_BIBLE.md) | Master governance specification (CGT v2) |
+| [GOVERNANCE_CONTRACT.md](../docs/governance-bible/GOVERNANCE_CONTRACT.md) | Governance contract definitions |
+| [GOVERNANCE_FREEZE.md](../docs/governance-bible/GOVERNANCE_FREEZE.md) | Freeze protocol specification |
+| [ENFORCEMENT_RULES.md](../docs/governance-bible/ENFORCEMENT_RULES.md) | Enforcement rule definitions |
+| [ENFORCEMENT_VALIDATION.md](../docs/governance-bible/ENFORCEMENT_VALIDATION.md) | Enforcement validation criteria |
+| [LINKING_FRAMEWORK.md](../docs/governance-bible/LINKING_FRAMEWORK.md) | Governed linking framework |
+| [MATURITY_LADDER.md](../docs/governance-bible/MATURITY_LADDER.md) | Governance maturity ladder |
+| [NO_REGRESSION_POLICY.md](../docs/governance-bible/NO_REGRESSION_POLICY.md) | No-regression policy |
+| [RED_TEAM_PROTOCOL.md](../docs/governance-bible/RED_TEAM_PROTOCOL.md) | Red team protocol |
+| [REVIEW_GUIDELINES.md](../docs/governance-bible/REVIEW_GUIDELINES.md) | Review guidelines |
 
-### Client UI
-- `client/src/pages/GovernanceCenterPage.tsx`
-- `client/src/pages/GovernanceScorecard.tsx`
-- `client/src/pages/governance/` -- Governance panels
-- `client/src/components/GovernanceNav.tsx`
-- `client/src/components/workspace/PMGovernanceBadge.tsx`
+---
 
-### Database
-- `drizzle/tables/governance.ts` -- Governance DB schema
-- `drizzle/0010_governance_freeze.sql` -- Freeze migration
-- `migrations/add_governance_fields.sql` -- Governance fields migration
+## Reports & Audits (`reports/`)
 
-### Tests
-- `tests/governance/` -- Governance blocking/transition tests
-- `tests/helpers/governance-harness.ts` -- Governance test harness
-- `tests/integration/runtime/governance-authority.test.ts`
-- `tests/integration/ai-types/scenario4.governance-violation.test.ts`
-- `server/governance/*.test.ts` -- Unit tests co-located with runtime
+| Report | Purpose |
+|---|---|
+| [FINAL_REPORT.md](../reports/audit/FINAL_REPORT.md) | Platform audit final report |
+| [01_mutation_entrypoints.md](../reports/audit/01_mutation_entrypoints.md) | Mutation entrypoint audit |
+| [02_gate_coverage_report.md](../reports/audit/02_gate_coverage_report.md) | Gate coverage report |
+| [03_systemic_findings.md](../reports/audit/03_systemic_findings.md) | Systemic findings |
+| [04_governance_engine_usage.md](../reports/audit/04_governance_engine_usage.md) | Governance engine usage audit |
+| [05_freeze_drift_enforcement.md](../reports/audit/05_freeze_drift_enforcement.md) | Freeze/drift enforcement audit |
+| [06_risk_matrix.md](../reports/audit/06_risk_matrix.md) | Risk matrix |
+| [compliance_checklist.md](../reports/audit/compliance_checklist.md) | Compliance checklist |
+| [GOVERNANCE_COMPLIANCE_REPORT.md](../reports/GOVERNANCE_COMPLIANCE_REPORT.md) | Compliance report |
+| [cross-domain-alignment-audit](../reports/cross-domain-alignment-audit-2026-03-21.md) | Cross-domain alignment audit |
 
-### Cross-Domain Governance References
-- `HR/GOVERNANCE_HR_COMPATIBILITY_ASSESSMENT.md` -- HR governance assessment
-- `HR/HR_GOVERNANCE_COMPLIANCE_AUDIT.md` -- HR compliance audit
-- `Template/Shell/FederatedGovernanceModel.md` -- Federated governance template
-- `Template/Shell/GovernanceBible_v1.0.0.md` -- Bible template
-- `Template/Shell/GovernanceEnforcementMiddleware.md` -- Middleware template
+---
+
+## Key Runtime Governance Locations (outside Governance-Centrale)
+
+These remain in their original locations because they are runtime/build-critical:
+
+| Location | Purpose |
+|---|---|
+| `server/governance/` | Core governance engine (40+ files) |
+| `server/policies/` | Domain policy engines (7 files) |
+| `server/middleware/governance.ts` | Express enforcement middleware |
+| `server/services/governance*.ts` | Governance services (logger, metrics) |
+| `server/hr/` | HR governance implementation (14 sub-routers) |
+| `config/governance/` | Runtime action registry YAML |
+| `controls/` | Runtime YAML control catalog |
+| `scripts/governance*/` | CI governance scripts |
+| `.github/workflows/governance-*.yml` | CI governance workflows |
+| `client/src/pages/governance/` | Governance UI pages |
+| `drizzle/tables/governance.ts` | Governance DB schema |
+| `tests/governance/` | Governance test suite |
+| `HR/` | HR governance audit docs (cross-domain) |
+| `Template/Shell/Governance*.md` | Template governance docs (cross-domain) |
+
+---
+
+## Scope & Organization
+
+See [GOVERNANCE_SCOPE.md](GOVERNANCE_SCOPE.md) for what counts as governance content.
+See [RELOCATION_MAP.md](RELOCATION_MAP.md) for the full old path → new path mapping.
