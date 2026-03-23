@@ -43,17 +43,17 @@ const severityColor: Record<string, string> = {
 };
 
 export default function HRGrievancesPage() {
-  const [gStatusFilter, setGStatusFilter] = useState<string>("");
-  const [invStatusFilter, setInvStatusFilter] = useState<string>("");
+  const [gStatusFilter, setGStatusFilter] = useState<string>("all");
+  const [invStatusFilter, setInvStatusFilter] = useState<string>("all");
 
   const grievances = trpc.hr.relations.listGrievances.useQuery({
     limit: 50,
-    ...(gStatusFilter ? { status: gStatusFilter } : {}),
+    ...(gStatusFilter && gStatusFilter !== "all" ? { status: gStatusFilter } : {}),
   });
   const disciplinary = trpc.hr.relations.listDisciplinaryActions.useQuery({ limit: 50 });
   const investigations = trpc.hr.relations.listInvestigations.useQuery({
     limit: 50,
-    ...(invStatusFilter ? { status: invStatusFilter } : {}),
+    ...(invStatusFilter && invStatusFilter !== "all" ? { status: invStatusFilter } : {}),
   });
 
   if (grievances.isLoading) {
@@ -86,7 +86,7 @@ export default function HRGrievancesPage() {
             <Select value={gStatusFilter} onValueChange={setGStatusFilter}>
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="filed">Filed</SelectItem>
                 <SelectItem value="under_review">Under Review</SelectItem>
                 <SelectItem value="investigating">Investigating</SelectItem>
@@ -144,7 +144,7 @@ export default function HRGrievancesPage() {
             <Select value={invStatusFilter} onValueChange={setInvStatusFilter}>
               <SelectTrigger className="w-[200px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="opened">Opened</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="pending_review">Pending Review</SelectItem>

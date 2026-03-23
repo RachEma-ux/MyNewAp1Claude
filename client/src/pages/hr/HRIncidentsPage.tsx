@@ -27,13 +27,13 @@ const severityColor: Record<string, string> = {
 };
 
 export default function HRIncidentsPage() {
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [severityFilter, setSeverityFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [severityFilter, setSeverityFilter] = useState<string>("all");
 
   const incidents = trpc.hr.compliance.listIncidentReports.useQuery({
     limit: 50,
-    ...(statusFilter ? { status: statusFilter } : {}),
-    ...(severityFilter ? { severity: severityFilter } : {}),
+    ...(statusFilter && statusFilter !== "all" ? { status: statusFilter } : {}),
+    ...(severityFilter && severityFilter !== "all" ? { severity: severityFilter } : {}),
   });
 
   if (incidents.isLoading) {
@@ -54,7 +54,7 @@ export default function HRIncidentsPage() {
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="reported">Reported</SelectItem>
             <SelectItem value="under_investigation">Under Investigation</SelectItem>
             <SelectItem value="action_required">Action Required</SelectItem>
@@ -65,7 +65,7 @@ export default function HRIncidentsPage() {
         <Select value={severityFilter} onValueChange={setSeverityFilter}>
           <SelectTrigger className="w-[140px]"><SelectValue placeholder="All severity" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="low">Low</SelectItem>
             <SelectItem value="medium">Medium</SelectItem>
             <SelectItem value="high">High</SelectItem>

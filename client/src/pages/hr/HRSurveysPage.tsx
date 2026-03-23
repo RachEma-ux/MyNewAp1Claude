@@ -20,11 +20,11 @@ const statusColor: Record<string, string> = {
 };
 
 export default function HRSurveysPage() {
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const campaigns = trpc.hr.engagement.listSurveyCampaigns.useQuery({
     limit: 50,
-    ...(statusFilter ? { status: statusFilter } : {}),
+    ...(statusFilter && statusFilter !== "all" ? { status: statusFilter } : {}),
   });
   const responses = trpc.hr.engagement.listSurveyResponses.useQuery({ limit: 50 });
 
@@ -53,7 +53,7 @@ export default function HRSurveysPage() {
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="closed">Closed</SelectItem>

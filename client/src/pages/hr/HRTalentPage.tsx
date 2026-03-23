@@ -42,16 +42,16 @@ const riskColor: Record<string, string> = {
 };
 
 export default function HRTalentPage() {
-  const [reviewStatusFilter, setReviewStatusFilter] = useState<string>("");
-  const [planStatusFilter, setPlanStatusFilter] = useState<string>("");
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<string>("all");
+  const [planStatusFilter, setPlanStatusFilter] = useState<string>("all");
 
   const reviews = trpc.hr.talent.listTalentReviews.useQuery({
     limit: 50,
-    ...(reviewStatusFilter ? { status: reviewStatusFilter } : {}),
+    ...(reviewStatusFilter && reviewStatusFilter !== "all" ? { status: reviewStatusFilter } : {}),
   });
   const plans = trpc.hr.talent.listSuccessionPlans.useQuery({
     limit: 50,
-    ...(planStatusFilter ? { status: planStatusFilter } : {}),
+    ...(planStatusFilter && planStatusFilter !== "all" ? { status: planStatusFilter } : {}),
   });
   const candidates = trpc.hr.talent.listSuccessionCandidates.useQuery({ limit: 50 });
 
@@ -96,7 +96,7 @@ export default function HRTalentPage() {
             <Select value={reviewStatusFilter} onValueChange={setReviewStatusFilter}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="submitted">Submitted</SelectItem>
                 <SelectItem value="calibrated">Calibrated</SelectItem>
@@ -137,7 +137,7 @@ export default function HRTalentPage() {
             <Select value={planStatusFilter} onValueChange={setPlanStatusFilter}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>

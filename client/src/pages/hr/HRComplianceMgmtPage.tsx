@@ -35,17 +35,17 @@ const impactColor: Record<string, string> = {
 };
 
 export default function HRComplianceMgmtPage() {
-  const [oblStatusFilter, setOblStatusFilter] = useState<string>("");
-  const [riskStatusFilter, setRiskStatusFilter] = useState<string>("");
+  const [oblStatusFilter, setOblStatusFilter] = useState<string>("all");
+  const [riskStatusFilter, setRiskStatusFilter] = useState<string>("all");
 
   const obligations = trpc.hr.compliance.listComplianceObligations.useQuery({
     limit: 50,
-    ...(oblStatusFilter ? { status: oblStatusFilter } : {}),
+    ...(oblStatusFilter && oblStatusFilter !== "all" ? { status: oblStatusFilter } : {}),
   });
   const evidence = trpc.hr.compliance.listComplianceEvidence.useQuery({ limit: 50 });
   const risks = trpc.hr.compliance.listRiskItems.useQuery({
     limit: 50,
-    ...(riskStatusFilter ? { status: riskStatusFilter } : {}),
+    ...(riskStatusFilter && riskStatusFilter !== "all" ? { status: riskStatusFilter } : {}),
   });
 
   if (obligations.isLoading) {
@@ -74,7 +74,7 @@ export default function HRComplianceMgmtPage() {
             <Select value={oblStatusFilter} onValueChange={setOblStatusFilter}>
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="compliant">Compliant</SelectItem>
                 <SelectItem value="non_compliant">Non-Compliant</SelectItem>
@@ -130,7 +130,7 @@ export default function HRComplianceMgmtPage() {
             <Select value={riskStatusFilter} onValueChange={setRiskStatusFilter}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="identified">Identified</SelectItem>
                 <SelectItem value="assessing">Assessing</SelectItem>
                 <SelectItem value="mitigating">Mitigating</SelectItem>

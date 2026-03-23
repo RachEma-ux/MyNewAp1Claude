@@ -27,14 +27,14 @@ const statusColor: Record<string, string> = {
 
 export default function HRCompensationPage() {
   const [bandFilter, setBandFilter] = useState<string>("");
-  const [bonusStatusFilter, setBonusStatusFilter] = useState<string>("");
+  const [bonusStatusFilter, setBonusStatusFilter] = useState<string>("all");
 
   const salaryBands = trpc.hr.compensation.listSalaryBands.useQuery({ limit: 50, isActive: true });
   const compRecords = trpc.hr.compensation.listCompensationRecords.useQuery({ limit: 50 });
   const reviewCycles = trpc.hr.compensation.listSalaryReviewCycles.useQuery({ limit: 50 });
   const bonuses = trpc.hr.compensation.listBonusRecords.useQuery({
     limit: 50,
-    ...(bonusStatusFilter ? { status: bonusStatusFilter } : {}),
+    ...(bonusStatusFilter && bonusStatusFilter !== "all" ? { status: bonusStatusFilter } : {}),
   });
 
   const isLoading = salaryBands.isLoading || compRecords.isLoading;
@@ -152,7 +152,7 @@ export default function HRCompensationPage() {
             <Select value={bonusStatusFilter} onValueChange={setBonusStatusFilter}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>

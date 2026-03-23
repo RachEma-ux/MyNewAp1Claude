@@ -20,12 +20,12 @@ const statusColor: Record<string, string> = {
 };
 
 export default function HRBenefitsPage() {
-  const [enrollStatusFilter, setEnrollStatusFilter] = useState<string>("");
+  const [enrollStatusFilter, setEnrollStatusFilter] = useState<string>("all");
 
   const plans = trpc.hr.compensation.listBenefitPlans.useQuery({ limit: 50, isActive: true });
   const enrollments = trpc.hr.compensation.listBenefitEnrollments.useQuery({
     limit: 50,
-    ...(enrollStatusFilter ? { status: enrollStatusFilter } : {}),
+    ...(enrollStatusFilter && enrollStatusFilter !== "all" ? { status: enrollStatusFilter } : {}),
   });
 
   if (plans.isLoading) {
@@ -93,7 +93,7 @@ export default function HRBenefitsPage() {
             <Select value={enrollStatusFilter} onValueChange={setEnrollStatusFilter}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>

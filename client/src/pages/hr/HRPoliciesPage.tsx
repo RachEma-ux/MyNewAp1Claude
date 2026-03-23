@@ -24,11 +24,11 @@ const statusColor: Record<string, string> = {
 };
 
 export default function HRPoliciesPage() {
-  const [policyStatusFilter, setPolicyStatusFilter] = useState<string>("");
+  const [policyStatusFilter, setPolicyStatusFilter] = useState<string>("all");
 
   const policies = trpc.hr.relations.listPolicies.useQuery({
     limit: 50,
-    ...(policyStatusFilter ? { status: policyStatusFilter } : {}),
+    ...(policyStatusFilter && policyStatusFilter !== "all" ? { status: policyStatusFilter } : {}),
   });
   const acknowledgements = trpc.hr.relations.listPolicyAcknowledgements.useQuery({ limit: 50 });
 
@@ -61,7 +61,7 @@ export default function HRPoliciesPage() {
             <Select value={policyStatusFilter} onValueChange={setPolicyStatusFilter}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="published">Published</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>
