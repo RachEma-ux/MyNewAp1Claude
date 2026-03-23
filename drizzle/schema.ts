@@ -26,3 +26,6 @@ export * from './tables/hr-organization';
 export * from './tables/hr-staffing';
 export * from './tables/hr-recruiting';
 export * from './tables/hr-lifecycle';
+export * from './tables/hr-time';
+export * from './tables/hr-learning';
+export * from './tables/hr-performance';
