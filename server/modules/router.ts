@@ -22,6 +22,7 @@ import { knowledgeRouter } from "./knowledge/router";
 import { agentOrchRouter } from "./agents/router";
 import { collaborationRouter } from "./collaboration/router";
 import { reportingRouter } from "./reporting/router";
+import { hrModuleRouter } from "./hr/router";
 
 // Module management sub-router
 const moduleManageRouter = router({
@@ -83,4 +84,5 @@ export const modulesRouter = router({
   agentOrch: agentOrchRouter,
   collaboration: collaborationRouter,
   reporting: reportingRouter,
+  hr: hrModuleRouter,
 });

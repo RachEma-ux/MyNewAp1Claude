@@ -1,0 +1,276 @@
+/**
+ * HR Directory Router — Employee directory CRUD
+ *
+ * Provides list, search, get, create, update for the employee directory.
+ * All reads are protected, all writes are governed + audited.
+ */
+
+import { z } from "zod";
+import { eq, and, desc, or, ilike, sql } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
+import { getDb } from "../../db/connection";
+import { hrPeople, hrWorkerProfiles, hrEmploymentRecords } from "../../../drizzle/schema";
+import { logHrAudit } from "../audit";
+import { maskDirectoryFields } from "../permissions";
+
+export const hrDirectoryRouter = router({
+  list: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(200).default(50),
+      offset: z.number().min(0).default(0),
+      status: z.string().optional(),
+      workerType: z.string().optional(),
+      orgUnitId: z.number().optional(),
+    }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) return [];
+
+      const conditions = [];
+      if (input.status) conditions.push(eq(hrWorkerProfiles.status, input.status));
+      if (input.workerType) conditions.push(eq(hrWorkerProfiles.workerType, input.workerType));
+      if (input.orgUnitId) conditions.push(eq(hrWorkerProfiles.homeOrgUnitId, input.orgUnitId));
+
+      const rows = await db
+        .select({
+          workerId: hrWorkerProfiles.id,
+          personId: hrPeople.id,
+          displayName: hrPeople.displayName,
+          firstName: hrPeople.firstName,
+          lastName: hrPeople.lastName,
+          primaryEmail: hrPeople.primaryEmail,
+          employeeNumber: hrWorkerProfiles.employeeNumber,
+          workerType: hrWorkerProfiles.workerType,
+          employmentCategory: hrWorkerProfiles.employmentCategory,
+          homeOrgUnitId: hrWorkerProfiles.homeOrgUnitId,
+          primaryPositionId: hrWorkerProfiles.primaryPositionId,
+          status: hrWorkerProfiles.status,
+        })
+        .from(hrWorkerProfiles)
+        .innerJoin(hrPeople, eq(hrWorkerProfiles.personId, hrPeople.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(hrPeople.displayName))
+        .limit(input.limit)
+        .offset(input.offset);
+
+      return rows.map(maskDirectoryFields);
+    }),
+
+  search: protectedProcedure
+    .input(z.object({
+      query: z.string().min(1).max(200),
+      limit: z.number().min(1).max(100).default(20),
+    }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) return [];
+
+      const q = `%${input.query}%`;
+
+      const rows = await db
+        .select({
+          workerId: hrWorkerProfiles.id,
+          displayName: hrPeople.displayName,
+          primaryEmail: hrPeople.primaryEmail,
+          employeeNumber: hrWorkerProfiles.employeeNumber,
+          workerType: hrWorkerProfiles.workerType,
+          status: hrWorkerProfiles.status,
+        })
+        .from(hrWorkerProfiles)
+        .innerJoin(hrPeople, eq(hrWorkerProfiles.personId, hrPeople.id))
+        .where(
+          or(
+            ilike(hrPeople.displayName, q),
+            ilike(hrPeople.primaryEmail, q),
+            ilike(hrPeople.firstName, q),
+            ilike(hrPeople.lastName, q),
+            ilike(hrWorkerProfiles.employeeNumber, q),
+          )
+        )
+        .limit(input.limit);
+
+      return rows.map(maskDirectoryFields);
+    }),
+
+  getById: protectedProcedure
+    .input(z.object({ workerId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const rows = await db
+        .select({
+          workerId: hrWorkerProfiles.id,
+          personId: hrPeople.id,
+          displayName: hrPeople.displayName,
+          firstName: hrPeople.firstName,
+          lastName: hrPeople.lastName,
+          preferredName: hrPeople.preferredName,
+          primaryEmail: hrPeople.primaryEmail,
+          employeeNumber: hrWorkerProfiles.employeeNumber,
+          workerType: hrWorkerProfiles.workerType,
+          employmentCategory: hrWorkerProfiles.employmentCategory,
+          homeOrgUnitId: hrWorkerProfiles.homeOrgUnitId,
+          primaryPositionId: hrWorkerProfiles.primaryPositionId,
+          managerWorkerId: hrWorkerProfiles.managerWorkerId,
+          status: hrWorkerProfiles.status,
+          personStatus: hrPeople.status,
+        })
+        .from(hrWorkerProfiles)
+        .innerJoin(hrPeople, eq(hrWorkerProfiles.personId, hrPeople.id))
+        .where(eq(hrWorkerProfiles.id, input.workerId))
+        .limit(1);
+
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Worker not found" });
+      return rows[0];
+    }),
+
+  getSummary: protectedProcedure
+    .query(async () => {
+      const db = getDb();
+      if (!db) return { total: 0, active: 0, onLeave: 0, terminated: 0 };
+
+      const rows = await db
+        .select({
+          status: hrWorkerProfiles.status,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(hrWorkerProfiles)
+        .groupBy(hrWorkerProfiles.status);
+
+      const counts: Record<string, number> = {};
+      for (const r of rows) counts[r.status] = r.count;
+
+      return {
+        total: Object.values(counts).reduce((a, b) => a + b, 0),
+        active: counts["active"] ?? 0,
+        onLeave: counts["on_leave"] ?? 0,
+        terminated: counts["terminated"] ?? 0,
+      };
+    }),
+
+  create: governedProcedure
+    .input(z.object({
+      firstName: z.string().min(1).max(100),
+      lastName: z.string().min(1).max(100),
+      displayName: z.string().min(1).max(200),
+      primaryEmail: z.string().email().max(255),
+      preferredName: z.string().max(100).optional(),
+      primaryPhone: z.string().max(50).optional(),
+      workerType: z.enum(["employee", "contractor", "intern", "consultant"]).default("employee"),
+      employeeNumber: z.string().max(50).optional(),
+      employmentCategory: z.string().max(50).default("full_time"),
+      homeOrgUnitId: z.number().optional(),
+      primaryPositionId: z.number().optional(),
+      managerWorkerId: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Create person
+      const [person] = await db.insert(hrPeople).values({
+        firstName: input.firstName,
+        lastName: input.lastName,
+        displayName: input.displayName,
+        primaryEmail: input.primaryEmail,
+        preferredName: input.preferredName,
+        primaryPhone: input.primaryPhone,
+      }).returning();
+
+      // Create worker profile
+      const [worker] = await db.insert(hrWorkerProfiles).values({
+        personId: person.id,
+        workerType: input.workerType,
+        employeeNumber: input.employeeNumber,
+        employmentCategory: input.employmentCategory,
+        homeOrgUnitId: input.homeOrgUnitId,
+        primaryPositionId: input.primaryPositionId,
+        managerWorkerId: input.managerWorkerId,
+      }).returning();
+
+      // Create initial employment record
+      await db.insert(hrEmploymentRecords).values({
+        workerId: worker.id,
+        employmentStatus: "active",
+        contractType: "permanent",
+        startDate: new Date().toISOString().split("T")[0],
+        effectiveFrom: new Date().toISOString().split("T")[0],
+      });
+
+      await logHrAudit({
+        actorId: ctx.user.id,
+        targetWorkerId: worker.id,
+        action: "hr.worker.create",
+        metadata: { displayName: input.displayName, email: input.primaryEmail },
+      });
+
+      return { personId: person.id, workerId: worker.id };
+    }),
+
+  update: governedProcedure
+    .input(z.object({
+      workerId: z.number(),
+      displayName: z.string().max(200).optional(),
+      preferredName: z.string().max(100).optional(),
+      primaryEmail: z.string().email().max(255).optional(),
+      workerType: z.enum(["employee", "contractor", "intern", "consultant"]).optional(),
+      employmentCategory: z.string().max(50).optional(),
+      status: z.string().max(30).optional(),
+      homeOrgUnitId: z.number().nullable().optional(),
+      primaryPositionId: z.number().nullable().optional(),
+      managerWorkerId: z.number().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Get current worker to find personId
+      const [worker] = await db.select().from(hrWorkerProfiles)
+        .where(eq(hrWorkerProfiles.id, input.workerId)).limit(1);
+      if (!worker) throw new TRPCError({ code: "NOT_FOUND", message: "Worker not found" });
+
+      // Update person fields
+      const personUpdates: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.displayName) personUpdates.displayName = input.displayName;
+      if (input.preferredName !== undefined) personUpdates.preferredName = input.preferredName;
+      if (input.primaryEmail) personUpdates.primaryEmail = input.primaryEmail;
+      if (Object.keys(personUpdates).length > 1) {
+        await db.update(hrPeople).set(personUpdates).where(eq(hrPeople.id, worker.personId));
+      }
+
+      // Update worker profile fields
+      const workerUpdates: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.workerType) workerUpdates.workerType = input.workerType;
+      if (input.employmentCategory) workerUpdates.employmentCategory = input.employmentCategory;
+      if (input.status) workerUpdates.status = input.status;
+      if (input.homeOrgUnitId !== undefined) workerUpdates.homeOrgUnitId = input.homeOrgUnitId;
+      if (input.primaryPositionId !== undefined) workerUpdates.primaryPositionId = input.primaryPositionId;
+      if (input.managerWorkerId !== undefined) workerUpdates.managerWorkerId = input.managerWorkerId;
+      if (Object.keys(workerUpdates).length > 1) {
+        await db.update(hrWorkerProfiles).set(workerUpdates).where(eq(hrWorkerProfiles.id, input.workerId));
+      }
+
+      await logHrAudit({
+        actorId: ctx.user.id,
+        targetWorkerId: input.workerId,
+        action: "hr.worker.update",
+        metadata: { changes: Object.keys(input).filter(k => k !== "workerId") },
+      });
+
+      return { success: true };
+    }),
+
+  getAssignments: protectedProcedure
+    .input(z.object({ workerId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) return [];
+
+      const { hrWorkspaceAssignments } = await import("../../../drizzle/schema");
+      return db.select().from(hrWorkspaceAssignments)
+        .where(eq(hrWorkspaceAssignments.workerId, input.workerId))
+        .orderBy(desc(hrWorkspaceAssignments.createdAt));
+    }),
+});

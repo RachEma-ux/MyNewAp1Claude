@@ -21,3 +21,8 @@ export * from './tables/workspace-modules';
 export * from './tables/platform-audit';
 export * from './tables/operator-runtime';
 export * from './tables/bots';
+export * from './tables/hr-core';
+export * from './tables/hr-organization';
+export * from './tables/hr-staffing';
+export * from './tables/hr-recruiting';
+export * from './tables/hr-lifecycle';

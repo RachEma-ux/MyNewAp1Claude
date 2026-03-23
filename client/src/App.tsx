@@ -89,6 +89,19 @@ const LLMCreationWizard = lazy(() => import("@/pages/LLMCreationWizard"));
 const LLMProviderConfigWizard = lazy(() => import("@/pages/LLMProviderConfigWizard"));
 const NewProviderPage = lazy(() => import("@/pages/NewProviderPage"));
 const LLMCataloguePage = lazy(() => import("@/pages/LLMCataloguePage"));
+// HR Module — Phase 1 pages
+const HRHomePage = lazy(() => import("@/pages/hr/HRHomePage"));
+const HRDirectoryPage = lazy(() => import("@/pages/hr/HRDirectoryPage"));
+const HROrganizationPage = lazy(() => import("@/pages/hr/HROrganizationPage"));
+const HRPositionsPage = lazy(() => import("@/pages/hr/HRPositionsPage"));
+const HRStaffingPage = lazy(() => import("@/pages/hr/HRStaffingPage"));
+const HRSkillsPage = lazy(() => import("@/pages/hr/HRSkillsPage"));
+const HRReportsPage = lazy(() => import("@/pages/hr/HRReportsPage"));
+const HRSettingsPage = lazy(() => import("@/pages/hr/HRSettingsPage"));
+// HR Module — Phase 2 pages (Lifecycle Workflows)
+const HRRecruitmentPage = lazy(() => import("@/pages/hr/HRRecruitmentPage"));
+const HROnboardingPage = lazy(() => import("@/pages/hr/HROnboardingPage"));
+const HROffboardingPage = lazy(() => import("@/pages/hr/HROffboardingPage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
@@ -188,6 +201,19 @@ function Router() {
       <Route path="/ws/wizard" component={() => <ProtectedRoute component={WSWizardPage} />} />
       <Route path="/ws/list" component={() => <ProtectedRoute component={WSListPage} />} />
       <Route path="/ws/catalog" component={() => <ProtectedRoute component={WSCatalogPage} />} />
+      {/* HR Module — Phase 1 routes */}
+      <Route path="/hr/directory" component={() => <ProtectedRoute component={HRDirectoryPage} />} />
+      <Route path="/hr/organization" component={() => <ProtectedRoute component={HROrganizationPage} />} />
+      <Route path="/hr/positions" component={() => <ProtectedRoute component={HRPositionsPage} />} />
+      <Route path="/hr/staffing" component={() => <ProtectedRoute component={HRStaffingPage} />} />
+      <Route path="/hr/skills" component={() => <ProtectedRoute component={HRSkillsPage} />} />
+      <Route path="/hr/reports" component={() => <ProtectedRoute component={HRReportsPage} />} />
+      <Route path="/hr/settings" component={() => <ProtectedRoute component={HRSettingsPage} />} />
+      {/* HR Module — Phase 2 routes (Lifecycle Workflows) */}
+      <Route path="/hr/recruitment" component={() => <ProtectedRoute component={HRRecruitmentPage} />} />
+      <Route path="/hr/onboarding" component={() => <ProtectedRoute component={HROnboardingPage} />} />
+      <Route path="/hr/offboarding" component={() => <ProtectedRoute component={HROffboardingPage} />} />
+      <Route path="/hr" component={() => <ProtectedRoute component={HRHomePage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
       <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />

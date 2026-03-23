@@ -66,6 +66,11 @@ import {
   Inbox,
   Radio,
   Video,
+  Briefcase,
+  UserPlus,
+  UserMinus,
+  Award,
+  ClipboardList,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -95,6 +100,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [pmCentralMenuOpen, setPmCentralMenuOpen] = useState(false);
   const [wsSandboxMenuOpen, setWsSandboxMenuOpen] = useState(false);
   const [communicationMenuOpen, setCommunicationMenuOpen] = useState(false);
+  const [hrMenuOpen, setHrMenuOpen] = useState(false);
   const [aiTypesSubMenus, setAiTypesSubMenus] = useState<Record<string, boolean>>({});
   const logoutMutation = trpc.auth.logout.useMutation();
 
@@ -243,7 +249,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
       ]
     },
     {
-      label: "Automation", 
+      label: "Human Resources",
+      icon: <Users className="w-5 h-5" />,
+      children: [
+        { label: "Directory", icon: <Users className="w-4 h-4" />, href: "/hr/directory" },
+        { label: "Organization", icon: <Building2 className="w-4 h-4" />, href: "/hr/organization" },
+        { label: "Positions", icon: <Briefcase className="w-4 h-4" />, href: "/hr/positions" },
+        { label: "Staffing", icon: <UserPlus className="w-4 h-4" />, href: "/hr/staffing" },
+        { label: "Recruitment", icon: <ClipboardList className="w-4 h-4" />, href: "/hr/recruitment" },
+        { label: "Onboarding", icon: <UserPlus className="w-4 h-4" />, href: "/hr/onboarding" },
+        { label: "Offboarding", icon: <UserMinus className="w-4 h-4" />, href: "/hr/offboarding" },
+        { label: "Skills", icon: <Award className="w-4 h-4" />, href: "/hr/skills" },
+        { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, href: "/hr/reports" },
+        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/hr/settings" },
+      ]
+    },
+    {
+      label: "Automation",
       icon: <Zap className="w-5 h-5" />,
       children: [
         { label: "Workflows", icon: <Zap className="w-4 h-4" />, href: "/automation" },

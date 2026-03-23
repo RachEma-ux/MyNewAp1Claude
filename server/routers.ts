@@ -43,6 +43,7 @@ import { modulesRouter } from "./modules/router";
 import { orchestratorRouter } from "./orchestrator/router";
 import { botsRouter } from "./routers/bots";
 import { workspaceRouter, wsCatalogRouter } from "./workspace/workspace-router";
+import { hrRouter } from "./hr/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -81,7 +82,8 @@ export const appRouter = router({
   discoveryOps: discoveryOpsRouter, // Discovery Ops: monitoring, promotion, audit
   governance: governanceRouter, // Governance Engine (CGT v2)
   hq: hqRouter, // Digital HQ aggregation
-  modules: modulesRouter, // Platform Engines (PMT, Knowledge, Agents, Collaboration, Reporting)
+  hr: hrRouter, // Human Resources — global workforce backbone
+  modules: modulesRouter, // Platform Engines (PMT, Knowledge, Agents, Collaboration, Reporting, HR)
   orchestrator: orchestratorRouter, // Multi-Operator Autonomous Runtime
   models: modelsRouter, // Model Registry (governed)
   bots: botsRouter, // Bot Domain (governed lifecycle)
