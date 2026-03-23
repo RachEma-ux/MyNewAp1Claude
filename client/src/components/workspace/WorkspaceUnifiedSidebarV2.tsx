@@ -198,52 +198,98 @@ export function WorkspaceUnifiedSidebarV2({
           </Button>
         </div>
 
-        {/* Tools section — icon column */}
-        <div className="flex-1 flex flex-col items-center gap-1 py-2 border-b">
-          <Tooltip><TooltipTrigger asChild>
-            <div className="p-1"><Wrench className="h-3.5 w-3.5 text-blue-400" /></div>
-          </TooltipTrigger><TooltipContent side="right">Tools</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
-            <Link href={`${base}/settings`}><Button variant={isActive(`${base}/settings`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><LayoutDashboard className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="right">Dashboard</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
-            <Link href={`${base}/team`}><Button variant={isActive(`${base}/team`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Users className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="right">Team</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
-            <Link href={`${base}/crew`}><Button variant={isActive(`${base}/crew`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Cpu className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="right">Crew</TooltipContent></Tooltip>
+        {/* Tools section — clickable dropdown */}
+        <div className="flex-1 flex flex-col items-center justify-center border-b">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-2 rounded-md hover:bg-blue-500/10 transition-colors cursor-pointer">
+                <Wrench className="h-4 w-4 text-blue-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="start" className="w-56 max-h-80 overflow-y-auto">
+              <DropdownMenuLabel>Tools — Full List</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {[
+                { icon: <LayoutDashboard className="h-4 w-4" />, label: "Dashboard", path: `${base}/settings` },
+                { icon: <LayoutDashboard className="h-4 w-4" />, label: "Overview", path: base },
+                { icon: <FolderKanban className="h-4 w-4" />, label: "Projects", path: `${base}/projects` },
+                { icon: <BookOpen className="h-4 w-4" />, label: "Knowledge", path: `${base}/knowledge` },
+                { icon: <Bot className="h-4 w-4" />, label: "Agents", path: `${base}/agents` },
+                { icon: <MessageSquare className="h-4 w-4" />, label: "Collaboration", path: `${base}/collaboration` },
+                { icon: <BarChart3 className="h-4 w-4" />, label: "Reports", path: `${base}/reports` },
+                { icon: <Users className="h-4 w-4" />, label: "Team", path: `${base}/team` },
+                { icon: <Cpu className="h-4 w-4" />, label: "Crew", path: `${base}/crew` },
+                { icon: <CheckCircle2 className="h-4 w-4" />, label: "Modules", path: `${base}/projects/settings` },
+                { icon: <Scale className="h-4 w-4" />, label: "Rules", path: `${base}/rules` },
+                { icon: <ShieldCheck className="h-4 w-4" />, label: "Governance", path: `${base}/governance` },
+                { icon: <Package className="h-4 w-4" />, label: "Resources", path: `${base}/resources` },
+                { icon: <GitBranch className="h-4 w-4" />, label: "Workflows", path: `${base}/workflows` },
+              ].map((item, i) => (
+                <DropdownMenuItem key={i} className={cn("gap-2 cursor-pointer", item.path && isActive(item.path) && "bg-accent")} onClick={() => item.path ? navigate(item.path) : undefined}>
+                  {item.icon}{item.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        {/* Context section — icon column */}
-        <div className="flex-1 flex flex-col items-center gap-1 py-2 border-b">
-          <Tooltip><TooltipTrigger asChild>
-            <div className="p-1"><Info className="h-3.5 w-3.5 text-emerald-400" /></div>
-          </TooltipTrigger><TooltipContent side="right">Context</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
-            <div className="h-8 w-8 flex items-center justify-center"><Target className="h-4 w-4 text-muted-foreground" /></div>
-          </TooltipTrigger><TooltipContent side="right">{shell.workspaceName}</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
-            <div className="h-8 w-8 flex items-center justify-center"><Activity className="h-4 w-4 text-muted-foreground" /></div>
-          </TooltipTrigger><TooltipContent side="right">{shell.status.replace(/_/g, " ")}</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
-            <div className="h-8 w-8 flex items-center justify-center"><Compass className="h-4 w-4 text-muted-foreground" /></div>
-          </TooltipTrigger><TooltipContent side="right">{shell.purposeType || "Purpose"}</TooltipContent></Tooltip>
+        {/* Context section — clickable dropdown */}
+        <div className="flex-1 flex flex-col items-center justify-center border-b">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-2 rounded-md hover:bg-emerald-500/10 transition-colors cursor-pointer">
+                <Info className="h-4 w-4 text-emerald-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="start" className="w-56 max-h-80 overflow-y-auto">
+              <DropdownMenuLabel>Context — Full List</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {[
+                { icon: <Target className="h-4 w-4" />, label: `Identity: ${shell.workspaceName}`, path: "" },
+                { icon: <Compass className="h-4 w-4" />, label: `Purpose: ${shell.purposeType || "not set"}`, path: "" },
+                { icon: <Activity className="h-4 w-4" />, label: `Status: ${shell.status.replace(/_/g, " ")}`, path: "" },
+                ...(shell.missionEmphasis ? [{ icon: <Zap className="h-4 w-4" />, label: `Mission: ${shell.missionEmphasis}`, path: "" }] : []),
+                { icon: <HeartPulse className="h-4 w-4" />, label: "Health: Healthy", path: "" },
+                { icon: <Bell className="h-4 w-4" />, label: "Alerts: None", path: "" },
+                { icon: <BookOpen className="h-4 w-4" />, label: "Workspace Guide", path: `${base}/rules` },
+                ...((activity as any[]) || []).slice(0, 3).map((act: any) => ({
+                  icon: <Clock className="h-4 w-4" />,
+                  label: act.action,
+                  path: "",
+                })),
+              ].map((item, i) => (
+                <DropdownMenuItem key={i} className={cn("gap-2 cursor-pointer", item.path && isActive(item.path) && "bg-accent")} onClick={() => item.path ? navigate(item.path) : undefined}>
+                  {item.icon}{item.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        {/* Settings section — icon column */}
-        <div className="flex-1 flex flex-col items-center gap-1 py-2">
-          <Tooltip><TooltipTrigger asChild>
-            <div className="p-1"><Settings className="h-3.5 w-3.5 text-orange-400" /></div>
-          </TooltipTrigger><TooltipContent side="right">Settings</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
-            <Link href={`${base}/oversight`}><Button variant={isActive(`${base}/oversight`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Shield className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="right">Oversight</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
-            <Link href={`${base}/rules`}><Button variant={isActive(`${base}/rules`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Scale className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="right">Rules</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
-            <Link href={`${base}/governance`}><Button variant={isActive(`${base}/governance`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><ShieldCheck className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="right">Governance</TooltipContent></Tooltip>
+        {/* Settings section — clickable dropdown */}
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-2 rounded-md hover:bg-orange-500/10 transition-colors cursor-pointer">
+                <Settings className="h-4 w-4 text-orange-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="start" className="w-56 max-h-80 overflow-y-auto">
+              <DropdownMenuLabel>Settings — Full List</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {[
+                { icon: <Shield className="h-4 w-4" />, label: "Oversight", path: `${base}/oversight` },
+                { icon: <Scale className="h-4 w-4" />, label: "Rules", path: `${base}/rules` },
+                { icon: <Eye className="h-4 w-4" />, label: "Visibility", path: `${base}/visibility` },
+                { icon: <BookOpen className="h-4 w-4" />, label: "Workspace Guide", path: `${base}/rules` },
+                { icon: <ShieldCheck className="h-4 w-4" />, label: "Governance", path: `${base}/governance` },
+              ].map((item, i) => (
+                <DropdownMenuItem key={i} className={cn("gap-2 cursor-pointer", item.path && isActive(item.path) && "bg-accent")} onClick={() => item.path ? navigate(item.path) : undefined}>
+                  {item.icon}{item.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </aside>
     );
