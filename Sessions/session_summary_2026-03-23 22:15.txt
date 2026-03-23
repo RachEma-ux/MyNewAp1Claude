@@ -1,0 +1,44 @@
+Session Summary — 2026-03-23 22:15
+====================================
+
+## Task: HR Phase 7.3 — Read Governance Completion (3 Blockers)
+
+Closed the 3 top remaining blockers from the HR re-audit (v7.2.0):
+
+### Blocker 1: Talent Masking on Reads (FIXED)
+- File: server/hr/talent/router.ts
+- Applied maskTalentFields() in listTalentReviews and getTalentReview
+- Used TALENT_WRITE as sensitive gate: manager→masked, hrbp/admin→unmasked
+- Fixed logSensitiveRead params (was using invalid entityId/fields, now uses targetWorkerId/recordCount)
+
+### Blocker 2: Employee Self-Service Scope (FIXED)
+- Files: server/hr/time/router.ts, server/hr/performance/router.ts
+- Replaced checkHrAccess with resolveDataScope on 10 read endpoints
+- Time: listTimeEntries, getTimeEntry, listLeaveRequests, getLeaveRequest, getLeaveBalances, listLeaveTypes
+- Performance: listGoals, getGoal, listReviews, getReview
+- Employees with *_SELF actions get scope-narrowed to own records
+- Managers with TIME_READ_TEAM get team-scoped queries
+- Record-level verification on get-by-id endpoints prevents scope bypass
+
+### Blocker 3: Frontend HR Role Gating (FIXED)
+- Files: client/src/App.tsx, client/src/components/MainLayout.tsx
+- App.tsx: HrGate component + hrGated() HOC — 16 sensitive routes gated, 12 self-service open
+- MainLayout.tsx: HR nav expanded from 10 to 28 items, requiredAction-based filtering via useHrRole
+- Fixed HR menu toggle handler (was missing "Human Resources" case)
+
+### Additional
+- Version bumped to 7.3.0 in server/hr/router.ts
+- Tests: Added sections K-N to hr-phase6.test.ts (talent masking, scope enforcement, frontend gating, version)
+- All hardening controls preserved (governedProcedure, requireHrPermission, preventSelfApproval, audit)
+
+### Commit
+4522957 HR Phase 7.3: Read governance — talent masking, self-service scope, frontend role gating
+
+### Files Modified (7 files, +496 -48)
+- client/src/App.tsx — HrGate component, 16 gated wrappers, route updates
+- client/src/components/MainLayout.tsx — HR nav expansion + role filtering
+- server/hr/__tests__/hr-phase6.test.ts — 234 lines of new tests
+- server/hr/performance/router.ts — resolveDataScope on 4 endpoints
+- server/hr/router.ts — version 7.3.0 + phase comment
+- server/hr/talent/router.ts — maskTalentFields + logSensitiveRead fix
+- server/hr/time/router.ts — resolveDataScope on 6 endpoints
