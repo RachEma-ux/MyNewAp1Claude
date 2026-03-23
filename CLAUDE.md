@@ -9,6 +9,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Never modify files on device outside of git workflow** — edit, commit, push.
 - Once built on GitHub (CI), pull to device.
 
+## MANDATORY: Local App Launch Procedure
+
+When asked to open/start/run the app on localhost:3000, ALWAYS follow these steps in order:
+1. Create `/tmp` dirs: `mkdir -p /tmp/claude-$(id -u) 2>/dev/null`
+2. Kill all running instances: `pkill -f "tsx.*server/_core/index.ts"; pkill -f "npm run dev"; pkill -f "npm exec tsx"; pkill -f "esbuild.*service"; kill $(lsof -ti :3000) 2>/dev/null`
+3. Ensure PostgreSQL is running: `pg_ctl -D /data/data/com.termux/files/usr/var/lib/postgresql status || pg_ctl -D /data/data/com.termux/files/usr/var/lib/postgresql start`
+4. Ensure DB exists: `psql -d mynewap1claude -c "SELECT 1;" || createdb mynewap1claude`
+5. Start dev server: `TMPDIR=/data/data/com.termux/files/usr/tmp nohup npm run dev > /data/data/com.termux/files/usr/tmp/dev-server.log 2>&1 &`
+6. Wait and verify: `/data/data/com.termux/files/usr/bin/sleep 5 && tail -3 /data/data/com.termux/files/usr/tmp/dev-server.log` — confirm `Server running on http://localhost:3000/`
+7. Open: `xdg-open "http://localhost:3000/"`
+
 ## Project Overview
 
 MyNewAppV1 is a local-first AI development platform (LLM Control Plane) built as a full-stack TypeScript monorepo. It provides workspace-based management for LLM providers, document ingestion/RAG, agent orchestration, automation workflows, and governance features.
