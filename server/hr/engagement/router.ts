@@ -20,6 +20,11 @@ import {
   hrRecognitionEvents,
 } from "../../../drizzle/schema";
 import { logHrAudit } from "../audit";
+import {
+  checkHrAccess,
+  requireHrPermission,
+  HR_ACTIONS,
+} from "../permissions";
 
 // ============================================================================
 // State machines

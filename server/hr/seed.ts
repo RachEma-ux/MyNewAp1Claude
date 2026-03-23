@@ -41,6 +41,7 @@ import {
   hrEngagementPrograms,
   hrSurveyCampaigns,
   hrRiskItems,
+  hrRoleAssignments,
 } from "../../drizzle/schema";
 
 export async function seedHrDemoData(): Promise<{ seeded: boolean; message: string }> {
@@ -298,6 +299,63 @@ export async function seedHrDemoData(): Promise<{ seeded: boolean; message: stri
   for (const wId of [workers[25].id, workers[26].id, workers[27].id]) {
     await db.update(hrWorkerProfiles).set({ managerWorkerId: workers[23].id }).where(eq(hrWorkerProfiles.id, wId));
   }
+
+  // =========================================================================
+  // HR Role Assignments — Persistent HR role mapping for governance
+  // Maps platform userId (1-based) to HR roles + worker profiles.
+  // In production, userId comes from the users table. Here we assume
+  // demo users 1..28 correspond to people/workers 0..27.
+  // =========================================================================
+  await db.insert(hrRoleAssignments).values([
+    // Alice (CEO) — HR admin
+    { userId: 1, workerId: workers[0].id, hrRole: "admin", scope: "global" },
+    // Bob (Eng Director) — manager
+    { userId: 2, workerId: workers[1].id, hrRole: "manager", scope: "global" },
+    // Carol (HR Director) — hrbp (head of HR)
+    { userId: 3, workerId: workers[2].id, hrRole: "hrbp", scope: "global" },
+    // David (Product Director) — manager
+    { userId: 4, workerId: workers[3].id, hrRole: "manager", scope: "global" },
+    // Eve (Eng Manager FE) — manager
+    { userId: 5, workerId: workers[4].id, hrRole: "manager", scope: "global" },
+    // Frank (Eng Manager BE) — manager
+    { userId: 6, workerId: workers[5].id, hrRole: "manager", scope: "global" },
+    // Grace–Karen (engineers) — employee
+    { userId: 7, workerId: workers[6].id, hrRole: "employee", scope: "global" },
+    { userId: 8, workerId: workers[7].id, hrRole: "employee", scope: "global" },
+    { userId: 9, workerId: workers[8].id, hrRole: "employee", scope: "global" },
+    { userId: 10, workerId: workers[9].id, hrRole: "employee", scope: "global" },
+    { userId: 11, workerId: workers[10].id, hrRole: "employee", scope: "global" },
+    { userId: 12, workerId: workers[11].id, hrRole: "employee", scope: "global" },
+    // Mia, Nathan (PMs) — employee
+    { userId: 13, workerId: workers[12].id, hrRole: "employee", scope: "global" },
+    { userId: 14, workerId: workers[13].id, hrRole: "employee", scope: "global" },
+    // Olivia, Paul (designers) — employee
+    { userId: 15, workerId: workers[14].id, hrRole: "employee", scope: "global" },
+    { userId: 16, workerId: workers[15].id, hrRole: "employee", scope: "global" },
+    // Quinn (QA Lead) — manager
+    { userId: 17, workerId: workers[16].id, hrRole: "manager", scope: "global" },
+    // Rachel, Sam (QA) — employee
+    { userId: 18, workerId: workers[17].id, hrRole: "employee", scope: "global" },
+    { userId: 19, workerId: workers[18].id, hrRole: "employee", scope: "global" },
+    // Tina (HRBP) — hrbp
+    { userId: 20, workerId: workers[19].id, hrRole: "hrbp", scope: "global" },
+    // Uma (People Ops) — hrbp
+    { userId: 21, workerId: workers[20].id, hrRole: "hrbp", scope: "global" },
+    // Victor (Recruiter) — employee
+    { userId: 22, workerId: workers[21].id, hrRole: "employee", scope: "global" },
+    // Wendy (Finance Lead) — manager
+    { userId: 23, workerId: workers[22].id, hrRole: "manager", scope: "global" },
+    // Xavier (Ops Lead) — manager
+    { userId: 24, workerId: workers[23].id, hrRole: "manager", scope: "global" },
+    // Yara (Compliance Lead) — manager
+    { userId: 25, workerId: workers[24].id, hrRole: "manager", scope: "global" },
+    // Zach (Support Lead) — employee
+    { userId: 26, workerId: workers[25].id, hrRole: "employee", scope: "global" },
+    // Amy (Biz Ops) — employee
+    { userId: 27, workerId: workers[26].id, hrRole: "employee", scope: "global" },
+    // Brian (terminated) — employee (inactive)
+    { userId: 28, workerId: workers[27].id, hrRole: "employee", scope: "global", isActive: false },
+  ]);
 
   // Set org unit managers
   await db.update(hrOrgUnits).set({ managerWorkerId: workers[0].id }).where(eq(hrOrgUnits.id, orgUnits[0].id));

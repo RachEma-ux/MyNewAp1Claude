@@ -15,7 +15,13 @@ import {
   hrSuccessionPlans,
   hrSuccessionCandidates,
 } from "../../../drizzle/schema";
-import { logHrAudit } from "../audit";
+import { logHrAudit, logSensitiveRead } from "../audit";
+import {
+  checkHrAccess,
+  requireHrPermission,
+  maskTalentFields,
+  HR_ACTIONS,
+} from "../permissions";
 
 // ============================================================================
 // State machines
@@ -66,7 +72,8 @@ export const hrTalentRouter = router({
       status: z.string().optional(),
       nineBoxPosition: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.TALENT_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -81,11 +88,13 @@ export const hrTalentRouter = router({
 
   getTalentReview: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.TALENT_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrTalentReviews).where(eq(hrTalentReviews.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Talent review not found" });
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "talent", entityId: input.id, fields: ["performanceRating", "potentialRating", "nineBoxPosition", "retentionRisk"] });
       return row;
     }),
 
@@ -104,6 +113,7 @@ export const hrTalentRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.TALENT_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrTalentReviews).values({
@@ -129,6 +139,7 @@ export const hrTalentRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.TALENT_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...data } = input;
@@ -145,6 +156,7 @@ export const hrTalentRouter = router({
   transitionTalentReview: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.TALENT_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrTalentReviews).where(eq(hrTalentReviews.id, input.id)).limit(1);
@@ -172,7 +184,8 @@ export const hrTalentRouter = router({
       status: z.string().optional(),
       criticality: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.SUCCESSION_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -186,7 +199,8 @@ export const hrTalentRouter = router({
 
   getSuccessionPlan: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.SUCCESSION_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrSuccessionPlans).where(eq(hrSuccessionPlans.id, input.id)).limit(1);
@@ -204,6 +218,7 @@ export const hrTalentRouter = router({
       nextReviewDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SUCCESSION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrSuccessionPlans).values({
@@ -216,6 +231,7 @@ export const hrTalentRouter = router({
   transitionSuccessionPlan: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SUCCESSION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrSuccessionPlans).where(eq(hrSuccessionPlans.id, input.id)).limit(1);
@@ -243,7 +259,8 @@ export const hrTalentRouter = router({
       candidateWorkerId: z.number().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.SUCCESSION_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -266,6 +283,7 @@ export const hrTalentRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SUCCESSION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrSuccessionCandidates).values({
@@ -282,6 +300,7 @@ export const hrTalentRouter = router({
   transitionSuccessionCandidate: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SUCCESSION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrSuccessionCandidates).where(eq(hrSuccessionCandidates.id, input.id)).limit(1);

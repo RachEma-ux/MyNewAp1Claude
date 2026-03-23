@@ -1,8 +1,18 @@
 /**
- * HR Permissions — Role and capability constants for HR module
+ * HR Permissions — Role/capability constants, persistent role resolution,
+ * self/team scope enforcement, field masking, and runtime permission checks.
+ *
+ * Phase 7 Governance Hardening:
+ * - Persistent HR role resolution via hr_role_assignments table
+ * - Self-scope enforcement helpers (employee sees own data only)
+ * - Team-scope enforcement helpers (manager sees direct reports only)
+ * - Improved masking (null instead of undefined)
+ * - Self-approval prevention for sensitive actions
  */
 
+import { eq, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { getDb } from "../db/connection";
 
 export const HR_ROLES = ["employee", "manager", "hrbp", "admin", "workspace_admin"] as const;
 export type HrRole = typeof HR_ROLES[number];
@@ -129,6 +139,15 @@ export const MASKED_RELATIONS_FIELDS = [
   "appealNotes",
 ] as const;
 
+/** Fields that should be masked in talent/performance responses for non-privileged users */
+export const MASKED_TALENT_FIELDS = [
+  "retentionRisk",
+  "developmentAreas",
+  "developmentNeeds",
+  "nineBoxPosition",
+  "readinessForPromotion",
+] as const;
+
 // ============================================================================
 // Phase 5 — Role → Permission Matrix
 // ============================================================================
@@ -238,11 +257,11 @@ export function hasPermission(role: HrRole, action: string): boolean {
 }
 
 // ============================================================================
-// Field Masking Utilities
+// Field Masking Utilities (Phase 7 — uses null instead of undefined)
 // ============================================================================
 
 /**
- * Generic field masker — strips specified fields from a record.
+ * Generic field masker — sets specified fields to null.
  */
 function maskFields<T extends Record<string, unknown>>(
   record: T,
@@ -251,7 +270,7 @@ function maskFields<T extends Record<string, unknown>>(
   const masked = { ...record };
   for (const field of fields) {
     if (field in masked) {
-      (masked as Record<string, unknown>)[field] = undefined;
+      (masked as Record<string, unknown>)[field] = null;
     }
   }
   return masked;
@@ -272,56 +291,126 @@ export function maskRelationsFields<T extends Record<string, unknown>>(record: T
   return maskFields(record, MASKED_RELATIONS_FIELDS);
 }
 
+/** Strip sensitive talent fields for non-privileged users. */
+export function maskTalentFields<T extends Record<string, unknown>>(record: T): T {
+  return maskFields(record, MASKED_TALENT_FIELDS);
+}
+
 // ============================================================================
-// Runtime Permission Enforcement
+// Persistent HR Role Resolution (Phase 7)
 // ============================================================================
 
+/** Cache for HR role lookups — cleared every 60s */
+const roleCache = new Map<number, { role: HrRole; ts: number }>();
+const ROLE_CACHE_TTL = 60_000;
+
 /**
- * Resolve the HR role for a user. Maps platform role to HR role.
- * Wire to a dedicated user→HR-role mapping table in a future phase.
+ * Resolve the HR role for a user. Checks:
+ * 1. Platform admin → HR admin
+ * 2. hr_role_assignments table (persistent mapping)
+ * 3. Fallback: employee
  */
-export function getHrRoleForUser(user: { id: number; role?: string }): HrRole {
+export async function getHrRoleForUser(user: { id: number; role?: string }): Promise<HrRole> {
+  // Platform admin always maps to HR admin
   if (user.role === "admin") return "admin";
+
+  // Check cache
+  const cached = roleCache.get(user.id);
+  if (cached && Date.now() - cached.ts < ROLE_CACHE_TTL) {
+    return cached.role;
+  }
+
+  // Query persistent role assignments
+  const db = getDb();
+  if (db) {
+    try {
+      const { hrRoleAssignments } = await import("../../drizzle/schema");
+      const rows = await db
+        .select({ hrRole: hrRoleAssignments.hrRole })
+        .from(hrRoleAssignments)
+        .where(
+          and(
+            eq(hrRoleAssignments.userId, user.id),
+            eq(hrRoleAssignments.isActive, true),
+          ),
+        )
+        .limit(5);
+
+      if (rows.length > 0) {
+        // Pick highest-privilege role: admin > workspace_admin > hrbp > manager > employee
+        const priority: Record<string, number> = { admin: 5, workspace_admin: 4, hrbp: 3, manager: 2, employee: 1 };
+        let bestRole: HrRole = "employee";
+        let bestPriority = 0;
+        for (const row of rows) {
+          const p = priority[row.hrRole] ?? 0;
+          if (p > bestPriority) {
+            bestPriority = p;
+            bestRole = row.hrRole as HrRole;
+          }
+        }
+        roleCache.set(user.id, { role: bestRole, ts: Date.now() });
+        return bestRole;
+      }
+    } catch {
+      // Table may not exist yet — fall through to string matching
+    }
+  }
+
+  // Fallback: map from platform role string (backwards compatibility)
+  if (user.role === "workspace_admin") return "workspace_admin";
+  if (user.role === "hrbp") return "hrbp";
+  if (user.role === "manager") return "manager";
+
+  const result: HrRole = "employee";
+  roleCache.set(user.id, { role: result, ts: Date.now() });
+  return result;
+}
+
+/**
+ * Synchronous fallback for getHrRoleForUser when async is not possible.
+ * Uses cache or falls back to platform role string.
+ */
+export function getHrRoleForUserSync(user: { id: number; role?: string }): HrRole {
+  if (user.role === "admin") return "admin";
+  const cached = roleCache.get(user.id);
+  if (cached && Date.now() - cached.ts < ROLE_CACHE_TTL) return cached.role;
   if (user.role === "workspace_admin") return "workspace_admin";
   if (user.role === "hrbp") return "hrbp";
   if (user.role === "manager") return "manager";
   return "employee";
 }
 
+// ============================================================================
+// Runtime Permission Enforcement
+// ============================================================================
+
 /**
  * Enforce an HR permission check. Throws FORBIDDEN if the caller's
  * HR role does not include the requested action.
  */
-export function requireHrPermission(
+export async function requireHrPermission(
   user: { id: number; role?: string },
   action: string,
-): void {
-  const hrRole = getHrRoleForUser(user);
+): Promise<HrRole> {
+  const hrRole = await getHrRoleForUser(user);
   if (!hasPermission(hrRole, action)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: `HR permission denied: ${action}`,
     });
   }
+  return hrRole;
 }
 
 /**
  * Check HR access and determine masking requirement in one call.
- *
- * - Throws FORBIDDEN if the user lacks `readAction`
- * - Returns `{ masked: true }` if the user lacks `sensitiveAction`
- * - Returns `{ masked: false }` if the user has `sensitiveAction` (privileged)
- *
- * Use this in read endpoints that serve sensitive data:
- *   const { masked } = checkHrAccess(ctx.user, COMPENSATION_READ, COMPENSATION_READ_SENSITIVE);
- *   return masked ? results.map(maskCompensationFields) : results;
  */
-export function checkHrAccess(
+export async function checkHrAccess(
   user: { id: number; role?: string },
   readAction: string,
   sensitiveAction?: string,
-): { masked: boolean; hrRole: HrRole } {
-  const hrRole = getHrRoleForUser(user);
+): Promise<{ masked: boolean; hrRole: HrRole }> {
+  const hrRole = await getHrRoleForUser(user);
   if (!hasPermission(hrRole, readAction)) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -331,3 +420,136 @@ export function checkHrAccess(
   const masked = sensitiveAction ? !hasPermission(hrRole, sensitiveAction) : true;
   return { masked, hrRole };
 }
+
+// ============================================================================
+// Self-Scope & Team-Scope Enforcement (Phase 7)
+// ============================================================================
+
+/**
+ * Resolve the worker ID for a platform user.
+ * Used for self-scope enforcement — links auth user to HR worker profile.
+ */
+export async function getWorkerIdForUser(userId: number): Promise<number | null> {
+  const db = getDb();
+  if (!db) return null;
+
+  try {
+    const { hrRoleAssignments } = await import("../../drizzle/schema");
+    const [row] = await db
+      .select({ workerId: hrRoleAssignments.workerId })
+      .from(hrRoleAssignments)
+      .where(
+        and(
+          eq(hrRoleAssignments.userId, userId),
+          eq(hrRoleAssignments.isActive, true),
+        ),
+      )
+      .limit(1);
+    return row?.workerId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get direct report worker IDs for a manager.
+ * Used for team-scope enforcement — manager sees only their team.
+ */
+export async function getTeamWorkerIds(managerWorkerId: number): Promise<number[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  try {
+    const { hrWorkerProfiles } = await import("../../drizzle/schema");
+    const rows = await db
+      .select({ id: hrWorkerProfiles.id })
+      .from(hrWorkerProfiles)
+      .where(eq(hrWorkerProfiles.managerWorkerId, managerWorkerId));
+    return rows.map((r) => r.id);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Determine the scope of data a user should see for a given action.
+ * Returns:
+ * - { scope: "all" } — user can see all records (hrbp/admin)
+ * - { scope: "team", workerIds: [...] } — manager sees team only
+ * - { scope: "self", workerId: N } — employee sees own data only
+ * - { scope: "none" } — no access
+ */
+export async function resolveDataScope(
+  user: { id: number; role?: string },
+  globalAction: string,
+  teamAction?: string,
+  selfAction?: string,
+): Promise<
+  | { scope: "all" }
+  | { scope: "team"; workerIds: number[] }
+  | { scope: "self"; workerId: number }
+  | { scope: "none" }
+> {
+  const hrRole = await getHrRoleForUser(user);
+
+  // Global access (hrbp, admin, workspace_admin)
+  if (hasPermission(hrRole, globalAction)) {
+    return { scope: "all" };
+  }
+
+  // Team access (manager)
+  if (teamAction && hasPermission(hrRole, teamAction)) {
+    const selfWorkerId = await getWorkerIdForUser(user.id);
+    if (selfWorkerId) {
+      const teamIds = await getTeamWorkerIds(selfWorkerId);
+      // Manager sees team + self
+      return { scope: "team", workerIds: [...teamIds, selfWorkerId] };
+    }
+    return { scope: "none" };
+  }
+
+  // Self access (employee)
+  if (selfAction && hasPermission(hrRole, selfAction)) {
+    const selfWorkerId = await getWorkerIdForUser(user.id);
+    if (selfWorkerId) {
+      return { scope: "self", workerId: selfWorkerId };
+    }
+    return { scope: "none" };
+  }
+
+  return { scope: "none" };
+}
+
+// ============================================================================
+// Self-Approval Prevention (Phase 7)
+// ============================================================================
+
+/**
+ * Prevent self-approval for sensitive HR actions.
+ * Throws FORBIDDEN if the actor is approving their own record.
+ */
+export function preventSelfApproval(
+  actorUserId: number,
+  targetWorkerId: number | undefined,
+  actorWorkerId: number | null,
+  actionLabel: string,
+): void {
+  if (actorWorkerId && targetWorkerId && actorWorkerId === targetWorkerId) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Self-approval not permitted for ${actionLabel}`,
+    });
+  }
+}
+
+// ============================================================================
+// Worker Status State Machine (Phase 7)
+// ============================================================================
+
+export const WORKER_STATUS_FLOW: Record<string, string[]> = {
+  active: ["on_leave", "suspended", "terminated", "inactive"],
+  on_leave: ["active", "terminated"],
+  suspended: ["active", "terminated"],
+  inactive: ["active", "terminated"],
+  terminated: [],
+};

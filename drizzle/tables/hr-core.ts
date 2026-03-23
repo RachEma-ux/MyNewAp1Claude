@@ -121,3 +121,30 @@ export const hrAuditLog = pgTable("hr_audit_log", {
 
 export type HrAuditEntry = typeof hrAuditLog.$inferSelect;
 export type InsertHrAuditEntry = typeof hrAuditLog.$inferInsert;
+
+// ============================================================================
+// HR Role Assignments — Persistent user-to-HR-role mapping
+// ============================================================================
+
+export const hrRoleAssignments = pgTable("hr_role_assignments", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  workerId: integer("worker_id"), // link to HR worker profile if exists
+  hrRole: varchar("hr_role", { length: 30 }).notNull(), // employee | manager | hrbp | admin | workspace_admin
+  scope: varchar("scope", { length: 30 }).default("global"), // global | org_unit | workspace
+  scopeId: integer("scope_id"), // orgUnitId or workspaceId depending on scope
+  isActive: boolean("is_active").default(true).notNull(),
+  assignedBy: integer("assigned_by"),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("hr_role_user_idx").on(table.userId),
+  workerIdx: index("hr_role_worker_idx").on(table.workerId),
+  roleIdx: index("hr_role_role_idx").on(table.hrRole),
+  activeUserUniq: unique("hr_role_active_user_uniq").on(table.userId, table.hrRole, table.scope, table.scopeId),
+}));
+
+export type HrRoleAssignment = typeof hrRoleAssignments.$inferSelect;
+export type InsertHrRoleAssignment = typeof hrRoleAssignments.$inferInsert;

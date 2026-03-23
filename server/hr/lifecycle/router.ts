@@ -20,6 +20,11 @@ import {
   hrExitInterviews,
 } from "../../../drizzle/schema";
 import { logHrAudit, logStatusChange } from "../audit";
+import {
+  checkHrAccess,
+  requireHrPermission,
+  HR_ACTIONS,
+} from "../permissions";
 import { logLifecycleEvent } from "./event-logger";
 import { generateOnboardingTasks, generateOffboardingTasks } from "./task-generator";
 
@@ -60,7 +65,8 @@ export const hrLifecycleRouter = router({
       offset: z.number().min(0).default(0),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ONBOARDING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -76,7 +82,8 @@ export const hrLifecycleRouter = router({
 
   getOnboardingCase: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ONBOARDING_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -98,6 +105,7 @@ export const hrLifecycleRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ONBOARDING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -143,6 +151,7 @@ export const hrLifecycleRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ONBOARDING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -193,7 +202,8 @@ export const hrLifecycleRouter = router({
       category: z.string().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ONBOARDING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -214,6 +224,7 @@ export const hrLifecycleRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ONBOARDING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -276,7 +287,8 @@ export const hrLifecycleRouter = router({
       offset: z.number().min(0).default(0),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.OFFBOARDING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -292,7 +304,8 @@ export const hrLifecycleRouter = router({
 
   getOffboardingCase: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.OFFBOARDING_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -311,6 +324,7 @@ export const hrLifecycleRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.OFFBOARDING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -354,6 +368,7 @@ export const hrLifecycleRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.OFFBOARDING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -403,7 +418,8 @@ export const hrLifecycleRouter = router({
       category: z.string().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.OFFBOARDING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -424,6 +440,7 @@ export const hrLifecycleRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.OFFBOARDING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -481,7 +498,8 @@ export const hrLifecycleRouter = router({
 
   listKnowledgeTransferItems: protectedProcedure
     .input(z.object({ offboardingCaseId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.OFFBOARDING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -498,6 +516,7 @@ export const hrLifecycleRouter = router({
       recipientWorkerId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.OFFBOARDING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -517,6 +536,7 @@ export const hrLifecycleRouter = router({
       recipientWorkerId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.OFFBOARDING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -540,7 +560,8 @@ export const hrLifecycleRouter = router({
       status: z.string().optional(),
       limit: z.number().min(1).max(100).default(50),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.OFFBOARDING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -563,6 +584,7 @@ export const hrLifecycleRouter = router({
       confidential: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.OFFBOARDING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -585,6 +607,7 @@ export const hrLifecycleRouter = router({
       primaryReason: z.string().max(200).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.OFFBOARDING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -602,7 +625,8 @@ export const hrLifecycleRouter = router({
   // Lifecycle Summary
   // ============================================================================
 
-  summary: protectedProcedure.query(async () => {
+  summary: protectedProcedure.query(async ({ ctx }) => {
+    await checkHrAccess(ctx.user, HR_ACTIONS.LIFECYCLE_READ);
     const db = getDb();
     if (!db) return { activeOnboarding: 0, activeOffboarding: 0, pendingTasks: 0 };
 

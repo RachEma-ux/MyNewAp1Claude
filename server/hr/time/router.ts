@@ -21,6 +21,11 @@ import {
   hrShiftAssignments,
 } from "../../../drizzle/schema";
 import { logHrAudit, logStatusChange } from "../audit";
+import {
+  checkHrAccess,
+  requireHrPermission,
+  HR_ACTIONS,
+} from "../permissions";
 
 // ============================================================================
 // State machines
@@ -88,7 +93,8 @@ export const hrTimeRouter = router({
       dateFrom: z.string().optional(),
       dateTo: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.TIME_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -107,7 +113,8 @@ export const hrTimeRouter = router({
 
   getTimeEntry: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.TIME_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -129,6 +136,7 @@ export const hrTimeRouter = router({
       description: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.TIME_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -199,7 +207,8 @@ export const hrTimeRouter = router({
   // Leave Types
   // ============================================================================
 
-  listLeaveTypes: protectedProcedure.query(async () => {
+  listLeaveTypes: protectedProcedure.query(async ({ ctx }) => {
+    await checkHrAccess(ctx.user, HR_ACTIONS.LEAVE_READ);
     const db = getDb();
     if (!db) return [];
     return db.select().from(hrLeaveTypes).orderBy(hrLeaveTypes.name);
@@ -241,7 +250,8 @@ export const hrTimeRouter = router({
       status: z.string().optional(),
       leaveTypeId: z.number().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.LEAVE_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -259,7 +269,8 @@ export const hrTimeRouter = router({
 
   getLeaveRequest: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.LEAVE_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -372,7 +383,8 @@ export const hrTimeRouter = router({
       workerId: z.number(),
       year: z.number().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.LEAVE_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -395,7 +407,8 @@ export const hrTimeRouter = router({
       workerId: z.number().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.OVERTIME_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -412,7 +425,8 @@ export const hrTimeRouter = router({
 
   getOvertimeRequest: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.OVERTIME_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -504,7 +518,8 @@ export const hrTimeRouter = router({
       status: z.string().optional(),
       orgUnitId: z.number().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.SHIFT_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -521,7 +536,8 @@ export const hrTimeRouter = router({
 
   getShiftPlan: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.SHIFT_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -603,7 +619,8 @@ export const hrTimeRouter = router({
       shiftPlanId: z.number(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.SHIFT_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -684,7 +701,8 @@ export const hrTimeRouter = router({
   // Time & Attendance Summary
   // ============================================================================
 
-  summary: protectedProcedure.query(async () => {
+  summary: protectedProcedure.query(async ({ ctx }) => {
+    await checkHrAccess(ctx.user, HR_ACTIONS.TIME_READ);
     const db = getDb();
     if (!db) return { pendingLeave: 0, pendingOvertime: 0, activeShifts: 0, draftTimeEntries: 0 };
 

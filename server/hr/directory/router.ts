@@ -6,13 +6,19 @@
  */
 
 import { z } from "zod";
-import { eq, and, desc, or, ilike, sql } from "drizzle-orm";
+import { eq, and, desc, or, ilike, sql, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
 import { hrPeople, hrWorkerProfiles, hrEmploymentRecords } from "../../../drizzle/schema";
-import { logHrAudit } from "../audit";
-import { maskDirectoryFields } from "../permissions";
+import { logHrAudit, logSensitiveRead } from "../audit";
+import {
+  maskDirectoryFields,
+  checkHrAccess,
+  requireHrPermission,
+  resolveDataScope,
+  HR_ACTIONS,
+} from "../permissions";
 
 export const hrDirectoryRouter = router({
   list: protectedProcedure
@@ -23,7 +29,16 @@ export const hrDirectoryRouter = router({
       workerType: z.string().optional(),
       orgUnitId: z.number().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      // Scope-aware: employee sees self, manager sees team, hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.DIRECTORY_READ,
+        HR_ACTIONS.DIRECTORY_READ_TEAM,
+        HR_ACTIONS.DIRECTORY_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
@@ -31,6 +46,13 @@ export const hrDirectoryRouter = router({
       if (input.status) conditions.push(eq(hrWorkerProfiles.status, input.status));
       if (input.workerType) conditions.push(eq(hrWorkerProfiles.workerType, input.workerType));
       if (input.orgUnitId) conditions.push(eq(hrWorkerProfiles.homeOrgUnitId, input.orgUnitId));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrWorkerProfiles.id, scope.workerId));
+      } else if (scope.scope === "team") {
+        conditions.push(sql`${hrWorkerProfiles.id} = ANY(${scope.workerIds})`);
+      }
 
       const rows = await db
         .select({
@@ -62,7 +84,8 @@ export const hrDirectoryRouter = router({
       query: z.string().min(1).max(200),
       limit: z.number().min(1).max(100).default(20),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -95,7 +118,8 @@ export const hrDirectoryRouter = router({
 
   getById: protectedProcedure
     .input(z.object({ workerId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -127,7 +151,8 @@ export const hrDirectoryRouter = router({
     }),
 
   getSummary: protectedProcedure
-    .query(async () => {
+    .query(async ({ ctx }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
       const db = getDb();
       if (!db) return { total: 0, active: 0, onLeave: 0, terminated: 0 };
 
@@ -166,6 +191,7 @@ export const hrDirectoryRouter = router({
       managerWorkerId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.DIRECTORY_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -223,6 +249,7 @@ export const hrDirectoryRouter = router({
       managerWorkerId: z.number().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.DIRECTORY_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -264,7 +291,8 @@ export const hrDirectoryRouter = router({
 
   getAssignments: protectedProcedure
     .input(z.object({ workerId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
       const db = getDb();
       if (!db) return [];
 

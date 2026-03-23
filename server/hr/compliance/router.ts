@@ -16,7 +16,12 @@ import {
   hrComplianceEvidence,
   hrRiskItems,
 } from "../../../drizzle/schema";
-import { logHrAudit } from "../audit";
+import { logHrAudit, logSensitiveRead } from "../audit";
+import {
+  checkHrAccess,
+  requireHrPermission,
+  HR_ACTIONS,
+} from "../permissions";
 
 // ============================================================================
 // State machines

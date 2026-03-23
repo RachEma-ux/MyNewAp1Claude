@@ -21,6 +21,11 @@ import {
   hrEmployeeCertifications,
 } from "../../../drizzle/schema";
 import { logHrAudit } from "../audit";
+import {
+  checkHrAccess,
+  requireHrPermission,
+  HR_ACTIONS,
+} from "../permissions";
 
 // ============================================================================
 // State machines
@@ -64,7 +69,8 @@ export const hrLearningRouter = router({
       isMandatory: z.boolean().optional(),
       isActive: z.boolean().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.LEARNING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -82,7 +88,8 @@ export const hrLearningRouter = router({
 
   getTraining: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.LEARNING_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -106,6 +113,7 @@ export const hrLearningRouter = router({
       tags: z.array(z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.LEARNING_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -161,7 +169,8 @@ export const hrLearningRouter = router({
       trainingId: z.number().optional(),
       isActive: z.boolean().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.LEARNING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -212,7 +221,8 @@ export const hrLearningRouter = router({
       trainingId: z.number().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.LEARNING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -230,7 +240,8 @@ export const hrLearningRouter = router({
 
   getAssignment: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.LEARNING_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -334,7 +345,8 @@ export const hrLearningRouter = router({
       limit: z.number().min(1).max(200).default(50),
       offset: z.number().min(0).default(0),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.LEARNING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -356,7 +368,8 @@ export const hrLearningRouter = router({
     .input(z.object({
       isActive: z.boolean().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.CERTIFICATION_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -370,7 +383,8 @@ export const hrLearningRouter = router({
 
   getCertification: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.CERTIFICATION_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -414,7 +428,8 @@ export const hrLearningRouter = router({
       status: z.string().optional(),
       expiringBefore: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.CERTIFICATION_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -507,7 +522,8 @@ export const hrLearningRouter = router({
     .input(z.object({
       withinDays: z.number().min(1).max(365).default(90),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.CERTIFICATION_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -527,7 +543,8 @@ export const hrLearningRouter = router({
   // Learning Summary
   // ============================================================================
 
-  summary: protectedProcedure.query(async () => {
+  summary: protectedProcedure.query(async ({ ctx }) => {
+    await checkHrAccess(ctx.user, HR_ACTIONS.LEARNING_READ);
     const db = getDb();
     if (!db) return { totalTraining: 0, activeAssignments: 0, overdueAssignments: 0, expiringCerts: 0 };
 

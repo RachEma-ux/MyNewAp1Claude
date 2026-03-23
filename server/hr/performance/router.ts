@@ -16,7 +16,12 @@ import {
   hrGoals,
   hrPerformanceReviews,
 } from "../../../drizzle/schema";
-import { logHrAudit, logStatusChange } from "../audit";
+import { logHrAudit, logStatusChange, logSensitiveRead } from "../audit";
+import {
+  checkHrAccess,
+  requireHrPermission,
+  HR_ACTIONS,
+} from "../permissions";
 
 // ============================================================================
 // State machines
@@ -70,7 +75,8 @@ export const hrPerformanceRouter = router({
       offset: z.number().min(0).default(0),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -86,7 +92,8 @@ export const hrPerformanceRouter = router({
 
   getCycle: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -108,6 +115,7 @@ export const hrPerformanceRouter = router({
       managerReviewDeadline: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.PERFORMANCE_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -133,6 +141,7 @@ export const hrPerformanceRouter = router({
       status: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.PERFORMANCE_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -170,7 +179,8 @@ export const hrPerformanceRouter = router({
       workerId: z.number().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -188,7 +198,8 @@ export const hrPerformanceRouter = router({
 
   getGoal: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -210,6 +221,7 @@ export const hrPerformanceRouter = router({
       dueDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.PERFORMANCE_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -245,6 +257,7 @@ export const hrPerformanceRouter = router({
       dueDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.PERFORMANCE_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -292,7 +305,8 @@ export const hrPerformanceRouter = router({
       reviewerId: z.number().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -311,7 +325,8 @@ export const hrPerformanceRouter = router({
 
   getReview: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -328,6 +343,7 @@ export const hrPerformanceRouter = router({
       reviewerId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.PERFORMANCE_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -356,6 +372,7 @@ export const hrPerformanceRouter = router({
       selfComments: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.PERFORMANCE_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -401,6 +418,7 @@ export const hrPerformanceRouter = router({
       developmentPlan: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.PERFORMANCE_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -444,6 +462,7 @@ export const hrPerformanceRouter = router({
       status: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.PERFORMANCE_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -472,7 +491,8 @@ export const hrPerformanceRouter = router({
   // Performance Summary
   // ============================================================================
 
-  summary: protectedProcedure.query(async () => {
+  summary: protectedProcedure.query(async ({ ctx }) => {
+    await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
     const db = getDb();
     if (!db) return { activeCycles: 0, pendingReviews: 0, activeGoals: 0 };
 

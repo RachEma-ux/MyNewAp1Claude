@@ -17,6 +17,11 @@ import {
   hrOffers,
 } from "../../../drizzle/schema";
 import { logHrAudit } from "../audit";
+import {
+  checkHrAccess,
+  requireHrPermission,
+  HR_ACTIONS,
+} from "../permissions";
 import { logLifecycleEvent } from "../lifecycle/event-logger";
 
 // ============================================================================
