@@ -199,14 +199,14 @@ export function WorkspaceUnifiedSidebarV2({
             <div className="p-1"><Wrench className="h-3.5 w-3.5 text-blue-400" /></div>
           </TooltipTrigger><TooltipContent side="left">Tools</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/settings`}><Button variant={isActive(`${base}/settings`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Settings className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="left">Configure</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/team`}><Button variant={isActive(`${base}/team`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Users className="h-4 w-4" /></Button></Link>
           </TooltipTrigger><TooltipContent side="left">Team</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/crew`}><Button variant={isActive(`${base}/crew`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Cpu className="h-4 w-4" /></Button></Link>
           </TooltipTrigger><TooltipContent side="left">Crew</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
-            <Link href={`${base}/knowledge`}><Button variant={isActive(`${base}/knowledge`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><FileText className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="left">Documents</TooltipContent></Tooltip>
         </div>
 
         {/* Context section — icon column */}
@@ -231,14 +231,14 @@ export function WorkspaceUnifiedSidebarV2({
             <div className="p-1"><Settings className="h-3.5 w-3.5 text-orange-400" /></div>
           </TooltipTrigger><TooltipContent side="left">Settings</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
-            <Link href={`${base}/settings`}><Button variant={isActive(`${base}/settings`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Settings className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="left">Configure</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOversightOpen}><Shield className="h-4 w-4" /></Button>
           </TooltipTrigger><TooltipContent side="left">Oversight</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/rules`}><Button variant={isActive(`${base}/rules`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Scale className="h-4 w-4" /></Button></Link>
           </TooltipTrigger><TooltipContent side="left">Rules</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/governance`}><Button variant={isActive(`${base}/governance`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><ShieldCheck className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="left">Governance</TooltipContent></Tooltip>
         </div>
       </aside>
     );
@@ -263,6 +263,7 @@ export function WorkspaceUnifiedSidebarV2({
         icon={<Wrench className="h-3.5 w-3.5" />}
         color="bg-blue-500/10 text-blue-400"
         dropdownItems={[
+          { icon: <Settings className="h-4 w-4" />, label: "Configure", path: `${base}/settings` },
           { icon: <LayoutDashboard className="h-4 w-4" />, label: "Overview", path: base },
           { icon: <FolderKanban className="h-4 w-4" />, label: "Projects", path: `${base}/projects` },
           { icon: <BookOpen className="h-4 w-4" />, label: "Knowledge", path: `${base}/knowledge` },
@@ -277,9 +278,9 @@ export function WorkspaceUnifiedSidebarV2({
           { icon: <GitBranch className="h-4 w-4" />, label: "Workflows", path: `${base}/workflows` },
         ]}
       >
+        <NavItem icon={<Settings className="h-4 w-4" />} label="Configure" path={`${base}/settings`} />
         <NavItem icon={<Users className="h-4 w-4" />} label="Team" path={`${base}/team`} />
         <NavItem icon={<Cpu className="h-4 w-4" />} label="Crew (AI)" path={`${base}/crew`} />
-        <NavItem icon={<FileText className="h-4 w-4" />} label="Documents" path={`${base}/knowledge`} />
       </Section>
 
       {/* ══ Separator ══ */}
@@ -441,7 +442,6 @@ export function WorkspaceUnifiedSidebarV2({
         icon={<Settings className="h-3.5 w-3.5" />}
         color="bg-orange-500/10 text-orange-400"
         dropdownItems={[
-          { icon: <Settings className="h-4 w-4" />, label: "Configure", path: `${base}/settings` },
           { icon: <Shield className="h-4 w-4" />, label: "Oversight", path: "", action: onOversightOpen },
           { icon: <Scale className="h-4 w-4" />, label: "Rules", path: `${base}/rules` },
           { icon: <Eye className="h-4 w-4" />, label: "Visibility", path: `${base}/visibility` },
@@ -449,9 +449,9 @@ export function WorkspaceUnifiedSidebarV2({
           { icon: <ShieldCheck className="h-4 w-4" />, label: "Governance", path: `${base}/governance` },
         ]}
       >
-        <NavItem icon={<Settings className="h-4 w-4" />} label="Configure" path={`${base}/settings`} />
         <NavItem icon={<Shield className="h-4 w-4" />} label="Oversight" path="" action={onOversightOpen} />
         <NavItem icon={<Scale className="h-4 w-4" />} label="Rules" path={`${base}/rules`} />
+        <NavItem icon={<ShieldCheck className="h-4 w-4" />} label="Governance" path={`${base}/governance`} />
       </Section>
     </aside>
   );
