@@ -3,8 +3,10 @@
  *
  * Placed on the RIGHT side for visual validation.
  * 3 equal sections (sidebar ÷ 3), thick separators, each with:
- *   - 3 pinned items
- *   - dropdown at bottom with the full list from that original sidebar
+ *   - dropdown title header with full list
+ *   - scrollable pinned content area
+ *
+ * Context section now contains the full WorkspaceContextSidebar content.
  */
 
 import { Link, useLocation } from "wouter";
@@ -23,6 +25,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Wrench,
   Info,
   Settings,
@@ -42,28 +46,26 @@ import {
   LayoutDashboard,
   // Context
   Target,
+  Compass,
+  Crosshair,
   Activity,
   Clock,
   Heart,
   Zap,
   Bell,
+  CheckCircle2,
+  HeartPulse,
   // Settings
   Eye,
   Shield,
 } from "lucide-react";
+import type { ShellViewData } from "@/components/workspace-shell/types";
+import { classifyParticipant } from "@/components/workspace-shell/types";
 
 interface Props {
-  workspaceId: number;
-  workspaceName: string;
-  workspaceType?: string | null;
-  status: string;
-  isManager: boolean;
-  participantRole?: string | null;
-  teamCount: number;
-  crewCount: number;
-  purposeType?: string | null;
-  purposeRef?: string | null;
-  missionEmphasis?: string | null;
+  shell: ShellViewData;
+  collapsed: boolean;
+  onToggle: () => void;
   onOversightOpen: () => void;
 }
 
@@ -78,26 +80,24 @@ const STATUS_COLORS: Record<string, string> = {
   archived: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
+const STATUS_TEXT_COLORS: Record<string, string> = {
+  draft: "text-yellow-500", active: "text-green-500", published: "text-cyan-500",
+  approved: "text-emerald-500", archived: "text-gray-400", rejected: "text-red-500",
+};
+
 export function WorkspaceUnifiedSidebarV2({
-  workspaceId,
-  workspaceName,
-  workspaceType,
-  status,
-  isManager,
-  participantRole,
-  teamCount,
-  crewCount,
-  purposeType,
-  purposeRef,
-  missionEmphasis,
+  shell,
+  collapsed,
+  onToggle,
   onOversightOpen,
 }: Props) {
   const [location, navigate] = useLocation();
-  const base = `/w/${workspaceId}`;
+  const base = `/w/${shell.workspaceId}`;
+  const participantType = classifyParticipant(shell.participantRole, shell.isManager);
 
   const { data: activity } = trpc.workspaces.activity.list.useQuery(
-    { workspaceId, limit: 5 },
-    {}
+    { workspaceId: shell.workspaceId, limit: 5 },
+    { staleTime: 30000, enabled: shell.workspaceId > 0 }
   );
 
   const isActive = (path: string) => {
@@ -139,67 +139,129 @@ export function WorkspaceUnifiedSidebarV2({
     icon,
     color,
     children,
-    dropdownLabel,
     dropdownItems,
   }: {
     title: string;
     icon: React.ReactNode;
     color: string;
     children: React.ReactNode;
-    dropdownLabel: string;
     dropdownItems: { icon: React.ReactNode; label: string; path: string; action?: () => void }[];
   }) => (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* Section header */}
-      <div className={cn("flex items-center gap-2 px-3 py-2 shrink-0", color)}>
-        {icon}
-        <span className="text-xs font-bold uppercase tracking-widest">{title}</span>
-      </div>
+      {/* Section header = dropdown trigger */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className={cn("flex items-center gap-2 px-3 py-2 shrink-0 w-full hover:brightness-125 transition-all cursor-pointer", color)}>
+            {icon}
+            <span className="text-xs font-bold uppercase tracking-widest">{title}</span>
+            <ChevronDown className="h-3 w-3 ml-auto opacity-60" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="left" align="start" className="w-56 max-h-80 overflow-y-auto">
+          <DropdownMenuLabel>{title} — Full List</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {dropdownItems.map((item, i) => (
+            <DropdownMenuItem
+              key={i}
+              className={cn("gap-2 cursor-pointer", item.path && isActive(item.path) && "bg-accent")}
+              onClick={() => item.action ? item.action() : item.path ? navigate(item.path) : undefined}
+            >
+              {item.icon}
+              {item.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
       {/* Pinned items */}
       <div className="flex-1 overflow-y-auto px-2 py-1.5 space-y-0.5">
         {children}
-      </div>
-      {/* Full list dropdown */}
-      <div className="px-2 pb-2 shrink-0">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center justify-between w-full px-3 py-1.5 text-xs rounded-lg border border-border/50 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
-              <span>{dropdownLabel}</span>
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="left" align="end" className="w-56 max-h-80 overflow-y-auto">
-            <DropdownMenuLabel>{title} — Full List</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {dropdownItems.map((item, i) => (
-              <DropdownMenuItem
-                key={i}
-                className={cn("gap-2 cursor-pointer", item.path && isActive(item.path) && "bg-accent")}
-                onClick={() => item.action ? item.action() : navigate(item.path)}
-              >
-                {item.icon}
-                {item.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   );
 
   /* ═══════════════════════════════════════════ */
-  /*                 RENDER                      */
+  /*            COLLAPSED (icon-only)            */
+  /* ═══════════════════════════════════════════ */
+
+  if (collapsed) {
+    return (
+      <aside className="flex flex-col border-l bg-card w-12 shrink-0 transition-all duration-200">
+        {/* Toggle button */}
+        <div className="flex items-center justify-center h-10 border-b shrink-0">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggle}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Tools section — icon column */}
+        <div className="flex-1 flex flex-col items-center gap-1 py-2 border-b">
+          <Tooltip><TooltipTrigger asChild>
+            <div className="p-1"><Wrench className="h-3.5 w-3.5 text-blue-400" /></div>
+          </TooltipTrigger><TooltipContent side="left">Tools</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/team`}><Button variant={isActive(`${base}/team`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Users className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="left">Team</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/crew`}><Button variant={isActive(`${base}/crew`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Cpu className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="left">Crew</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/knowledge`}><Button variant={isActive(`${base}/knowledge`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><FileText className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="left">Documents</TooltipContent></Tooltip>
+        </div>
+
+        {/* Context section — icon column */}
+        <div className="flex-1 flex flex-col items-center gap-1 py-2 border-b">
+          <Tooltip><TooltipTrigger asChild>
+            <div className="p-1"><Info className="h-3.5 w-3.5 text-emerald-400" /></div>
+          </TooltipTrigger><TooltipContent side="left">Context</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <div className="h-8 w-8 flex items-center justify-center"><Target className="h-4 w-4 text-muted-foreground" /></div>
+          </TooltipTrigger><TooltipContent side="left">{shell.workspaceName}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <div className="h-8 w-8 flex items-center justify-center"><Activity className="h-4 w-4 text-muted-foreground" /></div>
+          </TooltipTrigger><TooltipContent side="left">{shell.status.replace(/_/g, " ")}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <div className="h-8 w-8 flex items-center justify-center"><Users className="h-4 w-4 text-muted-foreground" /></div>
+          </TooltipTrigger><TooltipContent side="left">{shell.teamCount} team · {shell.crewCount} crew</TooltipContent></Tooltip>
+        </div>
+
+        {/* Settings section — icon column */}
+        <div className="flex-1 flex flex-col items-center gap-1 py-2">
+          <Tooltip><TooltipTrigger asChild>
+            <div className="p-1"><Settings className="h-3.5 w-3.5 text-orange-400" /></div>
+          </TooltipTrigger><TooltipContent side="left">Settings</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/settings`}><Button variant={isActive(`${base}/settings`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Settings className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="left">Configure</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOversightOpen}><Shield className="h-4 w-4" /></Button>
+          </TooltipTrigger><TooltipContent side="left">Oversight</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/rules`}><Button variant={isActive(`${base}/rules`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Scale className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="left">Rules</TooltipContent></Tooltip>
+        </div>
+      </aside>
+    );
+  }
+
+  /* ═══════════════════════════════════════════ */
+  /*            EXPANDED (full sidebar)          */
   /* ═══════════════════════════════════════════ */
 
   return (
-    <aside className="flex flex-col border-l bg-card w-64 shrink-0 overflow-hidden">
+    <aside className="flex flex-col border-l bg-card w-64 shrink-0 overflow-hidden transition-all duration-200">
+      {/* Toggle button */}
+      <div className="flex items-center justify-end h-10 border-b px-2 shrink-0">
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggle}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
 
       {/* ══════════ SECTION 1: TOOLS ══════════ */}
       <Section
         title="Tools"
         icon={<Wrench className="h-3.5 w-3.5" />}
         color="bg-blue-500/10 text-blue-400"
-        dropdownLabel={`All Tools (12)`}
         dropdownItems={[
           { icon: <LayoutDashboard className="h-4 w-4" />, label: "Overview", path: base },
           { icon: <FolderKanban className="h-4 w-4" />, label: "Projects", path: `${base}/projects` },
@@ -228,17 +290,18 @@ export function WorkspaceUnifiedSidebarV2({
         title="Context"
         icon={<Info className="h-3.5 w-3.5" />}
         color="bg-emerald-500/10 text-emerald-400"
-        dropdownLabel={`All Context (${8 + ((activity as any[])?.length || 0)})`}
         dropdownItems={[
-          { icon: <Target className="h-4 w-4" />, label: `Identity: ${workspaceName}`, path: "" },
-          { icon: <Activity className="h-4 w-4" />, label: `Status: ${status.replace(/_/g, " ")}`, path: "" },
-          { icon: <Users className="h-4 w-4" />, label: `Team: ${teamCount} members`, path: "" },
-          { icon: <Bot className="h-4 w-4" />, label: `Crew: ${crewCount} AI agents`, path: "" },
-          { icon: <Target className="h-4 w-4" />, label: `Purpose: ${purposeType || "other"}`, path: "" },
-          ...(missionEmphasis ? [{ icon: <Zap className="h-4 w-4" />, label: `Mission: ${missionEmphasis}`, path: "" }] : []),
-          { icon: <Shield className="h-4 w-4" />, label: `Role: ${participantRole || "viewer"}`, path: "" },
-          { icon: <Heart className="h-4 w-4" />, label: "Health: Healthy", path: "" },
+          { icon: <Target className="h-4 w-4" />, label: `Identity: ${shell.workspaceName}`, path: "" },
+          { icon: <Compass className="h-4 w-4" />, label: `Purpose: ${shell.purposeType || "not set"}`, path: "" },
+          { icon: <Crosshair className="h-4 w-4" />, label: `Role: ${shell.participantRole || "viewer"}`, path: "" },
+          { icon: <Activity className="h-4 w-4" />, label: `Status: ${shell.status.replace(/_/g, " ")}`, path: "" },
+          { icon: <Users className="h-4 w-4" />, label: `Team: ${shell.teamCount} members`, path: `${base}/team` },
+          { icon: <Bot className="h-4 w-4" />, label: `Crew: ${shell.crewCount} AI agents`, path: `${base}/crew` },
+          { icon: <CheckCircle2 className="h-4 w-4" />, label: `Modules: ${shell.enabledModules.length} active`, path: "" },
+          ...(shell.missionEmphasis ? [{ icon: <Zap className="h-4 w-4" />, label: `Mission: ${shell.missionEmphasis}`, path: "" }] : []),
+          { icon: <HeartPulse className="h-4 w-4" />, label: "Health: Healthy", path: "" },
           { icon: <Bell className="h-4 w-4" />, label: "Alerts: None", path: "" },
+          { icon: <BookOpen className="h-4 w-4" />, label: "Workspace Guide", path: `${base}/rules` },
           ...((activity as any[]) || []).slice(0, 3).map((act: any) => ({
             icon: <Clock className="h-4 w-4" />,
             label: act.action,
@@ -246,27 +309,127 @@ export function WorkspaceUnifiedSidebarV2({
           })),
         ]}
       >
-        {/* Pinned: Identity */}
-        <div className="flex items-center gap-2.5 px-3 py-2 text-sm">
-          <Target className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="truncate font-medium">{workspaceName}</span>
-          <Badge variant="secondary" className="text-[10px] py-0 ml-auto shrink-0">{workspaceType || "generic"}</Badge>
+        {/* ── Identity ── */}
+        <div className="px-1 pt-1 pb-1.5">
+          <div className="space-y-1.5">
+            <p className="text-sm font-semibold leading-tight truncate">{shell.workspaceName}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant="secondary" className="text-[10px] py-0 font-medium">
+                {shell.workspaceType || "generic"}
+              </Badge>
+              <span className={cn("text-[11px] font-semibold capitalize", STATUS_TEXT_COLORS[shell.status] || "text-muted-foreground")}>
+                {shell.status.replace(/_/g, " ")}
+              </span>
+            </div>
+            {shell.workspaceDescription && (
+              <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">{shell.workspaceDescription}</p>
+            )}
+          </div>
         </div>
-        {/* Pinned: Status + Role */}
-        <div className="flex items-center gap-2.5 px-3 py-2 text-sm">
-          <Activity className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <Badge className={cn("text-[10px] py-0 border", STATUS_COLORS[status] || "")}>
-            {status.replace(/_/g, " ")}
-          </Badge>
-          <Badge variant="outline" className="text-[10px] py-0 ml-auto">{participantRole || "viewer"}</Badge>
-        </div>
-        {/* Pinned: Participants */}
-        <div className="flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground">
-          <Users className="h-4 w-4 shrink-0" />
-          <span>{teamCount} team</span>
-          <span className="text-muted-foreground/50">·</span>
-          <span>{crewCount} crew</span>
-        </div>
+
+        {/* ── Purpose ── */}
+        {shell.sidebar.showPurpose && (
+          <div className="px-1 pb-1.5">
+            <div className="flex items-center gap-1 mb-0.5">
+              <Compass className="h-3 w-3 text-primary" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Purpose</span>
+            </div>
+            {shell.purposeType ? (
+              <p className="text-[11px]">
+                <span className="font-medium capitalize">{shell.purposeType}</span>
+                {shell.purposeRef && (
+                  <span className="text-muted-foreground"> — {shell.purposeRef}</span>
+                )}
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground italic">Not yet defined</p>
+            )}
+          </div>
+        )}
+
+        {/* ── Mission ── */}
+        {shell.sidebar.showMission && (
+          <div className="px-1 pb-1.5">
+            {shell.missionEmphasis ? (
+              <div className="rounded border border-primary/30 bg-primary/5 p-1.5">
+                <p className="text-[11px] font-medium text-primary leading-relaxed line-clamp-2">{shell.missionEmphasis}</p>
+              </div>
+            ) : (
+              <div className="rounded border bg-muted/40 p-1.5">
+                <Badge variant="secondary" className="text-[9px] py-0 font-semibold mb-0.5">
+                  {shell.participantRole || "viewer"}
+                </Badge>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  {participantType === "manager"
+                    ? "You manage this workspace."
+                    : participantType === "member"
+                    ? "You contribute here."
+                    : "You can observe activity."}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Current Work (compact grid) ── */}
+        {shell.sidebar.showCurrentWork && (
+          <div className="px-1 pb-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="text-center rounded bg-muted/50 py-1.5">
+                <Users className="h-3 w-3 mx-auto mb-0.5 text-muted-foreground" />
+                <p className="text-xs font-bold">{shell.teamCount}</p>
+                <p className="text-[8px] text-muted-foreground">Team</p>
+              </div>
+              <div className="text-center rounded bg-muted/50 py-1.5">
+                <Bot className="h-3 w-3 mx-auto mb-0.5 text-muted-foreground" />
+                <p className="text-xs font-bold">{shell.crewCount}</p>
+                <p className="text-[8px] text-muted-foreground">Crew</p>
+              </div>
+              <div className="text-center rounded bg-muted/50 py-1.5">
+                <CheckCircle2 className="h-3 w-3 mx-auto mb-0.5 text-muted-foreground" />
+                <p className="text-xs font-bold">{shell.enabledModules.length}</p>
+                <p className="text-[8px] text-muted-foreground">Modules</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Recent Activity (compact) ── */}
+        {shell.sidebar.showActivityLog && (
+          <div className="px-1 pb-1">
+            <div className="flex items-center gap-1 mb-0.5">
+              <Clock className="h-3 w-3 text-primary" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Activity</span>
+            </div>
+            {activity && (activity as any[]).length > 0 ? (
+              <div className="space-y-1">
+                {(activity as any[]).slice(0, 3).map((act: any) => (
+                  <div key={act.id} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                    <div className="h-1 w-1 rounded-full bg-primary/50 mt-1.5 shrink-0" />
+                    <span className="truncate text-foreground/80">{act.action}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] text-muted-foreground italic">No recent activity</p>
+            )}
+          </div>
+        )}
+
+        {/* ── Health + Alerts (inline) ── */}
+        {shell.sidebar.showHealth && (
+          <div className="flex items-center gap-1.5 px-1 pb-1 text-[11px] text-muted-foreground">
+            <HeartPulse className="h-3 w-3 text-green-500" />
+            <span>Healthy</span>
+            {shell.sidebar.showAlerts && shell.alertsEnabled && (
+              <>
+                <span className="text-muted-foreground/30">·</span>
+                <Bell className="h-3 w-3 text-green-500" />
+                <span>No alerts</span>
+              </>
+            )}
+          </div>
+        )}
       </Section>
 
       {/* ══ Separator ══ */}
@@ -277,7 +440,6 @@ export function WorkspaceUnifiedSidebarV2({
         title="Settings"
         icon={<Settings className="h-3.5 w-3.5" />}
         color="bg-orange-500/10 text-orange-400"
-        dropdownLabel={`All Settings (6)`}
         dropdownItems={[
           { icon: <Settings className="h-4 w-4" />, label: "Configure", path: `${base}/settings` },
           { icon: <Shield className="h-4 w-4" />, label: "Oversight", path: "", action: onOversightOpen },

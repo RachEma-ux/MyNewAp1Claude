@@ -115,6 +115,8 @@ export default function WorkspaceExecutionShell() {
   const [toolsCollapsed, setToolsCollapsed] = useState(true);
   const [toolsMobileOpen, setToolsMobileOpen] = useState(false);
   const [managerDrawerOpen, setManagerDrawerOpen] = useState(false);
+  // Unified sidebar V2 — collapsed by default
+  const [unifiedCollapsed, setUnifiedCollapsed] = useState(true);
 
   // Fetch the resolved shell view from backend — NON-BLOCKING
   const {
@@ -276,17 +278,9 @@ export default function WorkspaceExecutionShell() {
 
         {/* ─── NEW SIDEBAR V2 PROTOTYPE (right side for validation) ─── */}
         <WorkspaceUnifiedSidebarV2
-          workspaceId={workspaceId}
-          workspaceName={shell.workspaceName || "Workspace"}
-          workspaceType={shell.workspaceType}
-          status={shell.status || "draft"}
-          isManager={shell.isManager}
-          participantRole={shell.participantRole}
-          teamCount={shell.teamCount ?? 0}
-          crewCount={shell.crewCount ?? 0}
-          purposeType={shell.purposeType}
-          purposeRef={shell.purposeRef}
-          missionEmphasis={shell.missionEmphasis}
+          shell={shell}
+          collapsed={unifiedCollapsed}
+          onToggle={() => setUnifiedCollapsed(!unifiedCollapsed)}
           onOversightOpen={() => setManagerDrawerOpen(true)}
         />
       </div>
