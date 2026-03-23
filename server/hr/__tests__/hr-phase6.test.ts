@@ -297,8 +297,8 @@ describe("HR Phase 6 — Role Differentiation (P2-7)", () => {
 // H. Router Version
 // ============================================================================
 
-describe("HR Phase 6 — Version", () => {
-  it("settings.get returns version 6.0.0", async () => {
+describe("HR Phase 6/7 — Version", () => {
+  it("settings.get returns version 7.0.0", async () => {
     const { hrRouter } = await import("../router");
     const procedures = Object.keys(hrRouter._def.procedures);
     expect(procedures).toContain("settings.get");
@@ -353,5 +353,232 @@ describe("HR Phase 6 — Audit Coverage Verification", () => {
     const checkAccessCount = (content.match(/checkHrAccess/g) || []).length;
     // Import + getDashboardSummary + getWorkforceBreakdown + listReportDefs + createReport + updateReport + listMetrics + createMetric = 8+
     expect(checkAccessCount).toBeGreaterThanOrEqual(8);
+  });
+});
+
+// ============================================================================
+// J. Expanded Seed Data — 28-Employee Dataset Validation (Phase 7 expansion)
+// ============================================================================
+
+describe("HR Seed Data — 28-Employee Dataset Structure", () => {
+  it("seed module exports seedHrDemoData as a function", async () => {
+    const { seedHrDemoData } = await import("../seed");
+    expect(typeof seedHrDemoData).toBe("function");
+  });
+
+  it("seed source contains exactly 28 people entries", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    // Count people entries by matching primaryEmail patterns
+    const emailMatches = src.match(/primaryEmail:\s*"/g) || [];
+    expect(emailMatches.length).toBe(28);
+  });
+
+  it("seed source contains exactly 9 org units", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    // Count org units by matching code patterns in the orgUnits insert block
+    const orgUnitCodes = ["EXEC", "ENG", "HR", "PROD", "DESIGN", "QA", "FIN", "COMP-SEC", "OPS"];
+    for (const code of orgUnitCodes) {
+      expect(src).toContain(`code: "${code}"`);
+    }
+  });
+
+  it("seed source contains exactly 28 positions", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    const positionCodeMatches = src.match(/positionCode:\s*"/g) || [];
+    expect(positionCodeMatches.length).toBe(28);
+  });
+
+  it("seed source contains exactly 28 worker profiles", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    const empNumberMatches = src.match(/employeeNumber:\s*"EMP\d+"/g) || [];
+    expect(empNumberMatches.length).toBe(28);
+  });
+
+  it("seed source contains exactly 28 employment records", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    const costCenterMatches = src.match(/costCenter:\s*"CC-/g) || [];
+    expect(costCenterMatches.length).toBe(28);
+  });
+
+  it("seed includes worker skills across multiple roles", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    const skillMatches = src.match(/skillName:\s*"/g) || [];
+    expect(skillMatches.length).toBeGreaterThanOrEqual(20);
+    // Verify key skills present
+    expect(src).toContain('skillName: "React"');
+    expect(src).toContain('skillName: "TypeScript"');
+    expect(src).toContain('skillName: "PostgreSQL"');
+    expect(src).toContain('skillName: "SOC 2 Compliance"');
+  });
+
+  it("seed includes 5 training courses and 10 learning assignments", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    // Training catalog — 5 courses
+    const courseCodeMatches = src.match(/code:\s*"(SEC|LEAD|TECH|DEI|AGILE)-\d+"/g) || [];
+    expect(courseCodeMatches.length).toBe(5);
+    // Learning assignments — check for multiple dueDate entries
+    const dueDateInLearning = (src.match(/dueDate:\s*"\d{4}-\d{2}-\d{2}"/g) || []).length;
+    expect(dueDateInLearning).toBeGreaterThanOrEqual(10);
+  });
+
+  it("seed includes 4 certifications and 5 employee certifications", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(src).toContain('code: "AWS-SAA"');
+    expect(src).toContain('code: "PMP"');
+    expect(src).toContain('code: "CISSP"');
+    expect(src).toContain('code: "SHRM-CP"');
+    const obtainedMatches = src.match(/obtainedDate:\s*"/g) || [];
+    expect(obtainedMatches.length).toBe(5);
+  });
+
+  it("seed includes 7 salary bands covering IC to Executive", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    const bandCodes = ["IC1", "IC2", "IC3", "M1", "M2", "D1", "E1"];
+    for (const code of bandCodes) {
+      expect(src).toContain(`code: "${code}"`);
+    }
+  });
+
+  it("seed includes 13 compensation records", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    const baseSalaryMatches = src.match(/baseSalary:\s*"/g) || [];
+    expect(baseSalaryMatches.length).toBe(13);
+  });
+
+  it("seed includes manager hierarchy covering all levels", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    // Should set manager relationships via update calls
+    const managerSetMatches = src.match(/managerWorkerId:\s*workers\[\d+\]\.id/g) || [];
+    // 9 org unit managers + multiple worker manager sets
+    expect(managerSetMatches.length).toBeGreaterThanOrEqual(9);
+    // Verify all org units get a manager
+    for (let i = 0; i < 9; i++) {
+      expect(src).toContain(`hrOrgUnits.id, orgUnits[${i}].id`);
+    }
+  });
+
+  it("seed includes talent reviews, succession plans, engagement, surveys, and risk items", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    // Talent reviews
+    expect(src).toContain("hrTalentReviews");
+    const nineBoxMatches = src.match(/nineBoxPosition:\s*"/g) || [];
+    expect(nineBoxMatches.length).toBeGreaterThanOrEqual(4);
+
+    // Succession plans
+    expect(src).toContain("hrSuccessionPlans");
+    expect(src).toContain("hrSuccessionCandidates");
+
+    // Engagement programs
+    const engagementNames = src.match(/name:\s*"(Mentorship|Q2 Team|Wellness)/g) || [];
+    expect(engagementNames.length).toBe(3);
+
+    // Survey campaigns
+    expect(src).toContain("Pulse Survey");
+    expect(src).toContain("Engagement Survey");
+
+    // Risk items
+    expect(src).toContain("hrRiskItems");
+    const riskMatches = src.match(/riskScore:\s*\d/g) || [];
+    expect(riskMatches.length).toBe(3);
+  });
+
+  it("seed includes 1 terminated and 1 on-leave worker for status diversity", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    // Brian is terminated
+    expect(src).toContain('status: "terminated"');
+    // Leo is on_leave
+    expect(src).toContain('status: "on_leave"');
+    // Brian's person record is inactive
+    expect(src).toContain('status: "inactive"');
+  });
+
+  it("seed is idempotent — checks count before inserting", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(src).toContain("count(*)");
+    expect(src).toContain("HR data already exists");
+  });
+
+  it("seed uses .returning() for FK-dependent inserts", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    // Critical: people, orgUnits, positions, workers, courses, certs, bands, leaveTypes, perfCycle, succPlan
+    const returningMatches = src.match(/\.returning\(\)/g) || [];
+    expect(returningMatches.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it("all numeric/monetary fields use string values (not bare numbers)", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync(
+      new URL("../seed.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    // baseSalary values should be strings
+    expect(src).toContain('baseSalary: "250000"');
+    expect(src).toContain('baseSalary: "85000"');
+    // minAmount, midAmount, maxAmount should be strings
+    expect(src).toContain('minAmount: "50000"');
+    expect(src).toContain('maxAmount: "280000"');
+    // totalDays should be strings
+    expect(src).toContain('totalDays: "10"');
+    expect(src).toContain('totalDays: "5"');
   });
 });
