@@ -73,6 +73,7 @@ import { GovernancePage } from "@/pages/workspace/GovernancePage";
 import { WSTeamPage } from "@/pages/workspace/WSTeamPage";
 import { WSCrewPage } from "@/pages/workspace/WSCrewPage";
 import { WSRulesPage } from "@/pages/workspace/WSRulesPage";
+import { OversightPage } from "@/pages/workspace/OversightPage";
 
 /** Fallback shell data while loading — renders skeleton context immediately */
 function makeLoadingShell(workspaceId: number): ShellViewData {
@@ -267,8 +268,9 @@ export default function WorkspaceExecutionShell() {
             <Route path={`${basePath}/crew`}><WSCrewPage /></Route>
             <Route path={`${basePath}/rules`}><WSRulesPage /></Route>
 
-            {/* ─── Governance ─── */}
+            {/* ─── Governance / Oversight ─── */}
             <Route path={`${basePath}/governance`}><GovernancePage workspaceId={workspaceId} /></Route>
+            <Route path={`${basePath}/oversight`}><OversightPage workspaceId={workspaceId} /></Route>
 
             {/* ─── Default: Mission-driven landing ─── */}
             <Route><WorkspaceMainFrame shell={shell} basePath={basePath} /></Route>
@@ -281,7 +283,6 @@ export default function WorkspaceExecutionShell() {
           shell={shell}
           collapsed={unifiedCollapsed}
           onToggle={() => setUnifiedCollapsed(!unifiedCollapsed)}
-          onOversightOpen={() => setManagerDrawerOpen(true)}
         />
       </div>
 

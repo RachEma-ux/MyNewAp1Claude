@@ -66,7 +66,6 @@ interface Props {
   shell: ShellViewData;
   collapsed: boolean;
   onToggle: () => void;
-  onOversightOpen: () => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -89,7 +88,6 @@ export function WorkspaceUnifiedSidebarV2({
   shell,
   collapsed,
   onToggle,
-  onOversightOpen,
 }: Props) {
   const [location, navigate] = useLocation();
   const base = `/w/${shell.workspaceId}`;
@@ -231,7 +229,7 @@ export function WorkspaceUnifiedSidebarV2({
             <div className="p-1"><Settings className="h-3.5 w-3.5 text-orange-400" /></div>
           </TooltipTrigger><TooltipContent side="left">Settings</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOversightOpen}><Shield className="h-4 w-4" /></Button>
+            <Link href={`${base}/oversight`}><Button variant={isActive(`${base}/oversight`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Shield className="h-4 w-4" /></Button></Link>
           </TooltipTrigger><TooltipContent side="left">Oversight</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/rules`}><Button variant={isActive(`${base}/rules`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Scale className="h-4 w-4" /></Button></Link>
@@ -442,14 +440,14 @@ export function WorkspaceUnifiedSidebarV2({
         icon={<Settings className="h-3.5 w-3.5" />}
         color="bg-orange-500/10 text-orange-400"
         dropdownItems={[
-          { icon: <Shield className="h-4 w-4" />, label: "Oversight", path: "", action: onOversightOpen },
+          { icon: <Shield className="h-4 w-4" />, label: "Oversight", path: `${base}/oversight` },
           { icon: <Scale className="h-4 w-4" />, label: "Rules", path: `${base}/rules` },
           { icon: <Eye className="h-4 w-4" />, label: "Visibility", path: `${base}/visibility` },
           { icon: <BookOpen className="h-4 w-4" />, label: "Workspace Guide", path: `${base}/rules` },
           { icon: <ShieldCheck className="h-4 w-4" />, label: "Governance", path: `${base}/governance` },
         ]}
       >
-        <NavItem icon={<Shield className="h-4 w-4" />} label="Oversight" path="" action={onOversightOpen} />
+        <NavItem icon={<Shield className="h-4 w-4" />} label="Oversight" path={`${base}/oversight`} />
         <NavItem icon={<Scale className="h-4 w-4" />} label="Rules" path={`${base}/rules`} />
         <NavItem icon={<ShieldCheck className="h-4 w-4" />} label="Governance" path={`${base}/governance`} />
       </Section>
