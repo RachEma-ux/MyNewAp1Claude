@@ -104,15 +104,23 @@ export function WorkspaceUnifiedSidebarV2({
   };
 
   /* ─── Shared nav item renderer ─── */
-  const NavItem = ({ icon, label, path, action }: { icon: React.ReactNode; label: string; path: string; action?: () => void }) => {
+  const NavItem = ({ icon, label, path, action, count }: { icon: React.ReactNode; label: string; path: string; action?: () => void; count?: number }) => {
+    const content = (
+      <>
+        {icon}
+        <span>{label}</span>
+        {count !== undefined && (
+          <Badge variant="secondary" className="text-[10px] py-0 px-1.5 ml-auto font-mono">{count}</Badge>
+        )}
+      </>
+    );
     if (action) {
       return (
         <button
           onClick={action}
           className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
         >
-          {icon}
-          <span>{label}</span>
+          {content}
         </button>
       );
     }
@@ -124,8 +132,7 @@ export function WorkspaceUnifiedSidebarV2({
             ? "bg-primary/15 text-primary font-medium"
             : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
         )}>
-          {icon}
-          <span>{label}</span>
+          {content}
         </button>
       </Link>
     );
@@ -219,8 +226,8 @@ export function WorkspaceUnifiedSidebarV2({
             <div className="h-8 w-8 flex items-center justify-center"><Activity className="h-4 w-4 text-muted-foreground" /></div>
           </TooltipTrigger><TooltipContent side="left">{shell.status.replace(/_/g, " ")}</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
-            <div className="h-8 w-8 flex items-center justify-center"><Users className="h-4 w-4 text-muted-foreground" /></div>
-          </TooltipTrigger><TooltipContent side="left">{shell.teamCount} team · {shell.crewCount} crew</TooltipContent></Tooltip>
+            <div className="h-8 w-8 flex items-center justify-center"><Compass className="h-4 w-4 text-muted-foreground" /></div>
+          </TooltipTrigger><TooltipContent side="left">{shell.purposeType || "Purpose"}</TooltipContent></Tooltip>
         </div>
 
         {/* Settings section — icon column */}
@@ -269,16 +276,18 @@ export function WorkspaceUnifiedSidebarV2({
           { icon: <MessageSquare className="h-4 w-4" />, label: "Collaboration", path: `${base}/collaboration` },
           { icon: <BarChart3 className="h-4 w-4" />, label: "Reports", path: `${base}/reports` },
           { icon: <Users className="h-4 w-4" />, label: "Team", path: `${base}/team` },
-          { icon: <Cpu className="h-4 w-4" />, label: "Crew (AI)", path: `${base}/crew` },
+          { icon: <Cpu className="h-4 w-4" />, label: "Crew", path: `${base}/crew` },
+          { icon: <CheckCircle2 className="h-4 w-4" />, label: "Modules", path: `${base}/projects/settings` },
           { icon: <Scale className="h-4 w-4" />, label: "Rules", path: `${base}/rules` },
           { icon: <ShieldCheck className="h-4 w-4" />, label: "Governance", path: `${base}/governance` },
           { icon: <Package className="h-4 w-4" />, label: "Resources", path: `${base}/resources` },
           { icon: <GitBranch className="h-4 w-4" />, label: "Workflows", path: `${base}/workflows` },
         ]}
       >
-        <NavItem icon={<Settings className="h-4 w-4" />} label="Configure" path={`${base}/settings`} />
-        <NavItem icon={<Users className="h-4 w-4" />} label="Team" path={`${base}/team`} />
-        <NavItem icon={<Cpu className="h-4 w-4" />} label="Crew (AI)" path={`${base}/crew`} />
+        <NavItem icon={<Settings className="h-4 w-4" />} label="Configure" path={`${base}/settings`} count={shell.enabledModules.length} />
+        <NavItem icon={<Users className="h-4 w-4" />} label="Team" path={`${base}/team`} count={shell.teamCount} />
+        <NavItem icon={<Cpu className="h-4 w-4" />} label="Crew" path={`${base}/crew`} count={shell.crewCount} />
+        <NavItem icon={<CheckCircle2 className="h-4 w-4" />} label="Modules" path={`${base}/projects/settings`} count={shell.enabledModules.length} />
       </Section>
 
       {/* ══ Separator ══ */}
@@ -292,11 +301,7 @@ export function WorkspaceUnifiedSidebarV2({
         dropdownItems={[
           { icon: <Target className="h-4 w-4" />, label: `Identity: ${shell.workspaceName}`, path: "" },
           { icon: <Compass className="h-4 w-4" />, label: `Purpose: ${shell.purposeType || "not set"}`, path: "" },
-          { icon: <Crosshair className="h-4 w-4" />, label: `Role: ${shell.participantRole || "viewer"}`, path: "" },
           { icon: <Activity className="h-4 w-4" />, label: `Status: ${shell.status.replace(/_/g, " ")}`, path: "" },
-          { icon: <Users className="h-4 w-4" />, label: `Team: ${shell.teamCount} members`, path: `${base}/team` },
-          { icon: <Bot className="h-4 w-4" />, label: `Crew: ${shell.crewCount} AI agents`, path: `${base}/crew` },
-          { icon: <CheckCircle2 className="h-4 w-4" />, label: `Modules: ${shell.enabledModules.length} active`, path: "" },
           ...(shell.missionEmphasis ? [{ icon: <Zap className="h-4 w-4" />, label: `Mission: ${shell.missionEmphasis}`, path: "" }] : []),
           { icon: <HeartPulse className="h-4 w-4" />, label: "Health: Healthy", path: "" },
           { icon: <Bell className="h-4 w-4" />, label: "Alerts: None", path: "" },
@@ -355,9 +360,6 @@ export function WorkspaceUnifiedSidebarV2({
               </div>
             ) : (
               <div className="rounded border bg-muted/40 p-1.5">
-                <Badge variant="secondary" className="text-[9px] py-0 font-semibold mb-0.5">
-                  {shell.participantRole || "viewer"}
-                </Badge>
                 <p className="text-[10px] text-muted-foreground leading-relaxed">
                   {participantType === "manager"
                     ? "You manage this workspace."
@@ -367,29 +369,6 @@ export function WorkspaceUnifiedSidebarV2({
                 </p>
               </div>
             )}
-          </div>
-        )}
-
-        {/* ── Current Work (compact grid) ── */}
-        {shell.sidebar.showCurrentWork && (
-          <div className="px-1 pb-1.5">
-            <div className="grid grid-cols-3 gap-1.5">
-              <div className="text-center rounded bg-muted/50 py-1.5">
-                <Users className="h-3 w-3 mx-auto mb-0.5 text-muted-foreground" />
-                <p className="text-xs font-bold">{shell.teamCount}</p>
-                <p className="text-[8px] text-muted-foreground">Team</p>
-              </div>
-              <div className="text-center rounded bg-muted/50 py-1.5">
-                <Bot className="h-3 w-3 mx-auto mb-0.5 text-muted-foreground" />
-                <p className="text-xs font-bold">{shell.crewCount}</p>
-                <p className="text-[8px] text-muted-foreground">Crew</p>
-              </div>
-              <div className="text-center rounded bg-muted/50 py-1.5">
-                <CheckCircle2 className="h-3 w-3 mx-auto mb-0.5 text-muted-foreground" />
-                <p className="text-xs font-bold">{shell.enabledModules.length}</p>
-                <p className="text-[8px] text-muted-foreground">Modules</p>
-              </div>
-            </div>
           </div>
         )}
 
