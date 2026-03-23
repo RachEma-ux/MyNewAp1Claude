@@ -34,7 +34,8 @@ export const hrStaffingRouter = router({
       limit: z.number().min(1).max(200).default(50),
       offset: z.number().min(0).default(0),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.STAFFING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -77,7 +78,8 @@ export const hrStaffingRouter = router({
       workerType: z.string().optional(),
       limit: z.number().min(1).max(100).default(20),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.STAFFING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -124,6 +126,7 @@ export const hrStaffingRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.STAFFING_ASSIGN);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -162,6 +165,7 @@ export const hrStaffingRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.STAFFING_ASSIGN);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -190,6 +194,7 @@ export const hrStaffingRouter = router({
       endDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.STAFFING_END);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -216,7 +221,8 @@ export const hrStaffingRouter = router({
 
   listSkills: protectedProcedure
     .input(z.object({ workerId: z.number().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.STAFFING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -233,7 +239,8 @@ export const hrStaffingRouter = router({
 
   listCertifications: protectedProcedure
     .input(z.object({ workerId: z.number().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.STAFFING_READ);
       const db = getDb();
       if (!db) return [];
 

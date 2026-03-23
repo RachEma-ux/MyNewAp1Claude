@@ -24,7 +24,7 @@ import {
   hrEmployeeCertifications,
 } from "../../../drizzle/schema";
 import { logHrAudit } from "../audit";
-import { checkHrAccess, HR_ACTIONS } from "../permissions";
+import { checkHrAccess, requireHrPermission, HR_ACTIONS } from "../permissions";
 import { getAllReminders } from "../jobs/reminders";
 
 export const hrAnalyticsRouter = router({
@@ -33,7 +33,7 @@ export const hrAnalyticsRouter = router({
   // ============================================================================
 
   getDashboardSummary: protectedProcedure.query(async ({ ctx }) => {
-    checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_READ);
+    await checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_READ);
     const db = getDb();
     if (!db) return {
       totalWorkers: 0, activeWorkers: 0, onLeave: 0, terminated: 0,
@@ -122,7 +122,7 @@ export const hrAnalyticsRouter = router({
   // ============================================================================
 
   getWorkforceBreakdown: protectedProcedure.query(async ({ ctx }) => {
-    checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_READ);
+    await checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_READ);
     const db = getDb();
     if (!db) return { byType: [], byCategory: [], byStatus: [] };
 
@@ -152,7 +152,7 @@ export const hrAnalyticsRouter = router({
   // ============================================================================
 
   getReminders: protectedProcedure.query(async ({ ctx }) => {
-    checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_READ);
+    await checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_READ);
     return getAllReminders();
   }),
 
@@ -168,7 +168,7 @@ export const hrAnalyticsRouter = router({
       isActive: z.boolean().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_READ);
+      await checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -189,7 +189,7 @@ export const hrAnalyticsRouter = router({
       config: z.record(z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.ANALYTICS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrReportDefinitions).values({
@@ -209,7 +209,7 @@ export const hrAnalyticsRouter = router({
       isActive: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_MANAGE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.ANALYTICS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...data } = input;
@@ -234,7 +234,7 @@ export const hrAnalyticsRouter = router({
       periodTo: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_READ);
+      await checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -259,7 +259,7 @@ export const hrAnalyticsRouter = router({
       dimensions: z.record(z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      checkHrAccess(ctx.user, HR_ACTIONS.ANALYTICS_WRITE);
+      await requireHrPermission(ctx.user, HR_ACTIONS.ANALYTICS_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrMetricSnapshots).values(input).returning();

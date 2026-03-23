@@ -73,7 +73,8 @@ export const hrEngagementRouter = router({
       status: z.string().optional(),
       surveyType: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.SURVEY_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -87,7 +88,8 @@ export const hrEngagementRouter = router({
 
   getSurveyCampaign: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.SURVEY_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrSurveyCampaigns).where(eq(hrSurveyCampaigns.id, input.id)).limit(1);
@@ -106,6 +108,7 @@ export const hrEngagementRouter = router({
       isAnonymous: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SURVEY_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrSurveyCampaigns).values({
@@ -118,6 +121,7 @@ export const hrEngagementRouter = router({
   transitionSurveyCampaign: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SURVEY_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrSurveyCampaigns).where(eq(hrSurveyCampaigns.id, input.id)).limit(1);
@@ -144,7 +148,8 @@ export const hrEngagementRouter = router({
       campaignId: z.number().optional(),
       workerId: z.number().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.SURVEY_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -165,6 +170,7 @@ export const hrEngagementRouter = router({
       comments: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.SURVEY_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrSurveyResponses).values({
@@ -188,7 +194,8 @@ export const hrEngagementRouter = router({
       status: z.string().optional(),
       category: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ENGAGEMENT_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -209,6 +216,7 @@ export const hrEngagementRouter = router({
       endDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ENGAGEMENT_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrEngagementPrograms).values({
@@ -221,6 +229,7 @@ export const hrEngagementRouter = router({
   transitionEngagementProgram: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ENGAGEMENT_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrEngagementPrograms).where(eq(hrEngagementPrograms.id, input.id)).limit(1);
@@ -247,7 +256,8 @@ export const hrEngagementRouter = router({
       category: z.string().optional(),
       isActive: z.boolean().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ENGAGEMENT_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -269,6 +279,7 @@ export const hrEngagementRouter = router({
       contactInfo: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ENGAGEMENT_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrWellbeingResources).values({
@@ -288,7 +299,8 @@ export const hrEngagementRouter = router({
       offset: z.number().min(0).default(0),
       isActive: z.boolean().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.RECOGNITION_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -306,6 +318,7 @@ export const hrEngagementRouter = router({
       category: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RECOGNITION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrRecognitionPrograms).values({
@@ -327,7 +340,8 @@ export const hrEngagementRouter = router({
       recipientWorkerId: z.number().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.RECOGNITION_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -351,6 +365,7 @@ export const hrEngagementRouter = router({
       value: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RECOGNITION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrRecognitionEvents).values({
@@ -366,6 +381,7 @@ export const hrEngagementRouter = router({
   transitionRecognitionEvent: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ENGAGEMENT_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrRecognitionEvents).where(eq(hrRecognitionEvents.id, input.id)).limit(1);

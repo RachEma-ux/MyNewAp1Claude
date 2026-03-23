@@ -71,7 +71,8 @@ export const hrRecruitingRouter = router({
       status: z.string().optional(),
       priority: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.RECRUITING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -90,7 +91,8 @@ export const hrRecruitingRouter = router({
 
   getRequest: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.RECRUITING_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -114,6 +116,7 @@ export const hrRecruitingRouter = router({
       targetStartDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RECRUITING_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -148,6 +151,7 @@ export const hrRecruitingRouter = router({
       closedReason: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RECRUITING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -199,7 +203,8 @@ export const hrRecruitingRouter = router({
       limit: z.number().min(1).max(200).default(50),
       offset: z.number().min(0).default(0),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.RECRUITING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -216,7 +221,8 @@ export const hrRecruitingRouter = router({
 
   getCandidate: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.RECRUITING_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -237,6 +243,7 @@ export const hrRecruitingRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RECRUITING_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -267,6 +274,7 @@ export const hrRecruitingRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RECRUITING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -316,7 +324,8 @@ export const hrRecruitingRouter = router({
       status: z.string().optional(),
       limit: z.number().min(1).max(100).default(50),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.RECRUITING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -342,6 +351,7 @@ export const hrRecruitingRouter = router({
       location: z.string().max(300).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RECRUITING_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -364,6 +374,7 @@ export const hrRecruitingRouter = router({
       rating: z.number().min(1).max(5).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RECRUITING_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -385,7 +396,8 @@ export const hrRecruitingRouter = router({
       status: z.string().optional(),
       limit: z.number().min(1).max(100).default(50),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.RECRUITING_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -412,6 +424,7 @@ export const hrRecruitingRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RECRUITING_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -441,6 +454,7 @@ export const hrRecruitingRouter = router({
       declineReason: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RECRUITING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -486,7 +500,8 @@ export const hrRecruitingRouter = router({
   // Summary / Dashboard
   // ============================================================================
 
-  summary: protectedProcedure.query(async () => {
+  summary: protectedProcedure.query(async ({ ctx }) => {
+    await checkHrAccess(ctx.user, HR_ACTIONS.RECRUITING_READ);
     const db = getDb();
     if (!db) return { openRequests: 0, activeCandidates: 0, pendingOffers: 0 };
 

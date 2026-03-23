@@ -30,7 +30,8 @@ export const hrOrganizationRouter = router({
       parentId: z.number().nullable().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ORGANIZATION_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -51,7 +52,8 @@ export const hrOrganizationRouter = router({
 
   getOrgUnit: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ORGANIZATION_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(hrOrgUnits).where(eq(hrOrgUnits.id, input.id)).limit(1);
@@ -60,7 +62,8 @@ export const hrOrganizationRouter = router({
     }),
 
   getOrgTree: protectedProcedure
-    .query(async () => {
+    .query(async ({ ctx }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ORGANIZATION_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -95,6 +98,7 @@ export const hrOrganizationRouter = router({
       managerWorkerId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ORGANIZATION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -116,7 +120,8 @@ export const hrOrganizationRouter = router({
       limit: z.number().min(1).max(200).default(50),
       offset: z.number().min(0).default(0),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ORGANIZATION_READ);
       const db = getDb();
       if (!db) return [];
 
@@ -133,7 +138,8 @@ export const hrOrganizationRouter = router({
 
   getPosition: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ORGANIZATION_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(hrPositions).where(eq(hrPositions.id, input.id)).limit(1);
@@ -152,6 +158,7 @@ export const hrOrganizationRouter = router({
       headcountLimit: z.number().min(1).default(1),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ORGANIZATION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -178,6 +185,7 @@ export const hrOrganizationRouter = router({
       headcountLimit: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ORGANIZATION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -196,14 +204,16 @@ export const hrOrganizationRouter = router({
     }),
 
   listJobFamilies: protectedProcedure
-    .query(async () => {
+    .query(async ({ ctx }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ORGANIZATION_READ);
       const db = getDb();
       if (!db) return [];
       return db.select().from(hrJobFamilies).orderBy(hrJobFamilies.name);
     }),
 
   listJobLevels: protectedProcedure
-    .query(async () => {
+    .query(async ({ ctx }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.ORGANIZATION_READ);
       const db = getDb();
       if (!db) return [];
       return db.select().from(hrJobLevels).orderBy(hrJobLevels.rank);

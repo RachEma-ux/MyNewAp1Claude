@@ -76,7 +76,8 @@ export const hrComplianceRouter = router({
       severity: z.string().optional(),
       category: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.INCIDENT_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -91,11 +92,13 @@ export const hrComplianceRouter = router({
 
   getIncidentReport: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.INCIDENT_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrIncidentReports).where(eq(hrIncidentReports.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Incident report not found" });
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compliance.incident", entityId: input.id, fields: ["description", "rootCause", "correctiveAction"] });
       return row;
     }),
 
@@ -111,6 +114,7 @@ export const hrComplianceRouter = router({
       affectedWorkerId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.INCIDENT_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrIncidentReports).values({
@@ -132,6 +136,7 @@ export const hrComplianceRouter = router({
       correctiveAction: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.INCIDENT_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrIncidentReports).where(eq(hrIncidentReports.id, input.id)).limit(1);
@@ -161,7 +166,8 @@ export const hrComplianceRouter = router({
       status: z.string().optional(),
       category: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.COMPLIANCE_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -185,6 +191,7 @@ export const hrComplianceRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPLIANCE_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrComplianceObligations).values({
@@ -197,6 +204,7 @@ export const hrComplianceRouter = router({
   transitionComplianceObligation: governedProcedure
     .input(z.object({ id: z.number(), status: z.string(), notes: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPLIANCE_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrComplianceObligations).where(eq(hrComplianceObligations.id, input.id)).limit(1);
@@ -225,7 +233,8 @@ export const hrComplianceRouter = router({
       offset: z.number().min(0).default(0),
       obligationId: z.number().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.COMPLIANCE_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -245,6 +254,7 @@ export const hrComplianceRouter = router({
       documentRef: z.string().max(500).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPLIANCE_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrComplianceEvidence).values({
@@ -265,7 +275,8 @@ export const hrComplianceRouter = router({
       status: z.string().optional(),
       category: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.RISK_READ);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -279,7 +290,8 @@ export const hrComplianceRouter = router({
 
   getRiskItem: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.RISK_READ);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrRiskItems).where(eq(hrRiskItems.id, input.id)).limit(1);
@@ -299,6 +311,7 @@ export const hrComplianceRouter = router({
       mitigationDueDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RISK_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const likelihoodScore = { low: 1, medium: 2, high: 3, very_high: 4 }[input.likelihood] ?? 2;
@@ -318,6 +331,7 @@ export const hrComplianceRouter = router({
       mitigationPlan: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.RISK_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrRiskItems).where(eq(hrRiskItems.id, input.id)).limit(1);
