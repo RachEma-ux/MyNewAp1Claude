@@ -1,0 +1,51 @@
+Session Summary — 2026-03-23 23:45
+
+## Commits Pushed (5)
+
+1. 06efeae — Fix HR directory: add migration 0024 and unblock seed endpoint
+2. 8ab0e97 — Add Governance-Centrale structure and agent role definitions
+3. 8ef2e90 — Rename Governance-Centrale to Governance-Center
+4. 82cfa10 — Fix empty SelectItem values crashing Radix Select across 8 HR pages
+5. 96fe84f — Add governance-first module and sandbox policy with templates
+
+## Work Completed
+
+### 1. HR Directory Fix (06efeae)
+- ROOT CAUSE: Migration 0024_concerned_gravity.sql (66 HR tables) was never applied to the database. Directory INNER JOIN returned zero rows because tables didn't exist.
+- SECONDARY: seedDemo used governedProcedure which denied the call because hr.settings.seedDemo wasn't registered in the action registry.
+- FIX: Applied migration manually via psql. Changed seedDemo from governedProcedure to adminProcedure.
+- RESULT: 28 employees seeded and visible in directory. Seed idempotency confirmed.
+- Files changed: server/hr/router.ts, drizzle/meta/_journal.json, drizzle/0024_concerned_gravity.sql, drizzle/meta/0024_snapshot.json
+
+### 2. Governance-Centrale Docs + Agent Roles (8ab0e97)
+- Added global governance models (audit, threat, security, compliance, control matrix, coverage matrix, policy engine position)
+- Added module governance profiles for 10 modules
+- Added platform-domain docs for 7 domains
+- Added Builder, Reviewer, Tester agent role definitions
+- 35 files changed
+
+### 3. Rename Governance-Centrale to Governance-Center (8ef2e90)
+- Renamed folder and updated all 6 internal references
+- 71 files changed (renames + content updates)
+
+### 4. Fix Radix Select Crash (82cfa10)
+- 8 HR pages had <SelectItem value=""> which crashes Radix UI Select
+- Changed all to value="all" with matching state initializers and filter logic
+- Files: HRBenefitsPage, HRCompensationPage, HRComplianceMgmtPage, HRGrievancesPage, HRIncidentsPage, HRTalentPage, HRPoliciesPage, HRSurveysPage
+
+### 5. Governance-First Module and Sandbox Policy (96fe84f)
+- Created official policy: GOVERNANCE_FIRST_MODULE_AND_SANDBOX_POLICY.md
+- Created sandbox docs: README.md, SANDBOX_POLICY.md, 4 templates
+- Created module governance packet templates: 8 templates
+- Updated README, GOVERNANCE_INDEX, GOVERNANCE_MODEL, OPERATIONAL_COMPLIANCE_MODEL
+- 15 files created, 4 files modified
+- No runtime code changes — documentation only
+- Full AGENTS.md workflow followed: Planner → Builder → Reviewer → Tester → Governance
+
+## Database State
+- PostgreSQL: mynewap1claude
+- 66 HR tables present
+- 28 employees seeded (26 active, 1 on_leave, 1 terminated contractor)
+- App running on localhost:3000
+
+## Branch: main (up to date with origin)
