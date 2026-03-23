@@ -26,6 +26,16 @@ import {
   Star,
   UserCheck,
   UserMinus,
+  DollarSign,
+  Heart,
+  ScrollText,
+  Scale,
+  ClipboardList,
+  Smile,
+  AlertTriangle,
+  Shield,
+  PieChart,
+  Gem,
 } from "lucide-react";
 
 const sections = [
@@ -48,6 +58,21 @@ const sections = [
   { label: "Certifications", icon: ShieldCheck, href: "/hr/certifications", description: "Certification tracking" },
   { label: "Goals", icon: Target, href: "/hr/goals", description: "Employee goals and objectives" },
   { label: "Reviews", icon: Star, href: "/hr/reviews", description: "Performance reviews" },
+  // Phase 4 — Compensation & Benefits
+  { label: "Compensation", icon: DollarSign, href: "/hr/compensation", description: "Salary bands and comp records" },
+  { label: "Benefits", icon: Heart, href: "/hr/benefits", description: "Benefit plans and enrollments" },
+  // Phase 4 — Employee Relations
+  { label: "Policies", icon: ScrollText, href: "/hr/policies", description: "HR policies and acknowledgements" },
+  { label: "Grievances", icon: Scale, href: "/hr/grievances", description: "Grievances and investigations" },
+  // Phase 4 — Engagement
+  { label: "Surveys", icon: ClipboardList, href: "/hr/surveys", description: "Employee surveys" },
+  { label: "Engagement", icon: Smile, href: "/hr/engagement", description: "Programs and recognition" },
+  // Phase 4 — Compliance & Risk
+  { label: "Incidents", icon: AlertTriangle, href: "/hr/incidents", description: "Incident reports" },
+  { label: "Compliance", icon: Shield, href: "/hr/compliance-mgmt", description: "Obligations and risk register" },
+  // Phase 4 — Analytics & Talent
+  { label: "HR Analytics", icon: PieChart, href: "/hr/analytics", description: "Workforce metrics dashboard" },
+  { label: "Talent", icon: Gem, href: "/hr/talent", description: "Talent reviews and succession" },
   // Config
   { label: "Reports", icon: BarChart3, href: "/hr/reports", description: "HR reports and analytics" },
   { label: "Settings", icon: Settings, href: "/hr/settings", description: "HR module configuration" },

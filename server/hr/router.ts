@@ -1,9 +1,11 @@
 /**
  * HR Root Router — Global HR namespace
  *
- * Composes directory, organization, staffing, recruiting, lifecycle,
- * time & attendance, learning & development, and performance
- * sub-routers into the root `hr.*` tRPC namespace.
+ * Composes all HR sub-routers into the root `hr.*` tRPC namespace.
+ * Phase 1: Directory, Organization, Staffing
+ * Phase 2: Recruiting, Lifecycle (Onboarding/Offboarding)
+ * Phase 3: Time & Attendance, Learning, Performance
+ * Phase 4: Compensation, Relations, Engagement, Compliance, Analytics, Talent
  */
 
 import { router, protectedProcedure } from "../_core/trpc";
@@ -15,12 +17,17 @@ import { hrLifecycleRouter } from "./lifecycle/router";
 import { hrTimeRouter } from "./time/router";
 import { hrLearningRouter } from "./learning/router";
 import { hrPerformanceRouter } from "./performance/router";
+import { hrCompensationRouter } from "./compensation/router";
+import { hrRelationsRouter } from "./relations/router";
+import { hrEngagementRouter } from "./engagement/router";
+import { hrComplianceRouter } from "./compliance/router";
+import { hrAnalyticsRouter } from "./analytics/router";
+import { hrTalentRouter } from "./talent/router";
 
-// Placeholder sub-routers for future phases
 const hrSettingsRouter = router({
   get: protectedProcedure.query(() => ({
     module: "hr",
-    version: "3.0.0",
+    version: "4.0.0",
     features: {
       directory: true,
       organization: true,
@@ -30,31 +37,35 @@ const hrSettingsRouter = router({
       time: true,
       learning: true,
       performance: true,
-      compensation: false,
-      relations: false,
-      analytics: false,
-      security: false,
-      compliance: false,
+      compensation: true,
+      relations: true,
+      engagement: true,
+      compliance: true,
+      analytics: true,
+      talent: true,
     },
   })),
 });
 
-const hrReportsRouter = router({
-  summary: protectedProcedure.query(() => ({
-    message: "HR Reports — coming in Phase 4",
-    availableReports: [],
-  })),
-});
-
 export const hrRouter = router({
+  // Phase 1
   directory: hrDirectoryRouter,
   organization: hrOrganizationRouter,
   staffing: hrStaffingRouter,
+  // Phase 2
   recruiting: hrRecruitingRouter,
   lifecycle: hrLifecycleRouter,
+  // Phase 3
   time: hrTimeRouter,
   learning: hrLearningRouter,
   performance: hrPerformanceRouter,
+  // Phase 4
+  compensation: hrCompensationRouter,
+  relations: hrRelationsRouter,
+  engagement: hrEngagementRouter,
+  compliance: hrComplianceRouter,
+  analytics: hrAnalyticsRouter,
+  talent: hrTalentRouter,
+  // Config
   settings: hrSettingsRouter,
-  reports: hrReportsRouter,
 });

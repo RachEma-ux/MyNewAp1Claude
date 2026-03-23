@@ -53,6 +53,52 @@ export const HR_ACTIONS = {
   PERFORMANCE_READ_SELF: "hr.performance.read.self",
   PERFORMANCE_WRITE: "hr.performance.write",
   PERFORMANCE_MANAGE: "hr.performance.manage",
+  // Phase 4 — Compensation & Benefits
+  COMPENSATION_READ: "hr.compensation.read",
+  COMPENSATION_READ_SENSITIVE: "hr.compensation.read.sensitive",
+  COMPENSATION_WRITE: "hr.compensation.write",
+  COMPENSATION_MANAGE: "hr.compensation.manage",
+  BENEFITS_READ: "hr.benefits.read",
+  BENEFITS_WRITE: "hr.benefits.write",
+  BENEFITS_MANAGE: "hr.benefits.manage",
+  // Phase 4 — Employee Relations
+  RELATIONS_READ: "hr.relations.read",
+  RELATIONS_READ_SENSITIVE: "hr.relations.read.sensitive",
+  RELATIONS_WRITE: "hr.relations.write",
+  RELATIONS_MANAGE: "hr.relations.manage",
+  POLICY_READ: "hr.policy.read",
+  POLICY_WRITE: "hr.policy.write",
+  POLICY_MANAGE: "hr.policy.manage",
+  // Phase 4 — Well Being & Engagement
+  ENGAGEMENT_READ: "hr.engagement.read",
+  ENGAGEMENT_WRITE: "hr.engagement.write",
+  ENGAGEMENT_MANAGE: "hr.engagement.manage",
+  SURVEY_READ: "hr.survey.read",
+  SURVEY_WRITE: "hr.survey.write",
+  SURVEY_MANAGE: "hr.survey.manage",
+  RECOGNITION_READ: "hr.recognition.read",
+  RECOGNITION_WRITE: "hr.recognition.write",
+  // Phase 4 — Compliance & Risk
+  COMPLIANCE_READ: "hr.compliance.read",
+  COMPLIANCE_WRITE: "hr.compliance.write",
+  COMPLIANCE_MANAGE: "hr.compliance.manage",
+  INCIDENT_READ: "hr.incident.read",
+  INCIDENT_WRITE: "hr.incident.write",
+  INCIDENT_MANAGE: "hr.incident.manage",
+  RISK_READ: "hr.risk.read",
+  RISK_WRITE: "hr.risk.write",
+  RISK_MANAGE: "hr.risk.manage",
+  // Phase 4 — Analytics & Reporting
+  ANALYTICS_READ: "hr.analytics.read",
+  ANALYTICS_WRITE: "hr.analytics.write",
+  ANALYTICS_MANAGE: "hr.analytics.manage",
+  // Phase 4 — Advanced Talent
+  TALENT_READ: "hr.talent.read",
+  TALENT_WRITE: "hr.talent.write",
+  TALENT_MANAGE: "hr.talent.manage",
+  SUCCESSION_READ: "hr.succession.read",
+  SUCCESSION_WRITE: "hr.succession.write",
+  SUCCESSION_MANAGE: "hr.succession.manage",
 } as const;
 
 /** Fields that should be masked in public directory responses */
@@ -61,6 +107,24 @@ export const MASKED_DIRECTORY_FIELDS = [
   "notes",
   "costCenter",
   "legalEntity",
+] as const;
+
+/** Fields that should be masked in compensation responses for non-privileged users */
+export const MASKED_COMPENSATION_FIELDS = [
+  "baseSalary",
+  "amount",
+  "budgetPercent",
+  "employerContribution",
+  "employeeContribution",
+] as const;
+
+/** Fields that should be masked in employee relations responses for non-privileged users */
+export const MASKED_RELATIONS_FIELDS = [
+  "description",
+  "resolutionNotes",
+  "findings",
+  "recommendation",
+  "appealNotes",
 ] as const;
 
 /**
