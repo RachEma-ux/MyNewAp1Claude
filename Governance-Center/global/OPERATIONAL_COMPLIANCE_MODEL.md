@@ -55,6 +55,10 @@ Current state: evidence production is inconsistent across modules (see [Audit Mo
 4. **Action registry sync**: Are all actions registered? (action-registry.ts)
 5. **Control catalog lint**: Are YAML controls valid? (catalog-lint.ts)
 
+## Sandbox Compliance
+
+Sandbox explorations are subject to the [Sandbox Policy](../sandbox/SANDBOX_POLICY.md) and the overarching [Governance-First Module and Sandbox Policy](GOVERNANCE_FIRST_MODULE_AND_SANDBOX_POLICY.md). Active sandboxes must be tracked in `Governance-Center/sandbox/README.md` and reviewed at their declared target review dates. Sandbox promotion requires full module governance packet compliance.
+
 ## Remediation Tracking
 
 Governance gaps identified in audits are tracked in:

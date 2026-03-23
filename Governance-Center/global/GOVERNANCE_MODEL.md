@@ -52,6 +52,13 @@ Current default: `permissive` (as seen in server boot logs).
 - **policyGate**: RBAC-based policy gate in services layer
 - **Scorecard**: Per-entity governance health scoring with control catalog evaluation
 
-## Authoritative Source
+## Module Governance Sequencing
 
-The full governance specification is in the [Governance Bible](../docs/governance-bible/GOVERNANCE_BIBLE.md).
+All modules must follow the governance-first policy: governance documentation before implementation code. See [GOVERNANCE_FIRST_MODULE_AND_SANDBOX_POLICY.md](GOVERNANCE_FIRST_MODULE_AND_SANDBOX_POLICY.md) for the official policy, including the sandbox exception path and promotion rules.
+
+Module governance packet templates are in `Governance-Center/templates/module/`.
+
+## Authoritative Sources
+
+- Full governance specification: [Governance Bible](../docs/governance-bible/GOVERNANCE_BIBLE.md)
+- Module and sandbox policy: [Governance-First Module and Sandbox Policy](GOVERNANCE_FIRST_MODULE_AND_SANDBOX_POLICY.md)

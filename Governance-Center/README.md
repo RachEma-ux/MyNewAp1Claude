@@ -64,6 +64,14 @@ Governance-Center/
   reports/                      -- audit and compliance reports
     audit/                      -- platform audit reports
 
+  sandbox/                      -- sandbox exploration governance
+    README.md                   -- sandbox overview, active sandboxes
+    SANDBOX_POLICY.md           -- operational sandbox rules
+    _templates/                 -- copy-ready sandbox governance templates
+
+  templates/                    -- reusable governance templates
+    module/                     -- module governance packet templates (8 files)
+
   manifests/                    -- reference manifests and policies
 ```
 
@@ -71,11 +79,14 @@ Governance-Center/
 
 1. **Start with** `index/GOVERNANCE_INDEX.md` for a full navigation map
 2. **Understand scope** via `index/GOVERNANCE_SCOPE.md`
-3. **Read global doctrine** in `global/` for platform-wide governance
-4. **Check a specific module** in `modules/<module>/README.md` for its governance profile
-5. **Check a platform domain** in `platform-domains/<domain>/README.md` for cross-cutting concerns
-6. **Find runtime code locations** in `*_RUNTIME_REFERENCES.md` files
-7. **Review audit results** in `reports/`
+3. **Read the governance-first policy** in `global/GOVERNANCE_FIRST_MODULE_AND_SANDBOX_POLICY.md`
+4. **Read global doctrine** in `global/` for platform-wide governance
+5. **Check a specific module** in `modules/<module>/README.md` for its governance profile
+6. **Check a platform domain** in `platform-domains/<domain>/README.md` for cross-cutting concerns
+7. **Start a new module** using templates from `templates/module/`
+8. **Start a sandbox exploration** using templates from `sandbox/_templates/`
+9. **Find runtime code locations** in `*_RUNTIME_REFERENCES.md` files
+10. **Review audit results** in `reports/`
 
 ## Where Runtime Governance Code Lives
 

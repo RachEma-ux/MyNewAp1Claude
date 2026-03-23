@@ -16,6 +16,32 @@ Navigational map of all governance-related content in this repository.
 | [POLICY_ENGINE_POSITION.md](../global/POLICY_ENGINE_POSITION.md) | Rule-based vs OPA clarification |
 | [GOVERNANCE_COVERAGE_MATRIX.md](../global/GOVERNANCE_COVERAGE_MATRIX.md) | Mutation/read governance coverage per module |
 | [THREAT_MODEL.md](../global/THREAT_MODEL.md) | Threats and governance-security risks |
+| [GOVERNANCE_FIRST_MODULE_AND_SANDBOX_POLICY.md](../global/GOVERNANCE_FIRST_MODULE_AND_SANDBOX_POLICY.md) | Official governance-first module and sandbox policy |
+
+---
+
+## Sandbox (`sandbox/`)
+
+| Document | Purpose |
+|---|---|
+| [README.md](../sandbox/README.md) | Sandbox overview, active sandboxes, promotion process |
+| [SANDBOX_POLICY.md](../sandbox/SANDBOX_POLICY.md) | Operational sandbox rules (concise) |
+| [_templates/](../sandbox/_templates/) | Copy-ready sandbox governance templates (4 files) |
+
+---
+
+## Module Governance Packet Templates (`templates/module/`)
+
+| Template | Purpose |
+|---|---|
+| [README.template.md](../templates/module/README.template.md) | Module overview and governance status |
+| [MODULE_GOVERNANCE_PROFILE.template.md](../templates/module/MODULE_GOVERNANCE_PROFILE.template.md) | Governance model, procedures, permissions |
+| [MODULE_CONTROL_SURFACE.template.md](../templates/module/MODULE_CONTROL_SURFACE.template.md) | Controls, gates, enforcement points |
+| [MODULE_AUDIT_MODEL.template.md](../templates/module/MODULE_AUDIT_MODEL.template.md) | Audit logging, evidence, traceability |
+| [MODULE_PERIODIC_CHECKS.template.md](../templates/module/MODULE_PERIODIC_CHECKS.template.md) | Recurring governance checks |
+| [MODULE_RISKS.template.md](../templates/module/MODULE_RISKS.template.md) | Risk register and categories |
+| [MODULE_OPEN_GAPS.template.md](../templates/module/MODULE_OPEN_GAPS.template.md) | Open governance gaps and remediation |
+| [MODULE_RUNTIME_REFERENCES.template.md](../templates/module/MODULE_RUNTIME_REFERENCES.template.md) | Runtime code locations |
 
 ---
 
