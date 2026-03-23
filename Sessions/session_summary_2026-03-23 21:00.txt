@@ -1,0 +1,60 @@
+Session Summary — 2026-03-23 21:00
+
+## Task: Combined HR Re-Audit (v7.2.0) — Evidence Gathering Phase
+
+### What Was Done
+Continued evidence gathering for the combined Governance-to-HR Compatibility + Final HR Acceptance audit.
+
+### Files Read This Session (Builder Evidence Phase)
+Already read from prior context:
+- server/hr/router.ts (v7.2.0, 14 sub-routers + settings + hrMeRouter)
+- server/hr/permissions.ts (async checkHrAccess, requireHrPermission, resolveDataScope, preventSelfApproval)
+- server/hr/time/router.ts (fully hardened, all mutations governed)
+- server/hr/directory/router.ts (scope-aware list, maskDirectoryFields)
+- server/hr/compensation/router.ts (masking, preventSelfApproval on bonus)
+- server/hr/talent/router.ts (masking imported but NOT applied on listTalentReviews)
+- server/hr/analytics/router.ts (unified audit log endpoint)
+- server/hr/audit.ts (logHrAudit, logSensitiveRead, logStatusChange)
+- server/_core/trpc.ts (governedProcedure with full governance pipeline)
+- server/modules/hr/router.ts (workspace-scoped HR surface)
+
+Newly read this session:
+- server/hr/relations/router.ts — FULLY HARDENED: checkHrAccess + masking on sensitive reads, governedProcedure + requireHrPermission on all writes, 4 state machines, logSensitiveRead, logStatusChange
+- server/hr/engagement/router.ts — FULLY HARDENED: checkHrAccess on all reads, governedProcedure + requireHrPermission on all writes, 3 state machines, logHrAudit on all mutations
+- server/hr/compliance/router.ts — FULLY HARDENED: checkHrAccess on all reads, governedProcedure + requireHrPermission on all writes, 3 state machines, logSensitiveRead on incident details
+- server/hr/organization/router.ts — FULLY HARDENED: checkHrAccess on all reads, governedProcedure + requireHrPermission on all writes, logHrAudit on mutations
+
+### Still Needed to Complete Audit
+Files not yet read:
+- server/hr/staffing/router.ts
+- server/hr/recruiting/router.ts
+- server/hr/lifecycle/router.ts
+- server/hr/learning/router.ts
+- server/hr/performance/router.ts
+- client/src/App.tsx (HR routes)
+- client/src/pages/hr/* (HR frontend pages)
+- server/governance/rbac-model.ts
+- server/governance/requireGovernedAction.ts
+- server/modules/registry.ts
+
+### Key Findings So Far
+CONFIRMED:
+- Version 7.2.0
+- Async await on checkHrAccess/requireHrPermission across ALL read routers
+- preventSelfApproval on time entry, leave, overtime, bonus approvals
+- Time mutation governance (governedProcedure)
+- Unified audit endpoint (analytics/listAuditLog)
+- hrMeRouter for frontend role gating
+- Workspace HR surface with requireHrPermission
+- Relations router: full masking + sensitive read logging
+- Engagement router: full permission checks + state machines
+- Compliance router: full permission checks + state machines + sensitive logging
+- Organization router: full permission checks + auditing
+
+ISSUES FOUND:
+- Talent router: listTalentReviews imports maskTalentFields but does NOT apply it (masking gap)
+- Talent router: getTalentReview calls logSensitiveRead with non-standard params
+
+### Session Status
+Audit is ~65% complete (evidence gathering phase). User exited before completion.
+Next session should resume reading remaining 5 sub-routers + frontend files + governance sources, then produce the 8-section audit output.
