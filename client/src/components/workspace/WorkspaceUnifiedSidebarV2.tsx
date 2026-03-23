@@ -162,7 +162,7 @@ export function WorkspaceUnifiedSidebarV2({
             <ChevronDown className="h-3 w-3 ml-auto opacity-60" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="left" align="start" className="w-56 max-h-80 overflow-y-auto">
+        <DropdownMenuContent side="right" align="start" className="w-56 max-h-80 overflow-y-auto">
           <DropdownMenuLabel>{title} — Full List</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {dropdownItems.map((item, i) => (
@@ -190,11 +190,11 @@ export function WorkspaceUnifiedSidebarV2({
 
   if (collapsed) {
     return (
-      <aside className="flex flex-col border-l bg-card w-12 shrink-0 transition-all duration-200">
+      <aside className="flex flex-col border-r bg-card w-12 shrink-0 transition-all duration-200">
         {/* Toggle button */}
         <div className="flex items-center justify-center h-10 border-b shrink-0">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggle}>
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
@@ -202,48 +202,48 @@ export function WorkspaceUnifiedSidebarV2({
         <div className="flex-1 flex flex-col items-center gap-1 py-2 border-b">
           <Tooltip><TooltipTrigger asChild>
             <div className="p-1"><Wrench className="h-3.5 w-3.5 text-blue-400" /></div>
-          </TooltipTrigger><TooltipContent side="left">Tools</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">Tools</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/settings`}><Button variant={isActive(`${base}/settings`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><LayoutDashboard className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="left">Dashboard</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">Dashboard</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/team`}><Button variant={isActive(`${base}/team`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Users className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="left">Team</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">Team</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/crew`}><Button variant={isActive(`${base}/crew`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Cpu className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="left">Crew</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">Crew</TooltipContent></Tooltip>
         </div>
 
         {/* Context section — icon column */}
         <div className="flex-1 flex flex-col items-center gap-1 py-2 border-b">
           <Tooltip><TooltipTrigger asChild>
             <div className="p-1"><Info className="h-3.5 w-3.5 text-emerald-400" /></div>
-          </TooltipTrigger><TooltipContent side="left">Context</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">Context</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <div className="h-8 w-8 flex items-center justify-center"><Target className="h-4 w-4 text-muted-foreground" /></div>
-          </TooltipTrigger><TooltipContent side="left">{shell.workspaceName}</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">{shell.workspaceName}</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <div className="h-8 w-8 flex items-center justify-center"><Activity className="h-4 w-4 text-muted-foreground" /></div>
-          </TooltipTrigger><TooltipContent side="left">{shell.status.replace(/_/g, " ")}</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">{shell.status.replace(/_/g, " ")}</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <div className="h-8 w-8 flex items-center justify-center"><Compass className="h-4 w-4 text-muted-foreground" /></div>
-          </TooltipTrigger><TooltipContent side="left">{shell.purposeType || "Purpose"}</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">{shell.purposeType || "Purpose"}</TooltipContent></Tooltip>
         </div>
 
         {/* Settings section — icon column */}
         <div className="flex-1 flex flex-col items-center gap-1 py-2">
           <Tooltip><TooltipTrigger asChild>
             <div className="p-1"><Settings className="h-3.5 w-3.5 text-orange-400" /></div>
-          </TooltipTrigger><TooltipContent side="left">Settings</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">Settings</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/oversight`}><Button variant={isActive(`${base}/oversight`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Shield className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="left">Oversight</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">Oversight</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/rules`}><Button variant={isActive(`${base}/rules`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Scale className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="left">Rules</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">Rules</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/governance`}><Button variant={isActive(`${base}/governance`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><ShieldCheck className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="left">Governance</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent side="right">Governance</TooltipContent></Tooltip>
         </div>
       </aside>
     );
@@ -254,11 +254,11 @@ export function WorkspaceUnifiedSidebarV2({
   /* ═══════════════════════════════════════════ */
 
   return (
-    <aside className="flex flex-col border-l bg-card w-64 shrink-0 overflow-hidden transition-all duration-200">
+    <aside className="flex flex-col border-r bg-card w-64 shrink-0 overflow-hidden transition-all duration-200">
       {/* Toggle button */}
       <div className="flex items-center justify-end h-10 border-b px-2 shrink-0">
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggle}>
-          <ChevronRight className="h-4 w-4" />
+          <ChevronLeft className="h-4 w-4" />
         </Button>
       </div>
 

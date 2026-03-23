@@ -186,26 +186,33 @@ export default function WorkspaceExecutionShell() {
         basePath={basePath}
       />
 
-      {/* ─── Body: Context Sidebar + Tools Sidebar + Main Content ─── */}
+      {/* ─── Body: Unified Sidebar (left) + Main Content ─── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Context Sidebar (left) — ALWAYS VISIBLE on desktop */}
-        <WorkspaceContextManagerSidebar
+        {/* Unified Sidebar V2 (left) */}
+        <WorkspaceUnifiedSidebarV2
+          shell={shell}
+          collapsed={unifiedCollapsed}
+          onToggle={() => setUnifiedCollapsed(!unifiedCollapsed)}
+        />
+
+        {/* HIDDEN — kept for rollback, not rendered */}
+        {/* <WorkspaceContextManagerSidebar
           shell={shell}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-        />
+        /> */}
 
-        {/* Main Execution Area — flex row: [ToolsToolbar | content] */}
+        {/* Main Execution Area */}
         <main className="flex-1 flex overflow-hidden bg-background">
-          {/* Tools Toolbar — left edge of main, full height, never exceeds main */}
-          <WorkspaceToolsManagerToolbar
+          {/* HIDDEN — kept for rollback, not rendered */}
+          {/* <WorkspaceToolsManagerToolbar
             shell={shell}
             basePath={basePath}
             open={toolsMobileOpen}
             collapsed={toolsCollapsed}
             onToggle={() => setToolsCollapsed(!toolsCollapsed)}
             onClose={() => setToolsMobileOpen(false)}
-          />
+          /> */}
 
           {/* Scrollable route content */}
           <div className="flex-1 overflow-auto">
@@ -278,12 +285,6 @@ export default function WorkspaceExecutionShell() {
           </div>
         </main>
 
-        {/* ─── NEW SIDEBAR V2 PROTOTYPE (right side for validation) ─── */}
-        <WorkspaceUnifiedSidebarV2
-          shell={shell}
-          collapsed={unifiedCollapsed}
-          onToggle={() => setUnifiedCollapsed(!unifiedCollapsed)}
-        />
       </div>
 
       {/* ─── Manager Controls Drawer (right) ─── */}
