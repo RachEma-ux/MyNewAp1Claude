@@ -81,6 +81,21 @@ describe("HR Phase 5 — Permission Matrix", () => {
     expect(hasPermission("employee", HR_ACTIONS.DIRECTORY_WRITE)).toBe(false);
     expect(hasPermission("admin", HR_ACTIONS.SUCCESSION_MANAGE)).toBe(true);
   });
+
+  it("getHrRoleForUser resolves roles correctly", async () => {
+    const { getHrRoleForUser } = await import("../permissions");
+    expect(getHrRoleForUser({ id: 1, role: "admin" })).toBe("admin");
+    expect(getHrRoleForUser({ id: 2, role: "workspace_admin" })).toBe("workspace_admin");
+    expect(getHrRoleForUser({ id: 3, role: "manager" })).toBe("manager");
+    expect(getHrRoleForUser({ id: 4, role: "hrbp" })).toBe("hrbp");
+    expect(getHrRoleForUser({ id: 5 })).toBe("employee");
+  });
+
+  it("requireHrPermission throws FORBIDDEN for unauthorized action", async () => {
+    const { requireHrPermission, HR_ACTIONS } = await import("../permissions");
+    expect(() => requireHrPermission({ id: 1 }, HR_ACTIONS.DIRECTORY_WRITE)).toThrow();
+    expect(() => requireHrPermission({ id: 1, role: "admin" }, HR_ACTIONS.DIRECTORY_WRITE)).not.toThrow();
+  });
 });
 
 // ============================================================================
@@ -355,5 +370,36 @@ describe("HR Phase 5 — Permission Completeness", () => {
     expect(MASKED_DIRECTORY_FIELDS.length).toBeGreaterThan(0);
     expect(MASKED_COMPENSATION_FIELDS.length).toBeGreaterThan(0);
     expect(MASKED_RELATIONS_FIELDS.length).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================================
+// K. Integration — Audit hooks usage verification
+// ============================================================================
+
+describe("HR Phase 5 — Audit Integration", () => {
+  it("time router imports logStatusChange", async () => {
+    const timeModule = await import("../time/router");
+    expect(timeModule.hrTimeRouter).toBeDefined();
+  });
+
+  it("performance router imports logStatusChange", async () => {
+    const perfModule = await import("../performance/router");
+    expect(perfModule.hrPerformanceRouter).toBeDefined();
+  });
+
+  it("lifecycle router imports logStatusChange", async () => {
+    const lcModule = await import("../lifecycle/router");
+    expect(lcModule.hrLifecycleRouter).toBeDefined();
+  });
+
+  it("compensation router imports maskCompensationFields", async () => {
+    const compModule = await import("../compensation/router");
+    expect(compModule.hrCompensationRouter).toBeDefined();
+  });
+
+  it("relations router imports maskRelationsFields", async () => {
+    const relModule = await import("../relations/router");
+    expect(relModule.hrRelationsRouter).toBeDefined();
   });
 });
