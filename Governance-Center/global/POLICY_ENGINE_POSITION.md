@@ -18,7 +18,7 @@ The **rule-based governance engine** (`server/governance/governance-engine.ts`) 
 - **Legacy/reference**: A Rego policy file exists at `server/policies/agent_governance.rego`
 - **Not actively enforced at runtime**: The OPA evaluation path is not wired into the main governance engine
 - **Historical**: OPA was part of an earlier governance design (documented in archived `OPA_POLICY_GUIDE.md`)
-- **Reference copy**: A copy exists in `Governance-Centrale/manifests/agent_governance.rego` for documentation
+- **Reference copy**: A copy exists in `Governance-Center/manifests/agent_governance.rego` for documentation
 
 ### Is OPA planned?
 

@@ -84,7 +84,7 @@ Navigational map of all governance-related content in this repository.
 
 ---
 
-## Key Runtime Governance Locations (outside Governance-Centrale)
+## Key Runtime Governance Locations (outside Governance-Center)
 
 These remain in their original locations because they are runtime/build-critical:
 

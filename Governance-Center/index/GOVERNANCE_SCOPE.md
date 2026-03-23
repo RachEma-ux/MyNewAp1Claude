@@ -4,7 +4,7 @@ Defines what counts as governance content in this repository and what does not.
 
 ---
 
-## What Belongs in Governance-Centrale/
+## What Belongs in Governance-Center/
 
 Content whose primary purpose is governance documentation, reporting, reference, or policy specification:
 
@@ -19,7 +19,7 @@ Content whose primary purpose is governance documentation, reporting, reference,
 - **Governance index/navigation files** — this file, the governance index, relocation map
 - **Archived governance design documents** — historical governance architecture, mapping, and planning docs
 
-## What Does NOT Belong in Governance-Centrale/
+## What Does NOT Belong in Governance-Center/
 
 Content that is live runtime code, build artifacts, or tightly coupled to the application's execution:
 
@@ -85,4 +85,4 @@ If in doubt, ask:
 4. Is this file part of a build pipeline? **Leave it in place.**
 5. Is this file's primary purpose documentation, reporting, or reference? **Centralize it.**
 
-A dedicated runtime governance code refactor may be approved separately in the future. Until then, runtime code stays where it is, and `Governance-Centrale/` serves as the canonical discovery hub.
+A dedicated runtime governance code refactor may be approved separately in the future. Until then, runtime code stays where it is, and `Governance-Center/` serves as the canonical discovery hub.

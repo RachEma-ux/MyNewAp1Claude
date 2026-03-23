@@ -19,5 +19,5 @@ AI Types encompasses the catalog taxonomy: providers, LLMs, models, agents, and 
 | Catalog import router | `server/routers/catalog-import/router.ts` | Runtime tRPC router |
 | Policy engines | `server/policies/*-policy-engine.ts` | Runtime policy evaluation |
 | Catalog taxonomy | `shared/catalog-taxonomy.ts` | Shared types used by client+server |
-| AI Types governance standard | `Governance-Centrale/docs/architecture/AI_TYPES_GOVERNANCE_STANDARD.md` | Already centralized |
-| AI Types alignment doc | `Governance-Centrale/docs/AI-Types-Governance-Alignment-Architecture.md` | Already centralized |
+| AI Types governance standard | `Governance-Center/docs/architecture/AI_TYPES_GOVERNANCE_STANDARD.md` | Already centralized |
+| AI Types alignment doc | `Governance-Center/docs/AI-Types-Governance-Alignment-Architecture.md` | Already centralized |

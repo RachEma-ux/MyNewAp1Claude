@@ -1,12 +1,12 @@
-# Governance Centrale
+# Governance Center
 
 ## What It Is
 
-Governance Centrale is the **canonical governance knowledge and control center** for the MyNewAp1Claude platform. It is the single place to discover, navigate, and understand all governance documentation, policies, audit reports, compliance models, and module governance profiles.
+Governance Center is the **canonical governance knowledge and control center** for the MyNewAp1Claude platform. It is the single place to discover, navigate, and understand all governance documentation, policies, audit reports, compliance models, and module governance profiles.
 
 ## What It Is Not
 
-Governance Centrale is **not** a runtime code directory. It does not contain:
+Governance Center is **not** a runtime code directory. It does not contain:
 - Live TypeScript/JavaScript code that runs at application startup
 - Files imported by `import` statements in server or client code
 - Build artifacts or CI/CD scripts
@@ -17,7 +17,7 @@ Live runtime governance code remains in its original locations (`server/governan
 ## How It Is Structured
 
 ```
-Governance-Centrale/
+Governance-Center/
   README.md                     -- this file
 
   index/                        -- navigation and organization
