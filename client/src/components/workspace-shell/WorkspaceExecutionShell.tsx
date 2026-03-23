@@ -173,8 +173,8 @@ export default function WorkspaceExecutionShell() {
 
   return (
     <div className="-m-6 flex flex-col" style={{ height: "calc(100vh - 4rem)" }}>
-      {/* ─── Shell Header ─── */}
-      <WorkspaceShellHeader
+      {/* HIDDEN — kept for rollback, not rendered */}
+      {/* <WorkspaceShellHeader
         workspaceName={shell.workspaceName}
         workspaceType={shell.workspaceType}
         status={shell.status}
@@ -184,7 +184,7 @@ export default function WorkspaceExecutionShell() {
         onManagerOpen={() => setManagerDrawerOpen(true)}
         onToolsToggle={() => setToolsMobileOpen(!toolsMobileOpen)}
         basePath={basePath}
-      />
+      /> */}
 
       {/* ─── Body: Unified Sidebar (left) + Main Content ─── */}
       <div className="flex flex-1 overflow-hidden">
