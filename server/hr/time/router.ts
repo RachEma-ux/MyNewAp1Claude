@@ -26,6 +26,7 @@ import {
   requireHrPermission,
   preventSelfApproval,
   getWorkerIdForUser,
+  resolveDataScope,
   HR_ACTIONS,
 } from "../permissions";
 
@@ -96,7 +97,15 @@ export const hrTimeRouter = router({
       dateTo: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.TIME_READ);
+      // Scope-aware: employee sees self, manager sees team, hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.TIME_READ,
+        HR_ACTIONS.TIME_READ_TEAM,
+        HR_ACTIONS.TIME_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
@@ -105,6 +114,13 @@ export const hrTimeRouter = router({
       if (input.status) conditions.push(eq(hrTimeEntries.status, input.status));
       if (input.dateFrom) conditions.push(gte(hrTimeEntries.entryDate, input.dateFrom));
       if (input.dateTo) conditions.push(lte(hrTimeEntries.entryDate, input.dateTo));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrTimeEntries.workerId, scope.workerId));
+      } else if (scope.scope === "team") {
+        conditions.push(sql`${hrTimeEntries.workerId} = ANY(${scope.workerIds})`);
+      }
 
       return db.select().from(hrTimeEntries)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -116,13 +132,29 @@ export const hrTimeRouter = router({
   getTimeEntry: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.TIME_READ);
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.TIME_READ,
+        HR_ACTIONS.TIME_READ_TEAM,
+        HR_ACTIONS.TIME_READ_SELF,
+      );
+      if (scope.scope === "none") throw new TRPCError({ code: "FORBIDDEN", message: "HR permission denied: time read" });
+
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const [row] = await db.select().from(hrTimeEntries)
         .where(eq(hrTimeEntries.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Time entry not found" });
+
+      // Verify scope access
+      if (scope.scope === "self" && row.workerId !== scope.workerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this time entry" });
+      }
+      if (scope.scope === "team" && !scope.workerIds.includes(row.workerId)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this time entry" });
+      }
+
       return row;
     }),
 
@@ -217,7 +249,9 @@ export const hrTimeRouter = router({
   // ============================================================================
 
   listLeaveTypes: protectedProcedure.query(async ({ ctx }) => {
-    await checkHrAccess(ctx.user, HR_ACTIONS.LEAVE_READ);
+    // Reference data — accessible to anyone with leave read or leave self-read
+    const scope = await resolveDataScope(ctx.user, HR_ACTIONS.LEAVE_READ, undefined, HR_ACTIONS.LEAVE_READ_SELF);
+    if (scope.scope === "none") throw new TRPCError({ code: "FORBIDDEN", message: "HR permission denied: leave read" });
     const db = getDb();
     if (!db) return [];
     return db.select().from(hrLeaveTypes).orderBy(hrLeaveTypes.name);
@@ -261,7 +295,15 @@ export const hrTimeRouter = router({
       leaveTypeId: z.number().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.LEAVE_READ);
+      // Scope-aware: employee sees own leave, manager/hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.LEAVE_READ,
+        undefined,
+        HR_ACTIONS.LEAVE_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
@@ -269,6 +311,11 @@ export const hrTimeRouter = router({
       if (input.workerId) conditions.push(eq(hrLeaveRequests.workerId, input.workerId));
       if (input.status) conditions.push(eq(hrLeaveRequests.status, input.status));
       if (input.leaveTypeId) conditions.push(eq(hrLeaveRequests.leaveTypeId, input.leaveTypeId));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrLeaveRequests.workerId, scope.workerId));
+      }
 
       return db.select().from(hrLeaveRequests)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -280,13 +327,26 @@ export const hrTimeRouter = router({
   getLeaveRequest: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.LEAVE_READ);
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.LEAVE_READ,
+        undefined,
+        HR_ACTIONS.LEAVE_READ_SELF,
+      );
+      if (scope.scope === "none") throw new TRPCError({ code: "FORBIDDEN", message: "HR permission denied: leave read" });
+
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const [row] = await db.select().from(hrLeaveRequests)
         .where(eq(hrLeaveRequests.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Leave request not found" });
+
+      // Verify scope access
+      if (scope.scope === "self" && row.workerId !== scope.workerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this leave request" });
+      }
+
       return row;
     }),
 
@@ -402,7 +462,18 @@ export const hrTimeRouter = router({
       year: z.number().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.LEAVE_READ);
+      // Scope-aware: employee can only view own balances
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.LEAVE_READ,
+        undefined,
+        HR_ACTIONS.LEAVE_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+      if (scope.scope === "self" && input.workerId !== scope.workerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Can only view own leave balances" });
+      }
+
       const db = getDb();
       if (!db) return [];
 

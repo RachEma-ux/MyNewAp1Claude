@@ -15,6 +15,7 @@ export function useHeaderActions(node: ReactNode) {
   }, [node]);
 }
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useHrRole } from "@/hooks/useHrRole";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -82,6 +83,7 @@ interface NavItem {
   icon: ReactNode;
   href?: string;
   children?: NavItem[];
+  requiredAction?: string;
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
@@ -102,6 +104,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [communicationMenuOpen, setCommunicationMenuOpen] = useState(false);
   const [hrMenuOpen, setHrMenuOpen] = useState(false);
   const [aiTypesSubMenus, setAiTypesSubMenus] = useState<Record<string, boolean>>({});
+  const hrRole = useHrRole();
   const logoutMutation = trpc.auth.logout.useMutation();
 
   const handleLogout = async () => {
@@ -252,16 +255,36 @@ export default function MainLayout({ children }: MainLayoutProps) {
       label: "Human Resources",
       icon: <Users className="w-5 h-5" />,
       children: [
+        // Self-service (open to all employees)
         { label: "Directory", icon: <Users className="w-4 h-4" />, href: "/hr/directory" },
-        { label: "Organization", icon: <Building2 className="w-4 h-4" />, href: "/hr/organization" },
-        { label: "Positions", icon: <Briefcase className="w-4 h-4" />, href: "/hr/positions" },
-        { label: "Staffing", icon: <UserPlus className="w-4 h-4" />, href: "/hr/staffing" },
-        { label: "Recruitment", icon: <ClipboardList className="w-4 h-4" />, href: "/hr/recruitment" },
-        { label: "Onboarding", icon: <UserPlus className="w-4 h-4" />, href: "/hr/onboarding" },
-        { label: "Offboarding", icon: <UserMinus className="w-4 h-4" />, href: "/hr/offboarding" },
+        { label: "Timesheet", icon: <Clock className="w-4 h-4" />, href: "/hr/timesheet" },
+        { label: "Leave", icon: <Clock className="w-4 h-4" />, href: "/hr/leave" },
+        { label: "Goals", icon: <Activity className="w-4 h-4" />, href: "/hr/goals" },
+        { label: "Reviews", icon: <ClipboardList className="w-4 h-4" />, href: "/hr/reviews" },
+        { label: "Training", icon: <BookOpen className="w-4 h-4" />, href: "/hr/training" },
+        { label: "Certifications", icon: <Award className="w-4 h-4" />, href: "/hr/certifications" },
+        { label: "Benefits", icon: <Shield className="w-4 h-4" />, href: "/hr/benefits" },
+        { label: "Policies", icon: <FileText className="w-4 h-4" />, href: "/hr/policies" },
+        { label: "Surveys", icon: <ClipboardList className="w-4 h-4" />, href: "/hr/surveys" },
+        { label: "Engagement", icon: <Activity className="w-4 h-4" />, href: "/hr/engagement" },
         { label: "Skills", icon: <Award className="w-4 h-4" />, href: "/hr/skills" },
-        { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, href: "/hr/reports" },
-        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/hr/settings" },
+        // Gated (require HR role permissions)
+        { label: "Organization", icon: <Building2 className="w-4 h-4" />, href: "/hr/organization", requiredAction: "hr.organization.read" },
+        { label: "Positions", icon: <Briefcase className="w-4 h-4" />, href: "/hr/positions", requiredAction: "hr.staffing.read" },
+        { label: "Staffing", icon: <UserPlus className="w-4 h-4" />, href: "/hr/staffing", requiredAction: "hr.staffing.read" },
+        { label: "Recruitment", icon: <ClipboardList className="w-4 h-4" />, href: "/hr/recruitment", requiredAction: "hr.recruiting.read" },
+        { label: "Onboarding", icon: <UserPlus className="w-4 h-4" />, href: "/hr/onboarding", requiredAction: "hr.onboarding.read" },
+        { label: "Offboarding", icon: <UserMinus className="w-4 h-4" />, href: "/hr/offboarding", requiredAction: "hr.offboarding.read" },
+        { label: "Overtime", icon: <Clock className="w-4 h-4" />, href: "/hr/overtime", requiredAction: "hr.overtime.read" },
+        { label: "Shift Planning", icon: <Clock className="w-4 h-4" />, href: "/hr/shifts", requiredAction: "hr.shift.read" },
+        { label: "Compensation", icon: <Briefcase className="w-4 h-4" />, href: "/hr/compensation", requiredAction: "hr.compensation.read" },
+        { label: "Grievances", icon: <AlertTriangle className="w-4 h-4" />, href: "/hr/grievances", requiredAction: "hr.relations.read" },
+        { label: "Incidents", icon: <AlertTriangle className="w-4 h-4" />, href: "/hr/incidents", requiredAction: "hr.incident.read" },
+        { label: "Compliance", icon: <Shield className="w-4 h-4" />, href: "/hr/compliance-mgmt", requiredAction: "hr.compliance.read" },
+        { label: "Analytics", icon: <BarChart3 className="w-4 h-4" />, href: "/hr/analytics", requiredAction: "hr.analytics.read" },
+        { label: "Talent", icon: <Sparkles className="w-4 h-4" />, href: "/hr/talent", requiredAction: "hr.talent.read" },
+        { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, href: "/hr/reports", requiredAction: "hr.analytics.read" },
+        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/hr/settings", requiredAction: "hr.analytics.manage" },
       ]
     },
     {
@@ -372,6 +395,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setWsSandboxMenuOpen(!wsSandboxMenuOpen);
                       } else if (item.label === "Communication") {
                         setCommunicationMenuOpen(!communicationMenuOpen);
+                      } else if (item.label === "Human Resources") {
+                        setHrMenuOpen(!hrMenuOpen);
                       }
                     }}
                     className="flex w-full items-center justify-between space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -380,12 +405,32 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Human Resources" && hrMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* Automation / Digital HQ menus (2-level) */}
                   {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
+                        <Link key={child.href} href={child.href!}>
+                          <a
+                            onClick={() => setSidebarOpen(false)}
+                            className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                              isActive(child.href!)
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            }`}
+                          >
+                            {child.icon}
+                            <span>{child.label}</span>
+                          </a>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                  {/* Human Resources menu (2-level with role-based filtering) */}
+                  {item.label === "Human Resources" && hrMenuOpen && (
+                    <div className="ml-4 mt-1 space-y-1">
+                      {item.children.filter(child => !child.requiredAction || hrRole.can(child.requiredAction)).map((child) => (
                         <Link key={child.href} href={child.href!}>
                           <a
                             onClick={() => setSidebarOpen(false)}

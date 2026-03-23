@@ -73,29 +73,32 @@ export const hrTalentRouter = router({
       nineBoxPosition: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.TALENT_READ);
+      // TALENT_WRITE as sensitive gate: hrbp/admin get unmasked, manager gets masked
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.TALENT_READ, HR_ACTIONS.TALENT_WRITE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.workerId) conditions.push(eq(hrTalentReviews.workerId, input.workerId));
       if (input.status) conditions.push(eq(hrTalentReviews.status, input.status));
       if (input.nineBoxPosition) conditions.push(eq(hrTalentReviews.nineBoxPosition, input.nineBoxPosition));
-      return db.select().from(hrTalentReviews)
+      const rows = await db.select().from(hrTalentReviews)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrTalentReviews.reviewDate))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "talent", recordCount: rows.length });
+      return masked ? rows.map(r => maskTalentFields(r as Record<string, unknown>)) : rows;
     }),
 
   getTalentReview: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.TALENT_READ);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.TALENT_READ, HR_ACTIONS.TALENT_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrTalentReviews).where(eq(hrTalentReviews.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Talent review not found" });
-      await logSensitiveRead({ actorId: ctx.user.id, domain: "talent", entityId: input.id, fields: ["performanceRating", "potentialRating", "nineBoxPosition", "retentionRisk"] });
-      return row;
+      await logSensitiveRead({ actorId: ctx.user.id, targetWorkerId: row.workerId, domain: "talent", recordCount: 1 });
+      return masked ? maskTalentFields(row as Record<string, unknown>) : row;
     }),
 
   createTalentReview: governedProcedure

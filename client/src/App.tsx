@@ -10,6 +10,7 @@ import { getLoginUrl, isOAuthConfigured } from "./const";
 import MainLayout from "./components/MainLayout";
 import InstallPrompt from "./components/InstallPrompt";
 import { Loader2 } from "lucide-react";
+import { useHrRole } from "@/hooks/useHrRole";
 
 // Lazy-loaded page components (code splitting)
 const Home = lazy(() => import("./pages/Home"));
@@ -211,6 +212,48 @@ function ShellRoute({ component: Component }: { component: React.ComponentType }
   return <Component />;
 }
 
+/** HR role gate — shows access-denied if user lacks the required HR action */
+function HrGate({ action, children }: { action: string; children: React.ReactNode }) {
+  const { can, isLoading } = useHrRole();
+  if (isLoading) {
+    return <div className="flex items-center justify-center p-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  }
+  if (!can(action)) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center">
+        <h2 className="text-lg font-semibold mb-2">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground">You don't have permission to view this HR section.</p>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
+/** Helper: wrap an HR page component with role gating */
+function hrGated(Component: React.ComponentType, action: string) {
+  return function HrGatedPage() {
+    return <HrGate action={action}><Component /></HrGate>;
+  };
+}
+
+// HR role-gated page wrappers for sensitive areas
+const HrOrganizationGated = hrGated(HROrganizationPage, "hr.organization.read");
+const HrPositionsGated = hrGated(HRPositionsPage, "hr.staffing.read");
+const HrStaffingGated = hrGated(HRStaffingPage, "hr.staffing.read");
+const HrRecruitmentGated = hrGated(HRRecruitmentPage, "hr.recruiting.read");
+const HrOnboardingGated = hrGated(HROnboardingPage, "hr.onboarding.read");
+const HrOffboardingGated = hrGated(HROffboardingPage, "hr.offboarding.read");
+const HrOvertimeGated = hrGated(HROvertimePage, "hr.overtime.read");
+const HrShiftPlanningGated = hrGated(HRShiftPlanningPage, "hr.shift.read");
+const HrCompensationGated = hrGated(HRCompensationPage, "hr.compensation.read");
+const HrGrievancesGated = hrGated(HRGrievancesPage, "hr.relations.read");
+const HrIncidentsGated = hrGated(HRIncidentsPage, "hr.incident.read");
+const HrComplianceMgmtGated = hrGated(HRComplianceMgmtPage, "hr.compliance.read");
+const HrAnalyticsGated = hrGated(HRAnalyticsDashboardPage, "hr.analytics.read");
+const HrTalentGated = hrGated(HRTalentPage, "hr.talent.read");
+const HrReportsGated = hrGated(HRReportsPage, "hr.analytics.read");
+const HrSettingsGated = hrGated(HRSettingsPage, "hr.analytics.manage");
+
 function Router() {
   return (
     <Switch>
@@ -221,38 +264,36 @@ function Router() {
       <Route path="/ws/wizard" component={() => <ProtectedRoute component={WSWizardPage} />} />
       <Route path="/ws/list" component={() => <ProtectedRoute component={WSListPage} />} />
       <Route path="/ws/catalog" component={() => <ProtectedRoute component={WSCatalogPage} />} />
-      {/* HR Module — Phase 1 routes */}
+      {/* HR Module — Employee self-service (all authenticated users) */}
       <Route path="/hr/directory" component={() => <ProtectedRoute component={HRDirectoryPage} />} />
-      <Route path="/hr/organization" component={() => <ProtectedRoute component={HROrganizationPage} />} />
-      <Route path="/hr/positions" component={() => <ProtectedRoute component={HRPositionsPage} />} />
-      <Route path="/hr/staffing" component={() => <ProtectedRoute component={HRStaffingPage} />} />
-      <Route path="/hr/skills" component={() => <ProtectedRoute component={HRSkillsPage} />} />
-      <Route path="/hr/reports" component={() => <ProtectedRoute component={HRReportsPage} />} />
-      <Route path="/hr/settings" component={() => <ProtectedRoute component={HRSettingsPage} />} />
-      {/* HR Module — Phase 2 routes (Lifecycle Workflows) */}
-      <Route path="/hr/recruitment" component={() => <ProtectedRoute component={HRRecruitmentPage} />} />
-      <Route path="/hr/onboarding" component={() => <ProtectedRoute component={HROnboardingPage} />} />
-      <Route path="/hr/offboarding" component={() => <ProtectedRoute component={HROffboardingPage} />} />
-      {/* HR Module — Phase 3 routes (Workforce Operations) */}
       <Route path="/hr/timesheet" component={() => <ProtectedRoute component={HRTimesheetPage} />} />
       <Route path="/hr/leave" component={() => <ProtectedRoute component={HRLeavePage} />} />
-      <Route path="/hr/overtime" component={() => <ProtectedRoute component={HROvertimePage} />} />
-      <Route path="/hr/shifts" component={() => <ProtectedRoute component={HRShiftPlanningPage} />} />
-      <Route path="/hr/training" component={() => <ProtectedRoute component={HRTrainingPage} />} />
-      <Route path="/hr/certifications" component={() => <ProtectedRoute component={HRCertificationsPage} />} />
       <Route path="/hr/goals" component={() => <ProtectedRoute component={HRGoalsPage} />} />
       <Route path="/hr/reviews" component={() => <ProtectedRoute component={HRPerformanceReviewsPage} />} />
-      {/* HR Module — Phase 4 routes (Compensation, Relations, Engagement, Compliance, Analytics, Talent) */}
-      <Route path="/hr/compensation" component={() => <ProtectedRoute component={HRCompensationPage} />} />
+      <Route path="/hr/training" component={() => <ProtectedRoute component={HRTrainingPage} />} />
+      <Route path="/hr/certifications" component={() => <ProtectedRoute component={HRCertificationsPage} />} />
       <Route path="/hr/benefits" component={() => <ProtectedRoute component={HRBenefitsPage} />} />
       <Route path="/hr/policies" component={() => <ProtectedRoute component={HRPoliciesPage} />} />
-      <Route path="/hr/grievances" component={() => <ProtectedRoute component={HRGrievancesPage} />} />
       <Route path="/hr/surveys" component={() => <ProtectedRoute component={HRSurveysPage} />} />
       <Route path="/hr/engagement" component={() => <ProtectedRoute component={HREngagementPage} />} />
-      <Route path="/hr/incidents" component={() => <ProtectedRoute component={HRIncidentsPage} />} />
-      <Route path="/hr/compliance-mgmt" component={() => <ProtectedRoute component={HRComplianceMgmtPage} />} />
-      <Route path="/hr/analytics" component={() => <ProtectedRoute component={HRAnalyticsDashboardPage} />} />
-      <Route path="/hr/talent" component={() => <ProtectedRoute component={HRTalentPage} />} />
+      <Route path="/hr/skills" component={() => <ProtectedRoute component={HRSkillsPage} />} />
+      {/* HR Module — Role-gated routes (require specific HR permissions) */}
+      <Route path="/hr/organization" component={() => <ProtectedRoute component={HrOrganizationGated} />} />
+      <Route path="/hr/positions" component={() => <ProtectedRoute component={HrPositionsGated} />} />
+      <Route path="/hr/staffing" component={() => <ProtectedRoute component={HrStaffingGated} />} />
+      <Route path="/hr/recruitment" component={() => <ProtectedRoute component={HrRecruitmentGated} />} />
+      <Route path="/hr/onboarding" component={() => <ProtectedRoute component={HrOnboardingGated} />} />
+      <Route path="/hr/offboarding" component={() => <ProtectedRoute component={HrOffboardingGated} />} />
+      <Route path="/hr/overtime" component={() => <ProtectedRoute component={HrOvertimeGated} />} />
+      <Route path="/hr/shifts" component={() => <ProtectedRoute component={HrShiftPlanningGated} />} />
+      <Route path="/hr/compensation" component={() => <ProtectedRoute component={HrCompensationGated} />} />
+      <Route path="/hr/grievances" component={() => <ProtectedRoute component={HrGrievancesGated} />} />
+      <Route path="/hr/incidents" component={() => <ProtectedRoute component={HrIncidentsGated} />} />
+      <Route path="/hr/compliance-mgmt" component={() => <ProtectedRoute component={HrComplianceMgmtGated} />} />
+      <Route path="/hr/analytics" component={() => <ProtectedRoute component={HrAnalyticsGated} />} />
+      <Route path="/hr/talent" component={() => <ProtectedRoute component={HrTalentGated} />} />
+      <Route path="/hr/reports" component={() => <ProtectedRoute component={HrReportsGated} />} />
+      <Route path="/hr/settings" component={() => <ProtectedRoute component={HrSettingsGated} />} />
       <Route path="/hr" component={() => <ProtectedRoute component={HRHomePage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />

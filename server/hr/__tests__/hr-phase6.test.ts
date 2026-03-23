@@ -9,6 +9,11 @@
  * - P2-5: Seed data uses valid enum values and correct types
  * - P2-6: Lifecycle task count race-safe logic
  * - P2-7: Manager/team scoping differentiation
+ *
+ * Phase 7.3 additions:
+ * - Talent masking applied on read endpoints
+ * - Self-service scope enforcement (time, leave, performance)
+ * - Frontend HR role gating (HrGate, useHrRole, MainLayout filtering)
  */
 
 import { describe, it, expect } from "vitest";
@@ -580,5 +585,234 @@ describe("HR Seed Data — 28-Employee Dataset Structure", () => {
     // totalDays should be strings
     expect(src).toContain('totalDays: "10"');
     expect(src).toContain('totalDays: "5"');
+  });
+});
+
+// ============================================================================
+// K. Phase 7.3 — Talent Masking on Read Endpoints
+// ============================================================================
+
+describe("HR Phase 7.3 — Talent Masking on Reads", () => {
+  it("talent router applies maskTalentFields in listTalentReviews", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../talent/router.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain("maskTalentFields(r as Record<string, unknown>)");
+    expect(content).toContain("HR_ACTIONS.TALENT_WRITE");
+  });
+
+  it("talent router applies maskTalentFields in getTalentReview", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../talent/router.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain("maskTalentFields(row as Record<string, unknown>)");
+  });
+
+  it("talent router uses logSensitiveRead with correct params", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../talent/router.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain('domain: "talent"');
+    expect(content).toContain("targetWorkerId: row.workerId");
+    expect(content).not.toContain("entityId:");
+  });
+
+  it("maskTalentFields masks retentionRisk, nineBoxPosition, developmentAreas, readinessForPromotion", async () => {
+    const { maskTalentFields, MASKED_TALENT_FIELDS } = await import("../permissions");
+    expect(MASKED_TALENT_FIELDS).toContain("retentionRisk");
+    expect(MASKED_TALENT_FIELDS).toContain("nineBoxPosition");
+    expect(MASKED_TALENT_FIELDS).toContain("developmentAreas");
+    expect(MASKED_TALENT_FIELDS).toContain("readinessForPromotion");
+    const record = {
+      id: 1, workerId: 10, retentionRisk: "high", nineBoxPosition: "star",
+      developmentAreas: "leadership", readinessForPromotion: "ready_now", status: "draft",
+    };
+    const masked = maskTalentFields(record);
+    expect(masked.retentionRisk).toBeNull();
+    expect(masked.nineBoxPosition).toBeNull();
+    expect(masked.developmentAreas).toBeNull();
+    expect(masked.readinessForPromotion).toBeNull();
+    expect(masked.id).toBe(1);
+    expect(masked.status).toBe("draft");
+  });
+
+  it("checkHrAccess with TALENT_WRITE gate: manager masked, admin unmasked", async () => {
+    const { checkHrAccess, HR_ACTIONS } = await import("../permissions");
+    const adminResult = checkHrAccess(
+      { id: 1, role: "admin" }, HR_ACTIONS.TALENT_READ, HR_ACTIONS.TALENT_WRITE,
+    );
+    expect(adminResult.masked).toBe(false);
+    const mgrResult = checkHrAccess(
+      { id: 3, role: "manager" }, HR_ACTIONS.TALENT_READ, HR_ACTIONS.TALENT_WRITE,
+    );
+    expect(mgrResult.masked).toBe(true);
+  });
+});
+
+// ============================================================================
+// L. Phase 7.3 — Self-Service Scope Enforcement (Time, Leave, Performance)
+// ============================================================================
+
+describe("HR Phase 7.3 — Self-Service Scope Enforcement", () => {
+  it("time router uses resolveDataScope for listTimeEntries", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../time/router.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain("resolveDataScope");
+    expect(content).toContain("HR_ACTIONS.TIME_READ_SELF");
+    expect(content).toContain("HR_ACTIONS.TIME_READ_TEAM");
+  });
+
+  it("time router uses resolveDataScope for leave endpoints", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../time/router.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain("HR_ACTIONS.LEAVE_READ_SELF");
+    expect(content).toContain('scope.scope === "self"');
+    expect(content).toContain('scope.scope === "none"');
+  });
+
+  it("performance router uses resolveDataScope for goals and reviews", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../performance/router.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain("resolveDataScope");
+    expect(content).toContain("HR_ACTIONS.PERFORMANCE_READ_SELF");
+    expect(content).toContain('scope.scope === "self"');
+  });
+
+  it("employee has self-scope actions but not global read", async () => {
+    const { hasPermission, HR_ACTIONS } = await import("../permissions");
+    expect(hasPermission("employee", HR_ACTIONS.TIME_READ_SELF)).toBe(true);
+    expect(hasPermission("employee", HR_ACTIONS.TIME_READ)).toBe(false);
+    expect(hasPermission("employee", HR_ACTIONS.LEAVE_READ_SELF)).toBe(true);
+    expect(hasPermission("employee", HR_ACTIONS.LEAVE_READ)).toBe(false);
+    expect(hasPermission("employee", HR_ACTIONS.PERFORMANCE_READ_SELF)).toBe(true);
+    expect(hasPermission("employee", HR_ACTIONS.PERFORMANCE_READ)).toBe(false);
+  });
+
+  it("manager has team-scope for time and global for performance", async () => {
+    const { hasPermission, HR_ACTIONS } = await import("../permissions");
+    expect(hasPermission("manager", HR_ACTIONS.TIME_READ)).toBe(true);
+    expect(hasPermission("manager", HR_ACTIONS.TIME_READ_TEAM)).toBe(true);
+    expect(hasPermission("manager", HR_ACTIONS.PERFORMANCE_READ)).toBe(true);
+  });
+
+  it("time router has scope-narrowing for self and team in listTimeEntries", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../time/router.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    // Self-scope adds workerId filter
+    expect(content).toContain("scope.workerId");
+    // Team-scope uses workerIds array
+    expect(content).toContain("scope.workerIds");
+  });
+
+  it("performance router has scope-narrowing for self in listGoals", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../performance/router.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain("scope.workerId");
+  });
+});
+
+// ============================================================================
+// M. Phase 7.3 — Frontend Role Gating
+// ============================================================================
+
+describe("HR Phase 7.3 — Frontend Role Gating", () => {
+  it("App.tsx contains HrGate component and hrGated helper", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../../../client/src/App.tsx", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain("function HrGate");
+    expect(content).toContain("function hrGated");
+    expect(content).toContain("useHrRole");
+  });
+
+  it("App.tsx gates sensitive HR routes with correct actions", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../../../client/src/App.tsx", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain('hrGated(HROrganizationPage, "hr.organization.read")');
+    expect(content).toContain('hrGated(HRTalentPage, "hr.talent.read")');
+    expect(content).toContain('hrGated(HRCompensationPage, "hr.compensation.read")');
+    expect(content).toContain('hrGated(HRSettingsPage, "hr.analytics.manage")');
+  });
+
+  it("App.tsx keeps self-service routes ungated", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../../../client/src/App.tsx", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain('path="/hr/directory" component={() => <ProtectedRoute component={HRDirectoryPage}');
+    expect(content).toContain('path="/hr/timesheet" component={() => <ProtectedRoute component={HRTimesheetPage}');
+    expect(content).toContain('path="/hr/leave" component={() => <ProtectedRoute component={HRLeavePage}');
+    expect(content).toContain('path="/hr/goals" component={() => <ProtectedRoute component={HRGoalsPage}');
+  });
+
+  it("MainLayout.tsx has role-filtered HR navigation", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../../../client/src/components/MainLayout.tsx", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain("useHrRole");
+    expect(content).toContain("hrRole.can(child.requiredAction)");
+    expect(content).toContain("requiredAction:");
+    expect(content).toContain('href: "/hr/directory"');
+    expect(content).toContain('href: "/hr/timesheet"');
+    expect(content).toContain('href: "/hr/talent"');
+    expect(content).toContain('href: "/hr/analytics"');
+    expect(content).toContain('href: "/hr/settings"');
+  });
+
+  it("useHrRole hook exports can, isAdmin, isHrbp, isManager", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../../../client/src/hooks/useHrRole.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain("export function useHrRole");
+    expect(content).toContain("can:");
+    expect(content).toContain("isAdmin:");
+    expect(content).toContain("isHrbp:");
+    expect(content).toContain("isManager:");
+  });
+});
+
+// ============================================================================
+// N. Phase 7.3 — Version Bump
+// ============================================================================
+
+describe("HR Phase 7.3 — Version", () => {
+  it("HR router version is 7.3.0", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync(
+      new URL("../router.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(content).toContain('version: "7.3.0"');
   });
 });

@@ -22,6 +22,7 @@ import {
   requireHrPermission,
   preventSelfApproval,
   getWorkerIdForUser,
+  resolveDataScope,
   HR_ACTIONS,
 } from "../permissions";
 
@@ -182,7 +183,15 @@ export const hrPerformanceRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
+      // Scope-aware: employee sees own goals, manager/hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.PERFORMANCE_READ,
+        undefined,
+        HR_ACTIONS.PERFORMANCE_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
@@ -190,6 +199,11 @@ export const hrPerformanceRouter = router({
       if (input.cycleId) conditions.push(eq(hrGoals.cycleId, input.cycleId));
       if (input.workerId) conditions.push(eq(hrGoals.workerId, input.workerId));
       if (input.status) conditions.push(eq(hrGoals.status, input.status));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrGoals.workerId, scope.workerId));
+      }
 
       return db.select().from(hrGoals)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -201,13 +215,26 @@ export const hrPerformanceRouter = router({
   getGoal: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.PERFORMANCE_READ,
+        undefined,
+        HR_ACTIONS.PERFORMANCE_READ_SELF,
+      );
+      if (scope.scope === "none") throw new TRPCError({ code: "FORBIDDEN", message: "HR permission denied: performance read" });
+
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const [row] = await db.select().from(hrGoals)
         .where(eq(hrGoals.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Goal not found" });
+
+      // Verify scope access
+      if (scope.scope === "self" && row.workerId !== scope.workerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this goal" });
+      }
+
       return row;
     }),
 
@@ -308,7 +335,15 @@ export const hrPerformanceRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
+      // Scope-aware: employee sees own reviews, manager/hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.PERFORMANCE_READ,
+        undefined,
+        HR_ACTIONS.PERFORMANCE_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
@@ -317,6 +352,11 @@ export const hrPerformanceRouter = router({
       if (input.workerId) conditions.push(eq(hrPerformanceReviews.workerId, input.workerId));
       if (input.reviewerId) conditions.push(eq(hrPerformanceReviews.reviewerId, input.reviewerId));
       if (input.status) conditions.push(eq(hrPerformanceReviews.status, input.status));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrPerformanceReviews.workerId, scope.workerId));
+      }
 
       return db.select().from(hrPerformanceReviews)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -328,13 +368,26 @@ export const hrPerformanceRouter = router({
   getReview: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.PERFORMANCE_READ);
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.PERFORMANCE_READ,
+        undefined,
+        HR_ACTIONS.PERFORMANCE_READ_SELF,
+      );
+      if (scope.scope === "none") throw new TRPCError({ code: "FORBIDDEN", message: "HR permission denied: performance read" });
+
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const [row] = await db.select().from(hrPerformanceReviews)
         .where(eq(hrPerformanceReviews.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Performance review not found" });
+
+      // Verify scope access
+      if (scope.scope === "self" && row.workerId !== scope.workerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this review" });
+      }
+
       return row;
     }),
 
