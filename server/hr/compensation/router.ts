@@ -1,9 +1,12 @@
 /**
- * HR Compensation & Benefits Router
+ * HR Compensation & Benefits Router (Phase 6 Hardened)
  *
  * Salary bands, compensation records, salary review cycles,
  * bonuses, benefit plans, and benefit enrollments.
- * All reads are protected, all writes are governed + audited.
+ *
+ * All reads enforce HR permission checks and role-aware masking.
+ * Privileged users (hrbp/admin) see unmasked data.
+ * All writes are governed + audited.
  */
 
 import { z } from "zod";
@@ -20,7 +23,7 @@ import {
   hrBenefitEnrollments,
 } from "../../../drizzle/schema";
 import { logHrAudit, logSensitiveRead, logStatusChange } from "../audit";
-import { maskCompensationFields } from "../permissions";
+import { checkHrAccess, maskCompensationFields, HR_ACTIONS } from "../permissions";
 
 // ============================================================================
 // State machines
@@ -72,27 +75,32 @@ export const hrCompensationRouter = router({
       jobFamily: z.string().optional(),
       isActive: z.boolean().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.jobLevel) conditions.push(eq(hrSalaryBands.jobLevel, input.jobLevel));
       if (input.jobFamily) conditions.push(eq(hrSalaryBands.jobFamily, input.jobFamily));
       if (input.isActive !== undefined) conditions.push(eq(hrSalaryBands.isActive, input.isActive));
-      return db.select().from(hrSalaryBands)
+      const results = await db.select().from(hrSalaryBands)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrSalaryBands.createdAt))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compensation.salary_band", recordCount: results.length });
+      return masked ? results.map((r) => maskCompensationFields(r as Record<string, unknown>)) : results;
     }),
 
   getSalaryBand: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrSalaryBands).where(eq(hrSalaryBands.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Salary band not found" });
-      return row;
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compensation.salary_band", recordCount: 1 });
+      return masked ? maskCompensationFields(row as Record<string, unknown>) : row;
     }),
 
   createSalaryBand: governedProcedure
@@ -110,6 +118,7 @@ export const hrCompensationRouter = router({
       effectiveTo: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrSalaryBands).values({
@@ -132,6 +141,7 @@ export const hrCompensationRouter = router({
       isActive: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...data } = input;
@@ -154,6 +164,7 @@ export const hrCompensationRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
+      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -164,7 +175,7 @@ export const hrCompensationRouter = router({
         .orderBy(desc(hrCompensationRecords.effectiveFrom))
         .limit(input.limit).offset(input.offset);
       await logSensitiveRead({ actorId: ctx.user.id, domain: "compensation", recordCount: results.length });
-      return results.map((r) => maskCompensationFields(r as Record<string, unknown>));
+      return masked ? results.map((r) => maskCompensationFields(r as Record<string, unknown>)) : results;
     }),
 
   createCompensationRecord: governedProcedure
@@ -180,6 +191,7 @@ export const hrCompensationRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrCompensationRecords).values({
@@ -202,15 +214,18 @@ export const hrCompensationRouter = router({
       offset: z.number().min(0).default(0),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.status) conditions.push(eq(hrSalaryReviewCycles.status, input.status));
-      return db.select().from(hrSalaryReviewCycles)
+      const results = await db.select().from(hrSalaryReviewCycles)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrSalaryReviewCycles.startDate))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compensation.review_cycle", recordCount: results.length });
+      return masked ? results.map((r) => maskCompensationFields(r as Record<string, unknown>)) : results;
     }),
 
   createSalaryReviewCycle: governedProcedure
@@ -223,6 +238,7 @@ export const hrCompensationRouter = router({
       endDate: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrSalaryReviewCycles).values({
@@ -235,6 +251,7 @@ export const hrCompensationRouter = router({
   transitionSalaryReviewCycle: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrSalaryReviewCycles).where(eq(hrSalaryReviewCycles.id, input.id)).limit(1);
@@ -264,6 +281,7 @@ export const hrCompensationRouter = router({
       bonusType: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
+      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
@@ -275,7 +293,7 @@ export const hrCompensationRouter = router({
         .orderBy(desc(hrBonusRecords.createdAt))
         .limit(input.limit).offset(input.offset);
       await logSensitiveRead({ actorId: ctx.user.id, domain: "compensation.bonus", recordCount: results.length });
-      return results.map((r) => maskCompensationFields(r as Record<string, unknown>));
+      return masked ? results.map((r) => maskCompensationFields(r as Record<string, unknown>)) : results;
     }),
 
   createBonusRecord: governedProcedure
@@ -288,6 +306,7 @@ export const hrCompensationRouter = router({
       reason: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrBonusRecords).values({
@@ -303,6 +322,7 @@ export const hrCompensationRouter = router({
   transitionBonusRecord: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      checkHrAccess(ctx.user, HR_ACTIONS.COMPENSATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrBonusRecords).where(eq(hrBonusRecords.id, input.id)).limit(1);
@@ -332,16 +352,19 @@ export const hrCompensationRouter = router({
       category: z.string().optional(),
       isActive: z.boolean().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.category) conditions.push(eq(hrBenefitPlans.category, input.category));
       if (input.isActive !== undefined) conditions.push(eq(hrBenefitPlans.isActive, input.isActive));
-      return db.select().from(hrBenefitPlans)
+      const results = await db.select().from(hrBenefitPlans)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrBenefitPlans.createdAt))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "benefits.plan", recordCount: results.length });
+      return masked ? results.map((r) => maskCompensationFields(r as Record<string, unknown>)) : results;
     }),
 
   createBenefitPlan: governedProcedure
@@ -357,6 +380,7 @@ export const hrCompensationRouter = router({
       enrollmentWindowEnd: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrBenefitPlans).values({
@@ -378,17 +402,20 @@ export const hrCompensationRouter = router({
       benefitPlanId: z.number().optional(),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const { masked } = checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_READ, HR_ACTIONS.COMPENSATION_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.workerId) conditions.push(eq(hrBenefitEnrollments.workerId, input.workerId));
       if (input.benefitPlanId) conditions.push(eq(hrBenefitEnrollments.benefitPlanId, input.benefitPlanId));
       if (input.status) conditions.push(eq(hrBenefitEnrollments.status, input.status));
-      return db.select().from(hrBenefitEnrollments)
+      const results = await db.select().from(hrBenefitEnrollments)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrBenefitEnrollments.enrollmentDate))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "benefits.enrollment", recordCount: results.length });
+      return masked ? results.map((r) => maskCompensationFields(r as Record<string, unknown>)) : results;
     }),
 
   createBenefitEnrollment: governedProcedure
@@ -402,6 +429,7 @@ export const hrCompensationRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(hrBenefitEnrollments).values({
@@ -417,6 +445,7 @@ export const hrCompensationRouter = router({
   transitionBenefitEnrollment: governedProcedure
     .input(z.object({ id: z.number(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      checkHrAccess(ctx.user, HR_ACTIONS.BENEFITS_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [existing] = await db.select().from(hrBenefitEnrollments).where(eq(hrBenefitEnrollments.id, input.id)).limit(1);

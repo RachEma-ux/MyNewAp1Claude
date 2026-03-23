@@ -262,7 +262,7 @@ describe("HR Phase 5 — Root Router", () => {
     }
   });
 
-  it("settings.get returns version 5.0.0 with Phase 5 features", async () => {
+  it("settings.get returns current version with Phase 5+ features", async () => {
     const { hrRouter } = await import("../router");
     const procedures = Object.keys(hrRouter._def.procedures);
     expect(procedures).toContain("settings.get");

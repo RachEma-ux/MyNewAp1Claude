@@ -304,3 +304,30 @@ export function requireHrPermission(
     });
   }
 }
+
+/**
+ * Check HR access and determine masking requirement in one call.
+ *
+ * - Throws FORBIDDEN if the user lacks `readAction`
+ * - Returns `{ masked: true }` if the user lacks `sensitiveAction`
+ * - Returns `{ masked: false }` if the user has `sensitiveAction` (privileged)
+ *
+ * Use this in read endpoints that serve sensitive data:
+ *   const { masked } = checkHrAccess(ctx.user, COMPENSATION_READ, COMPENSATION_READ_SENSITIVE);
+ *   return masked ? results.map(maskCompensationFields) : results;
+ */
+export function checkHrAccess(
+  user: { id: number; role?: string },
+  readAction: string,
+  sensitiveAction?: string,
+): { masked: boolean; hrRole: HrRole } {
+  const hrRole = getHrRoleForUser(user);
+  if (!hasPermission(hrRole, readAction)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `HR permission denied: ${readAction}`,
+    });
+  }
+  const masked = sensitiveAction ? !hasPermission(hrRole, sensitiveAction) : true;
+  return { masked, hrRole };
+}

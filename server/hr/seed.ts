@@ -128,8 +128,8 @@ export async function seedHrDemoData(): Promise<{ seeded: boolean; message: stri
   ]).returning();
 
   await db.insert(hrGoals).values([
-    { workerId: workers[0].id, cycleId: perfCycle.id, title: "Ship v2.0 release", description: "Deliver main product release by Q2", status: "in_progress", weight: 40 },
-    { workerId: workers[1].id, cycleId: perfCycle.id, title: "Complete cloud architecture cert", status: "not_started", weight: 30 },
+    { workerId: workers[0].id, cycleId: perfCycle.id, title: "Ship v2.0 release", description: "Deliver main product release by Q2", status: "active", weight: 40 },
+    { workerId: workers[1].id, cycleId: perfCycle.id, title: "Complete cloud architecture cert", status: "draft", weight: 30 },
   ]);
 
   // === Leave Types + Requests ===
@@ -140,8 +140,8 @@ export async function seedHrDemoData(): Promise<{ seeded: boolean; message: stri
   ]).returning();
 
   await db.insert(hrLeaveRequests).values([
-    { workerId: workers[4].id, leaveTypeId: leaveTypes[0].id, startDate: "2026-03-20", endDate: "2026-04-03", totalDays: 10, status: "approved", reason: "Family vacation" },
-    { workerId: workers[1].id, leaveTypeId: leaveTypes[1].id, startDate: "2026-04-01", endDate: "2026-04-02", totalDays: 2, status: "pending", reason: "Medical appointment" },
+    { workerId: workers[4].id, leaveTypeId: leaveTypes[0].id, startDate: "2026-03-20", endDate: "2026-04-03", totalDays: "10", status: "approved", reason: "Family vacation" },
+    { workerId: workers[1].id, leaveTypeId: leaveTypes[1].id, startDate: "2026-04-01", endDate: "2026-04-02", totalDays: "2", status: "pending", reason: "Medical appointment" },
   ]);
 
   // === Salary Bands + Comp Records ===

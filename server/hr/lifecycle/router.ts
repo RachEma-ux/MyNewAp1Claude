@@ -256,8 +256,8 @@ export const hrLifecycleRouter = router({
               eq(hrOnboardingTasks.status, "skipped"),
             ),
           ));
-        // Account for the current task being updated (count query may not reflect it yet)
-        const completedCount = (countRow?.count ?? 0) + (current.status !== "completed" && current.status !== "skipped" ? 1 : 0);
+        // The UPDATE already committed the new status, so the COUNT reflects it
+        const completedCount = countRow?.count ?? 0;
         await db.update(hrOnboardingCases)
           .set({ completedTasks: completedCount, updatedAt: new Date() })
           .where(eq(hrOnboardingCases.id, current.caseId));
@@ -465,7 +465,8 @@ export const hrLifecycleRouter = router({
               eq(hrOffboardingTasks.status, "skipped"),
             ),
           ));
-        const completedCount = (countRow?.count ?? 0) + (current.status !== "completed" && current.status !== "skipped" ? 1 : 0);
+        // The UPDATE already committed the new status, so the COUNT reflects it
+        const completedCount = countRow?.count ?? 0;
         await db.update(hrOffboardingCases)
           .set({ completedTasks: completedCount, updatedAt: new Date() })
           .where(eq(hrOffboardingCases.id, current.caseId));

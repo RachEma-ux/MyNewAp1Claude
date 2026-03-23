@@ -7,6 +7,7 @@
  * Phase 3: Time & Attendance, Learning, Performance
  * Phase 4: Compensation, Relations, Engagement, Compliance, Analytics, Talent
  * Phase 5: Stabilization — Cross-phase integration, hardened analytics, reminders
+ * Phase 6: Hardening — Permission enforcement, role-aware masking, audit coverage, bug fixes
  */
 
 import { z } from "zod";
@@ -30,7 +31,7 @@ import { seedHrDemoData } from "./seed";
 const hrSettingsRouter = router({
   get: protectedProcedure.query(() => ({
     module: "hr",
-    version: "5.0.0",
+    version: "6.0.0",
     features: {
       directory: true,
       organization: true,
@@ -51,6 +52,9 @@ const hrSettingsRouter = router({
       workforceBreakdown: true,
       rolePermissionMatrix: true,
       sensitiveAuditLogging: true,
+      // Phase 6 hardening
+      roleAwareMasking: true,
+      apiPermissionEnforcement: true,
     },
   })),
   seedDemo: governedProcedure
