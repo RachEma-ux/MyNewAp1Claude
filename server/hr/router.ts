@@ -13,7 +13,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, governedProcedure, adminProcedure } from "../_core/trpc";
 import { getHrRoleForUser, HR_ROLE_PERMISSIONS, HR_ACTIONS } from "./permissions";
 import { hrDirectoryRouter } from "./directory/router";
 import { hrOrganizationRouter } from "./organization/router";
@@ -78,7 +78,7 @@ const hrSettingsRouter = router({
       unifiedAuditQuery: true,
     },
   })),
-  seedDemo: governedProcedure
+  seedDemo: adminProcedure
     .input(z.object({ confirm: z.boolean().default(false) }).optional())
     .mutation(async ({ input }) => {
       if (!input?.confirm) {

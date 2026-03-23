@@ -162,6 +162,13 @@
       "when": 1774483200000,
       "tag": "0023_crew_participant_type",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1774294716325,
+      "tag": "0024_concerned_gravity",
+      "breakpoints": true
     }
   ]
 }
