@@ -204,8 +204,8 @@ export function WorkspaceUnifiedSidebarV2({
             <div className="p-1"><Wrench className="h-3.5 w-3.5 text-blue-400" /></div>
           </TooltipTrigger><TooltipContent side="left">Tools</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
-            <Link href={`${base}/settings`}><Button variant={isActive(`${base}/settings`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Settings className="h-4 w-4" /></Button></Link>
-          </TooltipTrigger><TooltipContent side="left">Configure</TooltipContent></Tooltip>
+            <Link href={`${base}/settings`}><Button variant={isActive(`${base}/settings`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><LayoutDashboard className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="left">Dashboard</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/team`}><Button variant={isActive(`${base}/team`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Users className="h-4 w-4" /></Button></Link>
           </TooltipTrigger><TooltipContent side="left">Team</TooltipContent></Tooltip>
@@ -268,7 +268,7 @@ export function WorkspaceUnifiedSidebarV2({
         icon={<Wrench className="h-3.5 w-3.5" />}
         color="bg-blue-500/10 text-blue-400"
         dropdownItems={[
-          { icon: <Settings className="h-4 w-4" />, label: "Configure", path: `${base}/settings` },
+          { icon: <LayoutDashboard className="h-4 w-4" />, label: "Dashboard", path: `${base}/settings` },
           { icon: <LayoutDashboard className="h-4 w-4" />, label: "Overview", path: base },
           { icon: <FolderKanban className="h-4 w-4" />, label: "Projects", path: `${base}/projects` },
           { icon: <BookOpen className="h-4 w-4" />, label: "Knowledge", path: `${base}/knowledge` },
@@ -284,7 +284,7 @@ export function WorkspaceUnifiedSidebarV2({
           { icon: <GitBranch className="h-4 w-4" />, label: "Workflows", path: `${base}/workflows` },
         ]}
       >
-        <NavItem icon={<Settings className="h-4 w-4" />} label="Configure" path={`${base}/settings`} count={shell.enabledModules.length} />
+        <NavItem icon={<LayoutDashboard className="h-4 w-4" />} label="Dashboard" path={`${base}/settings`} count={shell.enabledModules.length} />
         <NavItem icon={<Users className="h-4 w-4" />} label="Team" path={`${base}/team`} count={shell.teamCount} />
         <NavItem icon={<Cpu className="h-4 w-4" />} label="Crew" path={`${base}/crew`} count={shell.crewCount} />
         <NavItem icon={<CheckCircle2 className="h-4 w-4" />} label="Modules" path={`${base}/projects/settings`} count={shell.enabledModules.length} />
