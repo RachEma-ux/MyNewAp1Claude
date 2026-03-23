@@ -1,0 +1,76 @@
+Session Summary — 2026-03-23 21:30
+====================================
+
+## Objective
+Complete Task 6 of the HR governance-hardening remediation run: "Add approval/SoD, unified audit, and final consistency pass"
+
+## Changes Made (commit fa445f3)
+
+### 1. Critical Async Bug Fix — Compensation & Relations Routers
+- **Problem**: All `checkHrAccess()` calls in compensation/router.ts (17 calls) and relations/router.ts (16 calls) were missing `await`. Since `checkHrAccess` is async (queries hr_role_assignments table), the permission check was fire-and-forget — it started but never blocked, meaning ANY user could access protected endpoints.
+- **Fix**: Added `await` to every `checkHrAccess` call in both routers.
+
+### 2. Mutation Permission Enforcement — Compensation & Relations Routers
+- **Problem**: Mutation endpoints used `checkHrAccess()` (read-check pattern) instead of `requireHrPermission()` (write-check pattern). This is semantically wrong — `checkHrAccess` returns masking info, `requireHrPermission` throws FORBIDDEN.
+- **Fix**: Upgraded all mutation permission checks:
+  - Compensation: 10 mutations → `requireHrPermission` with COMPENSATION_MANAGE, COMPENSATION_WRITE, BENEFITS_MANAGE, BENEFITS_WRITE
+  - Relations: 9 mutations → `requireHrPermission` with POLICY_MANAGE, POLICY_WRITE, RELATIONS_WRITE, RELATIONS_MANAGE
+
+### 3. Self-Approval Prevention (Segregation of Duties)
+Applied `preventSelfApproval()` to 5 sensitive approval paths:
+- **Bonus approval** (compensation/transitionBonusRecord) — prevents approving own bonus
+- **Leave approval** (time/updateLeaveRequestStatus) — prevents approving own leave
+- **Overtime approval** (time/updateOvertimeRequestStatus) — prevents approving own OT
+- **Time entry approval** (time/updateTimeEntry) — prevents approving own timesheet
+- **Performance review** (performance/submitManagerReview) — prevents reviewing yourself
+
+### 4. Missing Permission Checks — Time Router
+Added `requireHrPermission` to 9 mutations that had NO permission enforcement:
+- createLeaveType → LEAVE_APPROVE
+- createLeaveRequest → LEAVE_WRITE
+- updateLeaveRequestStatus → LEAVE_APPROVE
+- createOvertimeRequest → OVERTIME_WRITE
+- updateOvertimeRequestStatus → OVERTIME_APPROVE
+- createShiftPlan → SHIFT_WRITE
+- updateShiftPlanStatus → SHIFT_MANAGE
+- assignWorkerToShift → SHIFT_WRITE
+- updateShiftAssignmentStatus → SHIFT_MANAGE
+- updateTimeEntry → TIME_APPROVE (when approving) / TIME_WRITE (otherwise)
+
+### 5. Bug Fix — actorId:0 in Shift Assignment Audit
+Fixed `logStatusChange({ actorId: 0, ... })` → `logStatusChange({ actorId: ctx.user.id, ... })` in updateShiftAssignmentStatus.
+
+### 6. Unified Audit Query Endpoint
+Added `hr.analytics.listAuditLog` with filters:
+- actorId, targetWorkerId, action (exact), actionPrefix (LIKE), dateFrom, dateTo
+- Protected by `ANALYTICS_MANAGE` permission (admin/workspace_admin only)
+- Returns up to 500 entries ordered by most recent
+
+### 7. Workspace HR + Frontend Governance (carried from previous session)
+- Added HR permission enforcement to workspace HR module mutations (assignWorker, endAssignment)
+- Added dual audit trail (logActivity + logHrAudit) for workspace mutations
+- Added `hr.me.getRole` endpoint returning user's HR role + allowedActions
+- Created `client/src/hooks/useHrRole.ts` hook for frontend role gating
+- Version bumped to 7.2.0 with feature flags: selfApprovalPrevention, unifiedAuditQuery
+
+## Files Modified (8 files)
+- server/hr/compensation/router.ts — await fixes + requireHrPermission + SoD
+- server/hr/relations/router.ts — await fixes + requireHrPermission
+- server/hr/time/router.ts — 9 permission checks + 3 SoD checks + actorId fix
+- server/hr/performance/router.ts — SoD check on submitManagerReview
+- server/hr/analytics/router.ts — listAuditLog endpoint
+- server/hr/router.ts — hr.me.getRole endpoint, version 7.2.0, feature flags
+- server/modules/hr/router.ts — HR permission + dual audit on mutations
+- client/src/hooks/useHrRole.ts — new frontend hook
+
+## Task Tracking
+All 6 governance remediation tasks completed:
+1. ✅ Plan governance remediation implementation
+2. ✅ Implement HR role assignment table and role resolution
+3. ✅ Implement self-scope and team-scope enforcement
+4. ✅ Apply HR permission enforcement to all 14 sub-routers
+5. ✅ Harden workspace HR routes and add frontend governance
+6. ✅ Add approval/SoD, unified audit, and final consistency pass
+
+## Commits
+- fa445f3 — HR Phase 7.2: SoD enforcement, await fixes, unified audit, final governance pass
