@@ -171,6 +171,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/bots/control-panel" },
             { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/bots/wizard" },
             { label: "Bots List", icon: <List className="w-3 h-3" />, href: "/list/bots" },
+            { label: "Analytics", icon: <BarChart3 className="w-3 h-3" />, href: "/analytics" },
           ]
         },
       ]
@@ -208,7 +209,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Audit", icon: <FileSearch className="w-4 h-4" />, href: "/governance/audit" },
       ]
     },
-    { label: "Analytics", icon: <BarChart3 className="w-5 h-5" />, href: "/analytics" },
     {
       label: "Collaboration",
       icon: <MessagesSquare className="w-5 h-5" />,
