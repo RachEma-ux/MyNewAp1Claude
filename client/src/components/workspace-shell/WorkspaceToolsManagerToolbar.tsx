@@ -263,7 +263,7 @@ function SidebarContent({
   );
 }
 
-export function WorkspaceToolsToolbar({
+export function WorkspaceToolsManagerToolbar({
   shell,
   basePath,
   open,

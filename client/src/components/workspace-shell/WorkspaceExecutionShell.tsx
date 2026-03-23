@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 
 import { WorkspaceShellHeader } from "./WorkspaceShellHeader";
 import { WorkspaceContextManagerSidebar } from "./WorkspaceContextManagerSidebar";
-import { WorkspaceToolsToolbar } from "./WorkspaceToolsToolbar";
+import { WorkspaceToolsManagerToolbar } from "./WorkspaceToolsManagerToolbar";
 import { WorkspaceMainFrame } from "./WorkspaceMainFrame";
 import { WorkspaceManagerControls } from "./WorkspaceManagerControls";
 import { WorkspaceUnifiedSidebarV2 } from "@/components/workspace/WorkspaceUnifiedSidebarV2";
@@ -198,7 +198,7 @@ export default function WorkspaceExecutionShell() {
         {/* Main Execution Area — flex row: [ToolsToolbar | content] */}
         <main className="flex-1 flex overflow-hidden bg-background">
           {/* Tools Toolbar — left edge of main, full height, never exceeds main */}
-          <WorkspaceToolsToolbar
+          <WorkspaceToolsManagerToolbar
             shell={shell}
             basePath={basePath}
             open={toolsMobileOpen}
