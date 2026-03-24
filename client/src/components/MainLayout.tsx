@@ -17,6 +17,7 @@ export function useHeaderActions(node: ReactNode) {
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useHrRole } from "@/hooks/useHrRole";
 import { HR_NAV_CONFIG } from "@/config/hrNavConfig";
+import { HRSideNav } from "@/components/HRSideNav";
 import { PM_NAV_CONFIG } from "@/config/pmNavConfig";
 import { AUTOMATION_NAV_CONFIG } from "@/config/automationNavConfig";
 import { Button } from "@/components/ui/button";
@@ -394,33 +395,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       ))}
                     </div>
                   )}
-                  {/* Human Resources menu (section-grouped with role-based filtering) */}
+                  {/* Human Resources menu (Carbon-style 3-level accordion nav) */}
                   {item.label === "Human Resources" && hrMenuOpen && (
-                    <div className="ml-4 mt-1 space-y-1">
-                      {HR_NAV_CONFIG.sections
-                        .filter((section) => {
-                          // Section visible if at least one child item is accessible
-                          return section.items.some((childItem) => {
-                            if (childItem.visibilityMode === "show") return true;
-                            return hrRole.can(childItem.requiredAction);
-                          });
-                        })
-                        .map((section) => (
-                          <Link key={section.href} href={section.href}>
-                            <a
-                              onClick={() => setSidebarOpen(false)}
-                              className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                                isActive(section.href)
-                                  ? "bg-primary text-primary-foreground"
-                                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                              }`}
-                            >
-                              <Users className="w-4 h-4" />
-                              <span>{section.label}</span>
-                            </a>
-                          </Link>
-                        ))}
-                    </div>
+                    <HRSideNav
+                      onNavigate={() => setSidebarOpen(false)}
+                      className="ml-2 mt-1"
+                    />
                   )}
                   {/* AI Types menu (3-level with dynamic sub-menus) */}
                   {item.label === "AI Types" && aiTypesMenuOpen && (
