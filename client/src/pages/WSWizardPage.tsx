@@ -20,8 +20,8 @@
  *   10. Promotion     — Can it be approved, published, and activated?
  */
 
-import { useState, useMemo } from "react";
-import { useLocation } from "wouter";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -386,6 +386,8 @@ function createDefaultWizardData(): WizardData {
 
 export default function WSWizardPage() {
   const [, navigate] = useLocation();
+  const params = useParams<{ id?: string }>();
+  const editId = params.id ? Number(params.id) : null;
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
@@ -397,8 +399,90 @@ export default function WSWizardPage() {
 
   // --- Wizard state ---
   const [currentStepId, setCurrentStepId] = useState<WizardStep>("identity");
-  const [draftId, setDraftId] = useState<number | null>(null);
+  const [draftId, setDraftId] = useState<number | null>(editId);
   const [data, setData] = useState<WizardData>(createDefaultWizardData);
+  const [hydrated, setHydrated] = useState(!editId); // true if no draft to load
+
+  // --- Load existing draft for resume ---
+  const draftQuery = trpc.workspaces.get.useQuery(
+    { id: editId! },
+    { enabled: !!editId && !hydrated },
+  );
+  const crewQuery = trpc.workspaces.crew.list.useQuery(
+    { workspaceId: editId! },
+    { enabled: !!editId && !hydrated },
+  );
+
+  useEffect(() => {
+    if (!editId || hydrated) return;
+    if (!draftQuery.data) return;
+
+    const ws = draftQuery.data as any;
+    const meta = (ws.wizardMeta || {}) as Record<string, any>;
+    const crewRows = (crewQuery.data || []) as Array<any>;
+
+    // Hydrate wizard data from workspace + wizardMeta + crew
+    setData({
+      // Step 1: Identity
+      name: ws.name || "",
+      description: ws.description || "",
+      type: ws.type || "team",
+      // Step 2: Purpose
+      purposeType: ws.purposeType || "project",
+      purposeStatement: meta.purposeStatement || "",
+      purposeRef: ws.purposeRef || "",
+      // Step 3: Anchor
+      anchorType: meta.anchorType || "",
+      // Step 4: Scope Details
+      anchorRef: meta.anchorRef || "",
+      anchorLabel: meta.anchorLabel || "",
+      anchorMeta: meta.anchorMeta || {},
+      // Step 5: Team (from wizardMeta — relational members are the source of truth but
+      //   we use wizardMeta for the wizard display since it has the role granularity)
+      team: (() => {
+        const t = meta.team || {};
+        const result: TeamMember[] = [];
+        if (t.owner) result.push({ workerId: t.owner.workerId, displayName: t.owner.displayName, role: "owner" });
+        for (const m of t.managers || []) result.push({ workerId: m.workerId, displayName: m.displayName, role: "manager" });
+        for (const m of t.members || []) result.push({ workerId: m.workerId, displayName: m.displayName, role: "member" });
+        for (const m of t.viewers || []) result.push({ workerId: m.workerId, displayName: m.displayName, role: "viewer" });
+        return result;
+      })(),
+      // Step 5: Crew (from relational table)
+      crewAgents: crewRows.map((c) => ({
+        participantType: (c.participantType || "agent") as CrewParticipantType,
+        participantId: String(c.agentId),
+        participantName: c.agentName || "",
+        crewRole: (c.role || "executor") as CrewRole,
+        note: c.note || "",
+      })),
+      // Step 6: Activities
+      primaryActivityType: meta.activities?.primaryType || "",
+      secondaryActivityTypes: meta.activities?.secondaryTypes || [],
+      operatingMode: meta.activities?.operatingMode || "",
+      executionStyle: meta.activities?.executionStyle || "",
+      collaborationIntensity: meta.activities?.collaborationIntensity || "",
+      // Step 7: Needs
+      needs: meta.needs || {},
+      // Step 8: Configuration
+      enabledModules: meta.configuration?.enabledModules || [],
+      routingProfile: meta.configuration?.routingProfile || "AUTO",
+      resourceProfile: meta.configuration?.resourceProfile || "",
+      capabilityBundles: meta.configuration?.capabilityBundles || [],
+      embeddingModel: ws.embeddingModel || "bge-small-en-v1.5",
+      chunkingStrategy: ws.chunkingStrategy || "semantic",
+    });
+
+    // Restore step position
+    const lastStep = meta.lastCompletedStep;
+    if (typeof lastStep === "number" && lastStep > 0) {
+      const targetStep = STEPS.find((s) => s.stepNumber === lastStep);
+      if (targetStep) setCurrentStepId(targetStep.id);
+    }
+
+    setDraftId(editId);
+    setHydrated(true);
+  }, [editId, hydrated, draftQuery.data, crewQuery.data]);
 
   // --- Crew add-form state ---
   const [newCrewType, setNewCrewType] = useState<CrewParticipantType>("agent");
