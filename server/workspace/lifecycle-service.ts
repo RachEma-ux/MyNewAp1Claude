@@ -52,10 +52,12 @@ export async function validateDraftCompleteness(
   if (!ws.type) missing.push("type");
 
   // Purpose
-  if (!ws.purposeType || ws.purposeType === "other") {
-    // "other" is allowed but purposeStatement must exist
+  if (!ws.purposeType) missing.push("purposeType");
+  if (!meta?.purposeStatement?.trim()) {
+    missing.push("purposeStatement");
+  } else if (ws.purposeType === "other" && meta.purposeStatement.trim().length < 20) {
+    missing.push("purposeStatement (purposeType 'other' requires a detailed statement of at least 20 characters)");
   }
-  if (!meta?.purposeStatement?.trim()) missing.push("purposeStatement");
 
   // Anchor
   if (!meta?.anchorType) missing.push("anchorType");
@@ -222,34 +224,55 @@ export async function beginReview(
 
 /**
  * Approve workspace (under_review → approved).
+ * Re-validates content completeness to ensure nothing was modified after review began.
  */
 export async function approveWorkspace(
   workspaceId: number,
   actorId: number,
   notes?: string
 ): Promise<TransitionResult> {
+  const completeness = await validateDraftCompleteness(workspaceId);
+  if (!completeness.complete) {
+    throw new Error(
+      `Workspace cannot be approved — content no longer complete. Missing: ${completeness.missingFields.join(", ")}`
+    );
+  }
   return transitionWorkspace(workspaceId, "approved", actorId, { notes });
 }
 
 /**
  * Publish workspace (approved → published).
  * Makes workspace visible in WS Catalog.
+ * Re-validates content completeness before publication.
  */
 export async function publishWorkspace(
   workspaceId: number,
   actorId: number
 ): Promise<TransitionResult> {
+  const completeness = await validateDraftCompleteness(workspaceId);
+  if (!completeness.complete) {
+    throw new Error(
+      `Workspace cannot be published — content no longer complete. Missing: ${completeness.missingFields.join(", ")}`
+    );
+  }
   return transitionWorkspace(workspaceId, "published", actorId);
 }
 
 /**
  * Activate workspace (published → active).
  * Makes workspace fully executable.
+ * Re-validates content completeness before activation.
  */
 export async function activateWorkspace(
   workspaceId: number,
   actorId: number
 ): Promise<TransitionResult> {
+  const completeness = await validateDraftCompleteness(workspaceId);
+  if (!completeness.complete) {
+    throw new Error(
+      `Workspace cannot be activated — content no longer complete. Missing: ${completeness.missingFields.join(", ")}`
+    );
+  }
   return transitionWorkspace(workspaceId, "active", actorId);
 }
 
