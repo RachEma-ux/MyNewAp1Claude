@@ -272,6 +272,92 @@ export const hrAnalyticsRouter = router({
     }),
 
   // ============================================================================
+  // Role Assignment Management (Phase 4 — Access Controls)
+  // ============================================================================
+
+  listRoleAssignments: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(200).default(50),
+      offset: z.number().min(0).default(0),
+      userId: z.number().optional(),
+      hrRole: z.string().optional(),
+      isActive: z.boolean().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ANALYTICS_MANAGE);
+      const db = getDb();
+      if (!db) return [];
+      const { hrRoleAssignments } = await import("../../../drizzle/schema");
+      const conditions = [];
+      if (input.userId) conditions.push(eq(hrRoleAssignments.userId, input.userId));
+      if (input.hrRole) conditions.push(eq(hrRoleAssignments.hrRole, input.hrRole));
+      if (input.isActive !== undefined) conditions.push(eq(hrRoleAssignments.isActive, input.isActive));
+      return db.select().from(hrRoleAssignments)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(hrRoleAssignments.createdAt))
+        .limit(input.limit).offset(input.offset);
+    }),
+
+  createRoleAssignment: governedProcedure
+    .input(z.object({
+      userId: z.number(),
+      workerId: z.number().optional(),
+      hrRole: z.enum(["employee", "manager", "hrbp", "admin", "workspace_admin"]),
+      scope: z.enum(["global", "org_unit", "workspace"]).default("global"),
+      scopeId: z.number().optional(),
+      expiresAt: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ANALYTICS_MANAGE);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { hrRoleAssignments } = await import("../../../drizzle/schema");
+      const [created] = await db.insert(hrRoleAssignments).values({
+        ...input,
+        isActive: true,
+        assignedBy: ctx.user.id,
+        expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,
+      }).returning();
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.role_assignment.create",
+        metadata: { assignmentId: created.id, userId: input.userId, hrRole: input.hrRole, scope: input.scope },
+      });
+      return created;
+    }),
+
+  updateRoleAssignment: governedProcedure
+    .input(z.object({
+      id: z.number(),
+      isActive: z.boolean().optional(),
+      hrRole: z.enum(["employee", "manager", "hrbp", "admin", "workspace_admin"]).optional(),
+      scope: z.enum(["global", "org_unit", "workspace"]).optional(),
+      scopeId: z.number().nullable().optional(),
+      expiresAt: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ANALYTICS_MANAGE);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { hrRoleAssignments } = await import("../../../drizzle/schema");
+      const { id, ...updates } = input;
+      const values: Record<string, unknown> = { ...updates, updatedAt: new Date() };
+      if (updates.expiresAt !== undefined) {
+        values.expiresAt = updates.expiresAt ? new Date(updates.expiresAt) : null;
+      }
+      const [updated] = await db.update(hrRoleAssignments)
+        .set(values)
+        .where(eq(hrRoleAssignments.id, id)).returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Role assignment not found" });
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.role_assignment.update",
+        metadata: { assignmentId: id, changes: Object.keys(updates) },
+      });
+      return updated;
+    }),
+
+  // ============================================================================
   // Unified Audit Log Query
   // ============================================================================
 

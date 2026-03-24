@@ -125,6 +125,13 @@ const HRIncidentsPage = lazy(() => import("@/pages/hr/HRIncidentsPage"));
 const HRComplianceMgmtPage = lazy(() => import("@/pages/hr/HRComplianceMgmtPage"));
 const HRAnalyticsDashboardPage = lazy(() => import("@/pages/hr/HRAnalyticsDashboardPage"));
 const HRTalentPage = lazy(() => import("@/pages/hr/HRTalentPage"));
+// HR Module — Phase 4 expansion pages (Job Architecture, Work Permits, Letters, Risk, Audit, Access)
+const HRJobArchitecturePage = lazy(() => import("@/pages/hr/HRJobArchitecturePage"));
+const HRWorkPermitsPage = lazy(() => import("@/pages/hr/HRWorkPermitsPage"));
+const HRLettersCertificatesPage = lazy(() => import("@/pages/hr/HRLettersCertificatesPage"));
+const HRRiskManagementPage = lazy(() => import("@/pages/hr/HRRiskManagementPage"));
+const HRAuditLogsPage = lazy(() => import("@/pages/hr/HRAuditLogsPage"));
+const HRAccessControlsPage = lazy(() => import("@/pages/hr/HRAccessControlsPage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
@@ -255,6 +262,12 @@ const HrAnalyticsGated = hrGated(HRAnalyticsDashboardPage, "hr.analytics.read");
 const HrTalentGated = hrGated(HRTalentPage, "hr.talent.read");
 const HrReportsGated = hrGated(HRReportsPage, "hr.analytics.read");
 const HrSettingsGated = hrGated(HRSettingsPage, "hr.analytics.manage");
+const HrJobArchitectureGated = hrGated(HRJobArchitecturePage, "hr.organization.read");
+const HrWorkPermitsGated = hrGated(HRWorkPermitsPage, "hr.compliance.read");
+const HrLettersCertificatesGated = hrGated(HRLettersCertificatesPage, "hr.directory.read");
+const HrRiskManagementGated = hrGated(HRRiskManagementPage, "hr.risk.read");
+const HrAuditLogsGated = hrGated(HRAuditLogsPage, "hr.analytics.manage");
+const HrAccessControlsGated = hrGated(HRAccessControlsPage, "hr.analytics.manage");
 
 function Router() {
   return (

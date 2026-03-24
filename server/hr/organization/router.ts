@@ -218,4 +218,90 @@ export const hrOrganizationRouter = router({
       if (!db) return [];
       return db.select().from(hrJobLevels).orderBy(hrJobLevels.rank);
     }),
+
+  // ============================================================================
+  // Job Family & Level CRUD (Phase 4 — Job Architecture)
+  // ============================================================================
+
+  createJobFamily: governedProcedure
+    .input(z.object({
+      code: z.string().min(1).max(50),
+      name: z.string().min(1).max(200),
+      description: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ORGANIZATION_WRITE);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [created] = await db.insert(hrJobFamilies).values(input).returning();
+      await logHrAudit({
+        actorId: ctx.user.id, action: "hr.job_family.create",
+        metadata: { jobFamilyId: created.id, code: input.code },
+      });
+      return created;
+    }),
+
+  updateJobFamily: governedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().max(200).optional(),
+      description: z.string().optional(),
+      status: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ORGANIZATION_WRITE);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { id, ...updates } = input;
+      const [updated] = await db.update(hrJobFamilies)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(hrJobFamilies.id, id)).returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Job family not found" });
+      await logHrAudit({
+        actorId: ctx.user.id, action: "hr.job_family.update",
+        metadata: { jobFamilyId: id, changes: Object.keys(updates) },
+      });
+      return updated;
+    }),
+
+  createJobLevel: governedProcedure
+    .input(z.object({
+      code: z.string().min(1).max(50),
+      name: z.string().min(1).max(200),
+      rank: z.number().min(0).default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ORGANIZATION_WRITE);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [created] = await db.insert(hrJobLevels).values(input).returning();
+      await logHrAudit({
+        actorId: ctx.user.id, action: "hr.job_level.create",
+        metadata: { jobLevelId: created.id, code: input.code },
+      });
+      return created;
+    }),
+
+  updateJobLevel: governedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().max(200).optional(),
+      rank: z.number().optional(),
+      status: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.ORGANIZATION_WRITE);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { id, ...updates } = input;
+      const [updated] = await db.update(hrJobLevels)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(hrJobLevels.id, id)).returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Job level not found" });
+      await logHrAudit({
+        actorId: ctx.user.id, action: "hr.job_level.update",
+        metadata: { jobLevelId: id, changes: Object.keys(updates) },
+      });
+      return updated;
+    }),
 });

@@ -4,9 +4,10 @@
 
 - **Type:** Governance-first navigation and capability mapping
 - **Module:** Human Resources
-- **Phase:** Phase 1 — Nav Model and Route Normalization
+- **Phase:** Phase 3 — Permission and Scope Completion
 - **Canonical source:** `client/src/config/hrNavConfig.ts`
 - **Route aliases:** `client/src/config/hrRouteAliases.ts`
+- **Authorization helpers:** `client/src/lib/hrNavAuth.ts`
 - **Last updated:** 2026-03-24
 
 ---
@@ -437,3 +438,135 @@ When new leaf capabilities are implemented, each must pass:
 3. Sensitive data handling audit
 4. Audit logging coverage verification
 5. Field masking policy enforcement
+
+---
+
+## 10. Phase 3 — Field Masking & Audit Metadata
+
+Phase 3 adds masking, audit, and scope resolution metadata to every nav item that interacts with backend field masking or sensitive-read audit logging.
+
+### New HrNavItem Fields (Phase 3)
+
+| Field | Type | Purpose |
+|---|---|---|
+| `maskingRequired` | `boolean?` | Whether backend applies field masking to responses |
+| `maskingFieldSet` | `"directory" \| "compensation" \| "relations" \| "talent"?` | Which masking function set is applied |
+| `sensitiveReadAudit` | `boolean?` | Whether reads trigger `logSensitiveRead()` audit entries |
+| `sensitiveAction` | `string?` | Elevated permission action that grants unmasked access |
+| `scopeActions` | `{ global?, team?, self? }?` | Scope resolution actions for `resolveDataScope()` |
+
+### Items with Field Masking
+
+| Item ID | Masking Field Set | Sensitive Read Audit | Sensitive Action |
+|---|---|---|---|
+| employee-profile | directory | No | — |
+| contracts-documents | directory | — | — |
+| employment-changes | directory | — | — |
+| hr-letters-certificates | directory | — | — |
+| salary-structure | compensation | Yes | hr.compensation.read.sensitive |
+| annual-salary-review | compensation | Yes | hr.compensation.read.sensitive |
+| bonus-incentives | compensation | Yes | hr.compensation.read.sensitive |
+| health-insurance | compensation | Yes | hr.compensation.read.sensitive |
+| pension-retirement | compensation | Yes | hr.compensation.read.sensitive |
+| allowances-perks | compensation | Yes | hr.compensation.read.sensitive |
+| grievances-complaints | relations | Yes | hr.relations.read.sensitive |
+| disciplinary-actions | relations | Yes | hr.relations.read.sensitive |
+| workplace-investigations | relations | Yes | hr.relations.read.sensitive |
+| talent-reviews | talent | Yes | hr.talent.write |
+
+### Items with Scope Resolution Actions
+
+These items declare `scopeActions` matching the backend's `resolveDataScope()` calls:
+
+| Item ID | Global Action | Team Action | Self Action |
+|---|---|---|---|
+| employee-profile | hr.directory.read | hr.directory.read.team | hr.directory.read.self |
+| time-tracking | hr.time.read | hr.time.read.team | hr.time.read.self |
+| leave-management | hr.leave.read | — | hr.leave.read.self |
+| training-catalog | hr.learning.read | — | hr.learning.read.self |
+| goal-setting | hr.performance.read | — | hr.performance.read.self |
+| performance-reviews | hr.performance.read | — | hr.performance.read.self |
+
+### Backend Masking Functions (from server/hr/permissions.ts)
+
+| Function | Fields Masked | Used By |
+|---|---|---|
+| `maskDirectoryFields()` | primaryPhone, notes, costCenter, legalEntity | Directory router |
+| `maskCompensationFields()` | baseSalary, amount, budgetPercent, employerContribution, employeeContribution | Compensation router |
+| `maskRelationsFields()` | description, resolutionNotes, findings, recommendation, appealNotes | Relations router |
+| `maskTalentFields()` | retentionRisk, developmentAreas, developmentNeeds, nineBoxPosition, readinessForPromotion | Talent router |
+
+---
+
+## 11. Phase 3 — Client-Side Authorization Helper
+
+`client/src/lib/hrNavAuth.ts` provides reusable pure functions for nav visibility and scope resolution. No backend calls — operates on the nav config + user's allowed actions.
+
+### Key Functions
+
+| Function | Purpose |
+|---|---|
+| `resolveItemVisibility(item, actions)` | Determine if an item is visible/disabled for a user |
+| `resolveSectionVisibility(section, actions)` | Determine if a section should appear |
+| `getVisibleSections(actions)` | Get all sections with their visible items |
+| `getVisibleItemsForSection(sectionId, actions)` | Get visible items in a section |
+| `canAccessRoute(href, actions)` | Check if a user can access a route path |
+| `wouldSeeMaskedData(item, actions)` | Check if user would see masked fields |
+| `getMaskedItemsForUser(actions)` | Get all accessible items with masked fields |
+| `getUnmaskedItemsForUser(actions)` | Get all items with full data access |
+| `resolveClientScope(item, actions)` | Determine client-side scope (all/team/self/none) |
+| `getSectionAccessSummaries(actions)` | Per-section access summary for dashboards |
+| `getItemScopeInfo(item)` | Detailed scope/masking info for an item |
+
+### Visibility Mode Enforcement
+
+| Mode | `resolveItemVisibility` Behavior |
+|---|---|
+| `show` | Always returns `{ visible: true, disabled: false }` |
+| `hide-if-no-access` | Hidden if user lacks `requiredAction` |
+| `show-disabled` | Visible but disabled if user lacks access |
+| `redirect-to-parent` | Hidden (redirect handled at route level) |
+
+### Scope Resolution (Client-Side)
+
+`resolveClientScope()` mirrors the server's `resolveDataScope()` logic:
+
+1. If user has the `global` action → scope is `"all"`
+2. If user has the `team` action → scope is `"team"`
+3. If user has the `self` action → scope is `"self"`
+4. Otherwise → scope is `"none"`
+
+### Masking Determination
+
+`wouldSeeMaskedData()` returns `true` when:
+- Item has `maskingRequired: true`
+- Item declares a `sensitiveAction`
+- User does NOT have the `sensitiveAction` in their allowed actions
+
+This enables UI indicators like "Some fields are restricted" on pages where the user sees masked data.
+
+---
+
+## 12. Role → Effective Access Summary
+
+Based on the HR_ROLE_PERMISSIONS matrix and the nav config:
+
+### Employee
+- **Visible sections:** Employee Records, Time & Attendance, Learning & Development, Performance (self), Well Being & Engagement, HR Policies
+- **Scope:** Self only (own profile, own timesheet, own goals, own leave)
+- **Masking:** Directory fields masked, compensation not accessible, relations not accessible, talent not accessible
+
+### Manager
+- **Visible sections:** Employee Records (team), Time & Attendance (team), Learning, Performance (team), Well Being, Talent Reviews (read only, masked)
+- **Scope:** Team + self (direct reports)
+- **Masking:** Directory fields masked, talent fields masked (no TALENT_WRITE)
+
+### HRBP
+- **Visible sections:** All 13 sections
+- **Scope:** All (organization-wide)
+- **Masking:** Unmasked for compensation (has COMPENSATION_READ_SENSITIVE), unmasked for relations (has RELATIONS_READ_SENSITIVE), unmasked for talent (has TALENT_WRITE)
+
+### Admin / Workspace Admin
+- **Visible sections:** All 13 sections
+- **Scope:** All
+- **Masking:** Fully unmasked (has all actions)

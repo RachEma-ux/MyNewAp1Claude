@@ -346,4 +346,96 @@ export const hrComplianceRouter = router({
       });
       return updated;
     }),
+
+  // ============================================================================
+  // Work Permits (Phase 4)
+  // ============================================================================
+
+  listWorkPermits: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(200).default(50),
+      offset: z.number().min(0).default(0),
+      workerId: z.number().optional(),
+      status: z.string().optional(),
+      permitType: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.COMPLIANCE_READ);
+      const db = getDb();
+      if (!db) return [];
+      const { hrWorkPermits } = await import("../../../drizzle/schema");
+      const conditions: any[] = [];
+      if (input.workerId) conditions.push(eq(hrWorkPermits.workerId, input.workerId));
+      if (input.status) conditions.push(eq(hrWorkPermits.status, input.status));
+      if (input.permitType) conditions.push(eq(hrWorkPermits.permitType, input.permitType));
+      return db.select().from(hrWorkPermits)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(hrWorkPermits.expiryDate))
+        .limit(input.limit).offset(input.offset);
+    }),
+
+  getWorkPermit: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.COMPLIANCE_READ);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { hrWorkPermits } = await import("../../../drizzle/schema");
+      const [row] = await db.select().from(hrWorkPermits).where(eq(hrWorkPermits.id, input.id)).limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Work permit not found" });
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compliance.work_permit", entityId: input.id, fields: ["permitNumber", "issuingAuthority"] });
+      return row;
+    }),
+
+  createWorkPermit: governedProcedure
+    .input(z.object({
+      workerId: z.number(),
+      permitType: z.enum(["work_visa", "residence_permit", "employment_authorization", "travel_visa", "other"]),
+      permitNumber: z.string().max(200).optional(),
+      issuingCountry: z.string().max(100).optional(),
+      issuingAuthority: z.string().max(300).optional(),
+      issueDate: z.string().optional(),
+      expiryDate: z.string().optional(),
+      notes: z.string().optional(),
+      documentRef: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPLIANCE_WRITE);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { hrWorkPermits } = await import("../../../drizzle/schema");
+      const [created] = await db.insert(hrWorkPermits).values({
+        ...input, status: "active", createdBy: ctx.user.id, updatedBy: ctx.user.id,
+      }).returning();
+      await logHrAudit({
+        actorId: ctx.user.id, action: "hr.compliance.work_permit.create",
+        metadata: { permitId: created.id, workerId: input.workerId, type: input.permitType },
+      });
+      return created;
+    }),
+
+  updateWorkPermit: governedProcedure
+    .input(z.object({
+      id: z.number(),
+      status: z.enum(["active", "expired", "pending_renewal", "revoked", "cancelled"]).optional(),
+      expiryDate: z.string().optional(),
+      notes: z.string().optional(),
+      documentRef: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.COMPLIANCE_MANAGE);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { hrWorkPermits } = await import("../../../drizzle/schema");
+      const { id, ...updates } = input;
+      const [updated] = await db.update(hrWorkPermits)
+        .set({ ...updates, updatedBy: ctx.user.id, updatedAt: new Date() })
+        .where(eq(hrWorkPermits.id, id)).returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Work permit not found" });
+      await logHrAudit({
+        actorId: ctx.user.id, action: "hr.compliance.work_permit.update",
+        metadata: { permitId: id, changes: Object.keys(updates) },
+      });
+      return updated;
+    }),
 });

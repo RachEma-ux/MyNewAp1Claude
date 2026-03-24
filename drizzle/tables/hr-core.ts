@@ -148,3 +148,35 @@ export const hrRoleAssignments = pgTable("hr_role_assignments", {
 
 export type HrRoleAssignment = typeof hrRoleAssignments.$inferSelect;
 export type InsertHrRoleAssignment = typeof hrRoleAssignments.$inferInsert;
+
+// ============================================================================
+// HR Letters & Certificates — Generated/tracked HR documents (Phase 4)
+// ============================================================================
+
+export const hrLetters = pgTable("hr_letters", {
+  id: serial("id").primaryKey(),
+  workerId: integer("worker_id").notNull().references(() => hrWorkerProfiles.id),
+  letterType: varchar("letter_type", { length: 100 }).notNull(), // employment_verification | salary_certificate | experience_letter | noc | recommendation | warning | offer | promotion | transfer | other
+  title: varchar("title", { length: 300 }).notNull(),
+  description: text("description"),
+  referenceNumber: varchar("reference_number", { length: 100 }),
+  issueDate: date("issue_date"),
+  expiryDate: date("expiry_date"),
+  status: varchar("status", { length: 30 }).default("draft").notNull(), // draft | issued | revoked | expired
+  documentRef: varchar("document_ref", { length: 500 }),
+  templateId: varchar("template_id", { length: 100 }),
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  issuedBy: integer("issued_by"),
+  createdBy: integer("created_by"),
+  updatedBy: integer("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  workerIdx: index("hr_letters_worker_idx").on(table.workerId),
+  typeIdx: index("hr_letters_type_idx").on(table.letterType),
+  statusIdx: index("hr_letters_status_idx").on(table.status),
+  refIdx: index("hr_letters_ref_idx").on(table.referenceNumber),
+}));
+
+export type HrLetter = typeof hrLetters.$inferSelect;
+export type InsertHrLetter = typeof hrLetters.$inferInsert;

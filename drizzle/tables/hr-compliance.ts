@@ -124,3 +124,33 @@ export const hrRiskItems = pgTable("hr_risk_items", {
 
 export type HrRiskItem = typeof hrRiskItems.$inferSelect;
 export type InsertHrRiskItem = typeof hrRiskItems.$inferInsert;
+
+// ============================================================================
+// HR Work Permits — Work authorization and permit tracking (Phase 4)
+// ============================================================================
+
+export const hrWorkPermits = pgTable("hr_work_permits", {
+  id: serial("id").primaryKey(),
+  workerId: integer("worker_id").notNull().references(() => hrWorkerProfiles.id),
+  permitType: varchar("permit_type", { length: 100 }).notNull(), // work_visa | residence_permit | employment_authorization | travel_visa | other
+  permitNumber: varchar("permit_number", { length: 200 }),
+  issuingCountry: varchar("issuing_country", { length: 100 }),
+  issuingAuthority: varchar("issuing_authority", { length: 300 }),
+  issueDate: date("issue_date"),
+  expiryDate: date("expiry_date"),
+  status: varchar("status", { length: 30 }).default("active").notNull(), // active | expired | pending_renewal | revoked | cancelled
+  notes: text("notes"),
+  documentRef: varchar("document_ref", { length: 500 }),
+  createdBy: integer("created_by"),
+  updatedBy: integer("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  workerIdx: index("hr_work_permit_worker_idx").on(table.workerId),
+  expiryIdx: index("hr_work_permit_expiry_idx").on(table.expiryDate),
+  statusIdx: index("hr_work_permit_status_idx").on(table.status),
+  typeIdx: index("hr_work_permit_type_idx").on(table.permitType),
+}));
+
+export type HrWorkPermit = typeof hrWorkPermits.$inferSelect;
+export type InsertHrWorkPermit = typeof hrWorkPermits.$inferInsert;

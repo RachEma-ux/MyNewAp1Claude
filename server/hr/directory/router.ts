@@ -301,4 +301,118 @@ export const hrDirectoryRouter = router({
         .where(eq(hrWorkspaceAssignments.workerId, input.workerId))
         .orderBy(desc(hrWorkspaceAssignments.createdAt));
     }),
+
+  // ============================================================================
+  // HR Letters & Certificates (Phase 4 — Employee Records expansion)
+  // ============================================================================
+
+  listLetters: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(200).default(50),
+      offset: z.number().min(0).default(0),
+      workerId: z.number().optional(),
+      letterType: z.string().optional(),
+      status: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
+      const db = getDb();
+      if (!db) return [];
+
+      const { hrLetters } = await import("../../../drizzle/schema");
+      const conditions = [];
+      if (input.workerId) conditions.push(eq(hrLetters.workerId, input.workerId));
+      if (input.letterType) conditions.push(eq(hrLetters.letterType, input.letterType));
+      if (input.status) conditions.push(eq(hrLetters.status, input.status));
+
+      return db.select().from(hrLetters)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(hrLetters.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+    }),
+
+  getLetter: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const { hrLetters } = await import("../../../drizzle/schema");
+      const rows = await db.select().from(hrLetters).where(eq(hrLetters.id, input.id)).limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Letter not found" });
+
+      await logSensitiveRead(ctx.user.id, "hr.letter.read", { letterId: input.id });
+      return rows[0];
+    }),
+
+  createLetter: governedProcedure
+    .input(z.object({
+      workerId: z.number(),
+      letterType: z.string().min(1).max(100),
+      title: z.string().min(1).max(300),
+      description: z.string().optional(),
+      referenceNumber: z.string().max(100).optional(),
+      issueDate: z.string().optional(),
+      expiryDate: z.string().optional(),
+      templateId: z.string().max(100).optional(),
+      documentRef: z.string().max(500).optional(),
+      metadata: z.record(z.unknown()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.DIRECTORY_WRITE);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const { hrLetters } = await import("../../../drizzle/schema");
+      const [created] = await db.insert(hrLetters).values({
+        ...input,
+        status: "draft",
+        createdBy: ctx.user.id,
+        updatedBy: ctx.user.id,
+      }).returning();
+
+      await logHrAudit({
+        actorId: ctx.user.id,
+        targetWorkerId: input.workerId,
+        action: "hr.letter.create",
+        metadata: { letterId: created.id, letterType: input.letterType, title: input.title },
+      });
+
+      return created;
+    }),
+
+  updateLetter: governedProcedure
+    .input(z.object({
+      id: z.number(),
+      title: z.string().max(300).optional(),
+      description: z.string().optional(),
+      status: z.string().optional(),
+      issueDate: z.string().optional(),
+      expiryDate: z.string().optional(),
+      documentRef: z.string().max(500).optional(),
+      issuedBy: z.number().optional(),
+      metadata: z.record(z.unknown()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.DIRECTORY_WRITE);
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const { hrLetters } = await import("../../../drizzle/schema");
+      const { id, ...updates } = input;
+      const [updated] = await db.update(hrLetters)
+        .set({ ...updates, updatedBy: ctx.user.id, updatedAt: new Date() })
+        .where(eq(hrLetters.id, id)).returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Letter not found" });
+
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.letter.update",
+        metadata: { letterId: id, changes: Object.keys(updates) },
+      });
+
+      return updated;
+    }),
 });

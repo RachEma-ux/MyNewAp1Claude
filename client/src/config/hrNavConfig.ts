@@ -5,7 +5,8 @@
  * All sidebar rendering, route resolution, permission gating, and governance
  * documentation should derive from this configuration.
  *
- * Phase 1 deliverable — nav model + capability mapping only.
+ * Phase 1 deliverable — nav model + capability mapping.
+ * Phase 3 deliverable — masking, audit, and scope metadata.
  * Phase 2+ will consume this config to render the actual Carbon SideNav.
  *
  * Every item includes:
@@ -13,7 +14,9 @@
  *   requiredAction, scopeType, visibilityMode, backedBy,
  *   backendDomain, implementationStatus,
  *   currentRoute (if different from target href),
- *   currentComponent (if an existing page backs it)
+ *   currentComponent (if an existing page backs it),
+ *   maskingRequired, maskingFieldSet, sensitiveReadAudit,
+ *   sensitiveAction, scopeActions (Phase 3)
  */
 
 // ---------------------------------------------------------------------------
@@ -40,6 +43,8 @@ export type ImplementationStatus =
   | "planned"
   | "not-started";
 
+export type MaskingFieldSet = "directory" | "compensation" | "relations" | "talent";
+
 export interface HrNavItem {
   id: string;
   label: string;
@@ -57,6 +62,23 @@ export interface HrNavItem {
   currentRoute?: string;
   /** Current React component filename backing this item (if any) */
   currentComponent?: string;
+
+  // --- Phase 3: Permission & Scope Metadata ---
+
+  /** Whether backend applies field masking to responses for this capability */
+  maskingRequired?: boolean;
+  /** Which field masking set is applied (maps to server/hr/permissions.ts masking functions) */
+  maskingFieldSet?: MaskingFieldSet;
+  /** Whether reads of this data trigger sensitive-read audit logging */
+  sensitiveReadAudit?: boolean;
+  /** The elevated permission action that grants unmasked/full access */
+  sensitiveAction?: string;
+  /** Scope resolution actions consumed by resolveDataScope() on the backend */
+  scopeActions?: {
+    global?: string;
+    team?: string;
+    self?: string;
+  };
 }
 
 export interface HrNavSection {
@@ -461,6 +483,14 @@ export const HR_NAV_CONFIG: HrNavModule = {
           implementationStatus: "live",
           currentRoute: "/hr/directory",
           currentComponent: "HRDirectoryPage",
+          maskingRequired: true,
+          maskingFieldSet: "directory",
+          sensitiveReadAudit: false,
+          scopeActions: {
+            global: "hr.directory.read",
+            team: "hr.directory.read.team",
+            self: "hr.directory.read.self",
+          },
         },
         {
           id: "contracts-documents",
@@ -475,6 +505,8 @@ export const HR_NAV_CONFIG: HrNavModule = {
           backedBy: "not-yet-implemented",
           backendDomain: "directory",
           implementationStatus: "not-started",
+          maskingRequired: true,
+          maskingFieldSet: "directory",
         },
         {
           id: "employment-changes",
@@ -489,6 +521,8 @@ export const HR_NAV_CONFIG: HrNavModule = {
           backedBy: "not-yet-implemented",
           backendDomain: "directory",
           implementationStatus: "not-started",
+          maskingRequired: true,
+          maskingFieldSet: "directory",
         },
         {
           id: "work-permits-compliance",
@@ -517,6 +551,8 @@ export const HR_NAV_CONFIG: HrNavModule = {
           backedBy: "not-yet-implemented",
           backendDomain: "directory",
           implementationStatus: "not-started",
+          maskingRequired: true,
+          maskingFieldSet: "directory",
         },
       ],
     },
@@ -553,6 +589,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           implementationStatus: "live",
           currentRoute: "/hr/compensation",
           currentComponent: "HRCompensationPage",
+          maskingRequired: true,
+          maskingFieldSet: "compensation",
+          sensitiveReadAudit: true,
+          sensitiveAction: "hr.compensation.read.sensitive",
         },
         {
           id: "annual-salary-review",
@@ -567,6 +607,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           backedBy: "not-yet-implemented",
           backendDomain: "compensation",
           implementationStatus: "not-started",
+          maskingRequired: true,
+          maskingFieldSet: "compensation",
+          sensitiveReadAudit: true,
+          sensitiveAction: "hr.compensation.read.sensitive",
         },
         {
           id: "bonus-incentives",
@@ -581,6 +625,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           backedBy: "not-yet-implemented",
           backendDomain: "compensation",
           implementationStatus: "not-started",
+          maskingRequired: true,
+          maskingFieldSet: "compensation",
+          sensitiveReadAudit: true,
+          sensitiveAction: "hr.compensation.read.sensitive",
         },
         {
           id: "health-insurance",
@@ -597,6 +645,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           implementationStatus: "live",
           currentRoute: "/hr/benefits",
           currentComponent: "HRBenefitsPage",
+          maskingRequired: true,
+          maskingFieldSet: "compensation",
+          sensitiveReadAudit: true,
+          sensitiveAction: "hr.compensation.read.sensitive",
         },
         {
           id: "pension-retirement",
@@ -611,6 +663,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           backedBy: "not-yet-implemented",
           backendDomain: "compensation",
           implementationStatus: "not-started",
+          maskingRequired: true,
+          maskingFieldSet: "compensation",
+          sensitiveReadAudit: true,
+          sensitiveAction: "hr.compensation.read.sensitive",
         },
         {
           id: "allowances-perks",
@@ -625,6 +681,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           backedBy: "not-yet-implemented",
           backendDomain: "compensation",
           implementationStatus: "not-started",
+          maskingRequired: true,
+          maskingFieldSet: "compensation",
+          sensitiveReadAudit: true,
+          sensitiveAction: "hr.compensation.read.sensitive",
         },
       ],
     },
@@ -661,6 +721,11 @@ export const HR_NAV_CONFIG: HrNavModule = {
           implementationStatus: "live",
           currentRoute: "/hr/timesheet",
           currentComponent: "HRTimesheetPage",
+          scopeActions: {
+            global: "hr.time.read",
+            team: "hr.time.read.team",
+            self: "hr.time.read.self",
+          },
         },
         {
           id: "leave-management",
@@ -677,6 +742,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           implementationStatus: "live",
           currentRoute: "/hr/leave",
           currentComponent: "HRLeavePage",
+          scopeActions: {
+            global: "hr.leave.read",
+            self: "hr.leave.read.self",
+          },
         },
         {
           id: "overtime-requests",
@@ -745,6 +814,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           implementationStatus: "live",
           currentRoute: "/hr/training",
           currentComponent: "HRTrainingPage",
+          scopeActions: {
+            global: "hr.learning.read",
+            self: "hr.learning.read.self",
+          },
         },
         {
           id: "mandatory-training",
@@ -841,6 +914,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           implementationStatus: "live",
           currentRoute: "/hr/goals",
           currentComponent: "HRGoalsPage",
+          scopeActions: {
+            global: "hr.performance.read",
+            self: "hr.performance.read.self",
+          },
         },
         {
           id: "performance-reviews",
@@ -857,6 +934,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           implementationStatus: "live",
           currentRoute: "/hr/reviews",
           currentComponent: "HRPerformanceReviewsPage",
+          scopeActions: {
+            global: "hr.performance.read",
+            self: "hr.performance.read.self",
+          },
         },
         {
           id: "feedback-360",
@@ -887,6 +968,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           implementationStatus: "live",
           currentRoute: "/hr/talent",
           currentComponent: "HRTalentPage",
+          maskingRequired: true,
+          maskingFieldSet: "talent",
+          sensitiveReadAudit: true,
+          sensitiveAction: "hr.talent.write",
         },
         {
           id: "succession-planning",
@@ -953,6 +1038,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           implementationStatus: "live",
           currentRoute: "/hr/grievances",
           currentComponent: "HRGrievancesPage",
+          maskingRequired: true,
+          maskingFieldSet: "relations",
+          sensitiveReadAudit: true,
+          sensitiveAction: "hr.relations.read.sensitive",
         },
         {
           id: "disciplinary-actions",
@@ -967,6 +1056,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           backedBy: "not-yet-implemented",
           backendDomain: "relations",
           implementationStatus: "not-started",
+          maskingRequired: true,
+          maskingFieldSet: "relations",
+          sensitiveReadAudit: true,
+          sensitiveAction: "hr.relations.read.sensitive",
         },
         {
           id: "workplace-investigations",
@@ -981,6 +1074,10 @@ export const HR_NAV_CONFIG: HrNavModule = {
           backedBy: "not-yet-implemented",
           backendDomain: "relations",
           implementationStatus: "not-started",
+          maskingRequired: true,
+          maskingFieldSet: "relations",
+          sensitiveReadAudit: true,
+          sensitiveAction: "hr.relations.read.sensitive",
         },
       ],
     },
@@ -1406,4 +1503,45 @@ export function findSectionById(sectionId: string): HrNavSection | undefined {
 /** Get the section that contains a given item id */
 export function getSectionForItem(itemId: string): HrNavSection | undefined {
   return HR_NAV_CONFIG.sections.find((s) => s.items.some((i) => i.id === itemId));
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Masking & Scope Helpers
+// ---------------------------------------------------------------------------
+
+/** Get all items that require field masking */
+export function getItemsRequiringMasking(): HrNavItem[] {
+  return getAllHrNavItems().filter((i) => i.maskingRequired);
+}
+
+/** Get all items that trigger sensitive-read audit logging */
+export function getItemsWithSensitiveAudit(): HrNavItem[] {
+  return getAllHrNavItems().filter((i) => i.sensitiveReadAudit);
+}
+
+/** Get all items by masking field set */
+export function getItemsByMaskingFieldSet(fieldSet: MaskingFieldSet): HrNavItem[] {
+  return getAllHrNavItems().filter((i) => i.maskingFieldSet === fieldSet);
+}
+
+/** Get all items that declare scope resolution actions */
+export function getItemsWithScopeActions(): HrNavItem[] {
+  return getAllHrNavItems().filter((i) => i.scopeActions != null);
+}
+
+/** Get all items classified as sensitive scope */
+export function getSensitiveItems(): HrNavItem[] {
+  return getAllHrNavItems().filter((i) => i.scopeType === "sensitive");
+}
+
+/** Group items by scope type */
+export function groupByScope(): Record<ScopeType, HrNavItem[]> {
+  const all = getAllHrNavItems();
+  return {
+    self: all.filter((i) => i.scopeType === "self"),
+    team: all.filter((i) => i.scopeType === "team"),
+    all: all.filter((i) => i.scopeType === "all"),
+    sensitive: all.filter((i) => i.scopeType === "sensitive"),
+    mixed: all.filter((i) => i.scopeType === "mixed"),
+  };
 }
