@@ -832,14 +832,14 @@ export default function WSWizardPage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-          {/* Identity Stage */}
-          {currentStage === "identity" && (
+          {/* ======== Step 1: Identity ======== */}
+          {currentStepId === "identity" && (
             <>
               <div>
                 <label className="text-sm font-medium mb-1 block">Workspace Name *</label>
                 <Input
                   value={data.name}
-                  onChange={(e) => setData({ ...data, name: e.target.value })}
+                  onChange={(e) => updateData({ name: e.target.value })}
                   placeholder="My Workspace"
                 />
               </div>
@@ -847,14 +847,14 @@ export default function WSWizardPage() {
                 <label className="text-sm font-medium mb-1 block">Description</label>
                 <Textarea
                   value={data.description}
-                  onChange={(e) => setData({ ...data, description: e.target.value })}
-                  placeholder="What is this workspace about?"
+                  onChange={(e) => updateData({ description: e.target.value })}
+                  placeholder="What is this workspace about? This should make it easy to review later."
                   rows={3}
                 />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Workspace Type</label>
-                <Select value={data.type} onValueChange={(v) => setData({ ...data, type: v })}>
+                <Select value={data.type} onValueChange={(v) => updateData({ type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="personal">Personal</SelectItem>
@@ -869,36 +869,242 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* Purpose Stage */}
-          {currentStage === "purpose" && (
+          {/* ======== Step 2: Purpose ======== */}
+          {currentStepId === "purpose" && (
             <>
               <div>
-                <label className="text-sm font-medium mb-1 block">Purpose Type</label>
-                <Select value={data.purposeType} onValueChange={(v) => setData({ ...data, purposeType: v })}>
+                <label className="text-sm font-medium mb-1 block">Purpose Type *</label>
+                <Select value={data.purposeType} onValueChange={(v) => updateData({ purposeType: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="goal">Goal</SelectItem>
-                    <SelectItem value="mission">Mission</SelectItem>
-                    <SelectItem value="project">Project</SelectItem>
-                    <SelectItem value="team">Team Activity</SelectItem>
-                    <SelectItem value="strategy">Strategy</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {PURPOSE_TYPES.map((pt) => (
+                      <SelectItem key={pt.value} value={pt.value}>{pt.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium mb-1 block">Purpose Reference</label>
+                <label className="text-sm font-medium mb-1 block">Purpose Statement *</label>
+                <Textarea
+                  value={data.purposeStatement}
+                  onChange={(e) => updateData({ purposeStatement: e.target.value })}
+                  placeholder="Why does this workspace exist? Describe its reason for being."
+                  rows={3}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Purpose is the reason the workspace exists. It is not the same as the structural anchor.
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Purpose Reference (optional)</label>
                 <Input
                   value={data.purposeRef}
-                  onChange={(e) => setData({ ...data, purposeRef: e.target.value })}
-                  placeholder="e.g., project name, goal description, mission statement"
+                  onChange={(e) => updateData({ purposeRef: e.target.value })}
+                  placeholder="e.g., link to project brief, goal doc, or strategy reference"
                 />
               </div>
             </>
           )}
 
-          {/* Actors Stage */}
-          {currentStage === "actors" && (
+          {/* ======== Step 3: Creation Basis / Anchor ======== */}
+          {currentStepId === "anchor" && (
+            <>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Anchor Type *</label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  What is this workspace organized around? This is different from its purpose.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {ANCHOR_TYPES.map((at) => (
+                    <button
+                      key={at.value}
+                      onClick={() => updateData({ anchorType: at.value, anchorRef: "", anchorLabel: "", anchorMeta: {} })}
+                      className={`text-left px-3 py-2.5 rounded-md border text-sm transition-colors ${
+                        data.anchorType === at.value
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      {at.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {data.anchorType && (
+                <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                  <AlertCircle className="h-3.5 w-3.5 inline mr-1" />
+                  Selected: <strong>{ANCHOR_TYPES.find((a) => a.value === data.anchorType)?.label}</strong>
+                  {" "}— scope details will be captured in the next step.
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ======== Step 4: Scope Details (dynamic based on anchor) ======== */}
+          {currentStepId === "scopeDetails" && (
+            <>
+              {!data.anchorType ? (
+                <div className="flex items-start gap-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>No anchor type selected. Go back to Step 3 to choose one.</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Provide details for anchor: <strong>{ANCHOR_TYPES.find((a) => a.value === data.anchorType)?.label}</strong>
+                  </p>
+
+                  {/* Per Project */}
+                  {data.anchorType === "per_project" && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Project Reference *</label>
+                        <Input
+                          value={data.anchorRef}
+                          onChange={(e) => updateData({ anchorRef: e.target.value })}
+                          placeholder="Project ID or reference"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Project Name</label>
+                        <Input
+                          value={data.anchorLabel}
+                          onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                          placeholder="Human-readable project name"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Per Employee Role */}
+                  {data.anchorType === "per_employee_role" && (
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Role Name *</label>
+                      <Input
+                        value={data.anchorLabel}
+                        onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                        placeholder="e.g., Senior Analyst, Lead Developer"
+                      />
+                    </div>
+                  )}
+
+                  {/* Per HR Position */}
+                  {data.anchorType === "per_hr_position" && (
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">HR Position *</label>
+                      <Input
+                        value={data.anchorLabel}
+                        onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                        placeholder="Position title from HR system"
+                      />
+                    </div>
+                  )}
+
+                  {/* Per Company Entity */}
+                  {data.anchorType === "per_company_entity" && (
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Entity Name *</label>
+                      <Input
+                        value={data.anchorLabel}
+                        onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                        placeholder="e.g., Legal Division, R&D Department"
+                      />
+                    </div>
+                  )}
+
+                  {/* Per Activity */}
+                  {data.anchorType === "per_activity" && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Activity Type *</label>
+                        <Input
+                          value={data.anchorLabel}
+                          onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                          placeholder="e.g., Compliance Review, Data Analysis"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Operational Area</label>
+                        <Input
+                          value={data.anchorRef}
+                          onChange={(e) => updateData({ anchorRef: e.target.value })}
+                          placeholder="e.g., Finance, Engineering"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Per Custom Factor */}
+                  {data.anchorType === "per_custom_factor" && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Custom Label *</label>
+                        <Input
+                          value={data.anchorLabel}
+                          onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                          placeholder="Label for this organizing factor"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Custom Value *</label>
+                        <Input
+                          value={data.anchorRef}
+                          onChange={(e) => updateData({ anchorRef: e.target.value })}
+                          placeholder="Value or identifier"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Explanation</label>
+                        <Textarea
+                          value={data.anchorMeta.explanation || ""}
+                          onChange={(e) => updateData({ anchorMeta: { ...data.anchorMeta, explanation: e.target.value } })}
+                          placeholder="Why is this the right organizing factor?"
+                          rows={2}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Per App Module */}
+                  {data.anchorType === "per_app_module" && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Module Name *</label>
+                        <Input
+                          value={data.anchorLabel}
+                          onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                          placeholder="e.g., Chat, Documents, Agents"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Module Preset Rationale</label>
+                        <Input
+                          value={data.anchorRef}
+                          onChange={(e) => updateData({ anchorRef: e.target.value })}
+                          placeholder="Why this module is the anchor"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Per Function */}
+                  {data.anchorType === "per_function" && (
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Function Name *</label>
+                      <Input
+                        value={data.anchorLabel}
+                        onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                        placeholder="e.g., Risk Management, Talent Acquisition"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* ======== Step 5: Actors ======== */}
+          {currentStepId === "actors" && (
             <>
               <div>
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
@@ -1052,8 +1258,8 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* Activities Stage */}
-          {currentStage === "activities" && (
+          {/* ======== Step 6: Activities ======== */}
+          {currentStepId === "activities" && (
             <>
               <div>
                 <label className="text-sm font-medium mb-1 block">Planned Activities</label>
@@ -1098,8 +1304,8 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* Needs Stage */}
-          {currentStage === "needs" && (
+          {/* ======== Step 7: Needs ======== */}
+          {currentStepId === "needs" && (
             <>
               <div>
                 <label className="text-sm font-medium mb-1 block">Resource & Tool Needs</label>
@@ -1144,8 +1350,8 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* Configuration Stage (Admin only) */}
-          {currentStage === "configuration" && isAdmin && (
+          {/* ======== Step 8: Configuration (Admin) ======== */}
+          {currentStepId === "configuration" && isAdmin && (
             <>
               <div>
                 <label className="text-sm font-medium mb-1 block">Embedding Model</label>
@@ -1172,8 +1378,8 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* Review Stage (Admin only — Governance) */}
-          {currentStage === "review" && isAdmin && (
+          {/* ======== Step 9: Review Packet (Governance) ======== */}
+          {currentStepId === "reviewPacket" && isAdmin && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-muted-foreground">Name:</span> {data.name || "—"}</div>
