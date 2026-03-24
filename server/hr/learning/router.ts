@@ -147,6 +147,7 @@ export const hrLearningRouter = router({
       tags: z.array(z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.LEARNING_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -156,6 +157,12 @@ export const hrLearningRouter = router({
         updatedBy: ctx.user.id,
         updatedAt: new Date(),
       }).where(eq(hrTrainingCatalog.id, id));
+
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.training.update",
+        metadata: { trainingId: id, changes: Object.keys(fields) },
+      });
 
       return { success: true };
     }),
@@ -192,6 +199,7 @@ export const hrLearningRouter = router({
       recurringMonths: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.LEARNING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -259,6 +267,7 @@ export const hrLearningRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.LEARNING_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -286,6 +295,7 @@ export const hrLearningRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.LEARNING_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -403,6 +413,7 @@ export const hrLearningRouter = router({
       validityMonths: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.CERTIFICATION_WRITE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -454,6 +465,7 @@ export const hrLearningRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.CERTIFICATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -483,6 +495,7 @@ export const hrLearningRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await requireHrPermission(ctx.user, HR_ACTIONS.CERTIFICATION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 

@@ -189,6 +189,12 @@ export const hrRecruitingRouter = router({
         actorId: ctx.user.id,
       });
 
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.recruiting.request.status_change",
+        metadata: { requestId: input.id, from: current.status, to: input.status },
+      });
+
       return { success: true };
     }),
 
@@ -263,6 +269,12 @@ export const hrRecruitingRouter = router({
         metadata: { recruitmentRequestId: input.recruitmentRequestId },
       });
 
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.recruiting.candidate.create",
+        metadata: { candidateId: created.id, requestId: input.recruitmentRequestId },
+      });
+
       return created;
     }),
 
@@ -308,6 +320,12 @@ export const hrRecruitingRouter = router({
         fromStatus: current.pipelineStage,
         toStatus: input.pipelineStage,
         actorId: ctx.user.id,
+      });
+
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.recruiting.candidate.stage_change",
+        metadata: { candidateId: input.id, from: current.pipelineStage, to: input.pipelineStage },
       });
 
       return { success: true };
@@ -362,6 +380,12 @@ export const hrRecruitingRouter = router({
         createdBy: ctx.user.id,
       }).returning();
 
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.recruiting.interview.create",
+        metadata: { interviewId: created.id, candidateId: input.candidateId, type: input.type },
+      });
+
       return created;
     }),
 
@@ -381,6 +405,12 @@ export const hrRecruitingRouter = router({
       const { id, ...updates } = input;
       await db.update(hrInterviews).set({ ...updates, updatedAt: new Date() })
         .where(eq(hrInterviews.id, id));
+
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.recruiting.interview.update",
+        metadata: { interviewId: id, changes: Object.keys(updates) },
+      });
 
       return { success: true };
     }),
@@ -444,6 +474,12 @@ export const hrRecruitingRouter = router({
         metadata: { candidateId: input.candidateId },
       });
 
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.recruiting.offer.create",
+        metadata: { offerId: created.id, candidateId: input.candidateId },
+      });
+
       return created;
     }),
 
@@ -491,6 +527,12 @@ export const hrRecruitingRouter = router({
         fromStatus: current.status,
         toStatus: input.status,
         actorId: ctx.user.id,
+      });
+
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.recruiting.offer.status_change",
+        metadata: { offerId: input.id, from: current.status, to: input.status },
       });
 
       return { success: true };

@@ -541,6 +541,12 @@ export const hrPerformanceRouter = router({
       await db.update(hrPerformanceReviews).set(updates)
         .where(eq(hrPerformanceReviews.id, input.id));
 
+      await logHrAudit({
+        actorId: ctx.user.id,
+        targetWorkerId: current.workerId,
+        action: "hr.performance.review.status_change",
+        metadata: { reviewId: input.id, from: current.status, to: input.status },
+      });
       await logStatusChange({ actorId: ctx.user.id, targetWorkerId: current.workerId, domain: "performance.review", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };
