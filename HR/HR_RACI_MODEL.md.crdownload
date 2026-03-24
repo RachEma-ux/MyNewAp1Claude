@@ -1,0 +1,514 @@
+# HR RACI model
+
+## Document Control
+
+- **Document type:** Responsibility, approval, and operating model standard
+- **Intended repo path:** `docs/hr/HR_RACI_MODEL.md`
+- **Module:** Human Resources (`hr`)
+- **Status:** Draft, repo-ready
+- **Primary audience:** HR, hiring managers, department directors, executives, admins, governance, and implementation teams
+- **Primary purpose:** Define who is Responsible, Accountable, Consulted, and Informed across the HR role-definition lifecycle and related operational flows
+- **Parent document:** `HR_ROLE_DEFINITION_FRAMEWORK.md`
+- **Related artifacts:** `HR_ROLE_VISIBILITY_MATRIX.md`, `HR_MODULE_IMPLEMENTATION_ROADMAP.md`, `HR_SECURITY_AND_COMPLIANCE.md`
+
+---
+
+## 1. Executive Summary
+
+In this app, role definition is not a single-author document task.
+
+It is a controlled lifecycle that touches:
+
+- business need identification
+- organizational design
+- staffing readiness
+- performance expectations
+- visibility and privacy rules
+- policy and governance controls
+- publication into platform-consumable structures
+
+Because of that, ownership must be explicit at every step.
+
+This RACI model defines how the HR role-definition process should work from request through retirement. It is designed to eliminate the most common failure modes:
+
+- nobody owns the final decision
+- too many people edit the same object without authority
+- managers define roles without HR normalization
+- HR publishes records without business sign-off
+- admins expose data before visibility rules are ready
+- governance concerns are discovered too late
+
+The operating principle is simple:
+
+**many roles may contribute, but only one role is accountable at each decision point.**
+
+---
+
+## 2. Purpose
+
+This document standardizes responsibility for the HR role-definition operating model.
+
+It defines:
+
+1. lifecycle actors
+2. lifecycle stages
+3. approval responsibilities
+4. RACI matrices for common HR role-definition scenarios
+5. escalation rules
+6. exception paths
+7. implementation expectations for workflow, state, and audit logic
+
+---
+
+## 3. Scope
+
+This RACI model applies to:
+
+- creation of new role definitions
+- material updates to existing roles
+- minor wording updates
+- structural changes to role placement or level
+- retirement of roles
+- visibility classification decisions for role data
+- publication of approved role records
+- mapping of approved roles to positions and staffing flows
+
+It should be used together with the role-definition framework and the role-visibility matrix.
+
+---
+
+## 4. Core operating principles
+
+### 4.1 Single accountability per checkpoint
+There must be exactly one accountable owner for each formal checkpoint.
+
+### 4.2 Business + HR dual integrity
+Managers define business need. HR normalizes, validates, and formalizes. Neither side should replace the other.
+
+### 4.3 Sensitive-change discipline
+The higher the organizational, privacy, or governance impact, the stronger the approval path.
+
+### 4.4 Publish only after approval
+No role definition should become the active canonical record before the formal approval path is complete.
+
+### 4.5 Structured workflow over ad hoc collaboration
+Chat, email, or meetings may support the process, but the authoritative state change must occur in the controlled workflow.
+
+### 4.6 History preservation
+Material changes must create reviewed, approvable versions rather than silently overwriting the active role.
+
+---
+
+## 5. Canonical actors
+
+| Actor | Description |
+|---|---|
+| **Hiring Manager / Direct Manager** | Identifies operational need, drafts role content, validates practical work expectations |
+| **Department Director** | Owns departmental fit, strategic scope, and budget-aligned business approval |
+| **HRBP / HR Manager** | Owns job architecture alignment, policy fit, language quality, and lifecycle review discipline |
+| **HR Admin / HR Ops** | Owns controlled publication, data maintenance, effective dating, and operational record hygiene |
+| **Executive Sponsor** | Approves strategic, sensitive, or executive-level role changes |
+| **Incumbent Employee** | Provides current-state evidence for existing roles and validates practical reality |
+| **Workspace Owner / Admin** | Advises when workspace assignment or approval routing implications exist |
+| **Security / Governance Reviewer** | Reviews visibility, segregation-of-duties, or control-sensitive changes |
+| **Platform Admin** | Implements system configuration and controlled publishing dependencies |
+
+### 5.1 Actor rule
+Being consulted does not grant approval authority.
+
+---
+
+## 6. RACI definitions
+
+| Code | Meaning | Practical interpretation |
+|---|---|---|
+| **R** | Responsible | Performs the work or directly drives the activity |
+| **A** | Accountable | Owns the final outcome and sign-off for that step |
+| **C** | Consulted | Provides input before the decision or output is finalized |
+| **I** | Informed | Must be notified after the step or decision |
+
+### 6.1 Accountability rule
+A step may have multiple `R` participants, but only one `A`.
+
+### 6.2 Consultation rule
+Consultation should be purposeful. Avoid expanding `C` so far that accountability becomes unclear.
+
+---
+
+## 7. Lifecycle model
+
+The role-definition lifecycle should follow a controlled path.
+
+### 7.1 Recommended lifecycle states
+
+1. **Requested**
+2. **Discovery**
+3. **Draft**
+4. **HR Review**
+5. **Business Approval**
+6. **Sensitive Review** (only when required)
+7. **Approved**
+8. **Published**
+9. **Effective**
+10. **Superseded / Retired**
+
+### 7.2 Transition rule
+A state transition should only be possible when the accountable role for that stage has completed its decision.
+
+### 7.3 Sensitive review triggers
+Sensitive review should be required when the role change affects any of the following:
+
+- executive or enterprise control roles
+- segregation-of-duties boundaries
+- broad visibility or data-access expectations
+- confidential workforce restructuring
+- control-plane or governance-relevant authority
+
+---
+
+## 8. Master RACI: end-to-end role-definition lifecycle
+
+| Lifecycle activity | Hiring Manager | Department Director | HRBP / HR Manager | HR Admin / Ops | Executive Sponsor | Incumbent | Workspace Owner | Governance / Security | Platform Admin |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Identify business need | R | A | C | I | I | C | C | I | I |
+| Open request / intake | R | A | C | I | I | I | I | I | I |
+| Perform discovery and gap analysis | R | A | C | I | I | C | C | C if needed | I |
+| Audit current-state role reality | R | A | C | I | I | R | C if needed | I | I |
+| Draft structured role definition | R | A | C | I | I | C | C if workspace-linked | I | I |
+| Validate job-architecture alignment | C | I | A / R | I | I | I | I | I | I |
+| Validate clarity and language quality | C | I | A / R | C | I | I | I | I | I |
+| Validate legal / policy fit | I | I | A / R | C | I | I | I | C if needed | I |
+| Validate visibility classification | I | I | R | C | I | I | C | A if sensitive | C |
+| Approve business scope and decision rights | R | A | C | I | I | C | C | C if sensitive | I |
+| Approve strategic or enterprise-sensitive change | I | C | C | I | A / R | I | I | C | I |
+| Prepare approved record for publishing | I | I | A | R | I | I | I | I | C |
+| Publish version and effective date | I | I | A | R | I | I | I | I | C |
+| Map role to position / staffing model | C | A | R | R | I | I | C | I | C |
+| Configure system visibility and dependencies | I | I | C | C | I | I | I | C | A / R |
+| Notify stakeholders | I | I | A | R | I | I | I | I | I |
+| Schedule future review | I | I | A | R | I | I | I | I | I |
+| Retire or supersede role version | C | A | R | R | C if strategic | I | I | C if sensitive | C |
+
+### 8.1 Interpretation
+This matrix deliberately keeps:
+
+- **business accountability** with the director for role scope
+- **formal HR accountability** with HR for structure and publishing discipline
+- **strategic accountability** with executives when the impact justifies it
+- **technical accountability** with platform admins only for system implementation, not business meaning
+
+---
+
+## 9. RACI by change type
+
+Different change types should not follow the same approval weight.
+
+### 9.1 Minor wording change
+
+Examples:
+
+- improve wording clarity
+- remove duplicate phrasing
+- correct typos
+- standardize terminology without changing meaning
+
+| Step | Responsible | Accountable | Consulted | Informed |
+|---|---|---|---|---|
+| Draft change | HRBP or Manager | HRBP | Manager | HR Admin |
+| Verify no material meaning change | HRBP | HRBP | Manager | Director |
+| Publish updated wording | HR Admin | HR Manager | Platform Admin if needed | Stakeholders |
+
+### 9.2 Material role change
+
+Examples:
+
+- change accountabilities
+- change KPIs
+- change decision rights
+- expand or reduce role boundaries
+
+| Step | Responsible | Accountable | Consulted | Informed |
+|---|---|---|---|---|
+| Draft change | Manager | Director | HRBP, Incumbent | HR Admin |
+| Validate structure and policy | HRBP | HR Manager | Manager, Director | Admin |
+| Approve business change | Manager | Director | HRBP | Stakeholders |
+| Publish approved version | HR Admin | HR Manager | Platform Admin | Stakeholders |
+
+### 9.3 Structural change
+
+Examples:
+
+- move role to another department
+- change reporting line materially
+- change family or grade
+- reclassify the role for job architecture
+
+| Step | Responsible | Accountable | Consulted | Informed |
+|---|---|---|---|---|
+| Draft structural redesign | Director | Director | HRBP, Manager | Executive if needed |
+| Validate HR architecture impact | HRBP | HR Manager | Director | HR Admin |
+| Approve structure | Director or Executive | Director or Executive | HR Head | Stakeholders |
+| Publish and re-map linked records | HR Admin / HR Ops | HR Manager | Platform Admin | Stakeholders |
+
+### 9.4 Sensitive visibility or control change
+
+Examples:
+
+- broaden role visibility beyond current model
+- add governance-restricted annotations
+- change segregation-of-duties boundaries
+
+| Step | Responsible | Accountable | Consulted | Informed |
+|---|---|---|---|---|
+| Propose change | HRBP or Admin | HRBP | Manager, Director | HR Admin |
+| Review control impact | Governance / Security | Governance / Security | HRBP, Platform Admin | Director |
+| Approve change | Governance or Executive, by policy | Governance or Executive | HR Head, Director | Stakeholders |
+| Implement | Platform Admin | Platform Admin | HR Admin, Governance | Stakeholders |
+
+### 9.5 Retirement of role
+
+Examples:
+
+- role no longer used for new staffing
+- role merged into another definition
+- function discontinued
+
+| Step | Responsible | Accountable | Consulted | Informed |
+|---|---|---|---|---|
+| Propose retirement | Manager or Director | Director | HRBP | HR Admin |
+| Validate no unresolved dependencies | HRBP / HR Ops | HR Manager | Manager, Platform Admin | Governance if needed |
+| Approve retirement | Director | Director | HRBP | Stakeholders |
+| Publish retired status / supersession | HR Admin | HR Manager | Platform Admin | Stakeholders |
+
+---
+
+## 10. Sub-process RACI: existing-team role audit
+
+This process is essential when the app is capturing current reality rather than inventing a new role from scratch.
+
+| Activity | Hiring Manager | Director | HRBP | Incumbent | HR Admin |
+|---|---:|---:|---:|---:|---:|
+| Launch audit | R | A | C | I | I |
+| Complete incumbent self-audit | C | I | I | R | I |
+| Compare actual vs expected role | R | A | C | C | I |
+| Identify overlaps and gaps | R | A | C | C | I |
+| Convert findings into structured role draft | R | A | C | C | I |
+| Route revised role to review | I | I | A / R | I | C |
+
+### 10.1 Audit rule
+The incumbent informs reality. The manager and HR formalize the canonical definition.
+
+---
+
+## 11. Sub-process RACI: role visibility classification
+
+Because the platform uses structured visibility controls, the visibility decision needs its own ownership model.
+
+| Activity | Manager | Director | HRBP | Governance / Security | Platform Admin | HR Admin |
+|---|---:|---:|---:|---:|---:|---:|
+| Propose visibility classes | C | I | R | C | C | I |
+| Identify sensitive sections | C | I | R | A if control-sensitive | C | I |
+| Validate implementation feasibility | I | I | C | C | A / R | I |
+| Approve classification | I | I | A for normal cases | A for sensitive cases | C | I |
+| Implement shaping rules | I | I | C | C | A / R | C |
+| Verify post-release behavior | I | I | C | C | A / R | C |
+
+---
+
+## 12. Sub-process RACI: publishing and activation
+
+Publishing is not the same as drafting or approving.
+
+| Activity | HRBP | HR Admin / Ops | Platform Admin | Director | Governance |
+|---|---:|---:|---:|---:|---:|
+| Confirm approved package completeness | A | R | I | I | I |
+| Set effective dates and version metadata | C | A / R | I | I | I |
+| Publish canonical record | C | A / R | C | I | I |
+| Trigger downstream synchronization | I | R | A / R | I | I |
+| Verify read-model / UI availability | I | C | A / R | I | I |
+| Archive superseded version | I | A / R | C | I | I |
+
+### 12.1 Publishing rule
+No draft should become active because of a technical shortcut, migration script, or admin action without the required approvals already recorded.
+
+---
+
+## 13. Approval thresholds
+
+The workflow should explicitly distinguish when director, executive, or governance sign-off is required.
+
+### 13.1 Director approval required when
+
+- role scope materially changes
+- key decision rights change
+- staffing impact crosses teams
+- reporting line or departmental alignment changes
+
+### 13.2 Executive approval required when
+
+- role is executive or enterprise-critical
+- role changes materially affect strategy or control ownership
+- organization redesign affects multiple departments
+- compensation or authority tier changes require executive governance by policy
+
+### 13.3 Governance or security review required when
+
+- visibility broadens into restricted areas
+- segregation-of-duties issues exist
+- the role affects controlled workflows or enterprise approvals
+- the change introduces risk flags or policy exceptions
+
+---
+
+## 14. Escalation model
+
+### 14.1 Disagreement on business scope
+If the manager and HR disagree on business meaning, the department director resolves scope.
+
+### 14.2 Disagreement on architecture or policy
+If the manager or director disagrees with HR classification, HR leadership resolves within the job-architecture policy framework.
+
+### 14.3 Disagreement on sensitive controls
+If HR and governance disagree on visibility or control requirements, governance and the designated executive sponsor resolve according to policy.
+
+### 14.4 Stalled approvals
+If an approval step is overdue, the workflow should escalate to the accountable owner’s manager or designated delegate rather than allowing bypass.
+
+---
+
+## 15. Delegation and substitution rules
+
+### 15.1 Temporary substitution
+A temporary delegate may act for a responsible or accountable actor only when:
+
+- the delegation is explicitly recorded
+- the delegate falls within allowed policy scope
+- the delegation is time-bound
+- audit history retains both original and acting authority
+
+### 15.2 Non-delegable areas
+The app should treat some approvals as non-delegable unless policy says otherwise, especially:
+
+- executive sign-off for enterprise-sensitive roles
+- governance approval for control exceptions
+- board-level approvals for the CEO or equivalent roles
+
+---
+
+## 16. Workflow evidence requirements
+
+Every formal checkpoint should leave evidence.
+
+### 16.1 Minimum evidence per stage
+
+| Stage | Minimum evidence |
+|---|---|
+| Request | Business reason, requester, target org scope |
+| Discovery | Gap analysis, overlap notes, affected stakeholders |
+| Draft | Structured role record, draft owner, change rationale |
+| HR Review | Review outcome, comments, normalization decisions |
+| Business Approval | Approver identity, decision, timestamp |
+| Sensitive Review | Control rationale, reviewer, conditions |
+| Publish | Version, effective dates, publisher, linked prior version |
+| Retirement | Retirement rationale, dependency check, supersession link if any |
+
+### 16.2 Audit rule
+The workflow system should make it easy to explain later:
+
+- who changed what
+- who approved it
+- why it changed
+- when it became effective
+
+---
+
+## 17. Recommended state and action model for implementation
+
+The app should implement role-definition workflow as explicit actions over state, not as free editing.
+
+### 17.1 Recommended actions
+
+- `requestRoleDefinition`
+- `startDiscovery`
+- `submitDraft`
+- `returnForRevision`
+- `submitForHrReview`
+- `approveHrReview`
+- `submitForBusinessApproval`
+- `approveBusinessScope`
+- `submitForSensitiveReview`
+- `approveSensitiveReview`
+- `publishRoleVersion`
+- `activateEffectiveVersion`
+- `retireRoleVersion`
+- `supersedeRoleVersion`
+
+### 17.2 Action rule
+Each action should validate:
+
+- actor eligibility
+- current state
+- required evidence
+- required consulted steps where policy demands them
+
+---
+
+## 18. Operating checklist
+
+Use this checklist before enabling the workflow in production.
+
+### 18.1 Governance checklist
+
+- [ ] Every lifecycle stage has exactly one accountable actor.
+- [ ] Sensitive change triggers are documented.
+- [ ] Executive-role approvals are explicitly routed.
+- [ ] Visibility classification decisions have an owner.
+- [ ] Publishing cannot bypass approval state.
+- [ ] Retirement and supersession preserve history.
+
+### 18.2 Product checklist
+
+- [ ] State transitions are explicit in the UI.
+- [ ] Users can see what step is waiting and who owns it.
+- [ ] Draft, active, and historical versions are clearly separated.
+- [ ] Approval comments and rationale are captured in structured form.
+
+### 18.3 Technical checklist
+
+- [ ] Actions validate actor authority.
+- [ ] Audit events are emitted on key transitions.
+- [ ] Effective dating is enforced.
+- [ ] Notification logic follows the RACI model.
+- [ ] Reporting can distinguish pending vs approved work.
+
+---
+
+## 19. Minimum policy questions to settle before implementation
+
+Before finalizing the workflow, the app should explicitly decide:
+
+1. which role changes count as “material” versus “minor”
+2. which strategic roles require executive sign-off
+3. which visibility changes require governance review
+4. whether managers can initiate structural changes directly or only via directors
+5. whether workspace-linked role changes require workspace-owner consultation
+6. who may publish records in production
+7. whether retirement of a role requires dependency validation against open positions and active staff assignments
+
+---
+
+## 20. Final operating standard
+
+The HR module should use this RACI model as the authority for who does what in role-definition workflow.
+
+The standard is:
+
+- managers define need and practical role shape
+- directors own business scope and departmental accountability
+- HR owns normalization, review discipline, and formal publication control
+- executives approve enterprise-sensitive role changes
+- governance reviews control-sensitive visibility and authority shifts
+- admins implement, but do not redefine business meaning
+- every formal checkpoint has one accountable owner
+
+This is the responsibility model that makes the HR role-definition framework operational, auditable, and safe to implement inside the app.

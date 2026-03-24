@@ -1,0 +1,589 @@
+# HR role-visibility matrix
+
+## Document Control
+
+- **Document type:** Access, visibility, and data-shaping standard
+- **Intended repo path:** `docs/hr/HR_ROLE_VISIBILITY_MATRIX.md`
+- **Module:** Human Resources (`hr`)
+- **Status:** Draft, repo-ready
+- **Primary audience:** HR, managers, admins, security, governance, product, platform, and implementation teams
+- **Primary purpose:** Define who can see which HR role-definition data, through which surfaces, under which constraints, with which enforcement requirements
+- **Parent document:** `HR_ROLE_DEFINITION_FRAMEWORK.md`
+- **Related artifacts:** `HR_RACI_MODEL.md`, `HR_SECURITY_AND_COMPLIANCE.md`, `HR_MODULE_IMPLEMENTATION_ROADMAP.md`
+
+---
+
+## 1. Executive Summary
+
+In this app, role-definition visibility must be deliberate.
+
+A role definition contains a mix of:
+
+- safe organizational context
+- operational expectations
+- authority and boundary data
+- planning information
+- compliance notes
+- sometimes restricted HR or admin metadata
+
+That means the platform cannot treat every role-definition field as broadly readable just because the role itself exists in the organization.
+
+This document defines a professional, implementation-ready visibility model for HR role-definition records so that the app can:
+
+- expose the right data to the right users
+- protect sensitive fields from unnecessary access
+- keep frontend and backend behavior aligned
+- support auditability for restricted reads
+- allow self-service where appropriate without overexposing planning or control data
+
+This standard is intentionally designed for a platform that already treats HR as a first-class module and that expects route-level checks, field-level shaping, and audit-aware behavior.
+
+---
+
+## 2. Purpose
+
+This document exists to standardize HR role-definition visibility across the platform.
+
+It defines:
+
+1. canonical personas
+2. sensitivity classes
+3. route-level visibility expectations
+4. field-level visibility rules
+5. masking and redaction behavior
+6. audit requirements for sensitive reads
+7. approval paths for exceptions
+8. implementation rules for backend, frontend, and admin tooling
+
+---
+
+## 3. Scope
+
+This matrix applies to the visibility of:
+
+- role-definition summary records
+- full role-definition records
+- draft role definitions
+- approval metadata
+- version history
+- role-linked planning notes
+- role-linked staffing relevance
+- role-linked control metadata
+- restricted attachments and structured notes where they are stored under HR role-management flows
+
+This document does **not** grant permissions by itself.
+
+It defines visibility expectations that must be enforced through the platform’s security and governance model.
+
+---
+
+## 4. Design principles
+
+### 4.1 Least necessary visibility
+A user should only see the minimum role-definition data needed for their legitimate business purpose.
+
+### 4.2 Structured over implicit
+Visibility must be derived from explicit field classes, route classes, and policy rules rather than assumptions.
+
+### 4.3 Backend-enforced
+Restricted data must be protected in the backend first. The frontend is a second control layer, not the source of truth.
+
+### 4.4 Context-aware
+Visibility may depend on whether the viewer is:
+
+- the role holder
+- the role holder’s manager
+- HR for that scope
+- an admin operating within approved authority
+- a workspace owner with legitimate staffing needs
+
+### 4.5 Audit-ready
+Sensitive reads should generate audit events when the risk level or policy requires it.
+
+### 4.6 Effective-dated and version-aware
+Visibility must respect record status. Drafts, pending approvals, superseded versions, and retired records may each require different treatment.
+
+---
+
+## 5. Canonical personas
+
+The HR module should use at least the following baseline personas for role-definition visibility.
+
+| Persona | Description |
+|---|---|
+| **Employee** | A worker accessing their own approved role information or permitted directory-level data |
+| **Manager** | A line manager or hiring manager needing role visibility for supervision, staffing, and review workflows |
+| **HRBP / HR Manager** | HR authority responsible for formalization, review, staffing, and lifecycle administration |
+| **HR Admin / HR Ops** | HR operations or module admin responsible for publishing, configuration, and data maintenance |
+| **Executive** | Senior leadership with approved enterprise-level or departmental visibility |
+| **Workspace Admin / Owner** | Contextual workspace authority who may need limited staffing-related role visibility |
+| **Security / Governance Reviewer** | Control-plane reviewer for sensitive cases, policy enforcement, and audit inquiries |
+| **Platform Admin** | Technical admin handling configuration and controlled operations, not automatically entitled to all HR content |
+|
+### 5.1 Important rule
+Platform-level technical authority does **not** automatically imply broad HR read access.
+
+Technical administration and HR business visibility are distinct concerns.
+
+---
+
+## 6. Sensitivity classes
+
+Every role-definition field or section should be assigned a visibility class.
+
+| Class | Typical content | Default exposure |
+|---|---|---|
+| `public_internal` | Role title, department, role purpose summary, non-sensitive accountabilities | Broad internal visibility |
+| `team_visible` | Team-facing expectations, collaboration interfaces, approved non-sensitive responsibilities | Team and management visibility |
+| `manager_visible` | Manager planning details, staffing implications, team-specific scope notes | Manager and above |
+| `hr_restricted` | HR notes, workforce planning rationale, structural review comments, legal/compliance annotations | HR and approved reviewers |
+| `admin_restricted` | Configuration metadata, publication controls, system mapping data | Admin and approved technical operators |
+| `governance_restricted` | Segregation-of-duties notes, control exceptions, risk flags, audit-linked restrictions | Governance, security, narrowly approved admins |
+| `confidential_case` | Employee-relations or case-derived content that should not appear in normal role browsing | Explicit case-based access only |
+
+### 6.1 Classification rule
+The visibility class should be attached to the field or section itself, not guessed at runtime from prose.
+
+### 6.2 Mixed-record rule
+A single role-definition record may contain fields from multiple visibility classes.
+
+That means the API must support partial shaping rather than only “allow or deny the whole record.”
+
+---
+
+## 7. Record states and visibility impact
+
+| Record state | Default visibility expectation |
+|---|---|
+| **Draft** | Visible to draft owner, designated reviewers, HR, and approved admins only |
+| **Review** | Visible to involved reviewers and approvers; not visible as canonical staff-facing content |
+| **Approval Pending** | Restricted to participants in the approval path and necessary admins |
+| **Approved** | Visible according to field classes and route scope |
+| **Published** | Canonical version for downstream consumption |
+| **Effective** | Current operational version |
+| **Superseded** | Historical access only; not default for ordinary browsing |
+| **Retired** | Limited reference access depending on legitimate need |
+
+### 7.1 Canonical browsing rule
+Standard user-facing role views should default to the active approved effective version, not drafts or superseded records.
+
+---
+
+## 8. Visibility surfaces
+
+The app should distinguish between visibility surfaces because not all surfaces should expose the same data.
+
+### 8.1 Typical surfaces
+
+- list pages
+- summary cards
+- detail pages
+- edit forms
+- admin review queues
+- approval drawers or modals
+- staffing selectors
+- workspace assignment views
+- exports
+- analytics
+- audit views
+- API responses
+
+### 8.2 Surface rule
+A field being visible on one surface does not mean it should be visible on all surfaces.
+
+Example:
+
+- a staffing selector may only need role title, department, level, and status
+- a full detail page may show accountabilities and KPIs
+- an approval queue may show change rationale and sensitive review metadata
+
+---
+
+## 9. Route-level access standard
+
+The following route families are recommended as implementation categories. Exact paths may vary, but the access pattern should remain consistent.
+
+| Route class | Typical purpose | Default allowed personas |
+|---|---|---|
+| **Role catalog list** | Browse approved active roles | Employee, Manager, HR, approved Admin, Executive |
+| **Role detail page** | View full approved role definition | Role holder, relevant Manager, HR, approved Admin, Executive within scope |
+| **Self role page** | Employee self-view of current approved role | Employee for own role only |
+| **Manager team role page** | Manager view of roles in their reporting scope | Manager, HR |
+| **Draft role editor** | Create or edit draft role definitions | Manager owner, HR, designated approvers, approved Admin |
+| **Approval review page** | Review pending role changes | HR, Director, Executive, Governance when required |
+| **Version history page** | View older versions and change metadata | HR, approved Admin, Manager where justified, Governance |
+| **Sensitive control page** | Review governance-restricted role metadata | Governance, Security, explicitly approved Admin |
+| **Export endpoint** | Export role data | Restricted by export policy and field class |
+
+### 9.1 Route policy rule
+Every HR route must declare:
+
+- allowed personas
+- allowed scopes
+- whether field shaping is required
+- whether access should be audited
+- whether export is allowed
+
+---
+
+## 10. Section-level visibility matrix
+
+The matrix below sets the default baseline.
+
+| Role-definition section | Employee | Manager | HRBP / HR Manager | HR Admin / Ops | Workspace Admin | Executive | Security / Governance |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Role title, department, level, status | Y | Y | Y | Y | Y (limited) | Y | Y |
+| Role purpose summary | Y | Y | Y | Y | Y (limited) | Y | Y |
+| High-level accountabilities | Y | Y | Y | Y | Y (staffing-relevant only) | Y | Y |
+| Reporting line | Y | Y | Y | Y | Y (limited) | Y | Y |
+| Decision rights summary | Self only | Y (team scope) | Y | Y | N by default | Y | Y |
+| Detailed decision boundaries | Self only if approved | Y (team scope) | Y | Y | N by default | Y | Y |
+| Collaboration interfaces | Y | Y | Y | Y | Y (if staffing-relevant) | Y | Y |
+| Essential qualifications | Y | Y | Y | Y | Y (limited) | Y | Y |
+| Preferred qualifications | Self only if approved | Y | Y | Y | N by default | Y | Y |
+| KPIs / success metrics | Self only | Y | Y | Y | N by default | Y | Y |
+| Draft notes | N | Owner only | Y | Y | N | If approver | If required |
+| Review comments | N | Limited if participant | Y | Y | N | If approver | If required |
+| Change rationale | N | Limited if participant | Y | Y | N | If approver | Y |
+| Workforce planning notes | N | Limited by scope | Y | Y | N | Y if justified | Y if required |
+| Compensation benchmark references | N | N by default | Y (restricted) | Y (restricted) | N | Limited | Y if required |
+| Compliance annotations | N | Limited | Y | Y | N | Limited | Y |
+| Segregation-of-duties notes | N | N by default | Limited | Limited | N | Limited | Y |
+| System mapping / internal config metadata | N | N | Limited | Y | N | N by default | Limited |
+| Historical versions | Self current only | Limited | Y | Y | N | Limited | Y |
+| Audit metadata | N | N | Limited | Limited | N | N by default | Y |
+
+### 10.1 Matrix interpretation rule
+“Y” still means “subject to scope.”
+
+Example:
+
+- a manager may see relevant team role data, not all HR role data in the company
+- an employee may see their own role, not every restricted variant of every role
+
+---
+
+## 11. Field-level shaping rules
+
+### 11.1 Summary payload
+A summary payload should usually include only:
+
+- role ID
+- role title
+- department
+- level / grade
+- status
+- high-level purpose
+- non-sensitive reporting line label
+- active version metadata
+
+### 11.2 Standard detail payload
+A standard detail payload may include:
+
+- summary payload fields
+- approved accountabilities
+- role purpose
+- collaboration interfaces
+- approved decision-rights summary
+- required qualifications
+- role-level KPIs
+
+### 11.3 Restricted detail payload
+A restricted payload may additionally include:
+
+- planning notes
+- draft or review metadata
+- compliance annotations
+- sensitive control notes
+- mapping and admin metadata
+
+### 11.4 Masking behavior
+When the user may access the record but not a field, the API should either:
+
+- omit the field entirely, or
+- return a masked placeholder and a policy reason code
+
+Avoid returning sensitive values and relying on the frontend to hide them.
+
+### 11.5 Recommended reason codes
+
+- `not_in_scope`
+- `requires_manager_scope`
+- `requires_hr_scope`
+- `requires_admin_scope`
+- `requires_governance_scope`
+- `draft_only`
+- `superseded_record`
+- `case_restricted`
+
+---
+
+## 12. Special visibility cases
+
+### 12.1 Employee self-service
+Employees should be able to view their own approved current role profile, including:
+
+- title
+- department
+- purpose
+- core accountabilities
+- reporting line
+- essential qualifications
+- role-level success expectations
+
+They should **not** automatically see:
+
+- workforce planning rationale
+- compensation benchmarking notes
+- restricted review commentary
+- control or security annotations
+
+### 12.2 Manager scope
+Managers should be able to view role data needed to:
+
+- supervise existing team members
+- open or update roles in their scope
+- compare active role expectations against actual team usage
+- review reporting-line and staffing implications
+
+Managers should not automatically gain unrestricted read access to all HR-restricted notes.
+
+### 12.3 Workspace context
+Workspace admins may need limited role visibility for staffing and assignment flows.
+
+They should usually see:
+
+- title
+- level
+- role purpose summary
+- relevant collaboration expectations
+- approved high-level accountabilities
+
+They should not usually see HR-restricted planning or compliance notes.
+
+### 12.4 Executive and strategic roles
+Executive role definitions may contain restricted governance and succession-sensitive content.
+
+The platform should separate:
+
+- public executive role summary
+- restricted strategic notes
+- governance-only annotations
+
+### 12.5 Historical access
+Superseded or retired records should not appear in normal employee browsing. Historical access should be explicit and purpose-bound.
+
+---
+
+## 13. Export and reporting controls
+
+### 13.1 Export minimization
+Exports should default to summary-safe data unless a higher-scope export has been explicitly requested and approved.
+
+### 13.2 Bulk extraction control
+Bulk export of HR role records should require:
+
+- scoped authorization
+- explicit field selection
+- audit logging
+- optional approval for restricted classes
+
+### 13.3 Reporting rule
+Analytics and dashboards should use aggregated role data where possible instead of exposing raw restricted notes.
+
+---
+
+## 14. Backend enforcement standard
+
+The backend must be the primary enforcement point.
+
+### 14.1 Required backend controls
+
+- route-level authorization
+- scope evaluation
+- record-state checks
+- field-class filtering
+- DTO shaping
+- audit event emission where required
+- export restrictions
+
+### 14.2 Service-layer rule
+Do not let controllers or routers directly assemble unrestricted HR payloads.
+
+The service layer should produce already-shaped results based on policy inputs.
+
+### 14.3 Deny-by-default rule
+If a field has no declared visibility class, it must not be exposed by default.
+
+### 14.4 Audit triggers
+Sensitive reads should be logged when they involve:
+
+- `hr_restricted`
+- `governance_restricted`
+- `confidential_case`
+- bulk access to manager-visible or restricted data
+- export operations
+
+---
+
+## 15. Frontend rendering standard
+
+The frontend must not assume that every field exists.
+
+### 15.1 UI rules
+
+- render from shaped DTOs only
+- support omitted or masked fields gracefully
+- avoid implying missing access means missing data quality
+- show clear policy-safe empty states
+- avoid exposing raw internal IDs or control notes without need
+
+### 15.2 Recommended UX patterns
+
+- summary list cards for broad internal views
+- expandable detail sections for role holder and manager views
+- clearly labeled restricted sections in HR/admin screens
+- change-history tabs for authorized reviewers only
+- export controls separated from normal browsing
+
+### 15.3 UI anti-patterns
+
+- fetching a full record and hiding fields client-side
+- showing edit buttons to users who can only view
+- including restricted fields in browser-visible debug payloads
+- mixing draft and active versions without labels
+
+---
+
+## 16. Approval and exception handling
+
+### 16.1 Standard rule
+If access is outside the default matrix, it should be treated as an exception and explicitly approved where policy requires it.
+
+### 16.2 Common exception cases
+
+- a temporary project lead needs role-detail access across teams
+- legal or audit needs access to historical restricted records
+- governance needs to inspect role-control annotations
+- a merger or reorganization requires cross-department review access
+
+### 16.3 Exception minimums
+Each exception should record:
+
+- requester
+- business reason
+- scope requested
+- duration
+- approver
+- review date
+- audit policy
+
+### 16.4 Time-bound rule
+Temporary access should expire automatically.
+
+---
+
+## 17. Recommended implementation object model
+
+The following structure is recommended for implementation.
+
+### 17.1 Role-definition field metadata
+
+Each field or section should carry metadata such as:
+
+- `visibilityClass`
+- `recordStateRule`
+- `auditableRead`
+- `exportable`
+- `maskStrategy`
+- `scopeRule`
+
+### 17.2 Policy decision inputs
+
+A policy evaluation should consider at least:
+
+- viewer persona
+- viewer scope
+- relationship to role or role holder
+- workspace context
+- record state
+- field visibility class
+- exception grants
+- export intent
+
+### 17.3 Shaped response families
+
+Recommended response families:
+
+- `RoleSummaryDto`
+- `RoleDetailDto`
+- `RoleRestrictedDetailDto`
+- `RoleApprovalReviewDto`
+- `RoleHistoryDto`
+- `RoleExportRowDto`
+
+---
+
+## 18. Baseline visibility checklist
+
+Use this checklist before publishing role-definition visibility in production.
+
+### 18.1 Policy checklist
+
+- [ ] Every route declares allowed personas.
+- [ ] Every field or section has a visibility class.
+- [ ] Draft and superseded records are correctly separated.
+- [ ] Restricted sections are not included in generic payloads.
+- [ ] Employee self-service is limited to approved self-scope.
+- [ ] Manager visibility is scope-bound.
+- [ ] Workspace views only expose staffing-relevant fields.
+- [ ] Restricted exports are controlled and audited.
+- [ ] Sensitive reads generate audit events where required.
+- [ ] Exception access is time-bound and reviewable.
+
+### 18.2 UI checklist
+
+- [ ] List views use summary DTOs only.
+- [ ] Detail pages support masked and omitted fields.
+- [ ] Draft and active views are clearly labeled.
+- [ ] Restricted actions are hidden when not authorized.
+- [ ] Export controls are not mixed with casual browsing.
+
+### 18.3 Backend checklist
+
+- [ ] Deny-by-default behavior is in place.
+- [ ] Service-layer shaping is implemented.
+- [ ] Route guards are tested.
+- [ ] Audit emission is implemented for sensitive reads.
+- [ ] No hidden unrestricted debug endpoints exist.
+
+---
+
+## 19. Minimum policy decisions required before build
+
+Before the module is finalized, the app should explicitly decide:
+
+1. whether employees can browse all published role summaries or only their own and selected directories
+2. whether managers can compare roles outside their direct reporting scope
+3. whether workspace owners can view any role-detail data beyond staffing-safe summaries
+4. which role-definition fields are auditable on read
+5. whether export of manager-visible data requires extra approval
+6. whether historical role versions are visible outside HR
+7. whether compensation-related role notes are stored in the role record at all
+8. how governance-restricted annotations are separated from normal HR views
+
+---
+
+## 20. Final standard
+
+The HR module should treat role-definition visibility as a formal access design problem, not a UI convenience decision.
+
+The standard is:
+
+- approved active role summaries may be broadly visible internally when safe
+- detailed role data must be shaped by persona, scope, and record state
+- HR-restricted and governance-restricted fields must be protected by backend policy
+- manager and workspace visibility must remain purpose-bound
+- sensitive reads and exports must be auditable where policy requires it
+
+This matrix is the control document that turns the role-definition framework into enforceable product behavior.
