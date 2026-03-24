@@ -421,58 +421,65 @@ export const workspaceRouter = router({
       return submitForReview(input.id, ctx.user.id);
     }),
 
-  /** Begin review (ready_for_review → under_review) */
+  /** Begin review (ready_for_review → under_review) — admin/governance only */
   review: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Begin Review requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return beginReview(input.id, ctx.user.id);
     }),
 
-  /** Approve workspace (under_review → approved) */
+  /** Approve workspace (under_review → approved) — admin/governance only */
   approve: governedProcedure
     .input(z.object({ id: z.number(), notes: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Approve requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return approveWorkspace(input.id, ctx.user.id, input.notes);
     }),
 
-  /** Publish workspace (approved → published) — exposes to WS Catalog */
+  /** Publish workspace (approved → published) — admin/governance only */
   publish: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Publish requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return publishWorkspace(input.id, ctx.user.id);
     }),
 
-  /** Activate workspace (published → active) — makes fully executable */
+  /** Activate workspace (published → active) — admin/governance only */
   activate: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Activate requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return activateWorkspace(input.id, ctx.user.id);
     }),
 
-  /** Reject workspace (under_review → rejected) */
+  /** Reject workspace (under_review → rejected) — admin/governance only */
   reject: governedProcedure
     .input(z.object({ id: z.number(), reason: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Reject requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return rejectWorkspace(input.id, ctx.user.id, input.reason);
     }),
 
-  /** Archive workspace (active/approved/published → archived) */
+  /** Archive workspace — admin/governance only */
   archive: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Archive requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return archiveWorkspace(input.id, ctx.user.id);
     }),
 
-  /** Delete workspace (archived → deleted) */
+  /** Delete workspace (archived → deleted) — admin/governance only */
   delete: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Delete requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return softDeleteWorkspace(input.id, ctx.user.id);
     }),
