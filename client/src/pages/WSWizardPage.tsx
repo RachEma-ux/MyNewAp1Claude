@@ -1297,95 +1297,146 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* ======== Step 6: Activities ======== */}
+          {/* ======== Step 6: Activities (Structured) ======== */}
           {currentStepId === "activities" && (
             <>
+              {/* Primary Activity Type */}
               <div>
-                <label className="text-sm font-medium mb-1 block">Planned Activities</label>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    value={newActivity}
-                    onChange={(e) => setNewActivity(e.target.value)}
-                    placeholder="e.g., Document analysis, Code review, Research"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && newActivity.trim()) {
-                        setData({ ...data, activities: [...data.activities, newActivity.trim()] });
-                        setNewActivity("");
-                      }
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (newActivity.trim()) {
-                        setData({ ...data, activities: [...data.activities, newActivity.trim()] });
-                        setNewActivity("");
-                      }
-                    }}
-                  >
-                    Add
-                  </Button>
+                <label className="text-sm font-medium mb-1 block">Primary Activity Type *</label>
+                <Select value={data.primaryActivityType} onValueChange={(v) => updateData({ primaryActivityType: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select primary activity..." /></SelectTrigger>
+                  <SelectContent>
+                    {ACTIVITY_TYPES.map((at) => (
+                      <SelectItem key={at} value={at}>
+                        {at.charAt(0).toUpperCase() + at.slice(1).replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Secondary Activity Types */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Secondary Activity Types</label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {ACTIVITY_TYPES.filter((at) => at !== data.primaryActivityType).map((at) => {
+                    const isSelected = data.secondaryActivityTypes.includes(at);
+                    return (
+                      <button
+                        key={at}
+                        onClick={() => {
+                          if (isSelected) {
+                            updateData({ secondaryActivityTypes: data.secondaryActivityTypes.filter((s) => s !== at) });
+                          } else {
+                            updateData({ secondaryActivityTypes: [...data.secondaryActivityTypes, at] });
+                          }
+                        }}
+                        className={`px-2 py-1 rounded text-xs transition-colors ${
+                          isSelected
+                            ? "bg-primary/15 text-primary border border-primary/30"
+                            : "bg-muted text-muted-foreground border border-transparent hover:bg-muted/80"
+                        }`}
+                      >
+                        {at.charAt(0).toUpperCase() + at.slice(1).replace(/_/g, " ")}
+                      </button>
+                    );
+                  })}
                 </div>
-                {data.activities.map((act, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm py-1">
-                    <Briefcase className="h-3 w-3 text-muted-foreground" />
-                    <span>{act}</span>
-                    <button
-                      className="text-xs text-destructive ml-auto"
-                      onClick={() => setData({ ...data, activities: data.activities.filter((_, j) => j !== i) })}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+              </div>
+
+              {/* Operating Mode */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Operating Mode</label>
+                <Select value={data.operatingMode} onValueChange={(v) => updateData({ operatingMode: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select mode..." /></SelectTrigger>
+                  <SelectContent>
+                    {OPERATING_MODES.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Execution Style */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Execution Style</label>
+                <Select value={data.executionStyle} onValueChange={(v) => updateData({ executionStyle: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select style..." /></SelectTrigger>
+                  <SelectContent>
+                    {EXECUTION_STYLES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Collaboration Intensity */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Collaboration / Automation Emphasis</label>
+                <Select value={data.collaborationIntensity} onValueChange={(v) => updateData({ collaborationIntensity: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select emphasis..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low — mostly independent</SelectItem>
+                    <SelectItem value="medium">Medium — regular collaboration</SelectItem>
+                    <SelectItem value="high">High — tight collaboration</SelectItem>
+                    <SelectItem value="automation_heavy">Automation-heavy</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </>
           )}
 
-          {/* ======== Step 7: Needs ======== */}
+          {/* ======== Step 7: Needs (Structured Categories) ======== */}
           {currentStepId === "needs" && (
             <>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Resource & Tool Needs</label>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    value={newNeed}
-                    onChange={(e) => setNewNeed(e.target.value)}
-                    placeholder="e.g., Vector DB, LLM Provider, Document Storage"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && newNeed.trim()) {
-                        setData({ ...data, needs: [...data.needs, newNeed.trim()] });
-                        setNewNeed("");
-                      }
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (newNeed.trim()) {
-                        setData({ ...data, needs: [...data.needs, newNeed.trim()] });
-                        setNewNeed("");
-                      }
-                    }}
-                  >
-                    Add
-                  </Button>
-                </div>
-                {data.needs.map((need, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm py-1">
-                    <Settings className="h-3 w-3 text-muted-foreground" />
-                    <span>{need}</span>
-                    <button
-                      className="text-xs text-destructive ml-auto"
-                      onClick={() => setData({ ...data, needs: data.needs.filter((_, j) => j !== i) })}
-                    >
-                      Remove
-                    </button>
+              <p className="text-xs text-muted-foreground mb-3">
+                Declare what users and agents need to succeed. This is the final manager intent step — admin will later translate these into governed configuration.
+              </p>
+              {NEEDS_CATEGORIES.map((cat) => {
+                const items = data.needs[cat.key] || [];
+                const inputVal = needsInput[cat.key] || "";
+                return (
+                  <div key={cat.key} className="space-y-1.5">
+                    <label className="text-sm font-medium block">{cat.label}</label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={inputVal}
+                        onChange={(e) => setNeedsInput((prev) => ({ ...prev, [cat.key]: e.target.value }))}
+                        placeholder={cat.placeholder}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { e.preventDefault(); addNeedItem(cat.key); }
+                        }}
+                        className="text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => addNeedItem(cat.key)}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                    {items.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {items.map((item, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs"
+                          >
+                            {item}
+                            <button
+                              className="text-destructive hover:text-destructive/80 ml-0.5"
+                              onClick={() => removeNeedItem(cat.key, i)}
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </>
           )}
 
