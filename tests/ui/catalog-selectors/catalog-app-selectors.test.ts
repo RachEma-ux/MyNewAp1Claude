@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import path from "path";
 import { CATALOG_AVAILABILITY_FILTERS, isCatalogEntryAvailableForAppUse } from "../../../server/catalog/availability";
 
 // ============================================================================
@@ -139,7 +140,7 @@ describe("Catalog App Selectors — No Raw Domain Leakage", () => {
     // This is a structural contract test
     const fs = await import("fs");
     const chatContent = fs.readFileSync(
-      "/data/data/com.termux/files/home/MyNewAp1Claude/client/src/pages/Chat.tsx",
+      path.resolve(process.cwd(), "client/src/pages/Chat.tsx"),
       "utf-8"
     );
 
@@ -154,7 +155,7 @@ describe("Catalog App Selectors — No Raw Domain Leakage", () => {
   it("useCatalogAvailable hooks call catalogManage.available, not raw domain endpoints", async () => {
     const fs = await import("fs");
     const hookContent = fs.readFileSync(
-      "/data/data/com.termux/files/home/MyNewAp1Claude/client/src/hooks/useCatalogAvailable.ts",
+      path.resolve(process.cwd(), "client/src/hooks/useCatalogAvailable.ts"),
       "utf-8"
     );
 
