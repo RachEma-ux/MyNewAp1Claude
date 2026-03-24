@@ -1103,26 +1103,94 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* ======== Step 5: Actors ======== */}
+          {/* ======== Step 5: Actors (Team + Crew) ======== */}
           {currentStepId === "actors" && (
             <>
+              {/* ---- Team (Human Participants — HR Directory) ---- */}
               <div>
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
                   <Users className="h-4 w-4" /> Team (Human Participants)
                 </h4>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Team members can be added after workspace creation from the workspace shell.
+                <p className="text-xs text-muted-foreground mb-3">
+                  Select team members from the HR Directory. Only active employees are available.
                 </p>
+
+                {/* Add team member form */}
+                <div className="space-y-3 rounded-md border p-3 mb-3">
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Select Employee</label>
+                    <DirectoryDropdown
+                      statusFilter="active"
+                      placeholder="Search HR Directory..."
+                      onSelect={(entry) => addTeamMember(entry, "member")}
+                      className="w-full"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Adds as Member by default. Change role after adding.
+                  </p>
+                </div>
+
+                {/* Team list */}
+                {data.team.length === 0 ? (
+                  <div className="flex items-start gap-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>No team members added yet. Use the HR Directory picker above.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {data.team.map((member, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm py-1.5 px-2 rounded hover:bg-muted/50">
+                        <Users className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="truncate">{member.displayName}</span>
+                        <Select
+                          value={member.role}
+                          onValueChange={(v) => {
+                            const updated = [...data.team];
+                            updated[i] = { ...updated[i], role: v as TeamMember["role"] };
+                            updateData({ team: updated });
+                          }}
+                        >
+                          <SelectTrigger className="h-6 w-[100px] text-[10px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="owner">Owner</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="member">Member</SelectItem>
+                            <SelectItem value="viewer">Viewer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <button
+                          className="text-xs text-destructive ml-auto shrink-0"
+                          onClick={() => removeTeamMember(i)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Owner warning */}
+                {data.team.length > 0 && !data.team.some((t) => t.role === "owner") && (
+                  <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-600">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    No owner assigned. Set one team member's role to Owner.
+                  </div>
+                )}
               </div>
-              <div>
+
+              {/* ---- Crew (AI Participants — Catalog-backed) ---- */}
+              <div className="mt-6 pt-4 border-t">
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
                   <Bot className="h-4 w-4" /> Crew (AI Participants)
                 </h4>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Select AI participants from your governed catalog. Only Agents and Bots that have been approved and activated in AI Types are available.
+                  Select AI participants from the governed catalog. Only approved and activated Agents/Bots are available.
                 </p>
 
-                {/* Step 1: Participant Type */}
+                {/* Add crew member form */}
                 <div className="space-y-3 rounded-md border p-3 mb-3">
                   <div>
                     <label className="text-xs font-medium mb-1 block">AI Participant Type</label>
@@ -1144,7 +1212,6 @@ export default function WSWizardPage() {
                     </div>
                   </div>
 
-                  {/* Step 2: Catalog-backed selection */}
                   <div>
                     <label className="text-xs font-medium mb-1 block">
                       {newCrewType === "agent" ? "Select Agent" : "Select Bot"}
@@ -1164,7 +1231,6 @@ export default function WSWizardPage() {
                     )}
                   </div>
 
-                  {/* Step 3: Crew Role */}
                   <div>
                     <label className="text-xs font-medium mb-1 block">Crew Role</label>
                     <Select value={newCrewRole} onValueChange={(v) => setNewCrewRole(v as CrewRole)}>
@@ -1177,7 +1243,6 @@ export default function WSWizardPage() {
                     </Select>
                   </div>
 
-                  {/* Step 4: Optional note */}
                   <div>
                     <label className="text-xs font-medium mb-1 block">Mission Note (optional)</label>
                     <Input
@@ -1187,33 +1252,7 @@ export default function WSWizardPage() {
                     />
                   </div>
 
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      if (!newCrewId) {
-                        toast.error(`Select ${newCrewType === "agent" ? "an Agent" : "a Bot"} from the catalog`);
-                        return;
-                      }
-                      if (data.crewAgents.some((c) => c.participantId === newCrewId && c.participantType === newCrewType)) {
-                        toast.error("This participant is already in the crew");
-                        return;
-                      }
-                      setData({
-                        ...data,
-                        crewAgents: [...data.crewAgents, {
-                          participantType: newCrewType,
-                          participantId: newCrewId,
-                          participantName: newCrewName,
-                          crewRole: newCrewRole,
-                          note: newCrewNote,
-                        }],
-                      });
-                      setNewCrewId("");
-                      setNewCrewName("");
-                      setNewCrewRole("executor");
-                      setNewCrewNote("");
-                    }}
-                  >
+                  <Button size="sm" onClick={addCrewMember}>
                     Add to Crew
                   </Button>
                 </div>
@@ -1223,7 +1262,7 @@ export default function WSWizardPage() {
                   <div className="flex items-start gap-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
                     <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     <span>
-                      No AI participants added yet. Select an Agent or Bot from your catalog above.
+                      No AI participants added yet. Select an Agent or Bot from the catalog above.
                       If none are available, first add and approve them in AI Types / Catalog.
                     </span>
                   </div>
@@ -1246,7 +1285,7 @@ export default function WSWizardPage() {
                         )}
                         <button
                           className="text-xs text-destructive ml-auto shrink-0"
-                          onClick={() => setData({ ...data, crewAgents: data.crewAgents.filter((_, j) => j !== i) })}
+                          onClick={() => removeCrewMember(i)}
                         >
                           Remove
                         </button>
