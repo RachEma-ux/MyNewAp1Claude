@@ -44,6 +44,7 @@ import {
   listPublishedWorkspaces,
   listAllWorkspaces,
   getWorkspaceLifecycleInfo,
+  validateDraftCompleteness,
 } from "./lifecycle-service";
 import {
   requireReadableWorkspaceRoute,
@@ -498,6 +499,84 @@ export const workspaceRouter = router({
     .query(async ({ ctx, input }) => {
       await requireReadableWorkspaceRoute(ctx.user.id, input.id);
       return getWorkspaceLifecycleInfo(input.id);
+    }),
+
+  /** Get governance-readable review packet for a workspace */
+  getReviewPacket: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireReadableWorkspaceRoute(ctx.user.id, input.id);
+      const dbConn = getDb();
+      if (!dbConn) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Load workspace
+      const [ws] = await dbConn.select().from(workspaces)
+        .where(eq(workspaces.id, input.id)).limit(1);
+      if (!ws) throw new TRPCError({ code: "NOT_FOUND", message: "Workspace not found" });
+
+      const meta = ((ws as any).wizardMeta || {}) as Record<string, any>;
+
+      // Load team members
+      const members = await dbConn.select().from(workspaceMembers)
+        .where(eq(workspaceMembers.workspaceId, input.id));
+
+      // Load crew
+      const crew = await dbConn.select().from(workspaceCrew)
+        .where(eq(workspaceCrew.workspaceId, input.id));
+
+      // Compute readiness
+      const completeness = await validateDraftCompleteness(input.id);
+      const lifecycle = await getWorkspaceLifecycleInfo(input.id);
+
+      return {
+        identity: {
+          name: ws.name,
+          description: ws.description,
+          type: ws.type,
+          ownerId: ws.ownerId,
+          status: ws.status,
+        },
+        purpose: {
+          purposeType: ws.purposeType,
+          purposeStatement: meta.purposeStatement || null,
+          purposeRef: ws.purposeRef,
+        },
+        anchor: {
+          anchorType: meta.anchorType || null,
+          anchorRef: meta.anchorRef || null,
+          anchorLabel: meta.anchorLabel || null,
+          anchorMeta: meta.anchorMeta || null,
+        },
+        team: members.map((m) => ({
+          id: m.id,
+          userId: m.userId,
+          role: m.role,
+        })),
+        crew: crew.map((c) => ({
+          id: c.id,
+          agentId: c.agentId,
+          agentName: c.agentName,
+          participantType: c.participantType,
+          role: c.role,
+          note: c.note,
+          enabled: c.enabled,
+        })),
+        activities: meta.activities || null,
+        needs: meta.needs || null,
+        configuration: {
+          wizardConfig: meta.configuration || null,
+          embeddingModel: ws.embeddingModel,
+          chunkingStrategy: ws.chunkingStrategy,
+          routingProfile: (ws as any).routingProfile || null,
+          resourceProfile: (ws as any).resourceProfile || null,
+          shellConfig: (ws as any).shellConfig || null,
+        },
+        readiness: {
+          complete: completeness.complete,
+          missingFields: completeness.missingFields,
+        },
+        lifecycle: lifecycle,
+      };
     }),
 
   // ============================================================================
