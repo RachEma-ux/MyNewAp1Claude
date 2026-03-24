@@ -163,7 +163,81 @@ Other modules consume HR through `modules.hr.*` — they never read HR tables di
 
 ---
 
-## 9. Governance Orchestration Model
+## 9. Sensitive Governance Sections
+
+The following HR sections contain governance-sensitive data and require elevated controls. For each, the governance expectation is stated explicitly.
+
+### 9.1 Compensation & Benefits
+
+| Aspect | Value |
+|---|---|
+| Why sensitive | Contains salary, bonus, and benefit amounts — PII and financial data |
+| Permission gate | `hr.compensation.read` (basic), `hr.compensation.read.sensitive` (unmasked) |
+| Scope | `sensitive` — HRBP/admin only for unmasked data |
+| Masking | `maskCompensationFields()` applied to all responses; baseSalary, amount, budgetPercent masked |
+| Audit | All reads trigger `logSensitiveRead()`; all writes trigger `logHrAudit()` |
+| Self-approval | Bonus approvals blocked by `preventSelfApproval()` |
+| Nav exposure | 2 of 6 items live (salary-structure, health-insurance); 4 deferred |
+
+### 9.2 Performance & Talent Management
+
+| Aspect | Value |
+|---|---|
+| Why sensitive | Contains performance ratings, talent assessments, nine-box positions, succession plans |
+| Permission gate | `hr.performance.read` (reviews), `hr.talent.read` (talent reviews) |
+| Scope | `mixed` for reviews (self/team/all), `sensitive` for talent reviews |
+| Masking | `maskTalentFields()` applied; retentionRisk, nineBoxPosition, readinessForPromotion masked |
+| Audit | Talent review reads trigger `logSensitiveRead()` |
+| Self-approval | Manager review submissions blocked by `preventSelfApproval()` |
+| Nav exposure | 3 of 5 items live (goals, reviews, talent-reviews); 2 deferred (360 feedback, succession) |
+
+### 9.3 Employee Relations
+
+| Aspect | Value |
+|---|---|
+| Why sensitive | Contains grievances, disciplinary actions, investigation records |
+| Permission gate | `hr.relations.read` (basic), `hr.relations.read.sensitive` (unmasked) |
+| Scope | `sensitive` — HRBP/admin only |
+| Masking | `maskRelationsFields()` applied; description, resolutionNotes, findings masked |
+| Audit | All grievance/disciplinary/investigation reads trigger `logSensitiveRead()` |
+| Nav exposure | 2 of 4 items live (policies, grievances); 2 deferred (disciplinary, investigations) |
+
+### 9.4 Security & Access
+
+| Aspect | Value |
+|---|---|
+| Why sensitive | Controls who can see what — role assignments, audit trail, access policies |
+| Permission gate | `hr.analytics.manage` — admin-only for all 5 items |
+| Scope | `sensitive` — admin only |
+| Masking | None (admin access assumed) |
+| Audit | Role assignment mutations trigger `logHrAudit()` |
+| Nav exposure | 3 of 5 items live (role-based-access as tab, audit-logs, access-controls); 2 deferred (data-privacy, security-policies) |
+
+### 9.5 Compliance
+
+| Aspect | Value |
+|---|---|
+| Why sensitive | Incident reports, risk assessments, compliance obligations — legal/regulatory data |
+| Permission gate | `hr.compliance.read` (basic), `hr.risk.read` (risk items), `hr.incident.read` (incidents) |
+| Scope | `all` for most items, `sensitive` for risk management and privacy controls |
+| Masking | None currently; work permit reads trigger sensitive-read audit |
+| Audit | Work permit reads trigger `logSensitiveRead()`; all writes trigger `logHrAudit()` |
+| Nav exposure | 3 of 6 items live (incidents, compliance-mgmt, risk-management); 3 deferred |
+
+### 9.6 Audit Logs (cross-cutting)
+
+| Aspect | Value |
+|---|---|
+| Why sensitive | The audit trail itself is security-critical metadata |
+| Permission gate | `hr.analytics.manage` — admin-only |
+| Scope | `sensitive` |
+| Masking | None |
+| Audit | Audit log reads are not themselves audited (intentional — avoids recursion) |
+| Nav exposure | Live at `/hr/security-access/audit-logs` |
+
+---
+
+## 10. Governance Orchestration Model
 
 Per AGENTS.md, all substantial HR changes must follow:
 

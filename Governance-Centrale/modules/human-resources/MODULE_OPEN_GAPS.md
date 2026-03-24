@@ -19,7 +19,7 @@ These nav items are declared in `hrNavConfig.ts` but have no backend or frontend
 | workforce-planning-core | Workforce Planning | hr.organization.read |
 | headcount-budget | Headcount & Budget Planning | hr.organization.write |
 
-### Talent Acquisition (4 of 6 unimplemented)
+### Talent Acquisition (5 of 6 unimplemented)
 
 | Item ID | Label | Required Action |
 |---|---|---|
@@ -27,8 +27,9 @@ These nav items are declared in `hrNavConfig.ts` but have no backend or frontend
 | candidate-pipeline | Candidate Pipeline | hr.recruiting.read |
 | interview-management | Interview Management | hr.recruiting.read |
 | offer-management | Offer Management | hr.recruiting.manage |
+| pre-boarding | Pre-boarding | hr.onboarding.manage |
 
-### Onboarding & Offboarding (5 of 8 unimplemented)
+### Onboarding & Offboarding (6 of 8 unimplemented)
 
 | Item ID | Label | Required Action |
 |---|---|---|
@@ -37,8 +38,7 @@ These nav items are declared in `hrNavConfig.ts` but have no backend or frontend
 | onboarding-orientation | Orientation & Training | hr.onboarding.manage |
 | offboarding-knowledge-transfer | Knowledge Transfer | hr.offboarding.manage |
 | offboarding-exit-interview | Exit Interview | hr.offboarding.manage |
-
-Note: `offboarding-access-removal` and `pre-boarding` are also unimplemented (total 7 lifecycle gaps, 5 in onboarding-offboarding section, 1 pre-boarding in talent-acquisition).
+| offboarding-access-removal | Access & Equipment Removal | hr.offboarding.manage |
 
 ### Employee Records & Administration (2 of 5 unimplemented)
 
@@ -47,15 +47,14 @@ Note: `offboarding-access-removal` and `pre-boarding` are also unimplemented (to
 | contracts-documents | Contracts & Documents | hr.directory.read |
 | employment-changes | Employment Changes | hr.directory.write |
 
-### Compensation & Benefits (3 of 6 unimplemented)
+### Compensation & Benefits (4 of 6 unimplemented)
 
 | Item ID | Label | Required Action |
 |---|---|---|
 | annual-salary-review | Annual Salary Review | hr.compensation.manage |
 | bonus-incentives | Bonus & Incentives | hr.compensation.manage |
 | pension-retirement | Pension & Retirement | hr.benefits.read |
-
-Note: `allowances-perks` also unimplemented (total 4 compensation gaps including the one in self-service items).
+| allowances-perks | Allowances & Perks | hr.benefits.read |
 
 ### Time & Attendance
 

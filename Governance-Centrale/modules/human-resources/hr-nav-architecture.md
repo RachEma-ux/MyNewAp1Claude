@@ -4,7 +4,7 @@
 
 - **Type:** Governance-first navigation and capability mapping
 - **Module:** Human Resources
-- **Phase:** Phase 3 — Permission and Scope Completion
+- **Phase:** Phase 4 — Post Backend Expansion
 - **Canonical source:** `client/src/config/hrNavConfig.ts`
 - **Route aliases:** `client/src/config/hrRouteAliases.ts`
 - **Authorization helpers:** `client/src/lib/hrNavAuth.ts`
@@ -44,10 +44,10 @@ The HR module adopts an IBM Carbon-friendly SideNav with **13 purpose-driven sec
 
 | Category | Count | Percentage |
 |---|---|---|
-| existing-page | 26 | 38% |
+| existing-page | 32 | 47% |
 | tab-in-existing-page | 1 | 1% |
 | new-page | 0 | 0% |
-| not-yet-implemented | 41 | 60% |
+| not-yet-implemented | 35 | 52% |
 
 ### Detailed Mapping by Section
 
@@ -56,7 +56,7 @@ The HR module adopts an IBM Carbon-friendly SideNav with **13 purpose-driven sec
 | Item ID | Label | Backed By | Current Route | Backend Domain | Status |
 |---|---|---|---|---|---|
 | workforce-planning-core | Workforce Planning | not-yet-implemented | — | organization | not-started |
-| job-architecture | Job Architecture & Role Definitions | not-yet-implemented | — | organization | not-started |
+| job-architecture | Job Architecture & Role Definitions | existing-page | /hr/workforce-planning/job-architecture | organization | live |
 | org-structure | Organizational Structure | existing-page | /hr/organization | organization | live |
 | headcount-budget | Headcount & Budget Planning | not-yet-implemented | — | organization | not-started |
 | position-management | Position Management | existing-page | /hr/positions | staffing | live |
@@ -92,8 +92,8 @@ The HR module adopts an IBM Carbon-friendly SideNav with **13 purpose-driven sec
 | employee-profile | Employee Profile | existing-page | /hr/directory | directory | live |
 | contracts-documents | Contracts & Documents | not-yet-implemented | — | directory | not-started |
 | employment-changes | Employment Changes | not-yet-implemented | — | directory | not-started |
-| work-permits-compliance | Work Permits & Compliance | not-yet-implemented | — | compliance | not-started |
-| hr-letters-certificates | HR Letters & Certificates | not-yet-implemented | — | directory | not-started |
+| work-permits-compliance | Work Permits & Compliance | existing-page | /hr/employee-records/work-permits | compliance | live |
+| hr-letters-certificates | HR Letters & Certificates | existing-page | /hr/employee-records/letters-certificates | directory | live |
 
 #### 2.5 Compensation & Benefits
 
@@ -168,9 +168,9 @@ The HR module adopts an IBM Carbon-friendly SideNav with **13 purpose-driven sec
 | Item ID | Label | Backed By | Current Route | Backend Domain | Status |
 |---|---|---|---|---|---|
 | role-based-access | Role-Based Access | tab-in-existing-page | /hr/settings | analytics | placeholder |
-| access-controls | Access Controls | not-yet-implemented | — | analytics | not-started |
+| access-controls | Access Controls | existing-page | /hr/security-access/access-controls | analytics | live |
 | data-privacy-settings | Data Privacy | not-yet-implemented | — | compliance | not-started |
-| audit-logs | Audit Logs | not-yet-implemented | — | analytics | not-started |
+| audit-logs | Audit Logs | existing-page | /hr/security-access/audit-logs | analytics | live |
 | security-policies | Security Policies | not-yet-implemented | — | compliance | not-started |
 
 #### 2.13 Compliance
@@ -182,7 +182,7 @@ The HR module adopts an IBM Carbon-friendly SideNav with **13 purpose-driven sec
 | compliance-management | Compliance Management | existing-page | /hr/compliance-mgmt | compliance | live |
 | audit-reporting | Audit & Reporting | not-yet-implemented | — | compliance | not-started |
 | privacy-access-controls | Data Privacy & Access Controls | not-yet-implemented | — | compliance | not-started |
-| risk-management | Risk Management | not-yet-implemented | — | compliance | not-started |
+| risk-management | Risk Management | existing-page | /hr/compliance/risk-management | compliance | live |
 
 ---
 

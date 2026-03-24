@@ -57,7 +57,7 @@ The HR module uses an IBM Carbon-inspired SideNav with **13 purpose-driven secti
 
 | File | Phase | Purpose |
 |---|---|
-| [hr-nav-architecture.md](hr-nav-architecture.md) | Phase 1+3 | Carbon SideNav nav model, scope, masking, auth helpers |
+| [hr-nav-architecture.md](hr-nav-architecture.md) | Phase 1-4 | Carbon SideNav nav model, scope, masking, auth helpers |
 | [hr-phase2-section-landing-pages.md](hr-phase2-section-landing-pages.md) | Phase 2 | Section landing pages implementation record |
 | [hr-phase4-backend-expansion.md](hr-phase4-backend-expansion.md) | Phase 4 | Backend expansion (6 new capabilities) |
 
