@@ -118,7 +118,7 @@ All 4 items are implemented. **No gaps.**
 | Gap | Severity | Detail |
 |---|---|---|
 | Not all router endpoints enforce role-based access | High | Some endpoints use only `protectedProcedure` (auth check) without `checkHrAccess()` or `requireHrPermission()` |
-| Frontend role gating inconsistent | Medium | Some pages use `hrGated()` HOC, others rely on sidebar visibility alone |
+| Frontend role gating improved (Phase 7.3+) | Low | 16 routes use `hrGated()`, 12 self-service routes auth-only, section landings filter by role. Remaining: section landing pages show filtered items without `hrGated()` (by design) |
 | No middleware-level permission enforcement | Medium | Permissions checked per-endpoint, no global HR middleware |
 
 ---
@@ -164,6 +164,9 @@ All 4 items are implemented. **No gaps.**
 | Field masking assertion tests missing | Medium | No tests verify `"***"` replacement for unauthorized users |
 | Frontend component tests missing | Low | HR pages have no unit or integration tests |
 | E2E tests missing | Medium | No end-to-end tests for full HR workflows |
+| Nav config + role/visibility tests | **Closed** | Phase 8 added `hr-nav-validation.test.ts` with 40+ assertions |
+| Route coherence tests | **Closed** | Phase 8 verifies all 48 routes mounted, ordering correct |
+| Backward compatibility tests | **Closed** | Phase 8 verifies all 28 aliases valid |
 
 ---
 

@@ -10,6 +10,7 @@
  * Phase 6: Hardening — Permission enforcement, role-aware masking, audit coverage, bug fixes
  * Phase 7: Data Expansion — 28-employee realistic seed dataset across 9 org units
  * Phase 7.3: Read Governance — Talent masking, self-service scope, frontend role gating
+ * Phase 8: Stabilization — Nav validation, rollout readiness, backward compat tests
  */
 
 import { z } from "zod";
@@ -43,7 +44,7 @@ const hrMeRouter = router({
 const hrSettingsRouter = router({
   get: protectedProcedure.query(() => ({
     module: "hr",
-    version: "7.3.0",
+    version: "8.0.0",
     features: {
       directory: true,
       organization: true,
@@ -76,6 +77,10 @@ const hrSettingsRouter = router({
       // Phase 7.2 SoD & audit
       selfApprovalPrevention: true,
       unifiedAuditQuery: true,
+      // Phase 8 Carbon SideNav stabilization
+      carbonSideNavRollout: true,
+      navConfigValidation: true,
+      backwardCompatAliases: true,
     },
   })),
   seedDemo: adminProcedure

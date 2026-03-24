@@ -94,9 +94,9 @@
 | Status | Deferred (by design) |
 | Impact | Old bookmarked URLs work but don't redirect to canonical paths |
 
-**Description:** All 27 route aliases in `hrRouteAliases.ts` are in `"documented"` status. No automatic redirects are implemented from old flat routes to new canonical hierarchical routes.
+**Description:** All 28 route aliases in `hrRouteAliases.ts` are in `"documented"` status. No automatic redirects are implemented from old flat routes to new canonical hierarchical routes.
 
-**Mitigation:** Acceptable for current phase. When redirects are activated, update alias status to `"active-redirect"` and add `<Redirect>` components.
+**Mitigation:** Acceptable for current phase. Phase 8 added automated validation: all 28 aliases have valid target sections, `hr-nav-validation.test.ts` verifies alias integrity. When redirects are activated, update alias status to `"active-redirect"` and add `<Redirect>` components.
 
 ---
 
@@ -111,7 +111,7 @@
 
 **Description:** Per the HR Module Audit Report, ~150 tests exist across 5 test files but 2 tests will fail due to schema/status mismatches. Permission boundary tests exist but don't cover all endpoints.
 
-**Mitigation:** Fix failing tests. Add permission boundary tests for every endpoint that handles sensitive or role-gated data.
+**Mitigation:** Phase 8 added `hr-nav-validation.test.ts` with 40+ assertions covering nav config, route coherence, role/visibility, scope, and masking. Combined with the existing 6 test files (Phases 1-6), ~200 tests now exist. Remaining gaps: frontend component tests, E2E tests.
 
 ---
 
@@ -156,8 +156,8 @@
 | R3 — 35 unimplemented nav items | Medium | Accepted |
 | R4 — Sensitive data exposure | High | Partially mitigated |
 | R5 — No export audit trail | Medium | Open |
-| R6 — Route redirects not active | Low | Deferred |
-| R7 — Test coverage gaps | Medium | Open |
+| R6 — Route redirects not active | Low | Deferred (validated) |
+| R7 — Test coverage gaps | Medium | Partially mitigated |
 | R8 — Directory DTO exposure | Was High | Mitigated |
 | R9 — Self-approval bypass | Was High | Mitigated |
 | R10 — Backward route compat | Was Medium | Mitigated |

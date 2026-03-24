@@ -19,7 +19,7 @@
 | Frontend route prefix | `/hr/*` |
 | Database table prefix | `hr_*` |
 | Schema files | `drizzle/tables/hr-*.ts` (14 files) |
-| Module version | 7.3.0 |
+| Module version | 8.0.0 |
 | Module posture | First-class domain module, workspace-consumable |
 
 ---
@@ -237,7 +237,53 @@ The following HR sections contain governance-sensitive data and require elevated
 
 ---
 
-## 10. Governance Orchestration Model
+## 10. Phase 8 — Carbon SideNav Rollout Readiness
+
+### 10.1 Rollout Control
+
+| Aspect | Value |
+|---|---|
+| Feature flag | `carbonSideNavRollout: true` in `hr.settings.get` |
+| Config validation | `hrNavConfigValidator.ts` — structural + governance integrity checks |
+| Backward compatibility | 28 route aliases documented, all original routes preserved |
+| Test coverage | `hr-nav-validation.test.ts` — 40+ assertions across 9 test groups |
+
+### 10.2 Nav-to-Route Alignment (verified)
+
+| Surface | Count | Status |
+|---|---|---|
+| Section landing routes | 13 | All mounted in App.tsx |
+| Flat page routes | 29 | All mounted, 12 self-service + 16 role-gated + /hr home |
+| Phase 4 deep routes | 6 | All mounted with role gating |
+| Route aliases | 28 | Documented, redirect activation deferred |
+| **Total mounted routes** | **48** | **Stable** |
+
+### 10.3 Validation Utility
+
+`client/src/config/hrNavConfigValidator.ts` performs:
+- Section/item field completeness checks
+- ID uniqueness enforcement
+- Action string format validation (`hr.<domain>.<operation>`)
+- Route coherence (live items have valid routes)
+- Governance metadata integrity (masking ↔ fieldSet, scope ↔ scopeActions)
+- Route alias target section validation
+
+### 10.4 Automated Test Coverage
+
+`server/hr/__tests__/hr-nav-validation.test.ts` covers:
+- Structural integrity (13 sections, 68 items, field completeness)
+- Route coherence (App.tsx mounting, route ordering)
+- Backward compatibility (28 aliases, resolve helpers)
+- Governance metadata (masking, audit, scope completeness)
+- Role/visibility profiles (employee, manager, hrbp, admin)
+- Scope resolution per role (self, team, all, none)
+- Masking classification per role
+- Rollout readiness (feature flags, version, router composition)
+- Validation utility self-test
+
+---
+
+## 11. Governance Orchestration Model
 
 Per AGENTS.md, all substantial HR changes must follow:
 

@@ -13,7 +13,8 @@
 | File | Purpose | Authoritative For |
 |---|---|---|
 | `client/src/config/hrNavConfig.ts` | HR Carbon SideNav definition | 13 sections, 68 leaf items, governance metadata |
-| `client/src/config/hrRouteAliases.ts` | Route backward compatibility map | 27 old→new route mappings |
+| `client/src/config/hrNavConfigValidator.ts` | Nav config validation | Structural integrity, route coherence, governance metadata checks |
+| `client/src/config/hrRouteAliases.ts` | Route backward compatibility map | 28 old→new route mappings |
 | `server/hr/permissions.ts` | Permission model | HR_ROLES, HR_ACTIONS, HR_ROLE_PERMISSIONS matrix, masking functions, scope resolution |
 
 ---
@@ -57,6 +58,7 @@
 | File | Purpose |
 |---|---|
 | `client/src/config/hrNavConfig.ts` | Canonical nav config (13 sections, 68 items) |
+| `client/src/config/hrNavConfigValidator.ts` | Nav config structural + governance validation (Phase 8) |
 | `client/src/config/hrRouteAliases.ts` | Route backward compatibility mappings |
 | `client/src/lib/hrNavAuth.ts` | Client-side authorization helpers (11 pure functions) |
 | `client/src/hooks/useHrRole.ts` | React hook for HR role/permission access |
@@ -127,6 +129,7 @@
 | `server/hr/__tests__/hr-phase4.test.ts` | Phase 4 (compensation, relations, engagement, compliance) |
 | `server/hr/__tests__/hr-phase5.test.ts` | Phase 5 (cross-phase integration, analytics, reminders) |
 | `server/hr/__tests__/hr-phase6.test.ts` | Phase 6 (hardening, permission enforcement, bug fixes) |
+| `server/hr/__tests__/hr-nav-validation.test.ts` | Phase 8 (nav config integrity, route coherence, role/visibility, rollout) |
 
 ---
 

@@ -148,7 +148,7 @@ Phase 2 does NOT activate redirects from old routes to new routes. The route ali
 ### Reused from Phase 1
 
 - Canonical nav config (`hrNavConfig.ts`) — 13 sections, 68 items
-- Route aliases (`hrRouteAliases.ts`) — 27 backward compat mappings
+- Route aliases (`hrRouteAliases.ts`) — 28 backward compat mappings
 - All 29 existing HR page components
 - HR role/permission model (`useHrRole`, `permissions.ts`)
 - All existing backend routers

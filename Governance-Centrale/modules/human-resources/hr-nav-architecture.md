@@ -339,7 +339,7 @@ All current `/hr/*` routes remain mounted in `App.tsx` and continue to work unch
 
 ### Route Alias Map
 
-`client/src/config/hrRouteAliases.ts` documents the mapping from each current flat route to its canonical target route in the new hierarchy. All 27 current routes with existing pages are mapped.
+`client/src/config/hrRouteAliases.ts` documents the mapping from each current flat route to its canonical target route in the new hierarchy. All 28 current routes with existing pages are mapped.
 
 ### Migration Strategy (Phase 2+)
 

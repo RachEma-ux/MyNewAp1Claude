@@ -172,7 +172,7 @@ Old flat routes (`/hr/directory`, `/hr/compensation`, etc.) coexist with new hie
 
 ### Route Alias Map
 
-`client/src/config/hrRouteAliases.ts` documents 27 backward-compatible route mappings. All aliases are in `"documented"` status — redirect activation is deferred.
+`client/src/config/hrRouteAliases.ts` documents 28 backward-compatible route mappings. All aliases are in `"documented"` status — redirect activation is deferred.
 
 ### Migration Plan
 
@@ -209,3 +209,54 @@ No existing routes have been removed or modified. All 29 original flat routes co
 | `resolveClientScope()` | Determine client-side scope |
 | `getSectionAccessSummaries()` | Per-section access summary |
 | `getItemScopeInfo()` | Detailed scope/masking info for an item |
+
+---
+
+## 6. Nav Config Validation Layer (Phase 8)
+
+### Source
+
+`client/src/config/hrNavConfigValidator.ts`
+
+### Functions
+
+3 exported functions for structural and governance integrity validation.
+
+| Function | Purpose |
+|---|---|
+| `validateHrNavConfig()` | Run all validation checks, return errors/warnings/stats |
+| `getLiveRoutes()` | Get all live items with their resolved route paths |
+| `getSectionRoutes()` | Get all section landing route paths |
+
+### Validation Categories
+
+| Category | Checks Performed |
+|---|---|
+| `missing-field` | Required fields on sections and items |
+| `invalid-value` | Enum membership, action format, route prefix |
+| `route-coherence` | Live items have valid routes, backedBy alignment |
+| `duplicate` | Section and item ID uniqueness |
+| `alias-mismatch` | Route aliases target existing sections |
+| `governance-metadata` | Masking ↔ fieldSet, scope ↔ scopeActions coherence |
+
+---
+
+## 7. Automated Test Surface (Phase 8)
+
+### Source
+
+`server/hr/__tests__/hr-nav-validation.test.ts`
+
+### Test Groups
+
+| Group | Focus | Assertions |
+|---|---|---|
+| A | Structural integrity | 13 sections, 68 items, field completeness, enum validity |
+| B | Route coherence | App.tsx mounting, route ordering, section alignment |
+| C | Backward compatibility | 28 aliases, resolve helpers, section targeting |
+| D | Governance metadata | Masking ↔ fieldSet, audit ↔ sensitiveAction, scope coherence |
+| E | Role/visibility profiles | Per-role visibility for employee, manager, hrbp, admin |
+| F | Scope resolution | Client-side scope per role (self, team, all, none) |
+| G | Masking classification | Per-role masking for compensation, relations, talent |
+| H | Rollout readiness | Feature flags, version, router composition |
+| I | Validation utility | Self-test of validateHrNavConfig() |
