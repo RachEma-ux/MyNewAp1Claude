@@ -298,7 +298,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={() => <ProtectedRoute component={Home} />} />
-      {/* WS Sandbox — workspace management surfaces */}
+      {/* Workspaces — workspace management surfaces */}
       <Route path="/ws/dashboard" component={() => <ProtectedRoute component={WSDashboardPage} />} />
       <Route path="/ws/control-panel" component={() => <ProtectedRoute component={WSControlPanelPage} />} />
       <Route path="/ws/wizard" component={() => <ProtectedRoute component={WSWizardPage} />} />

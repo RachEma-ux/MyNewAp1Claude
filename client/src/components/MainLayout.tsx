@@ -128,7 +128,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       ]
     },
     {
-      label: "WS Sandbox",
+      label: "Workspaces",
       icon: <Sparkles className="w-5 h-5" />,
       children: [
         { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/ws/dashboard" },
@@ -359,7 +359,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setGovernanceCenterMenuOpen(!governanceCenterMenuOpen);
                       } else if (item.label === "PM Central") {
                         setPmCentralMenuOpen(!pmCentralMenuOpen);
-                      } else if (item.label === "WS Sandbox") {
+                      } else if (item.label === "Workspaces") {
                         setWsSandboxMenuOpen(!wsSandboxMenuOpen);
                       } else if (item.label === "Communication") {
                         setCommunicationMenuOpen(!communicationMenuOpen);
@@ -373,10 +373,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Human Resources" && hrMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Human Resources" && hrMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* Automation / Digital HQ menus (2-level) */}
-                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "WS Sandbox" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen)) && (
+                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>

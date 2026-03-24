@@ -224,8 +224,8 @@ export const MODULE_NAV_REGISTRY: ModuleNavRegistryEntry[] = [
     validationPasses: null,
   },
   {
-    moduleId: "ws-sandbox",
-    label: "WS Sandbox",
+    moduleId: "workspaces",
+    label: "Workspaces",
     baseRoute: "/ws",
     adoptionStatus: "deferred",
     navConfigExists: false,

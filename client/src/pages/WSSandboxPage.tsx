@@ -1,5 +1,5 @@
 /**
- * WS Sandbox — Workspace system entry point
+ * Workspaces — Workspace system entry point
  *
  * Routes to:
  *   /ws/dashboard    → WS Dashboard
@@ -33,7 +33,7 @@ export default function WSSandboxPage() {
 
   return (
     <div>
-      {/* Top navigation for WS Sandbox surfaces */}
+      {/* Top navigation for Workspaces surfaces */}
       <div className="border-b bg-background/95 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center gap-1 px-4 py-2 overflow-x-auto">
           {NAV_ITEMS.map((item) => {
