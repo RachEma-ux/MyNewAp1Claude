@@ -127,6 +127,35 @@ export const workspaceRouter = router({
         } catch (err) {
           console.warn(`[Workspace] Failed to seed modules: ${(err as Error).message}`);
         }
+        // Sync wizardMeta.configuration to real workspace columns
+        if (input.wizardMeta && (input.wizardMeta as any).configuration) {
+          const cfg = (input.wizardMeta as any).configuration;
+          const configUpdates: Record<string, unknown> = {};
+          if (cfg.routingProfile) {
+            configUpdates.routingProfile = {
+              defaultRoute: cfg.routingProfile,
+              dataSensitivity: "LOW",
+              qualityTier: "BALANCED",
+              fallback: { enabled: true, maxHops: 3 },
+            };
+          }
+          if (cfg.resourceProfile) {
+            const RESOURCE_PRESETS: Record<string, any> = {
+              minimal: { computeQuota: 100, storageQuota: 1024, apiCallQuota: 1000 },
+              standard: { computeQuota: 500, storageQuota: 5120, apiCallQuota: 5000 },
+              elevated: { computeQuota: 2000, storageQuota: 20480, apiCallQuota: 20000 },
+              unrestricted: { computeQuota: 0, storageQuota: 0, apiCallQuota: 0 },
+            };
+            configUpdates.resourceProfile = RESOURCE_PRESETS[cfg.resourceProfile] || {};
+          }
+          if (Object.keys(configUpdates).length > 0) {
+            try {
+              await db.updateWorkspace(wsId, configUpdates as any);
+            } catch (err) {
+              console.warn(`[Workspace] Failed to sync config columns: ${(err as Error).message}`);
+            }
+          }
+        }
         // Persist crew entries if provided
         if (input.crew && input.crew.length > 0) {
           const dbConn = getDb();
@@ -324,7 +353,30 @@ export const workspaceRouter = router({
       await requireWorkspaceAccess(ctx.user.id, input.id);
       const { id, crew, wizardMeta, ...updates } = input;
       const dbUpdates: Record<string, unknown> = { ...updates, updatedAt: new Date() };
-      if (wizardMeta !== undefined) dbUpdates.wizardMeta = wizardMeta;
+      if (wizardMeta !== undefined) {
+        dbUpdates.wizardMeta = wizardMeta;
+        // Sync wizardMeta.configuration to real workspace columns
+        const cfg = (wizardMeta as any).configuration;
+        if (cfg) {
+          if (cfg.routingProfile) {
+            dbUpdates.routingProfile = {
+              defaultRoute: cfg.routingProfile,
+              dataSensitivity: "LOW",
+              qualityTier: "BALANCED",
+              fallback: { enabled: true, maxHops: 3 },
+            };
+          }
+          if (cfg.resourceProfile) {
+            const RESOURCE_PRESETS: Record<string, any> = {
+              minimal: { computeQuota: 100, storageQuota: 1024, apiCallQuota: 1000 },
+              standard: { computeQuota: 500, storageQuota: 5120, apiCallQuota: 5000 },
+              elevated: { computeQuota: 2000, storageQuota: 20480, apiCallQuota: 20000 },
+              unrestricted: { computeQuota: 0, storageQuota: 0, apiCallQuota: 0 },
+            };
+            dbUpdates.resourceProfile = RESOURCE_PRESETS[cfg.resourceProfile] || {};
+          }
+        }
+      }
       await db.updateWorkspace(id, dbUpdates as any);
       // Sync crew if provided: delete existing, re-insert
       if (crew !== undefined) {
