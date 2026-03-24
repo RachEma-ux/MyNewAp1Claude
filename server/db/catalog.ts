@@ -99,25 +99,28 @@ export async function updateCatalogEntry(
     updatedAt: new Date(),
   }).where(eq(catalogEntries.id, id));
 
-  if (data.config) {
-    const existingVersions = await db.select()
-      .from(catalogEntryVersions)
-      .where(eq(catalogEntryVersions.catalogEntryId, id))
-      .orderBy(desc(catalogEntryVersions.version))
-      .limit(1);
+  // Create a version record for every state change (invariant I6)
+  const [current] = await db.select().from(catalogEntries).where(eq(catalogEntries.id, id));
+  const snapshotConfig = data.config ?? current?.config ?? {};
+  const changedFields = Object.keys(data).join(", ");
 
-    const nextVersion = (existingVersions[0]?.version ?? 0) + 1;
-    const configHash = createHash("sha256").update(JSON.stringify(data.config)).digest("hex");
+  const existingVersions = await db.select()
+    .from(catalogEntryVersions)
+    .where(eq(catalogEntryVersions.catalogEntryId, id))
+    .orderBy(desc(catalogEntryVersions.version))
+    .limit(1);
 
-    await db.insert(catalogEntryVersions).values({
-      catalogEntryId: id,
-      version: nextVersion,
-      config: data.config,
-      configHash,
-      changeNotes: "Configuration updated",
-      changedBy: updatedBy,
-    });
-  }
+  const nextVersion = (existingVersions[0]?.version ?? 0) + 1;
+  const configHash = createHash("sha256").update(JSON.stringify(snapshotConfig)).digest("hex");
+
+  await db.insert(catalogEntryVersions).values({
+    catalogEntryId: id,
+    version: nextVersion,
+    config: snapshotConfig,
+    configHash,
+    changeNotes: `Updated: ${changedFields}`,
+    changedBy: updatedBy,
+  });
 
   const [updated] = await db.select().from(catalogEntries).where(eq(catalogEntries.id, id));
   return updated;
@@ -134,7 +137,28 @@ export async function approveCatalogEntry(id: number, approvedByUserId: number):
     updatedAt: new Date(),
   }).where(eq(catalogEntries.id, id));
 
+  // Create version record for approval (invariant I6)
   const [updated] = await db.select().from(catalogEntries).where(eq(catalogEntries.id, id));
+  const snapshotConfig = updated?.config ?? {};
+
+  const existingVersions = await db.select()
+    .from(catalogEntryVersions)
+    .where(eq(catalogEntryVersions.catalogEntryId, id))
+    .orderBy(desc(catalogEntryVersions.version))
+    .limit(1);
+
+  const nextVersion = (existingVersions[0]?.version ?? 0) + 1;
+  const configHash = createHash("sha256").update(JSON.stringify(snapshotConfig)).digest("hex");
+
+  await db.insert(catalogEntryVersions).values({
+    catalogEntryId: id,
+    version: nextVersion,
+    config: snapshotConfig,
+    configHash,
+    changeNotes: "Review approved",
+    changedBy: approvedByUserId,
+  });
+
   return updated;
 }
 
