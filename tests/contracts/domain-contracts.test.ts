@@ -24,8 +24,8 @@ describe("Domain Contract — Models", () => {
     expect(typeof modelsDb.getBlockingReasons).toBe("function");
   });
 
-  it("isDeployable returns true only for ready or active", () => {
-    const { isDeployable } = require("../../server/db/models");
+  it("isDeployable returns true only for ready or active", async () => {
+    const { isDeployable } = await import("../../server/db/models");
     // Deployable statuses
     expect(isDeployable({ status: "ready", name: "m", displayName: "M", modelType: "llm" })).toBe(true);
     expect(isDeployable({ status: "active", name: "m", displayName: "M", modelType: "llm" })).toBe(true);
@@ -35,8 +35,8 @@ describe("Domain Contract — Models", () => {
     expect(isDeployable({ status: "disabled", name: "m", displayName: "M", modelType: "llm" })).toBe(false);
   });
 
-  it("getBlockingReasons returns reasons for non-deployable models", () => {
-    const { getBlockingReasons } = require("../../server/db/models");
+  it("getBlockingReasons returns reasons for non-deployable models", async () => {
+    const { getBlockingReasons } = await import("../../server/db/models");
     const draft = getBlockingReasons({ status: "draft", name: "m", displayName: "M", modelType: "llm" });
     expect(draft.length).toBeGreaterThan(0);
     expect(draft.some((r: string) => r.includes("draft"))).toBe(true);
@@ -68,8 +68,8 @@ describe("Domain Contract — Bots", () => {
     expect(typeof botsDb.getBlockingReasons).toBe("function");
   });
 
-  it("isDeployable returns true only for configured/validated/deployable with channels", () => {
-    const { isDeployable } = require("../../server/db/bots");
+  it("isDeployable returns true only for configured/validated/deployable with channels", async () => {
+    const { isDeployable } = await import("../../server/db/bots");
     // Deployable
     expect(isDeployable({ status: "configured", name: "b", channels: ["web"] })).toBe(true);
     expect(isDeployable({ status: "validated", name: "b", channels: ["web"] })).toBe(true);
@@ -81,8 +81,8 @@ describe("Domain Contract — Bots", () => {
     expect(isDeployable({ status: "configured", name: "b", channels: [] })).toBe(false);
   });
 
-  it("getBlockingReasons lists all blockers", () => {
-    const { getBlockingReasons } = require("../../server/db/bots");
+  it("getBlockingReasons lists all blockers", async () => {
+    const { getBlockingReasons } = await import("../../server/db/bots");
     const draft = getBlockingReasons({ status: "draft", name: "b", channels: [] });
     expect(draft.length).toBeGreaterThanOrEqual(2); // draft + no channels
     expect(draft.some((r: string) => r.includes("draft"))).toBe(true);

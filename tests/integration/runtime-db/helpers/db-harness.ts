@@ -29,10 +29,10 @@ export const hasDb = !!process.env.DATABASE_URL;
 
 let _db: any = null;
 
-export function getTestDb() {
+export async function getTestDb() {
   if (!_db) {
     // Use the same getDb() from the app — it initializes from DATABASE_URL
-    const { getDb } = require("../../../../server/db/connection");
+    const { getDb } = await import("../../../../server/db/connection");
     _db = getDb();
   }
   return _db;
@@ -65,7 +65,7 @@ export function trackRun(id: number) {
  * Call this in afterEach / afterAll.
  */
 export async function cleanup() {
-  const db = getTestDb();
+  const db = await getTestDb();
   if (!db) return;
 
   // 1. Execution runs (references catalog_entries)
