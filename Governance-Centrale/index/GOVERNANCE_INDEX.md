@@ -56,6 +56,8 @@ Master index of all governance artifacts in the repository.
 | Phase 0 Sensitivity Map | [modules/human-resources/CARBON_SIDENAV_SENSITIVITY_MAP.md](../modules/human-resources/CARBON_SIDENAV_SENSITIVITY_MAP.md) | Masking and sensitivity (Phase 0) |
 | Phase 0 Audit Expectations | [modules/human-resources/CARBON_SIDENAV_AUDIT_EXPECTATIONS.md](../modules/human-resources/CARBON_SIDENAV_AUDIT_EXPECTATIONS.md) | Per-item audit expectations (Phase 0) |
 | Phase 0 Summary | [modules/human-resources/CARBON_SIDENAV_PHASE0_SUMMARY.md](../modules/human-resources/CARBON_SIDENAV_PHASE0_SUMMARY.md) | Phase 0 completion summary |
+| Phase 9 Operationalization | [modules/human-resources/hr-phase9-operationalization.md](../modules/human-resources/hr-phase9-operationalization.md) | Operationalization, drift detection, observability |
+| **Roadmap Completion** | [modules/human-resources/HR_CARBON_SIDENAV_ROADMAP_COMPLETION.md](../modules/human-resources/HR_CARBON_SIDENAV_ROADMAP_COMPLETION.md) | **Phases 0-14 verified complete** |
 
 ### PM Central (Phase 11 Pilot)
 

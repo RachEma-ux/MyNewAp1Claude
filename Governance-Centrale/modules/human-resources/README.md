@@ -83,6 +83,7 @@ The complete Phase 0 governance package establishes the HR Carbon SideNav as a g
 | [CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md](CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md) | Phase 8-9 | Final rollout acceptance status and gap summary |
 | [hr-phase9-operationalization.md](hr-phase9-operationalization.md) | Phase 9 | Operationalization, observability, drift detection, maintainability |
 | [CARBON_SIDENAV_REFERENCE_IMPLEMENTATION.md](CARBON_SIDENAV_REFERENCE_IMPLEMENTATION.md) | Phase 10 | HR as platform reference implementation for module nav pattern |
+| [HR_CARBON_SIDENAV_ROADMAP_COMPLETION.md](HR_CARBON_SIDENAV_ROADMAP_COMPLETION.md) | Phase 0-14 | Roadmap completion verification — all phases verified complete |
 
 ## Related Documentation
 

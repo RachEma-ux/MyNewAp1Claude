@@ -127,5 +127,5 @@ The module-nav standard is enforced via:
 3. New templates: add to `templates/` and update the governance index
 4. Use scaffolding: `npx tsx scripts/scaffold-module-nav.ts <module-id> "<label>" /<route>`
 5. Register in `client/src/navigation/moduleNavRegistry.ts` with compliance state
-5. If not fully compliant, create an exception in `global/MODULE_NAV_EXCEPTION_REGISTRY.md`
-6. Changes to scope itself: update this document and get governance review
+6. If not fully compliant, create an exception in `global/MODULE_NAV_EXCEPTION_REGISTRY.md`
+7. Changes to scope itself: update this document and get governance review
