@@ -598,11 +598,15 @@ export const workspaceRouter = router({
       return softDeleteWorkspace(input.id, ctx.user.id);
     }),
 
-  /** Return to draft (rejected/archived → draft) */
+  /** Return to draft (rejected/archived → draft) — archived→draft requires admin */
   returnToDraft: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       await requireWorkspaceAccess(ctx.user.id, input.id);
+      const lifecycle = await getWorkspaceLifecycleInfo(input.id);
+      if (lifecycle.status === "archived" && ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Return from archived state requires admin role" });
+      }
       return returnToDraft(input.id, ctx.user.id);
     }),
 
