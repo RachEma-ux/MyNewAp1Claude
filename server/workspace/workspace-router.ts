@@ -148,11 +148,39 @@ export const workspaceRouter = router({
             }
           }
         }
+        // Persist team members from wizardMeta to workspace_members table
+        if (input.wizardMeta && (input.wizardMeta as any).team) {
+          const dbConn = getDb();
+          if (dbConn) {
+            try {
+              const teamData = (input.wizardMeta as any).team;
+              const ROLE_MAP: Record<string, string> = { owner: "owner", manager: "editor", member: "editor", viewer: "viewer" };
+              const teamRows: Array<{ workerId: number; displayName: string; role: string }> = [];
+              if (teamData.owner) teamRows.push({ ...teamData.owner, role: "owner" });
+              for (const m of teamData.managers || []) teamRows.push({ ...m, role: "manager" });
+              for (const m of teamData.members || []) teamRows.push({ ...m, role: "member" });
+              for (const m of teamData.viewers || []) teamRows.push({ ...m, role: "viewer" });
+              // Insert non-owner team members (owner already inserted by createWorkspace)
+              const nonOwner = teamRows.filter((t) => t.role !== "owner");
+              if (nonOwner.length > 0) {
+                await dbConn.insert(workspaceMembers).values(
+                  nonOwner.map((t) => ({
+                    workspaceId: wsId,
+                    userId: t.workerId,
+                    role: ROLE_MAP[t.role] || "viewer",
+                  }))
+                );
+              }
+            } catch (err) {
+              console.warn(`[Workspace] Failed to persist team members: ${(err as Error).message}`);
+            }
+          }
+        }
         await logActivity({
           workspaceId: wsId,
           actorId: ctx.user.id,
           action: "workspace.create",
-          metadata: { workspaceType, crewCount: input.crew?.length ?? 0 },
+          metadata: { workspaceType, crewCount: input.crew?.length ?? 0, teamCount: ((input.wizardMeta as any)?.team ? Object.values((input.wizardMeta as any).team).flat().length : 0) },
         }).catch(() => {});
         // Admin shortcut: create draft + submit for review in one action
         if (input.submitForReview) {
@@ -315,6 +343,43 @@ export const workspaceRouter = router({
                 constraints: {} as Record<string, unknown>,
               }))
             );
+          }
+        }
+      }
+      // Sync team members from wizardMeta to workspace_members table
+      if (wizardMeta && (wizardMeta as any).team) {
+        const dbConn = getDb();
+        if (dbConn) {
+          try {
+            const teamData = (wizardMeta as any).team;
+            const ROLE_MAP: Record<string, string> = { owner: "owner", manager: "editor", member: "editor", viewer: "viewer" };
+            const teamRows: Array<{ workerId: number; role: string }> = [];
+            if (teamData.owner) teamRows.push({ workerId: teamData.owner.workerId, role: "owner" });
+            for (const m of teamData.managers || []) teamRows.push({ workerId: m.workerId, role: "manager" });
+            for (const m of teamData.members || []) teamRows.push({ workerId: m.workerId, role: "member" });
+            for (const m of teamData.viewers || []) teamRows.push({ workerId: m.workerId, role: "viewer" });
+            // Delete non-owner members, then re-insert (preserve original owner row)
+            const currentMembers = await dbConn.select().from(workspaceMembers)
+              .where(eq(workspaceMembers.workspaceId, id));
+            const ownerRow = currentMembers.find((m) => m.role === "owner");
+            // Remove all non-owner members
+            for (const m of currentMembers.filter((m) => m.role !== "owner")) {
+              await dbConn.delete(workspaceMembers)
+                .where(and(eq(workspaceMembers.workspaceId, id), eq(workspaceMembers.id, m.id)));
+            }
+            // Re-insert non-owner team members
+            const nonOwner = teamRows.filter((t) => t.role !== "owner");
+            if (nonOwner.length > 0) {
+              await dbConn.insert(workspaceMembers).values(
+                nonOwner.map((t) => ({
+                  workspaceId: id,
+                  userId: t.workerId,
+                  role: ROLE_MAP[t.role] || "viewer",
+                }))
+              );
+            }
+          } catch (err) {
+            console.warn(`[Workspace] Failed to sync team members: ${(err as Error).message}`);
           }
         }
       }
