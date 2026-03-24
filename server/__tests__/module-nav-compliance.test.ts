@@ -12,6 +12,9 @@
  * E. Exception coverage — partially compliant and legacy modules have exception entries
  * F. Cross-module contract consistency — no ID/route collisions
  * G. HR reference implementation preserved
+ * H. File-existence verification — nav configs and governance packs exist on disk
+ * I. Exception ID cross-reference — exception IDs reference real registry entries
+ * J. Adoption summary counts — registry helpers produce consistent counts
  */
 
 import { describe, it, expect } from "vitest";
@@ -357,5 +360,155 @@ describe("Module Nav Compliance — HR Reference Preserved", () => {
     );
     const hr = getModuleById("human-resources");
     expect(hr!.validationPasses).toBe(true);
+  });
+});
+
+// ============================================================================
+// H. File-Existence Verification
+// ============================================================================
+
+describe("Module Nav Compliance — File-Existence Verification", () => {
+  it("adopted modules have nav config files on disk", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const { getAdoptedModules } = await import(
+      "../../client/src/navigation/moduleNavRegistry"
+    );
+    const adopted = getAdoptedModules();
+    const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+    for (const mod of adopted) {
+      if (mod.navConfigPath) {
+        const fullPath = path.join(repoRoot, mod.navConfigPath);
+        expect(
+          fs.existsSync(fullPath),
+          `${mod.moduleId} nav config file missing on disk: ${mod.navConfigPath}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("adopted modules have governance pack README on disk", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const { getAdoptedModules } = await import(
+      "../../client/src/navigation/moduleNavRegistry"
+    );
+    const adopted = getAdoptedModules();
+    const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+    for (const mod of adopted) {
+      if (mod.governancePackPath) {
+        const readmePath = path.join(repoRoot, mod.governancePackPath, "README.md");
+        expect(
+          fs.existsSync(readmePath),
+          `${mod.moduleId} governance pack README missing: ${readmePath}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("adopted modules have governance profile on disk", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const { getAdoptedModules } = await import(
+      "../../client/src/navigation/moduleNavRegistry"
+    );
+    const adopted = getAdoptedModules();
+    const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+    for (const mod of adopted) {
+      if (mod.governancePackPath) {
+        const profilePath = path.join(repoRoot, mod.governancePackPath, "MODULE_GOVERNANCE_PROFILE.md");
+        expect(
+          fs.existsSync(profilePath),
+          `${mod.moduleId} governance profile missing: ${profilePath}`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+// ============================================================================
+// I. Exception ID Cross-Reference
+// ============================================================================
+
+describe("Module Nav Compliance — Exception Cross-Reference", () => {
+  // Known exception IDs from the exception registry (MODULE_NAV_EXCEPTION_REGISTRY.md)
+  const VALID_EXCEPTION_IDS = [
+    "EX-001", "EX-002", "EX-003", "EX-004",
+    "EX-005", "EX-006", "EX-007", "EX-008",
+  ];
+
+  it("all exception IDs in registry reference valid exception entries", async () => {
+    const { MODULE_NAV_REGISTRY } = await import(
+      "../../client/src/navigation/moduleNavRegistry"
+    );
+    for (const mod of MODULE_NAV_REGISTRY) {
+      if (mod.exceptionIds) {
+        for (const exId of mod.exceptionIds) {
+          expect(
+            VALID_EXCEPTION_IDS.includes(exId),
+            `${mod.moduleId} references unknown exception ID: ${exId}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("modules with active exception status have exception IDs", async () => {
+    const { MODULE_NAV_REGISTRY } = await import(
+      "../../client/src/navigation/moduleNavRegistry"
+    );
+    const active = MODULE_NAV_REGISTRY.filter((m) => m.exceptionStatus === "active");
+    for (const mod of active) {
+      expect(
+        mod.exceptionIds && mod.exceptionIds.length > 0,
+        `${mod.moduleId} has active exception status but no exception IDs`,
+      ).toBe(true);
+    }
+  });
+
+  it("modules with not-required exception status have no exception IDs", async () => {
+    const { MODULE_NAV_REGISTRY } = await import(
+      "../../client/src/navigation/moduleNavRegistry"
+    );
+    const notRequired = MODULE_NAV_REGISTRY.filter((m) => m.exceptionStatus === "not-required");
+    for (const mod of notRequired) {
+      expect(
+        !mod.exceptionIds || mod.exceptionIds.length === 0,
+        `${mod.moduleId} has not-required exception status but has exception IDs`,
+      ).toBe(true);
+    }
+  });
+});
+
+// ============================================================================
+// J. Adoption Summary Counts
+// ============================================================================
+
+describe("Module Nav Compliance — Summary Consistency", () => {
+  it("adoption summary counts match registry entries", async () => {
+    const { MODULE_NAV_REGISTRY, getAdoptionSummary } = await import(
+      "../../client/src/navigation/moduleNavRegistry"
+    );
+    const summary = getAdoptionSummary();
+    expect(summary.totalModules).toBe(MODULE_NAV_REGISTRY.length);
+    expect(summary.adoptedModules).toBeGreaterThanOrEqual(3);
+    expect(summary.adoptionRate).toBeGreaterThan(0);
+  });
+
+  it("compliance counts match registry entries", async () => {
+    const { MODULE_NAV_REGISTRY, countByComplianceStatus } = await import(
+      "../../client/src/navigation/moduleNavRegistry"
+    );
+    const counts = countByComplianceStatus();
+    const total = counts.compliant + counts["partially-compliant"] + counts.exempt + counts["non-compliant"];
+    expect(total).toBe(MODULE_NAV_REGISTRY.length);
+  });
+
+  it("no non-compliant modules exist", async () => {
+    const { countByComplianceStatus } = await import(
+      "../../client/src/navigation/moduleNavRegistry"
+    );
+    const counts = countByComplianceStatus();
+    expect(counts["non-compliant"]).toBe(0);
   });
 });

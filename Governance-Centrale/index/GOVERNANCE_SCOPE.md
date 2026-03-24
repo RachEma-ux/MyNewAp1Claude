@@ -97,9 +97,11 @@ See [MODULE_NAV_ADOPTION_REGISTRY.md](../global/MODULE_NAV_ADOPTION_REGISTRY.md)
 
 The module-nav standard is enforced via:
 
-- **Enforcement policy:** Defines compliant, partially-compliant, and exempt states
-- **Machine validation:** `server/__tests__/module-nav-compliance.test.ts` (runs in `npm test`)
-- **Exception registry:** Formal tracking of all deviations from the standard
+- **Enforcement policy:** Defines compliant, partially-compliant, and exempt states (v1.1.0)
+- **Machine validation:** `server/__tests__/module-nav-compliance.test.ts` (10 test groups, runs in `npm test`)
+- **File-existence guardrails:** Nav config files and governance packs verified on disk
+- **Exception registry:** Formal tracking of all deviations from the standard (8 active entries)
+- **Exception cross-reference:** All exception IDs validated against registry entries
 
 ### Compliance Visibility
 

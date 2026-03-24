@@ -19,7 +19,7 @@ Master index of all governance artifacts in the repository.
 | Module Nav Wave Plan | [global/MODULE_NAV_WAVE_PLAN.md](../global/MODULE_NAV_WAVE_PLAN.md) | Rollout wave plan and selection criteria (Phase 12) |
 | Module Nav Enforcement Policy | [global/MODULE_NAV_ENFORCEMENT_POLICY.md](../global/MODULE_NAV_ENFORCEMENT_POLICY.md) | Enforceable compliance definitions (Phase 13) |
 | Module Nav Exception Registry | [global/MODULE_NAV_EXCEPTION_REGISTRY.md](../global/MODULE_NAV_EXCEPTION_REGISTRY.md) | Formal exception model (Phase 13) |
-| Module Nav Compliance Report | [global/MODULE_NAV_COMPLIANCE_REPORT.md](../global/MODULE_NAV_COMPLIANCE_REPORT.md) | Current compliance snapshot (Phase 13) |
+| Module Nav Compliance Report | [global/MODULE_NAV_COMPLIANCE_REPORT.md](../global/MODULE_NAV_COMPLIANCE_REPORT.md) | Current compliance snapshot (Phase 13, file-existence verified) |
 
 ---
 
@@ -88,7 +88,7 @@ Master index of all governance artifacts in the repository.
 | Module Nav Types | `client/src/navigation/moduleNavTypes.ts` | Shared type contract |
 | Module Nav Helpers | `client/src/navigation/moduleNavHelpers.ts` | Shared validation and utility functions |
 | Module Nav Registry | `client/src/navigation/moduleNavRegistry.ts` | Platform-wide adoption + compliance registry (Phase 12-13) |
-| Module Nav Compliance Tests | `server/__tests__/module-nav-compliance.test.ts` | Machine-checkable compliance validation (Phase 13) |
+| Module Nav Compliance Tests | `server/__tests__/module-nav-compliance.test.ts` | Machine-checkable compliance validation (Phase 13, 10 test groups) |
 | HR Nav Config | `client/src/config/hrNavConfig.ts` | HR reference implementation (13 sections, 68 items) |
 | PM Central Nav Config | `client/src/config/pmNavConfig.ts` | PM Central pilot (8 sections, 12 items) |
 | Automation Nav Config | `client/src/config/automationNavConfig.ts` | Automation Wave 1 (3 sections, 7 items) |

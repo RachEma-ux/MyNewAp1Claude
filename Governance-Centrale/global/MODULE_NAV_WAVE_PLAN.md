@@ -4,7 +4,7 @@
 
 - **Type:** Platform-wide rollout plan
 - **Date:** 2026-03-24
-- **Last updated:** Phase 12
+- **Last updated:** Phase 13 (enforcement operational)
 
 ---
 
@@ -18,12 +18,22 @@
 | Pilot | 11 | PM Central | Complete |
 | Wave 1 | 12 | Automation | Complete |
 
+### Enforcement (Phase 13)
+
+| Deliverable | Status |
+|---|---|
+| Enforceable compliance definitions | Operational |
+| Exception registry | 8 active entries |
+| Machine-checkable validation | 10 test groups in `npm test` |
+| Compliance report | Current |
+| File-existence guardrails | Operational |
+
 ### Planned
 
 | Wave | Target | Candidates | Notes |
 |---|---|---|---|
-| Wave 2 | Phase 13+ | Digital HQ, Governance Center | Low effort, clear structures |
-| Wave 3 | Phase 14+ | AI Types | Complex multi-level nav, needs careful design |
+| Wave 2 | Phase 14+ | Digital HQ, Governance Center | Low effort, clear structures |
+| Wave 3 | Phase 15+ | AI Types | Complex multi-level nav, needs careful design |
 
 ---
 

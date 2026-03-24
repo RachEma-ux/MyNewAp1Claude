@@ -4,7 +4,7 @@
 
 - **Type:** Platform-wide adoption status
 - **Date:** 2026-03-24
-- **Last updated:** Phase 13 (compliance + exception state added)
+- **Last updated:** Phase 13 (compliance + exception state added, file-existence verified)
 
 ---
 

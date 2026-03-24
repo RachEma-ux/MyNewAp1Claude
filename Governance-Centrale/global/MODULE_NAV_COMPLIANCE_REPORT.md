@@ -4,8 +4,9 @@
 
 - **Type:** Platform-wide compliance snapshot
 - **Date:** 2026-03-24
-- **Phase:** 13
+- **Phase:** 13 (final review)
 - **Generated from:** `client/src/navigation/moduleNavRegistry.ts`
+- **Machine-validated by:** `server/__tests__/module-nav-compliance.test.ts` (10 test groups)
 
 ---
 
@@ -128,9 +129,11 @@
 
 | Mechanism | Status |
 |---|---|
-| Enforcement policy defined | Yes (`MODULE_NAV_ENFORCEMENT_POLICY.md`) |
-| Exception registry active | Yes (`MODULE_NAV_EXCEPTION_REGISTRY.md`) |
-| Machine validation integrated | Yes (`server/__tests__/module-nav-compliance.test.ts`) |
+| Enforcement policy defined | Yes (`MODULE_NAV_ENFORCEMENT_POLICY.md` v1.1.0) |
+| Exception registry active | Yes (`MODULE_NAV_EXCEPTION_REGISTRY.md`, 8 entries) |
+| Machine validation integrated | Yes (`server/__tests__/module-nav-compliance.test.ts`, 10 groups) |
+| File-existence verification | Yes (nav configs + governance packs verified on disk) |
+| Exception cross-reference | Yes (all exception IDs validated against registry) |
 | Runs in `npm test` | Yes (vitest) |
 | Governance-first rule documented | Yes (in enforcement policy + governance rules) |
 | Compliance report maintained | Yes (this document) |

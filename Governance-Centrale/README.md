@@ -30,9 +30,9 @@ Governance-Centrale/
 
 | Document | Purpose |
 |---|---|
-| [MODULE_NAV_ENFORCEMENT_POLICY.md](global/MODULE_NAV_ENFORCEMENT_POLICY.md) | Enforceable compliance definitions and blocking failure rules |
-| [MODULE_NAV_EXCEPTION_REGISTRY.md](global/MODULE_NAV_EXCEPTION_REGISTRY.md) | Formal exception model for non-compliant/partial states |
-| [MODULE_NAV_COMPLIANCE_REPORT.md](global/MODULE_NAV_COMPLIANCE_REPORT.md) | Current platform-wide compliance snapshot |
+| [MODULE_NAV_ENFORCEMENT_POLICY.md](global/MODULE_NAV_ENFORCEMENT_POLICY.md) | Enforceable compliance definitions, blocking failure rules, 10-group validation coverage |
+| [MODULE_NAV_EXCEPTION_REGISTRY.md](global/MODULE_NAV_EXCEPTION_REGISTRY.md) | Formal exception model for non-compliant/partial states (8 active entries) |
+| [MODULE_NAV_COMPLIANCE_REPORT.md](global/MODULE_NAV_COMPLIANCE_REPORT.md) | Current platform-wide compliance snapshot with file-existence verification |
 
 ## Indexes
 

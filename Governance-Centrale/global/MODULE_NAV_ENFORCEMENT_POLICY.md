@@ -4,8 +4,8 @@
 
 - **Type:** Platform-wide enforcement policy
 - **Date:** 2026-03-24
-- **Version:** 1.0.0
-- **Phase:** 13
+- **Version:** 1.1.0
+- **Phase:** 13 (reviewed and strengthened)
 
 ---
 
@@ -177,6 +177,21 @@ Compliance is machine-checked via:
 - Checks all adopted modules against the compliance rules defined above
 - Non-adopted modules (legacy, deferred, N/A) are skipped with documented reason
 - Partially compliant modules must have matching exception entries
+
+### 9.1 Validation Test Coverage (10 groups)
+
+| Group | Focus |
+|---|---|
+| A | Registry integrity — required fields, unique IDs, unique routes |
+| B | Structural validation — each adopted config passes `validateModuleNavConfig()` with zero errors |
+| C | Governance packs — adopted modules claim nav config + governance pack exist |
+| D | Status consistency — compliant modules satisfy all mandatory requirements |
+| E | Exception coverage — partial/legacy modules have active exceptions |
+| F | Cross-module consistency — no ID or route collisions between modules |
+| G | HR reference preserved — status, compliance, structure, validation |
+| H | File-existence verification — nav config files and governance pack files exist on disk |
+| I | Exception cross-reference — all exception IDs reference valid entries |
+| J | Summary consistency — registry helper counts match actual entries |
 
 ---
 
