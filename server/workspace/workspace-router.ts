@@ -604,7 +604,7 @@ export const workspaceRouter = router({
     .mutation(async ({ ctx, input }) => {
       await requireWorkspaceAccess(ctx.user.id, input.id);
       const lifecycle = await getWorkspaceLifecycleInfo(input.id);
-      if (lifecycle.status === "archived" && ctx.user.role !== "admin") {
+      if (lifecycle?.currentStatus === "archived" && ctx.user.role !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Return from archived state requires admin role" });
       }
       return returnToDraft(input.id, ctx.user.id);
