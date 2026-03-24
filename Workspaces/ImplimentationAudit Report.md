@@ -135,22 +135,28 @@ These are both **edge-case tightenings**, not structural gaps.
 
 ## 10. Final Compliance Score
 
-### 9.5 / 10
+### 9.0 / 10
 
 **What prevents a 10/10:**
 
-- `approve`, `publish`, `activate` do not re-validate content completeness before transition — they rely on the graph + admin role only. This is intentional (human governance decision) but means a corrupted workspace could theoretically advance if someone bypasses the UI and calls the API directly after data was modified post-review. (-0.5)
+- `approve`, `publish`, `activate` do not re-validate content completeness before transition — they rely on the graph + admin role only. (-0.5)
+- `purposeType === "other"` bypass and edge-case tightenings. (-0.5)
+
+**Post-meta-audit corrections applied (2026-03-24):**
+- `shellVisibility` now validated in `validateDraftCompleteness` promotion gate
+- Review packet `purposeStatement` now reads from dedicated column with JSON fallback
+- Score adjusted from 9.5 to 9.0 per meta-audit recommendation (original was slightly generous on configuration completeness)
 
 **What earns the score:**
 
 - Full 10-step governance-first UI with correct phase boundaries
-- `draft → ready_for_review` gate validates 12 fields: name, type, purposeStatement, anchorType, actors, primaryActivityType, needs, enabledModules, routingProfile, resourceProfile, capabilityBundles, module/resource coherence
+- `draft → ready_for_review` gate validates 13 fields: name, type, purposeStatement, anchorType, actors, primaryActivityType, needs, enabledModules, routingProfile, resourceProfile, capabilityBundles, shellVisibility, module/resource coherence
 - `ready_for_review → under_review` re-validates completeness
 - All 7 governance endpoints admin-role-gated server-side
 - Team persisted to `workspace_members` with userId FK validation
 - Crew persisted to `workspace_crew` via catalog-backed selectors
 - Draft resume via `/ws/wizard/:id?` with full hydration
-- Server-side `getReviewPacket` with all 10 sections
+- Server-side `getReviewPacket` with all 10 sections (purposeStatement from dedicated column)
 - Configuration synced to `routingProfile`, `resourceProfile`, `shellConfig` real columns
 - `shellVisibility` and `publicationConstraints` wired end-to-end
 - Step-level audit trail via `logWizardStep`

@@ -651,7 +651,7 @@ export const workspaceRouter = router({
         },
         purpose: {
           purposeType: ws.purposeType,
-          purposeStatement: meta.purposeStatement || null,
+          purposeStatement: (ws as any).purposeStatement || meta.purposeStatement || null,
           purposeRef: ws.purposeRef,
         },
         anchor: {

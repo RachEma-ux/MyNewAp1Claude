@@ -93,6 +93,11 @@ export async function validateDraftCompleteness(
     missing.push("configuration.capabilityBundles (no capabilities defined)");
   }
 
+  // Shell visibility — required for governance-reviewable workspace behavior
+  if (!cfg?.shellVisibility) {
+    missing.push("configuration.shellVisibility");
+  }
+
   // Module/resource coherence — certain modules require elevated resources
   if (cfg?.enabledModules && cfg.enabledModules.length > 0 && cfg.resourceProfile) {
     const RESOURCE_RANK: Record<string, number> = { minimal: 1, standard: 2, elevated: 3, unrestricted: 4 };
