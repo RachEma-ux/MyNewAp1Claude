@@ -57,6 +57,21 @@ The HR module uses an IBM Carbon-inspired SideNav with **13 purpose-driven secti
 | [MODULE_OPEN_GAPS.md](MODULE_OPEN_GAPS.md) | Honest gap list and deferred items |
 | [MODULE_RUNTIME_REFERENCES.md](MODULE_RUNTIME_REFERENCES.md) | Source-of-truth file map |
 
+## Phase 0 — Governance-First Definition
+
+The complete Phase 0 governance package establishes the HR Carbon SideNav as a governed module surface. Every capability's permission, scope, masking, and audit expectations are explicitly defined and reviewable.
+
+| File | Purpose |
+|---|---|
+| [CARBON_SIDENAV_PHASE0_GOVERNANCE_IMPACT_NOTE.md](CARBON_SIDENAV_PHASE0_GOVERNANCE_IMPACT_NOTE.md) | Why the SideNav is a governed change — impact and risk analysis |
+| [CARBON_SIDENAV_CAPABILITY_INVENTORY.md](CARBON_SIDENAV_CAPABILITY_INVENTORY.md) | Full 13-section, 68-item inventory with governance metadata |
+| [CARBON_SIDENAV_ROUTE_VISIBILITY_CLASSIFICATION.md](CARBON_SIDENAV_ROUTE_VISIBILITY_CLASSIFICATION.md) | Visibility model — section/item visibility, mixed sections, backward compat |
+| [CARBON_SIDENAV_PERMISSION_MAP.md](CARBON_SIDENAV_PERMISSION_MAP.md) | Permission-to-navigation mapping — actions, roles, access promises |
+| [CARBON_SIDENAV_SCOPE_MAP.md](CARBON_SIDENAV_SCOPE_MAP.md) | Data scope classification — self/team/all/sensitive/mixed per item |
+| [CARBON_SIDENAV_SENSITIVITY_MAP.md](CARBON_SIDENAV_SENSITIVITY_MAP.md) | Masking and sensitivity — which items are masked, audited, governance-sensitive |
+| [CARBON_SIDENAV_AUDIT_EXPECTATIONS.md](CARBON_SIDENAV_AUDIT_EXPECTATIONS.md) | Per-item audit expectations — read audit, write audit, SoD enforcement |
+| [CARBON_SIDENAV_PHASE0_SUMMARY.md](CARBON_SIDENAV_PHASE0_SUMMARY.md) | Phase 0 completion summary — what was implicit, what is now explicit |
+
 ## Phase-Specific Documents
 
 | File | Phase | Purpose |

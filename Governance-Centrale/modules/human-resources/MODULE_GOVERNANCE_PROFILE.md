@@ -39,7 +39,9 @@
 
 ## 3. Carbon SideNav as Governance Surface
 
-The HR module's IBM Carbon-style SideNav is not just navigation — it is a **governance surface**. Every one of the 68 leaf items in the nav config declares governance metadata:
+The HR module's IBM Carbon-style SideNav is not just navigation — it is a **governance surface**. The complete governance-first analysis is documented in the **Phase 0 governance package** — see [CARBON_SIDENAV_PHASE0_SUMMARY.md](CARBON_SIDENAV_PHASE0_SUMMARY.md) for the full artifact index.
+
+Every one of the 68 leaf items in the nav config declares governance metadata:
 
 ### Nav-Level Governance Fields
 
