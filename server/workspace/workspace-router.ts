@@ -25,8 +25,10 @@ import {
   workspaceActivityLog,
   type WorkspaceStatus,
   type WorkspacePurposeType,
+  type WizardMeta,
   WORKSPACE_STATUSES,
   WORKSPACE_PURPOSE_TYPES,
+  WORKSPACE_ANCHOR_TYPES,
 } from "../../drizzle/schema";
 import {
   transitionWorkspace,
@@ -87,6 +89,7 @@ export const workspaceRouter = router({
           role: z.string().default("executor"),
           note: z.string().optional(),
         })).optional(),
+        wizardMeta: z.record(z.unknown()).optional(),
         submitForReview: z.boolean().optional(),
       })
     )
@@ -114,7 +117,8 @@ export const workspaceRouter = router({
         chunkSize: input.chunkSize,
         chunkOverlap: input.chunkOverlap,
         collectionName: `workspace_${Date.now()}`,
-      });
+        wizardMeta: input.wizardMeta as WizardMeta | undefined,
+      } as any);
       if (workspace && typeof workspace === "object" && "id" in workspace) {
         const wsId = (workspace as any).id;
         try {
@@ -284,12 +288,15 @@ export const workspaceRouter = router({
           role: z.string().default("executor"),
           note: z.string().optional(),
         })).optional(),
+        wizardMeta: z.record(z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await requireWorkspaceAccess(ctx.user.id, input.id);
-      const { id, crew, ...updates } = input;
-      await db.updateWorkspace(id, { ...updates, updatedAt: new Date() } as any);
+      const { id, crew, wizardMeta, ...updates } = input;
+      const dbUpdates: Record<string, unknown> = { ...updates, updatedAt: new Date() };
+      if (wizardMeta !== undefined) dbUpdates.wizardMeta = wizardMeta;
+      await db.updateWorkspace(id, dbUpdates as any);
       // Sync crew if provided: delete existing, re-insert
       if (crew !== undefined) {
         const dbConn = getDb();
