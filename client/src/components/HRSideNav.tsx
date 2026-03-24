@@ -24,7 +24,7 @@ import { getVisibleSections } from "@/lib/hrNavAuth";
 import { trackSectionVisit, trackItemClick } from "@/lib/hrNavObservability";
 import { resolveHrIcon } from "@/lib/hrIconMap";
 import { cn } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Users } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -128,8 +128,33 @@ export function HRSideNav({ onNavigate, className }: HRSideNavProps) {
     );
   }
 
+  // Directory is always visible — every role has at least hr.directory.read.self
+  const directoryActive = location === "/hr/directory" || location.startsWith("/hr/directory/");
+
   return (
     <nav className={cn("space-y-0.5", className)} aria-label="HR Navigation">
+      {/* Pinned: Directory — top-level quick access (scope-gated on backend) */}
+      <Link href="/hr/directory">
+        <a
+          onClick={() => {
+            trackItemClick("employee-records", "directory-quick-access");
+            onNavigate?.();
+          }}
+          className={cn(
+            "flex items-center gap-2 rounded-md px-2 h-8 text-[13px] font-semibold transition-colors",
+            directoryActive
+              ? "border-l-2 border-blue-500 text-blue-500 bg-blue-500/5"
+              : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground",
+          )}
+        >
+          <Users className="w-4 h-4 flex-shrink-0" />
+          <span>Directory</span>
+        </a>
+      </Link>
+
+      {/* Separator */}
+      <div className="h-px bg-border/50 my-1" />
+
       {visibleSections.map((section) => {
         const SectionIcon = resolveHrIcon(section.iconHint);
         const isExpanded = expandedSection === section.id;
