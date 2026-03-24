@@ -4,7 +4,7 @@
 
 - **Type:** Governance boundary definition
 - **Date:** 2026-03-24
-- **Version:** 1.2.0 (Phase 14 — contributor workflow and handoff)
+- **Version:** 1.3.0 (Phase 0 completion — HR governance-first definition)
 
 ---
 

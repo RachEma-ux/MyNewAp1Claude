@@ -4,7 +4,7 @@ Master index of all governance artifacts in the repository.
 
 ## Last Updated
 
-2026-03-24 (Phase 14 — Contributor workflow, scaffolding, and handoff)
+2026-03-24 (Phase 0 completion — HR Carbon SideNav governance-first definition)
 
 ---
 
@@ -48,6 +48,14 @@ Master index of all governance artifacts in the repository.
 | Phase 2 Section Landing Pages | [modules/human-resources/hr-phase2-section-landing-pages.md](../modules/human-resources/hr-phase2-section-landing-pages.md) | Implementation record |
 | Phase 4 Backend Expansion | [modules/human-resources/hr-phase4-backend-expansion.md](../modules/human-resources/hr-phase4-backend-expansion.md) | Backend expansion record |
 | Phase 6/8 Stabilization | [modules/human-resources/hr-phase6-stabilization.md](../modules/human-resources/hr-phase6-stabilization.md) | Stabilization and rollout readiness |
+| Phase 0 Governance Impact Note | [modules/human-resources/CARBON_SIDENAV_PHASE0_GOVERNANCE_IMPACT_NOTE.md](../modules/human-resources/CARBON_SIDENAV_PHASE0_GOVERNANCE_IMPACT_NOTE.md) | Governance impact analysis (Phase 0) |
+| Phase 0 Capability Inventory | [modules/human-resources/CARBON_SIDENAV_CAPABILITY_INVENTORY.md](../modules/human-resources/CARBON_SIDENAV_CAPABILITY_INVENTORY.md) | Full 68-item inventory (Phase 0) |
+| Phase 0 Route Visibility | [modules/human-resources/CARBON_SIDENAV_ROUTE_VISIBILITY_CLASSIFICATION.md](../modules/human-resources/CARBON_SIDENAV_ROUTE_VISIBILITY_CLASSIFICATION.md) | Visibility model (Phase 0) |
+| Phase 0 Permission Map | [modules/human-resources/CARBON_SIDENAV_PERMISSION_MAP.md](../modules/human-resources/CARBON_SIDENAV_PERMISSION_MAP.md) | Permission mapping (Phase 0) |
+| Phase 0 Scope Map | [modules/human-resources/CARBON_SIDENAV_SCOPE_MAP.md](../modules/human-resources/CARBON_SIDENAV_SCOPE_MAP.md) | Scope classification (Phase 0) |
+| Phase 0 Sensitivity Map | [modules/human-resources/CARBON_SIDENAV_SENSITIVITY_MAP.md](../modules/human-resources/CARBON_SIDENAV_SENSITIVITY_MAP.md) | Masking and sensitivity (Phase 0) |
+| Phase 0 Audit Expectations | [modules/human-resources/CARBON_SIDENAV_AUDIT_EXPECTATIONS.md](../modules/human-resources/CARBON_SIDENAV_AUDIT_EXPECTATIONS.md) | Per-item audit expectations (Phase 0) |
+| Phase 0 Summary | [modules/human-resources/CARBON_SIDENAV_PHASE0_SUMMARY.md](../modules/human-resources/CARBON_SIDENAV_PHASE0_SUMMARY.md) | Phase 0 completion summary |
 
 ### PM Central (Phase 11 Pilot)
 
