@@ -55,7 +55,7 @@ Governance-Centrale/
 
 | Module | Location | Status |
 |---|---|---|
-| Human Resources | [modules/human-resources/](modules/human-resources/) | Reference implementation (Phase 1-10) |
+| Human Resources | [modules/human-resources/](modules/human-resources/) | Reference implementation (Phase 0-10) — includes Phase 0 governance-first definition |
 | PM Central | [modules/pm-central/](modules/pm-central/) | Pilot (Phase 11) |
 | Automation | [modules/automation/](modules/automation/) | Wave 1 (Phase 12) |
 
