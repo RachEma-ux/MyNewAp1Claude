@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
+import { useHrRole } from "@/hooks/useHrRole";
 import {
   Users,
   Building2,
@@ -42,47 +43,50 @@ import {
 
 const sections = [
   // Phase 1 — Workforce Backbone
-  { label: "Directory", icon: Users, href: "/hr/directory", description: "Browse employee directory" },
-  { label: "Organization", icon: Building2, href: "/hr/organization", description: "Org units and structure" },
-  { label: "Positions", icon: Briefcase, href: "/hr/positions", description: "Position management" },
-  { label: "Staffing", icon: UserPlus, href: "/hr/staffing", description: "Workspace assignments" },
-  { label: "Skills", icon: Award, href: "/hr/skills", description: "Skills and certifications" },
+  { label: "Directory", icon: Users, href: "/hr/directory", description: "Browse employee directory", requiredAction: "hr.directory.read.self" },
+  { label: "Organization", icon: Building2, href: "/hr/organization", description: "Org units and structure", requiredAction: "hr.organization.read" },
+  { label: "Positions", icon: Briefcase, href: "/hr/positions", description: "Position management", requiredAction: "hr.organization.read" },
+  { label: "Staffing", icon: UserPlus, href: "/hr/staffing", description: "Workspace assignments", requiredAction: "hr.staffing.read" },
+  { label: "Skills", icon: Award, href: "/hr/skills", description: "Skills and certifications", requiredAction: "hr.staffing.read" },
   // Phase 2 — Lifecycle
-  { label: "Recruitment", icon: FileText, href: "/hr/recruitment", description: "Recruitment pipeline" },
-  { label: "Onboarding", icon: UserCheck, href: "/hr/onboarding", description: "New hire onboarding" },
-  { label: "Offboarding", icon: UserMinus, href: "/hr/offboarding", description: "Exit workflows" },
+  { label: "Recruitment", icon: FileText, href: "/hr/recruitment", description: "Recruitment pipeline", requiredAction: "hr.recruiting.read" },
+  { label: "Onboarding", icon: UserCheck, href: "/hr/onboarding", description: "New hire onboarding", requiredAction: "hr.onboarding.read" },
+  { label: "Offboarding", icon: UserMinus, href: "/hr/offboarding", description: "Exit workflows", requiredAction: "hr.offboarding.read" },
   // Phase 3 — Workforce Operations
-  { label: "Timesheet", icon: Clock, href: "/hr/timesheet", description: "Time entries and tracking" },
-  { label: "Leave", icon: Calendar, href: "/hr/leave", description: "Leave requests and approvals" },
-  { label: "Overtime", icon: CalendarDays, href: "/hr/overtime", description: "Overtime requests" },
-  { label: "Shift Planning", icon: CalendarDays, href: "/hr/shifts", description: "Shift plans and assignments" },
-  { label: "Training", icon: BookOpen, href: "/hr/training", description: "Training catalog and learning" },
-  { label: "Certifications", icon: ShieldCheck, href: "/hr/certifications", description: "Certification tracking" },
-  { label: "Goals", icon: Target, href: "/hr/goals", description: "Employee goals and objectives" },
-  { label: "Reviews", icon: Star, href: "/hr/reviews", description: "Performance reviews" },
+  { label: "Timesheet", icon: Clock, href: "/hr/timesheet", description: "Time entries and tracking", requiredAction: "hr.time.read.self" },
+  { label: "Leave", icon: Calendar, href: "/hr/leave", description: "Leave requests and approvals", requiredAction: "hr.leave.read.self" },
+  { label: "Overtime", icon: CalendarDays, href: "/hr/overtime", description: "Overtime requests", requiredAction: "hr.overtime.read" },
+  { label: "Shift Planning", icon: CalendarDays, href: "/hr/shifts", description: "Shift plans and assignments", requiredAction: "hr.shift.read" },
+  { label: "Training", icon: BookOpen, href: "/hr/training", description: "Training catalog and learning", requiredAction: "hr.learning.read.self" },
+  { label: "Certifications", icon: ShieldCheck, href: "/hr/certifications", description: "Certification tracking", requiredAction: "hr.certification.read" },
+  { label: "Goals", icon: Target, href: "/hr/goals", description: "Employee goals and objectives", requiredAction: "hr.performance.read.self" },
+  { label: "Reviews", icon: Star, href: "/hr/reviews", description: "Performance reviews", requiredAction: "hr.performance.read.self" },
   // Phase 4 — Compensation & Benefits
-  { label: "Compensation", icon: DollarSign, href: "/hr/compensation", description: "Salary bands and comp records" },
-  { label: "Benefits", icon: Heart, href: "/hr/benefits", description: "Benefit plans and enrollments" },
+  { label: "Compensation", icon: DollarSign, href: "/hr/compensation", description: "Salary bands and comp records", requiredAction: "hr.compensation.read" },
+  { label: "Benefits", icon: Heart, href: "/hr/benefits", description: "Benefit plans and enrollments", requiredAction: "hr.benefits.read" },
   // Phase 4 — Employee Relations
-  { label: "Policies", icon: ScrollText, href: "/hr/policies", description: "HR policies and acknowledgements" },
-  { label: "Grievances", icon: Scale, href: "/hr/grievances", description: "Grievances and investigations" },
+  { label: "Policies", icon: ScrollText, href: "/hr/policies", description: "HR policies and acknowledgements", requiredAction: "hr.policy.read" },
+  { label: "Grievances", icon: Scale, href: "/hr/grievances", description: "Grievances and investigations", requiredAction: "hr.relations.read" },
   // Phase 4 — Engagement
-  { label: "Surveys", icon: ClipboardList, href: "/hr/surveys", description: "Employee surveys" },
-  { label: "Engagement", icon: Smile, href: "/hr/engagement", description: "Programs and recognition" },
+  { label: "Surveys", icon: ClipboardList, href: "/hr/surveys", description: "Employee surveys", requiredAction: "hr.survey.read" },
+  { label: "Engagement", icon: Smile, href: "/hr/engagement", description: "Programs and recognition", requiredAction: "hr.engagement.read" },
   // Phase 4 — Compliance & Risk
-  { label: "Incidents", icon: AlertTriangle, href: "/hr/incidents", description: "Incident reports" },
-  { label: "Compliance", icon: Shield, href: "/hr/compliance-mgmt", description: "Obligations and risk register" },
+  { label: "Incidents", icon: AlertTriangle, href: "/hr/incidents", description: "Incident reports", requiredAction: "hr.incident.read" },
+  { label: "Compliance", icon: Shield, href: "/hr/compliance-mgmt", description: "Obligations and risk register", requiredAction: "hr.compliance.read" },
   // Phase 4 — Analytics & Talent
-  { label: "HR Analytics", icon: PieChart, href: "/hr/analytics", description: "Workforce metrics and reminders" },
-  { label: "Talent", icon: Gem, href: "/hr/talent", description: "Talent reviews and succession" },
+  { label: "HR Analytics", icon: PieChart, href: "/hr/analytics", description: "Workforce metrics and reminders", requiredAction: "hr.analytics.read" },
+  { label: "Talent", icon: Gem, href: "/hr/talent", description: "Talent reviews and succession", requiredAction: "hr.talent.read" },
   // Config
-  { label: "Reports", icon: BarChart3, href: "/hr/reports", description: "HR reports and analytics" },
-  { label: "Settings", icon: Settings, href: "/hr/settings", description: "HR module configuration" },
+  { label: "Reports", icon: BarChart3, href: "/hr/reports", description: "HR reports and analytics", requiredAction: "hr.analytics.read" },
+  { label: "Settings", icon: Settings, href: "/hr/settings", description: "HR module configuration", requiredAction: "hr.analytics.manage" },
 ];
 
 export default function HRHomePage() {
+  const { can } = useHrRole();
   const dashboard = trpc.hr.analytics.getDashboardSummary.useQuery();
   const reminders = trpc.hr.analytics.getReminders.useQuery();
+
+  const visibleSections = sections.filter((s) => can(s.requiredAction));
 
   const criticalCount = reminders.data?.filter((r) => r.urgency === "critical").length ?? 0;
 
@@ -153,7 +157,7 @@ export default function HRHomePage() {
 
       {/* Section Navigation */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {sections.map((s) => (
+        {visibleSections.map((s) => (
           <Link key={s.href} href={s.href}>
             <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
               <CardContent className="p-4 flex items-center gap-3">

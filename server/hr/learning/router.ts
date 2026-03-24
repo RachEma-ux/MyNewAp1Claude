@@ -24,6 +24,7 @@ import { logHrAudit } from "../audit";
 import {
   checkHrAccess,
   requireHrPermission,
+  resolveDataScope,
   HR_ACTIONS,
 } from "../permissions";
 
@@ -230,14 +231,27 @@ export const hrLearningRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.LEARNING_READ);
+      // Scope-aware: employee sees own assignments, manager/hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.LEARNING_READ,
+        undefined,
+        HR_ACTIONS.LEARNING_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
-      const conditions = [];
+      const conditions: any[] = [];
       if (input.workerId) conditions.push(eq(hrLearningAssignments.workerId, input.workerId));
       if (input.trainingId) conditions.push(eq(hrLearningAssignments.trainingId, input.trainingId));
       if (input.status) conditions.push(eq(hrLearningAssignments.status, input.status));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrLearningAssignments.workerId, scope.workerId));
+      }
 
       return db.select().from(hrLearningAssignments)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -249,13 +263,26 @@ export const hrLearningRouter = router({
   getAssignment: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.LEARNING_READ);
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.LEARNING_READ,
+        undefined,
+        HR_ACTIONS.LEARNING_READ_SELF,
+      );
+      if (scope.scope === "none") throw new TRPCError({ code: "FORBIDDEN", message: "HR permission denied: learning read" });
+
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const [row] = await db.select().from(hrLearningAssignments)
         .where(eq(hrLearningAssignments.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Learning assignment not found" });
+
+      // Verify scope access
+      if (scope.scope === "self" && row.workerId !== scope.workerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this assignment" });
+      }
+
       return row;
     }),
 
@@ -356,12 +383,25 @@ export const hrLearningRouter = router({
       offset: z.number().min(0).default(0),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.LEARNING_READ);
+      // Scope-aware: employee sees own history, manager/hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.LEARNING_READ,
+        undefined,
+        HR_ACTIONS.LEARNING_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
-      const conditions = [];
+      const conditions: any[] = [];
       if (input.workerId) conditions.push(eq(hrLearningHistory.workerId, input.workerId));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrLearningHistory.workerId, scope.workerId));
+      }
 
       return db.select().from(hrLearningHistory)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -440,15 +480,28 @@ export const hrLearningRouter = router({
       expiringBefore: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.CERTIFICATION_READ);
+      // Scope-aware: employee sees own certifications, manager/hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.CERTIFICATION_READ,
+        undefined,
+        HR_ACTIONS.LEARNING_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
-      const conditions = [];
+      const conditions: any[] = [];
       if (input.workerId) conditions.push(eq(hrEmployeeCertifications.workerId, input.workerId));
       if (input.certificationId) conditions.push(eq(hrEmployeeCertifications.certificationId, input.certificationId));
       if (input.status) conditions.push(eq(hrEmployeeCertifications.status, input.status));
       if (input.expiringBefore) conditions.push(lte(hrEmployeeCertifications.expiryDate, input.expiringBefore));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrEmployeeCertifications.workerId, scope.workerId));
+      }
 
       return db.select().from(hrEmployeeCertifications)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
