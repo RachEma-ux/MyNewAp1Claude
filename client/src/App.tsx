@@ -323,6 +323,13 @@ function Router() {
       <Route path="/hr/talent" component={() => <ProtectedRoute component={HrTalentGated} />} />
       <Route path="/hr/reports" component={() => <ProtectedRoute component={HrReportsGated} />} />
       <Route path="/hr/settings" component={() => <ProtectedRoute component={HrSettingsGated} />} />
+      {/* HR Module — Phase 4 expansion routes (Carbon SideNav leaf pages) */}
+      <Route path="/hr/workforce-planning/job-architecture" component={() => <ProtectedRoute component={HrJobArchitectureGated} />} />
+      <Route path="/hr/employee-records/work-permits" component={() => <ProtectedRoute component={HrWorkPermitsGated} />} />
+      <Route path="/hr/employee-records/letters-certificates" component={() => <ProtectedRoute component={HrLettersCertificatesGated} />} />
+      <Route path="/hr/compliance/risk-management" component={() => <ProtectedRoute component={HrRiskManagementGated} />} />
+      <Route path="/hr/security-access/audit-logs" component={() => <ProtectedRoute component={HrAuditLogsGated} />} />
+      <Route path="/hr/security-access/access-controls" component={() => <ProtectedRoute component={HrAccessControlsGated} />} />
       <Route path="/hr" component={() => <ProtectedRoute component={HRHomePage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
