@@ -161,3 +161,41 @@ This document defines the recurring checks that should be performed on the HR mo
 - [ ] `MODULE_OPEN_GAPS.md` is updated when gaps are closed or new ones discovered
 - [ ] `MODULE_CONTROL_SURFACE.md` is updated when routes or routers are added
 - [ ] Implementation status counts in governance docs match actual code
+
+---
+
+## 8. Phase 9 — Operationalization Checks
+
+### Check 8.1 — Nav Drift Detection
+
+- [ ] `hrNavBaseline.ts` matches the current nav config digest (no unintentional drift)
+- [ ] `hr-phase9.test.ts` drift detection tests pass
+- [ ] If nav config was intentionally changed, `hrNavBaseline.ts` has been updated to match
+- [ ] Per-section baselines in `HR_SECTION_BASELINES` match actual section item counts
+
+### Check 8.2 — Backend Domain Consistency
+
+- [ ] All `backendDomain` values in `hrNavConfig.ts` exist in `HR_BACKEND_DOMAINS` constant
+- [ ] `findUnknownBackendDomains()` returns empty array
+- [ ] New sub-routers added to `server/hr/` are reflected in `HR_BACKEND_DOMAINS`
+
+### Check 8.3 — Dead-End and Deferred Handling
+
+- [ ] `getDeadEndItems()` returns empty array (no broken live item routes)
+- [ ] Section landing pages sort live items before deferred items
+- [ ] Deferred cards show contextual guidance to available capabilities
+- [ ] Empty-state sections have "Back to HR Home" action
+- [ ] Sections with high deferral rates (>50%) show summary message
+
+### Check 8.4 — Observability
+
+- [ ] `trackSectionVisit()` is called in section landing pages
+- [ ] `trackDeadEnd()` is called when users hit empty sections
+- [ ] No PII or HR content is tracked — only navigation signals
+- [ ] Event buffer does not grow unbounded (MAX_BUFFER_SIZE enforced)
+
+### Check 8.5 — Feature Flag Currency
+
+- [ ] `hr.settings.get` version matches current phase (9.0.0)
+- [ ] All Phase 9 feature flags are present and true
+- [ ] Prior phase feature flags remain intact

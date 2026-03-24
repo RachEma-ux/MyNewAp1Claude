@@ -353,13 +353,13 @@ describe("HR Phase 8 — Deferred Item Consistency", () => {
 // ============================================================================
 
 describe("HR Phase 8 — Rollout Mechanism", () => {
-  it("router version is 8.0.0", async () => {
+  it("router version is 9.0.0", async () => {
     const fs = await import("fs");
     const content = fs.readFileSync(
       new URL("../router.ts", import.meta.url).pathname,
       "utf-8",
     );
-    expect(content).toContain('version: "8.0.0"');
+    expect(content).toContain('version: "9.0.0"');
   });
 
   it("carbonSideNavRollout feature flag is true", async () => {

@@ -11,6 +11,7 @@
  * Phase 7: Data Expansion — 28-employee realistic seed dataset across 9 org units
  * Phase 7.3: Read Governance — Talent masking, self-service scope, frontend role gating
  * Phase 8: Stabilization — Nav validation, rollout readiness, backward compat tests
+ * Phase 9: Operationalization — Drift detection, nav health dashboard, dead-end handling
  */
 
 import { z } from "zod";
@@ -44,7 +45,7 @@ const hrMeRouter = router({
 const hrSettingsRouter = router({
   get: protectedProcedure.query(() => ({
     module: "hr",
-    version: "8.0.0",
+    version: "9.0.0",
     features: {
       directory: true,
       organization: true,
@@ -81,6 +82,11 @@ const hrSettingsRouter = router({
       carbonSideNavRollout: true,
       navConfigValidation: true,
       backwardCompatAliases: true,
+      // Phase 9 Operationalization
+      navDriftDetection: true,
+      navHealthSummary: true,
+      navObservability: true,
+      deferredItemTracking: true,
     },
   })),
   seedDemo: adminProcedure

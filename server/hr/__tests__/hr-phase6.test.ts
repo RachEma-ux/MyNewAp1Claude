@@ -303,7 +303,7 @@ describe("HR Phase 6 — Role Differentiation (P2-7)", () => {
 // ============================================================================
 
 describe("HR Phase 6/7 — Version", () => {
-  it("settings.get returns version 8.0.0", async () => {
+  it("settings.get returns version 9.0.0", async () => {
     const { hrRouter } = await import("../router");
     const procedures = Object.keys(hrRouter._def.procedures);
     expect(procedures).toContain("settings.get");
@@ -807,12 +807,12 @@ describe("HR Phase 7.3 — Frontend Role Gating", () => {
 // ============================================================================
 
 describe("HR Phase 7.3 — Version", () => {
-  it("HR router version is 7.3.0", async () => {
+  it("HR router version is 9.0.0", async () => {
     const fs = await import("fs");
     const content = fs.readFileSync(
       new URL("../router.ts", import.meta.url).pathname,
       "utf-8",
     );
-    expect(content).toContain('version: "8.0.0"');
+    expect(content).toContain('version: "9.0.0"');
   });
 });

@@ -13,7 +13,7 @@
 | File | Purpose | Authoritative For |
 |---|---|---|
 | `client/src/config/hrNavConfig.ts` | HR Carbon SideNav definition | 13 sections, 68 leaf items, governance metadata |
-| `client/src/config/hrNavConfigValidator.ts` | Nav config validation | Structural integrity, route coherence, governance metadata checks |
+| `client/src/config/hrNavConfigValidator.ts` | Nav config validation | Structural integrity, route coherence, governance metadata, drift detection, health summary (Phase 8-9) |
 | `client/src/config/hrRouteAliases.ts` | Route backward compatibility map | 28 old→new route mappings |
 | `server/hr/permissions.ts` | Permission model | HR_ROLES, HR_ACTIONS, HR_ROLE_PERMISSIONS matrix, masking functions, scope resolution |
 
@@ -58,9 +58,11 @@
 | File | Purpose |
 |---|---|
 | `client/src/config/hrNavConfig.ts` | Canonical nav config (13 sections, 68 items) |
-| `client/src/config/hrNavConfigValidator.ts` | Nav config structural + governance validation (Phase 8) |
+| `client/src/config/hrNavConfigValidator.ts` | Nav config validation + drift detection + health summary (Phase 8-9) |
 | `client/src/config/hrRouteAliases.ts` | Route backward compatibility mappings |
 | `client/src/lib/hrNavAuth.ts` | Client-side authorization helpers (11 pure functions) |
+| `client/src/lib/hrNavObservability.ts` | Lightweight nav event tracking — section visits, deferred clicks, dead ends (Phase 9) |
+| `client/src/config/hrNavBaseline.ts` | Frozen baseline snapshot for drift detection (Phase 9) |
 | `client/src/hooks/useHrRole.ts` | React hook for HR role/permission access |
 
 ### Key Page Components
@@ -129,8 +131,9 @@
 | `server/hr/__tests__/hr-phase4.test.ts` | Phase 4 (compensation, relations, engagement, compliance) |
 | `server/hr/__tests__/hr-phase5.test.ts` | Phase 5 (cross-phase integration, analytics, reminders) |
 | `server/hr/__tests__/hr-phase6.test.ts` | Phase 6 (hardening, permission enforcement, bug fixes) |
-| `server/hr/__tests__/hr-nav-validation.test.ts` | Phase 6-8 (nav config integrity, route coherence, role/visibility, rollout) |
+| `server/hr/__tests__/hr-nav-validation.test.ts` | Phase 6-9 (nav config integrity, route coherence, role/visibility, rollout, drift detection, health) |
 | `server/hr/__tests__/hr-phase8.test.ts` | Phase 8 (final acceptance: reality alignment, compatibility, governance, deferred consistency) |
+| `server/hr/__tests__/hr-phase9.test.ts` | Phase 9 (drift detection, health summary, dead-end/deferred analysis, backend domains, observability, maintainability, baseline integrity, feature flags) |
 
 ---
 
@@ -150,7 +153,8 @@
 | `Governance-Centrale/modules/human-resources/hr-phase2-section-landing-pages.md` | Phase 2 section landing pages doc |
 | `Governance-Centrale/modules/human-resources/hr-phase4-backend-expansion.md` | Phase 4 backend expansion doc |
 | `Governance-Centrale/modules/human-resources/hr-phase6-stabilization.md` | Phase 6/8 stabilization and rollout readiness doc |
-| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md` | Phase 8 final rollout acceptance status |
+| `Governance-Centrale/modules/human-resources/hr-phase9-operationalization.md` | Phase 9 operationalization and maintainability doc |
+| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md` | Phase 9 final rollout acceptance status |
 
 ---
 

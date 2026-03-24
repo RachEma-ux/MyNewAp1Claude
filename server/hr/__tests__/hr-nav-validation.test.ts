@@ -1,16 +1,20 @@
 /**
  * HR Nav Validation Tests — Phase 6 Stabilization & Rollout Readiness
+ * Phase 9 additions: Drift detection, dead-end handling, maintainability
  *
  * Covers:
  * A. Nav config structural integrity (required fields, uniqueness, format)
  * B. Route coherence (live items → mounted routes, section landing alignment)
- * C. Backward compatibility (all 27 aliases valid, old routes preserved)
+ * C. Backward compatibility (all 28 aliases valid, old routes preserved)
  * D. Governance metadata completeness (scope, masking, audit, visibility)
  * E. Role/visibility profiles (employee, manager, hrbp, admin visibility)
  * F. Scope resolution per role (self, team, all, none)
  * G. Masking classification per role
  * H. Rollout readiness checks (feature flags, version)
  * I. Consistency layer validation utility
+ * J. Drift detection (config digest, baseline comparison)
+ * K. Dead-end detection (live items with broken links)
+ * L. Section completion and health summary
  */
 
 import { describe, it, expect } from "vitest";
@@ -665,13 +669,13 @@ describe("HR Nav Config — Masking Classification", () => {
 // ============================================================================
 
 describe("HR Nav Config — Rollout Readiness", () => {
-  it("HR settings endpoint returns version 8.0.0", async () => {
+  it("HR settings endpoint returns version 9.0.0", async () => {
     const fs = await import("fs");
     const routerContent = fs.readFileSync(
       new URL("../router.ts", import.meta.url).pathname,
       "utf-8",
     );
-    expect(routerContent).toContain('version: "8.0.0"');
+    expect(routerContent).toContain('version: "9.0.0"');
   });
 
   it("HR settings has carbonSideNavRollout feature flag", async () => {
@@ -759,5 +763,162 @@ describe("HR Nav Config — Validation Utility", () => {
     const result = validateHrNavConfig();
     const aliasMismatch = result.errors.filter((e) => e.category === "alias-mismatch");
     expect(aliasMismatch).toHaveLength(0);
+  });
+});
+
+// ============================================================================
+// J. Drift Detection (Phase 9)
+// ============================================================================
+
+describe("HR Nav Config — Drift Detection", () => {
+  it("getNavConfigDigest returns deterministic digest", async () => {
+    const { getNavConfigDigest } = await import("../../../client/src/config/hrNavConfigValidator");
+    const d1 = getNavConfigDigest();
+    const d2 = getNavConfigDigest();
+    expect(d1).toEqual(d2);
+  });
+
+  it("digest has expected baseline counts", async () => {
+    const { getNavConfigDigest } = await import("../../../client/src/config/hrNavConfigValidator");
+    const digest = getNavConfigDigest();
+    expect(digest.totalSections).toBe(13);
+    expect(digest.totalItems).toBe(68);
+    expect(digest.liveCount).toBe(32);
+    expect(digest.placeholderCount).toBe(1);
+    expect(digest.notStartedCount).toBe(35);
+    expect(digest.aliasCount).toBe(28);
+    expect(digest.maskingCount).toBe(14);
+    expect(digest.auditCount).toBe(10);
+  });
+
+  it("digest sectionIds match expected set", async () => {
+    const { getNavConfigDigest } = await import("../../../client/src/config/hrNavConfigValidator");
+    const digest = getNavConfigDigest();
+    expect(digest.sectionIds).toHaveLength(13);
+    expect(digest.sectionIds).toContain("workforce-planning");
+    expect(digest.sectionIds).toContain("compliance");
+  });
+
+  it("detectConfigDrift returns empty array for matching baseline", async () => {
+    const { getNavConfigDigest, detectConfigDrift } = await import("../../../client/src/config/hrNavConfigValidator");
+    const baseline = getNavConfigDigest();
+    const drifts = detectConfigDrift(baseline);
+    expect(drifts).toHaveLength(0);
+  });
+
+  it("detectConfigDrift detects section count change", async () => {
+    const { getNavConfigDigest, detectConfigDrift } = await import("../../../client/src/config/hrNavConfigValidator");
+    const baseline = { ...getNavConfigDigest(), totalSections: 12 };
+    const drifts = detectConfigDrift(baseline);
+    expect(drifts.length).toBeGreaterThan(0);
+    expect(drifts.some((d) => d.includes("Section count changed"))).toBe(true);
+  });
+
+  it("detectConfigDrift detects item count change", async () => {
+    const { getNavConfigDigest, detectConfigDrift } = await import("../../../client/src/config/hrNavConfigValidator");
+    const baseline = { ...getNavConfigDigest(), totalItems: 60 };
+    const drifts = detectConfigDrift(baseline);
+    expect(drifts.some((d) => d.includes("Item count changed"))).toBe(true);
+  });
+
+  it("detectConfigDrift detects removed section", async () => {
+    const { getNavConfigDigest, detectConfigDrift } = await import("../../../client/src/config/hrNavConfigValidator");
+    const baseline = { ...getNavConfigDigest(), sectionIds: [...getNavConfigDigest().sectionIds, "fake-section"] };
+    const drifts = detectConfigDrift(baseline);
+    expect(drifts.some((d) => d.includes("Section removed: fake-section"))).toBe(true);
+  });
+});
+
+// ============================================================================
+// K. Dead-End Detection (Phase 9)
+// ============================================================================
+
+describe("HR Nav Config — Dead-End Detection", () => {
+  it("getDeadEndItems returns no dead ends for current config", async () => {
+    const { getDeadEndItems } = await import("../../../client/src/config/hrNavConfigValidator");
+    const deadEnds = getDeadEndItems();
+    expect(deadEnds).toHaveLength(0);
+  });
+
+  it("all live items have routes starting with /hr/", async () => {
+    const { getLiveRoutes } = await import("../../../client/src/config/hrNavConfigValidator");
+    const routes = getLiveRoutes();
+    for (const r of routes) {
+      expect(r.route.startsWith("/hr/")).toBe(true);
+    }
+  });
+
+  it("no live item has backedBy=not-yet-implemented (cross-check)", async () => {
+    const { getAllHrNavItems } = await import("../../../client/src/config/hrNavConfig");
+    const live = getAllHrNavItems().filter(
+      (i) => i.implementationStatus === "live" || i.implementationStatus === "placeholder",
+    );
+    for (const item of live) {
+      expect(item.backedBy).not.toBe("not-yet-implemented");
+    }
+  });
+});
+
+// ============================================================================
+// L. Section Completion & Health Summary (Phase 9)
+// ============================================================================
+
+describe("HR Nav Config — Section Completion & Health", () => {
+  it("getSectionCompletionStats returns 13 sections", async () => {
+    const { getSectionCompletionStats } = await import("../../../client/src/config/hrNavConfigValidator");
+    const stats = getSectionCompletionStats();
+    expect(stats).toHaveLength(13);
+  });
+
+  it("time-attendance section is 100% complete", async () => {
+    const { getSectionCompletionStats } = await import("../../../client/src/config/hrNavConfigValidator");
+    const stats = getSectionCompletionStats();
+    const timeSection = stats.find((s) => s.sectionId === "time-attendance");
+    expect(timeSection).toBeTruthy();
+    expect(timeSection!.completionPct).toBe(100);
+    expect(timeSection!.notStartedItems).toBe(0);
+  });
+
+  it("completion percentages are between 0 and 100", async () => {
+    const { getSectionCompletionStats } = await import("../../../client/src/config/hrNavConfigValidator");
+    const stats = getSectionCompletionStats();
+    for (const s of stats) {
+      expect(s.completionPct).toBeGreaterThanOrEqual(0);
+      expect(s.completionPct).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it("getNavHealthSummary returns valid summary", async () => {
+    const { getNavHealthSummary } = await import("../../../client/src/config/hrNavConfigValidator");
+    const summary = getNavHealthSummary();
+    expect(summary.valid).toBe(true);
+    expect(summary.errorCount).toBe(0);
+    expect(summary.overallCompletionPct).toBeGreaterThan(0);
+    expect(summary.overallCompletionPct).toBeLessThanOrEqual(100);
+    expect(summary.sections).toHaveLength(13);
+  });
+
+  it("health summary section counts add up", async () => {
+    const { getNavHealthSummary } = await import("../../../client/src/config/hrNavConfigValidator");
+    const summary = getNavHealthSummary();
+    expect(summary.sectionsComplete + summary.sectionsPartial + summary.sectionsEmpty).toBe(13);
+  });
+
+  it("health summary deadEndCount matches getDeadEndItems", async () => {
+    const { getNavHealthSummary, getDeadEndItems } = await import("../../../client/src/config/hrNavConfigValidator");
+    const summary = getNavHealthSummary();
+    const deadEnds = getDeadEndItems();
+    expect(summary.deadEndCount).toBe(deadEnds.length);
+  });
+
+  it("Phase 9 feature flags are present in router", async () => {
+    const fs = await import("fs");
+    const routerContent = fs.readFileSync(
+      new URL("../router.ts", import.meta.url).pathname,
+      "utf-8",
+    );
+    expect(routerContent).toContain("navDriftDetection:");
+    expect(routerContent).toContain("navHealthSummary:");
+    expect(routerContent).toContain("deferredItemTracking:");
   });
 });

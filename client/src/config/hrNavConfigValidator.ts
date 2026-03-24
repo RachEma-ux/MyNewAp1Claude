@@ -9,6 +9,13 @@
  * - Action string format consistency
  * - Route alias alignment
  *
+ * Phase 9 additions:
+ * - Config digest for drift detection (getNavConfigDigest)
+ * - Drift comparison against known baseline (detectConfigDrift)
+ * - Health summary for admin/settings consumption (getNavHealthSummary)
+ * - Section-level completion stats (getSectionCompletionStats)
+ * - Dead-end detection (getDeadEndItems)
+ *
  * This is a pure validation layer — no side effects, no backend calls.
  * Used by automated tests and optionally at dev-time for config drift detection.
  */
@@ -16,6 +23,7 @@
 import {
   HR_NAV_CONFIG,
   getAllHrNavItems,
+  findUnknownBackendDomains,
   type HrNavItem,
   type HrNavSection,
 } from "./hrNavConfig";
@@ -388,4 +396,275 @@ export function getSectionRoutes(): Array<{ sectionId: string; route: string }> 
     sectionId: s.id,
     route: s.id === "onboarding-offboarding" ? "/hr/lifecycle" : `/hr/${s.id}`,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 — Drift Detection
+// ---------------------------------------------------------------------------
+
+export interface NavConfigDigest {
+  totalSections: number;
+  totalItems: number;
+  liveCount: number;
+  placeholderCount: number;
+  notStartedCount: number;
+  sectionIds: string[];
+  aliasCount: number;
+  maskingCount: number;
+  auditCount: number;
+}
+
+/**
+ * Produce a deterministic digest of the nav config shape.
+ * Used for drift detection — compare against a known baseline to catch
+ * unintentional changes to section/item counts or structure.
+ */
+export function getNavConfigDigest(): NavConfigDigest {
+  const allItems = getAllHrNavItems();
+  return {
+    totalSections: HR_NAV_CONFIG.sections.length,
+    totalItems: allItems.length,
+    liveCount: allItems.filter((i) => i.implementationStatus === "live").length,
+    placeholderCount: allItems.filter((i) => i.implementationStatus === "placeholder").length,
+    notStartedCount: allItems.filter((i) => i.implementationStatus === "not-started").length,
+    sectionIds: HR_NAV_CONFIG.sections.map((s) => s.id),
+    aliasCount: HR_ROUTE_ALIASES.length,
+    maskingCount: allItems.filter((i) => i.maskingRequired).length,
+    auditCount: allItems.filter((i) => i.sensitiveReadAudit).length,
+  };
+}
+
+/**
+ * Compare current nav config digest against a known baseline.
+ * Returns a list of drift descriptions, or empty array if no drift.
+ */
+export function detectConfigDrift(baseline: NavConfigDigest): string[] {
+  const current = getNavConfigDigest();
+  const drifts: string[] = [];
+
+  if (current.totalSections !== baseline.totalSections) {
+    drifts.push(`Section count changed: ${baseline.totalSections} → ${current.totalSections}`);
+  }
+  if (current.totalItems !== baseline.totalItems) {
+    drifts.push(`Item count changed: ${baseline.totalItems} → ${current.totalItems}`);
+  }
+  if (current.liveCount !== baseline.liveCount) {
+    drifts.push(`Live item count changed: ${baseline.liveCount} → ${current.liveCount}`);
+  }
+  if (current.aliasCount !== baseline.aliasCount) {
+    drifts.push(`Route alias count changed: ${baseline.aliasCount} → ${current.aliasCount}`);
+  }
+  if (current.maskingCount !== baseline.maskingCount) {
+    drifts.push(`Masking item count changed: ${baseline.maskingCount} → ${current.maskingCount}`);
+  }
+  if (current.auditCount !== baseline.auditCount) {
+    drifts.push(`Audit item count changed: ${baseline.auditCount} → ${current.auditCount}`);
+  }
+
+  // Check section IDs match
+  const baselineSet = new Set(baseline.sectionIds);
+  const currentSet = new Set(current.sectionIds);
+  for (const id of current.sectionIds) {
+    if (!baselineSet.has(id)) drifts.push(`New section added: ${id}`);
+  }
+  for (const id of baseline.sectionIds) {
+    if (!currentSet.has(id)) drifts.push(`Section removed: ${id}`);
+  }
+
+  return drifts;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 — Health Summary
+// ---------------------------------------------------------------------------
+
+export interface SectionCompletionStat {
+  sectionId: string;
+  label: string;
+  totalItems: number;
+  liveItems: number;
+  placeholderItems: number;
+  notStartedItems: number;
+  completionPct: number;
+}
+
+/**
+ * Per-section completion stats for admin/developer visibility.
+ */
+export function getSectionCompletionStats(): SectionCompletionStat[] {
+  return HR_NAV_CONFIG.sections.map((s) => {
+    const live = s.items.filter((i) => i.implementationStatus === "live").length;
+    const placeholder = s.items.filter((i) => i.implementationStatus === "placeholder").length;
+    const notStarted = s.items.filter((i) => i.implementationStatus === "not-started").length;
+    return {
+      sectionId: s.id,
+      label: s.label,
+      totalItems: s.items.length,
+      liveItems: live,
+      placeholderItems: placeholder,
+      notStartedItems: notStarted,
+      completionPct: s.items.length > 0 ? Math.round(((live + placeholder) / s.items.length) * 100) : 0,
+    };
+  });
+}
+
+export interface NavHealthSummary {
+  valid: boolean;
+  errorCount: number;
+  warningCount: number;
+  overallCompletionPct: number;
+  sectionsComplete: number;
+  sectionsPartial: number;
+  sectionsEmpty: number;
+  deadEndCount: number;
+  sections: SectionCompletionStat[];
+}
+
+/**
+ * Aggregate health summary suitable for display on admin settings page.
+ * Pure function — no side effects, no backend calls.
+ */
+export function getNavHealthSummary(): NavHealthSummary {
+  const validation = validateHrNavConfig();
+  const sectionStats = getSectionCompletionStats();
+  const deadEnds = getDeadEndItems();
+
+  const sectionsComplete = sectionStats.filter((s) => s.completionPct === 100).length;
+  const sectionsEmpty = sectionStats.filter((s) => s.completionPct === 0).length;
+  const sectionsPartial = sectionStats.length - sectionsComplete - sectionsEmpty;
+
+  const totalItems = sectionStats.reduce((sum, s) => sum + s.totalItems, 0);
+  const totalLive = sectionStats.reduce((sum, s) => sum + s.liveItems + s.placeholderItems, 0);
+
+  return {
+    valid: validation.valid,
+    errorCount: validation.errors.length,
+    warningCount: validation.warnings.length,
+    overallCompletionPct: totalItems > 0 ? Math.round((totalLive / totalItems) * 100) : 0,
+    sectionsComplete,
+    sectionsPartial,
+    sectionsEmpty,
+    deadEndCount: deadEnds.length,
+    sections: sectionStats,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 — Dead-End Detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Items that are live but lead to dead ends (no currentRoute and href doesn't
+ * match any known flat route pattern). These represent potential broken links.
+ */
+export function getDeadEndItems(): Array<{ itemId: string; href: string; reason: string }> {
+  const allItems = getAllHrNavItems();
+  const deadEnds: Array<{ itemId: string; href: string; reason: string }> = [];
+
+  for (const item of allItems) {
+    // Only check live/placeholder items — not-started items are expected to be dead ends
+    if (item.implementationStatus !== "live" && item.implementationStatus !== "placeholder") {
+      continue;
+    }
+
+    const route = item.currentRoute ?? item.href;
+    if (!route) {
+      deadEnds.push({ itemId: item.id, href: item.href, reason: "No resolvable route" });
+      continue;
+    }
+
+    // Check for route that doesn't match expected patterns
+    if (!route.startsWith("/hr/")) {
+      deadEnds.push({ itemId: item.id, href: item.href, reason: `Route "${route}" outside /hr/ namespace` });
+    }
+  }
+
+  return deadEnds;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 — Baseline Drift Check
+// ---------------------------------------------------------------------------
+
+/**
+ * Run drift detection against a provided baseline and return a structured result.
+ * Unlike detectConfigDrift (which returns string descriptions), this returns
+ * a typed result suitable for programmatic checks.
+ */
+export interface DriftCheckResult {
+  drifted: boolean;
+  drifts: string[];
+  current: NavConfigDigest;
+  baseline: NavConfigDigest;
+}
+
+export function checkBaselineDrift(baseline: NavConfigDigest): DriftCheckResult {
+  const current = getNavConfigDigest();
+  const drifts = detectConfigDrift(baseline);
+  return {
+    drifted: drifts.length > 0,
+    drifts,
+    current,
+    baseline,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 — Backend Domain Validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate that all backendDomain values in the nav config match the
+ * HR_BACKEND_DOMAINS constant set. Returns mismatches.
+ */
+export function validateBackendDomains(): ValidationError[] {
+  const unknowns = findUnknownBackendDomains();
+  return unknowns.map((u) => ({
+    category: "invalid-value" as const,
+    message: `Item ${u.itemId} references unknown backendDomain "${u.domain}"`,
+    entityId: u.itemId,
+    severity: "warning" as const,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 — Section-Level Deferred Analysis
+// ---------------------------------------------------------------------------
+
+export interface SectionDeferredAnalysis {
+  sectionId: string;
+  label: string;
+  totalItems: number;
+  deferredItems: number;
+  liveItems: number;
+  deferredRatio: number;
+  /** true if >50% of items are deferred — section may feel thin */
+  highDeferralRate: boolean;
+  /** IDs of deferred items in this section */
+  deferredItemIds: string[];
+}
+
+/**
+ * Analyze deferred item distribution per section.
+ * Identifies sections with high deferral rates that may need
+ * priority implementation or better UX messaging.
+ */
+export function getSectionDeferredAnalysis(): SectionDeferredAnalysis[] {
+  return HR_NAV_CONFIG.sections.map((s) => {
+    const deferred = s.items.filter((i) => i.implementationStatus === "not-started");
+    const live = s.items.filter(
+      (i) => i.implementationStatus === "live" || i.implementationStatus === "placeholder",
+    );
+    const deferredRatio = s.items.length > 0 ? deferred.length / s.items.length : 0;
+    return {
+      sectionId: s.id,
+      label: s.label,
+      totalItems: s.items.length,
+      deferredItems: deferred.length,
+      liveItems: live.length,
+      deferredRatio: Math.round(deferredRatio * 100) / 100,
+      highDeferralRate: deferredRatio > 0.5,
+      deferredItemIds: deferred.map((i) => i.id),
+    };
+  });
 }

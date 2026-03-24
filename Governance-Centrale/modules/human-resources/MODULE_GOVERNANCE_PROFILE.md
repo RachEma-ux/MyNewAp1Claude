@@ -19,7 +19,7 @@
 | Frontend route prefix | `/hr/*` |
 | Database table prefix | `hr_*` |
 | Schema files | `drizzle/tables/hr-*.ts` (14 files) |
-| Module version | 8.0.0 |
+| Module version | 9.0.0 |
 | Module posture | First-class domain module, workspace-consumable |
 
 ---
@@ -301,7 +301,51 @@ See [CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md](CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md)
 
 ---
 
-## 11. Governance Orchestration Model
+## 11. Phase 9 — Operationalization & Long-Term Maintainability
+
+### 11.1 Drift Detection
+
+| Aspect | Value |
+|---|---|
+| Feature flag | `navDriftDetection: true`, `navObservability: true` in `hr.settings.get` |
+| Digest function | `getNavConfigDigest()` — returns frozen count snapshot |
+| Drift comparison | `detectConfigDrift(baseline)` — returns list of structural changes |
+| Baseline check | `checkBaselineDrift(baseline)` — typed result for programmatic use |
+| Coverage | Section count, item count, live/placeholder/not-started counts, alias count, masking count, audit count, section IDs |
+
+### 11.2 Nav Health Dashboard
+
+| Aspect | Value |
+|---|---|
+| Feature flag | `navHealthSummary: true` in `hr.settings.get` |
+| Health summary | `getNavHealthSummary()` — aggregated health for admin settings page |
+| Section completion | `getSectionCompletionStats()` — per-section live/planned/% complete |
+| Admin visibility | HRSettingsPage shows validation status, completion progress, dead-end count |
+| Deferred analysis | `getSectionDeferredAnalysis()` — identifies sections with high deferral rates |
+
+### 11.3 Dead-End Handling
+
+| Aspect | Value |
+|---|---|
+| Feature flag | `deferredItemTracking: true` in `hr.settings.get` |
+| Detection | `getDeadEndItems()` — finds live items with broken/missing routes |
+| UX improvement | Not-started items render with dashed border, context message |
+| Placeholder badge | Live placeholder items show "Preview" badge |
+| Progress indicator | Section landing pages show % complete per section |
+
+### 11.4 Test Coverage (Phase 9 additions)
+
+3 new test groups added to `hr-nav-validation.test.ts`:
+
+| Group | Focus | Assertions |
+|---|---|---|
+| J | Drift detection | Digest determinism, baseline counts, drift comparison, section removal detection |
+| K | Dead-end detection | Zero dead ends in current config, live routes valid, backedBy coherence |
+| L | Section completion & health | 13 section stats, time-attendance 100%, health summary validity, feature flags |
+
+---
+
+## 12. Governance Orchestration Model
 
 Per AGENTS.md, all substantial HR changes must follow:
 

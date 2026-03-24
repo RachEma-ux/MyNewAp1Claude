@@ -181,3 +181,42 @@ The `preventSelfApproval()` function blocks same-user approvals on:
 | Analytics dashboard reads are not audited | Low | Aggregate data, not PII |
 | No export audit event implemented | Medium | `export` category exists but no router uses it yet |
 | Audit log viewer (`hr.analytics.listAuditLogs`) itself is not audited | Low | Circular — admin tool |
+
+---
+
+## 6. Navigation Observability (Phase 9)
+
+Phase 9 added lightweight, privacy-safe navigation signal tracking. This is **not** part of the HR audit system — it is a separate operational observability layer that records only navigation behavior, never HR data content.
+
+### Event Types
+
+| Event Type | Trigger | Data Captured |
+|---|---|---|
+| `section_visit` | User opens a section landing page | Section ID only |
+| `deferred_click` | User clicks a "Coming soon" card | Item ID only |
+| `dead_end` | User lands on a section with no accessible items | Section ID only |
+| `permission_denied` | User attempts navigation blocked by role | Item ID only |
+
+### What Is NOT Tracked
+
+- User identity or PII
+- HR data content (names, salaries, reviews, etc.)
+- Session identifiers or behavioral profiling
+- Cross-page navigation paths
+
+### Storage
+
+Events are held in an **in-memory buffer** (`MAX_BUFFER_SIZE = 200`). No backend persistence. Buffer resets on page reload. This is intentional — the signal is for operational awareness, not compliance audit.
+
+### Retrieval Functions
+
+| Function | Purpose |
+|---|---|
+| `getNavEventSummary()` | Aggregate counts by event type |
+| `getTopDeferredItems(n)` | Most-clicked deferred items (prioritization signal) |
+| `getNavEventBuffer()` | Raw event buffer for debugging |
+| `clearNavEvents()` | Reset the buffer |
+
+### Source File
+
+`client/src/lib/hrNavObservability.ts`

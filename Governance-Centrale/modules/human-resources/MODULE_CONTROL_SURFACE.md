@@ -212,13 +212,13 @@ No existing routes have been removed or modified. All 29 original flat routes co
 
 ---
 
-## 6. Nav Config Validation Layer (Phase 8)
+## 6. Nav Config Validation Layer (Phase 8-9)
 
 ### Source
 
 `client/src/config/hrNavConfigValidator.ts`
 
-### Functions
+### Functions (Phase 8)
 
 3 exported functions for structural and governance integrity validation.
 
@@ -227,6 +227,20 @@ No existing routes have been removed or modified. All 29 original flat routes co
 | `validateHrNavConfig()` | Run all validation checks, return errors/warnings/stats |
 | `getLiveRoutes()` | Get all live items with their resolved route paths |
 | `getSectionRoutes()` | Get all section landing route paths |
+
+### Functions (Phase 9 — Operationalization)
+
+7 exported functions for drift detection, health monitoring, and maintainability.
+
+| Function | Purpose |
+|---|---|
+| `getNavConfigDigest()` | Deterministic count snapshot for drift detection |
+| `detectConfigDrift(baseline)` | Compare current state against known baseline, return drift descriptions |
+| `checkBaselineDrift(baseline)` | Typed drift result for programmatic checks |
+| `getSectionCompletionStats()` | Per-section completion percentages |
+| `getNavHealthSummary()` | Aggregated health summary for admin/settings page |
+| `getDeadEndItems()` | Find live items with broken/missing routes |
+| `getSectionDeferredAnalysis()` | Identify sections with high deferral rates |
 
 ### Validation Categories
 
@@ -241,7 +255,7 @@ No existing routes have been removed or modified. All 29 original flat routes co
 
 ---
 
-## 7. Automated Test Surface (Phase 6-8)
+## 7. Automated Test Surface (Phase 6-9)
 
 ### Nav Validation Tests
 
@@ -258,6 +272,9 @@ No existing routes have been removed or modified. All 29 original flat routes co
 | G | Masking classification | Per-role masking for compensation, relations, talent |
 | H | Rollout readiness | Feature flags, version, router composition |
 | I | Validation utility | Self-test of validateHrNavConfig() |
+| J | Drift detection (Phase 9) | Digest determinism, baseline counts, drift comparison, section changes |
+| K | Dead-end detection (Phase 9) | Zero dead ends, live routes valid, backedBy coherence |
+| L | Section completion (Phase 9) | Per-section stats, health summary, feature flags |
 
 ### Final Acceptance Tests (Phase 8)
 

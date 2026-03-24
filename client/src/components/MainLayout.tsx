@@ -17,6 +17,8 @@ export function useHeaderActions(node: ReactNode) {
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useHrRole } from "@/hooks/useHrRole";
 import { HR_NAV_CONFIG } from "@/config/hrNavConfig";
+import { PM_NAV_CONFIG } from "@/config/pmNavConfig";
+import { AUTOMATION_NAV_CONFIG } from "@/config/automationNavConfig";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -237,20 +239,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
     {
       label: "PM Central",
       icon: <FolderKanban className="w-5 h-5" />,
-      children: [
-        { label: "Projects Home", icon: <FolderKanban className="w-4 h-4" />, href: "/pm-central/dashboard" },
-        { label: "PM Inbox", icon: <Inbox className="w-4 h-4" />, href: "/pm-central/inbox" },
-        { label: "PM Shells", icon: <Terminal className="w-4 h-4" />, href: "/pm-central/shell" },
-        { label: "Plans", icon: <FileText className="w-4 h-4" />, href: "/pm-central/plans" },
-        { label: "Execution", icon: <Activity className="w-4 h-4" />, href: "/pm-central/execution" },
-        { label: "Changes", icon: <GitPullRequest className="w-4 h-4" />, href: "/pm-central/changes" },
-        { label: "Risks", icon: <AlertTriangle className="w-4 h-4" />, href: "/pm-central/risks" },
-        { label: "Collaboration", icon: <MessagesSquare className="w-4 h-4" />, href: "/pm-central/collaboration" },
-        { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, href: "/pm-central/reports" },
-        { label: "Méthodes", icon: <BookOpen className="w-4 h-4" />, href: "/pm-central/methodes" },
-        { label: "Agent Engine", icon: <Bot className="w-4 h-4" />, href: "/pm-central/agent-engine" },
-        { label: "Idea Builder", icon: <Bot className="w-4 h-4" />, href: "/pm-central/idea-builder" },
-      ]
+      children: PM_NAV_CONFIG.sections.map((section) => ({
+        label: section.label,
+        icon: <FolderKanban className="w-4 h-4" />,
+        href: section.currentRoute ?? section.href,
+      })),
     },
     {
       label: "Human Resources",
@@ -266,14 +259,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
       label: "Automation",
       icon: <Zap className="w-5 h-5" />,
       children: [
-        { label: "Workflows", icon: <Zap className="w-4 h-4" />, href: "/automation" },
+        ...AUTOMATION_NAV_CONFIG.sections.map((section) => ({
+          label: section.label,
+          icon: <Zap className="w-4 h-4" />,
+          href: section.currentRoute ?? section.href,
+        })),
         { label: "WCP Workflows", icon: <Activity className="w-4 h-4" />, href: "/wcp/workflows" },
-        { label: "Triggers Store", icon: <Activity className="w-4 h-4" />, href: "/automation/triggers" },
-        { label: "Actions Store", icon: <Package className="w-4 h-4" />, href: "/automation/actions" },
-        { label: "Secrets", icon: <Key className="w-4 h-4" />, href: "/automation/secrets" },
-        { label: "Templates", icon: <FileText className="w-4 h-4" />, href: "/automation/templates" },
-        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/automation/settings" },
-      ]
+      ],
     },
     { 
       label: "Infrastructure", 

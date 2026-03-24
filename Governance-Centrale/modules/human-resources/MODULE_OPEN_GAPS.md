@@ -165,12 +165,19 @@ All 4 items are implemented. **No gaps.**
 | Field masking assertion tests missing | Medium | No tests verify `"***"` replacement for unauthorized users |
 | Frontend component tests missing | Low | HR pages have no unit or integration tests |
 | E2E tests missing | Medium | No end-to-end tests for full HR workflows |
-| Nav config + role/visibility tests | **Closed** | Phase 6-8 added `hr-nav-validation.test.ts` with 66 assertions |
+| Nav config + role/visibility tests | **Closed** | Phase 6-8 added `hr-nav-validation.test.ts` with 66+ assertions |
 | Route coherence tests | **Closed** | Phase 6-8 verifies all 48 routes mounted, ordering correct |
 | Backward compatibility tests | **Closed** | Phase 6-8 verifies all 28 aliases valid |
 | Final acceptance tests | **Closed** | Phase 8 added `hr-phase8.test.ts` with ~50 assertions — reality alignment, deferred consistency, governance coherence |
 | Config-to-surface alignment | **Closed** | Phase 8 verifies every live item has matching page file on disk |
 | Sensitive governance alignment | **Closed** | Phase 8 verifies sensitive items hidden from unauthorized roles, masking functions exist |
+| Drift detection tests | **Closed** | Phase 9 added digest determinism, baseline comparison, section change detection (`hr-phase9.test.ts` A) |
+| Dead-end detection tests | **Closed** | Phase 9 added zero dead-end verification, deferred analysis, high-deferral detection (`hr-phase9.test.ts` C) |
+| Section completion tests | **Closed** | Phase 9 added per-section stats, health summary coherence (`hr-phase9.test.ts` B) |
+| Backend domain consistency tests | **Closed** | Phase 9 added 14-domain constant validation, no-unknown check (`hr-phase9.test.ts` D) |
+| Observability unit tests | **Closed** | Phase 9 added event accumulation, summary aggregation, top deferred items (`hr-phase9.test.ts` E) |
+| Maintainability helper tests | **Closed** | Phase 9 added implementation breakdown, baseline integrity (`hr-phase9.test.ts` F-G) |
+| Feature flag currency tests | **Closed** | Phase 9 verifies version 9.0.0, all Phase 9 flags present (`hr-phase9.test.ts` H) |
 
 ---
 

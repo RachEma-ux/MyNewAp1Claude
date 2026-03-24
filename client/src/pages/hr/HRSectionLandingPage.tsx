@@ -8,12 +8,14 @@
  * Handles existing-page links, not-yet-implemented placeholders, and empty states.
  */
 
+import { useEffect } from "react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useHrRole } from "@/hooks/useHrRole";
 import { findSectionById, type HrNavSection, type HrNavItem } from "@/config/hrNavConfig";
+import { trackSectionVisit, trackDeadEnd } from "@/lib/hrNavObservability";
 import {
   ArrowLeft,
   Building2,
@@ -147,7 +149,33 @@ function Breadcrumb({ sectionLabel }: { sectionLabel: string }) {
   );
 }
 
-function ChildCard({ item }: { item: HrNavItem }) {
+function DeferredCard({ item, liveCount }: { item: HrNavItem; liveCount: number }) {
+  const Icon = getIcon(item.iconHint);
+
+  return (
+    <Card className="opacity-60 cursor-default border-dashed">
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+          <Icon className="w-5 h-5 text-muted-foreground" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm text-muted-foreground">{item.label}</span>
+            <Badge variant="outline" className="text-xs">Coming soon</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.purpose}</p>
+          {liveCount > 0 && (
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              Explore the {liveCount} available {liveCount === 1 ? "capability" : "capabilities"} above while this is in development.
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ChildCard({ item, liveCount }: { item: HrNavItem; liveCount: number }) {
   const Icon = getIcon(item.iconHint);
   const isLive = item.implementationStatus === "live";
   const isPlaceholder = item.implementationStatus === "placeholder";
@@ -155,22 +183,7 @@ function ChildCard({ item }: { item: HrNavItem }) {
   const targetRoute = item.currentRoute ?? item.href;
 
   if (!isAccessible) {
-    return (
-      <Card className="opacity-50 cursor-default border-dashed">
-        <CardContent className="p-4 flex items-center gap-3">
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-            <Icon className="w-5 h-5 text-muted-foreground" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-sm text-muted-foreground">{item.label}</span>
-              <Badge variant="outline" className="text-xs">Coming soon</Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.purpose}</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <DeferredCard item={item} liveCount={liveCount} />;
   }
 
   return (
@@ -208,6 +221,26 @@ export default function HRSectionLandingPage({ sectionId }: HRSectionLandingPage
   const section = findSectionById(sectionId);
   const { can, isLoading } = useHrRole();
 
+  // Compute visible items early (safe when section is null)
+  const visibleItems = section
+    ? section.items.filter((item) => {
+        if (item.visibilityMode === "show") return true;
+        if (item.visibilityMode === "hide-if-no-access") {
+          return can(item.requiredAction);
+        }
+        return true;
+      })
+    : [];
+
+  // Phase 9 — Track section visits and dead ends (hook must be before early returns)
+  useEffect(() => {
+    if (!section || isLoading) return;
+    trackSectionVisit(sectionId);
+    if (visibleItems.length === 0) {
+      trackDeadEnd(sectionId);
+    }
+  }, [sectionId, section, isLoading, visibleItems.length]);
+
   if (!section) {
     return (
       <div className="p-6 max-w-5xl mx-auto">
@@ -239,20 +272,20 @@ export default function HRSectionLandingPage({ sectionId }: HRSectionLandingPage
     );
   }
 
-  // Filter children by role visibility
-  const visibleItems = section.items.filter((item) => {
-    if (item.visibilityMode === "show") return true;
-    if (item.visibilityMode === "hide-if-no-access") {
-      return can(item.requiredAction);
-    }
-    return true;
-  });
-
   const SectionIcon = getIcon(section.iconHint);
   const liveCount = visibleItems.filter(
     (i) => i.implementationStatus === "live" || i.implementationStatus === "placeholder",
   ).length;
   const plannedCount = visibleItems.length - liveCount;
+
+  // Sort: live items first, then deferred items
+  const sortedItems = [...visibleItems].sort((a, b) => {
+    const aLive = a.implementationStatus === "live" || a.implementationStatus === "placeholder";
+    const bLive = b.implementationStatus === "live" || b.implementationStatus === "placeholder";
+    if (aLive && !bLive) return -1;
+    if (!aLive && bLive) return 1;
+    return 0;
+  });
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -298,14 +331,27 @@ export default function HRSectionLandingPage({ sectionId }: HRSectionLandingPage
               You don't have access to any items in this section.
               Contact your HR administrator for access.
             </p>
+            <Link href="/hr">
+              <Button variant="outline" size="sm" className="mt-4">
+                <ArrowLeft className="w-3 h-3 mr-1" /> Back to HR Home
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {visibleItems.map((item) => (
-            <ChildCard key={item.id} item={item} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {sortedItems.map((item) => (
+              <ChildCard key={item.id} item={item} liveCount={liveCount} />
+            ))}
+          </div>
+          {/* Phase 9 — Section summary when deferral rate is high */}
+          {plannedCount > liveCount && liveCount > 0 && (
+            <p className="text-xs text-muted-foreground text-center pt-2">
+              This section has {liveCount} active {liveCount === 1 ? "capability" : "capabilities"} with {plannedCount} more in development.
+            </p>
+          )}
+        </>
       )}
     </div>
   );

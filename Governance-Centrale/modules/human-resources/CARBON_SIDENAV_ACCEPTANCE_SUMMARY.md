@@ -2,11 +2,11 @@
 
 ## Document Status
 
-- **Type:** Phase 8 rollout acceptance artifact
+- **Type:** Phase 9 rollout acceptance artifact
 - **Module:** Human Resources
 - **Date:** 2026-03-24
-- **Version:** 8.0.0
-- **Status:** Accepted for rollout at current scope
+- **Version:** 9.0.0
+- **Status:** Accepted for rollout at current scope — operationalization complete
 
 ---
 
@@ -21,7 +21,10 @@ The HR Carbon SideNav rollout is **accepted** at the following scope:
 - **28 backward-compatible route aliases** documented, redirect activation deferred
 - **All old flat `/hr/*` routes preserved** — no breakage
 - **Full permission/visibility/scope/masking governance model** operational
-- **~200 automated test assertions** across 8 test files covering all phases
+- **~250 automated test assertions** across 9 test files covering all phases
+- **Nav drift detection** — frozen baseline with automated comparison tests
+- **Operational observability** — lightweight, privacy-safe navigation signal tracking
+- **Dead-end/deferred UX improvements** — sorted cards, contextual guidance, section summaries
 
 ---
 
@@ -149,6 +152,10 @@ All deferred items:
 | `carbonSideNavRollout` | `true` | Carbon SideNav model is active |
 | `navConfigValidation` | `true` | Config validator is available |
 | `backwardCompatAliases` | `true` | Route alias map is available |
+| `navDriftDetection` | `true` | Frozen baseline drift detection (Phase 9) |
+| `navHealthSummary` | `true` | Nav health summary available (Phase 9) |
+| `navObservability` | `true` | Navigation event tracking active (Phase 9) |
+| `deferredItemTracking` | `true` | Deferred item click tracking active (Phase 9) |
 
 ### Rollout Control
 
@@ -195,10 +202,26 @@ There is no separate feature-flag toggle for enabling/disabling the Carbon SideN
 | `hr-phase6.test.ts` | 6-7 | Hardening, permission enforcement, masking, scope, seed data | ~50 |
 | `hr-nav-validation.test.ts` | 6-8 | Nav config integrity, routes, visibility, scope, masking, rollout | ~50 |
 | `hr-phase8.test.ts` | 8 | Final acceptance: reality alignment, compatibility, governance | ~50 |
+| `hr-phase9.test.ts` | 9 | Drift detection, health, dead-ends, domains, observability, maintainability | ~50 |
 
 ---
 
-## 8. What Should Come Next After Phase 8
+## 8. What Phase 9 Added (Operationalization)
+
+| Capability | Purpose | Source |
+|---|---|---|
+| Frozen baseline snapshot | Detect unintentional nav config drift | `client/src/config/hrNavBaseline.ts` |
+| Drift detection tests | Automated baseline comparison | `server/hr/__tests__/hr-phase9.test.ts` section A |
+| Nav health summary | Section completion stats, overall health | `hrNavConfigValidator.ts` |
+| Backend domain constants | Prevent string-typo drift in backendDomain fields | `hrNavConfig.ts` `HR_BACKEND_DOMAINS` |
+| Observability event tracking | Privacy-safe section visit / deferred click / dead-end signals | `client/src/lib/hrNavObservability.ts` |
+| Improved deferred UX | Live-first sorting, contextual guidance, section summary | `HRSectionLandingPage.tsx` |
+| Dead-end prevention | "Back to HR Home" on empty sections, dead-end detection | `HRSectionLandingPage.tsx`, `hrNavConfigValidator.ts` |
+| Maintainability helpers | `getImplementationBreakdown()`, `findUnknownBackendDomains()` | `hrNavConfig.ts` |
+
+---
+
+## 9. What Should Come Next After Phase 9
 
 1. **Permission enforcement audit** — systematically verify every router endpoint calls `checkHrAccess()` or `requireHrPermission()` (addresses Risk R1)
 2. **Fix reminders.ts** — correct schema column references and status enum values (addresses Risk R2)
@@ -207,12 +230,13 @@ There is no separate feature-flag toggle for enabling/disabling the Carbon SideN
 5. **Add export audit logging** — implement `logHrAudit()` with category `"export"` when CSV/download features are added
 6. **Frontend component tests** — add unit/integration tests for HR page components
 7. **E2E tests** — add end-to-end tests for critical HR workflows
+8. **Persist observability signals** — when a backend telemetry store is available, persist nav event buffer for trend analysis
 
 ---
 
-## 9. Acceptance Decision
+## 10. Acceptance Decision
 
-The HR Carbon SideNav rollout is **accepted** for the following reasons:
+The HR Carbon SideNav rollout is **accepted** at Phase 9 scope for the following reasons:
 
 1. The canonical nav config is the single source of truth and passes all structural/governance validation
 2. 33 of 68 items are backed by real surfaces — no empty/theater pages
@@ -221,5 +245,8 @@ The HR Carbon SideNav rollout is **accepted** for the following reasons:
 5. Permission, visibility, scope, and masking models are coherent and tested
 6. Governance documentation is complete and truthful
 7. The rollout does not introduce route sprawl, backend fragmentation, or architectural violations
+8. Nav drift detection provides automated protection against unintentional config changes
+9. Operational observability gives visibility into navigation patterns without PII exposure
+10. Dead-end handling and deferred UX guide users to available capabilities
 
-**Signed off by Governance pass — Phase 8 complete.**
+**Signed off by Governance pass — Phase 9 complete.**

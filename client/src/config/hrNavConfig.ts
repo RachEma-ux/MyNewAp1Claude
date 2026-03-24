@@ -20,6 +20,29 @@
  */
 
 // ---------------------------------------------------------------------------
+// Phase 9 — Backend Domain Constants (reduces drift from string typos)
+// ---------------------------------------------------------------------------
+
+export const HR_BACKEND_DOMAINS = {
+  ORGANIZATION: "organization",
+  STAFFING: "staffing",
+  RECRUITING: "recruiting",
+  LIFECYCLE: "lifecycle",
+  DIRECTORY: "directory",
+  COMPENSATION: "compensation",
+  TIME: "time",
+  LEARNING: "learning",
+  PERFORMANCE: "performance",
+  RELATIONS: "relations",
+  ENGAGEMENT: "engagement",
+  COMPLIANCE: "compliance",
+  ANALYTICS: "analytics",
+  TALENT: "talent",
+} as const;
+
+export type HrBackendDomain = typeof HR_BACKEND_DOMAINS[keyof typeof HR_BACKEND_DOMAINS];
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -1556,4 +1579,57 @@ export function groupByScope(): Record<ScopeType, HrNavItem[]> {
     sensitive: all.filter((i) => i.scopeType === "sensitive"),
     mixed: all.filter((i) => i.scopeType === "mixed"),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 — Maintainability Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Get all unique backendDomain values referenced in the nav config.
+ * Useful for verifying domain coverage matches router registration.
+ */
+export function getReferencedBackendDomains(): string[] {
+  const domains = new Set<string>();
+  for (const section of HR_NAV_CONFIG.sections) {
+    domains.add(section.backendDomain);
+    for (const item of section.items) {
+      domains.add(item.backendDomain);
+    }
+  }
+  return Array.from(domains).sort();
+}
+
+/**
+ * Get items grouped by implementation status.
+ * Returns a breakdown suitable for operational dashboards.
+ */
+export function getImplementationBreakdown(): Record<ImplementationStatus, number> {
+  const items = getAllHrNavItems();
+  return {
+    live: items.filter((i) => i.implementationStatus === "live").length,
+    placeholder: items.filter((i) => i.implementationStatus === "placeholder").length,
+    planned: items.filter((i) => i.implementationStatus === "planned").length,
+    "not-started": items.filter((i) => i.implementationStatus === "not-started").length,
+  };
+}
+
+/**
+ * Validate that a backendDomain value exists in the HR_BACKEND_DOMAINS constant.
+ * Returns mismatched domain strings for items that reference unlisted domains.
+ */
+export function findUnknownBackendDomains(): Array<{ itemId: string; domain: string }> {
+  const validDomains = new Set(Object.values(HR_BACKEND_DOMAINS));
+  const mismatches: Array<{ itemId: string; domain: string }> = [];
+  for (const section of HR_NAV_CONFIG.sections) {
+    if (!validDomains.has(section.backendDomain as HrBackendDomain)) {
+      mismatches.push({ itemId: section.id, domain: section.backendDomain });
+    }
+    for (const item of section.items) {
+      if (!validDomains.has(item.backendDomain as HrBackendDomain)) {
+        mismatches.push({ itemId: item.id, domain: item.backendDomain });
+      }
+    }
+  }
+  return mismatches;
 }

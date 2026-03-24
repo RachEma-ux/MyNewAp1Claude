@@ -13,7 +13,8 @@ This directory contains the governance documentation for the **Human Resources (
 | Frontend route prefix | `/hr/*` |
 | Backend domain path | `server/hr/` |
 | Database prefix | `hr_*` tables |
-| Current version | 8.0.0 |
+| Current version | 10.0.0 |
+| Platform role | **Reference implementation** for module Carbon SideNav pattern |
 | Governance model | AGENTS.md 5-agent orchestration |
 
 ## Current State
@@ -28,8 +29,9 @@ The HR module is in **production-ready** state with:
 - **4 field masking functions** protecting sensitive data
 - **Audit logging** on all mutations and sensitive reads
 - **Self-approval prevention** on critical workflows
-- **66 automated nav validation tests** covering structure, routes, visibility, scope, masking
+- **~250 automated test assertions** covering structure, routes, visibility, scope, masking, drift, observability
 - **Rollout feature flags** (carbonSideNavRollout, navConfigValidation, backwardCompatAliases)
+- **Phase 9 operationalization** — drift detection, nav health summary, observability, deferred UX improvements
 
 ## Carbon SideNav Architecture
 
@@ -63,7 +65,9 @@ The HR module uses an IBM Carbon-inspired SideNav with **13 purpose-driven secti
 | [hr-phase2-section-landing-pages.md](hr-phase2-section-landing-pages.md) | Phase 2 | Section landing pages implementation record |
 | [hr-phase4-backend-expansion.md](hr-phase4-backend-expansion.md) | Phase 4 | Backend expansion (6 new capabilities) |
 | [hr-phase6-stabilization.md](hr-phase6-stabilization.md) | Phase 6/8 | Stabilization, testing, rollout readiness |
-| [CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md](CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md) | Phase 8 | Final rollout acceptance status and gap summary |
+| [CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md](CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md) | Phase 8-9 | Final rollout acceptance status and gap summary |
+| [hr-phase9-operationalization.md](hr-phase9-operationalization.md) | Phase 9 | Operationalization, observability, drift detection, maintainability |
+| [CARBON_SIDENAV_REFERENCE_IMPLEMENTATION.md](CARBON_SIDENAV_REFERENCE_IMPLEMENTATION.md) | Phase 10 | HR as platform reference implementation for module nav pattern |
 
 ## Related Documentation
 
@@ -75,3 +79,8 @@ The HR module uses an IBM Carbon-inspired SideNav with **13 purpose-driven secti
 | `HR/HR_MODULE_AUDIT_REPORT.md` | Post-Phase 5 acceptance audit |
 | `AGENTS.md` | Mandatory 5-agent orchestration model |
 | `ARCHITECTURE.md` | Platform layer architecture |
+| `Governance-Centrale/global/MODULE_NAV_STANDARD.md` | Platform module nav standard |
+| `Governance-Centrale/global/MODULE_NAV_GOVERNANCE_RULES.md` | Governance rules for module nav changes |
+| `Governance-Centrale/global/MODULE_NAV_ADOPTION_CHECKLIST.md` | Adoption checklist for new modules |
+| `client/src/navigation/moduleNavTypes.ts` | Shared type contract for module navs |
+| `client/src/navigation/moduleNavHelpers.ts` | Shared helper functions and generic validator |
