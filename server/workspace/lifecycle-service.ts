@@ -185,11 +185,20 @@ export async function submitForReview(
 /**
  * Begin review (ready_for_review → under_review).
  * Admin/governance action to start validation.
+ *
+ * Enforces content-based gate: re-validates draft completeness to ensure
+ * the review packet is coherent and nothing was corrupted after submission.
  */
 export async function beginReview(
   workspaceId: number,
   actorId: number
 ): Promise<TransitionResult> {
+  const completeness = await validateDraftCompleteness(workspaceId);
+  if (!completeness.complete) {
+    throw new Error(
+      `Workspace cannot begin review — review packet incomplete. Missing: ${completeness.missingFields.join(", ")}`
+    );
+  }
   return transitionWorkspace(workspaceId, "under_review", actorId);
 }
 
