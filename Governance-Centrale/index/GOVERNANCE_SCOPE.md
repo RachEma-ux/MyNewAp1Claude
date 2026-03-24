@@ -4,7 +4,7 @@
 
 - **Type:** Governance boundary definition
 - **Date:** 2026-03-24
-- **Version:** 1.1.0 (Phase 13 — enforcement and compliance)
+- **Version:** 1.2.0 (Phase 14 — contributor workflow and handoff)
 
 ---
 
@@ -41,6 +41,11 @@ Global policies that apply to all modules are documented under `global/`. Curren
 - Module navigation enforcement policy (Phase 13)
 - Module navigation exception registry (Phase 13)
 - Module navigation compliance report (Phase 13)
+- Module navigation contributor workflow (Phase 14)
+- Module navigation decision tree (Phase 14)
+- Module navigation handoff guide (Phase 14)
+- Module navigation common failures guide (Phase 14)
+- Module navigation operating checklist (Phase 14)
 
 ### 4. Templates
 
@@ -76,6 +81,10 @@ Platform-wide standards in `global/` define rules that all modules must follow. 
 ### Template Boundary
 
 Templates in `templates/` are copy-ready starting points. Modules may extend templates with module-specific fields. Templates do not contain module-specific data.
+
+### Contributor Workflow Boundary (Phase 14)
+
+Contributor workflow docs in `global/` provide step-by-step guides for common governance tasks. Scaffolding scripts in `scripts/` generate starter files but do not enforce governance — contributors must complete governance analysis, validation, and review manually after scaffolding.
 
 ---
 
@@ -116,6 +125,7 @@ The module-nav standard is enforced via:
 1. New modules: create a governance pack under `modules/<module>/`
 2. New global policies: create a document under `global/` and update the governance index
 3. New templates: add to `templates/` and update the governance index
-4. Register in `client/src/navigation/moduleNavRegistry.ts` with compliance state
+4. Use scaffolding: `npx tsx scripts/scaffold-module-nav.ts <module-id> "<label>" /<route>`
+5. Register in `client/src/navigation/moduleNavRegistry.ts` with compliance state
 5. If not fully compliant, create an exception in `global/MODULE_NAV_EXCEPTION_REGISTRY.md`
 6. Changes to scope itself: update this document and get governance review

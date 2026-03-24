@@ -15,6 +15,7 @@
  * H. File-existence verification — nav configs and governance packs exist on disk
  * I. Exception ID cross-reference — exception IDs reference real registry entries
  * J. Adoption summary counts — registry helpers produce consistent counts
+ * K. Phase 14 scaffolding and template coherence — templates and workflow docs exist
  */
 
 import { describe, it, expect } from "vitest";
@@ -510,5 +511,76 @@ describe("Module Nav Compliance — Summary Consistency", () => {
     );
     const counts = countByComplianceStatus();
     expect(counts["non-compliant"]).toBe(0);
+  });
+});
+
+// ============================================================================
+// K. Phase 14 — Scaffolding & Template Coherence
+// ============================================================================
+
+describe("Module Nav Compliance — Scaffolding & Templates (Phase 14)", () => {
+  const PHASE_14_WORKFLOW_DOCS = [
+    "Governance-Centrale/global/MODULE_NAV_WORKFLOW.md",
+    "Governance-Centrale/global/MODULE_NAV_DECISION_TREE.md",
+    "Governance-Centrale/global/MODULE_NAV_HANDOFF_GUIDE.md",
+    "Governance-Centrale/global/MODULE_NAV_COMMON_FAILURES.md",
+    "Governance-Centrale/global/MODULE_NAV_OPERATING_CHECKLIST.md",
+  ];
+
+  const PHASE_14_TEMPLATES = [
+    "Governance-Centrale/templates/module-nav/MODULE_NAV_ADOPTION_ENTRY.template.md",
+    "Governance-Centrale/templates/module-nav/MODULE_NAV_EXCEPTION_ENTRY.template.md",
+    "Governance-Centrale/templates/module-nav/MODULE_NAV_VALIDATION_CHECKLIST.md",
+    "Governance-Centrale/templates/module-nav/MODULE_NAV_PR_REVIEW_CHECKLIST.md",
+    "Governance-Centrale/templates/module-nav/MODULE_NAV_ROLLOUT_PLAN.template.md",
+  ];
+
+  it("all Phase 14 workflow docs exist on disk", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+    for (const doc of PHASE_14_WORKFLOW_DOCS) {
+      const fullPath = path.join(repoRoot, doc);
+      expect(
+        fs.existsSync(fullPath),
+        `Phase 14 workflow doc missing: ${doc}`,
+      ).toBe(true);
+    }
+  });
+
+  it("all Phase 14 templates exist on disk", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+    for (const tmpl of PHASE_14_TEMPLATES) {
+      const fullPath = path.join(repoRoot, tmpl);
+      expect(
+        fs.existsSync(fullPath),
+        `Phase 14 template missing: ${tmpl}`,
+      ).toBe(true);
+    }
+  });
+
+  it("scaffolding script exists on disk", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+    const scriptPath = path.join(repoRoot, "scripts/scaffold-module-nav.ts");
+    expect(
+      fs.existsSync(scriptPath),
+      "Scaffolding script missing: scripts/scaffold-module-nav.ts",
+    ).toBe(true);
+  });
+
+  it("nav config template exists and imports shared types", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+    const templatePath = path.join(
+      repoRoot,
+      "Governance-Centrale/templates/module-nav/MODULE_NAV_CONFIG.template.ts",
+    );
+    const content = fs.readFileSync(templatePath, "utf-8");
+    expect(content).toContain("moduleNavTypes");
   });
 });

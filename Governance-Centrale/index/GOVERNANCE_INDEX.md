@@ -4,7 +4,7 @@ Master index of all governance artifacts in the repository.
 
 ## Last Updated
 
-2026-03-24 (Phase 13 — Enforcement, exceptions, compliance automation)
+2026-03-24 (Phase 14 — Contributor workflow, scaffolding, and handoff)
 
 ---
 
@@ -20,6 +20,11 @@ Master index of all governance artifacts in the repository.
 | Module Nav Enforcement Policy | [global/MODULE_NAV_ENFORCEMENT_POLICY.md](../global/MODULE_NAV_ENFORCEMENT_POLICY.md) | Enforceable compliance definitions (Phase 13) |
 | Module Nav Exception Registry | [global/MODULE_NAV_EXCEPTION_REGISTRY.md](../global/MODULE_NAV_EXCEPTION_REGISTRY.md) | Formal exception model (Phase 13) |
 | Module Nav Compliance Report | [global/MODULE_NAV_COMPLIANCE_REPORT.md](../global/MODULE_NAV_COMPLIANCE_REPORT.md) | Current compliance snapshot (Phase 13, file-existence verified) |
+| Module Nav Workflow | [global/MODULE_NAV_WORKFLOW.md](../global/MODULE_NAV_WORKFLOW.md) | Contributor workflow for all nav change types (Phase 14) |
+| Module Nav Decision Tree | [global/MODULE_NAV_DECISION_TREE.md](../global/MODULE_NAV_DECISION_TREE.md) | Adoption path decision guide (Phase 14) |
+| Module Nav Handoff Guide | [global/MODULE_NAV_HANDOFF_GUIDE.md](../global/MODULE_NAV_HANDOFF_GUIDE.md) | Handoff guide for future contributors (Phase 14) |
+| Module Nav Common Failures | [global/MODULE_NAV_COMMON_FAILURES.md](../global/MODULE_NAV_COMMON_FAILURES.md) | Common mistakes and drift patterns (Phase 14) |
+| Module Nav Operating Checklist | [global/MODULE_NAV_OPERATING_CHECKLIST.md](../global/MODULE_NAV_OPERATING_CHECKLIST.md) | Reusable checklist for routine changes (Phase 14) |
 
 ---
 
@@ -78,6 +83,11 @@ Master index of all governance artifacts in the repository.
 | Section Landing Page Checklist | [templates/module-nav/MODULE_SECTION_LANDING_PAGE_CHECKLIST.md](../templates/module-nav/MODULE_SECTION_LANDING_PAGE_CHECKLIST.md) | Checklist for section landing pages |
 | Nav Governance Review Template | [templates/module-nav/MODULE_NAV_GOVERNANCE_REVIEW.template.md](../templates/module-nav/MODULE_NAV_GOVERNANCE_REVIEW.template.md) | Governance review document template |
 | Nav Deferred Items Template | [templates/module-nav/MODULE_NAV_DEFERRED_ITEMS.template.md](../templates/module-nav/MODULE_NAV_DEFERRED_ITEMS.template.md) | Deferred item tracking template |
+| Nav Adoption Entry Template | [templates/module-nav/MODULE_NAV_ADOPTION_ENTRY.template.md](../templates/module-nav/MODULE_NAV_ADOPTION_ENTRY.template.md) | Registry entry template (Phase 14) |
+| Nav Exception Entry Template | [templates/module-nav/MODULE_NAV_EXCEPTION_ENTRY.template.md](../templates/module-nav/MODULE_NAV_EXCEPTION_ENTRY.template.md) | Exception entry template (Phase 14) |
+| Nav Validation Checklist | [templates/module-nav/MODULE_NAV_VALIDATION_CHECKLIST.md](../templates/module-nav/MODULE_NAV_VALIDATION_CHECKLIST.md) | Validation checklist (Phase 14) |
+| Nav PR Review Checklist | [templates/module-nav/MODULE_NAV_PR_REVIEW_CHECKLIST.md](../templates/module-nav/MODULE_NAV_PR_REVIEW_CHECKLIST.md) | PR review checklist (Phase 14) |
+| Nav Rollout Plan Template | [templates/module-nav/MODULE_NAV_ROLLOUT_PLAN.template.md](../templates/module-nav/MODULE_NAV_ROLLOUT_PLAN.template.md) | Rollout plan template (Phase 14) |
 
 ---
 
@@ -92,6 +102,14 @@ Master index of all governance artifacts in the repository.
 | HR Nav Config | `client/src/config/hrNavConfig.ts` | HR reference implementation (13 sections, 68 items) |
 | PM Central Nav Config | `client/src/config/pmNavConfig.ts` | PM Central pilot (8 sections, 12 items) |
 | Automation Nav Config | `client/src/config/automationNavConfig.ts` | Automation Wave 1 (3 sections, 7 items) |
+
+---
+
+## Scaffolding Tools
+
+| Tool | Location | Purpose |
+|---|---|---|
+| Module Nav Scaffolding | `scripts/scaffold-module-nav.ts` | Generate starter files for new module adoption (Phase 14) |
 
 ---
 
