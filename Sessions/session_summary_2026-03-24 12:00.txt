@@ -1,0 +1,45 @@
+Session Summary — 2026-03-24 12:00
+===================================
+
+## Phase 4 — HR Carbon SideNav Backend/Domain Expansion (Completion)
+
+### What was done
+Completed the Phase 4 HR Carbon SideNav backend expansion, implementing 6 high-value
+capabilities that reduce the not-yet-implemented gap from 41 to 35 nav items.
+
+### Changes across 2 commits
+
+#### Commit 6f33d4e (from prior context, already pushed)
+Schema additions:
+- `hr_work_permits` table in drizzle/tables/hr-compliance.ts
+- `hr_letters` table in drizzle/tables/hr-core.ts
+
+Backend router extensions:
+- server/hr/organization/router.ts — createJobFamily, updateJobFamily, createJobLevel, updateJobLevel
+- server/hr/compliance/router.ts — listWorkPermits, getWorkPermit, createWorkPermit, updateWorkPermit
+- server/hr/directory/router.ts — listLetters, getLetter, createLetter, updateLetter
+- server/hr/analytics/router.ts — listRoleAssignments, createRoleAssignment, updateRoleAssignment
+
+Frontend pages (6 new):
+- HRJobArchitecturePage.tsx — Job Families & Levels with tab UI
+- HRWorkPermitsPage.tsx — Work permit tracking with status filters
+- HRLettersCertificatesPage.tsx — Letter/certificate management with type/status filters
+- HRRiskManagementPage.tsx — Risk register with impact/status badges
+- HRAuditLogsPage.tsx — Audit log viewer with action prefix filters
+- HRAccessControlsPage.tsx — Role assignment management with role filters
+
+#### Commit 46bd0b6 (this session)
+- App.tsx: Added 6 routes for Carbon SideNav leaf pages with hrGated wrappers
+- hrNavConfig.ts: Updated 6 items from not-yet-implemented/not-started to existing-page/live
+- Created governance doc: Governance-Centrale/modules/human-resources/hr-phase4-backend-expansion.md
+
+### Nav Config Stats After Phase 4
+- existing-page: 32 (was 26)
+- tab-in-existing-page: 1 (unchanged)
+- not-yet-implemented: 35 (was 41)
+
+### Key Design Decisions
+- Extended 4 existing domain routers (organization, compliance, directory, analytics) — no new routers created
+- Only 2 new schema tables (work_permits, letters) — risk + audit already had backend support
+- All endpoints follow established protected/governed + audit pattern
+- All pages use hrGated() permission wrappers matching nav config requiredAction
