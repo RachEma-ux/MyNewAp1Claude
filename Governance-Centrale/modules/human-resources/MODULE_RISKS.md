@@ -111,7 +111,7 @@
 
 **Description:** Per the HR Module Audit Report, ~150 tests exist across 5 test files but 2 tests will fail due to schema/status mismatches. Permission boundary tests exist but don't cover all endpoints.
 
-**Mitigation:** Phase 8 added `hr-nav-validation.test.ts` with 40+ assertions covering nav config, route coherence, role/visibility, scope, and masking. Combined with the existing 6 test files (Phases 1-6), ~200 tests now exist. Remaining gaps: frontend component tests, E2E tests.
+**Mitigation:** Phase 6-8 added `hr-nav-validation.test.ts` (66 assertions) and `hr-phase8.test.ts` (~48 assertions) covering nav config integrity, route coherence, role/visibility, scope, masking, reality alignment, deferred consistency, and governance coherence. Combined with the existing 6 test files (Phases 1-6), ~260 tests now exist across 8 test files. Remaining gaps: frontend component tests, E2E tests.
 
 ---
 

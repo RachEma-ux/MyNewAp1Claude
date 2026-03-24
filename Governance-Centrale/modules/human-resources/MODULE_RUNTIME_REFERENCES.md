@@ -129,7 +129,8 @@
 | `server/hr/__tests__/hr-phase4.test.ts` | Phase 4 (compensation, relations, engagement, compliance) |
 | `server/hr/__tests__/hr-phase5.test.ts` | Phase 5 (cross-phase integration, analytics, reminders) |
 | `server/hr/__tests__/hr-phase6.test.ts` | Phase 6 (hardening, permission enforcement, bug fixes) |
-| `server/hr/__tests__/hr-nav-validation.test.ts` | Phase 8 (nav config integrity, route coherence, role/visibility, rollout) |
+| `server/hr/__tests__/hr-nav-validation.test.ts` | Phase 6-8 (nav config integrity, route coherence, role/visibility, rollout) |
+| `server/hr/__tests__/hr-phase8.test.ts` | Phase 8 (final acceptance: reality alignment, compatibility, governance, deferred consistency) |
 
 ---
 
@@ -148,6 +149,8 @@
 | `Governance-Centrale/modules/human-resources/hr-nav-architecture.md` | Phase 1+3 nav architecture doc |
 | `Governance-Centrale/modules/human-resources/hr-phase2-section-landing-pages.md` | Phase 2 section landing pages doc |
 | `Governance-Centrale/modules/human-resources/hr-phase4-backend-expansion.md` | Phase 4 backend expansion doc |
+| `Governance-Centrale/modules/human-resources/hr-phase6-stabilization.md` | Phase 6/8 stabilization and rollout readiness doc |
+| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md` | Phase 8 final rollout acceptance status |
 
 ---
 

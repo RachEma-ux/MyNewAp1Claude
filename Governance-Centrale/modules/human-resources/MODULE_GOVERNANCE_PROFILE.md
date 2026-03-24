@@ -246,7 +246,7 @@ The following HR sections contain governance-sensitive data and require elevated
 | Feature flag | `carbonSideNavRollout: true` in `hr.settings.get` |
 | Config validation | `hrNavConfigValidator.ts` — structural + governance integrity checks |
 | Backward compatibility | 28 route aliases documented, all original routes preserved |
-| Test coverage | `hr-nav-validation.test.ts` — 40+ assertions across 9 test groups |
+| Test coverage | `hr-nav-validation.test.ts` — 66 assertions across 9 test groups |
 
 ### 10.2 Nav-to-Route Alignment (verified)
 
@@ -270,7 +270,9 @@ The following HR sections contain governance-sensitive data and require elevated
 
 ### 10.4 Automated Test Coverage
 
-`server/hr/__tests__/hr-nav-validation.test.ts` covers:
+Two test files cover the Carbon SideNav rollout:
+
+**`server/hr/__tests__/hr-nav-validation.test.ts`** (Phase 6-8):
 - Structural integrity (13 sections, 68 items, field completeness)
 - Route coherence (App.tsx mounting, route ordering)
 - Backward compatibility (28 aliases, resolve helpers)
@@ -280,6 +282,22 @@ The following HR sections contain governance-sensitive data and require elevated
 - Masking classification per role
 - Rollout readiness (feature flags, version, router composition)
 - Validation utility self-test
+
+**`server/hr/__tests__/hr-phase8.test.ts`** (Phase 8 — final acceptance):
+- Config-to-reality alignment (live items have page files on disk)
+- Route compatibility (aliases valid, flat + section routes coexist)
+- Section visibility coherence (every section has live children)
+- Item visibility coherence (all actions in HR_ACTIONS, show-mode accessible)
+- Deferred item consistency (35 items properly classified)
+- Rollout mechanism state (feature flags, version, namespaces)
+- Real surface verification (page files exist, no theater)
+- Sensitive governance alignment (masking functions, hide-if-no-access)
+- Validator clean result (no errors)
+- Cross-phase permission coverage (admin/employee alignment)
+
+### 10.5 Acceptance Status
+
+See [CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md](CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md) for the full rollout acceptance decision.
 
 ---
 

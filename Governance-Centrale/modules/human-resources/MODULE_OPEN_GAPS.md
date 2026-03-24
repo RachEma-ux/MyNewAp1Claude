@@ -100,8 +100,8 @@ All 4 items are implemented. **No gaps.**
 
 | Item ID | Label | Required Action |
 |---|---|---|
-| data-privacy-settings | Data Privacy | hr.compliance.read |
-| security-policies | Security Policies | hr.compliance.manage |
+| data-privacy-settings | Data Privacy | hr.analytics.manage |
+| security-policies | Security Policies | hr.analytics.manage |
 
 ### Compliance (3 of 6 unimplemented)
 
@@ -120,6 +120,7 @@ All 4 items are implemented. **No gaps.**
 | Not all router endpoints enforce role-based access | High | Some endpoints use only `protectedProcedure` (auth check) without `checkHrAccess()` or `requireHrPermission()` |
 | Frontend role gating improved (Phase 7.3+) | Low | 16 routes use `hrGated()`, 12 self-service routes auth-only, section landings filter by role. Remaining: section landing pages show filtered items without `hrGated()` (by design) |
 | No middleware-level permission enforcement | Medium | Permissions checked per-endpoint, no global HR middleware |
+| Mixed-scope items without scopeActions | Low | 6 live items with `scopeType=mixed` lack fine-grained `scopeActions` definitions; scope fallback works but is not explicit |
 
 ---
 
@@ -164,9 +165,12 @@ All 4 items are implemented. **No gaps.**
 | Field masking assertion tests missing | Medium | No tests verify `"***"` replacement for unauthorized users |
 | Frontend component tests missing | Low | HR pages have no unit or integration tests |
 | E2E tests missing | Medium | No end-to-end tests for full HR workflows |
-| Nav config + role/visibility tests | **Closed** | Phase 8 added `hr-nav-validation.test.ts` with 40+ assertions |
-| Route coherence tests | **Closed** | Phase 8 verifies all 48 routes mounted, ordering correct |
-| Backward compatibility tests | **Closed** | Phase 8 verifies all 28 aliases valid |
+| Nav config + role/visibility tests | **Closed** | Phase 6-8 added `hr-nav-validation.test.ts` with 66 assertions |
+| Route coherence tests | **Closed** | Phase 6-8 verifies all 48 routes mounted, ordering correct |
+| Backward compatibility tests | **Closed** | Phase 6-8 verifies all 28 aliases valid |
+| Final acceptance tests | **Closed** | Phase 8 added `hr-phase8.test.ts` with ~50 assertions — reality alignment, deferred consistency, governance coherence |
+| Config-to-surface alignment | **Closed** | Phase 8 verifies every live item has matching page file on disk |
+| Sensitive governance alignment | **Closed** | Phase 8 verifies sensitive items hidden from unauthorized roles, masking functions exist |
 
 ---
 

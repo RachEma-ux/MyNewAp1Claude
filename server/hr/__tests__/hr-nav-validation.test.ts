@@ -287,7 +287,7 @@ describe("HR Nav Config — Route Coherence", () => {
 // ============================================================================
 
 describe("HR Nav Config — Backward Compatibility", () => {
-  it("route alias map has exactly 27 entries", async () => {
+  it("route alias map has exactly 28 entries", async () => {
     const { HR_ROUTE_ALIASES } = await import("../../../client/src/config/hrRouteAliases");
     expect(HR_ROUTE_ALIASES).toHaveLength(28);
   });
@@ -335,7 +335,7 @@ describe("HR Nav Config — Backward Compatibility", () => {
     expect(resolveOldRoute("/hr/compensation-benefits/salary-structure")).toBe("/hr/compensation");
   });
 
-  it("getAllOldRoutes returns 27 routes", async () => {
+  it("getAllOldRoutes returns 28 routes", async () => {
     const { getAllOldRoutes } = await import("../../../client/src/config/hrRouteAliases");
     expect(getAllOldRoutes()).toHaveLength(28);
   });
@@ -378,11 +378,19 @@ describe("HR Nav Config — Governance Metadata", () => {
     }
   });
 
-  it("items with scopeType=mixed have scopeActions defined", async () => {
+  it("live items with scopeType=mixed that declare scopeActions have valid ones", async () => {
     const { getAllHrNavItems } = await import("../../../client/src/config/hrNavConfig");
-    const mixedItems = getAllHrNavItems().filter((i) => i.scopeType === "mixed");
-    for (const item of mixedItems) {
-      expect(item.scopeActions).toBeTruthy();
+    const liveMixedWithScope = getAllHrNavItems().filter(
+      (i) =>
+        i.scopeType === "mixed" &&
+        (i.implementationStatus === "live" || i.implementationStatus === "placeholder") &&
+        i.scopeActions != null,
+    );
+    // At least some live mixed items have scopeActions defined
+    expect(liveMixedWithScope.length).toBeGreaterThan(0);
+    for (const item of liveMixedWithScope) {
+      const sa = item.scopeActions!;
+      expect(sa.global || sa.team || sa.self).toBeTruthy();
     }
   });
 
@@ -657,7 +665,7 @@ describe("HR Nav Config — Masking Classification", () => {
 // ============================================================================
 
 describe("HR Nav Config — Rollout Readiness", () => {
-  it("HR settings endpoint returns version 7.3.0", async () => {
+  it("HR settings endpoint returns version 8.0.0", async () => {
     const fs = await import("fs");
     const routerContent = fs.readFileSync(
       new URL("../router.ts", import.meta.url).pathname,

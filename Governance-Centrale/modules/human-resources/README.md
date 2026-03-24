@@ -13,7 +13,7 @@ This directory contains the governance documentation for the **Human Resources (
 | Frontend route prefix | `/hr/*` |
 | Backend domain path | `server/hr/` |
 | Database prefix | `hr_*` tables |
-| Current version | 7.3.0 |
+| Current version | 8.0.0 |
 | Governance model | AGENTS.md 5-agent orchestration |
 
 ## Current State
@@ -28,6 +28,8 @@ The HR module is in **production-ready** state with:
 - **4 field masking functions** protecting sensitive data
 - **Audit logging** on all mutations and sensitive reads
 - **Self-approval prevention** on critical workflows
+- **66 automated nav validation tests** covering structure, routes, visibility, scope, masking
+- **Rollout feature flags** (carbonSideNavRollout, navConfigValidation, backwardCompatAliases)
 
 ## Carbon SideNav Architecture
 
@@ -60,6 +62,8 @@ The HR module uses an IBM Carbon-inspired SideNav with **13 purpose-driven secti
 | [hr-nav-architecture.md](hr-nav-architecture.md) | Phase 1-4 | Carbon SideNav nav model, scope, masking, auth helpers |
 | [hr-phase2-section-landing-pages.md](hr-phase2-section-landing-pages.md) | Phase 2 | Section landing pages implementation record |
 | [hr-phase4-backend-expansion.md](hr-phase4-backend-expansion.md) | Phase 4 | Backend expansion (6 new capabilities) |
+| [hr-phase6-stabilization.md](hr-phase6-stabilization.md) | Phase 6/8 | Stabilization, testing, rollout readiness |
+| [CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md](CARBON_SIDENAV_ACCEPTANCE_SUMMARY.md) | Phase 8 | Final rollout acceptance status and gap summary |
 
 ## Related Documentation
 

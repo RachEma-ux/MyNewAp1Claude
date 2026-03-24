@@ -149,19 +149,21 @@ function Breadcrumb({ sectionLabel }: { sectionLabel: string }) {
 
 function ChildCard({ item }: { item: HrNavItem }) {
   const Icon = getIcon(item.iconHint);
-  const isLive = item.implementationStatus === "live" || item.implementationStatus === "placeholder";
+  const isLive = item.implementationStatus === "live";
+  const isPlaceholder = item.implementationStatus === "placeholder";
+  const isAccessible = isLive || isPlaceholder;
   const targetRoute = item.currentRoute ?? item.href;
 
-  if (!isLive) {
+  if (!isAccessible) {
     return (
-      <Card className="opacity-60 cursor-default">
+      <Card className="opacity-50 cursor-default border-dashed">
         <CardContent className="p-4 flex items-center gap-3">
           <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
             <Icon className="w-5 h-5 text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-sm">{item.label}</span>
+              <span className="font-medium text-sm text-muted-foreground">{item.label}</span>
               <Badge variant="outline" className="text-xs">Coming soon</Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.purpose}</p>
@@ -179,7 +181,12 @@ function ChildCard({ item }: { item: HrNavItem }) {
             <Icon className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-medium text-sm">{item.label}</div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm">{item.label}</span>
+              {isPlaceholder && (
+                <Badge variant="outline" className="text-xs">Preview</Badge>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.purpose}</p>
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -268,11 +275,16 @@ export default function HRSectionLandingPage({ sectionId }: HRSectionLandingPage
         </div>
       </div>
 
-      {/* Stats bar */}
+      {/* Stats bar with progress */}
       <div className="flex items-center gap-3 text-sm">
         <Badge variant="secondary">{liveCount} available</Badge>
         {plannedCount > 0 && (
           <Badge variant="outline">{plannedCount} planned</Badge>
+        )}
+        {visibleItems.length > 0 && (
+          <span className="text-xs text-muted-foreground">
+            {Math.round((liveCount / visibleItems.length) * 100)}% complete
+          </span>
         )}
       </div>
 

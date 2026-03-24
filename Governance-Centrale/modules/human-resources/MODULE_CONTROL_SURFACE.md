@@ -241,13 +241,11 @@ No existing routes have been removed or modified. All 29 original flat routes co
 
 ---
 
-## 7. Automated Test Surface (Phase 8)
+## 7. Automated Test Surface (Phase 6-8)
 
-### Source
+### Nav Validation Tests
 
 `server/hr/__tests__/hr-nav-validation.test.ts`
-
-### Test Groups
 
 | Group | Focus | Assertions |
 |---|---|---|
@@ -260,3 +258,20 @@ No existing routes have been removed or modified. All 29 original flat routes co
 | G | Masking classification | Per-role masking for compensation, relations, talent |
 | H | Rollout readiness | Feature flags, version, router composition |
 | I | Validation utility | Self-test of validateHrNavConfig() |
+
+### Final Acceptance Tests (Phase 8)
+
+`server/hr/__tests__/hr-phase8.test.ts`
+
+| Group | Focus | Assertions |
+|---|---|---|
+| A | Config-to-reality alignment | Live items have matching page files on disk |
+| B | Route compatibility | All 28 aliases valid, flat + section routes coexist |
+| C | Section visibility coherence | Every section has live children, admin sees all 13 |
+| D | Item visibility coherence | requiredAction exists in HR_ACTIONS, show-mode accessible to employee |
+| E | Deferred item consistency | 35 not-started items properly classified, no false currentComponent |
+| F | Rollout mechanism state | Feature flags, version, router namespace count |
+| G | Real surface verification | Page files exist on disk, HRSectionLandingPage exists |
+| H | Sensitive governance alignment | Sensitive items hide-if-no-access, masking functions exist |
+| I | Validator clean result | No errors, stats match expected counts |
+| J | Cross-phase permission coverage | All actions in admin role, self-service available to employee |
