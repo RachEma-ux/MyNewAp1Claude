@@ -20,6 +20,8 @@ import { logHrAudit, logSensitiveRead } from "../audit";
 import {
   checkHrAccess,
   requireHrPermission,
+  maskIncidentFields,
+  maskWorkPermitFields,
   HR_ACTIONS,
 } from "../permissions";
 
@@ -77,29 +79,31 @@ export const hrComplianceRouter = router({
       category: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.INCIDENT_READ);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.INCIDENT_READ, HR_ACTIONS.INCIDENT_MANAGE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.status) conditions.push(eq(hrIncidentReports.status, input.status));
       if (input.severity) conditions.push(eq(hrIncidentReports.severity, input.severity));
       if (input.category) conditions.push(eq(hrIncidentReports.category, input.category));
-      return db.select().from(hrIncidentReports)
+      const rows = await db.select().from(hrIncidentReports)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrIncidentReports.incidentDate))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compliance.incident", recordCount: rows.length });
+      return masked ? rows.map(r => maskIncidentFields(r as Record<string, unknown>)) : rows;
     }),
 
   getIncidentReport: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.INCIDENT_READ);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.INCIDENT_READ, HR_ACTIONS.INCIDENT_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrIncidentReports).where(eq(hrIncidentReports.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Incident report not found" });
-      await logSensitiveRead({ actorId: ctx.user.id, domain: "compliance.incident", entityId: input.id, fields: ["description", "rootCause", "correctiveAction"] });
-      return row;
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compliance.incident", recordCount: 1 });
+      return masked ? maskIncidentFields(row as Record<string, unknown>) : row;
     }),
 
   createIncidentReport: governedProcedure
@@ -360,7 +364,7 @@ export const hrComplianceRouter = router({
       permitType: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.COMPLIANCE_READ);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.COMPLIANCE_READ, HR_ACTIONS.COMPLIANCE_MANAGE);
       const db = getDb();
       if (!db) return [];
       const { hrWorkPermits } = await import("../../../drizzle/schema");
@@ -368,23 +372,25 @@ export const hrComplianceRouter = router({
       if (input.workerId) conditions.push(eq(hrWorkPermits.workerId, input.workerId));
       if (input.status) conditions.push(eq(hrWorkPermits.status, input.status));
       if (input.permitType) conditions.push(eq(hrWorkPermits.permitType, input.permitType));
-      return db.select().from(hrWorkPermits)
+      const rows = await db.select().from(hrWorkPermits)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrWorkPermits.expiryDate))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compliance.work_permit", recordCount: rows.length });
+      return masked ? rows.map(r => maskWorkPermitFields(r as Record<string, unknown>)) : rows;
     }),
 
   getWorkPermit: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.COMPLIANCE_READ);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.COMPLIANCE_READ, HR_ACTIONS.COMPLIANCE_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { hrWorkPermits } = await import("../../../drizzle/schema");
       const [row] = await db.select().from(hrWorkPermits).where(eq(hrWorkPermits.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Work permit not found" });
-      await logSensitiveRead({ actorId: ctx.user.id, domain: "compliance.work_permit", entityId: input.id, fields: ["permitNumber", "issuingAuthority"] });
-      return row;
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "compliance.work_permit", recordCount: 1 });
+      return masked ? maskWorkPermitFields(row as Record<string, unknown>) : row;
     }),
 
   createWorkPermit: governedProcedure

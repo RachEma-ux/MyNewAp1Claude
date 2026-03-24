@@ -132,6 +132,12 @@ const HRLettersCertificatesPage = lazy(() => import("@/pages/hr/HRLettersCertifi
 const HRRiskManagementPage = lazy(() => import("@/pages/hr/HRRiskManagementPage"));
 const HRAuditLogsPage = lazy(() => import("@/pages/hr/HRAuditLogsPage"));
 const HRAccessControlsPage = lazy(() => import("@/pages/hr/HRAccessControlsPage"));
+// HR Module — Phase 8: Role Definitions
+const HRRoleDefinitionsPage = lazy(() => import("@/pages/hr/HRRoleDefinitionsPage"));
+const HRRoleDefinitionDetailPage = lazy(() => import("@/pages/hr/HRRoleDefinitionDetailPage"));
+const HRRoleDefinitionEditPage = lazy(() => import("@/pages/hr/HRRoleDefinitionEditPage"));
+const HRRoleDefinitionReviewPage = lazy(() => import("@/pages/hr/HRRoleDefinitionReviewPage"));
+const HRRoleDefinitionComparePage = lazy(() => import("@/pages/hr/HRRoleDefinitionComparePage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
@@ -268,6 +274,25 @@ const HrLettersCertificatesGated = hrGated(HRLettersCertificatesPage, "hr.direct
 const HrRiskManagementGated = hrGated(HRRiskManagementPage, "hr.risk.read");
 const HrAuditLogsGated = hrGated(HRAuditLogsPage, "hr.analytics.manage");
 const HrAccessControlsGated = hrGated(HRAccessControlsPage, "hr.analytics.manage");
+// Employee self-service — gated by self-level HR permissions
+const HrDirectoryGated = hrGated(HRDirectoryPage, "hr.directory.read.self");
+const HrTimesheetGated = hrGated(HRTimesheetPage, "hr.time.read.self");
+const HrLeaveGated = hrGated(HRLeavePage, "hr.leave.read.self");
+const HrGoalsGated = hrGated(HRGoalsPage, "hr.performance.read.self");
+const HrPerformanceReviewsGated = hrGated(HRPerformanceReviewsPage, "hr.performance.read.self");
+const HrTrainingGated = hrGated(HRTrainingPage, "hr.learning.read.self");
+const HrCertificationsGated = hrGated(HRCertificationsPage, "hr.certification.read");
+const HrBenefitsGated = hrGated(HRBenefitsPage, "hr.benefits.read");
+const HrPoliciesGated = hrGated(HRPoliciesPage, "hr.policy.read");
+const HrSurveysGated = hrGated(HRSurveysPage, "hr.survey.read");
+const HrEngagementGated = hrGated(HREngagementPage, "hr.engagement.read");
+const HrSkillsGated = hrGated(HRSkillsPage, "hr.staffing.read");
+// Role Definitions — gated by role-def permissions
+const HrRoleDefinitionsGated = hrGated(HRRoleDefinitionsPage, "hr.roledef.read");
+const HrRoleDefinitionDetailGated = hrGated(HRRoleDefinitionDetailPage, "hr.roledef.read");
+const HrRoleDefinitionEditGated = hrGated(HRRoleDefinitionEditPage, "hr.roledef.draft");
+const HrRoleDefinitionReviewGated = hrGated(HRRoleDefinitionReviewPage, "hr.roledef.review");
+const HrRoleDefinitionCompareGated = hrGated(HRRoleDefinitionComparePage, "hr.roledef.read");
 
 function Router() {
   return (
@@ -293,19 +318,19 @@ function Router() {
       <Route path="/hr/analytics-reporting" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="analytics-reporting" />} />} />
       <Route path="/hr/security-access" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="security-access" />} />} />
       <Route path="/hr/compliance" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="compliance" />} />} />
-      {/* HR Module — Employee self-service (all authenticated users, existing flat routes preserved) */}
-      <Route path="/hr/directory" component={() => <ProtectedRoute component={HRDirectoryPage} />} />
-      <Route path="/hr/timesheet" component={() => <ProtectedRoute component={HRTimesheetPage} />} />
-      <Route path="/hr/leave" component={() => <ProtectedRoute component={HRLeavePage} />} />
-      <Route path="/hr/goals" component={() => <ProtectedRoute component={HRGoalsPage} />} />
-      <Route path="/hr/reviews" component={() => <ProtectedRoute component={HRPerformanceReviewsPage} />} />
-      <Route path="/hr/training" component={() => <ProtectedRoute component={HRTrainingPage} />} />
-      <Route path="/hr/certifications" component={() => <ProtectedRoute component={HRCertificationsPage} />} />
-      <Route path="/hr/benefits" component={() => <ProtectedRoute component={HRBenefitsPage} />} />
-      <Route path="/hr/policies" component={() => <ProtectedRoute component={HRPoliciesPage} />} />
-      <Route path="/hr/surveys" component={() => <ProtectedRoute component={HRSurveysPage} />} />
-      <Route path="/hr/engagement" component={() => <ProtectedRoute component={HREngagementPage} />} />
-      <Route path="/hr/skills" component={() => <ProtectedRoute component={HRSkillsPage} />} />
+      {/* HR Module — Employee self-service (role-gated with self-level permissions) */}
+      <Route path="/hr/directory" component={() => <ProtectedRoute component={HrDirectoryGated} />} />
+      <Route path="/hr/timesheet" component={() => <ProtectedRoute component={HrTimesheetGated} />} />
+      <Route path="/hr/leave" component={() => <ProtectedRoute component={HrLeaveGated} />} />
+      <Route path="/hr/goals" component={() => <ProtectedRoute component={HrGoalsGated} />} />
+      <Route path="/hr/reviews" component={() => <ProtectedRoute component={HrPerformanceReviewsGated} />} />
+      <Route path="/hr/training" component={() => <ProtectedRoute component={HrTrainingGated} />} />
+      <Route path="/hr/certifications" component={() => <ProtectedRoute component={HrCertificationsGated} />} />
+      <Route path="/hr/benefits" component={() => <ProtectedRoute component={HrBenefitsGated} />} />
+      <Route path="/hr/policies" component={() => <ProtectedRoute component={HrPoliciesGated} />} />
+      <Route path="/hr/surveys" component={() => <ProtectedRoute component={HrSurveysGated} />} />
+      <Route path="/hr/engagement" component={() => <ProtectedRoute component={HrEngagementGated} />} />
+      <Route path="/hr/skills" component={() => <ProtectedRoute component={HrSkillsGated} />} />
       {/* HR Module — Role-gated routes (require specific HR permissions) */}
       <Route path="/hr/organization" component={() => <ProtectedRoute component={HrOrganizationGated} />} />
       <Route path="/hr/positions" component={() => <ProtectedRoute component={HrPositionsGated} />} />
@@ -330,6 +355,14 @@ function Router() {
       <Route path="/hr/compliance/risk-management" component={() => <ProtectedRoute component={HrRiskManagementGated} />} />
       <Route path="/hr/security-access/audit-logs" component={() => <ProtectedRoute component={HrAuditLogsGated} />} />
       <Route path="/hr/security-access/access-controls" component={() => <ProtectedRoute component={HrAccessControlsGated} />} />
+
+      {/* HR Role Definitions */}
+      <Route path="/hr/role-definitions" component={() => <ProtectedRoute component={HrRoleDefinitionsGated} />} />
+      <Route path="/hr/role-definitions/new" component={() => <ProtectedRoute component={HrRoleDefinitionEditGated} />} />
+      <Route path="/hr/role-definitions/review" component={() => <ProtectedRoute component={HrRoleDefinitionReviewGated} />} />
+      <Route path="/hr/role-definitions/:id/compare" component={() => <ProtectedRoute component={HrRoleDefinitionCompareGated} />} />
+      <Route path="/hr/role-definitions/:id/edit" component={() => <ProtectedRoute component={HrRoleDefinitionEditGated} />} />
+      <Route path="/hr/role-definitions/:id" component={() => <ProtectedRoute component={HrRoleDefinitionDetailGated} />} />
       <Route path="/hr" component={() => <ProtectedRoute component={HRHomePage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />

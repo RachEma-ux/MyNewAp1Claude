@@ -23,6 +23,7 @@ import {
   preventSelfApproval,
   getWorkerIdForUser,
   resolveDataScope,
+  maskPerformanceFields,
   HR_ACTIONS,
 } from "../permissions";
 
@@ -205,11 +206,14 @@ export const hrPerformanceRouter = router({
         conditions.push(eq(hrGoals.workerId, scope.workerId));
       }
 
-      return db.select().from(hrGoals)
+      const rows = await db.select().from(hrGoals)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrGoals.createdAt))
         .limit(input.limit)
         .offset(input.offset);
+
+      // Employees reading own goals see full data; broader scope gets manager fields masked
+      return scope.scope === "self" ? rows : rows.map(r => maskPerformanceFields(r as Record<string, unknown>));
     }),
 
   getGoal: protectedProcedure
@@ -235,7 +239,7 @@ export const hrPerformanceRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this goal" });
       }
 
-      return row;
+      return scope.scope === "self" ? row : maskPerformanceFields(row as Record<string, unknown>);
     }),
 
   createGoal: governedProcedure
@@ -358,11 +362,14 @@ export const hrPerformanceRouter = router({
         conditions.push(eq(hrPerformanceReviews.workerId, scope.workerId));
       }
 
-      return db.select().from(hrPerformanceReviews)
+      const rows = await db.select().from(hrPerformanceReviews)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrPerformanceReviews.createdAt))
         .limit(input.limit)
         .offset(input.offset);
+
+      // Employees see own reviews unmasked; broader scope masks manager-only comments
+      return scope.scope === "self" ? rows : rows.map(r => maskPerformanceFields(r as Record<string, unknown>));
     }),
 
   getReview: protectedProcedure
@@ -388,7 +395,7 @@ export const hrPerformanceRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this review" });
       }
 
-      return row;
+      return scope.scope === "self" ? row : maskPerformanceFields(row as Record<string, unknown>);
     }),
 
   createReview: governedProcedure
@@ -541,6 +548,12 @@ export const hrPerformanceRouter = router({
       await db.update(hrPerformanceReviews).set(updates)
         .where(eq(hrPerformanceReviews.id, input.id));
 
+      await logHrAudit({
+        actorId: ctx.user.id,
+        targetWorkerId: current.workerId,
+        action: "hr.performance.review.status_change",
+        metadata: { reviewId: input.id, from: current.status, to: input.status },
+      });
       await logStatusChange({ actorId: ctx.user.id, targetWorkerId: current.workerId, domain: "performance.review", entityId: input.id, fromStatus: current.status, toStatus: input.status });
 
       return { success: true };

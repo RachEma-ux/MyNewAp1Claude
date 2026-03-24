@@ -255,6 +255,12 @@ export const hrLifecycleRouter = router({
       await db.update(hrOnboardingTasks).set(updates)
         .where(eq(hrOnboardingTasks.id, input.id));
 
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.onboarding.task.update",
+        metadata: { taskId: input.id, caseId: current.caseId, status: input.status },
+      });
+
       // Update completed task count on case
       if (input.status === "completed" || input.status === "skipped") {
         const [countRow] = await db
@@ -470,6 +476,12 @@ export const hrLifecycleRouter = router({
       await db.update(hrOffboardingTasks).set(updates)
         .where(eq(hrOffboardingTasks.id, input.id));
 
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.offboarding.task.update",
+        metadata: { taskId: input.id, caseId: current.caseId, status: input.status },
+      });
+
       // Update completed task count on case
       if (input.status === "completed" || input.status === "skipped") {
         const [countRow] = await db
@@ -525,6 +537,12 @@ export const hrLifecycleRouter = router({
         status: "pending",
       }).returning();
 
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.offboarding.knowledge_transfer.create",
+        metadata: { itemId: created.id, caseId: input.offboardingCaseId },
+      });
+
       return created;
     }),
 
@@ -546,6 +564,12 @@ export const hrLifecycleRouter = router({
 
       await db.update(hrKnowledgeTransferItems).set(setData)
         .where(eq(hrKnowledgeTransferItems.id, id));
+
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.offboarding.knowledge_transfer.update",
+        metadata: { itemId: id, status: input.status },
+      });
 
       return { success: true };
     }),
@@ -594,6 +618,13 @@ export const hrLifecycleRouter = router({
         status: "scheduled",
       }).returning();
 
+      await logHrAudit({
+        actorId: ctx.user.id,
+        targetWorkerId: input.workerId,
+        action: "hr.offboarding.exit_interview.create",
+        metadata: { interviewId: created.id, caseId: input.offboardingCaseId },
+      });
+
       return created;
     }),
 
@@ -617,6 +648,12 @@ export const hrLifecycleRouter = router({
 
       await db.update(hrExitInterviews).set(setData)
         .where(eq(hrExitInterviews.id, id));
+
+      await logHrAudit({
+        actorId: ctx.user.id,
+        action: "hr.offboarding.exit_interview.update",
+        metadata: { interviewId: id, status: input.status },
+      });
 
       return { success: true };
     }),

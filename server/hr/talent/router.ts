@@ -188,27 +188,30 @@ export const hrTalentRouter = router({
       criticality: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.SUCCESSION_READ);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.SUCCESSION_READ, HR_ACTIONS.SUCCESSION_MANAGE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.status) conditions.push(eq(hrSuccessionPlans.status, input.status));
       if (input.criticality) conditions.push(eq(hrSuccessionPlans.criticality, input.criticality));
-      return db.select().from(hrSuccessionPlans)
+      const rows = await db.select().from(hrSuccessionPlans)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrSuccessionPlans.createdAt))
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "succession", recordCount: rows.length });
+      return masked ? rows.map(r => maskTalentFields(r as Record<string, unknown>)) : rows;
     }),
 
   getSuccessionPlan: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.SUCCESSION_READ);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.SUCCESSION_READ, HR_ACTIONS.SUCCESSION_MANAGE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrSuccessionPlans).where(eq(hrSuccessionPlans.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Succession plan not found" });
-      return row;
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "succession", recordCount: 1 });
+      return masked ? maskTalentFields(row as Record<string, unknown>) : row;
     }),
 
   createSuccessionPlan: governedProcedure
@@ -263,17 +266,19 @@ export const hrTalentRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.SUCCESSION_READ);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.SUCCESSION_READ, HR_ACTIONS.SUCCESSION_MANAGE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.successionPlanId) conditions.push(eq(hrSuccessionCandidates.successionPlanId, input.successionPlanId));
       if (input.candidateWorkerId) conditions.push(eq(hrSuccessionCandidates.candidateWorkerId, input.candidateWorkerId));
       if (input.status) conditions.push(eq(hrSuccessionCandidates.status, input.status));
-      return db.select().from(hrSuccessionCandidates)
+      const rows = await db.select().from(hrSuccessionCandidates)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(hrSuccessionCandidates.priority)
         .limit(input.limit).offset(input.offset);
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "succession_candidate", recordCount: rows.length });
+      return masked ? rows.map(r => maskTalentFields(r as Record<string, unknown>)) : rows;
     }),
 
   createSuccessionCandidate: governedProcedure

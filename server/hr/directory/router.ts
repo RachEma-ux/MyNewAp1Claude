@@ -85,11 +85,36 @@ export const hrDirectoryRouter = router({
       limit: z.number().min(1).max(100).default(20),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
+      // Scope-aware: employee can search but only sees self, manager sees team, hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.DIRECTORY_READ,
+        HR_ACTIONS.DIRECTORY_READ_TEAM,
+        HR_ACTIONS.DIRECTORY_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
       const q = `%${input.query}%`;
+
+      const conditions: any[] = [
+        or(
+          ilike(hrPeople.displayName, q),
+          ilike(hrPeople.primaryEmail, q),
+          ilike(hrPeople.firstName, q),
+          ilike(hrPeople.lastName, q),
+          ilike(hrWorkerProfiles.employeeNumber, q),
+        ),
+      ];
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrWorkerProfiles.id, scope.workerId));
+      } else if (scope.scope === "team") {
+        conditions.push(sql`${hrWorkerProfiles.id} = ANY(${scope.workerIds})`);
+      }
 
       const rows = await db
         .select({
@@ -102,15 +127,7 @@ export const hrDirectoryRouter = router({
         })
         .from(hrWorkerProfiles)
         .innerJoin(hrPeople, eq(hrWorkerProfiles.personId, hrPeople.id))
-        .where(
-          or(
-            ilike(hrPeople.displayName, q),
-            ilike(hrPeople.primaryEmail, q),
-            ilike(hrPeople.firstName, q),
-            ilike(hrPeople.lastName, q),
-            ilike(hrWorkerProfiles.employeeNumber, q),
-          )
-        )
+        .where(and(...conditions))
         .limit(input.limit);
 
       return rows.map(maskDirectoryFields);
@@ -119,9 +136,25 @@ export const hrDirectoryRouter = router({
   getById: protectedProcedure
     .input(z.object({ workerId: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
+      // Scope-aware: employee can view self, manager sees team, hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.DIRECTORY_READ,
+        HR_ACTIONS.DIRECTORY_READ_TEAM,
+        HR_ACTIONS.DIRECTORY_READ_SELF,
+      );
+      if (scope.scope === "none") throw new TRPCError({ code: "FORBIDDEN", message: "HR permission denied: directory read" });
+
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Verify scope access
+      if (scope.scope === "self" && input.workerId !== scope.workerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this worker profile" });
+      }
+      if (scope.scope === "team" && !scope.workerIds.includes(input.workerId)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this worker profile" });
+      }
 
       const rows = await db
         .select({
@@ -292,7 +325,22 @@ export const hrDirectoryRouter = router({
   getAssignments: protectedProcedure
     .input(z.object({ workerId: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.DIRECTORY_READ,
+        HR_ACTIONS.DIRECTORY_READ_TEAM,
+        HR_ACTIONS.DIRECTORY_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
+      // Verify scope access
+      if (scope.scope === "self" && input.workerId !== scope.workerId) {
+        return [];
+      }
+      if (scope.scope === "team" && !scope.workerIds.includes(input.workerId)) {
+        return [];
+      }
+
       const db = getDb();
       if (!db) return [];
 
@@ -315,15 +363,29 @@ export const hrDirectoryRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.DIRECTORY_READ,
+        HR_ACTIONS.DIRECTORY_READ_TEAM,
+        HR_ACTIONS.DIRECTORY_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
       const { hrLetters } = await import("../../../drizzle/schema");
-      const conditions = [];
+      const conditions: any[] = [];
       if (input.workerId) conditions.push(eq(hrLetters.workerId, input.workerId));
       if (input.letterType) conditions.push(eq(hrLetters.letterType, input.letterType));
       if (input.status) conditions.push(eq(hrLetters.status, input.status));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrLetters.workerId, scope.workerId));
+      } else if (scope.scope === "team") {
+        conditions.push(sql`${hrLetters.workerId} = ANY(${scope.workerIds})`);
+      }
 
       return db.select().from(hrLetters)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -343,7 +405,7 @@ export const hrDirectoryRouter = router({
       const rows = await db.select().from(hrLetters).where(eq(hrLetters.id, input.id)).limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Letter not found" });
 
-      await logSensitiveRead(ctx.user.id, "hr.letter.read", { letterId: input.id });
+      await logSensitiveRead({ actorId: ctx.user.id, domain: "letter", recordCount: 1 });
       return rows[0];
     }),
 

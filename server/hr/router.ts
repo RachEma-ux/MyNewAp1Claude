@@ -16,7 +16,7 @@
 
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure, adminProcedure } from "../_core/trpc";
-import { getHrRoleForUser, HR_ROLE_PERMISSIONS, HR_ACTIONS } from "./permissions";
+import { getHrRoleForUser, HR_ROLE_PERMISSIONS, HR_ACTIONS, checkHrAccess } from "./permissions";
 import { hrDirectoryRouter } from "./directory/router";
 import { hrOrganizationRouter } from "./organization/router";
 import { hrStaffingRouter } from "./staffing/router";
@@ -31,6 +31,7 @@ import { hrEngagementRouter } from "./engagement/router";
 import { hrComplianceRouter } from "./compliance/router";
 import { hrAnalyticsRouter } from "./analytics/router";
 import { hrTalentRouter } from "./talent/router";
+import { hrRoleDefinitionRouter } from "./role-definitions/router";
 import { seedHrDemoData } from "./seed";
 
 /** Returns current user's HR role and allowed actions — used by frontend for navigation gating */
@@ -43,7 +44,10 @@ const hrMeRouter = router({
 });
 
 const hrSettingsRouter = router({
-  get: protectedProcedure.query(() => ({
+  get: protectedProcedure.query(async ({ ctx }) => {
+    // Any HR role can read module settings — permission check ensures HR access
+    await getHrRoleForUser(ctx.user);
+    return ({
     module: "hr",
     version: "9.0.0",
     features: {
@@ -87,8 +91,15 @@ const hrSettingsRouter = router({
       navHealthSummary: true,
       navObservability: true,
       deferredItemTracking: true,
+      // Phase 8 — Role Definitions
+      roleDefinitions: true,
+      roleDefVersioning: true,
+      roleDefVisibilityEnforcement: true,
+      roleDefPositionLinkage: true,
+      roleDefReviewWorkflow: true,
     },
-  })),
+  });
+  }),
   seedDemo: adminProcedure
     .input(z.object({ confirm: z.boolean().default(false) }).optional())
     .mutation(async ({ input }) => {
@@ -118,6 +129,8 @@ export const hrRouter = router({
   compliance: hrComplianceRouter,
   analytics: hrAnalyticsRouter,
   talent: hrTalentRouter,
+  // Role Definitions — Canonical versioned role-definition lifecycle
+  roleDefinitions: hrRoleDefinitionRouter,
   // Config
   settings: hrSettingsRouter,
   me: hrMeRouter,

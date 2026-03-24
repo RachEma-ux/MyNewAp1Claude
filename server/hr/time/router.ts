@@ -497,13 +497,26 @@ export const hrTimeRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.OVERTIME_READ);
+      // Scope-aware: employee sees own overtime, manager/hrbp/admin sees all
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.OVERTIME_READ,
+        undefined,
+        HR_ACTIONS.OVERTIME_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
-      const conditions = [];
+      const conditions: any[] = [];
       if (input.workerId) conditions.push(eq(hrOvertimeRequests.workerId, input.workerId));
       if (input.status) conditions.push(eq(hrOvertimeRequests.status, input.status));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrOvertimeRequests.workerId, scope.workerId));
+      }
 
       return db.select().from(hrOvertimeRequests)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -515,13 +528,26 @@ export const hrTimeRouter = router({
   getOvertimeRequest: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.OVERTIME_READ);
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.OVERTIME_READ,
+        undefined,
+        HR_ACTIONS.OVERTIME_READ_SELF,
+      );
+      if (scope.scope === "none") throw new TRPCError({ code: "FORBIDDEN", message: "HR permission denied: overtime read" });
+
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const [row] = await db.select().from(hrOvertimeRequests)
         .where(eq(hrOvertimeRequests.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Overtime request not found" });
+
+      // Verify scope access
+      if (scope.scope === "self" && row.workerId !== scope.workerId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied to this overtime request" });
+      }
+
       return row;
     }),
 
