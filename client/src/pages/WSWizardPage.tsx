@@ -1,13 +1,27 @@
 /**
- * WS Wizard — Staged workspace creation flow
+ * WS Wizard — Governance-First Workspace Intake Flow
  *
- * Manager stages: Identity → Purpose → Actors → Activities → Needs → save as draft
- * Admin stage: Configuration → save as ready_for_review
- * Governance: Review → Approve/Reject → Publish → Activate
+ * 10-step staged flow across three phases:
+ *
+ * Manager Phase (Steps 1–7):
+ *   1. Identity   — What is this workspace?
+ *   2. Purpose    — Why does it exist?
+ *   3. Anchor     — What is it organized around?
+ *   4. Scope      — What does that anchor specifically mean here?
+ *   5. Actors     — Who will participate? (Team from HR + Crew from Catalog)
+ *   6. Activities — How will work happen?
+ *   7. Needs      — What is needed to succeed?
+ *
+ * Admin Phase (Step 8):
+ *   8. Configuration — How should it be governed and configured?
+ *
+ * Governance Phase (Steps 9–10):
+ *   9.  Review Packet — Is this ready for review?
+ *   10. Promotion     — Can it be approved, published, and activated?
  */
 
-import { useState, useMemo } from "react";
-import { useLocation } from "wouter";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -39,43 +53,221 @@ import {
   Workflow,
   AlertCircle,
   Lock,
+  Anchor,
+  ScanSearch,
+  PackageCheck,
+  ArrowUpRight,
+  Layers,
+  ClipboardCheck,
 } from "lucide-react";
 import { CatalogAgentSelect, CatalogBotSelect } from "@/components/catalog-selectors";
 import { useCatalogAvailableAgents, useCatalogAvailableBots } from "@/hooks/useCatalogAvailable";
+import { DirectoryDropdown, type DirectoryEntry } from "@/components/DirectoryDropdown";
 
-type WizardStage =
+// ============================================================================
+// Step & Phase Definitions — Governance-First 10-Step Model
+// ============================================================================
+
+type WizardStep =
   | "identity"
   | "purpose"
+  | "anchor"
+  | "scopeDetails"
   | "actors"
   | "activities"
   | "needs"
   | "configuration"
-  | "review";
+  | "reviewPacket"
+  | "promotion";
 
-const MANAGER_STAGES: WizardStage[] = ["identity", "purpose", "actors", "activities", "needs"];
-const ADMIN_STAGES: WizardStage[] = ["configuration"];
-const GOVERNANCE_STAGES: WizardStage[] = ["review"];
-const ALL_STAGES: WizardStage[] = [...MANAGER_STAGES, ...ADMIN_STAGES, ...GOVERNANCE_STAGES];
+type WizardPhase = "manager" | "admin" | "governance";
 
-const STAGE_LABELS: Record<WizardStage, string> = {
-  identity: "Identity",
-  purpose: "Purpose",
-  actors: "Actors",
-  activities: "Activities",
-  needs: "Needs",
-  configuration: "Configuration",
-  review: "Review",
-};
+interface StepDef {
+  id: WizardStep;
+  stepNumber: number;
+  label: string;
+  phase: WizardPhase;
+  question: string;
+  governanceHint: string;
+}
 
-const STAGE_ICONS: Record<WizardStage, React.ReactNode> = {
+const STEPS: StepDef[] = [
+  // Manager Phase (1–7)
+  {
+    id: "identity",
+    stepNumber: 1,
+    label: "Identity",
+    phase: "manager",
+    question: "Define what this workspace is.",
+    governanceHint: "Creates the identifiable object to govern.",
+  },
+  {
+    id: "purpose",
+    stepNumber: 2,
+    label: "Purpose",
+    phase: "manager",
+    question: "Define why the workspace exists.",
+    governanceHint: "Proves the workspace is not an empty shell.",
+  },
+  {
+    id: "anchor",
+    stepNumber: 3,
+    label: "Creation Basis / Anchor",
+    phase: "manager",
+    question: "Define what the workspace is organized around.",
+    governanceHint: "Defines structural scope and future policy interpretation.",
+  },
+  {
+    id: "scopeDetails",
+    stepNumber: 4,
+    label: "Scope Details",
+    phase: "manager",
+    question: "Capture anchor-specific details.",
+    governanceHint: "Makes the structural anchor reviewable and enforceable.",
+  },
+  {
+    id: "actors",
+    stepNumber: 5,
+    label: "Actors",
+    phase: "manager",
+    question: "Define who participates.",
+    governanceHint: "Defines the participation boundary.",
+  },
+  {
+    id: "activities",
+    stepNumber: 6,
+    label: "Activities",
+    phase: "manager",
+    question: "Define how work happens here.",
+    governanceHint: "Helps determine configuration and compliance expectations.",
+  },
+  {
+    id: "needs",
+    stepNumber: 7,
+    label: "Needs",
+    phase: "manager",
+    question: "Define what users and agents need to succeed.",
+    governanceHint: "Handoff between business intent and governed enablement.",
+  },
+  // Admin Phase (8)
+  {
+    id: "configuration",
+    stepNumber: 8,
+    label: "Configuration",
+    phase: "admin",
+    question: "Translate manager intent into enforceable workspace behavior.",
+    governanceHint: "Where the workspace becomes policy-aware and reviewable.",
+  },
+  // Governance Phase (9–10)
+  {
+    id: "reviewPacket",
+    stepNumber: 9,
+    label: "Review Packet",
+    phase: "governance",
+    question: "Is this ready for review?",
+    governanceHint: "Creates the reviewable workspace dossier.",
+  },
+  {
+    id: "promotion",
+    stepNumber: 10,
+    label: "Promotion",
+    phase: "governance",
+    question: "Can it be approved, published, and activated?",
+    governanceHint: "Lifecycle control — not form filling.",
+  },
+];
+
+const MANAGER_STEPS = STEPS.filter((s) => s.phase === "manager");
+const ADMIN_STEPS = STEPS.filter((s) => s.phase === "admin");
+const GOVERNANCE_STEPS = STEPS.filter((s) => s.phase === "governance");
+
+const STEP_ICONS: Record<WizardStep, React.ReactNode> = {
   identity: <Sparkles className="h-4 w-4" />,
   purpose: <Target className="h-4 w-4" />,
+  anchor: <Anchor className="h-4 w-4" />,
+  scopeDetails: <ScanSearch className="h-4 w-4" />,
   actors: <Users className="h-4 w-4" />,
   activities: <Briefcase className="h-4 w-4" />,
-  needs: <Settings className="h-4 w-4" />,
+  needs: <Layers className="h-4 w-4" />,
   configuration: <Settings className="h-4 w-4" />,
-  review: <Shield className="h-4 w-4" />,
+  reviewPacket: <ClipboardCheck className="h-4 w-4" />,
+  promotion: <ArrowUpRight className="h-4 w-4" />,
 };
+
+const PHASE_LABELS: Record<WizardPhase, string> = {
+  manager: "Manager Phase",
+  admin: "Admin Phase",
+  governance: "Governance Phase",
+};
+
+// ============================================================================
+// Anchor Type Options — per governance-first spec
+// ============================================================================
+
+const ANCHOR_TYPES = [
+  { value: "per_project", label: "Per Project" },
+  { value: "per_employee_role", label: "Per Employee Role" },
+  { value: "per_hr_position", label: "Per HR Position" },
+  { value: "per_company_entity", label: "Per Company Entity" },
+  { value: "per_activity", label: "Per Activity" },
+  { value: "per_custom_factor", label: "Per Custom Factor" },
+  { value: "per_app_module", label: "Per App Module" },
+  { value: "per_function", label: "Per Function" },
+] as const;
+
+// ============================================================================
+// Purpose Type Options — expanded per governance spec
+// ============================================================================
+
+const PURPOSE_TYPES = [
+  { value: "goal", label: "Goal" },
+  { value: "mission", label: "Mission" },
+  { value: "project", label: "Project" },
+  { value: "team", label: "Team Activity" },
+  { value: "research", label: "Research Effort" },
+  { value: "operational", label: "Operational Function" },
+  { value: "other", label: "Other" },
+] as const;
+
+// ============================================================================
+// Activity Types — structured options per spec
+// ============================================================================
+
+const ACTIVITY_TYPES = [
+  "research", "delivery", "monitoring", "support", "analysis",
+  "controlled_operations", "development", "review", "planning",
+] as const;
+
+const OPERATING_MODES = [
+  { value: "collaborative", label: "Collaborative" },
+  { value: "autonomous", label: "Autonomous" },
+  { value: "supervised", label: "Supervised" },
+  { value: "hybrid", label: "Hybrid" },
+] as const;
+
+const EXECUTION_STYLES = [
+  { value: "manual", label: "Manual" },
+  { value: "semi_automated", label: "Semi-Automated" },
+  { value: "fully_automated", label: "Fully Automated" },
+] as const;
+
+// ============================================================================
+// Needs Categories — governance-first structured intake
+// ============================================================================
+
+const NEEDS_CATEGORIES = [
+  { key: "permissions", label: "Permissions", placeholder: "e.g., Write access to documents" },
+  { key: "information", label: "Information", placeholder: "e.g., Access to project specs" },
+  { key: "tools", label: "Tools", placeholder: "e.g., Vector DB, Code analyzer" },
+  { key: "agents", label: "Agents", placeholder: "e.g., Research assistant, Code reviewer" },
+  { key: "resources", label: "Resources", placeholder: "e.g., GPU allocation, Storage" },
+  { key: "visibility", label: "Visibility", placeholder: "e.g., Dashboard, Activity feed" },
+  { key: "context", label: "Context", placeholder: "e.g., Organization policies, Team structure" },
+] as const;
+
+// ============================================================================
+// Crew Roles & Types
+// ============================================================================
 
 type CrewParticipantType = "agent" | "bot";
 type CrewRole = "executor" | "analyst" | "reviewer" | "monitor" | "coordinator" | "advisor";
@@ -97,53 +289,257 @@ interface CrewEntry {
   note: string;
 }
 
+// ============================================================================
+// Team Member (HR Directory backed)
+// ============================================================================
+
+interface TeamMember {
+  workerId: number;
+  displayName: string;
+  role: "owner" | "manager" | "member" | "viewer";
+}
+
+// ============================================================================
+// WizardData — full governance-first data model
+// ============================================================================
+
 interface WizardData {
+  // Step 1: Identity
   name: string;
   description: string;
   type: string;
+  // Step 2: Purpose
   purposeType: string;
+  purposeStatement: string;
   purposeRef: string;
-  teamMembers: string[];
+  // Step 3: Anchor
+  anchorType: string;
+  // Step 4: Scope Details
+  anchorRef: string;
+  anchorLabel: string;
+  anchorMeta: Record<string, string>;
+  // Step 5: Actors — Team (HR Directory)
+  team: TeamMember[];
+  // Step 5: Actors — Crew (AI Catalog)
   crewAgents: CrewEntry[];
-  activities: string[];
-  needs: string[];
+  // Step 6: Activities (structured)
+  primaryActivityType: string;
+  secondaryActivityTypes: string[];
+  operatingMode: string;
+  executionStyle: string;
+  collaborationIntensity: string;
+  // Step 7: Needs (structured categories)
+  needs: Record<string, string[]>;
+  // Step 8: Configuration (admin)
+  enabledModules: string[];
+  routingProfile: string;
+  resourceProfile: string;
+  capabilityBundles: string[];
+  shellVisibility: string;
+  publicationConstraints: string;
   embeddingModel: string;
   chunkingStrategy: string;
 }
 
-export default function WSWizardPage() {
-  const [, navigate] = useLocation();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
-  const visibleStages = useMemo<WizardStage[]>(
-    () => isAdmin ? ALL_STAGES : MANAGER_STAGES,
-    [isAdmin]
-  );
-  const [currentStage, setCurrentStage] = useState<WizardStage>("identity");
-  const [draftId, setDraftId] = useState<number | null>(null);
-  const [data, setData] = useState<WizardData>({
+// ============================================================================
+// Default wizard data factory
+// ============================================================================
+
+function createDefaultWizardData(): WizardData {
+  return {
+    // Step 1: Identity
     name: "",
     description: "",
     type: "team",
+    // Step 2: Purpose
     purposeType: "project",
+    purposeStatement: "",
     purposeRef: "",
-    teamMembers: [],
+    // Step 3: Anchor
+    anchorType: "",
+    // Step 4: Scope Details
+    anchorRef: "",
+    anchorLabel: "",
+    anchorMeta: {},
+    // Step 5: Actors
+    team: [],
     crewAgents: [],
-    activities: [],
-    needs: [],
+    // Step 6: Activities
+    primaryActivityType: "",
+    secondaryActivityTypes: [],
+    operatingMode: "",
+    executionStyle: "",
+    collaborationIntensity: "",
+    // Step 7: Needs
+    needs: {},
+    // Step 8: Configuration
+    enabledModules: [],
+    routingProfile: "AUTO",
+    resourceProfile: "",
+    capabilityBundles: [],
+    shellVisibility: "public_internal",
+    publicationConstraints: "",
     embeddingModel: "bge-small-en-v1.5",
     chunkingStrategy: "semantic",
-  });
-  const [newActivity, setNewActivity] = useState("");
-  const [newNeed, setNewNeed] = useState("");
+  };
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
+export default function WSWizardPage() {
+  const [, navigate] = useLocation();
+  const params = useParams<{ id?: string }>();
+  const editId = params.id ? Number(params.id) : null;
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
+  // --- Visible steps based on role ---
+  const visibleSteps = useMemo<StepDef[]>(() => {
+    if (isAdmin) return STEPS;
+    return MANAGER_STEPS;
+  }, [isAdmin]);
+
+  // --- Wizard state ---
+  const [currentStepId, setCurrentStepId] = useState<WizardStep>("identity");
+  const [draftId, setDraftId] = useState<number | null>(editId);
+  const [data, setData] = useState<WizardData>(createDefaultWizardData);
+  const [hydrated, setHydrated] = useState(!editId); // true if no draft to load
+
+  // --- Load existing draft for resume ---
+  const draftQuery = trpc.workspaces.get.useQuery(
+    { id: editId! },
+    { enabled: !!editId && !hydrated },
+  );
+  const crewQuery = trpc.workspaces.crew.list.useQuery(
+    { workspaceId: editId! },
+    { enabled: !!editId && !hydrated },
+  );
+
+  useEffect(() => {
+    if (!editId || hydrated) return;
+    if (!draftQuery.data) return;
+
+    const ws = draftQuery.data as any;
+    const meta = (ws.wizardMeta || {}) as Record<string, any>;
+    const crewRows = (crewQuery.data || []) as Array<any>;
+
+    // Hydrate wizard data from workspace + wizardMeta + crew
+    setData({
+      // Step 1: Identity
+      name: ws.name || "",
+      description: ws.description || "",
+      type: ws.type || "team",
+      // Step 2: Purpose
+      purposeType: ws.purposeType || "project",
+      purposeStatement: meta.purposeStatement || "",
+      purposeRef: ws.purposeRef || "",
+      // Step 3: Anchor
+      anchorType: meta.anchorType || "",
+      // Step 4: Scope Details
+      anchorRef: meta.anchorRef || "",
+      anchorLabel: meta.anchorLabel || "",
+      anchorMeta: meta.anchorMeta || {},
+      // Step 5: Team (from wizardMeta — relational members are the source of truth but
+      //   we use wizardMeta for the wizard display since it has the role granularity)
+      team: (() => {
+        const t = meta.team || {};
+        const result: TeamMember[] = [];
+        if (t.owner) result.push({ workerId: t.owner.workerId, displayName: t.owner.displayName, role: "owner" });
+        for (const m of t.managers || []) result.push({ workerId: m.workerId, displayName: m.displayName, role: "manager" });
+        for (const m of t.members || []) result.push({ workerId: m.workerId, displayName: m.displayName, role: "member" });
+        for (const m of t.viewers || []) result.push({ workerId: m.workerId, displayName: m.displayName, role: "viewer" });
+        return result;
+      })(),
+      // Step 5: Crew (from relational table)
+      crewAgents: crewRows.map((c) => ({
+        participantType: (c.participantType || "agent") as CrewParticipantType,
+        participantId: String(c.agentId),
+        participantName: c.agentName || "",
+        crewRole: (c.role || "executor") as CrewRole,
+        note: c.note || "",
+      })),
+      // Step 6: Activities
+      primaryActivityType: meta.activities?.primaryType || "",
+      secondaryActivityTypes: meta.activities?.secondaryTypes || [],
+      operatingMode: meta.activities?.operatingMode || "",
+      executionStyle: meta.activities?.executionStyle || "",
+      collaborationIntensity: meta.activities?.collaborationIntensity || "",
+      // Step 7: Needs
+      needs: meta.needs || {},
+      // Step 8: Configuration
+      enabledModules: meta.configuration?.enabledModules || [],
+      routingProfile: meta.configuration?.routingProfile || "AUTO",
+      resourceProfile: meta.configuration?.resourceProfile || "",
+      capabilityBundles: meta.configuration?.capabilityBundles || [],
+      shellVisibility: meta.configuration?.shellVisibility || "public_internal",
+      publicationConstraints: meta.configuration?.publicationConstraints || "",
+      embeddingModel: ws.embeddingModel || "bge-small-en-v1.5",
+      chunkingStrategy: ws.chunkingStrategy || "semantic",
+    });
+
+    // Restore step position
+    const lastStep = meta.lastCompletedStep;
+    if (typeof lastStep === "number" && lastStep > 0) {
+      const targetStep = STEPS.find((s) => s.stepNumber === lastStep);
+      if (targetStep) setCurrentStepId(targetStep.id);
+    }
+
+    setDraftId(editId);
+    setHydrated(true);
+  }, [editId, hydrated, draftQuery.data, crewQuery.data]);
+
+  // --- Crew add-form state ---
   const [newCrewType, setNewCrewType] = useState<CrewParticipantType>("agent");
   const [newCrewId, setNewCrewId] = useState("");
   const [newCrewName, setNewCrewName] = useState("");
   const [newCrewRole, setNewCrewRole] = useState<CrewRole>("executor");
   const [newCrewNote, setNewCrewNote] = useState("");
 
+  // --- Needs add-form state (per category) ---
+  const [needsInput, setNeedsInput] = useState<Record<string, string>>({});
+
+  // --- Catalog hooks ---
   const { options: agentOptions } = useCatalogAvailableAgents();
   const { options: botOptions } = useCatalogAvailableBots();
+
+  // --- Navigation helpers ---
+  const currentStep = STEPS.find((s) => s.id === currentStepId)!;
+  const currentIndex = visibleSteps.findIndex((s) => s.id === currentStepId);
+  const isFirst = currentIndex === 0;
+  const isLast = currentIndex === visibleSteps.length - 1;
+  const isManagerFinal = currentStepId === "needs";
+  const isAdminFinal = currentStepId === "configuration";
+
+  // --- Step audit trail ---
+  const logStepMutation = trpc.workspaces.activity.logWizardStep.useMutation();
+
+  const goNext = () => {
+    if (currentIndex < visibleSteps.length - 1) {
+      // Log step completion for audit trail (fire-and-forget)
+      if (draftId) {
+        logStepMutation.mutate({
+          workspaceId: draftId,
+          stepNumber: currentStep.stepNumber,
+          stepId: currentStep.id,
+          phase: currentStep.phase,
+        });
+      }
+      setCurrentStepId(visibleSteps[currentIndex + 1].id);
+    }
+  };
+
+  const goPrev = () => {
+    if (currentIndex > 0) {
+      setCurrentStepId(visibleSteps[currentIndex - 1].id);
+    }
+  };
+
+  // --- Data helpers ---
+  const updateData = (partial: Partial<WizardData>) => {
+    setData((prev) => ({ ...prev, ...partial }));
+  };
 
   const handleCrewSelect = (id: string) => {
     setNewCrewId(id);
@@ -151,6 +547,96 @@ export default function WSWizardPage() {
     const match = opts.find((o) => String(o.id) === id);
     setNewCrewName(match?.label || "");
   };
+
+  const addCrewMember = () => {
+    if (!newCrewId) {
+      toast.error(`Select ${newCrewType === "agent" ? "an Agent" : "a Bot"} from the catalog`);
+      return;
+    }
+    if (data.crewAgents.some((c) => c.participantId === newCrewId && c.participantType === newCrewType)) {
+      toast.error("This participant is already in the crew");
+      return;
+    }
+    updateData({
+      crewAgents: [...data.crewAgents, {
+        participantType: newCrewType,
+        participantId: newCrewId,
+        participantName: newCrewName,
+        crewRole: newCrewRole,
+        note: newCrewNote,
+      }],
+    });
+    setNewCrewId("");
+    setNewCrewName("");
+    setNewCrewRole("executor");
+    setNewCrewNote("");
+  };
+
+  const removeCrewMember = (index: number) => {
+    updateData({ crewAgents: data.crewAgents.filter((_, i) => i !== index) });
+  };
+
+  const addTeamMember = (entry: DirectoryEntry, role: TeamMember["role"]) => {
+    if (data.team.some((t) => t.workerId === entry.workerId)) {
+      toast.error("This person is already on the team");
+      return;
+    }
+    updateData({
+      team: [...data.team, { workerId: entry.workerId, displayName: entry.displayName, role }],
+    });
+  };
+
+  const removeTeamMember = (index: number) => {
+    updateData({ team: data.team.filter((_, i) => i !== index) });
+  };
+
+  const addNeedItem = (category: string) => {
+    const val = (needsInput[category] || "").trim();
+    if (!val) return;
+    const current = data.needs[category] || [];
+    updateData({ needs: { ...data.needs, [category]: [...current, val] } });
+    setNeedsInput((prev) => ({ ...prev, [category]: "" }));
+  };
+
+  const removeNeedItem = (category: string, index: number) => {
+    const current = data.needs[category] || [];
+    updateData({ needs: { ...data.needs, [category]: current.filter((_, i) => i !== index) } });
+  };
+
+  // --- Build wizardMeta payload for server ---
+  const buildWizardMeta = () => ({
+    purposeStatement: data.purposeStatement,
+    anchorType: data.anchorType,
+    anchorRef: data.anchorRef,
+    anchorLabel: data.anchorLabel,
+    anchorMeta: data.anchorMeta,
+    team: {
+      owner: data.team.find((t) => t.role === "owner")
+        ? { workerId: data.team.find((t) => t.role === "owner")!.workerId, displayName: data.team.find((t) => t.role === "owner")!.displayName }
+        : undefined,
+      managers: data.team.filter((t) => t.role === "manager").map((t) => ({ workerId: t.workerId, displayName: t.displayName })),
+      members: data.team.filter((t) => t.role === "member").map((t) => ({ workerId: t.workerId, displayName: t.displayName })),
+      viewers: data.team.filter((t) => t.role === "viewer").map((t) => ({ workerId: t.workerId, displayName: t.displayName })),
+    },
+    activities: {
+      primaryType: data.primaryActivityType,
+      secondaryTypes: data.secondaryActivityTypes,
+      operatingMode: data.operatingMode,
+      executionStyle: data.executionStyle,
+      collaborationIntensity: data.collaborationIntensity,
+    },
+    needs: data.needs,
+    configuration: {
+      enabledModules: data.enabledModules,
+      routingProfile: data.routingProfile,
+      resourceProfile: data.resourceProfile,
+      capabilityBundles: data.capabilityBundles,
+      shellVisibility: data.shellVisibility,
+      publicationConstraints: data.publicationConstraints,
+    },
+    lastCompletedStep: currentStep.stepNumber,
+    wizardPhase: currentStep.phase,
+  });
 
   const buildCrewPayload = () =>
     data.crewAgents.length > 0
@@ -163,6 +649,7 @@ export default function WSWizardPage() {
         }))
       : undefined;
 
+  // --- Mutations ---
   const createMutation = trpc.workspaces.createDraft.useMutation({
     onSuccess: (ws: any) => {
       setDraftId(ws.id);
@@ -172,9 +659,7 @@ export default function WSWizardPage() {
   });
 
   const updateMutation = trpc.workspaces.updateDraft.useMutation({
-    onSuccess: () => {
-      toast.success("Draft saved");
-    },
+    onSuccess: () => toast.success("Draft saved"),
     onError: (err) => toast.error(err.message),
   });
 
@@ -182,7 +667,7 @@ export default function WSWizardPage() {
     onSuccess: (ws: any) => {
       setDraftId(ws.id);
       toast.success("Workspace submitted for review");
-      navigate(`/ws/list`);
+      navigate("/ws/list");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -190,7 +675,7 @@ export default function WSWizardPage() {
   const submitForReviewMutation = trpc.workspaces.submitForReview.useMutation({
     onSuccess: () => {
       toast.success("Workspace submitted for review");
-      navigate(`/ws/list`);
+      navigate("/ws/list");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -198,29 +683,14 @@ export default function WSWizardPage() {
   const isSaving = createMutation.isPending || updateMutation.isPending
     || createAndSubmitMutation.isPending || submitForReviewMutation.isPending;
 
-  const currentIndex = visibleStages.indexOf(currentStage);
-  const isFirst = currentIndex === 0;
-  const isLast = currentIndex === visibleStages.length - 1;
-
-  const goNext = () => {
-    if (currentIndex < visibleStages.length - 1) {
-      setCurrentStage(visibleStages[currentIndex + 1]);
-    }
-  };
-
-  const goPrev = () => {
-    if (currentIndex > 0) {
-      setCurrentStage(visibleStages[currentIndex - 1]);
-    }
-  };
-
+  // --- Save actions ---
   const saveDraft = () => {
     if (!data.name.trim()) {
       toast.error("Workspace name is required");
       return;
     }
+    const wizardMeta = buildWizardMeta();
     if (draftId) {
-      // Update existing draft
       updateMutation.mutate({
         id: draftId,
         name: data.name,
@@ -231,9 +701,9 @@ export default function WSWizardPage() {
         embeddingModel: data.embeddingModel,
         chunkingStrategy: data.chunkingStrategy as any,
         crew: buildCrewPayload(),
+        wizardMeta,
       });
     } else {
-      // Create new draft
       createMutation.mutate({
         name: data.name,
         description: data.description,
@@ -241,6 +711,7 @@ export default function WSWizardPage() {
         purposeType: data.purposeType as any,
         purposeRef: data.purposeRef,
         crew: buildCrewPayload(),
+        wizardMeta,
       });
     }
   };
@@ -250,8 +721,8 @@ export default function WSWizardPage() {
       toast.error("Workspace name is required");
       return;
     }
+    const wizardMeta = buildWizardMeta();
     if (draftId) {
-      // Update existing draft then submit for review
       updateMutation.mutate({
         id: draftId,
         name: data.name,
@@ -262,13 +733,13 @@ export default function WSWizardPage() {
         embeddingModel: data.embeddingModel,
         chunkingStrategy: data.chunkingStrategy as any,
         crew: buildCrewPayload(),
+        wizardMeta,
       }, {
         onSuccess: () => {
           submitForReviewMutation.mutate({ id: draftId! });
         },
       });
     } else {
-      // Create draft and submit in one action
       createAndSubmitMutation.mutate({
         name: data.name,
         description: data.description,
@@ -276,88 +747,203 @@ export default function WSWizardPage() {
         purposeType: data.purposeType as any,
         purposeRef: data.purposeRef,
         crew: buildCrewPayload(),
+        wizardMeta,
         submitForReview: true,
       });
     }
   };
 
-  const getStagePhase = (stage: WizardStage): string => {
-    if (MANAGER_STAGES.includes(stage)) return "Manager";
-    if (ADMIN_STAGES.includes(stage)) return "Admin";
-    return "Governance";
-  };
-
   return (
-    <PageShell title="Workspace Wizard" subtitle="Create a new workspace through the guided flow">
-      {/* Progress bar */}
-      <div className="flex items-center gap-1 mb-6 overflow-x-auto pb-2">
-        {visibleStages.map((stage, i) => {
-          const isActive = stage === currentStage;
-          const isPast = i < currentIndex;
-          return (
-            <button
-              key={stage}
-              onClick={() => setCurrentStage(stage)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : isPast
-                  ? "bg-primary/20 text-primary"
-                  : "bg-muted text-muted-foreground"
-              }`}
+    <PageShell title="Workspace Wizard" subtitle="Governance-first intake, configuration, review & promotion">
+      {/* ================================================================ */}
+      {/* TOP HEADER — Always visible: name, status, phase, owner          */}
+      {/* ================================================================ */}
+      <div className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 mb-4">
+        <div className="flex items-center gap-3">
+          <div>
+            <h2 className="text-base font-semibold">
+              {data.name || "New Workspace"}
+            </h2>
+            {data.purposeStatement && (
+              <p className="text-xs text-muted-foreground truncate max-w-[300px]">{data.purposeStatement}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">draft</Badge>
+          <Badge variant="secondary">{PHASE_LABELS[currentStep.phase]}</Badge>
+          {user?.name && (
+            <span className="text-xs text-muted-foreground">Owner: {user.name}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ================================================================ */}
+      {/* 3-COLUMN LAYOUT: Left Rail | Main Canvas | Right Panel           */}
+      {/* ================================================================ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_260px] gap-4">
+
+        {/* ============================================================== */}
+        {/* LEFT PHASE RAIL — grouped by phase, shows completion/lock       */}
+        {/* ============================================================== */}
+        <nav className="space-y-4 hidden lg:block">
+          {/* Manager Phase */}
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 px-1">Manager Phase</p>
+            <div className="space-y-0.5">
+              {MANAGER_STEPS.map((step) => {
+                const isActive = step.id === currentStepId;
+                const stepIdx = visibleSteps.findIndex((s) => s.id === step.id);
+                const isPast = stepIdx >= 0 && stepIdx < currentIndex;
+                const isAccessible = stepIdx >= 0;
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => isAccessible && setCurrentStepId(step.id)}
+                    disabled={!isAccessible}
+                    className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                      isActive
+                        ? "bg-primary text-primary-foreground font-medium"
+                        : isPast
+                        ? "text-primary bg-primary/10"
+                        : isAccessible
+                        ? "text-muted-foreground hover:bg-muted/50"
+                        : "text-muted-foreground/40 cursor-not-allowed"
+                    }`}
+                  >
+                    {isPast ? <Check className="h-3 w-3 shrink-0" /> : STEP_ICONS[step.id]}
+                    <span className="truncate">{step.stepNumber}. {step.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Admin Phase */}
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 px-1">Admin Phase</p>
+            <div className="space-y-0.5">
+              {ADMIN_STEPS.map((step) => {
+                const isActive = step.id === currentStepId;
+                const stepIdx = visibleSteps.findIndex((s) => s.id === step.id);
+                const isPast = stepIdx >= 0 && stepIdx < currentIndex;
+                const isLocked = !isAdmin;
+                const isAccessible = stepIdx >= 0 && !isLocked;
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => isAccessible && setCurrentStepId(step.id)}
+                    disabled={!isAccessible}
+                    className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                      isLocked
+                        ? "text-muted-foreground/40 cursor-not-allowed"
+                        : isActive
+                        ? "bg-primary text-primary-foreground font-medium"
+                        : isPast
+                        ? "text-primary bg-primary/10"
+                        : "text-muted-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {isLocked ? <Lock className="h-3 w-3 shrink-0" /> : isPast ? <Check className="h-3 w-3 shrink-0" /> : STEP_ICONS[step.id]}
+                    <span className="truncate">{step.stepNumber}. {step.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Governance Phase */}
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 px-1">Governance Phase</p>
+            <div className="space-y-0.5">
+              {GOVERNANCE_STEPS.map((step) => {
+                const isActive = step.id === currentStepId;
+                const stepIdx = visibleSteps.findIndex((s) => s.id === step.id);
+                const isPast = stepIdx >= 0 && stepIdx < currentIndex;
+                const isLocked = !isAdmin;
+                const isAccessible = stepIdx >= 0 && !isLocked;
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => isAccessible && setCurrentStepId(step.id)}
+                    disabled={!isAccessible}
+                    className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                      isLocked
+                        ? "text-muted-foreground/40 cursor-not-allowed"
+                        : isActive
+                        ? "bg-primary text-primary-foreground font-medium"
+                        : isPast
+                        ? "text-primary bg-primary/10"
+                        : "text-muted-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {isLocked ? <Lock className="h-3 w-3 shrink-0" /> : isPast ? <Check className="h-3 w-3 shrink-0" /> : STEP_ICONS[step.id]}
+                    <span className="truncate">{step.stepNumber}. {step.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </nav>
+
+        {/* ============================================================== */}
+        {/* MOBILE STEP BAR — horizontal pills (visible on small screens)   */}
+        {/* ============================================================== */}
+        <div className="lg:hidden flex items-center gap-1 mb-2 overflow-x-auto pb-2 col-span-full">
+          {visibleSteps.map((step, i) => {
+            const isActive = step.id === currentStepId;
+            const isPast = i < currentIndex;
+            return (
+              <button
+                key={step.id}
+                onClick={() => setCurrentStepId(step.id)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors ${
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : isPast
+                    ? "bg-primary/20 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {isPast ? <Check className="h-3 w-3" /> : STEP_ICONS[step.id]}
+                {step.stepNumber}
+              </button>
+            );
+          })}
+          {!isAdmin && [...ADMIN_STEPS, ...GOVERNANCE_STEPS].map((step) => (
+            <span
+              key={step.id}
+              className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] whitespace-nowrap bg-muted/50 text-muted-foreground/40 cursor-not-allowed"
             >
-              {isPast ? <Check className="h-3 w-3" /> : STAGE_ICONS[stage]}
-              {STAGE_LABELS[stage]}
-            </button>
-          );
-        })}
-        {/* Show locked admin/governance stages to non-admin users */}
-        {!isAdmin && [...ADMIN_STAGES, ...GOVERNANCE_STAGES].map((stage) => (
-          <span
-            key={stage}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-muted/50 text-muted-foreground/50 cursor-not-allowed"
-            title={`${STAGE_LABELS[stage]} — Admin only`}
-          >
-            <Lock className="h-3 w-3" />
-            {STAGE_LABELS[stage]}
-          </span>
-        ))}
-      </div>
+              <Lock className="h-3 w-3" />{step.stepNumber}
+            </span>
+          ))}
+        </div>
 
-      <div className="flex items-center gap-2 mb-4">
-        <Badge variant="outline">{getStagePhase(currentStage)} Phase</Badge>
-        <span className="text-sm text-muted-foreground">
-          Step {currentIndex + 1} of {visibleStages.length}
-          {!isAdmin && <span className="text-muted-foreground/60"> (Manager)</span>}
-        </span>
-      </div>
-
-      {/* Stage content */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {STAGE_ICONS[currentStage]}
-            {STAGE_LABELS[currentStage]}
-          </CardTitle>
-          <CardDescription>
-            {currentStage === "identity" && "Define the workspace identity — name, description, type."}
-            {currentStage === "purpose" && "What is this workspace for? Define its purpose."}
-            {currentStage === "actors" && "Who will participate? Define team members and AI crew."}
-            {currentStage === "activities" && "What activities will take place in this workspace?"}
-            {currentStage === "needs" && "What resources and tools does this workspace need?"}
-            {currentStage === "configuration" && "Administrative configuration for governance readiness."}
-            {currentStage === "review" && "Review the workspace definition before submission."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Identity Stage */}
-          {currentStage === "identity" && (
+        {/* ============================================================== */}
+        {/* MAIN FORM CANVAS                                                */}
+        {/* ============================================================== */}
+        <div>
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                {STEP_ICONS[currentStepId]}
+                {currentStep.label}
+              </CardTitle>
+              <CardDescription>{currentStep.question}</CardDescription>
+              <p className="text-[11px] text-muted-foreground/70 italic mt-1">
+                Governance: {currentStep.governanceHint}
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+          {/* ======== Step 1: Identity ======== */}
+          {currentStepId === "identity" && (
             <>
               <div>
                 <label className="text-sm font-medium mb-1 block">Workspace Name *</label>
                 <Input
                   value={data.name}
-                  onChange={(e) => setData({ ...data, name: e.target.value })}
+                  onChange={(e) => updateData({ name: e.target.value })}
                   placeholder="My Workspace"
                 />
               </div>
@@ -365,14 +951,14 @@ export default function WSWizardPage() {
                 <label className="text-sm font-medium mb-1 block">Description</label>
                 <Textarea
                   value={data.description}
-                  onChange={(e) => setData({ ...data, description: e.target.value })}
-                  placeholder="What is this workspace about?"
+                  onChange={(e) => updateData({ description: e.target.value })}
+                  placeholder="What is this workspace about? This should make it easy to review later."
                   rows={3}
                 />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Workspace Type</label>
-                <Select value={data.type} onValueChange={(v) => setData({ ...data, type: v })}>
+                <Select value={data.type} onValueChange={(v) => updateData({ type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="personal">Personal</SelectItem>
@@ -387,54 +973,328 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* Purpose Stage */}
-          {currentStage === "purpose" && (
+          {/* ======== Step 2: Purpose ======== */}
+          {currentStepId === "purpose" && (
             <>
               <div>
-                <label className="text-sm font-medium mb-1 block">Purpose Type</label>
-                <Select value={data.purposeType} onValueChange={(v) => setData({ ...data, purposeType: v })}>
+                <label className="text-sm font-medium mb-1 block">Purpose Type *</label>
+                <Select value={data.purposeType} onValueChange={(v) => updateData({ purposeType: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="goal">Goal</SelectItem>
-                    <SelectItem value="mission">Mission</SelectItem>
-                    <SelectItem value="project">Project</SelectItem>
-                    <SelectItem value="team">Team Activity</SelectItem>
-                    <SelectItem value="strategy">Strategy</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {PURPOSE_TYPES.map((pt) => (
+                      <SelectItem key={pt.value} value={pt.value}>{pt.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium mb-1 block">Purpose Reference</label>
+                <label className="text-sm font-medium mb-1 block">Purpose Statement *</label>
+                <Textarea
+                  value={data.purposeStatement}
+                  onChange={(e) => updateData({ purposeStatement: e.target.value })}
+                  placeholder="Why does this workspace exist? Describe its reason for being."
+                  rows={3}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Purpose is the reason the workspace exists. It is not the same as the structural anchor.
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Purpose Reference (optional)</label>
                 <Input
                   value={data.purposeRef}
-                  onChange={(e) => setData({ ...data, purposeRef: e.target.value })}
-                  placeholder="e.g., project name, goal description, mission statement"
+                  onChange={(e) => updateData({ purposeRef: e.target.value })}
+                  placeholder="e.g., link to project brief, goal doc, or strategy reference"
                 />
               </div>
             </>
           )}
 
-          {/* Actors Stage */}
-          {currentStage === "actors" && (
+          {/* ======== Step 3: Creation Basis / Anchor ======== */}
+          {currentStepId === "anchor" && (
             <>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Anchor Type *</label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  What is this workspace organized around? This is different from its purpose.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {ANCHOR_TYPES.map((at) => (
+                    <button
+                      key={at.value}
+                      onClick={() => updateData({ anchorType: at.value, anchorRef: "", anchorLabel: "", anchorMeta: {} })}
+                      className={`text-left px-3 py-2.5 rounded-md border text-sm transition-colors ${
+                        data.anchorType === at.value
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      {at.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {data.anchorType && (
+                <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                  <AlertCircle className="h-3.5 w-3.5 inline mr-1" />
+                  Selected: <strong>{ANCHOR_TYPES.find((a) => a.value === data.anchorType)?.label}</strong>
+                  {" "}— scope details will be captured in the next step.
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ======== Step 4: Scope Details (dynamic based on anchor) ======== */}
+          {currentStepId === "scopeDetails" && (
+            <>
+              {!data.anchorType ? (
+                <div className="flex items-start gap-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>No anchor type selected. Go back to Step 3 to choose one.</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Provide details for anchor: <strong>{ANCHOR_TYPES.find((a) => a.value === data.anchorType)?.label}</strong>
+                  </p>
+
+                  {/* Per Project */}
+                  {data.anchorType === "per_project" && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Project Reference *</label>
+                        <Input
+                          value={data.anchorRef}
+                          onChange={(e) => updateData({ anchorRef: e.target.value })}
+                          placeholder="Project ID or reference"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Project Name</label>
+                        <Input
+                          value={data.anchorLabel}
+                          onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                          placeholder="Human-readable project name"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Per Employee Role */}
+                  {data.anchorType === "per_employee_role" && (
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Role Name *</label>
+                      <Input
+                        value={data.anchorLabel}
+                        onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                        placeholder="e.g., Senior Analyst, Lead Developer"
+                      />
+                    </div>
+                  )}
+
+                  {/* Per HR Position */}
+                  {data.anchorType === "per_hr_position" && (
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">HR Position *</label>
+                      <Input
+                        value={data.anchorLabel}
+                        onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                        placeholder="Position title from HR system"
+                      />
+                    </div>
+                  )}
+
+                  {/* Per Company Entity */}
+                  {data.anchorType === "per_company_entity" && (
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Entity Name *</label>
+                      <Input
+                        value={data.anchorLabel}
+                        onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                        placeholder="e.g., Legal Division, R&D Department"
+                      />
+                    </div>
+                  )}
+
+                  {/* Per Activity */}
+                  {data.anchorType === "per_activity" && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Activity Type *</label>
+                        <Input
+                          value={data.anchorLabel}
+                          onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                          placeholder="e.g., Compliance Review, Data Analysis"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Operational Area</label>
+                        <Input
+                          value={data.anchorRef}
+                          onChange={(e) => updateData({ anchorRef: e.target.value })}
+                          placeholder="e.g., Finance, Engineering"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Per Custom Factor */}
+                  {data.anchorType === "per_custom_factor" && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Custom Label *</label>
+                        <Input
+                          value={data.anchorLabel}
+                          onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                          placeholder="Label for this organizing factor"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Custom Value *</label>
+                        <Input
+                          value={data.anchorRef}
+                          onChange={(e) => updateData({ anchorRef: e.target.value })}
+                          placeholder="Value or identifier"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Explanation</label>
+                        <Textarea
+                          value={data.anchorMeta.explanation || ""}
+                          onChange={(e) => updateData({ anchorMeta: { ...data.anchorMeta, explanation: e.target.value } })}
+                          placeholder="Why is this the right organizing factor?"
+                          rows={2}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Per App Module */}
+                  {data.anchorType === "per_app_module" && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Module Name *</label>
+                        <Input
+                          value={data.anchorLabel}
+                          onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                          placeholder="e.g., Chat, Documents, Agents"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Module Preset Rationale</label>
+                        <Input
+                          value={data.anchorRef}
+                          onChange={(e) => updateData({ anchorRef: e.target.value })}
+                          placeholder="Why this module is the anchor"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Per Function */}
+                  {data.anchorType === "per_function" && (
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Function Name *</label>
+                      <Input
+                        value={data.anchorLabel}
+                        onChange={(e) => updateData({ anchorLabel: e.target.value })}
+                        placeholder="e.g., Risk Management, Talent Acquisition"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* ======== Step 5: Actors (Team + Crew) ======== */}
+          {currentStepId === "actors" && (
+            <>
+              {/* ---- Team (Human Participants — HR Directory) ---- */}
               <div>
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
                   <Users className="h-4 w-4" /> Team (Human Participants)
                 </h4>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Team members can be added after workspace creation from the workspace shell.
+                <p className="text-xs text-muted-foreground mb-3">
+                  Select team members from the HR Directory. Only active employees are available.
                 </p>
+
+                {/* Add team member form */}
+                <div className="space-y-3 rounded-md border p-3 mb-3">
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Select Employee</label>
+                    <DirectoryDropdown
+                      statusFilter="active"
+                      placeholder="Search HR Directory..."
+                      onSelect={(entry) => addTeamMember(entry, "member")}
+                      className="w-full"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Adds as Member by default. Change role after adding.
+                  </p>
+                </div>
+
+                {/* Team list */}
+                {data.team.length === 0 ? (
+                  <div className="flex items-start gap-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>No team members added yet. Use the HR Directory picker above.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {data.team.map((member, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm py-1.5 px-2 rounded hover:bg-muted/50">
+                        <Users className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="truncate">{member.displayName}</span>
+                        <Select
+                          value={member.role}
+                          onValueChange={(v) => {
+                            const updated = [...data.team];
+                            updated[i] = { ...updated[i], role: v as TeamMember["role"] };
+                            updateData({ team: updated });
+                          }}
+                        >
+                          <SelectTrigger className="h-6 w-[100px] text-[10px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="owner">Owner</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="member">Member</SelectItem>
+                            <SelectItem value="viewer">Viewer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <button
+                          className="text-xs text-destructive ml-auto shrink-0"
+                          onClick={() => removeTeamMember(i)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Owner warning */}
+                {data.team.length > 0 && !data.team.some((t) => t.role === "owner") && (
+                  <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-600">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    No owner assigned. Set one team member's role to Owner.
+                  </div>
+                )}
               </div>
-              <div>
+
+              {/* ---- Crew (AI Participants — Catalog-backed) ---- */}
+              <div className="mt-6 pt-4 border-t">
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
                   <Bot className="h-4 w-4" /> Crew (AI Participants)
                 </h4>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Select AI participants from your governed catalog. Only Agents and Bots that have been approved and activated in AI Types are available.
+                  Select AI participants from the governed catalog. Only approved and activated Agents/Bots are available.
                 </p>
 
-                {/* Step 1: Participant Type */}
+                {/* Add crew member form */}
                 <div className="space-y-3 rounded-md border p-3 mb-3">
                   <div>
                     <label className="text-xs font-medium mb-1 block">AI Participant Type</label>
@@ -456,7 +1316,6 @@ export default function WSWizardPage() {
                     </div>
                   </div>
 
-                  {/* Step 2: Catalog-backed selection */}
                   <div>
                     <label className="text-xs font-medium mb-1 block">
                       {newCrewType === "agent" ? "Select Agent" : "Select Bot"}
@@ -476,7 +1335,6 @@ export default function WSWizardPage() {
                     )}
                   </div>
 
-                  {/* Step 3: Crew Role */}
                   <div>
                     <label className="text-xs font-medium mb-1 block">Crew Role</label>
                     <Select value={newCrewRole} onValueChange={(v) => setNewCrewRole(v as CrewRole)}>
@@ -489,7 +1347,6 @@ export default function WSWizardPage() {
                     </Select>
                   </div>
 
-                  {/* Step 4: Optional note */}
                   <div>
                     <label className="text-xs font-medium mb-1 block">Mission Note (optional)</label>
                     <Input
@@ -499,33 +1356,7 @@ export default function WSWizardPage() {
                     />
                   </div>
 
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      if (!newCrewId) {
-                        toast.error(`Select ${newCrewType === "agent" ? "an Agent" : "a Bot"} from the catalog`);
-                        return;
-                      }
-                      if (data.crewAgents.some((c) => c.participantId === newCrewId && c.participantType === newCrewType)) {
-                        toast.error("This participant is already in the crew");
-                        return;
-                      }
-                      setData({
-                        ...data,
-                        crewAgents: [...data.crewAgents, {
-                          participantType: newCrewType,
-                          participantId: newCrewId,
-                          participantName: newCrewName,
-                          crewRole: newCrewRole,
-                          note: newCrewNote,
-                        }],
-                      });
-                      setNewCrewId("");
-                      setNewCrewName("");
-                      setNewCrewRole("executor");
-                      setNewCrewNote("");
-                    }}
-                  >
+                  <Button size="sm" onClick={addCrewMember}>
                     Add to Crew
                   </Button>
                 </div>
@@ -535,7 +1366,7 @@ export default function WSWizardPage() {
                   <div className="flex items-start gap-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
                     <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     <span>
-                      No AI participants added yet. Select an Agent or Bot from your catalog above.
+                      No AI participants added yet. Select an Agent or Bot from the catalog above.
                       If none are available, first add and approve them in AI Types / Catalog.
                     </span>
                   </div>
@@ -558,7 +1389,7 @@ export default function WSWizardPage() {
                         )}
                         <button
                           className="text-xs text-destructive ml-auto shrink-0"
-                          onClick={() => setData({ ...data, crewAgents: data.crewAgents.filter((_, j) => j !== i) })}
+                          onClick={() => removeCrewMember(i)}
                         >
                           Remove
                         </button>
@@ -570,104 +1401,239 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* Activities Stage */}
-          {currentStage === "activities" && (
+          {/* ======== Step 6: Activities (Structured) ======== */}
+          {currentStepId === "activities" && (
             <>
+              {/* Primary Activity Type */}
               <div>
-                <label className="text-sm font-medium mb-1 block">Planned Activities</label>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    value={newActivity}
-                    onChange={(e) => setNewActivity(e.target.value)}
-                    placeholder="e.g., Document analysis, Code review, Research"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && newActivity.trim()) {
-                        setData({ ...data, activities: [...data.activities, newActivity.trim()] });
-                        setNewActivity("");
-                      }
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (newActivity.trim()) {
-                        setData({ ...data, activities: [...data.activities, newActivity.trim()] });
-                        setNewActivity("");
-                      }
-                    }}
-                  >
-                    Add
-                  </Button>
+                <label className="text-sm font-medium mb-1 block">Primary Activity Type *</label>
+                <Select value={data.primaryActivityType} onValueChange={(v) => updateData({ primaryActivityType: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select primary activity..." /></SelectTrigger>
+                  <SelectContent>
+                    {ACTIVITY_TYPES.map((at) => (
+                      <SelectItem key={at} value={at}>
+                        {at.charAt(0).toUpperCase() + at.slice(1).replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Secondary Activity Types */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Secondary Activity Types</label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {ACTIVITY_TYPES.filter((at) => at !== data.primaryActivityType).map((at) => {
+                    const isSelected = data.secondaryActivityTypes.includes(at);
+                    return (
+                      <button
+                        key={at}
+                        onClick={() => {
+                          if (isSelected) {
+                            updateData({ secondaryActivityTypes: data.secondaryActivityTypes.filter((s) => s !== at) });
+                          } else {
+                            updateData({ secondaryActivityTypes: [...data.secondaryActivityTypes, at] });
+                          }
+                        }}
+                        className={`px-2 py-1 rounded text-xs transition-colors ${
+                          isSelected
+                            ? "bg-primary/15 text-primary border border-primary/30"
+                            : "bg-muted text-muted-foreground border border-transparent hover:bg-muted/80"
+                        }`}
+                      >
+                        {at.charAt(0).toUpperCase() + at.slice(1).replace(/_/g, " ")}
+                      </button>
+                    );
+                  })}
                 </div>
-                {data.activities.map((act, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm py-1">
-                    <Briefcase className="h-3 w-3 text-muted-foreground" />
-                    <span>{act}</span>
-                    <button
-                      className="text-xs text-destructive ml-auto"
-                      onClick={() => setData({ ...data, activities: data.activities.filter((_, j) => j !== i) })}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+              </div>
+
+              {/* Operating Mode */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Operating Mode</label>
+                <Select value={data.operatingMode} onValueChange={(v) => updateData({ operatingMode: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select mode..." /></SelectTrigger>
+                  <SelectContent>
+                    {OPERATING_MODES.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Execution Style */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Execution Style</label>
+                <Select value={data.executionStyle} onValueChange={(v) => updateData({ executionStyle: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select style..." /></SelectTrigger>
+                  <SelectContent>
+                    {EXECUTION_STYLES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Collaboration Intensity */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Collaboration / Automation Emphasis</label>
+                <Select value={data.collaborationIntensity} onValueChange={(v) => updateData({ collaborationIntensity: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select emphasis..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low — mostly independent</SelectItem>
+                    <SelectItem value="medium">Medium — regular collaboration</SelectItem>
+                    <SelectItem value="high">High — tight collaboration</SelectItem>
+                    <SelectItem value="automation_heavy">Automation-heavy</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </>
           )}
 
-          {/* Needs Stage */}
-          {currentStage === "needs" && (
+          {/* ======== Step 7: Needs (Structured Categories) ======== */}
+          {currentStepId === "needs" && (
             <>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Resource & Tool Needs</label>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    value={newNeed}
-                    onChange={(e) => setNewNeed(e.target.value)}
-                    placeholder="e.g., Vector DB, LLM Provider, Document Storage"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && newNeed.trim()) {
-                        setData({ ...data, needs: [...data.needs, newNeed.trim()] });
-                        setNewNeed("");
-                      }
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (newNeed.trim()) {
-                        setData({ ...data, needs: [...data.needs, newNeed.trim()] });
-                        setNewNeed("");
-                      }
-                    }}
-                  >
-                    Add
-                  </Button>
-                </div>
-                {data.needs.map((need, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm py-1">
-                    <Settings className="h-3 w-3 text-muted-foreground" />
-                    <span>{need}</span>
-                    <button
-                      className="text-xs text-destructive ml-auto"
-                      onClick={() => setData({ ...data, needs: data.needs.filter((_, j) => j !== i) })}
-                    >
-                      Remove
-                    </button>
+              <p className="text-xs text-muted-foreground mb-3">
+                Declare what users and agents need to succeed. This is the final manager intent step — admin will later translate these into governed configuration.
+              </p>
+              {NEEDS_CATEGORIES.map((cat) => {
+                const items = data.needs[cat.key] || [];
+                const inputVal = needsInput[cat.key] || "";
+                return (
+                  <div key={cat.key} className="space-y-1.5">
+                    <label className="text-sm font-medium block">{cat.label}</label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={inputVal}
+                        onChange={(e) => setNeedsInput((prev) => ({ ...prev, [cat.key]: e.target.value }))}
+                        placeholder={cat.placeholder}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { e.preventDefault(); addNeedItem(cat.key); }
+                        }}
+                        className="text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => addNeedItem(cat.key)}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                    {items.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {items.map((item, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs"
+                          >
+                            {item}
+                            <button
+                              className="text-destructive hover:text-destructive/80 ml-0.5"
+                              onClick={() => removeNeedItem(cat.key, i)}
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </>
           )}
 
-          {/* Configuration Stage (Admin only) */}
-          {currentStage === "configuration" && isAdmin && (
+          {/* ======== Step 8: Configuration (Admin Phase) ======== */}
+          {currentStepId === "configuration" && isAdmin && (
             <>
+              <p className="text-xs text-muted-foreground mb-3">
+                Translate the manager's intent into enforceable workspace behavior. This is where the workspace becomes policy-aware.
+              </p>
+
+              {/* Module Enablement */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Enabled Modules</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {["chat", "documents", "agents", "automation", "wiki", "inference", "embeddings", "vectordb", "models"].map((mod) => {
+                    const isOn = data.enabledModules.includes(mod);
+                    return (
+                      <button
+                        key={mod}
+                        onClick={() => {
+                          if (isOn) updateData({ enabledModules: data.enabledModules.filter((m) => m !== mod) });
+                          else updateData({ enabledModules: [...data.enabledModules, mod] });
+                        }}
+                        className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                          isOn
+                            ? "bg-primary/15 text-primary border border-primary/30"
+                            : "bg-muted text-muted-foreground border border-transparent hover:bg-muted/80"
+                        }`}
+                      >
+                        {mod.charAt(0).toUpperCase() + mod.slice(1)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Routing Profile */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Routing Profile</label>
+                <Select value={data.routingProfile} onValueChange={(v) => updateData({ routingProfile: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUTO">Auto</SelectItem>
+                    <SelectItem value="LOCAL_ONLY">Local Only</SelectItem>
+                    <SelectItem value="CLOUD_ALLOWED">Cloud Allowed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Resource Profile */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Resource Profile</label>
+                <Select value={data.resourceProfile} onValueChange={(v) => updateData({ resourceProfile: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select profile..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="minimal">Minimal — low compute, limited storage</SelectItem>
+                    <SelectItem value="standard">Standard — balanced allocation</SelectItem>
+                    <SelectItem value="elevated">Elevated — GPU access, larger storage</SelectItem>
+                    <SelectItem value="unrestricted">Unrestricted — full resource access</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Capability Bundles */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Capability Bundles</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {["read", "write", "execute", "manage", "export", "import", "configure", "audit"].map((cap) => {
+                    const isOn = data.capabilityBundles.includes(cap);
+                    return (
+                      <button
+                        key={cap}
+                        onClick={() => {
+                          if (isOn) updateData({ capabilityBundles: data.capabilityBundles.filter((c) => c !== cap) });
+                          else updateData({ capabilityBundles: [...data.capabilityBundles, cap] });
+                        }}
+                        className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                          isOn
+                            ? "bg-primary/15 text-primary border border-primary/30"
+                            : "bg-muted text-muted-foreground border border-transparent hover:bg-muted/80"
+                        }`}
+                      >
+                        {cap.charAt(0).toUpperCase() + cap.slice(1)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Embedding Model */}
               <div>
                 <label className="text-sm font-medium mb-1 block">Embedding Model</label>
-                <Select value={data.embeddingModel} onValueChange={(v) => setData({ ...data, embeddingModel: v })}>
+                <Select value={data.embeddingModel} onValueChange={(v) => updateData({ embeddingModel: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="bge-small-en-v1.5">BGE Small EN v1.5</SelectItem>
@@ -676,9 +1642,11 @@ export default function WSWizardPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Chunking Strategy */}
               <div>
                 <label className="text-sm font-medium mb-1 block">Chunking Strategy</label>
-                <Select value={data.chunkingStrategy} onValueChange={(v) => setData({ ...data, chunkingStrategy: v })}>
+                <Select value={data.chunkingStrategy} onValueChange={(v) => updateData({ chunkingStrategy: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="semantic">Semantic</SelectItem>
@@ -687,79 +1655,339 @@ export default function WSWizardPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Shell Visibility */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Shell Visibility</label>
+                <Select value={data.shellVisibility} onValueChange={(v) => updateData({ shellVisibility: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public_internal">Public Internal — visible to all org members</SelectItem>
+                    <SelectItem value="restricted">Restricted — visible to participants only</SelectItem>
+                    <SelectItem value="private">Private — visible to owner and admins only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Publication Constraints */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Publication Constraints (optional)</label>
+                <Textarea
+                  value={data.publicationConstraints}
+                  onChange={(e) => updateData({ publicationConstraints: e.target.value })}
+                  placeholder="e.g., Requires legal review before publication, restricted to internal catalog only"
+                  rows={2}
+                />
+              </div>
             </>
           )}
 
-          {/* Review Stage (Admin only — Governance) */}
-          {currentStage === "review" && isAdmin && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-muted-foreground">Name:</span> {data.name || "—"}</div>
-                <div><span className="text-muted-foreground">Type:</span> {data.type}</div>
-                <div><span className="text-muted-foreground">Purpose:</span> {data.purposeType}</div>
-                <div><span className="text-muted-foreground">Ref:</span> {data.purposeRef || "—"}</div>
-              </div>
-              {data.description && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Description:</span> {data.description}
+          {/* ======== Step 9: Review Packet (Governance Phase) ======== */}
+          {currentStepId === "reviewPacket" && isAdmin && (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                This is the governance-readable workspace dossier. Review all sections before proceeding to promotion.
+              </p>
+
+              {/* Identity */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Identity</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="text-muted-foreground">Name:</span> {data.name || "—"}</div>
+                  <div><span className="text-muted-foreground">Type:</span> {data.type || "—"}</div>
                 </div>
-              )}
-              {data.crewAgents.length > 0 && (
+                {data.description && <p className="text-sm text-muted-foreground">{data.description}</p>}
+              </div>
+
+              {/* Purpose */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Purpose</h4>
                 <div className="text-sm">
-                  <span className="text-muted-foreground block mb-1">Crew:</span>
-                  <div className="space-y-1 ml-2">
-                    {data.crewAgents.map((a, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-xs">
-                        {a.participantType === "agent" ? <Workflow className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
-                        <span>{a.participantName || `#${a.participantId}`}</span>
-                        <Badge variant="outline" className="text-[10px]">{a.participantType}</Badge>
-                        <Badge variant="secondary" className="text-[10px]">{a.crewRole}</Badge>
-                        {a.note && <span className="text-muted-foreground">— {a.note}</span>}
+                  <span className="text-muted-foreground">Type:</span>{" "}
+                  {PURPOSE_TYPES.find((p) => p.value === data.purposeType)?.label || data.purposeType}
+                </div>
+                {data.purposeStatement && <p className="text-sm">{data.purposeStatement}</p>}
+                {data.purposeRef && <p className="text-xs text-muted-foreground">Ref: {data.purposeRef}</p>}
+              </div>
+
+              {/* Anchor & Scope */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Anchor & Scope</h4>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Anchor:</span>{" "}
+                  {ANCHOR_TYPES.find((a) => a.value === data.anchorType)?.label || data.anchorType || "—"}
+                </div>
+                {data.anchorLabel && <div className="text-sm"><span className="text-muted-foreground">Label:</span> {data.anchorLabel}</div>}
+                {data.anchorRef && <div className="text-sm"><span className="text-muted-foreground">Ref:</span> {data.anchorRef}</div>}
+              </div>
+
+              {/* Team */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team</h4>
+                {data.team.length === 0 ? (
+                  <p className="text-xs text-amber-600">No team members assigned</p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {data.team.map((t, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <Users className="h-3 w-3 text-muted-foreground" />
+                        <span>{t.displayName}</span>
+                        <Badge variant="outline" className="text-[10px]">{t.role}</Badge>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-              {data.activities.length > 0 && (
+                )}
+              </div>
+
+              {/* Crew */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Crew</h4>
+                {data.crewAgents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No AI participants</p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {data.crewAgents.map((c, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-xs">
+                        {c.participantType === "agent" ? <Workflow className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
+                        <span>{c.participantName || `#${c.participantId}`}</span>
+                        <Badge variant="outline" className="text-[10px]">{c.participantType}</Badge>
+                        <Badge variant="secondary" className="text-[10px]">{c.crewRole}</Badge>
+                        {c.note && <span className="text-muted-foreground">— {c.note}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Activities */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Activities</h4>
                 <div className="text-sm">
-                  <span className="text-muted-foreground">Activities:</span>{" "}
-                  {data.activities.join(", ")}
+                  <span className="text-muted-foreground">Primary:</span>{" "}
+                  {data.primaryActivityType ? data.primaryActivityType.replace(/_/g, " ") : "—"}
                 </div>
-              )}
-              {data.needs.length > 0 && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Needs:</span>{" "}
-                  {data.needs.join(", ")}
+                {data.secondaryActivityTypes.length > 0 && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Secondary:</span>{" "}
+                    {data.secondaryActivityTypes.map((s) => s.replace(/_/g, " ")).join(", ")}
+                  </div>
+                )}
+                {data.operatingMode && <div className="text-sm"><span className="text-muted-foreground">Mode:</span> {data.operatingMode}</div>}
+                {data.executionStyle && <div className="text-sm"><span className="text-muted-foreground">Style:</span> {data.executionStyle.replace(/_/g, " ")}</div>}
+              </div>
+
+              {/* Needs */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Needs</h4>
+                {Object.entries(data.needs).filter(([, v]) => v.length > 0).length === 0 ? (
+                  <p className="text-xs text-amber-600">No needs declared</p>
+                ) : (
+                  Object.entries(data.needs).filter(([, v]) => v.length > 0).map(([key, items]) => (
+                    <div key={key} className="text-sm">
+                      <span className="text-muted-foreground capitalize">{key}:</span> {items.join(", ")}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Configuration */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Configuration</h4>
+                {data.enabledModules.length > 0 && (
+                  <div className="text-sm"><span className="text-muted-foreground">Modules:</span> {data.enabledModules.join(", ")}</div>
+                )}
+                <div className="text-sm"><span className="text-muted-foreground">Routing:</span> {data.routingProfile}</div>
+                {data.resourceProfile && <div className="text-sm"><span className="text-muted-foreground">Resources:</span> {data.resourceProfile}</div>}
+                {data.capabilityBundles.length > 0 && (
+                  <div className="text-sm"><span className="text-muted-foreground">Capabilities:</span> {data.capabilityBundles.join(", ")}</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ======== Step 10: Promotion (Governance Phase) ======== */}
+          {currentStepId === "promotion" && isAdmin && (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Lifecycle control — not form filling. Each transition is a distinct governance action.
+              </p>
+
+              {/* Current status display */}
+              <div className="rounded-md border p-4 text-center space-y-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Current Status</p>
+                <Badge className="text-sm px-3 py-1">draft</Badge>
+              </div>
+
+              {/* Status distinction callout */}
+              <div className="rounded-md bg-muted/50 p-3 text-xs space-y-1">
+                <p className="font-medium">Important distinctions:</p>
+                <p className="text-muted-foreground"><strong>Approved</strong> does not mean Published</p>
+                <p className="text-muted-foreground"><strong>Published</strong> does not mean Active</p>
+                <p className="text-muted-foreground">Each state requires an explicit governance action.</p>
+              </div>
+
+              {/* Promotion actions */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Available Actions</h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* Begin Review — draft status */}
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={saveAndSubmitForReview}
+                    disabled={isSaving}
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Submit for Review
+                  </Button>
+
+                  {/* These would be enabled based on actual workspace status from server */}
+                  <Button variant="outline" className="justify-start" disabled>
+                    <Check className="h-4 w-4 mr-2" />
+                    Approve
+                  </Button>
+                  <Button variant="outline" className="justify-start" disabled>
+                    <PackageCheck className="h-4 w-4 mr-2" />
+                    Publish
+                  </Button>
+                  <Button variant="outline" className="justify-start" disabled>
+                    <ArrowUpRight className="h-4 w-4 mr-2" />
+                    Activate
+                  </Button>
+                  <Button variant="destructive" className="justify-start" disabled>
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+                  <Button variant="secondary" className="justify-start" disabled>
+                    <Lock className="h-4 w-4 mr-2" />
+                    Archive
+                  </Button>
                 </div>
-              )}
+
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Actions become available as the workspace progresses through its lifecycle.
+                  Only "Submit for Review" is available for drafts.
+                </p>
+              </div>
             </div>
           )}
         </CardContent>
-      </Card>
+          </Card>
 
-      {/* Navigation — Previous | Save as Draft | Right action */}
-      {/* Right action is mutually exclusive: Next OR Submit for Review OR empty */}
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={goPrev} disabled={isFirst}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Previous
-        </Button>
-        <Button variant="outline" onClick={saveDraft} disabled={isSaving}>
-          <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving..." : "Save as Draft"}
-        </Button>
-        {isLast && isAdmin ? (
-          <Button onClick={saveAndSubmitForReview} disabled={isSaving}>
-            <Shield className="h-4 w-4 mr-1" /> Save & Submit for Review
-          </Button>
-        ) : isLast ? (
-          <Button variant="outline" disabled className="invisible">
-            <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
-        ) : (
-          <Button onClick={goNext}>
-            Next <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
-        )}
-      </div>
+          {/* ============================================================ */}
+          {/* FOOTER ACTIONS                                                */}
+          {/* Manager/Admin steps: [ Previous ] [ Save as Draft ] [ Next ] */}
+          {/* Admin final (Step 8): [ Previous ] [ Save as Draft ] [ Save as Ready for Review ] */}
+          {/* Governance steps (9-10): [ Previous ] only — actions live in step content */}
+          {/* ============================================================ */}
+          {currentStep.phase === "governance" ? (
+            /* Governance phase — minimal footer, no Save as Draft */
+            <div className="flex items-center justify-between">
+              <Button variant="outline" onClick={goPrev} disabled={isFirst}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Previous
+              </Button>
+              <span />
+              {currentStepId === "reviewPacket" ? (
+                <Button onClick={goNext}>
+                  Next <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              ) : (
+                <span />
+              )}
+            </div>
+          ) : (
+            /* Manager & Admin phases — full footer */
+            <div className="flex items-center justify-between">
+              <Button variant="outline" onClick={goPrev} disabled={isFirst}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Previous
+              </Button>
+              <Button variant="outline" onClick={saveDraft} disabled={isSaving}>
+                <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving..." : "Save as Draft"}
+              </Button>
+              {isAdminFinal && isAdmin ? (
+                <Button onClick={saveAndSubmitForReview} disabled={isSaving}>
+                  <Shield className="h-4 w-4 mr-1" /> Save as Ready for Review
+                </Button>
+              ) : isManagerFinal && !isAdmin ? (
+                /* Manager's last step — no Next (admin/governance locked) */
+                <span />
+              ) : (
+                <Button onClick={goNext}>
+                  Next <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================== */}
+        {/* RIGHT COMPLIANCE PANEL — live readiness view (Phase 5)          */}
+        {/* ============================================================== */}
+        <aside className="hidden lg:block space-y-3">
+          <div className="rounded-lg border bg-card p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Readiness
+            </h3>
+            {/* Draft readiness checks */}
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center gap-1.5">
+                {data.name ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.name ? "text-muted-foreground" : ""}>Identity complete</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {data.purposeType && data.purposeStatement ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.purposeType && data.purposeStatement ? "text-muted-foreground" : ""}>Purpose complete</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {data.anchorType ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.anchorType ? "text-muted-foreground" : ""}>Anchor complete</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {data.team.some((t) => t.role === "owner") ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.team.some((t) => t.role === "owner") ? "text-muted-foreground" : ""}>Owner assigned</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {data.team.length > 0 || data.crewAgents.length > 0 ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.team.length > 0 || data.crewAgents.length > 0 ? "text-muted-foreground" : ""}>Team/Crew valid</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {data.primaryActivityType ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.primaryActivityType ? "text-muted-foreground" : ""}>Activities defined</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {Object.values(data.needs).some((arr) => arr.length > 0) ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={Object.values(data.needs).some((arr) => arr.length > 0) ? "text-muted-foreground" : ""}>Needs declared</span>
+              </div>
+            </div>
+
+            {/* Review readiness — admin */}
+            {isAdmin && (
+              <>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-4 mb-2">
+                  Review Readiness
+                </h3>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    {data.enabledModules.length > 0 ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                    <span className={data.enabledModules.length > 0 ? "text-muted-foreground" : ""}>Configuration complete</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Current step info */}
+          <div className="rounded-lg border bg-card p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Current Step
+            </h3>
+            <p className="text-xs">{currentStep.stepNumber}. {currentStep.label}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">{currentStep.question}</p>
+          </div>
+        </aside>
+
+      </div>{/* end 3-column grid */}
     </PageShell>
   );
 }

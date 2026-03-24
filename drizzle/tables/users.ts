@@ -57,8 +57,68 @@ export const LEGACY_STATUS_MAP: Record<string, WorkspaceStatus> = {
 };
 
 // Workspace purpose types — what the workspace is organized around
-export const WORKSPACE_PURPOSE_TYPES = ["goal", "mission", "project", "team", "strategy", "other"] as const;
+// Governance-first spec: Goal, Mission, Project, Team Activity, Research Effort, Operational Function
+export const WORKSPACE_PURPOSE_TYPES = [
+  "goal", "mission", "project", "team", "research", "operational", "strategy", "other",
+] as const;
 export type WorkspacePurposeType = typeof WORKSPACE_PURPOSE_TYPES[number];
+
+// Workspace anchor types — structural organizing factor
+export const WORKSPACE_ANCHOR_TYPES = [
+  "per_project", "per_employee_role", "per_hr_position", "per_company_entity",
+  "per_activity", "per_custom_factor", "per_app_module", "per_function",
+] as const;
+export type WorkspaceAnchorType = typeof WORKSPACE_ANCHOR_TYPES[number];
+
+// WizardMeta — governance-first wizard intake data stored as JSON
+export interface WizardMeta {
+  // Purpose (Step 2)
+  purposeStatement?: string;
+  // Anchor (Step 3)
+  anchorType?: WorkspaceAnchorType;
+  // Scope Details (Step 4) — dynamic based on anchorType
+  anchorRef?: string;
+  anchorLabel?: string;
+  anchorMeta?: Record<string, unknown>;
+  // Team (Step 5) — human participants from HR Directory
+  team?: {
+    owner?: { workerId: number; displayName: string };
+    managers?: Array<{ workerId: number; displayName: string }>;
+    members?: Array<{ workerId: number; displayName: string }>;
+    viewers?: Array<{ workerId: number; displayName: string }>;
+  };
+  // Activities (Step 6)
+  activities?: {
+    primaryType?: string;
+    secondaryTypes?: string[];
+    operatingMode?: string;
+    executionStyle?: string;
+    collaborationIntensity?: string;
+  };
+  // Needs (Step 7) — structured declarative needs
+  needs?: {
+    permissions?: string[];
+    information?: string[];
+    tools?: string[];
+    agents?: string[];
+    resources?: string[];
+    visibility?: string[];
+    context?: string[];
+  };
+  // Configuration (Step 8) — admin phase
+  configuration?: {
+    enabledModules?: string[];
+    routingProfile?: string;
+    resourceProfile?: string;
+    capabilityBundles?: string[];
+    shellVisibility?: string;
+    publicationConstraints?: string;
+    runtimeDefaults?: Record<string, unknown>;
+  };
+  // Wizard progress tracking
+  lastCompletedStep?: number;
+  wizardPhase?: "manager" | "admin" | "governance";
+}
 
 // Shell configuration — manager-defined participant visibility
 export interface WorkspaceShellConfig {
@@ -108,6 +168,7 @@ export const workspaces = pgTable("workspaces", {
 
   // Workspace purpose — what this workspace is organized around
   purposeType: varchar("purposeType", { length: 50 }).default("other"),
+  purposeStatement: text("purposeStatement"),
   purposeRef: text("purposeRef"),
 
   // Workspace settings
@@ -128,6 +189,9 @@ export const workspaces = pgTable("workspaces", {
 
   // Shell Configuration — manager-defined visibility and emphasis
   shellConfig: json("shellConfig").$type<WorkspaceShellConfig>(),
+
+  // Governance-first wizard intake metadata (anchor, scope, activities, needs, config)
+  wizardMeta: json("wizardMeta").$type<WizardMeta>(),
 
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

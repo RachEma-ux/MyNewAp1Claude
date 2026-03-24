@@ -16,17 +16,20 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import * as db from "../db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import {
+  users,
   workspaces,
   workspaceMembers,
   workspaceCrew,
   workspaceActivityLog,
   type WorkspaceStatus,
   type WorkspacePurposeType,
+  type WizardMeta,
   WORKSPACE_STATUSES,
   WORKSPACE_PURPOSE_TYPES,
+  WORKSPACE_ANCHOR_TYPES,
 } from "../../drizzle/schema";
 import {
   transitionWorkspace,
@@ -42,6 +45,7 @@ import {
   listPublishedWorkspaces,
   listAllWorkspaces,
   getWorkspaceLifecycleInfo,
+  validateDraftCompleteness,
 } from "./lifecycle-service";
 import {
   requireReadableWorkspaceRoute,
@@ -87,6 +91,7 @@ export const workspaceRouter = router({
           role: z.string().default("executor"),
           note: z.string().optional(),
         })).optional(),
+        wizardMeta: z.record(z.unknown()).optional(),
         submitForReview: z.boolean().optional(),
       })
     )
@@ -108,19 +113,66 @@ export const workspaceRouter = router({
         ownerId: ctx.user.id,
         status: "draft",
         purposeType: input.purposeType || PURPOSE_TYPE_MAP[workspaceType] || "other",
+        purposeStatement: (input.wizardMeta as any)?.purposeStatement || null,
         purposeRef: input.purposeRef,
         embeddingModel: input.embeddingModel,
         chunkingStrategy: input.chunkingStrategy,
         chunkSize: input.chunkSize,
         chunkOverlap: input.chunkOverlap,
         collectionName: `workspace_${Date.now()}`,
-      });
+        wizardMeta: input.wizardMeta as WizardMeta | undefined,
+      } as any);
       if (workspace && typeof workspace === "object" && "id" in workspace) {
         const wsId = (workspace as any).id;
         try {
           await seedWorkspaceModules(wsId, workspaceType);
         } catch (err) {
           console.warn(`[Workspace] Failed to seed modules: ${(err as Error).message}`);
+        }
+        // Sync wizardMeta.configuration to real workspace columns
+        if (input.wizardMeta && (input.wizardMeta as any).configuration) {
+          const cfg = (input.wizardMeta as any).configuration;
+          const configUpdates: Record<string, unknown> = {};
+          if (cfg.routingProfile) {
+            configUpdates.routingProfile = {
+              defaultRoute: cfg.routingProfile,
+              dataSensitivity: "LOW",
+              qualityTier: "BALANCED",
+              fallback: { enabled: true, maxHops: 3 },
+            };
+          }
+          if (cfg.resourceProfile) {
+            const RESOURCE_PRESETS: Record<string, any> = {
+              minimal: { computeQuota: 100, storageQuota: 1024, apiCallQuota: 1000 },
+              standard: { computeQuota: 500, storageQuota: 5120, apiCallQuota: 5000 },
+              elevated: { computeQuota: 2000, storageQuota: 20480, apiCallQuota: 20000 },
+              unrestricted: { computeQuota: 0, storageQuota: 0, apiCallQuota: 0 },
+            };
+            configUpdates.resourceProfile = RESOURCE_PRESETS[cfg.resourceProfile] || {};
+          }
+          // Sync shellConfig from shellVisibility
+          if (cfg.shellVisibility) {
+            const isRestricted = cfg.shellVisibility === "restricted" || cfg.shellVisibility === "private";
+            configUpdates.shellConfig = {
+              sidebar: {
+                showIdentity: true, showPurpose: true, showMission: true,
+                showCurrentWork: true, showActivityLog: true, showAlerts: !isRestricted,
+                showQuickActions: true, showGuide: true, showHealth: true,
+              },
+              toolbar: { visibleItems: [], priorityItems: [] },
+              quickActions: [],
+              alertsEnabled: !isRestricted,
+              missionEmphasis: null,
+              participantVisibility: {},
+            };
+          }
+          if (Object.keys(configUpdates).length > 0) {
+            try {
+              await db.updateWorkspace(wsId, configUpdates as any);
+            } catch (err) {
+              console.warn(`[Workspace] Failed to sync config columns: ${(err as Error).message}`);
+            }
+          }
         }
         // Persist crew entries if provided
         if (input.crew && input.crew.length > 0) {
@@ -144,11 +196,51 @@ export const workspaceRouter = router({
             }
           }
         }
+        // Persist team members from wizardMeta to workspace_members table
+        if (input.wizardMeta && (input.wizardMeta as any).team) {
+          const dbConn = getDb();
+          if (dbConn) {
+            try {
+              const teamData = (input.wizardMeta as any).team;
+              const ROLE_MAP: Record<string, string> = { owner: "owner", manager: "editor", member: "editor", viewer: "viewer" };
+              const teamRows: Array<{ workerId: number; displayName: string; role: string }> = [];
+              if (teamData.owner) teamRows.push({ ...teamData.owner, role: "owner" });
+              for (const m of teamData.managers || []) teamRows.push({ ...m, role: "manager" });
+              for (const m of teamData.members || []) teamRows.push({ ...m, role: "member" });
+              for (const m of teamData.viewers || []) teamRows.push({ ...m, role: "viewer" });
+              // Insert non-owner team members (owner already inserted by createWorkspace)
+              const nonOwner = teamRows.filter((t) => t.role !== "owner");
+              if (nonOwner.length > 0) {
+                // Validate workerIds exist as user IDs before inserting
+                const workerIds = nonOwner.map((t) => t.workerId);
+                const validUsers = await dbConn.select({ id: users.id }).from(users)
+                  .where(inArray(users.id, workerIds));
+                const validIds = new Set(validUsers.map((u) => u.id));
+                const validMembers = nonOwner.filter((t) => validIds.has(t.workerId));
+                const skipped = nonOwner.filter((t) => !validIds.has(t.workerId));
+                if (skipped.length > 0) {
+                  console.warn(`[Workspace] Skipped ${skipped.length} team member(s) with invalid user IDs: ${skipped.map((t) => t.workerId).join(", ")}`);
+                }
+                if (validMembers.length > 0) {
+                  await dbConn.insert(workspaceMembers).values(
+                    validMembers.map((t) => ({
+                      workspaceId: wsId,
+                      userId: t.workerId,
+                      role: ROLE_MAP[t.role] || "viewer",
+                    }))
+                  );
+                }
+              }
+            } catch (err) {
+              console.warn(`[Workspace] Failed to persist team members: ${(err as Error).message}`);
+            }
+          }
+        }
         await logActivity({
           workspaceId: wsId,
           actorId: ctx.user.id,
           action: "workspace.create",
-          metadata: { workspaceType, crewCount: input.crew?.length ?? 0 },
+          metadata: { workspaceType, crewCount: input.crew?.length ?? 0, teamCount: ((input.wizardMeta as any)?.team ? Object.values((input.wizardMeta as any).team).flat().length : 0) },
         }).catch(() => {});
         // Admin shortcut: create draft + submit for review in one action
         if (input.submitForReview) {
@@ -284,12 +376,58 @@ export const workspaceRouter = router({
           role: z.string().default("executor"),
           note: z.string().optional(),
         })).optional(),
+        wizardMeta: z.record(z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await requireWorkspaceAccess(ctx.user.id, input.id);
-      const { id, crew, ...updates } = input;
-      await db.updateWorkspace(id, { ...updates, updatedAt: new Date() } as any);
+      const { id, crew, wizardMeta, ...updates } = input;
+      const dbUpdates: Record<string, unknown> = { ...updates, updatedAt: new Date() };
+      if (wizardMeta !== undefined) {
+        dbUpdates.wizardMeta = wizardMeta;
+        // Sync purposeStatement to dedicated column
+        if ((wizardMeta as any).purposeStatement !== undefined) {
+          dbUpdates.purposeStatement = (wizardMeta as any).purposeStatement || null;
+        }
+        // Sync wizardMeta.configuration to real workspace columns
+        const cfg = (wizardMeta as any).configuration;
+        if (cfg) {
+          if (cfg.routingProfile) {
+            dbUpdates.routingProfile = {
+              defaultRoute: cfg.routingProfile,
+              dataSensitivity: "LOW",
+              qualityTier: "BALANCED",
+              fallback: { enabled: true, maxHops: 3 },
+            };
+          }
+          if (cfg.resourceProfile) {
+            const RESOURCE_PRESETS: Record<string, any> = {
+              minimal: { computeQuota: 100, storageQuota: 1024, apiCallQuota: 1000 },
+              standard: { computeQuota: 500, storageQuota: 5120, apiCallQuota: 5000 },
+              elevated: { computeQuota: 2000, storageQuota: 20480, apiCallQuota: 20000 },
+              unrestricted: { computeQuota: 0, storageQuota: 0, apiCallQuota: 0 },
+            };
+            dbUpdates.resourceProfile = RESOURCE_PRESETS[cfg.resourceProfile] || {};
+          }
+          // Sync shellConfig from shellVisibility
+          if (cfg.shellVisibility) {
+            const isRestricted = cfg.shellVisibility === "restricted" || cfg.shellVisibility === "private";
+            dbUpdates.shellConfig = {
+              sidebar: {
+                showIdentity: true, showPurpose: true, showMission: true,
+                showCurrentWork: true, showActivityLog: true, showAlerts: !isRestricted,
+                showQuickActions: true, showGuide: true, showHealth: true,
+              },
+              toolbar: { visibleItems: [], priorityItems: [] },
+              quickActions: [],
+              alertsEnabled: !isRestricted,
+              missionEmphasis: null,
+              participantVisibility: {},
+            };
+          }
+        }
+      }
+      await db.updateWorkspace(id, dbUpdates as any);
       // Sync crew if provided: delete existing, re-insert
       if (crew !== undefined) {
         const dbConn = getDb();
@@ -308,6 +446,54 @@ export const workspaceRouter = router({
                 constraints: {} as Record<string, unknown>,
               }))
             );
+          }
+        }
+      }
+      // Sync team members from wizardMeta to workspace_members table
+      if (wizardMeta && (wizardMeta as any).team) {
+        const dbConn = getDb();
+        if (dbConn) {
+          try {
+            const teamData = (wizardMeta as any).team;
+            const ROLE_MAP: Record<string, string> = { owner: "owner", manager: "editor", member: "editor", viewer: "viewer" };
+            const teamRows: Array<{ workerId: number; role: string }> = [];
+            if (teamData.owner) teamRows.push({ workerId: teamData.owner.workerId, role: "owner" });
+            for (const m of teamData.managers || []) teamRows.push({ workerId: m.workerId, role: "manager" });
+            for (const m of teamData.members || []) teamRows.push({ workerId: m.workerId, role: "member" });
+            for (const m of teamData.viewers || []) teamRows.push({ workerId: m.workerId, role: "viewer" });
+            // Delete non-owner members, then re-insert (preserve original owner row)
+            const currentMembers = await dbConn.select().from(workspaceMembers)
+              .where(eq(workspaceMembers.workspaceId, id));
+            const ownerRow = currentMembers.find((m) => m.role === "owner");
+            // Remove all non-owner members
+            for (const m of currentMembers.filter((m) => m.role !== "owner")) {
+              await dbConn.delete(workspaceMembers)
+                .where(and(eq(workspaceMembers.workspaceId, id), eq(workspaceMembers.id, m.id)));
+            }
+            // Re-insert non-owner team members (validate workerIds exist as user IDs)
+            const nonOwner = teamRows.filter((t) => t.role !== "owner");
+            if (nonOwner.length > 0) {
+              const workerIds = nonOwner.map((t) => t.workerId);
+              const validUsers = await dbConn.select({ id: users.id }).from(users)
+                .where(inArray(users.id, workerIds));
+              const validIds = new Set(validUsers.map((u) => u.id));
+              const validMembers = nonOwner.filter((t) => validIds.has(t.workerId));
+              const skipped = nonOwner.filter((t) => !validIds.has(t.workerId));
+              if (skipped.length > 0) {
+                console.warn(`[Workspace] Skipped ${skipped.length} team member(s) with invalid user IDs: ${skipped.map((t) => t.workerId).join(", ")}`);
+              }
+              if (validMembers.length > 0) {
+                await dbConn.insert(workspaceMembers).values(
+                  validMembers.map((t) => ({
+                    workspaceId: id,
+                    userId: t.workerId,
+                    role: ROLE_MAP[t.role] || "viewer",
+                  }))
+                );
+              }
+            }
+          } catch (err) {
+            console.warn(`[Workspace] Failed to sync team members: ${(err as Error).message}`);
           }
         }
       }
@@ -349,58 +535,65 @@ export const workspaceRouter = router({
       return submitForReview(input.id, ctx.user.id);
     }),
 
-  /** Begin review (ready_for_review → under_review) */
+  /** Begin review (ready_for_review → under_review) — admin/governance only */
   review: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Begin Review requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return beginReview(input.id, ctx.user.id);
     }),
 
-  /** Approve workspace (under_review → approved) */
+  /** Approve workspace (under_review → approved) — admin/governance only */
   approve: governedProcedure
     .input(z.object({ id: z.number(), notes: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Approve requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return approveWorkspace(input.id, ctx.user.id, input.notes);
     }),
 
-  /** Publish workspace (approved → published) — exposes to WS Catalog */
+  /** Publish workspace (approved → published) — admin/governance only */
   publish: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Publish requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return publishWorkspace(input.id, ctx.user.id);
     }),
 
-  /** Activate workspace (published → active) — makes fully executable */
+  /** Activate workspace (published → active) — admin/governance only */
   activate: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Activate requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return activateWorkspace(input.id, ctx.user.id);
     }),
 
-  /** Reject workspace (under_review → rejected) */
+  /** Reject workspace (under_review → rejected) — admin/governance only */
   reject: governedProcedure
     .input(z.object({ id: z.number(), reason: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Reject requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return rejectWorkspace(input.id, ctx.user.id, input.reason);
     }),
 
-  /** Archive workspace (active/approved/published → archived) */
+  /** Archive workspace — admin/governance only */
   archive: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Archive requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return archiveWorkspace(input.id, ctx.user.id);
     }),
 
-  /** Delete workspace (archived → deleted) */
+  /** Delete workspace (archived → deleted) — admin/governance only */
   delete: governedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Delete requires admin role" });
       await requireWorkspaceAccess(ctx.user.id, input.id);
       return softDeleteWorkspace(input.id, ctx.user.id);
     }),
@@ -419,6 +612,84 @@ export const workspaceRouter = router({
     .query(async ({ ctx, input }) => {
       await requireReadableWorkspaceRoute(ctx.user.id, input.id);
       return getWorkspaceLifecycleInfo(input.id);
+    }),
+
+  /** Get governance-readable review packet for a workspace */
+  getReviewPacket: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await requireReadableWorkspaceRoute(ctx.user.id, input.id);
+      const dbConn = getDb();
+      if (!dbConn) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Load workspace
+      const [ws] = await dbConn.select().from(workspaces)
+        .where(eq(workspaces.id, input.id)).limit(1);
+      if (!ws) throw new TRPCError({ code: "NOT_FOUND", message: "Workspace not found" });
+
+      const meta = ((ws as any).wizardMeta || {}) as Record<string, any>;
+
+      // Load team members
+      const members = await dbConn.select().from(workspaceMembers)
+        .where(eq(workspaceMembers.workspaceId, input.id));
+
+      // Load crew
+      const crew = await dbConn.select().from(workspaceCrew)
+        .where(eq(workspaceCrew.workspaceId, input.id));
+
+      // Compute readiness
+      const completeness = await validateDraftCompleteness(input.id);
+      const lifecycle = await getWorkspaceLifecycleInfo(input.id);
+
+      return {
+        identity: {
+          name: ws.name,
+          description: ws.description,
+          type: ws.type,
+          ownerId: ws.ownerId,
+          status: ws.status,
+        },
+        purpose: {
+          purposeType: ws.purposeType,
+          purposeStatement: (ws as any).purposeStatement || meta.purposeStatement || null,
+          purposeRef: ws.purposeRef,
+        },
+        anchor: {
+          anchorType: meta.anchorType || null,
+          anchorRef: meta.anchorRef || null,
+          anchorLabel: meta.anchorLabel || null,
+          anchorMeta: meta.anchorMeta || null,
+        },
+        team: members.map((m) => ({
+          id: m.id,
+          userId: m.userId,
+          role: m.role,
+        })),
+        crew: crew.map((c) => ({
+          id: c.id,
+          agentId: c.agentId,
+          agentName: c.agentName,
+          participantType: c.participantType,
+          role: c.role,
+          note: c.note,
+          enabled: c.enabled,
+        })),
+        activities: meta.activities || null,
+        needs: meta.needs || null,
+        configuration: {
+          wizardConfig: meta.configuration || null,
+          embeddingModel: ws.embeddingModel,
+          chunkingStrategy: ws.chunkingStrategy,
+          routingProfile: (ws as any).routingProfile || null,
+          resourceProfile: (ws as any).resourceProfile || null,
+          shellConfig: (ws as any).shellConfig || null,
+        },
+        readiness: {
+          complete: completeness.complete,
+          missingFields: completeness.missingFields,
+        },
+        lifecycle: lifecycle,
+      };
     }),
 
   // ============================================================================
@@ -602,6 +873,28 @@ export const workspaceRouter = router({
           .where(eq(workspaceActivityLog.workspaceId, input.workspaceId))
           .orderBy(desc(workspaceActivityLog.createdAt))
           .limit(input.limit);
+      }),
+
+    /** Log wizard step completion for audit trail */
+    logWizardStep: protectedProcedure
+      .input(z.object({
+        workspaceId: z.number(),
+        stepNumber: z.number().min(1).max(10),
+        stepId: z.string(),
+        phase: z.enum(["manager", "admin", "governance"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await logActivity({
+          workspaceId: input.workspaceId,
+          actorId: ctx.user.id,
+          action: "workspace.wizard.step.complete",
+          metadata: {
+            stepNumber: input.stepNumber,
+            stepId: input.stepId,
+            phase: input.phase,
+          },
+        }).catch(() => {});
+        return { success: true };
       }),
   }),
 

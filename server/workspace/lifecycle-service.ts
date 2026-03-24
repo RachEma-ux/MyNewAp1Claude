@@ -10,7 +10,7 @@
 
 import { eq } from "drizzle-orm";
 import { getDb } from "../db/connection";
-import { workspaces, type WorkspaceStatus } from "../../drizzle/schema";
+import { workspaces, workspaceMembers, workspaceCrew, type WorkspaceStatus, type WizardMeta } from "../../drizzle/schema";
 import {
   validateTransition,
   getAllowedTransitions,
@@ -18,6 +18,101 @@ import {
   isWorkspaceExecutable,
 } from "./workspace-lifecycle";
 import { logActivity } from "../modules/registry";
+
+// ============================================================================
+// Draft Completeness Validation — Promotion Gate for draft → ready_for_review
+// ============================================================================
+
+export interface CompletenessResult {
+  complete: boolean;
+  missingFields: string[];
+}
+
+/**
+ * Validate that a workspace draft has enough structured content
+ * to proceed to review. This enforces the governance-first promotion gate.
+ *
+ * Checks: identity, purpose, anchor, actors, activities, needs.
+ */
+export async function validateDraftCompleteness(
+  workspaceId: number
+): Promise<CompletenessResult> {
+  const db = getDb();
+  if (!db) return { complete: false, missingFields: ["database_unavailable"] };
+
+  const [ws] = await db.select().from(workspaces)
+    .where(eq(workspaces.id, workspaceId)).limit(1);
+  if (!ws) return { complete: false, missingFields: ["workspace_not_found"] };
+
+  const meta = (ws as any).wizardMeta as WizardMeta | null;
+  const missing: string[] = [];
+
+  // Identity
+  if (!ws.name || !ws.name.trim()) missing.push("name");
+  if (!ws.type) missing.push("type");
+
+  // Purpose
+  if (!ws.purposeType || ws.purposeType === "other") {
+    // "other" is allowed but purposeStatement must exist
+  }
+  if (!meta?.purposeStatement?.trim()) missing.push("purposeStatement");
+
+  // Anchor
+  if (!meta?.anchorType) missing.push("anchorType");
+
+  // Actors — at least one team member or crew member
+  const members = await db.select().from(workspaceMembers)
+    .where(eq(workspaceMembers.workspaceId, workspaceId));
+  const crew = await db.select().from(workspaceCrew)
+    .where(eq(workspaceCrew.workspaceId, workspaceId));
+  if (members.length === 0 && crew.length === 0) missing.push("actors (no team or crew)");
+
+  // Activities
+  if (!meta?.activities?.primaryType) missing.push("primaryActivityType");
+
+  // Needs — at least one need in any category
+  const hasNeeds = meta?.needs && Object.values(meta.needs).some(
+    (arr) => Array.isArray(arr) && arr.length > 0
+  );
+  if (!hasNeeds) missing.push("needs (no needs declared)");
+
+  // Configuration (admin phase) — required for review readiness
+  const cfg = meta?.configuration;
+  if (!cfg?.enabledModules || cfg.enabledModules.length === 0) {
+    missing.push("configuration.enabledModules (no modules enabled)");
+  }
+  if (!cfg?.routingProfile) {
+    missing.push("configuration.routingProfile");
+  }
+  if (!cfg?.resourceProfile) {
+    missing.push("configuration.resourceProfile");
+  }
+
+  // Capability model — required for enforceable access control
+  if (!cfg?.capabilityBundles || cfg.capabilityBundles.length === 0) {
+    missing.push("configuration.capabilityBundles (no capabilities defined)");
+  }
+
+  // Shell visibility — required for governance-reviewable workspace behavior
+  if (!cfg?.shellVisibility) {
+    missing.push("configuration.shellVisibility");
+  }
+
+  // Module/resource coherence — certain modules require elevated resources
+  if (cfg?.enabledModules && cfg.enabledModules.length > 0 && cfg.resourceProfile) {
+    const RESOURCE_RANK: Record<string, number> = { minimal: 1, standard: 2, elevated: 3, unrestricted: 4 };
+    const rank = RESOURCE_RANK[cfg.resourceProfile] || 0;
+    const heavyModules = cfg.enabledModules.filter((m) => m === "inference" || m === "models");
+    if (heavyModules.length > 0 && rank < 3) {
+      missing.push(`module_resource_mismatch: ${heavyModules.join(", ")} require elevated+ resource profile (current: ${cfg.resourceProfile})`);
+    }
+    if (cfg.enabledModules.includes("vectordb") && rank < 2) {
+      missing.push(`module_resource_mismatch: vectordb requires standard+ resource profile (current: ${cfg.resourceProfile})`);
+    }
+  }
+
+  return { complete: missing.length === 0, missingFields: missing };
+}
 
 // ============================================================================
 // Lifecycle Transition Service
@@ -87,22 +182,41 @@ export async function transitionWorkspace(
 /**
  * Submit workspace for review (draft → ready_for_review).
  * Manager action after completing workspace definition.
+ *
+ * Enforces the governance promotion gate: validates that identity, purpose,
+ * anchor, actors, activities, and needs are all present before transition.
  */
 export async function submitForReview(
   workspaceId: number,
   actorId: number
 ): Promise<TransitionResult> {
+  // Promotion gate: validate draft completeness before allowing transition
+  const completeness = await validateDraftCompleteness(workspaceId);
+  if (!completeness.complete) {
+    throw new Error(
+      `Workspace cannot be submitted for review. Missing: ${completeness.missingFields.join(", ")}`
+    );
+  }
   return transitionWorkspace(workspaceId, "ready_for_review", actorId);
 }
 
 /**
  * Begin review (ready_for_review → under_review).
  * Admin/governance action to start validation.
+ *
+ * Enforces content-based gate: re-validates draft completeness to ensure
+ * the review packet is coherent and nothing was corrupted after submission.
  */
 export async function beginReview(
   workspaceId: number,
   actorId: number
 ): Promise<TransitionResult> {
+  const completeness = await validateDraftCompleteness(workspaceId);
+  if (!completeness.complete) {
+    throw new Error(
+      `Workspace cannot begin review — review packet incomplete. Missing: ${completeness.missingFields.join(", ")}`
+    );
+  }
   return transitionWorkspace(workspaceId, "under_review", actorId);
 }
 

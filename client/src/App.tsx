@@ -301,7 +301,7 @@ function Router() {
       {/* Workspaces — workspace management surfaces */}
       <Route path="/ws/dashboard" component={() => <ProtectedRoute component={WSDashboardPage} />} />
       <Route path="/ws/control-panel" component={() => <ProtectedRoute component={WSControlPanelPage} />} />
-      <Route path="/ws/wizard" component={() => <ProtectedRoute component={WSWizardPage} />} />
+      <Route path="/ws/wizard/:id?" component={() => <ProtectedRoute component={WSWizardPage} />} />
       <Route path="/ws/list" component={() => <ProtectedRoute component={WSListPage} />} />
       <Route path="/ws/catalog" component={() => <ProtectedRoute component={WSCatalogPage} />} />
       {/* HR Module — Phase 2 Section Landing Pages (grouped entry points) */}
