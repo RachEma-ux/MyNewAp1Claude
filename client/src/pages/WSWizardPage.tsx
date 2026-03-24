@@ -339,39 +339,105 @@ interface WizardData {
   chunkingStrategy: string;
 }
 
+// ============================================================================
+// Default wizard data factory
+// ============================================================================
+
+function createDefaultWizardData(): WizardData {
+  return {
+    // Step 1: Identity
+    name: "",
+    description: "",
+    type: "team",
+    // Step 2: Purpose
+    purposeType: "project",
+    purposeStatement: "",
+    purposeRef: "",
+    // Step 3: Anchor
+    anchorType: "",
+    // Step 4: Scope Details
+    anchorRef: "",
+    anchorLabel: "",
+    anchorMeta: {},
+    // Step 5: Actors
+    team: [],
+    crewAgents: [],
+    // Step 6: Activities
+    primaryActivityType: "",
+    secondaryActivityTypes: [],
+    operatingMode: "",
+    executionStyle: "",
+    collaborationIntensity: "",
+    // Step 7: Needs
+    needs: {},
+    // Step 8: Configuration
+    enabledModules: [],
+    routingProfile: "AUTO",
+    resourceProfile: "",
+    capabilityBundles: [],
+    embeddingModel: "bge-small-en-v1.5",
+    chunkingStrategy: "semantic",
+  };
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
 export default function WSWizardPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const visibleStages = useMemo<WizardStage[]>(
-    () => isAdmin ? ALL_STAGES : MANAGER_STAGES,
-    [isAdmin]
-  );
-  const [currentStage, setCurrentStage] = useState<WizardStage>("identity");
+
+  // --- Visible steps based on role ---
+  const visibleSteps = useMemo<StepDef[]>(() => {
+    if (isAdmin) return STEPS;
+    return MANAGER_STEPS;
+  }, [isAdmin]);
+
+  // --- Wizard state ---
+  const [currentStepId, setCurrentStepId] = useState<WizardStep>("identity");
   const [draftId, setDraftId] = useState<number | null>(null);
-  const [data, setData] = useState<WizardData>({
-    name: "",
-    description: "",
-    type: "team",
-    purposeType: "project",
-    purposeRef: "",
-    teamMembers: [],
-    crewAgents: [],
-    activities: [],
-    needs: [],
-    embeddingModel: "bge-small-en-v1.5",
-    chunkingStrategy: "semantic",
-  });
-  const [newActivity, setNewActivity] = useState("");
-  const [newNeed, setNewNeed] = useState("");
+  const [data, setData] = useState<WizardData>(createDefaultWizardData);
+
+  // --- Crew add-form state ---
   const [newCrewType, setNewCrewType] = useState<CrewParticipantType>("agent");
   const [newCrewId, setNewCrewId] = useState("");
   const [newCrewName, setNewCrewName] = useState("");
   const [newCrewRole, setNewCrewRole] = useState<CrewRole>("executor");
   const [newCrewNote, setNewCrewNote] = useState("");
 
+  // --- Needs add-form state (per category) ---
+  const [needsInput, setNeedsInput] = useState<Record<string, string>>({});
+
+  // --- Catalog hooks ---
   const { options: agentOptions } = useCatalogAvailableAgents();
   const { options: botOptions } = useCatalogAvailableBots();
+
+  // --- Navigation helpers ---
+  const currentStep = STEPS.find((s) => s.id === currentStepId)!;
+  const currentIndex = visibleSteps.findIndex((s) => s.id === currentStepId);
+  const isFirst = currentIndex === 0;
+  const isLast = currentIndex === visibleSteps.length - 1;
+  const isManagerFinal = currentStepId === "needs";
+  const isAdminFinal = currentStepId === "configuration";
+
+  const goNext = () => {
+    if (currentIndex < visibleSteps.length - 1) {
+      setCurrentStepId(visibleSteps[currentIndex + 1].id);
+    }
+  };
+
+  const goPrev = () => {
+    if (currentIndex > 0) {
+      setCurrentStepId(visibleSteps[currentIndex - 1].id);
+    }
+  };
+
+  // --- Data helpers ---
+  const updateData = (partial: Partial<WizardData>) => {
+    setData((prev) => ({ ...prev, ...partial }));
+  };
 
   const handleCrewSelect = (id: string) => {
     setNewCrewId(id);
@@ -379,6 +445,94 @@ export default function WSWizardPage() {
     const match = opts.find((o) => String(o.id) === id);
     setNewCrewName(match?.label || "");
   };
+
+  const addCrewMember = () => {
+    if (!newCrewId) {
+      toast.error(`Select ${newCrewType === "agent" ? "an Agent" : "a Bot"} from the catalog`);
+      return;
+    }
+    if (data.crewAgents.some((c) => c.participantId === newCrewId && c.participantType === newCrewType)) {
+      toast.error("This participant is already in the crew");
+      return;
+    }
+    updateData({
+      crewAgents: [...data.crewAgents, {
+        participantType: newCrewType,
+        participantId: newCrewId,
+        participantName: newCrewName,
+        crewRole: newCrewRole,
+        note: newCrewNote,
+      }],
+    });
+    setNewCrewId("");
+    setNewCrewName("");
+    setNewCrewRole("executor");
+    setNewCrewNote("");
+  };
+
+  const removeCrewMember = (index: number) => {
+    updateData({ crewAgents: data.crewAgents.filter((_, i) => i !== index) });
+  };
+
+  const addTeamMember = (entry: DirectoryEntry, role: TeamMember["role"]) => {
+    if (data.team.some((t) => t.workerId === entry.workerId)) {
+      toast.error("This person is already on the team");
+      return;
+    }
+    updateData({
+      team: [...data.team, { workerId: entry.workerId, displayName: entry.displayName, role }],
+    });
+  };
+
+  const removeTeamMember = (index: number) => {
+    updateData({ team: data.team.filter((_, i) => i !== index) });
+  };
+
+  const addNeedItem = (category: string) => {
+    const val = (needsInput[category] || "").trim();
+    if (!val) return;
+    const current = data.needs[category] || [];
+    updateData({ needs: { ...data.needs, [category]: [...current, val] } });
+    setNeedsInput((prev) => ({ ...prev, [category]: "" }));
+  };
+
+  const removeNeedItem = (category: string, index: number) => {
+    const current = data.needs[category] || [];
+    updateData({ needs: { ...data.needs, [category]: current.filter((_, i) => i !== index) } });
+  };
+
+  // --- Build wizardMeta payload for server ---
+  const buildWizardMeta = () => ({
+    purposeStatement: data.purposeStatement,
+    anchorType: data.anchorType,
+    anchorRef: data.anchorRef,
+    anchorLabel: data.anchorLabel,
+    anchorMeta: data.anchorMeta,
+    team: {
+      owner: data.team.find((t) => t.role === "owner")
+        ? { workerId: data.team.find((t) => t.role === "owner")!.workerId, displayName: data.team.find((t) => t.role === "owner")!.displayName }
+        : undefined,
+      managers: data.team.filter((t) => t.role === "manager").map((t) => ({ workerId: t.workerId, displayName: t.displayName })),
+      members: data.team.filter((t) => t.role === "member").map((t) => ({ workerId: t.workerId, displayName: t.displayName })),
+      viewers: data.team.filter((t) => t.role === "viewer").map((t) => ({ workerId: t.workerId, displayName: t.displayName })),
+    },
+    activities: {
+      primaryType: data.primaryActivityType,
+      secondaryTypes: data.secondaryActivityTypes,
+      operatingMode: data.operatingMode,
+      executionStyle: data.executionStyle,
+      collaborationIntensity: data.collaborationIntensity,
+    },
+    needs: data.needs,
+    configuration: {
+      enabledModules: data.enabledModules,
+      routingProfile: data.routingProfile,
+      resourceProfile: data.resourceProfile,
+      capabilityBundles: data.capabilityBundles,
+    },
+    lastCompletedStep: currentStep.stepNumber,
+    wizardPhase: currentStep.phase,
+  });
 
   const buildCrewPayload = () =>
     data.crewAgents.length > 0
@@ -391,6 +545,7 @@ export default function WSWizardPage() {
         }))
       : undefined;
 
+  // --- Mutations ---
   const createMutation = trpc.workspaces.createDraft.useMutation({
     onSuccess: (ws: any) => {
       setDraftId(ws.id);
@@ -400,9 +555,7 @@ export default function WSWizardPage() {
   });
 
   const updateMutation = trpc.workspaces.updateDraft.useMutation({
-    onSuccess: () => {
-      toast.success("Draft saved");
-    },
+    onSuccess: () => toast.success("Draft saved"),
     onError: (err) => toast.error(err.message),
   });
 
@@ -410,7 +563,7 @@ export default function WSWizardPage() {
     onSuccess: (ws: any) => {
       setDraftId(ws.id);
       toast.success("Workspace submitted for review");
-      navigate(`/ws/list`);
+      navigate("/ws/list");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -418,7 +571,7 @@ export default function WSWizardPage() {
   const submitForReviewMutation = trpc.workspaces.submitForReview.useMutation({
     onSuccess: () => {
       toast.success("Workspace submitted for review");
-      navigate(`/ws/list`);
+      navigate("/ws/list");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -426,29 +579,14 @@ export default function WSWizardPage() {
   const isSaving = createMutation.isPending || updateMutation.isPending
     || createAndSubmitMutation.isPending || submitForReviewMutation.isPending;
 
-  const currentIndex = visibleStages.indexOf(currentStage);
-  const isFirst = currentIndex === 0;
-  const isLast = currentIndex === visibleStages.length - 1;
-
-  const goNext = () => {
-    if (currentIndex < visibleStages.length - 1) {
-      setCurrentStage(visibleStages[currentIndex + 1]);
-    }
-  };
-
-  const goPrev = () => {
-    if (currentIndex > 0) {
-      setCurrentStage(visibleStages[currentIndex - 1]);
-    }
-  };
-
+  // --- Save actions ---
   const saveDraft = () => {
     if (!data.name.trim()) {
       toast.error("Workspace name is required");
       return;
     }
+    const wizardMeta = buildWizardMeta();
     if (draftId) {
-      // Update existing draft
       updateMutation.mutate({
         id: draftId,
         name: data.name,
@@ -459,9 +597,9 @@ export default function WSWizardPage() {
         embeddingModel: data.embeddingModel,
         chunkingStrategy: data.chunkingStrategy as any,
         crew: buildCrewPayload(),
+        wizardMeta,
       });
     } else {
-      // Create new draft
       createMutation.mutate({
         name: data.name,
         description: data.description,
@@ -469,6 +607,7 @@ export default function WSWizardPage() {
         purposeType: data.purposeType as any,
         purposeRef: data.purposeRef,
         crew: buildCrewPayload(),
+        wizardMeta,
       });
     }
   };
@@ -478,8 +617,8 @@ export default function WSWizardPage() {
       toast.error("Workspace name is required");
       return;
     }
+    const wizardMeta = buildWizardMeta();
     if (draftId) {
-      // Update existing draft then submit for review
       updateMutation.mutate({
         id: draftId,
         name: data.name,
@@ -490,13 +629,13 @@ export default function WSWizardPage() {
         embeddingModel: data.embeddingModel,
         chunkingStrategy: data.chunkingStrategy as any,
         crew: buildCrewPayload(),
+        wizardMeta,
       }, {
         onSuccess: () => {
           submitForReviewMutation.mutate({ id: draftId! });
         },
       });
     } else {
-      // Create draft and submit in one action
       createAndSubmitMutation.mutate({
         name: data.name,
         description: data.description,
@@ -504,15 +643,10 @@ export default function WSWizardPage() {
         purposeType: data.purposeType as any,
         purposeRef: data.purposeRef,
         crew: buildCrewPayload(),
+        wizardMeta,
         submitForReview: true,
       });
     }
-  };
-
-  const getStagePhase = (stage: WizardStage): string => {
-    if (MANAGER_STAGES.includes(stage)) return "Manager";
-    if (ADMIN_STAGES.includes(stage)) return "Admin";
-    return "Governance";
   };
 
   return (
