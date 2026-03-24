@@ -1,0 +1,172 @@
+# HR Module — Governance Profile
+
+## Document Status
+
+- **Type:** Governance identity card
+- **Module:** Human Resources
+- **Last updated:** 2026-03-24
+
+---
+
+## 1. Module Identity
+
+| Field | Value |
+|---|---|
+| Module key | `hr` |
+| Display name | Human Resources |
+| tRPC root namespace | `hr.*` |
+| Backend domain path | `server/hr/` |
+| Frontend route prefix | `/hr/*` |
+| Database table prefix | `hr_*` |
+| Schema files | `drizzle/tables/hr-*.ts` (14 files) |
+| Module version | 7.3.0 |
+| Module posture | First-class domain module, workspace-consumable |
+
+---
+
+## 2. Governance Classification
+
+| Dimension | Classification |
+|---|---|
+| Data sensitivity | **High** — contains PII, compensation, disciplinary, investigation data |
+| Mutation sensitivity | **High** — employment lifecycle, assignment changes, compensation changes |
+| Audit requirement | **Mandatory** — all mutations logged, sensitive reads logged |
+| Policy enforcement | **Active** — role-based access, field masking, scope resolution |
+| Self-approval prevention | **Active** — enforced on time/leave/overtime/bonus/review approvals |
+| Fail mode | **Fail-closed** — missing permission = denied |
+
+---
+
+## 3. Carbon SideNav as Governance Surface
+
+The HR module's IBM Carbon-style SideNav is not just navigation — it is a **governance surface**. Every one of the 68 leaf items in the nav config declares governance metadata:
+
+### Nav-Level Governance Fields
+
+| Field | Governance Purpose |
+|---|---|
+| `requiredAction` | Maps to an HR_ACTIONS constant; determines who can see/access the item |
+| `visibilityMode` | Controls whether unauthorized users see the item (show, hide, show-disabled, redirect) |
+| `scopeType` | Classifies data visibility scope (self, team, all, sensitive, mixed) |
+| `maskingRequired` | Indicates backend applies field-level masking |
+| `maskingFieldSet` | Identifies which masking function applies (directory, compensation, relations, talent) |
+| `sensitiveReadAudit` | Whether reads trigger audit log entries |
+| `sensitiveAction` | Elevated permission that grants unmasked data access |
+| `scopeActions` | Scope resolution actions matching backend `resolveDataScope()` |
+
+### Why This Matters
+
+The canonical nav config (`client/src/config/hrNavConfig.ts`) serves as the single source of truth for:
+
+1. **What capabilities exist** — 68 items across 13 sections
+2. **Who can see what** — via `requiredAction` + `visibilityMode`
+3. **What data scope applies** — via `scopeType` + `scopeActions`
+4. **What gets masked** — via `maskingRequired` + `maskingFieldSet`
+5. **What triggers audit** — via `sensitiveReadAudit`
+6. **Implementation status** — via `backedBy` + `implementationStatus`
+
+This makes the nav config a **governance declaration**, not just a UI artifact.
+
+---
+
+## 4. Permission Model
+
+### Roles
+
+| Role | Scope | Description |
+|---|---|---|
+| `employee` | Self | Basic self-service access (own profile, timesheet, goals, leave) |
+| `manager` | Team | Team-scoped access (direct reports' data, team time/performance) |
+| `hrbp` | All | Organization-wide access with sensitive data (compensation, relations, talent) |
+| `admin` | All | Full administrative access including security and configuration |
+| `workspace_admin` | All | Same as admin; workspace-level administrative authority |
+
+### Permission Matrix
+
+The `HR_ROLE_PERMISSIONS` matrix in `server/hr/permissions.ts` maps each role to a set of ~60+ allowed actions. The actions follow a consistent naming pattern:
+
+```
+hr.<domain>.<operation>[.<scope>]
+```
+
+Examples: `hr.directory.read`, `hr.compensation.read.sensitive`, `hr.time.read.team`
+
+### Role Determination
+
+User's HR role is determined by `getHrRoleForUser()` in `server/hr/permissions.ts`. The role and allowed actions are exposed to the frontend via `hr.me.getRole` tRPC endpoint, consumed by `useHrRole()` hook.
+
+---
+
+## 5. Scope Model
+
+### Scope Types
+
+| Scope | Meaning | Resolution |
+|---|---|---|
+| `self` | User sees only own data | `resolveDataScope()` returns worker's own records |
+| `team` | Manager sees direct reports | `resolveDataScope()` returns team member records |
+| `all` | HRBP/admin sees all records | `resolveDataScope()` returns all records |
+| `sensitive` | Restricted data requiring elevated permissions | `checkHrAccess()` with sensitive action |
+| `mixed` | Scope varies by role | `resolveDataScope()` cascades global → team → self |
+
+### Scope Resolution Chain
+
+Backend `resolveDataScope(globalAction, teamAction, selfAction)` cascades:
+1. User has global action → returns `"all"` scope
+2. User has team action → returns `"team"` scope + team worker IDs
+3. User has self action → returns `"self"` scope + own worker ID
+4. None → returns `"none"` (denied)
+
+Client-side `resolveClientScope()` in `client/src/lib/hrNavAuth.ts` mirrors this logic for UI-level scope indicators.
+
+---
+
+## 6. Field Masking Model
+
+### Masking Functions
+
+| Function | Fields Masked | Domain |
+|---|---|---|
+| `maskDirectoryFields()` | primaryPhone, notes, costCenter, legalEntity | Directory |
+| `maskCompensationFields()` | baseSalary, amount, budgetPercent, employerContribution, employeeContribution | Compensation |
+| `maskRelationsFields()` | description, resolutionNotes, findings, recommendation, appealNotes | Relations |
+| `maskTalentFields()` | retentionRisk, developmentAreas, developmentNeeds, nineBoxPosition, readinessForPromotion | Talent |
+
+### Masking Bypass
+
+Users with the item's `sensitiveAction` (e.g., `hr.compensation.read.sensitive`) bypass field masking and see full data. All unmasked reads of sensitive data are audit-logged via `logSensitiveRead()`.
+
+---
+
+## 7. Self-Approval Prevention
+
+The `preventSelfApproval()` function in `server/hr/permissions.ts` blocks users from approving their own:
+
+- Time entry submissions
+- Leave requests
+- Overtime requests
+- Bonus awards
+- Performance reviews (manager self-review)
+
+---
+
+## 8. Workspace Integration
+
+HR is both a standalone module and a workspace-consumable service:
+
+| Surface | Namespace | Purpose |
+|---|---|---|
+| Global HR | `hr.*` | Full HR operations (directory, org, compensation, etc.) |
+| Workspace HR | `modules.hr.*` | Workspace-facing queries (staffing, assignments, availability) |
+
+Other modules consume HR through `modules.hr.*` — they never read HR tables directly.
+
+---
+
+## 9. Governance Orchestration Model
+
+Per AGENTS.md, all substantial HR changes must follow:
+
+**Planner → Builder → Reviewer → Tester → Governance**
+
+This governance pack documents the Governance agent's verification surface.
