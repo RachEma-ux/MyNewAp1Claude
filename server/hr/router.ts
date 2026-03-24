@@ -29,6 +29,7 @@ import { hrEngagementRouter } from "./engagement/router";
 import { hrComplianceRouter } from "./compliance/router";
 import { hrAnalyticsRouter } from "./analytics/router";
 import { hrTalentRouter } from "./talent/router";
+import { hrRoleDefinitionRouter } from "./role-definitions/router";
 import { seedHrDemoData } from "./seed";
 
 /** Returns current user's HR role and allowed actions — used by frontend for navigation gating */
@@ -43,7 +44,7 @@ const hrMeRouter = router({
 const hrSettingsRouter = router({
   get: protectedProcedure.query(() => ({
     module: "hr",
-    version: "7.3.0",
+    version: "8.0.0",
     features: {
       directory: true,
       organization: true,
@@ -76,6 +77,12 @@ const hrSettingsRouter = router({
       // Phase 7.2 SoD & audit
       selfApprovalPrevention: true,
       unifiedAuditQuery: true,
+      // Phase 8 — Role Definitions
+      roleDefinitions: true,
+      roleDefVersioning: true,
+      roleDefVisibilityEnforcement: true,
+      roleDefPositionLinkage: true,
+      roleDefReviewWorkflow: true,
     },
   })),
   seedDemo: adminProcedure
@@ -107,6 +114,8 @@ export const hrRouter = router({
   compliance: hrComplianceRouter,
   analytics: hrAnalyticsRouter,
   talent: hrTalentRouter,
+  // Role Definitions — Canonical versioned role-definition lifecycle
+  roleDefinitions: hrRoleDefinitionRouter,
   // Config
   settings: hrSettingsRouter,
   me: hrMeRouter,

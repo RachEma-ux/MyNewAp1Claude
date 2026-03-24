@@ -132,6 +132,12 @@ const HRLettersCertificatesPage = lazy(() => import("@/pages/hr/HRLettersCertifi
 const HRRiskManagementPage = lazy(() => import("@/pages/hr/HRRiskManagementPage"));
 const HRAuditLogsPage = lazy(() => import("@/pages/hr/HRAuditLogsPage"));
 const HRAccessControlsPage = lazy(() => import("@/pages/hr/HRAccessControlsPage"));
+// HR Module — Phase 8: Role Definitions
+const HRRoleDefinitionsPage = lazy(() => import("@/pages/hr/HRRoleDefinitionsPage"));
+const HRRoleDefinitionDetailPage = lazy(() => import("@/pages/hr/HRRoleDefinitionDetailPage"));
+const HRRoleDefinitionEditPage = lazy(() => import("@/pages/hr/HRRoleDefinitionEditPage"));
+const HRRoleDefinitionReviewPage = lazy(() => import("@/pages/hr/HRRoleDefinitionReviewPage"));
+const HRRoleDefinitionComparePage = lazy(() => import("@/pages/hr/HRRoleDefinitionComparePage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
@@ -268,6 +274,12 @@ const HrLettersCertificatesGated = hrGated(HRLettersCertificatesPage, "hr.direct
 const HrRiskManagementGated = hrGated(HRRiskManagementPage, "hr.risk.read");
 const HrAuditLogsGated = hrGated(HRAuditLogsPage, "hr.analytics.manage");
 const HrAccessControlsGated = hrGated(HRAccessControlsPage, "hr.analytics.manage");
+// Role Definitions — gated by role-def permissions
+const HrRoleDefinitionsGated = hrGated(HRRoleDefinitionsPage, "hr.roledef.read");
+const HrRoleDefinitionDetailGated = hrGated(HRRoleDefinitionDetailPage, "hr.roledef.read");
+const HrRoleDefinitionEditGated = hrGated(HRRoleDefinitionEditPage, "hr.roledef.draft");
+const HrRoleDefinitionReviewGated = hrGated(HRRoleDefinitionReviewPage, "hr.roledef.review");
+const HrRoleDefinitionCompareGated = hrGated(HRRoleDefinitionComparePage, "hr.roledef.read");
 
 function Router() {
   return (
@@ -330,6 +342,14 @@ function Router() {
       <Route path="/hr/compliance/risk-management" component={() => <ProtectedRoute component={HrRiskManagementGated} />} />
       <Route path="/hr/security-access/audit-logs" component={() => <ProtectedRoute component={HrAuditLogsGated} />} />
       <Route path="/hr/security-access/access-controls" component={() => <ProtectedRoute component={HrAccessControlsGated} />} />
+
+      {/* HR Role Definitions */}
+      <Route path="/hr/role-definitions" component={() => <ProtectedRoute component={HrRoleDefinitionsGated} />} />
+      <Route path="/hr/role-definitions/new" component={() => <ProtectedRoute component={HrRoleDefinitionEditGated} />} />
+      <Route path="/hr/role-definitions/review" component={() => <ProtectedRoute component={HrRoleDefinitionReviewGated} />} />
+      <Route path="/hr/role-definitions/:id/compare" component={() => <ProtectedRoute component={HrRoleDefinitionCompareGated} />} />
+      <Route path="/hr/role-definitions/:id/edit" component={() => <ProtectedRoute component={HrRoleDefinitionEditGated} />} />
+      <Route path="/hr/role-definitions/:id" component={() => <ProtectedRoute component={HrRoleDefinitionDetailGated} />} />
       <Route path="/hr" component={() => <ProtectedRoute component={HRHomePage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />

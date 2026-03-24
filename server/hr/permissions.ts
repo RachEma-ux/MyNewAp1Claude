@@ -111,6 +111,17 @@ export const HR_ACTIONS = {
   SUCCESSION_READ: "hr.succession.read",
   SUCCESSION_WRITE: "hr.succession.write",
   SUCCESSION_MANAGE: "hr.succession.manage",
+  // Role Definitions — Canonical role-definition lifecycle
+  ROLE_DEF_READ: "hr.roledef.read",
+  ROLE_DEF_READ_SELF: "hr.roledef.read.self",
+  ROLE_DEF_READ_RESTRICTED: "hr.roledef.read.restricted",
+  ROLE_DEF_DRAFT: "hr.roledef.draft",
+  ROLE_DEF_SUBMIT: "hr.roledef.submit",
+  ROLE_DEF_REVIEW: "hr.roledef.review",
+  ROLE_DEF_APPROVE: "hr.roledef.approve",
+  ROLE_DEF_PUBLISH: "hr.roledef.publish",
+  ROLE_DEF_RETIRE: "hr.roledef.retire",
+  ROLE_DEF_LINK_POSITION: "hr.roledef.link_position",
 } as const;
 
 /** Fields that should be masked in public directory responses */
@@ -148,6 +159,32 @@ export const MASKED_TALENT_FIELDS = [
   "readinessForPromotion",
 ] as const;
 
+/** Fields that should be masked in role-definition responses for non-HR users */
+export const MASKED_ROLE_DEF_RESTRICTED_FIELDS = [
+  "compensationNotes",
+  "successionNotes",
+  "restructuringNotes",
+  "sensitivityNotes",
+  "complianceNotes",
+  "sodConstraints",
+] as const;
+
+/** Fields visible only to managers and above in role-definition responses */
+export const MASKED_ROLE_DEF_MANAGER_FIELDS = [
+  "directReportsScope",
+  "escalationTriggers",
+] as const;
+
+/** Strip restricted fields from role-definition versions for non-privileged users. */
+export function maskRoleDefRestrictedFields<T extends Record<string, unknown>>(record: T): T {
+  return maskFields(record, MASKED_ROLE_DEF_RESTRICTED_FIELDS);
+}
+
+/** Strip manager-only fields from role-definition versions for employee-level users. */
+export function maskRoleDefManagerFields<T extends Record<string, unknown>>(record: T): T {
+  return maskFields(record, MASKED_ROLE_DEF_MANAGER_FIELDS);
+}
+
 // ============================================================================
 // Phase 5 — Role → Permission Matrix
 // ============================================================================
@@ -168,6 +205,7 @@ export const HR_ROLE_PERMISSIONS: Record<HrRole, readonly string[]> = {
     HR_ACTIONS.ENGAGEMENT_READ,
     HR_ACTIONS.SURVEY_READ,
     HR_ACTIONS.RECOGNITION_READ,
+    HR_ACTIONS.ROLE_DEF_READ_SELF,
   ],
   manager: [
     HR_ACTIONS.DIRECTORY_READ_TEAM,
@@ -193,6 +231,9 @@ export const HR_ROLE_PERMISSIONS: Record<HrRole, readonly string[]> = {
     HR_ACTIONS.RECOGNITION_READ,
     HR_ACTIONS.RECOGNITION_WRITE,
     HR_ACTIONS.TALENT_READ,
+    HR_ACTIONS.ROLE_DEF_READ,
+    HR_ACTIONS.ROLE_DEF_DRAFT,
+    HR_ACTIONS.ROLE_DEF_SUBMIT,
   ],
   hrbp: [
     HR_ACTIONS.DIRECTORY_READ,
@@ -244,6 +285,15 @@ export const HR_ROLE_PERMISSIONS: Record<HrRole, readonly string[]> = {
     HR_ACTIONS.TALENT_READ,
     HR_ACTIONS.TALENT_WRITE,
     HR_ACTIONS.SUCCESSION_READ,
+    HR_ACTIONS.ROLE_DEF_READ,
+    HR_ACTIONS.ROLE_DEF_READ_RESTRICTED,
+    HR_ACTIONS.ROLE_DEF_DRAFT,
+    HR_ACTIONS.ROLE_DEF_SUBMIT,
+    HR_ACTIONS.ROLE_DEF_REVIEW,
+    HR_ACTIONS.ROLE_DEF_APPROVE,
+    HR_ACTIONS.ROLE_DEF_PUBLISH,
+    HR_ACTIONS.ROLE_DEF_RETIRE,
+    HR_ACTIONS.ROLE_DEF_LINK_POSITION,
   ],
   admin: Object.values(HR_ACTIONS),
   workspace_admin: Object.values(HR_ACTIONS),
