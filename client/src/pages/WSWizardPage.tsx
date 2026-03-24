@@ -650,68 +650,188 @@ export default function WSWizardPage() {
   };
 
   return (
-    <PageShell title="Workspace Wizard" subtitle="Create a new workspace through the guided flow">
-      {/* Progress bar */}
-      <div className="flex items-center gap-1 mb-6 overflow-x-auto pb-2">
-        {visibleStages.map((stage, i) => {
-          const isActive = stage === currentStage;
-          const isPast = i < currentIndex;
-          return (
-            <button
-              key={stage}
-              onClick={() => setCurrentStage(stage)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : isPast
-                  ? "bg-primary/20 text-primary"
-                  : "bg-muted text-muted-foreground"
-              }`}
+    <PageShell title="Workspace Wizard" subtitle="Governance-first intake, configuration, review & promotion">
+      {/* ================================================================ */}
+      {/* TOP HEADER — Always visible: name, status, phase, owner          */}
+      {/* ================================================================ */}
+      <div className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 mb-4">
+        <div className="flex items-center gap-3">
+          <div>
+            <h2 className="text-base font-semibold">
+              {data.name || "New Workspace"}
+            </h2>
+            {data.purposeStatement && (
+              <p className="text-xs text-muted-foreground truncate max-w-[300px]">{data.purposeStatement}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">draft</Badge>
+          <Badge variant="secondary">{PHASE_LABELS[currentStep.phase]}</Badge>
+          {user?.name && (
+            <span className="text-xs text-muted-foreground">Owner: {user.name}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ================================================================ */}
+      {/* 3-COLUMN LAYOUT: Left Rail | Main Canvas | Right Panel           */}
+      {/* ================================================================ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_260px] gap-4">
+
+        {/* ============================================================== */}
+        {/* LEFT PHASE RAIL — grouped by phase, shows completion/lock       */}
+        {/* ============================================================== */}
+        <nav className="space-y-4 hidden lg:block">
+          {/* Manager Phase */}
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 px-1">Manager Phase</p>
+            <div className="space-y-0.5">
+              {MANAGER_STEPS.map((step) => {
+                const isActive = step.id === currentStepId;
+                const stepIdx = visibleSteps.findIndex((s) => s.id === step.id);
+                const isPast = stepIdx >= 0 && stepIdx < currentIndex;
+                const isAccessible = stepIdx >= 0;
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => isAccessible && setCurrentStepId(step.id)}
+                    disabled={!isAccessible}
+                    className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                      isActive
+                        ? "bg-primary text-primary-foreground font-medium"
+                        : isPast
+                        ? "text-primary bg-primary/10"
+                        : isAccessible
+                        ? "text-muted-foreground hover:bg-muted/50"
+                        : "text-muted-foreground/40 cursor-not-allowed"
+                    }`}
+                  >
+                    {isPast ? <Check className="h-3 w-3 shrink-0" /> : STEP_ICONS[step.id]}
+                    <span className="truncate">{step.stepNumber}. {step.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Admin Phase */}
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 px-1">Admin Phase</p>
+            <div className="space-y-0.5">
+              {ADMIN_STEPS.map((step) => {
+                const isActive = step.id === currentStepId;
+                const stepIdx = visibleSteps.findIndex((s) => s.id === step.id);
+                const isPast = stepIdx >= 0 && stepIdx < currentIndex;
+                const isLocked = !isAdmin;
+                const isAccessible = stepIdx >= 0 && !isLocked;
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => isAccessible && setCurrentStepId(step.id)}
+                    disabled={!isAccessible}
+                    className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                      isLocked
+                        ? "text-muted-foreground/40 cursor-not-allowed"
+                        : isActive
+                        ? "bg-primary text-primary-foreground font-medium"
+                        : isPast
+                        ? "text-primary bg-primary/10"
+                        : "text-muted-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {isLocked ? <Lock className="h-3 w-3 shrink-0" /> : isPast ? <Check className="h-3 w-3 shrink-0" /> : STEP_ICONS[step.id]}
+                    <span className="truncate">{step.stepNumber}. {step.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Governance Phase */}
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 px-1">Governance Phase</p>
+            <div className="space-y-0.5">
+              {GOVERNANCE_STEPS.map((step) => {
+                const isActive = step.id === currentStepId;
+                const stepIdx = visibleSteps.findIndex((s) => s.id === step.id);
+                const isPast = stepIdx >= 0 && stepIdx < currentIndex;
+                const isLocked = !isAdmin;
+                const isAccessible = stepIdx >= 0 && !isLocked;
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => isAccessible && setCurrentStepId(step.id)}
+                    disabled={!isAccessible}
+                    className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                      isLocked
+                        ? "text-muted-foreground/40 cursor-not-allowed"
+                        : isActive
+                        ? "bg-primary text-primary-foreground font-medium"
+                        : isPast
+                        ? "text-primary bg-primary/10"
+                        : "text-muted-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {isLocked ? <Lock className="h-3 w-3 shrink-0" /> : isPast ? <Check className="h-3 w-3 shrink-0" /> : STEP_ICONS[step.id]}
+                    <span className="truncate">{step.stepNumber}. {step.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </nav>
+
+        {/* ============================================================== */}
+        {/* MOBILE STEP BAR — horizontal pills (visible on small screens)   */}
+        {/* ============================================================== */}
+        <div className="lg:hidden flex items-center gap-1 mb-2 overflow-x-auto pb-2 col-span-full">
+          {visibleSteps.map((step, i) => {
+            const isActive = step.id === currentStepId;
+            const isPast = i < currentIndex;
+            return (
+              <button
+                key={step.id}
+                onClick={() => setCurrentStepId(step.id)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors ${
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : isPast
+                    ? "bg-primary/20 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {isPast ? <Check className="h-3 w-3" /> : STEP_ICONS[step.id]}
+                {step.stepNumber}
+              </button>
+            );
+          })}
+          {!isAdmin && [...ADMIN_STEPS, ...GOVERNANCE_STEPS].map((step) => (
+            <span
+              key={step.id}
+              className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] whitespace-nowrap bg-muted/50 text-muted-foreground/40 cursor-not-allowed"
             >
-              {isPast ? <Check className="h-3 w-3" /> : STAGE_ICONS[stage]}
-              {STAGE_LABELS[stage]}
-            </button>
-          );
-        })}
-        {/* Show locked admin/governance stages to non-admin users */}
-        {!isAdmin && [...ADMIN_STAGES, ...GOVERNANCE_STAGES].map((stage) => (
-          <span
-            key={stage}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-muted/50 text-muted-foreground/50 cursor-not-allowed"
-            title={`${STAGE_LABELS[stage]} — Admin only`}
-          >
-            <Lock className="h-3 w-3" />
-            {STAGE_LABELS[stage]}
-          </span>
-        ))}
-      </div>
+              <Lock className="h-3 w-3" />{step.stepNumber}
+            </span>
+          ))}
+        </div>
 
-      <div className="flex items-center gap-2 mb-4">
-        <Badge variant="outline">{getStagePhase(currentStage)} Phase</Badge>
-        <span className="text-sm text-muted-foreground">
-          Step {currentIndex + 1} of {visibleStages.length}
-          {!isAdmin && <span className="text-muted-foreground/60"> (Manager)</span>}
-        </span>
-      </div>
-
-      {/* Stage content */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {STAGE_ICONS[currentStage]}
-            {STAGE_LABELS[currentStage]}
-          </CardTitle>
-          <CardDescription>
-            {currentStage === "identity" && "Define the workspace identity — name, description, type."}
-            {currentStage === "purpose" && "What is this workspace for? Define its purpose."}
-            {currentStage === "actors" && "Who will participate? Define team members and AI crew."}
-            {currentStage === "activities" && "What activities will take place in this workspace?"}
-            {currentStage === "needs" && "What resources and tools does this workspace need?"}
-            {currentStage === "configuration" && "Administrative configuration for governance readiness."}
-            {currentStage === "review" && "Review the workspace definition before submission."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        {/* ============================================================== */}
+        {/* MAIN FORM CANVAS                                                */}
+        {/* ============================================================== */}
+        <div>
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                {STEP_ICONS[currentStepId]}
+                {currentStep.label}
+              </CardTitle>
+              <CardDescription>{currentStep.question}</CardDescription>
+              <p className="text-[11px] text-muted-foreground/70 italic mt-1">
+                Governance: {currentStep.governanceHint}
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
           {/* Identity Stage */}
           {currentStage === "identity" && (
             <>
@@ -1097,31 +1217,97 @@ export default function WSWizardPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+          </Card>
 
-      {/* Navigation — Previous | Save as Draft | Right action */}
-      {/* Right action is mutually exclusive: Next OR Submit for Review OR empty */}
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={goPrev} disabled={isFirst}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Previous
-        </Button>
-        <Button variant="outline" onClick={saveDraft} disabled={isSaving}>
-          <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving..." : "Save as Draft"}
-        </Button>
-        {isLast && isAdmin ? (
-          <Button onClick={saveAndSubmitForReview} disabled={isSaving}>
-            <Shield className="h-4 w-4 mr-1" /> Save & Submit for Review
-          </Button>
-        ) : isLast ? (
-          <Button variant="outline" disabled className="invisible">
-            <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
-        ) : (
-          <Button onClick={goNext}>
-            Next <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
-        )}
-      </div>
+          {/* Footer Actions — [ Previous ] [ Save as Draft ] [ Next / Submit ] */}
+          <div className="flex items-center justify-between">
+            <Button variant="outline" onClick={goPrev} disabled={isFirst}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Previous
+            </Button>
+            <Button variant="outline" onClick={saveDraft} disabled={isSaving}>
+              <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving..." : "Save as Draft"}
+            </Button>
+            {isAdminFinal && isAdmin ? (
+              <Button onClick={saveAndSubmitForReview} disabled={isSaving}>
+                <Shield className="h-4 w-4 mr-1" /> Save as Ready for Review
+              </Button>
+            ) : isLast ? (
+              <span />
+            ) : (
+              <Button onClick={goNext}>
+                Next <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* ============================================================== */}
+        {/* RIGHT COMPLIANCE PANEL — live readiness view (Phase 5)          */}
+        {/* ============================================================== */}
+        <aside className="hidden lg:block space-y-3">
+          <div className="rounded-lg border bg-card p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Readiness
+            </h3>
+            {/* Draft readiness checks */}
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center gap-1.5">
+                {data.name ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.name ? "text-muted-foreground" : ""}>Identity complete</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {data.purposeType && data.purposeStatement ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.purposeType && data.purposeStatement ? "text-muted-foreground" : ""}>Purpose complete</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {data.anchorType ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.anchorType ? "text-muted-foreground" : ""}>Anchor complete</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {data.team.some((t) => t.role === "owner") ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.team.some((t) => t.role === "owner") ? "text-muted-foreground" : ""}>Owner assigned</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {data.team.length > 0 || data.crewAgents.length > 0 ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.team.length > 0 || data.crewAgents.length > 0 ? "text-muted-foreground" : ""}>Team/Crew valid</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {data.primaryActivityType ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={data.primaryActivityType ? "text-muted-foreground" : ""}>Activities defined</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {Object.values(data.needs).some((arr) => arr.length > 0) ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                <span className={Object.values(data.needs).some((arr) => arr.length > 0) ? "text-muted-foreground" : ""}>Needs declared</span>
+              </div>
+            </div>
+
+            {/* Review readiness — admin */}
+            {isAdmin && (
+              <>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-4 mb-2">
+                  Review Readiness
+                </h3>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    {data.enabledModules.length > 0 ? <Check className="h-3 w-3 text-green-500" /> : <AlertCircle className="h-3 w-3 text-amber-500" />}
+                    <span className={data.enabledModules.length > 0 ? "text-muted-foreground" : ""}>Configuration complete</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Current step info */}
+          <div className="rounded-lg border bg-card p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Current Step
+            </h3>
+            <p className="text-xs">{currentStep.stepNumber}. {currentStep.label}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">{currentStep.question}</p>
+          </div>
+        </aside>
+
+      </div>{/* end 3-column grid */}
     </PageShell>
   );
 }
