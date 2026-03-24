@@ -49,7 +49,7 @@ Navigational map of all governance-related content in this repository.
 
 | Module | Governance Status | Key File |
 |---|---|---|
-| [Human Resources](../modules/human-resources/README.md) | Full | governedProcedure + permissions + SoD + masking |
+| [Human Resources](../modules/human-resources/README.md) | Full — complete module governance package (11 files) | governedProcedure + permissions + SoD + masking + Carbon SideNav |
 | [AI Types](../modules/ai-types/README.md) | Partial | governedProcedure + policy engines |
 | [Workspace](../modules/workspace/README.md) | Partial | hasWorkspaceAccess |
 | [Automation](../modules/automation/README.md) | Minimal | protectedProcedure only |
