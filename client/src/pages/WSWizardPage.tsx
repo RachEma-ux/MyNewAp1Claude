@@ -1440,12 +1440,96 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* ======== Step 8: Configuration (Admin) ======== */}
+          {/* ======== Step 8: Configuration (Admin Phase) ======== */}
           {currentStepId === "configuration" && isAdmin && (
             <>
+              <p className="text-xs text-muted-foreground mb-3">
+                Translate the manager's intent into enforceable workspace behavior. This is where the workspace becomes policy-aware.
+              </p>
+
+              {/* Module Enablement */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Enabled Modules</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {["chat", "documents", "agents", "automation", "wiki", "inference", "embeddings", "vectordb", "models"].map((mod) => {
+                    const isOn = data.enabledModules.includes(mod);
+                    return (
+                      <button
+                        key={mod}
+                        onClick={() => {
+                          if (isOn) updateData({ enabledModules: data.enabledModules.filter((m) => m !== mod) });
+                          else updateData({ enabledModules: [...data.enabledModules, mod] });
+                        }}
+                        className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                          isOn
+                            ? "bg-primary/15 text-primary border border-primary/30"
+                            : "bg-muted text-muted-foreground border border-transparent hover:bg-muted/80"
+                        }`}
+                      >
+                        {mod.charAt(0).toUpperCase() + mod.slice(1)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Routing Profile */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Routing Profile</label>
+                <Select value={data.routingProfile} onValueChange={(v) => updateData({ routingProfile: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUTO">Auto</SelectItem>
+                    <SelectItem value="LOCAL_ONLY">Local Only</SelectItem>
+                    <SelectItem value="CLOUD_ALLOWED">Cloud Allowed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Resource Profile */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Resource Profile</label>
+                <Select value={data.resourceProfile} onValueChange={(v) => updateData({ resourceProfile: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select profile..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="minimal">Minimal — low compute, limited storage</SelectItem>
+                    <SelectItem value="standard">Standard — balanced allocation</SelectItem>
+                    <SelectItem value="elevated">Elevated — GPU access, larger storage</SelectItem>
+                    <SelectItem value="unrestricted">Unrestricted — full resource access</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Capability Bundles */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Capability Bundles</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {["read", "write", "execute", "manage", "export", "import", "configure", "audit"].map((cap) => {
+                    const isOn = data.capabilityBundles.includes(cap);
+                    return (
+                      <button
+                        key={cap}
+                        onClick={() => {
+                          if (isOn) updateData({ capabilityBundles: data.capabilityBundles.filter((c) => c !== cap) });
+                          else updateData({ capabilityBundles: [...data.capabilityBundles, cap] });
+                        }}
+                        className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                          isOn
+                            ? "bg-primary/15 text-primary border border-primary/30"
+                            : "bg-muted text-muted-foreground border border-transparent hover:bg-muted/80"
+                        }`}
+                      >
+                        {cap.charAt(0).toUpperCase() + cap.slice(1)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Embedding Model */}
               <div>
                 <label className="text-sm font-medium mb-1 block">Embedding Model</label>
-                <Select value={data.embeddingModel} onValueChange={(v) => setData({ ...data, embeddingModel: v })}>
+                <Select value={data.embeddingModel} onValueChange={(v) => updateData({ embeddingModel: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="bge-small-en-v1.5">BGE Small EN v1.5</SelectItem>
@@ -1454,9 +1538,11 @@ export default function WSWizardPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Chunking Strategy */}
               <div>
                 <label className="text-sm font-medium mb-1 block">Chunking Strategy</label>
-                <Select value={data.chunkingStrategy} onValueChange={(v) => setData({ ...data, chunkingStrategy: v })}>
+                <Select value={data.chunkingStrategy} onValueChange={(v) => updateData({ chunkingStrategy: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="semantic">Semantic</SelectItem>
@@ -1468,48 +1554,194 @@ export default function WSWizardPage() {
             </>
           )}
 
-          {/* ======== Step 9: Review Packet (Governance) ======== */}
+          {/* ======== Step 9: Review Packet (Governance Phase) ======== */}
           {currentStepId === "reviewPacket" && isAdmin && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-muted-foreground">Name:</span> {data.name || "—"}</div>
-                <div><span className="text-muted-foreground">Type:</span> {data.type}</div>
-                <div><span className="text-muted-foreground">Purpose:</span> {data.purposeType}</div>
-                <div><span className="text-muted-foreground">Ref:</span> {data.purposeRef || "—"}</div>
-              </div>
-              {data.description && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Description:</span> {data.description}
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                This is the governance-readable workspace dossier. Review all sections before proceeding to promotion.
+              </p>
+
+              {/* Identity */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Identity</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="text-muted-foreground">Name:</span> {data.name || "—"}</div>
+                  <div><span className="text-muted-foreground">Type:</span> {data.type || "—"}</div>
                 </div>
-              )}
-              {data.crewAgents.length > 0 && (
+                {data.description && <p className="text-sm text-muted-foreground">{data.description}</p>}
+              </div>
+
+              {/* Purpose */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Purpose</h4>
                 <div className="text-sm">
-                  <span className="text-muted-foreground block mb-1">Crew:</span>
-                  <div className="space-y-1 ml-2">
-                    {data.crewAgents.map((a, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-xs">
-                        {a.participantType === "agent" ? <Workflow className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
-                        <span>{a.participantName || `#${a.participantId}`}</span>
-                        <Badge variant="outline" className="text-[10px]">{a.participantType}</Badge>
-                        <Badge variant="secondary" className="text-[10px]">{a.crewRole}</Badge>
-                        {a.note && <span className="text-muted-foreground">— {a.note}</span>}
+                  <span className="text-muted-foreground">Type:</span>{" "}
+                  {PURPOSE_TYPES.find((p) => p.value === data.purposeType)?.label || data.purposeType}
+                </div>
+                {data.purposeStatement && <p className="text-sm">{data.purposeStatement}</p>}
+                {data.purposeRef && <p className="text-xs text-muted-foreground">Ref: {data.purposeRef}</p>}
+              </div>
+
+              {/* Anchor & Scope */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Anchor & Scope</h4>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Anchor:</span>{" "}
+                  {ANCHOR_TYPES.find((a) => a.value === data.anchorType)?.label || data.anchorType || "—"}
+                </div>
+                {data.anchorLabel && <div className="text-sm"><span className="text-muted-foreground">Label:</span> {data.anchorLabel}</div>}
+                {data.anchorRef && <div className="text-sm"><span className="text-muted-foreground">Ref:</span> {data.anchorRef}</div>}
+              </div>
+
+              {/* Team */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team</h4>
+                {data.team.length === 0 ? (
+                  <p className="text-xs text-amber-600">No team members assigned</p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {data.team.map((t, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <Users className="h-3 w-3 text-muted-foreground" />
+                        <span>{t.displayName}</span>
+                        <Badge variant="outline" className="text-[10px]">{t.role}</Badge>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-              {data.activities.length > 0 && (
+                )}
+              </div>
+
+              {/* Crew */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Crew</h4>
+                {data.crewAgents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No AI participants</p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {data.crewAgents.map((c, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-xs">
+                        {c.participantType === "agent" ? <Workflow className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
+                        <span>{c.participantName || `#${c.participantId}`}</span>
+                        <Badge variant="outline" className="text-[10px]">{c.participantType}</Badge>
+                        <Badge variant="secondary" className="text-[10px]">{c.crewRole}</Badge>
+                        {c.note && <span className="text-muted-foreground">— {c.note}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Activities */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Activities</h4>
                 <div className="text-sm">
-                  <span className="text-muted-foreground">Activities:</span>{" "}
-                  {data.activities.join(", ")}
+                  <span className="text-muted-foreground">Primary:</span>{" "}
+                  {data.primaryActivityType ? data.primaryActivityType.replace(/_/g, " ") : "—"}
                 </div>
-              )}
-              {data.needs.length > 0 && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Needs:</span>{" "}
-                  {data.needs.join(", ")}
+                {data.secondaryActivityTypes.length > 0 && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Secondary:</span>{" "}
+                    {data.secondaryActivityTypes.map((s) => s.replace(/_/g, " ")).join(", ")}
+                  </div>
+                )}
+                {data.operatingMode && <div className="text-sm"><span className="text-muted-foreground">Mode:</span> {data.operatingMode}</div>}
+                {data.executionStyle && <div className="text-sm"><span className="text-muted-foreground">Style:</span> {data.executionStyle.replace(/_/g, " ")}</div>}
+              </div>
+
+              {/* Needs */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Needs</h4>
+                {Object.entries(data.needs).filter(([, v]) => v.length > 0).length === 0 ? (
+                  <p className="text-xs text-amber-600">No needs declared</p>
+                ) : (
+                  Object.entries(data.needs).filter(([, v]) => v.length > 0).map(([key, items]) => (
+                    <div key={key} className="text-sm">
+                      <span className="text-muted-foreground capitalize">{key}:</span> {items.join(", ")}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Configuration */}
+              <div className="rounded-md border p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Configuration</h4>
+                {data.enabledModules.length > 0 && (
+                  <div className="text-sm"><span className="text-muted-foreground">Modules:</span> {data.enabledModules.join(", ")}</div>
+                )}
+                <div className="text-sm"><span className="text-muted-foreground">Routing:</span> {data.routingProfile}</div>
+                {data.resourceProfile && <div className="text-sm"><span className="text-muted-foreground">Resources:</span> {data.resourceProfile}</div>}
+                {data.capabilityBundles.length > 0 && (
+                  <div className="text-sm"><span className="text-muted-foreground">Capabilities:</span> {data.capabilityBundles.join(", ")}</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ======== Step 10: Promotion (Governance Phase) ======== */}
+          {currentStepId === "promotion" && isAdmin && (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Lifecycle control — not form filling. Each transition is a distinct governance action.
+              </p>
+
+              {/* Current status display */}
+              <div className="rounded-md border p-4 text-center space-y-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Current Status</p>
+                <Badge className="text-sm px-3 py-1">draft</Badge>
+              </div>
+
+              {/* Status distinction callout */}
+              <div className="rounded-md bg-muted/50 p-3 text-xs space-y-1">
+                <p className="font-medium">Important distinctions:</p>
+                <p className="text-muted-foreground"><strong>Approved</strong> does not mean Published</p>
+                <p className="text-muted-foreground"><strong>Published</strong> does not mean Active</p>
+                <p className="text-muted-foreground">Each state requires an explicit governance action.</p>
+              </div>
+
+              {/* Promotion actions */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Available Actions</h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* Begin Review — draft status */}
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={saveAndSubmitForReview}
+                    disabled={isSaving}
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Submit for Review
+                  </Button>
+
+                  {/* These would be enabled based on actual workspace status from server */}
+                  <Button variant="outline" className="justify-start" disabled>
+                    <Check className="h-4 w-4 mr-2" />
+                    Approve
+                  </Button>
+                  <Button variant="outline" className="justify-start" disabled>
+                    <PackageCheck className="h-4 w-4 mr-2" />
+                    Publish
+                  </Button>
+                  <Button variant="outline" className="justify-start" disabled>
+                    <ArrowUpRight className="h-4 w-4 mr-2" />
+                    Activate
+                  </Button>
+                  <Button variant="destructive" className="justify-start" disabled>
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+                  <Button variant="secondary" className="justify-start" disabled>
+                    <Lock className="h-4 w-4 mr-2" />
+                    Archive
+                  </Button>
                 </div>
-              )}
+
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Actions become available as the workspace progresses through its lifecycle.
+                  Only "Submit for Review" is available for drafts.
+                </p>
+              </div>
             </div>
           )}
         </CardContent>
