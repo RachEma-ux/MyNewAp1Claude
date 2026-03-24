@@ -818,6 +818,28 @@ export const workspaceRouter = router({
           .orderBy(desc(workspaceActivityLog.createdAt))
           .limit(input.limit);
       }),
+
+    /** Log wizard step completion for audit trail */
+    logWizardStep: protectedProcedure
+      .input(z.object({
+        workspaceId: z.number(),
+        stepNumber: z.number().min(1).max(10),
+        stepId: z.string(),
+        phase: z.enum(["manager", "admin", "governance"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await logActivity({
+          workspaceId: input.workspaceId,
+          actorId: ctx.user.id,
+          action: "workspace.wizard.step.complete",
+          metadata: {
+            stepNumber: input.stepNumber,
+            stepId: input.stepId,
+            phase: input.phase,
+          },
+        }).catch(() => {});
+        return { success: true };
+      }),
   }),
 
   // ============================================================================

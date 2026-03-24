@@ -506,8 +506,20 @@ export default function WSWizardPage() {
   const isManagerFinal = currentStepId === "needs";
   const isAdminFinal = currentStepId === "configuration";
 
+  // --- Step audit trail ---
+  const logStepMutation = trpc.workspaces.activity.logWizardStep.useMutation();
+
   const goNext = () => {
     if (currentIndex < visibleSteps.length - 1) {
+      // Log step completion for audit trail (fire-and-forget)
+      if (draftId) {
+        logStepMutation.mutate({
+          workspaceId: draftId,
+          stepNumber: currentStep.stepNumber,
+          stepId: currentStep.id,
+          phase: currentStep.phase,
+        });
+      }
       setCurrentStepId(visibleSteps[currentIndex + 1].id);
     }
   };
