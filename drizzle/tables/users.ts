@@ -168,6 +168,7 @@ export const workspaces = pgTable("workspaces", {
 
   // Workspace purpose — what this workspace is organized around
   purposeType: varchar("purposeType", { length: 50 }).default("other"),
+  purposeStatement: text("purposeStatement"),
   purposeRef: text("purposeRef"),
 
   // Workspace settings

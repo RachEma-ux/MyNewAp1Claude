@@ -112,6 +112,7 @@ export const workspaceRouter = router({
         ownerId: ctx.user.id,
         status: "draft",
         purposeType: input.purposeType || PURPOSE_TYPE_MAP[workspaceType] || "other",
+        purposeStatement: (input.wizardMeta as any)?.purposeStatement || null,
         purposeRef: input.purposeRef,
         embeddingModel: input.embeddingModel,
         chunkingStrategy: input.chunkingStrategy,
@@ -355,6 +356,10 @@ export const workspaceRouter = router({
       const dbUpdates: Record<string, unknown> = { ...updates, updatedAt: new Date() };
       if (wizardMeta !== undefined) {
         dbUpdates.wizardMeta = wizardMeta;
+        // Sync purposeStatement to dedicated column
+        if ((wizardMeta as any).purposeStatement !== undefined) {
+          dbUpdates.purposeStatement = (wizardMeta as any).purposeStatement || null;
+        }
         // Sync wizardMeta.configuration to real workspace columns
         const cfg = (wizardMeta as any).configuration;
         if (cfg) {
