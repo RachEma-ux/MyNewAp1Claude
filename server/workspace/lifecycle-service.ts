@@ -76,6 +76,23 @@ export async function validateDraftCompleteness(
   );
   if (!hasNeeds) missing.push("needs (no needs declared)");
 
+  // Configuration (admin phase) — required for review readiness
+  const cfg = meta?.configuration;
+  if (!cfg?.enabledModules || cfg.enabledModules.length === 0) {
+    missing.push("configuration.enabledModules (no modules enabled)");
+  }
+  if (!cfg?.routingProfile) {
+    missing.push("configuration.routingProfile");
+  }
+  if (!cfg?.resourceProfile) {
+    missing.push("configuration.resourceProfile");
+  }
+
+  // Capability model — required for enforceable access control
+  if (!cfg?.capabilityBundles || cfg.capabilityBundles.length === 0) {
+    missing.push("configuration.capabilityBundles (no capabilities defined)");
+  }
+
   return { complete: missing.length === 0, missingFields: missing };
 }
 
