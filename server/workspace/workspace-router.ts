@@ -16,9 +16,10 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import * as db from "../db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import {
+  users,
   workspaces,
   workspaceMembers,
   workspaceCrew,
@@ -210,13 +211,25 @@ export const workspaceRouter = router({
               // Insert non-owner team members (owner already inserted by createWorkspace)
               const nonOwner = teamRows.filter((t) => t.role !== "owner");
               if (nonOwner.length > 0) {
-                await dbConn.insert(workspaceMembers).values(
-                  nonOwner.map((t) => ({
-                    workspaceId: wsId,
-                    userId: t.workerId,
-                    role: ROLE_MAP[t.role] || "viewer",
-                  }))
-                );
+                // Validate workerIds exist as user IDs before inserting
+                const workerIds = nonOwner.map((t) => t.workerId);
+                const validUsers = await dbConn.select({ id: users.id }).from(users)
+                  .where(inArray(users.id, workerIds));
+                const validIds = new Set(validUsers.map((u) => u.id));
+                const validMembers = nonOwner.filter((t) => validIds.has(t.workerId));
+                const skipped = nonOwner.filter((t) => !validIds.has(t.workerId));
+                if (skipped.length > 0) {
+                  console.warn(`[Workspace] Skipped ${skipped.length} team member(s) with invalid user IDs: ${skipped.map((t) => t.workerId).join(", ")}`);
+                }
+                if (validMembers.length > 0) {
+                  await dbConn.insert(workspaceMembers).values(
+                    validMembers.map((t) => ({
+                      workspaceId: wsId,
+                      userId: t.workerId,
+                      role: ROLE_MAP[t.role] || "viewer",
+                    }))
+                  );
+                }
               }
             } catch (err) {
               console.warn(`[Workspace] Failed to persist team members: ${(err as Error).message}`);
@@ -457,16 +470,27 @@ export const workspaceRouter = router({
               await dbConn.delete(workspaceMembers)
                 .where(and(eq(workspaceMembers.workspaceId, id), eq(workspaceMembers.id, m.id)));
             }
-            // Re-insert non-owner team members
+            // Re-insert non-owner team members (validate workerIds exist as user IDs)
             const nonOwner = teamRows.filter((t) => t.role !== "owner");
             if (nonOwner.length > 0) {
-              await dbConn.insert(workspaceMembers).values(
-                nonOwner.map((t) => ({
-                  workspaceId: id,
-                  userId: t.workerId,
-                  role: ROLE_MAP[t.role] || "viewer",
-                }))
-              );
+              const workerIds = nonOwner.map((t) => t.workerId);
+              const validUsers = await dbConn.select({ id: users.id }).from(users)
+                .where(inArray(users.id, workerIds));
+              const validIds = new Set(validUsers.map((u) => u.id));
+              const validMembers = nonOwner.filter((t) => validIds.has(t.workerId));
+              const skipped = nonOwner.filter((t) => !validIds.has(t.workerId));
+              if (skipped.length > 0) {
+                console.warn(`[Workspace] Skipped ${skipped.length} team member(s) with invalid user IDs: ${skipped.map((t) => t.workerId).join(", ")}`);
+              }
+              if (validMembers.length > 0) {
+                await dbConn.insert(workspaceMembers).values(
+                  validMembers.map((t) => ({
+                    workspaceId: id,
+                    userId: t.workerId,
+                    role: ROLE_MAP[t.role] || "viewer",
+                  }))
+                );
+              }
             }
           } catch (err) {
             console.warn(`[Workspace] Failed to sync team members: ${(err as Error).message}`);
