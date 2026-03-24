@@ -34,6 +34,16 @@ Governance-Centrale/
 | [MODULE_NAV_EXCEPTION_REGISTRY.md](global/MODULE_NAV_EXCEPTION_REGISTRY.md) | Formal exception model for non-compliant/partial states (8 active entries) |
 | [MODULE_NAV_COMPLIANCE_REPORT.md](global/MODULE_NAV_COMPLIANCE_REPORT.md) | Current platform-wide compliance snapshot with file-existence verification |
 
+## Contributor Workflow & Handoff (Phase 14)
+
+| Document | Purpose |
+|---|---|
+| [MODULE_NAV_WORKFLOW.md](global/MODULE_NAV_WORKFLOW.md) | Step-by-step contributor workflow for all nav change types |
+| [MODULE_NAV_DECISION_TREE.md](global/MODULE_NAV_DECISION_TREE.md) | Decision guide for adoption path selection |
+| [MODULE_NAV_HANDOFF_GUIDE.md](global/MODULE_NAV_HANDOFF_GUIDE.md) | Handoff guide for future contributors |
+| [MODULE_NAV_COMMON_FAILURES.md](global/MODULE_NAV_COMMON_FAILURES.md) | Common mistakes and drift patterns |
+| [MODULE_NAV_OPERATING_CHECKLIST.md](global/MODULE_NAV_OPERATING_CHECKLIST.md) | Reusable checklist for routine changes |
+
 ## Indexes
 
 | Document | Purpose |
@@ -53,13 +63,25 @@ Governance-Centrale/
 
 | Template Set | Location | Purpose |
 |---|---|---|
-| Module Navigation | [templates/module-nav/](templates/module-nav/) | Templates for new module nav adoption |
+| Module Navigation | [templates/module-nav/](templates/module-nav/) | Templates for new module nav adoption (9 templates) |
+
+## Scaffolding
+
+| Tool | Location | Purpose |
+|---|---|---|
+| Module Nav Scaffolding | `scripts/scaffold-module-nav.ts` | Generate starter files for new module adoption |
 
 ## Governance Model
 
 This repository follows the AGENTS.md 5-agent orchestration model. Governance changes must pass through the Governance Agent role. See [AGENTS.md](../AGENTS.md) for the full team definition.
 
 ## Adding a New Module
+
+**Quick start:** Run `npx tsx scripts/scaffold-module-nav.ts <module-id> "<label>" /<route>` to generate starter files.
+
+**Full workflow:** See `global/MODULE_NAV_WORKFLOW.md` for the complete step-by-step guide.
+
+**Manual steps:**
 
 1. Create `modules/<module-name>/` with at minimum a `README.md` and `MODULE_GOVERNANCE_PROFILE.md`
 2. Follow the templates in `templates/module-nav/` if adopting the Carbon SideNav pattern

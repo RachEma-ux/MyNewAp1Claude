@@ -129,3 +129,15 @@ When a new module nav is introduced or materially changed:
 3. If this is a new module's first nav config, add it to `Governance-Centrale/README.md`
 4. Document any open gaps in the module's `MODULE_OPEN_GAPS.md`
 5. Document any risks in the module's `MODULE_RISKS.md`
+
+---
+
+## 8. Contributor Workflow Reference (Phase 14)
+
+For the full step-by-step contributor workflow, see:
+
+- `Governance-Centrale/global/MODULE_NAV_WORKFLOW.md` — Workflows A-D for all change types
+- `Governance-Centrale/global/MODULE_NAV_DECISION_TREE.md` — Which adoption path to follow
+- `Governance-Centrale/global/MODULE_NAV_OPERATING_CHECKLIST.md` — Quick post-change verification
+- `Governance-Centrale/global/MODULE_NAV_PR_REVIEW_CHECKLIST.md` — PR review checklist (template)
+- `scripts/scaffold-module-nav.ts` — Scaffolding utility for new module adoption

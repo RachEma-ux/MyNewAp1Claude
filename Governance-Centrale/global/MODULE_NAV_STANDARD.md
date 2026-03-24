@@ -240,3 +240,21 @@ After applying the standard to PM Central as the first pilot:
 |---|---|---|---|---|
 | Human Resources | Reference implementation | 1–10 | 13 | 68 |
 | PM Central | Pilot adoption | 11 | 8 | 12 |
+
+---
+
+## 9. Contributor Workflow (Phase 14)
+
+For step-by-step guidance on adopting or modifying module navigation:
+
+| Document | Purpose |
+|---|---|
+| `Governance-Centrale/global/MODULE_NAV_WORKFLOW.md` | Contributor workflow for all nav change types |
+| `Governance-Centrale/global/MODULE_NAV_DECISION_TREE.md` | Which adoption path to follow |
+| `Governance-Centrale/global/MODULE_NAV_HANDOFF_GUIDE.md` | Handoff guide for future contributors |
+| `Governance-Centrale/global/MODULE_NAV_COMMON_FAILURES.md` | Common mistakes and drift patterns |
+| `Governance-Centrale/global/MODULE_NAV_OPERATING_CHECKLIST.md` | Reusable checklist for routine changes |
+
+For scaffolding new module adoption: `npx tsx scripts/scaffold-module-nav.ts <module-id> "<label>" /<route>`
+
+For templates: `Governance-Centrale/templates/module-nav/`
