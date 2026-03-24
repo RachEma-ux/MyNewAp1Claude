@@ -1747,26 +1747,50 @@ export default function WSWizardPage() {
         </CardContent>
           </Card>
 
-          {/* Footer Actions — [ Previous ] [ Save as Draft ] [ Next / Submit ] */}
-          <div className="flex items-center justify-between">
-            <Button variant="outline" onClick={goPrev} disabled={isFirst}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Previous
-            </Button>
-            <Button variant="outline" onClick={saveDraft} disabled={isSaving}>
-              <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving..." : "Save as Draft"}
-            </Button>
-            {isAdminFinal && isAdmin ? (
-              <Button onClick={saveAndSubmitForReview} disabled={isSaving}>
-                <Shield className="h-4 w-4 mr-1" /> Save as Ready for Review
+          {/* ============================================================ */}
+          {/* FOOTER ACTIONS                                                */}
+          {/* Manager/Admin steps: [ Previous ] [ Save as Draft ] [ Next ] */}
+          {/* Admin final (Step 8): [ Previous ] [ Save as Draft ] [ Save as Ready for Review ] */}
+          {/* Governance steps (9-10): [ Previous ] only — actions live in step content */}
+          {/* ============================================================ */}
+          {currentStep.phase === "governance" ? (
+            /* Governance phase — minimal footer, no Save as Draft */
+            <div className="flex items-center justify-between">
+              <Button variant="outline" onClick={goPrev} disabled={isFirst}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Previous
               </Button>
-            ) : isLast ? (
               <span />
-            ) : (
-              <Button onClick={goNext}>
-                Next <ArrowRight className="h-4 w-4 ml-1" />
+              {currentStepId === "reviewPacket" ? (
+                <Button onClick={goNext}>
+                  Next <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              ) : (
+                <span />
+              )}
+            </div>
+          ) : (
+            /* Manager & Admin phases — full footer */
+            <div className="flex items-center justify-between">
+              <Button variant="outline" onClick={goPrev} disabled={isFirst}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Previous
               </Button>
-            )}
-          </div>
+              <Button variant="outline" onClick={saveDraft} disabled={isSaving}>
+                <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving..." : "Save as Draft"}
+              </Button>
+              {isAdminFinal && isAdmin ? (
+                <Button onClick={saveAndSubmitForReview} disabled={isSaving}>
+                  <Shield className="h-4 w-4 mr-1" /> Save as Ready for Review
+                </Button>
+              ) : isManagerFinal && !isAdmin ? (
+                /* Manager's last step — no Next (admin/governance locked) */
+                <span />
+              ) : (
+                <Button onClick={goNext}>
+                  Next <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ============================================================== */}
