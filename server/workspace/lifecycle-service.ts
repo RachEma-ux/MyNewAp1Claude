@@ -93,6 +93,19 @@ export async function validateDraftCompleteness(
     missing.push("configuration.capabilityBundles (no capabilities defined)");
   }
 
+  // Module/resource coherence — certain modules require elevated resources
+  if (cfg?.enabledModules && cfg.enabledModules.length > 0 && cfg.resourceProfile) {
+    const RESOURCE_RANK: Record<string, number> = { minimal: 1, standard: 2, elevated: 3, unrestricted: 4 };
+    const rank = RESOURCE_RANK[cfg.resourceProfile] || 0;
+    const heavyModules = cfg.enabledModules.filter((m) => m === "inference" || m === "models");
+    if (heavyModules.length > 0 && rank < 3) {
+      missing.push(`module_resource_mismatch: ${heavyModules.join(", ")} require elevated+ resource profile (current: ${cfg.resourceProfile})`);
+    }
+    if (cfg.enabledModules.includes("vectordb") && rank < 2) {
+      missing.push(`module_resource_mismatch: vectordb requires standard+ resource profile (current: ${cfg.resourceProfile})`);
+    }
+  }
+
   return { complete: missing.length === 0, missingFields: missing };
 }
 
