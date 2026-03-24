@@ -125,6 +125,16 @@ The HR module exposes 14 domain sub-routers + 2 config routers under the `hr.*` 
 
 `client/src/config/hrNavConfig.ts`
 
+### Phase 0 Governance Package
+
+The full per-item governance analysis is documented in the Phase 0 package:
+- [CARBON_SIDENAV_CAPABILITY_INVENTORY.md](CARBON_SIDENAV_CAPABILITY_INVENTORY.md) — all 68 items with governance metadata
+- [CARBON_SIDENAV_ROUTE_VISIBILITY_CLASSIFICATION.md](CARBON_SIDENAV_ROUTE_VISIBILITY_CLASSIFICATION.md) — visibility model
+- [CARBON_SIDENAV_PERMISSION_MAP.md](CARBON_SIDENAV_PERMISSION_MAP.md) — permission mapping
+- [CARBON_SIDENAV_SCOPE_MAP.md](CARBON_SIDENAV_SCOPE_MAP.md) — scope classification
+- [CARBON_SIDENAV_SENSITIVITY_MAP.md](CARBON_SIDENAV_SENSITIVITY_MAP.md) — masking and sensitivity
+- [CARBON_SIDENAV_AUDIT_EXPECTATIONS.md](CARBON_SIDENAV_AUDIT_EXPECTATIONS.md) — audit expectations
+
 ### Structure
 
 - **13 sections** with purpose, icon, required action, visibility mode

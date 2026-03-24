@@ -154,6 +154,7 @@ All 4 items are implemented. **No gaps.**
 | No HR API specification doc | Low | API surface documented in control surface doc but no formal OpenAPI/tRPC spec |
 | No HR domain model doc | Low | `HR_DOMAIN_MODEL.md` planned in roadmap but not created |
 | No HR security and compliance doc | Low | `HR_SECURITY_AND_COMPLIANCE.md` planned in roadmap but not created |
+| Phase 0 governance package | **Closed** | 8 artifacts created — governance impact note, capability inventory, visibility classification, permission map, scope map, sensitivity map, audit expectations, phase 0 summary. See [CARBON_SIDENAV_PHASE0_SUMMARY.md](CARBON_SIDENAV_PHASE0_SUMMARY.md) |
 
 ---
 

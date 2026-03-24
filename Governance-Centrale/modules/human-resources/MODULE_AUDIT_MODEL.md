@@ -140,6 +140,8 @@ Every audit entry includes:
 
 ## 3. Sensitive Read Audit Map
 
+For the full per-item audit expectations including all 68 nav items, see [CARBON_SIDENAV_AUDIT_EXPECTATIONS.md](CARBON_SIDENAV_AUDIT_EXPECTATIONS.md) (Phase 0 governance package).
+
 These nav items trigger `logSensitiveRead()` when accessed:
 
 | Item ID | Domain | Sensitive Action |

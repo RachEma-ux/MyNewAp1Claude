@@ -137,7 +137,22 @@
 
 ---
 
-## 6. Governance Documents
+## 6. Phase 0 Governance Package
+
+| File | Purpose |
+|---|---|
+| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_PHASE0_GOVERNANCE_IMPACT_NOTE.md` | Governance impact analysis |
+| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_CAPABILITY_INVENTORY.md` | Full 68-item capability inventory |
+| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_ROUTE_VISIBILITY_CLASSIFICATION.md` | Visibility model definition |
+| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_PERMISSION_MAP.md` | Permission-to-nav mapping |
+| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_SCOPE_MAP.md` | Data scope classification |
+| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_SENSITIVITY_MAP.md` | Masking and sensitivity classification |
+| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_AUDIT_EXPECTATIONS.md` | Per-item audit expectations |
+| `Governance-Centrale/modules/human-resources/CARBON_SIDENAV_PHASE0_SUMMARY.md` | Phase 0 completion summary |
+
+---
+
+## 7. Governance Documents
 
 | File | Purpose |
 |---|---|
