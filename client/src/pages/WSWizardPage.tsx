@@ -1,9 +1,23 @@
 /**
- * WS Wizard — Staged workspace creation flow
+ * WS Wizard — Governance-First Workspace Intake Flow
  *
- * Manager stages: Identity → Purpose → Actors → Activities → Needs → save as draft
- * Admin stage: Configuration → save as ready_for_review
- * Governance: Review → Approve/Reject → Publish → Activate
+ * 10-step staged flow across three phases:
+ *
+ * Manager Phase (Steps 1–7):
+ *   1. Identity   — What is this workspace?
+ *   2. Purpose    — Why does it exist?
+ *   3. Anchor     — What is it organized around?
+ *   4. Scope      — What does that anchor specifically mean here?
+ *   5. Actors     — Who will participate? (Team from HR + Crew from Catalog)
+ *   6. Activities — How will work happen?
+ *   7. Needs      — What is needed to succeed?
+ *
+ * Admin Phase (Step 8):
+ *   8. Configuration — How should it be governed and configured?
+ *
+ * Governance Phase (Steps 9–10):
+ *   9.  Review Packet — Is this ready for review?
+ *   10. Promotion     — Can it be approved, published, and activated?
  */
 
 import { useState, useMemo } from "react";
@@ -39,43 +53,221 @@ import {
   Workflow,
   AlertCircle,
   Lock,
+  Anchor,
+  ScanSearch,
+  PackageCheck,
+  ArrowUpRight,
+  Layers,
+  ClipboardCheck,
 } from "lucide-react";
 import { CatalogAgentSelect, CatalogBotSelect } from "@/components/catalog-selectors";
 import { useCatalogAvailableAgents, useCatalogAvailableBots } from "@/hooks/useCatalogAvailable";
+import { DirectoryDropdown, type DirectoryEntry } from "@/components/DirectoryDropdown";
 
-type WizardStage =
+// ============================================================================
+// Step & Phase Definitions — Governance-First 10-Step Model
+// ============================================================================
+
+type WizardStep =
   | "identity"
   | "purpose"
+  | "anchor"
+  | "scopeDetails"
   | "actors"
   | "activities"
   | "needs"
   | "configuration"
-  | "review";
+  | "reviewPacket"
+  | "promotion";
 
-const MANAGER_STAGES: WizardStage[] = ["identity", "purpose", "actors", "activities", "needs"];
-const ADMIN_STAGES: WizardStage[] = ["configuration"];
-const GOVERNANCE_STAGES: WizardStage[] = ["review"];
-const ALL_STAGES: WizardStage[] = [...MANAGER_STAGES, ...ADMIN_STAGES, ...GOVERNANCE_STAGES];
+type WizardPhase = "manager" | "admin" | "governance";
 
-const STAGE_LABELS: Record<WizardStage, string> = {
-  identity: "Identity",
-  purpose: "Purpose",
-  actors: "Actors",
-  activities: "Activities",
-  needs: "Needs",
-  configuration: "Configuration",
-  review: "Review",
-};
+interface StepDef {
+  id: WizardStep;
+  stepNumber: number;
+  label: string;
+  phase: WizardPhase;
+  question: string;
+  governanceHint: string;
+}
 
-const STAGE_ICONS: Record<WizardStage, React.ReactNode> = {
+const STEPS: StepDef[] = [
+  // Manager Phase (1–7)
+  {
+    id: "identity",
+    stepNumber: 1,
+    label: "Identity",
+    phase: "manager",
+    question: "Define what this workspace is.",
+    governanceHint: "Creates the identifiable object to govern.",
+  },
+  {
+    id: "purpose",
+    stepNumber: 2,
+    label: "Purpose",
+    phase: "manager",
+    question: "Define why the workspace exists.",
+    governanceHint: "Proves the workspace is not an empty shell.",
+  },
+  {
+    id: "anchor",
+    stepNumber: 3,
+    label: "Creation Basis / Anchor",
+    phase: "manager",
+    question: "Define what the workspace is organized around.",
+    governanceHint: "Defines structural scope and future policy interpretation.",
+  },
+  {
+    id: "scopeDetails",
+    stepNumber: 4,
+    label: "Scope Details",
+    phase: "manager",
+    question: "Capture anchor-specific details.",
+    governanceHint: "Makes the structural anchor reviewable and enforceable.",
+  },
+  {
+    id: "actors",
+    stepNumber: 5,
+    label: "Actors",
+    phase: "manager",
+    question: "Define who participates.",
+    governanceHint: "Defines the participation boundary.",
+  },
+  {
+    id: "activities",
+    stepNumber: 6,
+    label: "Activities",
+    phase: "manager",
+    question: "Define how work happens here.",
+    governanceHint: "Helps determine configuration and compliance expectations.",
+  },
+  {
+    id: "needs",
+    stepNumber: 7,
+    label: "Needs",
+    phase: "manager",
+    question: "Define what users and agents need to succeed.",
+    governanceHint: "Handoff between business intent and governed enablement.",
+  },
+  // Admin Phase (8)
+  {
+    id: "configuration",
+    stepNumber: 8,
+    label: "Configuration",
+    phase: "admin",
+    question: "Translate manager intent into enforceable workspace behavior.",
+    governanceHint: "Where the workspace becomes policy-aware and reviewable.",
+  },
+  // Governance Phase (9–10)
+  {
+    id: "reviewPacket",
+    stepNumber: 9,
+    label: "Review Packet",
+    phase: "governance",
+    question: "Is this ready for review?",
+    governanceHint: "Creates the reviewable workspace dossier.",
+  },
+  {
+    id: "promotion",
+    stepNumber: 10,
+    label: "Promotion",
+    phase: "governance",
+    question: "Can it be approved, published, and activated?",
+    governanceHint: "Lifecycle control — not form filling.",
+  },
+];
+
+const MANAGER_STEPS = STEPS.filter((s) => s.phase === "manager");
+const ADMIN_STEPS = STEPS.filter((s) => s.phase === "admin");
+const GOVERNANCE_STEPS = STEPS.filter((s) => s.phase === "governance");
+
+const STEP_ICONS: Record<WizardStep, React.ReactNode> = {
   identity: <Sparkles className="h-4 w-4" />,
   purpose: <Target className="h-4 w-4" />,
+  anchor: <Anchor className="h-4 w-4" />,
+  scopeDetails: <ScanSearch className="h-4 w-4" />,
   actors: <Users className="h-4 w-4" />,
   activities: <Briefcase className="h-4 w-4" />,
-  needs: <Settings className="h-4 w-4" />,
+  needs: <Layers className="h-4 w-4" />,
   configuration: <Settings className="h-4 w-4" />,
-  review: <Shield className="h-4 w-4" />,
+  reviewPacket: <ClipboardCheck className="h-4 w-4" />,
+  promotion: <ArrowUpRight className="h-4 w-4" />,
 };
+
+const PHASE_LABELS: Record<WizardPhase, string> = {
+  manager: "Manager Phase",
+  admin: "Admin Phase",
+  governance: "Governance Phase",
+};
+
+// ============================================================================
+// Anchor Type Options — per governance-first spec
+// ============================================================================
+
+const ANCHOR_TYPES = [
+  { value: "per_project", label: "Per Project" },
+  { value: "per_employee_role", label: "Per Employee Role" },
+  { value: "per_hr_position", label: "Per HR Position" },
+  { value: "per_company_entity", label: "Per Company Entity" },
+  { value: "per_activity", label: "Per Activity" },
+  { value: "per_custom_factor", label: "Per Custom Factor" },
+  { value: "per_app_module", label: "Per App Module" },
+  { value: "per_function", label: "Per Function" },
+] as const;
+
+// ============================================================================
+// Purpose Type Options — expanded per governance spec
+// ============================================================================
+
+const PURPOSE_TYPES = [
+  { value: "goal", label: "Goal" },
+  { value: "mission", label: "Mission" },
+  { value: "project", label: "Project" },
+  { value: "team", label: "Team Activity" },
+  { value: "research", label: "Research Effort" },
+  { value: "operational", label: "Operational Function" },
+  { value: "other", label: "Other" },
+] as const;
+
+// ============================================================================
+// Activity Types — structured options per spec
+// ============================================================================
+
+const ACTIVITY_TYPES = [
+  "research", "delivery", "monitoring", "support", "analysis",
+  "controlled_operations", "development", "review", "planning",
+] as const;
+
+const OPERATING_MODES = [
+  { value: "collaborative", label: "Collaborative" },
+  { value: "autonomous", label: "Autonomous" },
+  { value: "supervised", label: "Supervised" },
+  { value: "hybrid", label: "Hybrid" },
+] as const;
+
+const EXECUTION_STYLES = [
+  { value: "manual", label: "Manual" },
+  { value: "semi_automated", label: "Semi-Automated" },
+  { value: "fully_automated", label: "Fully Automated" },
+] as const;
+
+// ============================================================================
+// Needs Categories — governance-first structured intake
+// ============================================================================
+
+const NEEDS_CATEGORIES = [
+  { key: "permissions", label: "Permissions", placeholder: "e.g., Write access to documents" },
+  { key: "information", label: "Information", placeholder: "e.g., Access to project specs" },
+  { key: "tools", label: "Tools", placeholder: "e.g., Vector DB, Code analyzer" },
+  { key: "agents", label: "Agents", placeholder: "e.g., Research assistant, Code reviewer" },
+  { key: "resources", label: "Resources", placeholder: "e.g., GPU allocation, Storage" },
+  { key: "visibility", label: "Visibility", placeholder: "e.g., Dashboard, Activity feed" },
+  { key: "context", label: "Context", placeholder: "e.g., Organization policies, Team structure" },
+] as const;
+
+// ============================================================================
+// Crew Roles & Types
+// ============================================================================
 
 type CrewParticipantType = "agent" | "bot";
 type CrewRole = "executor" | "analyst" | "reviewer" | "monitor" | "coordinator" | "advisor";
@@ -97,16 +289,52 @@ interface CrewEntry {
   note: string;
 }
 
+// ============================================================================
+// Team Member (HR Directory backed)
+// ============================================================================
+
+interface TeamMember {
+  workerId: number;
+  displayName: string;
+  role: "owner" | "manager" | "member" | "viewer";
+}
+
+// ============================================================================
+// WizardData — full governance-first data model
+// ============================================================================
+
 interface WizardData {
+  // Step 1: Identity
   name: string;
   description: string;
   type: string;
+  // Step 2: Purpose
   purposeType: string;
+  purposeStatement: string;
   purposeRef: string;
-  teamMembers: string[];
+  // Step 3: Anchor
+  anchorType: string;
+  // Step 4: Scope Details
+  anchorRef: string;
+  anchorLabel: string;
+  anchorMeta: Record<string, string>;
+  // Step 5: Actors — Team (HR Directory)
+  team: TeamMember[];
+  // Step 5: Actors — Crew (AI Catalog)
   crewAgents: CrewEntry[];
-  activities: string[];
-  needs: string[];
+  // Step 6: Activities (structured)
+  primaryActivityType: string;
+  secondaryActivityTypes: string[];
+  operatingMode: string;
+  executionStyle: string;
+  collaborationIntensity: string;
+  // Step 7: Needs (structured categories)
+  needs: Record<string, string[]>;
+  // Step 8: Configuration (admin)
+  enabledModules: string[];
+  routingProfile: string;
+  resourceProfile: string;
+  capabilityBundles: string[];
   embeddingModel: string;
   chunkingStrategy: string;
 }
