@@ -152,14 +152,14 @@ describe("Catalog App Selectors — No Raw Domain Leakage", () => {
     // (admin/settings pages may still use raw queries — that's OK)
   });
 
-  it("useCatalogAvailable hooks call catalogManage.available, not raw domain endpoints", async () => {
+  it("useCatalogAvailable hooks call catalogManage, not raw domain endpoints", async () => {
     const fs = await import("fs");
     const hookContent = fs.readFileSync(
       path.resolve(process.cwd(), "client/src/hooks/useCatalogAvailable.ts"),
       "utf-8"
     );
 
-    expect(hookContent).toContain("catalogManage.available");
+    expect(hookContent).toContain("catalogManage.list");
     // Should NOT call trpc.providers.list or trpc.models.list for availability
   });
 });
