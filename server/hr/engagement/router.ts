@@ -165,7 +165,7 @@ export const hrEngagementRouter = router({
     .input(z.object({
       campaignId: z.number(),
       workerId: z.number().optional(),
-      answers: z.record(z.unknown()).optional(),
+      answers: z.record(z.string(), z.unknown()).optional(),
       overallRating: z.number().min(1).max(5).optional(),
       comments: z.string().optional(),
     }))

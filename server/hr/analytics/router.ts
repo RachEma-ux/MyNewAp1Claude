@@ -187,7 +187,7 @@ export const hrAnalyticsRouter = router({
       description: z.string().optional(),
       category: z.string().max(100).optional(),
       reportType: z.enum(["standard", "custom", "scheduled"]).default("standard"),
-      config: z.record(z.unknown()).optional(),
+      config: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireHrPermission(ctx.user, HR_ACTIONS.ANALYTICS_MANAGE);
@@ -206,7 +206,7 @@ export const hrAnalyticsRouter = router({
       name: z.string().max(200).optional(),
       description: z.string().optional(),
       category: z.string().max(100).optional(),
-      config: z.record(z.unknown()).optional(),
+      config: z.record(z.string(), z.unknown()).optional(),
       isActive: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -257,7 +257,7 @@ export const hrAnalyticsRouter = router({
       unit: z.enum(["count", "percent", "currency", "days", "ratio"]).optional(),
       periodStart: z.string(),
       periodEnd: z.string(),
-      dimensions: z.record(z.string()).optional(),
+      dimensions: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireHrPermission(ctx.user, HR_ACTIONS.ANALYTICS_WRITE);

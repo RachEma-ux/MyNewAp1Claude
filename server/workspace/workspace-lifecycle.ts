@@ -35,19 +35,19 @@ export const LIFECYCLE_TRANSITIONS: Record<WorkspaceStatus, WorkspaceStatus[]> =
 // ============================================================================
 
 /** Statuses that allow full read+write execution */
-const FULLY_EXECUTABLE: ReadonlySet<WorkspaceStatus> = new Set([
+const FULLY_EXECUTABLE: ReadonlySet<WorkspaceStatus> = new Set<WorkspaceStatus>([
   "active",
 ]);
 
 /** Statuses that allow setup/draft modifications (not full execution) */
-const SETUP_MUTABLE: ReadonlySet<WorkspaceStatus> = new Set([
+const SETUP_MUTABLE: ReadonlySet<WorkspaceStatus> = new Set<WorkspaceStatus>([
   "draft",
   "ready_for_review",
   "rejected",
 ]);
 
 /** Statuses that allow read-only access */
-const READ_ONLY: ReadonlySet<WorkspaceStatus> = new Set([
+const READ_ONLY: ReadonlySet<WorkspaceStatus> = new Set<WorkspaceStatus>([
   "under_review",
   "approved",
   "published",
@@ -55,7 +55,7 @@ const READ_ONLY: ReadonlySet<WorkspaceStatus> = new Set([
 ]);
 
 /** Statuses that block all access */
-const NON_ACCESSIBLE: ReadonlySet<WorkspaceStatus> = new Set([
+const NON_ACCESSIBLE: ReadonlySet<WorkspaceStatus> = new Set<WorkspaceStatus>([
   "deleted",
 ]);
 
@@ -162,7 +162,7 @@ export function requireExecutableWorkspace(
 
   throw new Error(
     `Workspace ${ctx.workspaceId} is ${ctx.status} — mutating operations are blocked. ` +
-    `Allowed actions on archived workspaces: ${[...ARCHIVED_ALLOWED_ACTIONS].join(", ")}`
+    `Allowed actions on archived workspaces: ${Array.from(ARCHIVED_ALLOWED_ACTIONS).join(", ")}`
   );
 }
 

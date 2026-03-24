@@ -122,7 +122,7 @@ export async function getWorkspaceShellView(
   let capabilities: string[] = [];
   try {
     const caps = await resolveWorkspaceCapabilities(participantId, workspaceId);
-    capabilities = [...caps];
+    capabilities = Array.from(caps);
   } catch {
     capabilities = [];
   }

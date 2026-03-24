@@ -91,7 +91,7 @@ export const workspaceRouter = router({
           role: z.string().default("executor"),
           note: z.string().optional(),
         })).optional(),
-        wizardMeta: z.record(z.unknown()).optional(),
+        wizardMeta: z.record(z.string(), z.unknown()).optional(),
         submitForReview: z.boolean().optional(),
       })
     )
@@ -376,7 +376,7 @@ export const workspaceRouter = router({
           role: z.string().default("executor"),
           note: z.string().optional(),
         })).optional(),
-        wizardMeta: z.record(z.unknown()).optional(),
+        wizardMeta: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -516,7 +516,7 @@ export const workspaceRouter = router({
         purposeType: wsCtx.purposeType,
         userId: wsCtx.userId,
         role: wsCtx.role,
-        effectiveCapabilities: [...wsCtx.effectiveCapabilities],
+        effectiveCapabilities: Array.from(wsCtx.effectiveCapabilities),
         enabledModules: wsCtx.enabledModules,
         workspaceType: wsCtx.workspaceType,
         routingProfile: wsCtx.routingProfile,
@@ -773,7 +773,7 @@ export const workspaceRouter = router({
         role: z.string().optional(),
         note: z.string().optional(),
         capabilities: z.array(z.string()).optional(),
-        constraints: z.record(z.unknown()).optional(),
+        constraints: z.record(z.string(), z.unknown()).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         await requireCapability(ctx.user.id, input.workspaceId, "workspace.manage");
@@ -815,7 +815,7 @@ export const workspaceRouter = router({
         crewId: z.number(),
         role: z.string().optional(),
         capabilities: z.array(z.string()).optional(),
-        constraints: z.record(z.unknown()).optional(),
+        constraints: z.record(z.string(), z.unknown()).optional(),
         enabled: z.boolean().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
@@ -840,7 +840,7 @@ export const workspaceRouter = router({
       .input(z.object({ workspaceId: z.number() }))
       .query(async ({ ctx, input }) => {
         const caps = await resolveWorkspaceCapabilities(ctx.user.id, input.workspaceId);
-        return [...caps];
+        return Array.from(caps);
       }),
   }),
 

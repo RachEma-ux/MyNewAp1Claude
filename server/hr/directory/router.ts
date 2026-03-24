@@ -420,7 +420,7 @@ export const hrDirectoryRouter = router({
       expiryDate: z.string().optional(),
       templateId: z.string().max(100).optional(),
       documentRef: z.string().max(500).optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireHrPermission(ctx.user, HR_ACTIONS.DIRECTORY_WRITE);
@@ -455,7 +455,7 @@ export const hrDirectoryRouter = router({
       expiryDate: z.string().optional(),
       documentRef: z.string().max(500).optional(),
       issuedBy: z.number().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireHrPermission(ctx.user, HR_ACTIONS.DIRECTORY_WRITE);
