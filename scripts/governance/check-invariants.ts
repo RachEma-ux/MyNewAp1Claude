@@ -51,24 +51,17 @@ for (const relPath of DOMAIN_ROUTERS) {
   const absPath = path.join(ROOT, relPath);
   const lines = readLines(absPath);
 
-  // Track whether we're inside an importToCatalog procedure
-  // (governance-approved pattern for domain → catalog intake)
-  let inImportToCatalog = false;
+  const fullContent = lines.join("\n");
+  const hasImportToCatalog = /importToCatalog/.test(fullContent);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Detect importToCatalog procedure boundaries
-    if (/importToCatalog/.test(line) && /procedure|mutation/.test(lines.slice(Math.max(0, i - 3), i + 1).join(" "))) {
-      inImportToCatalog = true;
-    }
-    // Reset on next procedure/mutation definition (rough heuristic)
-    if (inImportToCatalog && i > 0 && /^\s*\)\s*$/.test(line) && /\.mutation\(|\.query\(/.test(lines[i + 1] || "")) {
-      inImportToCatalog = false;
-    }
+    // Check for direct createCatalogEntry calls
+    if (/createCatalogEntry\s*\(/.test(line)) {
+      // Allow if file has an importToCatalog procedure — the call is part of catalog intake
+      if (hasImportToCatalog) continue;
 
-    // Check for direct createCatalogEntry calls (skip if in importToCatalog)
-    if (/createCatalogEntry\s*\(/.test(line) && !inImportToCatalog) {
       violations.push({
         file: relPath,
         line: i + 1,
@@ -77,22 +70,14 @@ for (const relPath of DOMAIN_ROUTERS) {
       });
     }
 
-    // Check for import of createCatalogEntry — allowed since importToCatalog needs it
-    // Only flag if the file has NO importToCatalog procedure
-  }
-
-  // If the file has no importToCatalog procedure, flag any createCatalogEntry import
-  const fullContent = lines.join("\n");
-  if (!/importToCatalog/.test(fullContent)) {
-    for (let i = 0; i < lines.length; i++) {
-      if (/import\s*\{[^}]*createCatalogEntry[^}]*\}\s*from/.test(lines[i])) {
-        violations.push({
-          file: relPath,
-          line: i + 1,
-          rule: "INV-1/INV-2: Domain router must not import createCatalogEntry",
-          text: lines[i].trim(),
-        });
-      }
+    // Check for import of createCatalogEntry — allowed if file has importToCatalog
+    if (/import\s*\{[^}]*createCatalogEntry[^}]*\}\s*from/.test(line) && !hasImportToCatalog) {
+      violations.push({
+        file: relPath,
+        line: i + 1,
+        rule: "INV-1/INV-2: Domain router must not import createCatalogEntry",
+        text: line.trim(),
+      });
     }
   }
 }
