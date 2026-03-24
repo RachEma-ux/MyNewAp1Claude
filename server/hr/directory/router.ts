@@ -325,7 +325,22 @@ export const hrDirectoryRouter = router({
   getAssignments: protectedProcedure
     .input(z.object({ workerId: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.DIRECTORY_READ,
+        HR_ACTIONS.DIRECTORY_READ_TEAM,
+        HR_ACTIONS.DIRECTORY_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
+      // Verify scope access
+      if (scope.scope === "self" && input.workerId !== scope.workerId) {
+        return [];
+      }
+      if (scope.scope === "team" && !scope.workerIds.includes(input.workerId)) {
+        return [];
+      }
+
       const db = getDb();
       if (!db) return [];
 
@@ -348,15 +363,29 @@ export const hrDirectoryRouter = router({
       status: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.DIRECTORY_READ);
+      const scope = await resolveDataScope(
+        ctx.user,
+        HR_ACTIONS.DIRECTORY_READ,
+        HR_ACTIONS.DIRECTORY_READ_TEAM,
+        HR_ACTIONS.DIRECTORY_READ_SELF,
+      );
+      if (scope.scope === "none") return [];
+
       const db = getDb();
       if (!db) return [];
 
       const { hrLetters } = await import("../../../drizzle/schema");
-      const conditions = [];
+      const conditions: any[] = [];
       if (input.workerId) conditions.push(eq(hrLetters.workerId, input.workerId));
       if (input.letterType) conditions.push(eq(hrLetters.letterType, input.letterType));
       if (input.status) conditions.push(eq(hrLetters.status, input.status));
+
+      // Apply scope narrowing
+      if (scope.scope === "self") {
+        conditions.push(eq(hrLetters.workerId, scope.workerId));
+      } else if (scope.scope === "team") {
+        conditions.push(sql`${hrLetters.workerId} = ANY(${scope.workerIds})`);
+      }
 
       return db.select().from(hrLetters)
         .where(conditions.length > 0 ? and(...conditions) : undefined)

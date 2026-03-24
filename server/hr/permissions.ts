@@ -49,6 +49,7 @@ export const HR_ACTIONS = {
   LEAVE_WRITE: "hr.leave.write",
   LEAVE_APPROVE: "hr.leave.approve",
   OVERTIME_READ: "hr.overtime.read",
+  OVERTIME_READ_SELF: "hr.overtime.read.self",
   OVERTIME_WRITE: "hr.overtime.write",
   OVERTIME_APPROVE: "hr.overtime.approve",
   SHIFT_READ: "hr.shift.read",
@@ -175,6 +176,29 @@ export const MASKED_ROLE_DEF_MANAGER_FIELDS = [
   "escalationTriggers",
 ] as const;
 
+/** Fields that should be masked in performance review/goal responses for non-privileged users */
+export const MASKED_PERFORMANCE_FIELDS = [
+  "managerNotes",
+  "managerComments",
+  "overallComments",
+  "developmentPlan",
+] as const;
+
+/** Fields that should be masked in incident report responses for non-privileged users */
+export const MASKED_INCIDENT_FIELDS = [
+  "description",
+  "rootCause",
+  "correctiveAction",
+  "investigationNotes",
+] as const;
+
+/** Fields that should be masked in work permit responses for non-privileged users */
+export const MASKED_WORK_PERMIT_FIELDS = [
+  "permitNumber",
+  "issuingAuthority",
+  "notes",
+] as const;
+
 /** Strip restricted fields from role-definition versions for non-privileged users. */
 export function maskRoleDefRestrictedFields<T extends Record<string, unknown>>(record: T): T {
   return maskFields(record, MASKED_ROLE_DEF_RESTRICTED_FIELDS);
@@ -183,6 +207,21 @@ export function maskRoleDefRestrictedFields<T extends Record<string, unknown>>(r
 /** Strip manager-only fields from role-definition versions for employee-level users. */
 export function maskRoleDefManagerFields<T extends Record<string, unknown>>(record: T): T {
   return maskFields(record, MASKED_ROLE_DEF_MANAGER_FIELDS);
+}
+
+/** Strip sensitive fields from performance reviews/goals for non-privileged users. */
+export function maskPerformanceFields<T extends Record<string, unknown>>(record: T): T {
+  return maskFields(record, MASKED_PERFORMANCE_FIELDS);
+}
+
+/** Strip sensitive fields from incident reports for non-privileged users. */
+export function maskIncidentFields<T extends Record<string, unknown>>(record: T): T {
+  return maskFields(record, MASKED_INCIDENT_FIELDS);
+}
+
+/** Strip sensitive fields from work permits for non-privileged users. */
+export function maskWorkPermitFields<T extends Record<string, unknown>>(record: T): T {
+  return maskFields(record, MASKED_WORK_PERMIT_FIELDS);
 }
 
 // ============================================================================
@@ -197,6 +236,8 @@ export const HR_ROLE_PERMISSIONS: Record<HrRole, readonly string[]> = {
     HR_ACTIONS.TIME_WRITE,
     HR_ACTIONS.LEAVE_READ_SELF,
     HR_ACTIONS.LEAVE_WRITE,
+    HR_ACTIONS.OVERTIME_READ_SELF,
+    HR_ACTIONS.OVERTIME_WRITE,
     HR_ACTIONS.LEARNING_READ_SELF,
     HR_ACTIONS.CERTIFICATION_READ,
     HR_ACTIONS.PERFORMANCE_READ_SELF,

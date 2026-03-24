@@ -14,7 +14,7 @@
 
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure, adminProcedure } from "../_core/trpc";
-import { getHrRoleForUser, HR_ROLE_PERMISSIONS, HR_ACTIONS } from "./permissions";
+import { getHrRoleForUser, HR_ROLE_PERMISSIONS, HR_ACTIONS, checkHrAccess } from "./permissions";
 import { hrDirectoryRouter } from "./directory/router";
 import { hrOrganizationRouter } from "./organization/router";
 import { hrStaffingRouter } from "./staffing/router";
@@ -42,7 +42,10 @@ const hrMeRouter = router({
 });
 
 const hrSettingsRouter = router({
-  get: protectedProcedure.query(() => ({
+  get: protectedProcedure.query(async ({ ctx }) => {
+    // Any HR role can read module settings — permission check ensures HR access
+    await getHrRoleForUser(ctx.user);
+    return ({
     module: "hr",
     version: "8.0.0",
     features: {
@@ -84,7 +87,8 @@ const hrSettingsRouter = router({
       roleDefPositionLinkage: true,
       roleDefReviewWorkflow: true,
     },
-  })),
+  });
+  }),
   seedDemo: adminProcedure
     .input(z.object({ confirm: z.boolean().default(false) }).optional())
     .mutation(async ({ input }) => {

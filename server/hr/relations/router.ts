@@ -87,27 +87,28 @@ export const hrRelationsRouter = router({
       category: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.POLICY_READ);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.POLICY_READ, HR_ACTIONS.RELATIONS_READ_SENSITIVE);
       const db = getDb();
       if (!db) return [];
       const conditions = [];
       if (input.status) conditions.push(eq(hrPolicies.status, input.status));
       if (input.category) conditions.push(eq(hrPolicies.category, input.category));
-      return db.select().from(hrPolicies)
+      const rows = await db.select().from(hrPolicies)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(hrPolicies.createdAt))
         .limit(input.limit).offset(input.offset);
+      return masked ? rows.map(r => maskRelationsFields(r as Record<string, unknown>)) : rows;
     }),
 
   getPolicy: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      await checkHrAccess(ctx.user, HR_ACTIONS.POLICY_READ);
+      const { masked } = await checkHrAccess(ctx.user, HR_ACTIONS.POLICY_READ, HR_ACTIONS.RELATIONS_READ_SENSITIVE);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [row] = await db.select().from(hrPolicies).where(eq(hrPolicies.id, input.id)).limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Policy not found" });
-      return row;
+      return masked ? maskRelationsFields(row as Record<string, unknown>) : row;
     }),
 
   createPolicy: governedProcedure
