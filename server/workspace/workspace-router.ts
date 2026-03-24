@@ -149,6 +149,22 @@ export const workspaceRouter = router({
             };
             configUpdates.resourceProfile = RESOURCE_PRESETS[cfg.resourceProfile] || {};
           }
+          // Sync shellConfig from shellVisibility
+          if (cfg.shellVisibility) {
+            const isRestricted = cfg.shellVisibility === "restricted" || cfg.shellVisibility === "private";
+            configUpdates.shellConfig = {
+              sidebar: {
+                showIdentity: true, showPurpose: true, showMission: true,
+                showCurrentWork: true, showActivityLog: true, showAlerts: !isRestricted,
+                showQuickActions: true, showGuide: true, showHealth: true,
+              },
+              toolbar: { visibleItems: [], priorityItems: [] },
+              quickActions: [],
+              alertsEnabled: !isRestricted,
+              missionEmphasis: null,
+              participantVisibility: {},
+            };
+          }
           if (Object.keys(configUpdates).length > 0) {
             try {
               await db.updateWorkspace(wsId, configUpdates as any);
@@ -379,6 +395,22 @@ export const workspaceRouter = router({
               unrestricted: { computeQuota: 0, storageQuota: 0, apiCallQuota: 0 },
             };
             dbUpdates.resourceProfile = RESOURCE_PRESETS[cfg.resourceProfile] || {};
+          }
+          // Sync shellConfig from shellVisibility
+          if (cfg.shellVisibility) {
+            const isRestricted = cfg.shellVisibility === "restricted" || cfg.shellVisibility === "private";
+            dbUpdates.shellConfig = {
+              sidebar: {
+                showIdentity: true, showPurpose: true, showMission: true,
+                showCurrentWork: true, showActivityLog: true, showAlerts: !isRestricted,
+                showQuickActions: true, showGuide: true, showHealth: true,
+              },
+              toolbar: { visibleItems: [], priorityItems: [] },
+              quickActions: [],
+              alertsEnabled: !isRestricted,
+              missionEmphasis: null,
+              participantVisibility: {},
+            };
           }
         }
       }

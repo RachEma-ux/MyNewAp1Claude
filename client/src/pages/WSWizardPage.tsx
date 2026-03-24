@@ -335,6 +335,8 @@ interface WizardData {
   routingProfile: string;
   resourceProfile: string;
   capabilityBundles: string[];
+  shellVisibility: string;
+  publicationConstraints: string;
   embeddingModel: string;
   chunkingStrategy: string;
 }
@@ -375,6 +377,8 @@ function createDefaultWizardData(): WizardData {
     routingProfile: "AUTO",
     resourceProfile: "",
     capabilityBundles: [],
+    shellVisibility: "public_internal",
+    publicationConstraints: "",
     embeddingModel: "bge-small-en-v1.5",
     chunkingStrategy: "semantic",
   };
@@ -469,6 +473,8 @@ export default function WSWizardPage() {
       routingProfile: meta.configuration?.routingProfile || "AUTO",
       resourceProfile: meta.configuration?.resourceProfile || "",
       capabilityBundles: meta.configuration?.capabilityBundles || [],
+      shellVisibility: meta.configuration?.shellVisibility || "public_internal",
+      publicationConstraints: meta.configuration?.publicationConstraints || "",
       embeddingModel: ws.embeddingModel || "bge-small-en-v1.5",
       chunkingStrategy: ws.chunkingStrategy || "semantic",
     });
@@ -625,6 +631,8 @@ export default function WSWizardPage() {
       routingProfile: data.routingProfile,
       resourceProfile: data.resourceProfile,
       capabilityBundles: data.capabilityBundles,
+      shellVisibility: data.shellVisibility,
+      publicationConstraints: data.publicationConstraints,
     },
     lastCompletedStep: currentStep.stepNumber,
     wizardPhase: currentStep.phase,
@@ -1646,6 +1654,30 @@ export default function WSWizardPage() {
                     <SelectItem value="recursive">Recursive</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Shell Visibility */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Shell Visibility</label>
+                <Select value={data.shellVisibility} onValueChange={(v) => updateData({ shellVisibility: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public_internal">Public Internal — visible to all org members</SelectItem>
+                    <SelectItem value="restricted">Restricted — visible to participants only</SelectItem>
+                    <SelectItem value="private">Private — visible to owner and admins only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Publication Constraints */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Publication Constraints (optional)</label>
+                <Textarea
+                  value={data.publicationConstraints}
+                  onChange={(e) => updateData({ publicationConstraints: e.target.value })}
+                  placeholder="e.g., Requires legal review before publication, restricted to internal catalog only"
+                  rows={2}
+                />
               </div>
             </>
           )}
