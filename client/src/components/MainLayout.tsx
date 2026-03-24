@@ -16,6 +16,7 @@ export function useHeaderActions(node: ReactNode) {
 }
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useHrRole } from "@/hooks/useHrRole";
+import { HR_NAV_CONFIG } from "@/config/hrNavConfig";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -254,38 +255,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
     {
       label: "Human Resources",
       icon: <Users className="w-5 h-5" />,
-      children: [
-        // Self-service (open to all employees)
-        { label: "Directory", icon: <Users className="w-4 h-4" />, href: "/hr/directory" },
-        { label: "Timesheet", icon: <Clock className="w-4 h-4" />, href: "/hr/timesheet" },
-        { label: "Leave", icon: <Clock className="w-4 h-4" />, href: "/hr/leave" },
-        { label: "Goals", icon: <Activity className="w-4 h-4" />, href: "/hr/goals" },
-        { label: "Reviews", icon: <ClipboardList className="w-4 h-4" />, href: "/hr/reviews" },
-        { label: "Training", icon: <BookOpen className="w-4 h-4" />, href: "/hr/training" },
-        { label: "Certifications", icon: <Award className="w-4 h-4" />, href: "/hr/certifications" },
-        { label: "Benefits", icon: <Shield className="w-4 h-4" />, href: "/hr/benefits" },
-        { label: "Policies", icon: <FileText className="w-4 h-4" />, href: "/hr/policies" },
-        { label: "Surveys", icon: <ClipboardList className="w-4 h-4" />, href: "/hr/surveys" },
-        { label: "Engagement", icon: <Activity className="w-4 h-4" />, href: "/hr/engagement" },
-        { label: "Skills", icon: <Award className="w-4 h-4" />, href: "/hr/skills" },
-        // Gated (require HR role permissions)
-        { label: "Organization", icon: <Building2 className="w-4 h-4" />, href: "/hr/organization", requiredAction: "hr.organization.read" },
-        { label: "Positions", icon: <Briefcase className="w-4 h-4" />, href: "/hr/positions", requiredAction: "hr.staffing.read" },
-        { label: "Staffing", icon: <UserPlus className="w-4 h-4" />, href: "/hr/staffing", requiredAction: "hr.staffing.read" },
-        { label: "Recruitment", icon: <ClipboardList className="w-4 h-4" />, href: "/hr/recruitment", requiredAction: "hr.recruiting.read" },
-        { label: "Onboarding", icon: <UserPlus className="w-4 h-4" />, href: "/hr/onboarding", requiredAction: "hr.onboarding.read" },
-        { label: "Offboarding", icon: <UserMinus className="w-4 h-4" />, href: "/hr/offboarding", requiredAction: "hr.offboarding.read" },
-        { label: "Overtime", icon: <Clock className="w-4 h-4" />, href: "/hr/overtime", requiredAction: "hr.overtime.read" },
-        { label: "Shift Planning", icon: <Clock className="w-4 h-4" />, href: "/hr/shifts", requiredAction: "hr.shift.read" },
-        { label: "Compensation", icon: <Briefcase className="w-4 h-4" />, href: "/hr/compensation", requiredAction: "hr.compensation.read" },
-        { label: "Grievances", icon: <AlertTriangle className="w-4 h-4" />, href: "/hr/grievances", requiredAction: "hr.relations.read" },
-        { label: "Incidents", icon: <AlertTriangle className="w-4 h-4" />, href: "/hr/incidents", requiredAction: "hr.incident.read" },
-        { label: "Compliance", icon: <Shield className="w-4 h-4" />, href: "/hr/compliance-mgmt", requiredAction: "hr.compliance.read" },
-        { label: "Analytics", icon: <BarChart3 className="w-4 h-4" />, href: "/hr/analytics", requiredAction: "hr.analytics.read" },
-        { label: "Talent", icon: <Sparkles className="w-4 h-4" />, href: "/hr/talent", requiredAction: "hr.talent.read" },
-        { label: "Reports", icon: <BarChart3 className="w-4 h-4" />, href: "/hr/reports", requiredAction: "hr.analytics.read" },
-        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/hr/settings", requiredAction: "hr.analytics.manage" },
-      ]
+      children: HR_NAV_CONFIG.sections.map((section) => ({
+        label: section.label,
+        icon: <Users className="w-4 h-4" />,
+        href: section.href,
+        requiredAction: section.requiredAction,
+      })),
     },
     {
       label: "Automation",
@@ -427,24 +402,32 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       ))}
                     </div>
                   )}
-                  {/* Human Resources menu (2-level with role-based filtering) */}
+                  {/* Human Resources menu (section-grouped with role-based filtering) */}
                   {item.label === "Human Resources" && hrMenuOpen && (
                     <div className="ml-4 mt-1 space-y-1">
-                      {item.children.filter(child => !child.requiredAction || hrRole.can(child.requiredAction)).map((child) => (
-                        <Link key={child.href} href={child.href!}>
-                          <a
-                            onClick={() => setSidebarOpen(false)}
-                            className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                              isActive(child.href!)
-                                ? "bg-primary text-primary-foreground"
-                                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                            }`}
-                          >
-                            {child.icon}
-                            <span>{child.label}</span>
-                          </a>
-                        </Link>
-                      ))}
+                      {HR_NAV_CONFIG.sections
+                        .filter((section) => {
+                          // Section visible if at least one child item is accessible
+                          return section.items.some((childItem) => {
+                            if (childItem.visibilityMode === "show") return true;
+                            return hrRole.can(childItem.requiredAction);
+                          });
+                        })
+                        .map((section) => (
+                          <Link key={section.href} href={section.href}>
+                            <a
+                              onClick={() => setSidebarOpen(false)}
+                              className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                                isActive(section.href)
+                                  ? "bg-primary text-primary-foreground"
+                                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                              }`}
+                            >
+                              <Users className="w-4 h-4" />
+                              <span>{section.label}</span>
+                            </a>
+                          </Link>
+                        ))}
                     </div>
                   )}
                   {/* AI Types menu (3-level with dynamic sub-menus) */}

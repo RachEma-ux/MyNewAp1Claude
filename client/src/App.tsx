@@ -90,6 +90,8 @@ const LLMCreationWizard = lazy(() => import("@/pages/LLMCreationWizard"));
 const LLMProviderConfigWizard = lazy(() => import("@/pages/LLMProviderConfigWizard"));
 const NewProviderPage = lazy(() => import("@/pages/NewProviderPage"));
 const LLMCataloguePage = lazy(() => import("@/pages/LLMCataloguePage"));
+// HR Module — Phase 2 Section Landing Pages (reusable component)
+const HRSectionLandingPage = lazy(() => import("@/pages/hr/HRSectionLandingPage"));
 // HR Module — Phase 1 pages
 const HRHomePage = lazy(() => import("@/pages/hr/HRHomePage"));
 const HRDirectoryPage = lazy(() => import("@/pages/hr/HRDirectoryPage"));
@@ -264,7 +266,21 @@ function Router() {
       <Route path="/ws/wizard" component={() => <ProtectedRoute component={WSWizardPage} />} />
       <Route path="/ws/list" component={() => <ProtectedRoute component={WSListPage} />} />
       <Route path="/ws/catalog" component={() => <ProtectedRoute component={WSCatalogPage} />} />
-      {/* HR Module — Employee self-service (all authenticated users) */}
+      {/* HR Module — Phase 2 Section Landing Pages (grouped entry points) */}
+      <Route path="/hr/workforce-planning" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="workforce-planning" />} />} />
+      <Route path="/hr/talent-acquisition" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="talent-acquisition" />} />} />
+      <Route path="/hr/lifecycle" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="onboarding-offboarding" />} />} />
+      <Route path="/hr/employee-records" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="employee-records" />} />} />
+      <Route path="/hr/compensation-benefits" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="compensation-benefits" />} />} />
+      <Route path="/hr/time-attendance" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="time-attendance" />} />} />
+      <Route path="/hr/learning-development" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="learning-development" />} />} />
+      <Route path="/hr/performance-talent" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="performance-talent" />} />} />
+      <Route path="/hr/employee-relations" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="employee-relations" />} />} />
+      <Route path="/hr/wellbeing-engagement" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="wellbeing-engagement" />} />} />
+      <Route path="/hr/analytics-reporting" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="analytics-reporting" />} />} />
+      <Route path="/hr/security-access" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="security-access" />} />} />
+      <Route path="/hr/compliance" component={() => <ProtectedRoute component={() => <HRSectionLandingPage sectionId="compliance" />} />} />
+      {/* HR Module — Employee self-service (all authenticated users, existing flat routes preserved) */}
       <Route path="/hr/directory" component={() => <ProtectedRoute component={HRDirectoryPage} />} />
       <Route path="/hr/timesheet" component={() => <ProtectedRoute component={HRTimesheetPage} />} />
       <Route path="/hr/leave" component={() => <ProtectedRoute component={HRLeavePage} />} />
