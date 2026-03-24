@@ -30,6 +30,7 @@ import {
   hrOrgUnits,
   hrJobFamilies,
   hrJobLevels,
+  hrWorkerProfiles,
 } from "../../../drizzle/schema";
 import { logHrAudit, logSensitiveRead, logStatusChange } from "../audit";
 import {
@@ -41,6 +42,8 @@ import {
   type HrRole,
   preventSelfApproval,
   getWorkerIdForUser,
+  getHrRoleForUser,
+  hasPermission,
 } from "../permissions";
 import {
   isValidRoleDefTransition,
@@ -923,5 +926,101 @@ export const hrRoleDefinitionRouter = router({
       return db.select().from(hrRoleDefinitionReviews)
         .where(eq(hrRoleDefinitionReviews.versionId, input.versionId))
         .orderBy(desc(hrRoleDefinitionReviews.reviewedAt));
+    }),
+
+  // ========================================================================
+  // SELF-SERVICE — Employee reads their own role definition
+  // ========================================================================
+
+  /**
+   * Get the role definition linked to the calling user's current position.
+   *
+   * Resolution chain:
+   *   user → workerId (via hr_role_assignments) → workerProfile.primaryPositionId
+   *   → active hrPositionRoleLinks → hrRoleDefinitions + current version
+   *
+   * Requires ROLE_DEF_READ_SELF (employee-level). Returns the role definition
+   * with employee-level masking applied (restricted + manager fields nulled).
+   */
+  getMyRoleDefinition: protectedProcedure
+    .query(async ({ ctx }) => {
+      const hrRole = await getHrRoleForUser(ctx.user);
+      // Employees need ROLE_DEF_READ_SELF; managers+ can use ROLE_DEF_READ
+      if (!hasPermission(hrRole, HR_ACTIONS.ROLE_DEF_READ_SELF) &&
+          !hasPermission(hrRole, HR_ACTIONS.ROLE_DEF_READ)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "HR permission denied: hr.roledef.read.self" });
+      }
+
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Step 1: Resolve caller's worker ID
+      const workerId = await getWorkerIdForUser(ctx.user.id);
+      if (!workerId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No HR worker profile linked to your account",
+        });
+      }
+
+      // Step 2: Get worker's primary position
+      const [worker] = await db
+        .select({ primaryPositionId: hrWorkerProfiles.primaryPositionId })
+        .from(hrWorkerProfiles)
+        .where(eq(hrWorkerProfiles.id, workerId))
+        .limit(1);
+
+      if (!worker?.primaryPositionId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No position assigned to your worker profile",
+        });
+      }
+
+      // Step 3: Find active position → role-definition link
+      const [link] = await db
+        .select({
+          roleDefinitionId: hrPositionRoleLinks.roleDefinitionId,
+        })
+        .from(hrPositionRoleLinks)
+        .where(
+          and(
+            eq(hrPositionRoleLinks.positionId, worker.primaryPositionId),
+            eq(hrPositionRoleLinks.isActive, true),
+          )
+        )
+        .limit(1);
+
+      if (!link) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No role definition linked to your current position",
+        });
+      }
+
+      // Step 4: Fetch role definition + current version
+      const [roleDef] = await db
+        .select()
+        .from(hrRoleDefinitions)
+        .where(eq(hrRoleDefinitions.id, link.roleDefinitionId))
+        .limit(1);
+
+      if (!roleDef) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Role definition not found" });
+      }
+
+      let currentVersion = null;
+      if (roleDef.currentVersionId) {
+        const [ver] = await db
+          .select()
+          .from(hrRoleDefinitionVersions)
+          .where(eq(hrRoleDefinitionVersions.id, roleDef.currentVersionId))
+          .limit(1);
+        if (ver) {
+          currentVersion = applyRoleDefMasking(ver as Record<string, unknown>, hrRole);
+        }
+      }
+
+      return { ...roleDef, currentVersion };
     }),
 });
