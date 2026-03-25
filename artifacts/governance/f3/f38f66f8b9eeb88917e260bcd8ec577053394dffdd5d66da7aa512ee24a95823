@@ -1,0 +1,1628 @@
+<!doctype html>
+<html lang="en-US" class="no-js">
+	<head>
+		<meta charset="UTF-8" />
+
+		<title>AI Systems Built for the Enterprise | AI21</title>
+
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		<meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />
+
+	<!-- This site is optimized with the Yoast SEO Premium plugin v27.1 (Yoast SEO v27.2) - https://yoast.com/product/yoast-seo-premium-wordpress/ -->
+	<meta name="description" content="AI21 builds Foundation Models and AI Systems for the enterprise. Power your most critical enterprise workflows with accurate, reliable, and scalable AI." />
+	<link rel="canonical" href="https://www.ai21.com/" />
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:type" content="website" />
+	<meta property="og:title" content="Homepage" />
+	<meta property="og:description" content="AI21 builds Foundation Models and AI Systems for the enterprise. Power your most critical enterprise workflows with accurate, reliable, and scalable AI." />
+	<meta property="og:url" content="https://www.ai21.com/" />
+	<meta property="og:site_name" content="AI21" />
+	<meta property="article:publisher" content="https://www.facebook.com/AI21Labs" />
+	<meta property="article:modified_time" content="2026-02-10T13:32:42+00:00" />
+	<meta property="og:image" content="https://www.ai21.com/wp-content/uploads/2026/02/logos-1.svg" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:site" content="@AI21Labs" />
+	<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://www.ai21.com/","url":"https://www.ai21.com/","name":"AI Systems Built for the Enterprise | AI21","isPartOf":{"@id":"https://www.ai21.com/#website"},"about":{"@id":"https://www.ai21.com/#organization"},"primaryImageOfPage":{"@id":"https://www.ai21.com/#primaryimage"},"image":{"@id":"https://www.ai21.com/#primaryimage"},"thumbnailUrl":"https://www.ai21.com/wp-content/uploads/2026/02/logos-1.svg","datePublished":"2026-02-01T15:44:17+00:00","dateModified":"2026-02-10T13:32:42+00:00","description":"AI21 builds Foundation Models and AI Systems for the enterprise. Power your most critical enterprise workflows with accurate, reliable, and scalable AI.","breadcrumb":{"@id":"https://www.ai21.com/#breadcrumb"},"inLanguage":"en-US","potentialAction":[{"@type":"ReadAction","target":["https://www.ai21.com/"]}]},{"@type":"ImageObject","inLanguage":"en-US","@id":"https://www.ai21.com/#primaryimage","url":"https://www.ai21.com/wp-content/uploads/2026/02/logos-1.svg","contentUrl":"https://www.ai21.com/wp-content/uploads/2026/02/logos-1.svg"},{"@type":"BreadcrumbList","@id":"https://www.ai21.com/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Homepage"}]},{"@type":"WebSite","@id":"https://www.ai21.com/#website","url":"https://www.ai21.com/","name":"AI21","description":"AI21","publisher":{"@id":"https://www.ai21.com/#organization"},"potentialAction":[{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://www.ai21.com/?s={search_term_string}"},"query-input":{"@type":"PropertyValueSpecification","valueRequired":true,"valueName":"search_term_string"}}],"inLanguage":"en-US"},{"@type":"Organization","@id":"https://www.ai21.com/#organization","name":"AI21 Labs","url":"https://www.ai21.com/","logo":{"@type":"ImageObject","inLanguage":"en-US","@id":"https://www.ai21.com/#/schema/logo/image/","url":"https://www.ai21.com/wp-content/uploads/2026/01/Frame-1410083255.png","contentUrl":"https://www.ai21.com/wp-content/uploads/2026/01/Frame-1410083255.png","width":1200,"height":1200,"caption":"AI21 Labs"},"image":{"@id":"https://www.ai21.com/#/schema/logo/image/"},"sameAs":["https://www.facebook.com/AI21Labs","https://x.com/AI21Labs","https://www.linkedin.com/company/ai21","https://www.youtube.com/@ai21labs"]}]}</script>
+	<!-- / Yoast SEO Premium plugin. -->
+
+
+<link rel='dns-prefetch' href='//js.hs-scripts.com' />
+<link rel='dns-prefetch' href='//js-eu1.hsforms.net' />
+<link rel='dns-prefetch' href='//cdn.amplitude.com' />
+<link rel='dns-prefetch' href='//unpkg.com' />
+<link rel="alternate" title="oEmbed (JSON)" type="application/json+oembed" href="https://www.ai21.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.ai21.com%2F" />
+<link rel="alternate" title="oEmbed (XML)" type="text/xml+oembed" href="https://www.ai21.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.ai21.com%2F&#038;format=xml" />
+<link rel='stylesheet' id='select2-css' href='https://www.ai21.com/wp-content/themes/ai21/assets/css/select2.min.css' type='text/css' media='all' />
+<link rel='stylesheet' id='fancybox-css' href='https://www.ai21.com/wp-content/themes/ai21/assets/css/fancybox.css' type='text/css' media='all' />
+<link rel='stylesheet' id='swiper-css' href='https://www.ai21.com/wp-content/themes/ai21/assets/css/swiper-bundle.min.css?ver=4.9.4' type='text/css' media='all' />
+<link rel='stylesheet' id='aos-css' href='https://www.ai21.com/wp-content/themes/ai21/assets/css/aos.min.css' type='text/css' media='all' />
+<link rel='stylesheet' id='style-css' href='https://www.ai21.com/wp-content/themes/ai21/style.css?ver=4.9.4' type='text/css' media='all' />
+<link rel='stylesheet' id='main-css' href='https://www.ai21.com/wp-content/themes/ai21/build/css/main.min.css?ver=4.9.4' type='text/css' media='all' />
+<script type="text/javascript" src="https://js.hs-scripts.com/25575448.js" id="hs-js"></script>
+<script type="text/javascript" src="//js-eu1.hsforms.net/forms/embed/v2.js" id="hsforms-js"></script>
+<script type="text/javascript" src="//cdn.amplitude.com/script/be0223327acdb089744156d19857f1ac.js" id="amplitude-js"></script>
+<script type="module" src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs"></script><script type="text/javascript" src="https://www.ai21.com/wp-includes/js/jquery/jquery.min.js?ver=3.7.1" id="jquery-core-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1" id="jquery-migrate-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-includes/js/jquery/ui/core.min.js?ver=1.13.3" id="jquery-ui-core-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-includes/js/jquery/ui/mouse.min.js?ver=1.13.3" id="jquery-ui-mouse-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-includes/js/jquery/ui/sortable.min.js?ver=1.13.3" id="jquery-ui-sortable-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-includes/js/jquery/ui/resizable.min.js?ver=1.13.3" id="jquery-ui-resizable-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/plugins/advanced-custom-fields-pro/assets/build/js/acf.min.js?ver=6.7.1" id="acf-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-includes/js/dist/dom-ready.min.js?ver=f77871ff7694fffea381" id="wp-dom-ready-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-includes/js/dist/hooks.min.js?ver=dd5603f07f9220ed27f1" id="wp-hooks-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-includes/js/dist/i18n.min.js?ver=c26c3dc7bed366793375" id="wp-i18n-js"></script>
+<script type="text/javascript" id="wp-i18n-js-after">
+/* <![CDATA[ */
+wp.i18n.setLocaleData( { 'text direction\u0004ltr': [ 'ltr' ] } );
+//# sourceURL=wp-i18n-js-after
+/* ]]> */
+</script>
+<script type="text/javascript" src="https://www.ai21.com/wp-includes/js/dist/a11y.min.js?ver=cb460b4676c94bd228ed" id="wp-a11y-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/plugins/advanced-custom-fields-pro/assets/build/js/acf-input.min.js?ver=6.7.1" id="acf-input-js"></script>
+<link rel="https://api.w.org/" href="https://www.ai21.com/wp-json/" /><link rel="alternate" title="JSON" type="application/json" href="https://www.ai21.com/wp-json/wp/v2/pages/28903" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://www.ai21.com/xmlrpc.php?rsd" />
+<link rel='shortlink' href='https://www.ai21.com/' />
+
+	<style type="text/css">
+		.b-section[data-id="section-hero"] { padding:0;max-width:100%; }
+.b-section[data-id="section-hero"] .block-container-section { max-width:100%;padding:0; }
+.b-section[data-id="customers"] { padding:6.4rem 0 3.5rem 0; }
+.b-marquee[data-id="block-6751a6d48bf40"] { padding:0; }
+.b-marquee[data-id="block-6751a6d48bf40"] .block-container-marquee { max-width:100%; }
+.b-section[data-id="section-headline"] { padding:12rem 0 18.5rem 0; }
+.b-section[data-id="section-stack"] { padding:4rem 0;background-color:#280611; }
+.b-section[data-id="section-stack-mobile"] { padding:4rem 0;background-color:#280611; }
+.b-section[data-id="section-foundations"] { padding:8rem 0 16rem 0; }
+.b-section[data-id="section-challenges"] { padding:6.2rem 0 7.8rem 0;background-color:#ebebeb; }
+.b-section[data-id="section-quote"] { background-color:#fbfbfb; }
+.b-section[data-id="section-blog"] { padding:4.4rem 0 4rem 0;background-color:#fbfbfb; }
+.b-section[data-id="section-footer-cta"] { padding:0;background-color:#fbfbfb;max-width:100%; }
+.b-section[data-id="section-footer-cta"] .block-container-section { max-width:100%;padding:0; }
+.b-subscribe-to-newsletter[data-id="block-6720a29a7463b"] { background-image:url(https://www.ai21.com/wp-content/uploads/2024/10/resource-cta.png); }
+
+@media only screen and (max-width:992px) { 
+.b-section[data-id="customers"] { padding:4.4rem 0; }
+.b-section[data-id="section-headline"] { padding:6rem 0 8rem 0; }
+.b-section[data-id="section-stack"] { padding:6rem 0; }
+.b-section[data-id="section-stack-mobile"] { padding:3.5rem 0; }
+.b-section[data-id="section-foundations"] { padding:5rem 0 10rem 0; }
+.b-section[data-id="section-blog"] { padding:4rem 0 8rem 0; }
+ }
+			</style>
+
+	<!-- OneTrust Cookies Consent Notice start for ai21.com -->
+<script src="https://cdn.cookielaw.org/scripttemplates/otSDKStub.js"  type="text/javascript" charset="UTF-8" data-domain-script="0199ebd6-2cf6-7686-b0a9-147f0fc6d6e9"></script>
+<script type="text/javascript">
+function OptanonWrapper() { }
+</script>
+<!-- OneTrust Cookies Consent Notice end for ai21.com -->
+
+<!-- Google Tag Manager -->
+<script>
+	(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+	new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+	j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+	'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+	})(window,document,'script','dataLayer','GTM-PC77KVH');
+</script>
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-5MQHGT73L3"></script>
+
+<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-5MQHGT73L3');
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Amplitude -->
+
+<script>
+const sessionReplayTracking = window.sessionReplay.plugin({
+	sampleRate: 0.2
+});
+window.amplitude.add(sessionReplayTracking);
+window.amplitude.init('be0223327acdb089744156d19857f1ac', {
+	autocapture: true
+});
+</script>
+
+<script>
+	window.amplitude.add({
+		name: "page-view-enrichment-plugin",
+		execute: function(event) {
+			// Add URL parameters to event properties
+			if (event.event_type === "[Amplitude] Page Viewed") {
+				const urlParams = new URLSearchParams(window.location.search);
+				urlParams.forEach((value, key) => {
+					event.event_properties[key] = value;
+				});
+			}
+
+			return event;
+		}
+	});
+</script>
+<!-- End of Amplitude -->
+
+<!-- Zoominfo -->
+<script>
+	window[function(t,e){for(var n="",r=0;r<t.length;r++){var o=t[r].charCodeAt();o-=27,o+=61,o%=94,o+=33,n+=String.fromCharCode(o)}return n}(atob("dWRrLywnIn4xZiI2"))]="32ebc1df5f1680005028";var zi=document.createElement("script");zi.type="text/javascript",zi.async=!0,zi.src=function(t,e){for(var n="",r=0;r<t.length;r++){var o=t[r].charCodeAt();o-=28,o+=61,o%=94,o+=33,n+=String.fromCharCode(o)}return n}(atob("JjIyLjFWS0soMUo4J0kxITAnLjIxSiEtK0s4J0kyfSVKKDE=")),"complete"===document.readyState?document.body.appendChild(zi):window.addEventListener("load",(function(){document.body.appendChild(zi)}));
+</script>
+<!-- End of Zoominfo -->
+
+<!-- Hockeystack -->
+<script>
+	var hsscript = document.createElement("script");
+	hsscript.id = "wphs";
+	hsscript.src = "https://cdn.jsdelivr.net/npm/hockeystack@latest/hockeystack.min.js";
+	hsscript.async = 1;
+	hsscript.dataset.apikey = "3d31e9430581868c72dd6e22dc2801";
+	hsscript.dataset.cookieless = 1;
+	hsscript.dataset.autoIdentify = 1;
+	document.getElementsByTagName('head')[0].append(hsscript);
+</script>
+<!-- End of Hockeystack -->
+
+<!-- Start VWO Async SmartCode -->
+<link rel="preconnect" href="https://dev.visualwebsiteoptimizer.com" />
+<script type='text/javascript' id='vwoCode'>
+	window._vwo_code || (function() {
+	var account_id=1068738,
+	version=2.1,
+	settings_tolerance=2000,
+	hide_element='body',
+	hide_element_style = 'opacity:0 !important;filter:alpha(opacity=0) !important;background:none !important;transition:none !important;',
+	/* DO NOT EDIT BELOW THIS LINE */
+	f=false,w=window,d=document,v=d.querySelector('#vwoCode'),cK='_vwo_'+account_id+'_settings',cc={};try{var c=JSON.parse(localStorage.getItem('_vwo_'+account_id+'_config'));cc=c&&typeof c==='object'?c:{}}catch(e){}var stT=cc.stT==='session'?w.sessionStorage:w.localStorage;code={nonce:v&&v.nonce,use_existing_jquery:function(){return typeof use_existing_jquery!=='undefined'?use_existing_jquery:undefined},library_tolerance:function(){return typeof library_tolerance!=='undefined'?library_tolerance:undefined},settings_tolerance:function(){return cc.sT||settings_tolerance},hide_element_style:function(){return'{'+(cc.hES||hide_element_style)+'}'},hide_element:function(){if(performance.getEntriesByName('first-contentful-paint')[0]){return''}return typeof cc.hE==='string'?cc.hE:hide_element},getVersion:function(){return version},finish:function(e){if(!f){f=true;var t=d.getElementById('_vis_opt_path_hides');if(t)t.parentNode.removeChild(t);if(e)(new Image).src='https://dev.visualwebsiteoptimizer.com/ee.gif?a='+account_id+e}},finished:function(){return f},addScript:function(e){var t=d.createElement('script');t.type='text/javascript';if(e.src){t.src=e.src}else{t.text=e.text}v&&t.setAttribute('nonce',v.nonce);d.getElementsByTagName('head')[0].appendChild(t)},load:function(e,t){var n=this.getSettings(),i=d.createElement('script'),r=this;t=t||{};if(n){i.textContent=n;d.getElementsByTagName('head')[0].appendChild(i);if(!w.VWO||VWO.caE){stT.removeItem(cK);r.load(e)}}else{var o=new XMLHttpRequest;o.open('GET',e,true);o.withCredentials=!t.dSC;o.responseType=t.responseType||'text';o.onload=function(){if(t.onloadCb){return t.onloadCb(o,e)}if(o.status===200||o.status===304){_vwo_code.addScript({text:o.responseText})}else{_vwo_code.finish('&e=loading_failure:'+e)}};o.onerror=function(){if(t.onerrorCb){return t.onerrorCb(e)}_vwo_code.finish('&e=loading_failure:'+e)};o.send()}},getSettings:function(){try{var e=stT.getItem(cK);if(!e){return}e=JSON.parse(e);if(Date.now()>e.e){stT.removeItem(cK);return}return e.s}catch(e){return}},init:function(){if(d.URL.indexOf('__vwo_disable__')>-1)return;var e=this.settings_tolerance();w._vwo_settings_timer=setTimeout(function(){_vwo_code.finish();stT.removeItem(cK)},e);var t;if(this.hide_element()!=='body'){t=d.createElement('style');var n=this.hide_element(),i=n?n+this.hide_element_style():'',r=d.getElementsByTagName('head')[0];t.setAttribute('id','_vis_opt_path_hides');v&&t.setAttribute('nonce',v.nonce);t.setAttribute('type','text/css');if(t.styleSheet)t.styleSheet.cssText=i;else t.appendChild(d.createTextNode(i));r.appendChild(t)}else{t=d.getElementsByTagName('head')[0];var i=d.createElement('div');i.style.cssText='z-index: 2147483647 !important;position: fixed !important;left: 0 !important;top: 0 !important;width: 100% !important;height: 100% !important;background: white !important;display: block !important;';i.setAttribute('id','_vis_opt_path_hides');i.classList.add('_vis_hide_layer');t.parentNode.insertBefore(i,t.nextSibling)}var o=window._vis_opt_url||d.URL,s='https://dev.visualwebsiteoptimizer.com/j.php?a='+account_id+'&u='+encodeURIComponent(o)+'&vn='+version;if(w.location.search.indexOf('_vwo_xhr')!==-1){this.addScript({src:s})}else{this.load(s+'&x=true')}}};w._vwo_code=code;code.init();})();
+</script>
+<!-- End VWO Async SmartCode -->
+<script type="text/javascript">siteObject = {"ajaxUrl":"https:\/\/www.ai21.com\/wp-admin\/admin-ajax.php","homeUrl":"https:\/\/www.ai21.com","pageLocale":"en_US"};</script><link rel="icon" href="https://www.ai21.com/wp-content/uploads/2026/01/favicon-75x75.png" sizes="32x32" />
+<link rel="icon" href="https://www.ai21.com/wp-content/uploads/2026/01/favicon.png" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://www.ai21.com/wp-content/uploads/2026/01/favicon.png" />
+<meta name="msapplication-TileImage" content="https://www.ai21.com/wp-content/uploads/2026/01/favicon.png" />
+	</head>
+
+	<body class="home wp-singular page-template-default page page-id-28903 wp-theme-ai21 page-homepage-v2">
+		<ul class="skiplinks">
+	<li><a href="#site-navigation">Skip to Main Menu</a></li>
+	<li><a href="#content">Skip to Main Content</a></li>
+	<li><a href="#colophon">Skip to Footer</a></li>
+</ul>
+
+		<div id="site-wrap" class="site-wrap">
+							
+				<header id="site-header" class="site-header">
+					
+<div class="header-desktop">
+	<div class="header__main">
+		<div class="container">
+			<div class="header__in">
+				<nav class="main-navigation" role="navigation">
+					
+<div class="site-logo">
+	<a href="https://www.ai21.com">
+		<img src="https://www.ai21.com/wp-content/uploads/2026/02/ai21-logo-black.svg" class="logo" width="120" height="38" alt="AI21 Labs logo" />
+	</a>
+</div>
+<div class="main-menu-wrap">
+			<ul class="main-menu">
+			
+				<li class="menu-item menu-item-type-products menu-item-has-two-columns menu-item-has-children">
+					<a href="#">Products</a>
+											<div class="sub-menu sub-menu-products">
+							
+								<div class="sub-menu-grid">
+									<div class="sub-menu-col sub-menu-col-l">
+										<ul class="sub-menu-links">
+											
+													<li class="menu-item menu-item-has-image" data-index="0">
+														
+
+
+														<a href="https://www.ai21.com/maestro/"  class="menu-item-link">
+
+															<div class="sub-menu-image-new">
+																
+																		<figure class="sub-menu-featured-item-image" data-index="0"><img width="488" height="260" src="https://www.ai21.com/wp-content/uploads/2026/02/Maestro-2.png" class="attachment-full size-full" alt="" decoding="async" fetchpriority="high" srcset="https://www.ai21.com/wp-content/uploads/2026/02/Maestro-2.png 488w, https://www.ai21.com/wp-content/uploads/2026/02/Maestro-2-75x40.png 75w" sizes="(max-width: 488px) 100vw, 488px" /></figure>
+																																																	</div>
+
+															<div class="menu-item-title">
+																Maestro															</div>
+
+															<div class="menu-item-desc">Reliable knowledge agents for complex enterprise tasks</div>														</a>
+													</li>
+
+												
+											
+													<li class="menu-item menu-item-has-image" data-index="1">
+														
+
+
+														<a href="https://www.ai21.com/jamba/"  class="menu-item-link">
+
+															<div class="sub-menu-image-new">
+																
+																		<figure class="sub-menu-featured-item-image" data-index="1"><img width="490" height="260" src="https://www.ai21.com/wp-content/uploads/2026/02/Jamba-2.png" class="attachment-full size-full" alt="" decoding="async" srcset="https://www.ai21.com/wp-content/uploads/2026/02/Jamba-2.png 490w, https://www.ai21.com/wp-content/uploads/2026/02/Jamba-2-75x40.png 75w" sizes="(max-width: 490px) 100vw, 490px" /></figure>
+																																																	</div>
+
+															<div class="menu-item-title">
+																Jamba Models															</div>
+
+															<div class="menu-item-desc">Efficient LLMs for long-context processing</div>														</a>
+													</li>
+
+												
+																					</ul>
+									</div>
+
+									<div class="sub-menu-col sub-menu-col-r">
+										<!-- <div class="sub-menu-image">
+											
+														<figure class="sub-menu-featured-item-image show" data-index="0"><img width="488" height="260" src="https://www.ai21.com/wp-content/uploads/2026/02/Maestro-2.png" class="attachment-full size-full" alt="" decoding="async" srcset="https://www.ai21.com/wp-content/uploads/2026/02/Maestro-2.png 488w, https://www.ai21.com/wp-content/uploads/2026/02/Maestro-2-75x40.png 75w" sizes="(max-width: 488px) 100vw, 488px" /></figure>
+																												
+														<figure class="sub-menu-featured-item-image" data-index="1"><img width="490" height="260" src="https://www.ai21.com/wp-content/uploads/2026/02/Jamba-2.png" class="attachment-full size-full" alt="" decoding="async" srcset="https://www.ai21.com/wp-content/uploads/2026/02/Jamba-2.png 490w, https://www.ai21.com/wp-content/uploads/2026/02/Jamba-2-75x40.png 75w" sizes="(max-width: 490px) 100vw, 490px" /></figure>
+																																						</div> -->
+
+										
+																							<div class="sub-menu-bottom-text">
+													Ready to build trustworthy AI systems?												</div>
+											
+											<div class="sub-menu-bottom-links">
+												<a href="https://ai21.com/contact-sales/" class="sub-menu-bottom-link">Get a Demo</a>											</div>
+
+																			</div>
+								</div>
+
+							
+						</div>
+									</li>
+
+			
+				<li class="menu-item menu-item-type-solutions menu-item-has-two-columns menu-item-has-children">
+					<a href="#">Solutions</a>
+											<div class="sub-menu sub-menu-solutions">
+															<div class="sub-menu-grid">
+									<div class="sub-menu-col sub-menu-col-l">
+										<div class="sub-menu-items-without-title">
+											<ul class="sub-menu-links">
+												
+														<li class="menu-item menu-item-has-image" data-index="0">
+															
+															<!-- <div class="sub-menu-image-new">
+																															</div> -->
+
+															<a href="https://www.ai21.com/custom-ai-solutions/"  class="menu-item-link">
+																<div class="menu-item-title">
+																	Custom AI Solutions																</div>
+
+																<div class="menu-item-desc">Built by AI21 experts and tuned to your data and use case</div>															</a>
+														</li>
+
+																								</ul>
+										</div>
+
+										<div class="sub-menu-items-with-title">
+											<ul class="sub-menu-links">
+												
+														<li class="menu-item menu-item-subject">
+															Industries														</li>
+
+												
+														<li class="menu-item menu-item-has-image menu-item-w-45 menu-item-no-border " data-index="2">
+															
+															<div class="sub-menu-image-new">
+																
+																		<figure class="sub-menu-featured-item-image" data-index="2"><img width="22" height="22" src="https://www.ai21.com/wp-content/uploads/2026/02/account_balance.svg" class="attachment-full size-full" alt="" decoding="async" /></figure>
+																																																	</div>
+
+															<a href="https://www.ai21.com/industries/finance/"  class="menu-item-link">
+																<div class="menu-item-title">
+																	Finance																</div>
+
+																															</a>
+														</li>
+
+													
+														<li class="menu-item menu-item-has-image menu-item-w-45 menu-item-no-border " data-index="3">
+															
+															<div class="sub-menu-image-new">
+																
+																		<figure class="sub-menu-featured-item-image" data-index="3"><img width="22" height="22" src="https://www.ai21.com/wp-content/uploads/2026/02/computer.svg" class="attachment-full size-full" alt="" decoding="async" /></figure>
+																																																	</div>
+
+															<a href="https://www.ai21.com/industries/tech/"  class="menu-item-link">
+																<div class="menu-item-title">
+																	Tech																</div>
+
+																															</a>
+														</li>
+
+													
+														<li class="menu-item menu-item-has-image menu-item-w-45 menu-item-no-border " data-index="4">
+															
+															<div class="sub-menu-image-new">
+																
+																		<figure class="sub-menu-featured-item-image" data-index="4"><img width="22" height="22" src="https://www.ai21.com/wp-content/uploads/2026/02/factory.svg" class="attachment-full size-full" alt="" decoding="async" /></figure>
+																																																	</div>
+
+															<a href="https://www.ai21.com/industries/manufacturing/"  class="menu-item-link">
+																<div class="menu-item-title">
+																	Manufacturing																</div>
+
+																															</a>
+														</li>
+
+													
+														<li class="menu-item menu-item-has-image menu-item-w-45 menu-item-no-border " data-index="5">
+															
+															<div class="sub-menu-image-new">
+																
+																		<figure class="sub-menu-featured-item-image" data-index="5"><img width="22" height="22" src="https://www.ai21.com/wp-content/uploads/2026/02/local_hospital.svg" class="attachment-full size-full" alt="" decoding="async" /></figure>
+																																																	</div>
+
+															<a href="https://www.ai21.com/industries/healthcare/"  class="menu-item-link">
+																<div class="menu-item-title">
+																	Healthcare																</div>
+
+																															</a>
+														</li>
+
+													
+														<li class="menu-item menu-item-has-image menu-item-w-45 menu-item-no-border " data-index="6">
+															
+															<div class="sub-menu-image-new">
+																
+																		<figure class="sub-menu-featured-item-image" data-index="6"><img width="22" height="22" src="https://www.ai21.com/wp-content/uploads/2026/02/security.svg" class="attachment-full size-full" alt="" decoding="async" /></figure>
+																																																	</div>
+
+															<a href="https://www.ai21.com/industries/defense/"  class="menu-item-link">
+																<div class="menu-item-title">
+																	Defense																</div>
+
+																															</a>
+														</li>
+
+																								</ul>
+										</div>
+									</div>
+
+									<div class="sub-menu-col sub-menu-col-r">
+										<!-- <div class="sub-menu-image">
+											
+															<figure class="sub-menu-featured-item-image" data-index="2"><img width="22" height="22" src="https://www.ai21.com/wp-content/uploads/2026/02/account_balance.svg" class="attachment-full size-full" alt="" decoding="async" /></figure>
+																										
+															<figure class="sub-menu-featured-item-image" data-index="3"><img width="22" height="22" src="https://www.ai21.com/wp-content/uploads/2026/02/computer.svg" class="attachment-full size-full" alt="" decoding="async" /></figure>
+																										
+															<figure class="sub-menu-featured-item-image" data-index="4"><img width="22" height="22" src="https://www.ai21.com/wp-content/uploads/2026/02/factory.svg" class="attachment-full size-full" alt="" decoding="async" /></figure>
+																										
+															<figure class="sub-menu-featured-item-image" data-index="5"><img width="22" height="22" src="https://www.ai21.com/wp-content/uploads/2026/02/local_hospital.svg" class="attachment-full size-full" alt="" decoding="async" /></figure>
+																										
+															<figure class="sub-menu-featured-item-image" data-index="6"><img width="22" height="22" src="https://www.ai21.com/wp-content/uploads/2026/02/security.svg" class="attachment-full size-full" alt="" decoding="async" /></figure>
+																																				</div> -->
+
+
+
+																					<a href="https://www.ai21.com/contact-sales/" class="sub-menu-featured-item-link"  target="_blank">
+																									<div class="sub-menu-image">
+														<figure class="c-image"><img width="660" height="420" src="https://www.ai21.com/wp-content/uploads/2026/02/Solutions-2.png" class="attachment-full size-full" alt="" decoding="async" srcset="https://www.ai21.com/wp-content/uploads/2026/02/Solutions-2.png 660w, https://www.ai21.com/wp-content/uploads/2026/02/Solutions-2-600x382.png 600w, https://www.ai21.com/wp-content/uploads/2026/02/Solutions-2-75x48.png 75w" sizes="(max-width: 660px) 100vw, 660px" /></figure>													</div>
+												
+												
+												<div class="sub-menu-bottom-links">
+													<span class="sub-menu-bottom-link">
+														Explore Finance Solutions													</span>
+												</div>
+											</a>
+																			</div>
+								</div>
+							
+						</div>
+									</li>
+
+			
+				<li class="menu-item menu-item-type-resources menu-item-has-children">
+					<a href="#">Lab</a>
+											<div class="sub-menu sub-menu-resources">
+							
+								<div class="sub-menu-grid">
+									<div class="sub-menu-col sub-menu-col-l">
+										<ul class="sub-menu-links">
+											
+												<li class="menu-item" data-index="0">
+													
+													<a href="https://www.ai21.com/research/"  class="menu-item-link">
+														<div class="menu-item-title">
+															Research														</div>
+
+																											</a>
+												</li>
+
+											
+												<li class="menu-item" data-index="1">
+													
+													<a href="https://www.ai21.com/developer-hub/"  class="menu-item-link">
+														<div class="menu-item-title">
+															Developers Hub														</div>
+
+																											</a>
+												</li>
+
+																					</ul>
+									</div>
+
+									<div class="sub-menu-col sub-menu-col-r">
+																					<a href="https://www.ai21.com/research/jamba-1-5-hybrid-transformer-mamba-models-at-scale/" class="sub-menu-featured-item-link"  target="_blank">
+												<div class="sub-menu-image">
+													<figure class="c-image"><img width="660" height="420" src="https://www.ai21.com/wp-content/uploads/2026/02/Labs-1.png" class="attachment-full size-full" alt="" decoding="async" srcset="https://www.ai21.com/wp-content/uploads/2026/02/Labs-1.png 660w, https://www.ai21.com/wp-content/uploads/2026/02/Labs-1-600x382.png 600w, https://www.ai21.com/wp-content/uploads/2026/02/Labs-1-75x48.png 75w" sizes="(max-width: 660px) 100vw, 660px" /></figure>												</div>
+
+												<div class="sub-menu-bottom-links">
+													<span class="sub-menu-bottom-link">
+														Read the Paper													</span>
+												</div>
+											</a>
+																			</div>
+								</div>
+
+							
+						</div>
+									</li>
+
+			
+				<li class="menu-item menu-item-type-resources menu-item-has-children">
+					<a href="#">Resources</a>
+											<div class="sub-menu sub-menu-resources">
+							
+								<div class="sub-menu-grid">
+									<div class="sub-menu-col sub-menu-col-l">
+										<ul class="sub-menu-links">
+											
+												<li class="menu-item" data-index="0">
+													
+													<a href="https://www.ai21.com/blog/"  class="menu-item-link">
+														<div class="menu-item-title">
+															Blog														</div>
+
+																											</a>
+												</li>
+
+											
+												<li class="menu-item" data-index="1">
+													
+													<a href="https://www.ai21.com/events/"  class="menu-item-link">
+														<div class="menu-item-title">
+															Events & Webinars														</div>
+
+																											</a>
+												</li>
+
+											
+												<li class="menu-item" data-index="2">
+													
+													<a href="https://www.ai21.com/yaap/"  class="menu-item-link">
+														<div class="menu-item-title">
+															Podcast														</div>
+
+																											</a>
+												</li>
+
+																					</ul>
+									</div>
+
+									<div class="sub-menu-col sub-menu-col-r">
+																					<a href="https://www.ai21.com/events/ai-and-the-future-of-work/" class="sub-menu-featured-item-link"  target="_blank">
+												<div class="sub-menu-image">
+													<figure class="c-image"><img width="662" height="420" src="https://www.ai21.com/wp-content/uploads/2026/02/Resources-1.png" class="attachment-full size-full" alt="" decoding="async" srcset="https://www.ai21.com/wp-content/uploads/2026/02/Resources-1.png 662w, https://www.ai21.com/wp-content/uploads/2026/02/Resources-1-600x381.png 600w, https://www.ai21.com/wp-content/uploads/2026/02/Resources-1-75x48.png 75w" sizes="(max-width: 662px) 100vw, 662px" /></figure>												</div>
+
+												<div class="sub-menu-bottom-links">
+													<span class="sub-menu-bottom-link">
+														Watch Webinar													</span>
+												</div>
+											</a>
+																			</div>
+								</div>
+
+							
+						</div>
+									</li>
+
+			
+				<li class="menu-item menu-item-type-resources menu-item-has-children">
+					<a href="#">Company</a>
+											<div class="sub-menu sub-menu-resources">
+							
+								<div class="sub-menu-grid">
+									<div class="sub-menu-col sub-menu-col-l">
+										<ul class="sub-menu-links">
+											
+												<li class="menu-item" data-index="0">
+													
+													<a href="https://www.ai21.com/about/"  class="menu-item-link">
+														<div class="menu-item-title">
+															About Us														</div>
+
+																											</a>
+												</li>
+
+											
+												<li class="menu-item" data-index="1">
+													
+													<a href="https://www.ai21.com/newsroom/"  class="menu-item-link">
+														<div class="menu-item-title">
+															Newsroom														</div>
+
+																											</a>
+												</li>
+
+											
+												<li class="menu-item" data-index="2">
+													
+													<a href="https://www.ai21.com/partners/"  class="menu-item-link">
+														<div class="menu-item-title">
+															Partners														</div>
+
+																											</a>
+												</li>
+
+																					</ul>
+									</div>
+
+									<div class="sub-menu-col sub-menu-col-r">
+																					<div class="sub-menu-featured-item-link">
+												<div class="sub-menu-image">
+													<figure class="c-image"><img width="660" height="420" src="https://www.ai21.com/wp-content/uploads/2026/02/Comapany-1.png" class="attachment-full size-full" alt="" decoding="async" srcset="https://www.ai21.com/wp-content/uploads/2026/02/Comapany-1.png 660w, https://www.ai21.com/wp-content/uploads/2026/02/Comapany-1-600x382.png 600w, https://www.ai21.com/wp-content/uploads/2026/02/Comapany-1-75x48.png 75w" sizes="(max-width: 660px) 100vw, 660px" /></figure>												</div>
+											</div>
+																			</div>
+								</div>
+
+							
+						</div>
+									</li>
+
+					</ul>
+	</div>
+					<div class="header__options">
+						<a href="https://www.ai21.com/contact-sales/" class="talk-to-us get-a-demo">
+							Get a Demo						</a>
+					</div>
+				</nav>
+			</div>
+		</div>
+	</div>
+</div>
+<div class="header-mobile">
+	
+<div class="site-logo">
+	<a href="https://www.ai21.com">
+		<img src="https://www.ai21.com/wp-content/uploads/2026/02/ai21-logo-black.svg" class="logo" width="120" height="38" alt="AI21 Labs logo" />
+	</a>
+</div>
+
+	<button class="mn-trigger" type="button" aria-label="Toggle Main Menu" title="Toggle Main Menu">
+		<span class="mn-icon">
+			<span class="mn-line"></span>
+			<span class="mn-line"></span>
+			<span class="mn-line"></span>
+		</span>
+	</button>
+</div>
+
+
+<div class="mobile-navigation">
+	<div class="mn-menu-wrap">
+		<nav class="mn-nav" role="navigation">
+			
+				<ul class="mn-menu">
+					
+						<li class="menu-item menu-item-has-children">
+							<a href="#">Products</a>
+															<ul class="sub-menu">
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/maestro/">
+													Maestro												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/jamba/">
+													Jamba Models												</a>
+											</li>
+
+										
+																	</ul>
+													</li>
+					
+						<li class="menu-item menu-item-has-children">
+							<a href="#">Solutions</a>
+															<ul class="sub-menu">
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/custom-ai-solutions/">
+													Custom AI Solutions												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item menu-item-subject">
+												Industries											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/industries/finance/">
+													Finance												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/industries/tech/">
+													Tech												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/industries/manufacturing/">
+													Manufacturing												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/industries/healthcare/">
+													Healthcare												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/industries/defense/">
+													Defense												</a>
+											</li>
+
+										
+																	</ul>
+													</li>
+					
+						<li class="menu-item menu-item-has-children">
+							<a href="#">Lab</a>
+															<ul class="sub-menu">
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/research/">
+													Research												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/developer-hub/">
+													Developers Hub												</a>
+											</li>
+
+										
+																	</ul>
+													</li>
+					
+						<li class="menu-item menu-item-has-children">
+							<a href="#">Resources</a>
+															<ul class="sub-menu">
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/blog/">
+													Blog												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/events/">
+													Events & Webinars												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/yaap/">
+													Podcast												</a>
+											</li>
+
+										
+																	</ul>
+													</li>
+					
+						<li class="menu-item menu-item-has-children">
+							<a href="#">Company</a>
+															<ul class="sub-menu">
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/about/">
+													About Us												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/newsroom/">
+													Newsroom												</a>
+											</li>
+
+										
+									
+										
+											<li class="menu-item">
+												
+												<a href="https://www.ai21.com/partners/">
+													Partners												</a>
+											</li>
+
+										
+																	</ul>
+													</li>
+									</ul>
+
+						</nav>
+
+		<div class="mn-cta">
+			<div class="mn-cta-buttons">
+				<a href="https://www.ai21.com/contact-sales/" class="talk-to-us">
+					Get a Demo				</a>
+			</div>
+		</div>
+	</div>
+</div>
+				</header>
+
+			
+			<div id="content" class="site-content">
+				<div class="block b-section section-hero" id="section-hero" data-id="section-hero"><div class="block-container block-container-section">
+
+<h2 class="wp-block-heading has-text-align-center hero__title" id="h-frontier-ai-research-powering-the-future-enterprise">Frontier AI research powering the future enterprise</h2>
+
+
+
+<div class="wp-block-group hero__html"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<div data-us-project="mdt4IFm4qJKYAKNoDB06" data-us-production="true" style="width:100%; height: 100vh"></div><script type="text/javascript">!function(){if(!window.UnicornStudio){window.UnicornStudio={isInitialized:!1};var i=document.createElement("script");i.src="https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v2.0.2/dist/unicornStudio.umd.js",i.onload=function(){window.UnicornStudio.isInitialized||(UnicornStudio.init(),window.UnicornStudio.isInitialized=!0)},(document.head || document.body).appendChild(i)}}();</script>
+</div></div>
+
+</div></div>
+
+<div class="block b-section section-customers" id="customers" data-id="customers"><div class="block-container block-container-section">
+
+<h2 class="wp-block-heading title" id="h-our-partners">Our partners</h2>
+
+
+<div class="block b-marquee hidden-desktop" id="block-6751a6d48bf40" data-id="block-6751a6d48bf40"><div class="block-container block-container-marquee"><div class="marquee">
+	<div class="marquee__item">
+		<img decoding="async" width="1800" height="50" src="https://www.ai21.com/wp-content/uploads/2026/02/logos-long.svg" class="attachment-full size-full" alt="" / loading="lazy">	</div>
+	<div class="marquee__item">
+		<img decoding="async" width="1800" height="50" src="https://www.ai21.com/wp-content/uploads/2026/02/logos-long.svg" class="attachment-full size-full" alt="" / loading="lazy">	</div>
+</div>
+</div></div>
+
+
+<figure class="wp-block-image size-full hidden-mobile"><img decoding="async" src="https://www.ai21.com/wp-content/uploads/2026/02/logos-1.svg" alt="" class="wp-image-28944"/ loading="lazy"></figure>
+
+</div></div>
+
+<div class="block b-section section-headline" id="section-headline" data-id="section-headline"><div class="block-container block-container-section">
+
+<h2 class="wp-block-heading has-text-align-center headline__title" id="h-high-impact-ai-agents-you-can-trust-built-for-the-work-you-do-today-and-the-scale-you-need-tomorrow">High-impact AI agents you can trust. Built for the work you do today and the scale you need tomorrow.</h2>
+
+
+
+<div class="wp-block-buttons headline__buttons is-layout-flex wp-block-buttons-is-layout-flex">
+<div class="wp-block-button btn btn--new btn--new-black"><a class="wp-block-button__link wp-element-button" href="https://www.ai21.com/contact-sales/"><span class="btn-text">Talk to an Expert</span></a></div>
+
+
+
+<div class="wp-block-button btn btn--new btn--new-white hidden-mobile"><a class="wp-block-button__link wp-element-button" href="https://studio.ai21.com/" target="_blank" rel="noreferrer noopener"><span class="btn-text">Start Building</span></a></div>
+
+
+
+<div class="wp-block-button talk-to-us hidden-desktop"><a class="wp-block-button__link wp-element-button" href="https://studio.ai21.com/" target="_blank" rel="noreferrer noopener"><span class="btn-text">Start Building</span></a></div>
+</div>
+
+</div></div>
+
+<div class="block b-section section-stack hidden-mobile" id="section-stack" data-id="section-stack"><div class="block-container block-container-section">
+
+<h2 class="wp-block-heading has-text-align-center section__title anim-fade-in" id="h-end-to-end-control-of-the-enterprise-ai-stack">End-to-end control of the enterprise AI stack</h2>
+
+
+
+<div class="wp-block-group section__groups"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<div class="wp-block-group group group__solutions"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<div class="wp-block-group group__content-wrapper"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h2 class="wp-block-heading group__title" id="h-solutions">[Solutions]</h2>
+
+
+
+<p class="group__text">From architecture design to post-deployment optimization, we build enterprise-ready AI solutions tailored to your specific needs.</p>
+
+
+
+<div class="wp-block-buttons group__buttons is-layout-flex wp-block-buttons-is-layout-flex">
+<div class="wp-block-button talk-to-us"><a class="wp-block-button__link wp-element-button" href="https://www.ai21.com/custom-ai-systems/" target="_blank" rel="noreferrer noopener"><span class="btn-text">Explore More</span></a></div>
+</div>
+</div></div>
+
+
+
+<div class="wp-block-group group__lottie-wrapper"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained"><div class="block b-lottie group__lottie-off" id="block-697b46f883607" data-id="block-697b46f883607"><div class="block-container block-container-lottie">
+
+	<dotlottie-player src="https://www.ai21.com/wp-content/uploads/2026/01/Layer_Off.json" class="c-lottie" loop></dotlottie-player>
+
+</div></div>
+
+<div class="block b-lottie group__lottie-on" id="block-697b46f883607" data-id="block-697b46f883607"><div class="block-container block-container-lottie">
+
+	<dotlottie-player src="https://www.ai21.com/wp-content/uploads/2026/01/Layer_On.json" class="c-lottie" loop></dotlottie-player>
+
+</div></div></div></div>
+</div></div>
+
+
+
+<div class="wp-block-group group group__maestro"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<div class="wp-block-group group__content-wrapper"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h2 class="wp-block-heading group__title" id="h-maestro">[Maestro]</h2>
+
+
+
+<p class="group__text">The high-accuracy AI orchestration system with built-in validation.</p>
+
+
+
+<div class="wp-block-buttons group__buttons is-layout-flex wp-block-buttons-is-layout-flex">
+<div class="wp-block-button talk-to-us"><a class="wp-block-button__link wp-element-button" href="https://www.ai21.com/maestro/" target="_blank" rel="noreferrer noopener"><span class="btn-text">Explore More</span></a></div>
+</div>
+</div></div>
+
+
+
+<div class="wp-block-group group__lottie-wrapper"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained"><div class="block b-lottie group__lottie-off" id="block-697b46f883607" data-id="block-697b46f883607"><div class="block-container block-container-lottie">
+
+	<dotlottie-player src="https://www.ai21.com/wp-content/uploads/2026/01/Layer_Off.json" class="c-lottie" loop></dotlottie-player>
+
+</div></div>
+
+<div class="block b-lottie group__lottie-on" id="block-697b46f883607" data-id="block-697b46f883607"><div class="block-container block-container-lottie">
+
+	<dotlottie-player src="https://www.ai21.com/wp-content/uploads/2026/01/Layer_On.json" class="c-lottie" loop></dotlottie-player>
+
+</div></div></div></div>
+</div></div>
+
+
+
+<div class="wp-block-group group group__jamba"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<div class="wp-block-group group__content-wrapper"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h2 class="wp-block-heading group__title" id="h-jamba">[Jamba]</h2>
+
+
+
+<p class="group__text">Our Jamba family of open foundation models delivers reliable outputs at top speed, while guaranteeing your enterprise AI workflows stay secure.</p>
+
+
+
+<div class="wp-block-buttons group__buttons is-layout-flex wp-block-buttons-is-layout-flex">
+<div class="wp-block-button talk-to-us"><a class="wp-block-button__link wp-element-button" href="https://www.ai21.com/jamba/" target="_blank" rel="noreferrer noopener"><span class="btn-text">Explore More</span></a></div>
+</div>
+</div></div>
+
+
+
+<div class="wp-block-group group__lottie-wrapper"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained"><div class="block b-lottie group__lottie-off" id="block-697b46f883607" data-id="block-697b46f883607"><div class="block-container block-container-lottie">
+
+	<dotlottie-player src="https://www.ai21.com/wp-content/uploads/2026/01/Layer_Off.json" class="c-lottie" loop></dotlottie-player>
+
+</div></div>
+
+<div class="block b-lottie group__lottie-on" id="block-697b46f883607" data-id="block-697b46f883607"><div class="block-container block-container-lottie">
+
+	<dotlottie-player src="https://www.ai21.com/wp-content/uploads/2026/01/Layer_On.json" class="c-lottie" loop></dotlottie-player>
+
+</div></div></div></div>
+</div></div>
+
+
+
+<div class="wp-block-group group group__labs"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<div class="wp-block-group group__content-wrapper"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h2 class="wp-block-heading group__title" id="h-labs">[Labs]</h2>
+
+
+
+<p class="group__text">Our team works at the frontier of AI progress to solve scientific challenges.</p>
+
+
+</div></div>
+
+
+
+<div class="wp-block-group group__lottie-wrapper"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained"><div class="block b-lottie group__lottie-off" id="block-697b46f883607" data-id="block-697b46f883607"><div class="block-container block-container-lottie">
+
+	<dotlottie-player src="https://www.ai21.com/wp-content/uploads/2026/01/Layer_Off.json" class="c-lottie" loop></dotlottie-player>
+
+</div></div>
+
+<div class="block b-lottie group__lottie-on" id="block-697b46f883607" data-id="block-697b46f883607"><div class="block-container block-container-lottie">
+
+	<dotlottie-player src="https://www.ai21.com/wp-content/uploads/2026/01/Layer_On.json" class="c-lottie" loop></dotlottie-player>
+
+</div></div></div></div>
+</div></div>
+</div></div>
+
+</div></div>
+
+<div class="block b-section section-stack-mobile hidden-desktop" id="section-stack-mobile" data-id="section-stack-mobile"><div class="block-container block-container-section">
+
+<h2 class="wp-block-heading has-text-align-center section__title anim-fade-in" id="h-end-to-end-control-of-the-enterprise-ai-stack-0">End-to-end control of the enterprise AI stack</h2>
+
+
+<div class="block b-slider b-slider--type-stack-mobile section__slider" id="block-697de8d8ca25a" data-id="block-697de8d8ca25a"><div class="block-container block-container-slider">
+<div class="swiper slider-stack-mobile fade-in">
+	
+	<div class="swiper-wrapper">
+		
+
+
+<div class="swiper-slide" id="block_83fb77e1b884d58aac0149026c60d5d5">
+	<div class="item">
+		
+
+<figure class="wp-block-image size-full slide__image"><img decoding="async" width="332" height="610" src="https://www.ai21.com/wp-content/uploads/2026/02/layer-1_mobile-1.png" alt="" class="wp-image-29089"/ loading="lazy" srcset="https://www.ai21.com/wp-content/uploads/2026/02/layer-1_mobile-1.png 332w, https://www.ai21.com/wp-content/uploads/2026/02/layer-1_mobile-1-327x600.png 327w, https://www.ai21.com/wp-content/uploads/2026/02/layer-1_mobile-1-41x75.png 41w" sizes="(max-width: 332px) 100vw, 332px" /></figure>
+
+
+
+<div class="wp-block-group slide__content"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h2 class="wp-block-heading content__title" id="h-solutions-0">[Solutions]</h2>
+
+
+
+<p class="content__text">From architecture design to post-deployment optimization, we build enterprise-ready AI solutions tailored to your specific needs.</p>
+
+
+
+<div class="wp-block-buttons content__buttons is-layout-flex wp-block-buttons-is-layout-flex">
+<div class="wp-block-button talk-to-us"><a class="wp-block-button__link wp-element-button" href="https://www.ai21.com/custom-ai-systems/" target="_blank" rel="noreferrer noopener"><span class="btn-text">Explore More</span></a></div>
+</div>
+</div></div>
+
+
+	</div>
+</div>
+
+
+
+
+<div class="swiper-slide" id="block_6debc4394ebdeb9b82ca49ce57116914">
+	<div class="item">
+		
+
+<figure class="wp-block-image size-full slide__image"><img decoding="async" width="332" height="610" src="https://www.ai21.com/wp-content/uploads/2026/02/layers-2_mobile-1.png" alt="" class="wp-image-29090"/ loading="lazy" srcset="https://www.ai21.com/wp-content/uploads/2026/02/layers-2_mobile-1.png 332w, https://www.ai21.com/wp-content/uploads/2026/02/layers-2_mobile-1-327x600.png 327w, https://www.ai21.com/wp-content/uploads/2026/02/layers-2_mobile-1-41x75.png 41w" sizes="(max-width: 332px) 100vw, 332px" /></figure>
+
+
+
+<div class="wp-block-group slide__content"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h2 class="wp-block-heading content__title" id="h-maestro-0">[Maestro]</h2>
+
+
+
+<p class="content__text">The high-accuracy AI orchestration system with built-in validation</p>
+
+
+
+<div class="wp-block-buttons content__buttons is-layout-flex wp-block-buttons-is-layout-flex">
+<div class="wp-block-button talk-to-us"><a class="wp-block-button__link wp-element-button" href="https://www.ai21.com/maestro/" target="_blank" rel="noreferrer noopener"><span class="btn-text">Explore More</span></a></div>
+</div>
+</div></div>
+
+
+	</div>
+</div>
+
+
+
+
+<div class="swiper-slide" id="block_6debc4394ebdeb9b82ca49ce57116914">
+	<div class="item">
+		
+
+<figure class="wp-block-image size-full slide__image"><img decoding="async" width="332" height="610" src="https://www.ai21.com/wp-content/uploads/2026/02/layer-3_mobile-1.png" alt="" class="wp-image-29091"/ loading="lazy" srcset="https://www.ai21.com/wp-content/uploads/2026/02/layer-3_mobile-1.png 332w, https://www.ai21.com/wp-content/uploads/2026/02/layer-3_mobile-1-327x600.png 327w, https://www.ai21.com/wp-content/uploads/2026/02/layer-3_mobile-1-41x75.png 41w" sizes="(max-width: 332px) 100vw, 332px" /></figure>
+
+
+
+<div class="wp-block-group slide__content"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h2 class="wp-block-heading content__title" id="h-jamba-0">[Jamba]</h2>
+
+
+
+<p class="content__text">Our Jamba family of open foundation models delivers reliable outputs at top speed, while guaranteeing your enterprise AI workflows stay secure.</p>
+
+
+
+<div class="wp-block-buttons content__buttons is-layout-flex wp-block-buttons-is-layout-flex">
+<div class="wp-block-button talk-to-us"><a class="wp-block-button__link wp-element-button" href="https://www.ai21.com/jamba/" target="_blank" rel="noreferrer noopener"><span class="btn-text">Explore More</span></a></div>
+</div>
+</div></div>
+
+
+	</div>
+</div>
+
+
+
+
+<div class="swiper-slide" id="block_6debc4394ebdeb9b82ca49ce57116914">
+	<div class="item">
+		
+
+<figure class="wp-block-image size-full slide__image"><img decoding="async" width="332" height="610" src="https://www.ai21.com/wp-content/uploads/2026/02/layer-4_mobile-1.png" alt="" class="wp-image-29092"/ loading="lazy" srcset="https://www.ai21.com/wp-content/uploads/2026/02/layer-4_mobile-1.png 332w, https://www.ai21.com/wp-content/uploads/2026/02/layer-4_mobile-1-327x600.png 327w, https://www.ai21.com/wp-content/uploads/2026/02/layer-4_mobile-1-41x75.png 41w" sizes="(max-width: 332px) 100vw, 332px" /></figure>
+
+
+
+<div class="wp-block-group slide__content"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h2 class="wp-block-heading content__title" id="h-labs-0">[Labs]</h2>
+
+
+
+<p class="content__text">Our team works at the frontier of AI progress to solve scientific challenges.</p>
+
+
+</div></div>
+
+
+	</div>
+</div>
+
+
+	</div>
+
+					<div class="slider-nav">
+			<div class="button-prev">
+				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
+					<mask id="mask0_3113_44798" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+						<rect width="19.5605" height="19.5605" fill="#D9D9D9" />
+					</mask>
+					<g mask="url(#mask0_3113_44798)">
+						<path d="M13.0406 17.3663L5.45459 9.78024L13.0406 2.19421L13.9074 3.06099L7.18814 9.78024L13.9074 16.4995L13.0406 17.3663Z" fill="white" />
+					</g>
+				</svg>
+			</div>
+			<div class="button-next">
+				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
+					<mask id="mask0_3113_44801" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+						<rect width="19.5605" height="19.5605" transform="matrix(-1 0 0 1 19.5605 0)" fill="#D9D9D9" />
+					</mask>
+					<g mask="url(#mask0_3113_44801)">
+						<path d="M6.51993 17.3663L14.106 9.78024L6.51993 2.19421L5.65315 3.06099L12.3724 9.78024L5.65315 16.4995L6.51993 17.3663Z" fill="white" />
+					</g>
+				</svg>
+			</div>
+		</div>
+		<div class="slider-pagination"></div>
+	</div>
+</div></div></div>
+</div></div>
+
+<div class="block b-section section-foundations" id="section-foundations" data-id="section-foundations"><div class="block-container block-container-section">
+
+<div class="wp-block-group anim-fade-in"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h2 class="wp-block-heading has-text-align-center section__title" id="h-system-foundations">System foundations</h2>
+
+
+<div class="block b-cards b-cards--type-default section__cards" id="block-68664ce0eeefe" data-id="block-68664ce0eeefe"><div class="block-container block-container-cards">
+<div class="cards-list">
+	<div class="card">
+		<div class="card__grid">
+					</div>
+
+		<div class="card__body">
+			<figure class="card__image"><img decoding="async" width="158" height="155" src="https://www.ai21.com/wp-content/uploads/2026/01/Accuracy.svg" class="attachment-full size-full" alt="" / loading="lazy"></figure><h3 class="card__title">Accuracy</h3><div class="card__text">Every part of our AI stack is engineered to deliver accurate &#038; reliable outputs.</div>		</div>
+
+		</div>
+	<div class="card">
+		<div class="card__grid">
+					</div>
+
+		<div class="card__body">
+			<figure class="card__image"><img decoding="async" width="158" height="155" src="https://www.ai21.com/wp-content/uploads/2026/01/Reliability.svg" class="attachment-full size-full" alt="" / loading="lazy"></figure><h3 class="card__title">Adaptability</h3><div class="card__text">The system automatically learns your unique environment &#038; inputs, adapting as things change.</div>		</div>
+
+		</div>
+	<div class="card">
+		<div class="card__grid">
+					</div>
+
+		<div class="card__body">
+			<figure class="card__image"><img decoding="async" width="158" height="155" src="https://www.ai21.com/wp-content/uploads/2026/01/Transparency.svg" class="attachment-full size-full" alt="" / loading="lazy"></figure><h3 class="card__title">Transparency</h3><div class="card__text">Each decision the system makes is traceable and auditable.</div>		</div>
+
+		</div>
+	</div></div></div></div></div>
+
+</div></div>
+
+<div class="block b-section section-challenges" id="section-challenges" data-id="section-challenges"><div class="block-container block-container-section">
+
+<div class="wp-block-group anim-fade-in"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h2 class="wp-block-heading has-text-align-center section__title" id="h-custom-ai-workflows-for-your-most-complex-challenges">Custom AI workflows for your most complex challenges</h2>
+
+
+<div class="block b-slider b-slider--type-challenges" id="block-691ef08016f12" data-id="block-691ef08016f12"><div class="block-container block-container-slider">
+<div class="swiper slider-challenges fade-in">
+	
+	<div class="swiper-wrapper">
+		
+
+
+<div class="swiper-slide" id="block_e7f950fbb3fc4763ba220b61ac51abf7">
+	<div class="item">
+		
+
+<div class="wp-block-columns cols is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex">
+<div class="wp-block-column col-content is-layout-flow wp-block-column-is-layout-flow">
+<p class="item__cta"><a href="https://ai21.com/industries/defense/">Defense</a></p>
+
+
+
+<p class="item__text">Support mission critical workflows with sovereign AI that turns unique&nbsp; and siloed data into clear, trusted, actionable insight — at speed, at scale and under strict information security protocols.</p>
+</div>
+
+
+
+<div class="wp-block-column col-image is-layout-flow wp-block-column-is-layout-flow">
+<figure class="wp-block-image size-full item__image"><img decoding="async" width="917" height="538" src="https://www.ai21.com/wp-content/uploads/2026/01/Defense.png" alt="" class="wp-image-28906"/ loading="lazy" srcset="https://www.ai21.com/wp-content/uploads/2026/01/Defense.png 917w, https://www.ai21.com/wp-content/uploads/2026/01/Defense-600x352.png 600w, https://www.ai21.com/wp-content/uploads/2026/01/Defense-768x451.png 768w, https://www.ai21.com/wp-content/uploads/2026/01/Defense-75x44.png 75w" sizes="(max-width: 917px) 100vw, 917px" /></figure>
+</div>
+</div>
+
+
+	</div>
+</div>
+
+
+
+
+<div class="swiper-slide" id="block_56e5227f8d050ea4bcd893451507b890">
+	<div class="item">
+		
+
+<div class="wp-block-columns cols is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex">
+<div class="wp-block-column col-content is-layout-flow wp-block-column-is-layout-flow">
+<p class="item__cta"><a href="https://ai21.com/industries/finance/">Finance</a></p>
+
+
+
+<p class="item__text">Accelerate decision-making and operational efficiency with enterprise-grade AI built to meet the precision, compliance and data security needs of financial institutions.</p>
+</div>
+
+
+
+<div class="wp-block-column col-image is-layout-flow wp-block-column-is-layout-flow">
+<figure class="wp-block-image size-full item__image"><img decoding="async" width="917" height="538" src="https://www.ai21.com/wp-content/uploads/2026/01/Finance.png" alt="" class="wp-image-28907"/ loading="lazy" srcset="https://www.ai21.com/wp-content/uploads/2026/01/Finance.png 917w, https://www.ai21.com/wp-content/uploads/2026/01/Finance-600x352.png 600w, https://www.ai21.com/wp-content/uploads/2026/01/Finance-768x451.png 768w, https://www.ai21.com/wp-content/uploads/2026/01/Finance-75x44.png 75w" sizes="(max-width: 917px) 100vw, 917px" /></figure>
+</div>
+</div>
+
+
+	</div>
+</div>
+
+
+
+
+<div class="swiper-slide" id="block_771e3421cdc3727dc0eb4231d9aabbdc">
+	<div class="item">
+		
+
+<div class="wp-block-columns cols is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex">
+<div class="wp-block-column col-content is-layout-flow wp-block-column-is-layout-flow">
+<p class="item__cta"><a href="https://ai21.com/industries/healthcare/">Healthcare</a></p>
+
+
+
+<p class="item__text">Improve performance across healthcare with AI that delivers accurate, source-grounded answers and protects sensitive data at every step.</p>
+</div>
+
+
+
+<div class="wp-block-column col-image is-layout-flow wp-block-column-is-layout-flow">
+<figure class="wp-block-image size-full item__image"><img decoding="async" width="917" height="538" src="https://www.ai21.com/wp-content/uploads/2026/01/Healthcare.png" alt="" class="wp-image-28908"/ loading="lazy" srcset="https://www.ai21.com/wp-content/uploads/2026/01/Healthcare.png 917w, https://www.ai21.com/wp-content/uploads/2026/01/Healthcare-600x352.png 600w, https://www.ai21.com/wp-content/uploads/2026/01/Healthcare-768x451.png 768w, https://www.ai21.com/wp-content/uploads/2026/01/Healthcare-75x44.png 75w" sizes="(max-width: 917px) 100vw, 917px" /></figure>
+</div>
+</div>
+
+
+	</div>
+</div>
+
+
+
+
+<div class="swiper-slide" id="block_eed7dc789fc22c478424a86e03032991">
+	<div class="item">
+		
+
+<div class="wp-block-columns cols is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex">
+<div class="wp-block-column col-content is-layout-flow wp-block-column-is-layout-flow">
+<p class="item__cta"><a href="https://ai21.com/industries/manufacturing/">Manufacturing</a></p>
+
+
+
+<p class="item__text">Unlock efficiency, productivity, and compliance with AI that delivers structured, source-grounded insights and adapts to complex industrial workflows.</p>
+</div>
+
+
+
+<div class="wp-block-column col-image is-layout-flow wp-block-column-is-layout-flow">
+<figure class="wp-block-image size-full item__image"><img decoding="async" width="917" height="538" src="https://www.ai21.com/wp-content/uploads/2026/01/Manufacturing.png" alt="" class="wp-image-28910"/ loading="lazy" srcset="https://www.ai21.com/wp-content/uploads/2026/01/Manufacturing.png 917w, https://www.ai21.com/wp-content/uploads/2026/01/Manufacturing-600x352.png 600w, https://www.ai21.com/wp-content/uploads/2026/01/Manufacturing-768x451.png 768w, https://www.ai21.com/wp-content/uploads/2026/01/Manufacturing-75x44.png 75w" sizes="(max-width: 917px) 100vw, 917px" /></figure>
+</div>
+</div>
+
+
+	</div>
+</div>
+
+
+
+
+<div class="swiper-slide" id="block_4a3c2b7e75de2ea8f745dc4e23a73aba">
+	<div class="item">
+		
+
+<div class="wp-block-columns cols is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex">
+<div class="wp-block-column col-content is-layout-flow wp-block-column-is-layout-flow">
+<p class="item__cta"><a href="https://ai21.com/industries/tech/">Tech</a></p>
+
+
+
+<p class="item__text">Build AI on your terms with secure, domain-tailored solutions that handle messy data, safeguard IP, and scale with your team.</p>
+</div>
+
+
+
+<div class="wp-block-column col-image is-layout-flow wp-block-column-is-layout-flow">
+<figure class="wp-block-image size-full item__image"><img decoding="async" width="861" height="538" src="https://www.ai21.com/wp-content/uploads/2026/01/Tech.png" alt="" class="wp-image-28912"/ loading="lazy" srcset="https://www.ai21.com/wp-content/uploads/2026/01/Tech.png 861w, https://www.ai21.com/wp-content/uploads/2026/01/Tech-600x375.png 600w, https://www.ai21.com/wp-content/uploads/2026/01/Tech-768x480.png 768w, https://www.ai21.com/wp-content/uploads/2026/01/Tech-75x47.png 75w" sizes="(max-width: 861px) 100vw, 861px" /></figure>
+</div>
+</div>
+
+
+	</div>
+</div>
+
+
+	</div>
+
+				<div class="slider-nav">
+			<div class="button-prev">
+				<svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
+					<rect x="0.417599" y="-0.417599" width="34.1648" height="34.1648" rx="0.582401" transform="matrix(1 0 0 -1 0 34.1648)" fill="white" fill-opacity="0.7" />
+					<rect x="0.417599" y="-0.417599" width="34.1648" height="34.1648" rx="0.582401" transform="matrix(1 0 0 -1 0 34.1648)" stroke="#212121" stroke-width="0.835198" />
+					<mask id="mask0_3399_1229" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="-3" width="38" height="38">
+						<rect width="37.1777" height="37.1777" transform="matrix(1 0 0 -1 0 35)" fill="#D9D9D9" />
+					</mask>
+					<g mask="url(#mask0_3399_1229)">
+						<path d="M20.8041 10.0393L13.3433 17.5001L20.8041 24.9609L21.6566 24.1085L15.0482 17.5001L21.6566 10.8917L20.8041 10.0393Z" fill="black" />
+					</g>
+				</svg>
+			</div>
+			<div class="button-next">
+				<svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
+					<rect x="0.417599" y="0.417599" width="34.1648" height="34.1648" rx="0.582401" fill="white" fill-opacity="0.7" />
+					<rect x="0.417599" y="0.417599" width="34.1648" height="34.1648" rx="0.582401" stroke="#212121" stroke-width="0.835198" />
+					<mask id="mask0_3399_1228" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="38" height="38">
+						<rect x="37.1777" y="37.1777" width="37.1777" height="37.1777" transform="rotate(180 37.1777 37.1777)" fill="#D9D9D9" />
+					</mask>
+					<g mask="url(#mask0_3399_1228)">
+						<path d="M14.1954 10.0393L21.6562 17.5001L14.1954 24.9609L13.3429 24.1085L19.9513 17.5001L13.3429 10.8917L14.1954 10.0393Z" fill="black" />
+					</g>
+				</svg>
+			</div>
+		</div>
+		</div>
+</div></div></div></div></div>
+
+</div></div>
+
+
+
+<div class="block b-section section-blog" id="section-blog" data-id="section-blog"><div class="block-container block-container-section">
+<div class="block b-posts-list b-posts-list--type-default" id="related-posts" data-id="related-posts"><div class="block-container block-container-posts-list"><h3 class="posts-list__title">Dive deeper</h3>
+<div class="posts-list">
+	
+<div class="card-post" data-post-id="28365">
+	
+	<figure class="post__image">
+		<a href="https://www.ai21.com/blog/test-time-compute-swe-bench/">
+			<img decoding="async" width="765" height="400" src="https://www.ai21.com/wp-content/uploads/2026/03/Main_1200x628-765x400.png" class="attachment-blog size-blog" alt="" srcset="https://www.ai21.com/wp-content/uploads/2026/03/Main_1200x628-765x400.png 765w, https://www.ai21.com/wp-content/uploads/2026/03/Main_1200x628-600x314.png 600w, https://www.ai21.com/wp-content/uploads/2026/03/Main_1200x628-1024x536.png 1024w, https://www.ai21.com/wp-content/uploads/2026/03/Main_1200x628-768x402.png 768w, https://www.ai21.com/wp-content/uploads/2026/03/Main_1200x628-75x39.png 75w, https://www.ai21.com/wp-content/uploads/2026/03/Main_1200x628.png 1239w" sizes="(max-width: 765px) 100vw, 765px" / loading="lazy">		</a>
+	</figure>
+
+	<div class="post__meta">
+		
+		<div class="post__header">
+			<div class="post__date">
+				Jan 7, 2026			</div>
+		</div>
+
+		<a class="post__main" href="https://www.ai21.com/blog/test-time-compute-swe-bench/">
+			<h3 class="post__title">
+				Elevating long-horizon agentic tasks with orchestrated Test-Time Compute			</h3>
+								</a>
+	</div>
+</div>
+<div class="card-post" data-post-id="28346">
+	
+	<figure class="post__image">
+		<a href="https://www.ai21.com/blog/stateful-agent-workspaces-mcp/">
+			<img decoding="async" width="765" height="400" src="https://www.ai21.com/wp-content/uploads/2026/03/MCP_1200x628-765x400.png" class="attachment-blog size-blog" alt="" srcset="https://www.ai21.com/wp-content/uploads/2026/03/MCP_1200x628-765x400.png 765w, https://www.ai21.com/wp-content/uploads/2026/03/MCP_1200x628-600x314.png 600w, https://www.ai21.com/wp-content/uploads/2026/03/MCP_1200x628-1024x536.png 1024w, https://www.ai21.com/wp-content/uploads/2026/03/MCP_1200x628-768x402.png 768w, https://www.ai21.com/wp-content/uploads/2026/03/MCP_1200x628-75x39.png 75w, https://www.ai21.com/wp-content/uploads/2026/03/MCP_1200x628.png 1239w" sizes="(max-width: 765px) 100vw, 765px" / loading="lazy">		</a>
+	</figure>
+
+	<div class="post__meta">
+		
+		<div class="post__header">
+			<div class="post__date">
+				Jan 7, 2026			</div>
+		</div>
+
+		<a class="post__main" href="https://www.ai21.com/blog/stateful-agent-workspaces-mcp/">
+			<h3 class="post__title">
+				Shared state, no drama: scaling state-modifying agents with MCP workspaces			</h3>
+								</a>
+	</div>
+</div>
+<div class="card-post" data-post-id="28438">
+	
+	<figure class="post__image">
+		<a href="https://www.ai21.com/blog/scaling-agentic-evaluation-swe-bench/">
+			<img decoding="async" width="765" height="400" src="https://www.ai21.com/wp-content/uploads/2026/03/Evaluating_1200x628-765x400.png" class="attachment-blog size-blog" alt="" srcset="https://www.ai21.com/wp-content/uploads/2026/03/Evaluating_1200x628-765x400.png 765w, https://www.ai21.com/wp-content/uploads/2026/03/Evaluating_1200x628-600x314.png 600w, https://www.ai21.com/wp-content/uploads/2026/03/Evaluating_1200x628-1024x536.png 1024w, https://www.ai21.com/wp-content/uploads/2026/03/Evaluating_1200x628-768x402.png 768w, https://www.ai21.com/wp-content/uploads/2026/03/Evaluating_1200x628-75x39.png 75w, https://www.ai21.com/wp-content/uploads/2026/03/Evaluating_1200x628.png 1239w" sizes="(max-width: 765px) 100vw, 765px" / loading="lazy">		</a>
+	</figure>
+
+	<div class="post__meta">
+		
+		<div class="post__header">
+			<div class="post__date">
+				Jan 8, 2026			</div>
+		</div>
+
+		<a class="post__main" href="https://www.ai21.com/blog/scaling-agentic-evaluation-swe-bench/">
+			<h3 class="post__title">
+				How to scale agentic evaluation: lessons from 200,000 SWE-bench runs			</h3>
+								</a>
+	</div>
+</div></div>
+</div></div>
+</div></div>
+
+<div class="block b-section section-footer-cta" id="section-footer-cta" data-id="section-footer-cta"><div class="block-container block-container-section">
+
+<div class="wp-block-group block-footer-cta block-footer-cta--type-video"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<div class="wp-block-group cta__content"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<h3 class="wp-block-heading has-text-align-center cta__title anim-fade-in" id="h-design-amp-build-reliable-ai-systems">Design &amp; build reliable AI systems.</h3>
+
+
+
+<div class="wp-block-buttons cta__buttons anim-fade-in anim-delay-200ms is-content-justification-center is-layout-flex wp-container-core-buttons-is-layout-16018d1d wp-block-buttons-is-layout-flex">
+<div class="wp-block-button btn btn--new"><a class="wp-block-button__link wp-element-button" href="https://ai21.com/contact-sales/"><span class="btn-text">Get a Demo</span></a></div>
+</div>
+</div></div>
+</div></div>
+
+
+
+<div id="section__html" class="wp-block-group section__html"><div class="wp-block-group__inner-container is-layout-constrained wp-block-group-is-layout-constrained">
+<div data-us-project="nCIiYoB0v0oBO6SFN3VB" data-us-production="true" style="width:100%; height: 46rem; margin: 0 auto;"></div><script type="text/javascript">!function(){var u=window.UnicornStudio;if(u&&u.init){if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){u.init()})}else{u.init()}}else{window.UnicornStudio={isInitialized:!1};var i=document.createElement("script");i.src="https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v2.0.4/dist/unicornStudio.umd.js",i.onload=function(){if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){UnicornStudio.init()})}else{UnicornStudio.init()}},(document.head||document.body).appendChild(i)}}();</script>
+</div></div>
+
+</div></div>		</div><!-- #content -->
+
+		
+			<footer id="colophon" class="site-footer" role="contentinfo">
+				<div class="footer-main">
+					<div class="container">
+						<div class="footer-row footer-row-top">
+							<div class="cols">
+								<div class="col-info">
+									<a href="https://www.ai21.com">
+										<figure class="footer-info__logo">
+											<img width="48" height="48" src="https://www.ai21.com/wp-content/uploads/2026/02/ai21-logo-footer.svg" class="attachment-full size-full" alt="" loading="lazy" decoding="async" />										</figure>
+									</a>
+								</div>
+
+								<div class="col-menus">
+									
+										<div class="col-footer-nav">
+											
+												<div class="footer-nav-wrap">
+													<h3 class="footer-title">
+														Products													</h3>
+
+													<div class="footer-nav">
+														<ul id="menu-footer-products" class="menu"><li id="menu-item-29030" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29030"><a href="https://www.ai21.com/custom-ai-solutions/">Custom AI Solutions</a></li>
+<li id="menu-item-29034" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29034"><a href="https://www.ai21.com/maestro/">Maestro</a></li>
+<li id="menu-item-29190" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29190"><a href="https://www.ai21.com/jamba/">Jamba</a></li>
+</ul>													</div>
+												</div>
+
+																					</div>
+
+									
+										<div class="col-footer-nav">
+											
+												<div class="footer-nav-wrap">
+													<h3 class="footer-title">
+														Solutions													</h3>
+
+													<div class="footer-nav">
+														<ul id="menu-footer-solutions" class="menu"><li id="menu-item-27628" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-27628"><a href="https://www.ai21.com/industries/finance/">Finance</a></li>
+<li id="menu-item-27629" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-27629"><a href="https://www.ai21.com/industries/healthcare/">Healthcare</a></li>
+<li id="menu-item-27627" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-27627"><a href="https://www.ai21.com/industries/tech/">Tech</a></li>
+<li id="menu-item-27626" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-27626"><a href="https://www.ai21.com/industries/defense/">Defense</a></li>
+<li id="menu-item-27625" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-27625"><a href="https://www.ai21.com/industries/manufacturing/">Manufacturing</a></li>
+</ul>													</div>
+												</div>
+
+																					</div>
+
+									
+										<div class="col-footer-nav">
+											
+												<div class="footer-nav-wrap">
+													<h3 class="footer-title">
+														Labs													</h3>
+
+													<div class="footer-nav">
+														<ul id="menu-footer-labs" class="menu"><li id="menu-item-29085" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29085"><a href="https://www.ai21.com/research/">Research</a></li>
+<li id="menu-item-26040" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-26040"><a href="https://www.ai21.com/developer-hub/">Developers Hub</a></li>
+</ul>													</div>
+												</div>
+
+																					</div>
+
+									
+										<div class="col-footer-nav">
+											
+												<div class="footer-nav-wrap">
+													<h3 class="footer-title">
+														Resources													</h3>
+
+													<div class="footer-nav">
+														<ul id="menu-footer-resources" class="menu"><li id="menu-item-25938" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-25938"><a href="https://www.ai21.com/blog/">Blog</a></li>
+<li id="menu-item-29087" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29087"><a href="https://www.ai21.com/events/">Events &amp; Webinars</a></li>
+<li id="menu-item-29086" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-29086"><a href="https://www.ai21.com/yaap/">Podcast</a></li>
+<li id="menu-item-26019" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-26019"><a href="https://www.ai21.com/glossary/">Glossary</a></li>
+<li id="menu-item-29563" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29563"><a href="https://www.ai21.com/knowledge/">Knowledge Hub</a></li>
+</ul>													</div>
+												</div>
+
+																					</div>
+
+									
+										<div class="col-footer-nav">
+											
+												<div class="footer-nav-wrap">
+													<h3 class="footer-title">
+														Company													</h3>
+
+													<div class="footer-nav">
+														<ul id="menu-footer-company" class="menu"><li id="menu-item-29031" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29031"><a href="https://www.ai21.com/about/">About Us</a></li>
+<li id="menu-item-29088" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29088"><a href="https://www.ai21.com/newsroom/">Newsroom</a></li>
+<li id="menu-item-23927" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-23927"><a href="https://www.ai21.com/careers/">Careers</a></li>
+</ul>													</div>
+												</div>
+
+																					</div>
+
+																	</div>
+							</div>
+															<div class="large-sentence">
+									<img src="https://www.ai21.com/wp-content/uploads/2026/02/Headline-Text.svg" alt="">
+								</div>
+													</div>
+
+						<div class="footer-row footer-row-bottom">
+							<div class="cols">
+								<div class="col-copyright">
+									<div class="footer-copyright">
+										© All Rights Reserved									</div>
+								</div>
+								<div class="col-policies">
+									<ul id="menu-footer-terms-and-polices" class="footer-bottom-menu"><li id="menu-item-26772" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-26772"><a href="https://www.ai21.com/terms-policies/terms-of-use/">Terms of Use</a></li>
+<li id="menu-item-26771" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-26771"><a href="https://www.ai21.com/terms-policies/privacy-policy/">Privacy Policy</a></li>
+<li id="menu-item-26770" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-26770"><a href="https://www.ai21.com/terms-policies/acceptable-use/">Acceptable Use</a></li>
+<li id="menu-item-27745" class="btn-cookies-settings menu-item menu-item-type-custom menu-item-object-custom menu-item-27745"><a href="#">Cookie Settings</a></li>
+<li id="menu-item-23930" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-23930"><a target="_blank" href="https://trust.ai21.com">Trust Center</a></li>
+<li id="menu-item-27624" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-27624"><a href="https://www.ai21.com/?page_id=26116">Report a Vulnerability</a></li>
+</ul>								</div>
+								<div class="col-socials">
+									
+			<div class="footer-socials">
+
+				
+						<a href="https://www.linkedin.com/company/ai21/" class="btn-socials linkedin" target="_blank" rel="noopener" aria-label="Visit us on LinkedIn">
+							<span class="icomoon icomoon-linkedin" aria-hidden="true"></span>
+						</a>
+
+						
+						<a href="https://twitter.com/AI21Labs" class="btn-socials twitter" target="_blank" rel="noopener" aria-label="Visit us on X (Twitter)">
+							<span class="icomoon icomoon-twitter" aria-hidden="true"></span>
+						</a>
+
+						
+						<a href="https://discord.com/invite/cKzg6GEAyB" class="btn-socials discord" target="_blank" rel="noopener" aria-label="Visit us on Discord">
+							<span class="icomoon icomoon-discord" aria-hidden="true"></span>
+						</a>
+
+						
+						<a href="https://www.youtube.com/@ai21labs/videos" class="btn-socials youtube" target="_blank" rel="noopener" aria-label="Visit us on YouTube">
+							<span class="icomoon icomoon-youtube" aria-hidden="true"></span>
+						</a>
+
+						
+						<a href="https://www.instagram.com/ai21.life?igsh=eWM4cjlvOHE2bWt3" class="btn-socials instagram" target="_blank" rel="noopener" aria-label="Visit us on Instagram">
+							<span class="icomoon icomoon-instagram" aria-hidden="true"></span>
+						</a>
+
+						
+			</div>
+
+											</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</footer>
+
+		
+		</div><!-- #site-wrap -->
+
+		<script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/ai21/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/themes/ai21/assets/js/gsap.min.js" id="gsap-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/themes/ai21/assets/js/ScrollTrigger.min.js" id="gsap-scrolltrigger-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/themes/ai21/assets/js/ScrollToPlugin.min.js" id="gsap-scrolltoplugin-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/themes/ai21/assets/js/select2.min.js" id="select2-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/themes/ai21/assets/js/aos.min.js" id="aos-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/themes/ai21/assets/js/fancybox.umd.js" id="fancybox-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/themes/ai21/assets/js/swiper-bundle.min.js?ver=4.9.4" id="swiper-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/themes/ai21/build/js/main.min.js?ver=4.9.4" id="main-js"></script>
+<script type="text/javascript" src="https://www.ai21.com/wp-content/themes/ai21/build/js/blocks.min.js?ver=4.9.4" id="blocks-js"></script>
+
+		<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e194db4afeae5d9',t:'MTc3NDM5MzM0Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+		</html>
