@@ -63,7 +63,14 @@ Files moved into Governance-Center and files intentionally left in place.
 | `Governance-Center/modules/human-resources/MODULE_GOVERNANCE_PROFILE.md` | new doc |
 | `Governance-Center/modules/human-resources/MODULE_RUNTIME_REFERENCES.md` | new doc |
 | `Governance-Center/modules/ai-types/README.md` | new doc |
-| `Governance-Center/modules/workspace/README.md` | new doc |
+| `Governance-Center/modules/workspace/README.md` | rewritten |
+| `Governance-Center/modules/workspace/MODULE_GOVERNANCE_PROFILE.md` | new doc |
+| `Governance-Center/modules/workspace/MODULE_CONTROL_SURFACE.md` | new doc |
+| `Governance-Center/modules/workspace/MODULE_AUDIT_MODEL.md` | new doc |
+| `Governance-Center/modules/workspace/MODULE_PERIODIC_CHECKS.md` | new doc |
+| `Governance-Center/modules/workspace/MODULE_RISKS.md` | new doc |
+| `Governance-Center/modules/workspace/MODULE_OPEN_GAPS.md` | new doc |
+| `Governance-Center/modules/workspace/MODULE_RUNTIME_REFERENCES.md` | new doc |
 | `Governance-Center/modules/automation/README.md` | new doc |
 | `Governance-Center/modules/resources/README.md` | new doc |
 | `Governance-Center/modules/collaboration/README.md` | new doc |

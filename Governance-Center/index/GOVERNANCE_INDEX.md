@@ -51,7 +51,7 @@ Navigational map of all governance-related content in this repository.
 |---|---|---|
 | [Human Resources](../modules/human-resources/README.md) | Full — complete module governance package (11 files) | governedProcedure + permissions + SoD + masking + Carbon SideNav |
 | [AI Types](../modules/ai-types/README.md) | Partial | governedProcedure + policy engines |
-| [Workspace](../modules/workspace/README.md) | Partial | hasWorkspaceAccess |
+| [Workspace](../modules/workspace/README.md) | Full — complete module governance package (8 files) | governedProcedure + lifecycle gates + capability checks + promotion gates + activity logging |
 | [Automation](../modules/automation/README.md) | Minimal | protectedProcedure only |
 | [Resources](../modules/resources/README.md) | Minimal | protectedProcedure + access checks |
 | [Collaboration](../modules/collaboration/README.md) | Minimal | protectedProcedure only |
