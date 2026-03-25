@@ -11,6 +11,7 @@ import { OMControlPanelPage } from "./OMControlPanelPage";
 import { OMWizardPage } from "./OMWizardPage";
 import { OMListPage } from "./OMListPage";
 import { OMSettingsPage } from "./OMSettingsPage";
+import { OMTemplatesPage } from "./OMTemplatesPage";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ export function OMTopLevelPage() {
     case "wizard": return <OMWizardPage workspaceId={workspaceId} />;
     case "list": return <OMListPage workspaceId={workspaceId} />;
     case "settings": return <OMSettingsPage workspaceId={workspaceId} />;
+    case "templates": return <OMTemplatesPage workspaceId={workspaceId} />;
     case "portfolio":
     default: return <OMPortfolioPage workspaceId={workspaceId} />;
   }

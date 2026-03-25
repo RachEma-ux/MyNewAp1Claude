@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { Plus, GitBranch, AlertTriangle, CheckCircle } from "lucide-react";
+import { Plus, GitBranch, AlertTriangle, CheckCircle, FileStack } from "lucide-react";
 
 export function OMControlPanelPage({ workspaceId }: { workspaceId: number }) {
   const versions = trpc.organizationManagement.structureVersions.list.useQuery({ workspaceId });
@@ -37,6 +37,11 @@ export function OMControlPanelPage({ workspaceId }: { workspaceId: number }) {
             <Link href={`/om/wizard?workspaceId=${workspaceId}`}>
               <Button className="w-full justify-start" variant="outline">
                 <Plus className="w-4 h-4 mr-2" /> Launch OM Wizard
+              </Button>
+            </Link>
+            <Link href="/om/templates">
+              <Button className="w-full justify-start" variant="outline">
+                <FileStack className="w-4 h-4 mr-2" /> Templates
               </Button>
             </Link>
             <Button className="w-full justify-start" variant="outline" disabled>

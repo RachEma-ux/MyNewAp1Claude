@@ -81,6 +81,7 @@ import { OMControlPanelPage } from "@/pages/organization-management/OMControlPan
 import { OMListPage } from "@/pages/organization-management/OMListPage";
 import { OMWizardPage } from "@/pages/organization-management/OMWizardPage";
 import { OMSettingsPage } from "@/pages/organization-management/OMSettingsPage";
+import { OMTemplatesPage } from "@/pages/organization-management/OMTemplatesPage";
 
 // CV — Culture Values
 import { CVPortfolioPage } from "@/pages/culture-values/CVPortfolioPage";
@@ -298,6 +299,7 @@ export default function WorkspaceExecutionShell() {
             <Route path={`${basePath}/om/control-panel`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMControlPanelPage workspaceId={workspaceId} /></ModuleGate></Route>
             <Route path={`${basePath}/om/list`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMListPage workspaceId={workspaceId} /></ModuleGate></Route>
             <Route path={`${basePath}/om/settings`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMSettingsPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/om/templates`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMTemplatesPage workspaceId={workspaceId} /></ModuleGate></Route>
             <Route path={`${basePath}/om`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMPortfolioPage workspaceId={workspaceId} /></ModuleGate></Route>
 
             {/* ─── Projects System ─── */}
