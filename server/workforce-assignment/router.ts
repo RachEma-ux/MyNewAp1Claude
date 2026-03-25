@@ -645,6 +645,71 @@ const assignmentRouter = router({
       return { success: true };
     }),
 
+  /** Complete an active assignment — active → completed */
+  complete: governedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [existing] = await db.select().from(resourceAssignments)
+        .where(eq(resourceAssignments.id, input.id)).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Assignment not found" });
+
+      validateAssignmentTransition(existing.status, "completed");
+
+      await db.update(resourceAssignments)
+        .set({
+          status: "completed",
+          endDate: new Date().toISOString().split("T")[0],
+          updatedAt: new Date(),
+        })
+        .where(eq(resourceAssignments.id, input.id));
+
+      await logBridgeAudit({
+        actorId: ctx.user.id,
+        action: "bridge.assignment.completed",
+        assignmentId: input.id,
+        employeeId: existing.employeeId,
+        projectId: existing.projectId,
+        fromStatus: existing.status,
+        toStatus: "completed",
+      });
+
+      return { success: true };
+    }),
+
+  /** Cancel a pending assignment — pending → cancelled */
+  cancel: governedProcedure
+    .input(z.object({ id: z.number(), reason: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [existing] = await db.select().from(resourceAssignments)
+        .where(eq(resourceAssignments.id, input.id)).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Assignment not found" });
+
+      validateAssignmentTransition(existing.status, "cancelled");
+
+      await db.update(resourceAssignments)
+        .set({ status: "cancelled", updatedAt: new Date() })
+        .where(eq(resourceAssignments.id, input.id));
+
+      await logBridgeAudit({
+        actorId: ctx.user.id,
+        action: "bridge.assignment.cancelled",
+        assignmentId: input.id,
+        employeeId: existing.employeeId,
+        projectId: existing.projectId,
+        fromStatus: existing.status,
+        toStatus: "cancelled",
+        reason: input.reason,
+      });
+
+      return { success: true };
+    }),
+
   /** List assignments (filtered) */
   list: protectedProcedure
     .input(z.object({

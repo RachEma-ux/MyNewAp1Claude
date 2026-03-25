@@ -2,55 +2,63 @@
 
 ## Overview
 
-This governance pack is **fully defined but has no runtime implementation**. The following gaps are known and documented. They must be resolved before the bridge becomes operational.
+The governance pack is **fully defined and has runtime implementation** (Phase 4 complete). The bridge is now operational with schema, lifecycle enforcement, authority checks, HR validation, and audit logging. Remaining gaps are tracked below.
 
 ## Gap Register
 
 | # | Gap | Severity | Dependency | Description |
 |---|---|---|---|---|
-| G1 | No runtime implementation | Critical | Builder phase | No code exists for `resource_request`, `resource_assignment`, or lifecycle enforcement |
-| G2 | No assignment engine | Critical | G1 | No system component processes requests through the governed lifecycle |
-| G3 | No approval workflow | Critical | G1, G2 | No approval gate exists in runtime — assignments cannot be authorized programmatically |
+| G1 | ~~No runtime implementation~~ | ~~Critical~~ **RESOLVED** | Builder phase | Runtime implemented: schema, lifecycle, enforcement, validation, authority, audit, API, tests |
+| G2 | ~~No assignment engine~~ | ~~Critical~~ **RESOLVED** | G1 | `requireGovernedAssignmentFlow()` enforces full governed lifecycle |
+| G3 | ~~No approval workflow~~ | ~~Critical~~ **RESOLVED** | G1, G2 | Approval gate with authority chain, separation of duties, and `governedProcedure` integration |
 | G4 | No utilization loop | High | G1, G2 | No feedback mechanism tracks actual resource utilization against assignments |
-| G5 | HR/PM misalignment risk | High | Governance | HR and PM Central may have conflicting interpretations of ownership boundaries |
-| G6 | OM dependency | Critical | Platform roadmap | Organization Management module does not exist — structural authority is unverifiable |
+| G5 | ~~HR/PM misalignment risk~~ | ~~High~~ **MITIGATED** | Governance | Runtime enforcement now blocks direct PM-to-employee assignment |
+| G6 | OM dependency | Critical | Platform roadmap | Organization Management module does not exist — structural authority uses transitional role-based fallback |
 
 ## Gap Details
 
-### G1 — No Runtime Implementation
+### G1 — Runtime Implementation — RESOLVED
 
-- **Status:** Pre-runtime. Governance-only.
-- **What exists:** This governance pack (8 files) defining authority, lifecycle, controls, audit, and risks.
-- **What does not exist:** Database schema, API endpoints, tRPC routers, UI pages.
-- **Remediation:** Build phase must implement runtime according to this governance specification.
+- **Status:** Implemented (Phase 4).
+- **What exists:**
+  - Schema: `drizzle/tables/workforce-assignment.ts` — `resource_requests`, `resource_assignments`
+  - Lifecycle: `server/workforce-assignment/lifecycle.ts` — state machines with transition validation
+  - Enforcement: `server/workforce-assignment/enforcement.ts` — governed flow guard, self-approval prevention, allocation overflow
+  - Validation: `server/workforce-assignment/validation.ts` — HR employee eligibility (exists, active, skill, level)
+  - Authority: `server/workforce-assignment/authority.ts` — temporary OM placeholder (transitional)
+  - Audit: `server/workforce-assignment/audit.ts` — bridge audit via HR audit infrastructure
+  - API: `server/workforce-assignment/router.ts` — request, HR validation, approval, assignment endpoints
+  - Tests: `server/workforce-assignment/__tests__/bridge.test.ts` — lifecycle, enforcement, authority, validation tests
+- **Registered:** `workforceAssignmentRouter` in `server/routers.ts` under `appRouter`
 
-### G2 — No Assignment Engine
+### G2 — Assignment Engine — RESOLVED
 
-- **Status:** Not started.
-- **What is needed:** A server-side component that processes `resource_request` → validation → proposal → approval → `resource_assignment`.
-- **Constraint:** Must enforce lifecycle stages as defined in MODULE_GOVERNANCE_PROFILE.md. Stage skipping is a governance violation.
+- **Status:** Implemented.
+- **What exists:** `requireGovernedAssignmentFlow()` in `enforcement.ts` checks: request exists, request approved, project match, no duplicate, no overlap.
+- **Runtime path:** request create → submit → HR review → candidate propose → approval submit → approve → assignment create (all governed)
 
-### G3 — No Approval Workflow
+### G3 — Approval Workflow — RESOLVED
 
-- **Status:** Not started.
-- **What is needed:** An approval gate that checks authority chain, separation of duties, and governance rules before creating an assignment.
-- **Constraint:** Must integrate with platform governance engine (`governedProcedure`).
+- **Status:** Implemented.
+- **What exists:** `approval.approve` endpoint checks: lifecycle transition valid, separation of duties (`preventRequesterSelfApproval`), authority resolved (`resolveAssignmentAuthority`).
+- **Integration:** All mutations use `governedProcedure` from platform governance engine.
 
 ### G4 — No Utilization Loop
 
-- **Status:** Not started.
+- **Status:** Not started. Deferred to future phase.
 - **What is needed:** A mechanism to compare active assignments against actual project activity and flag drift.
 - **Constraint:** Requires integration with PM Central (activity data) and HR (availability data).
+- **Current mitigation:** `checkAllocationOverflow()` detects allocation > 100% at assignment creation time.
 
-### G5 — HR/PM Misalignment Risk
+### G5 — HR/PM Misalignment Risk — MITIGATED
 
-- **Status:** Mitigated by governance patches (Part 1 and Part 2 of this task).
-- **What was done:** HR MODULE_GOVERNANCE_PROFILE.md now limits ownership. PM Central README.md now forbids employee ownership and requires governed bridge.
-- **Remaining risk:** Enforcement depends on runtime implementation respecting these boundaries.
+- **Status:** Mitigated by governance patches AND runtime enforcement.
+- **What was done:** HR governance limits ownership. PM Central governance forbids employee ownership. Runtime `requireGovernedAssignmentFlow()` blocks any assignment without approved request.
+- **Remaining risk:** Low — enforcement is now runtime-real, not just documented.
 
 ### G6 — OM Dependency
 
 - **Status:** Unresolved. OM module is on the platform roadmap but does not exist.
-- **Impact:** The bridge cannot fully validate organizational authority without OM data.
-- **Interim:** HR acts as custodian for transitional OM capabilities (org structure, job architecture, position management).
-- **Remediation:** OM module must be implemented. When it is, HR relinquishes transitional capabilities and the bridge integrates OM as the structural authority source.
+- **Impact:** Authority resolution uses transitional role-based fallback (admin/hrbp/workspace_admin).
+- **Interim:** `resolveAssignmentAuthority()` is clearly marked `_transitional: true` with `_omDependency` note. Isolated in `authority.ts`.
+- **Remediation:** OM module must be implemented. When it is, replace `authority.ts` with OM-derived organizational hierarchy resolution.
