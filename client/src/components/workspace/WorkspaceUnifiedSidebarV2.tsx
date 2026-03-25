@@ -44,6 +44,7 @@ import {
   GitBranch,
   Package,
   LayoutDashboard,
+  Building2,
   // Context
   Target,
   Compass,
@@ -224,6 +225,8 @@ export function WorkspaceUnifiedSidebarV2({
                 { icon: <ShieldCheck className="h-4 w-4" />, label: "Governance", path: `${base}/governance` },
                 { icon: <Package className="h-4 w-4" />, label: "Resources", path: `${base}/resources` },
                 { icon: <GitBranch className="h-4 w-4" />, label: "Workflows", path: `${base}/workflows` },
+                { icon: <Building2 className="h-4 w-4" />, label: "Org Management", path: `${base}/om` },
+                { icon: <Heart className="h-4 w-4" />, label: "Culture Values", path: `${base}/cv` },
               ].map((item, i) => (
                 <DropdownMenuItem key={i} className={cn("gap-2 cursor-pointer", item.path && isActive(item.path) && "bg-accent")} onClick={() => item.path ? navigate(item.path) : undefined}>
                   {item.icon}{item.label}
@@ -240,6 +243,12 @@ export function WorkspaceUnifiedSidebarV2({
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/crew`}><Button variant={isActive(`${base}/crew`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Cpu className="h-4 w-4" /></Button></Link>
           </TooltipTrigger><TooltipContent side="right">Crew</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/om`}><Button variant={isActive(`${base}/om`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Building2 className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="right">Org Management</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/cv`}><Button variant={isActive(`${base}/cv`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Heart className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="right">Culture Values</TooltipContent></Tooltip>
         </div>
 
         {/* Context section — dropdown header + item icons */}
@@ -355,11 +364,15 @@ export function WorkspaceUnifiedSidebarV2({
           { icon: <ShieldCheck className="h-4 w-4" />, label: "Governance", path: `${base}/governance` },
           { icon: <Package className="h-4 w-4" />, label: "Resources", path: `${base}/resources` },
           { icon: <GitBranch className="h-4 w-4" />, label: "Workflows", path: `${base}/workflows` },
+          { icon: <Building2 className="h-4 w-4" />, label: "Org Management", path: `${base}/om` },
+          { icon: <Heart className="h-4 w-4" />, label: "Culture Values", path: `${base}/cv` },
         ]}
       >
         <NavItem icon={<LayoutDashboard className="h-4 w-4" />} label="Dashboard" path={`${base}/settings`} count={shell.enabledModules.length} />
         <NavItem icon={<Users className="h-4 w-4" />} label="Team" path={`${base}/team`} count={shell.teamCount} />
         <NavItem icon={<Cpu className="h-4 w-4" />} label="Crew" path={`${base}/crew`} count={shell.crewCount} />
+        <NavItem icon={<Building2 className="h-4 w-4" />} label="Org Management" path={`${base}/om`} />
+        <NavItem icon={<Heart className="h-4 w-4" />} label="Culture Values" path={`${base}/cv`} />
         <NavItem icon={<CheckCircle2 className="h-4 w-4" />} label="Modules" path={`${base}/projects/settings`} count={shell.enabledModules.length} />
       </Section>
 
