@@ -22,7 +22,7 @@ import { workspaces } from "./users";
 // Module Keys — must match server/modules/ directory names
 // ============================================================================
 
-export const MODULE_KEYS = ["pmt", "knowledge", "agents", "collaboration", "reporting", "hr"] as const;
+export const MODULE_KEYS = ["pmt", "knowledge", "agents", "collaboration", "reporting", "hr", "om"] as const;
 export type ModuleKey = typeof MODULE_KEYS[number];
 
 // ============================================================================

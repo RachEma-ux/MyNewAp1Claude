@@ -45,6 +45,7 @@ import { botsRouter } from "./routers/bots";
 import { workspaceRouter, wsCatalogRouter } from "./workspace/workspace-router";
 import { hrRouter } from "./hr/router";
 import { workforceAssignmentRouter } from "./workforce-assignment/router";
+import { organizationManagementRouter } from "./organization-management/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -85,6 +86,7 @@ export const appRouter = router({
   hq: hqRouter, // Digital HQ aggregation
   hr: hrRouter, // Human Resources — global workforce backbone
   workforceAssignment: workforceAssignmentRouter, // Workforce Assignment Bridge — OM↔HR↔PS governed staffing
+  organizationManagement: organizationManagementRouter, // Organization Management — structural backbone (entities, org units, jobs, positions, authority)
   modules: modulesRouter, // Platform Engines (PMT, Knowledge, Agents, Collaboration, Reporting, HR)
   orchestrator: orchestratorRouter, // Multi-Operator Autonomous Runtime
   models: modelsRouter, // Model Registry (governed)

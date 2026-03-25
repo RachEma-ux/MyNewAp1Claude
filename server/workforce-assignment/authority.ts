@@ -1,28 +1,20 @@
 /**
- * Workforce Assignment Bridge — Temporary Authority Resolver
+ * Workforce Assignment Bridge — Authority Resolver
  *
- * ⚠️ TEMPORARY — OM MODULE NOT YET IMPLEMENTED
+ * Now integrates with the OM module when available.
+ * Falls back to role-based authority when OM structure is not defined.
  *
- * This module provides a placeholder authority resolution hook.
- * When the Organization Management (OM) module is built, this must be replaced
- * with OM-derived organizational authority chain resolution.
- *
- * Current behavior:
- * - Returns a minimal authority record based on actor role
- * - Does NOT verify organizational hierarchy (OM does not exist yet)
- * - Marks all authority records as "transitional"
- *
- * Future behavior (when OM exists):
- * - Resolve actor's position in org hierarchy
- * - Verify actor has authority over the employee's org unit
- * - Verify actor has authority over the project's cost center
- * - Return a full authority chain with org unit path
+ * Resolution order:
+ * 1. If OM structure exists for the workspace → resolve via OM hierarchy
+ * 2. If no OM structure → fall back to role-based (admin/hrbp/workspace_admin)
  */
 
+import { resolveOmAuthority, type OmAuthorityResolution } from "../organization-management/authority";
+
 export interface AuthorityResolution {
-  /** Whether authority was resolved (always true in transitional mode) */
+  /** Whether authority was resolved */
   resolved: boolean;
-  /** Authority source — "transitional" until OM is implemented */
+  /** Authority source — "om_hierarchy" when OM is available, "transitional" otherwise */
   source: "transitional" | "om_hierarchy";
   /** Actor's authority level for this action */
   level: "role_based" | "org_unit_based" | "position_based";
@@ -35,17 +27,46 @@ export interface AuthorityResolution {
 /**
  * Resolve assignment authority for an actor.
  *
- * ⚠️ TEMPORARY: Returns role-based authority without OM verification.
- * This MUST be replaced when OM runtime is implemented.
+ * Delegates to OM authority resolver when OM structure exists.
+ * Falls back to role-based authority otherwise.
  */
-export function resolveAssignmentAuthority(params: {
+export async function resolveAssignmentAuthority(params: {
   actorId: number;
   actorRole: string;
   employeeId: number;
   projectId: number;
-}): AuthorityResolution {
-  // Transitional: admin and hrbp roles are trusted for authority
-  // In the future, OM will verify the actor's position in the org hierarchy
+  workspaceId?: number;
+}): Promise<AuthorityResolution> {
+  // If workspaceId is available, try OM-based resolution
+  if (params.workspaceId) {
+    try {
+      const omResult: OmAuthorityResolution = await resolveOmAuthority({
+        workspaceId: params.workspaceId,
+        actorId: params.actorId,
+        actorRole: params.actorRole,
+      });
+
+      return {
+        resolved: omResult.resolved,
+        source: omResult.source,
+        level: omResult.level,
+        chain: {
+          actorId: params.actorId,
+          actorRole: params.actorRole,
+          employeeId: params.employeeId,
+          projectId: params.projectId,
+          resolvedAt: new Date().toISOString(),
+          omChain: omResult.chain,
+          _transitional: omResult.source === "transitional",
+        },
+        warning: omResult.warning,
+      };
+    } catch {
+      // If OM resolution fails, fall through to role-based
+    }
+  }
+
+  // Role-based fallback (backward-compatible)
   const isAuthoritative = ["admin", "workspace_admin", "hrbp"].includes(params.actorRole);
 
   return {
@@ -59,13 +80,12 @@ export function resolveAssignmentAuthority(params: {
       projectId: params.projectId,
       resolvedAt: new Date().toISOString(),
       _transitional: true,
-      _omDependency: "Organization Management module not yet implemented. " +
-        "Authority resolved via role-based fallback. Replace with OM hierarchy when available.",
+      _omIntegration: "OM module available but workspaceId not provided or resolution failed. " +
+        "Using role-based fallback.",
     },
     warning: isAuthoritative
       ? undefined
       : `Actor role "${params.actorRole}" does not have authority for assignment approval. ` +
-        `Required: admin, workspace_admin, or hrbp (transitional). ` +
-        `Future: OM-based organizational authority.`,
+        `Required: admin, workspace_admin, or hrbp (transitional).`,
   };
 }

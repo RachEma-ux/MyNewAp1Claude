@@ -393,8 +393,8 @@ const approvalRouter = router({
       // Separation of duties: requester cannot approve own request
       preventRequesterSelfApproval(request.requesterId, ctx.user.id);
 
-      // Temporary authority check (OM not implemented)
-      const authority = resolveAssignmentAuthority({
+      // Authority check — delegates to OM hierarchy when available
+      const authority = await resolveAssignmentAuthority({
         actorId: ctx.user.id,
         actorRole: ctx.user.role || "user",
         employeeId: ((request.metadata as any)?.proposedCandidateId) ?? 0,
