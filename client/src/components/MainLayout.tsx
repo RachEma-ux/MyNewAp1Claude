@@ -121,6 +121,26 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const navItems: NavItem[] = [
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/" },
     {
+      label: "Org Management",
+      icon: <Building2 className="w-5 h-5" />,
+      children: [
+        { label: "Portfolio", icon: <LayoutDashboard className="w-4 h-4" />, href: "/om/portfolio" },
+        { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/om/control-panel" },
+        { label: "OM Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/om/wizard" },
+        { label: "OM Records", icon: <List className="w-4 h-4" />, href: "/om/list" },
+        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/om/settings" },
+      ],
+    },
+    {
+      label: "Culture Values",
+      icon: <Award className="w-5 h-5" />,
+      children: [
+        { label: "Portfolio", icon: <LayoutDashboard className="w-4 h-4" />, href: "/cv/portfolio" },
+        { label: "Values Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/cv/wizard" },
+        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/cv/settings" },
+      ],
+    },
+    {
       label: "Communication",
       icon: <Radio className="w-5 h-5" />,
       children: [
@@ -257,26 +277,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
         href: section.href,
         requiredAction: section.requiredAction,
       })),
-    },
-    {
-      label: "Org Management",
-      icon: <Building2 className="w-5 h-5" />,
-      children: [
-        { label: "Portfolio", icon: <LayoutDashboard className="w-4 h-4" />, href: "/om/portfolio" },
-        { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/om/control-panel" },
-        { label: "OM Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/om/wizard" },
-        { label: "OM Records", icon: <List className="w-4 h-4" />, href: "/om/list" },
-        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/om/settings" },
-      ],
-    },
-    {
-      label: "Culture Values",
-      icon: <Award className="w-5 h-5" />,
-      children: [
-        { label: "Portfolio", icon: <LayoutDashboard className="w-4 h-4" />, href: "/cv/portfolio" },
-        { label: "Values Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/cv/wizard" },
-        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/cv/settings" },
-      ],
     },
     {
       label: "Automation",
