@@ -87,6 +87,12 @@ import { CVPortfolioPage } from "@/pages/culture-values/CVPortfolioPage";
 import { CVWizardPage } from "@/pages/culture-values/CVWizardPage";
 import { CVSettingsPage } from "@/pages/culture-values/CVSettingsPage";
 
+// PS — Projects System
+import { PSCatalogPage } from "@/pages/projects-system/PSCatalogPage";
+import { PSControlPanelPage } from "@/pages/projects-system/PSControlPanelPage";
+import { PSWizardPage } from "@/pages/projects-system/PSWizardPage";
+import { PSListPage } from "@/pages/projects-system/PSListPage";
+
 /** Fallback shell data while loading — renders skeleton context immediately */
 function makeLoadingShell(workspaceId: number): ShellViewData {
   return {
@@ -293,6 +299,13 @@ export default function WorkspaceExecutionShell() {
             <Route path={`${basePath}/om/list`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMListPage workspaceId={workspaceId} /></ModuleGate></Route>
             <Route path={`${basePath}/om/settings`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMSettingsPage workspaceId={workspaceId} /></ModuleGate></Route>
             <Route path={`${basePath}/om`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMPortfolioPage workspaceId={workspaceId} /></ModuleGate></Route>
+
+            {/* ─── Projects System ─── */}
+            <Route path={`${basePath}/ps/catalog`}><ModuleGate moduleKey="ps" moduleName="Projects System"><PSCatalogPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/ps/control-panel`}><ModuleGate moduleKey="ps" moduleName="Projects System"><PSControlPanelPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/ps/wizard`}><ModuleGate moduleKey="ps" moduleName="Projects System"><PSWizardPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/ps/list`}><ModuleGate moduleKey="ps" moduleName="Projects System"><PSListPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/ps`}><ModuleGate moduleKey="ps" moduleName="Projects System"><PSCatalogPage workspaceId={workspaceId} /></ModuleGate></Route>
 
             {/* ─── Culture Values ─── */}
             <Route path={`${basePath}/cv/wizard`}><ModuleGate moduleKey="cv" moduleName="Culture Values"><CVWizardPage workspaceId={workspaceId} /></ModuleGate></Route>

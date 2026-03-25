@@ -138,9 +138,10 @@ const HRRoleDefinitionDetailPage = lazy(() => import("@/pages/hr/HRRoleDefinitio
 const HRRoleDefinitionEditPage = lazy(() => import("@/pages/hr/HRRoleDefinitionEditPage"));
 const HRRoleDefinitionReviewPage = lazy(() => import("@/pages/hr/HRRoleDefinitionReviewPage"));
 const HRRoleDefinitionComparePage = lazy(() => import("@/pages/hr/HRRoleDefinitionComparePage"));
-// OM / CV Modules — top-level pages (auto-select default workspace)
+// OM / CV / PS Modules — top-level pages (auto-select default workspace)
 const OMTopLevelPage = lazy(() => import("@/pages/organization-management/OMTopLevelPage"));
 const CVTopLevelPage = lazy(() => import("@/pages/culture-values/CVTopLevelPage"));
+const PSTopLevelPage = lazy(() => import("@/pages/projects-system/PSTopLevelPage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
@@ -373,6 +374,9 @@ function Router() {
       {/* Culture Values — top-level (auto-selects default workspace) */}
       <Route path="/cv/:item" component={() => <ProtectedRoute component={CVTopLevelPage} />} />
       <Route path="/cv" component={() => <ProtectedRoute component={CVTopLevelPage} />} />
+      {/* Projects System — top-level (auto-selects default workspace) */}
+      <Route path="/ps/:item" component={() => <ProtectedRoute component={PSTopLevelPage} />} />
+      <Route path="/ps" component={() => <ProtectedRoute component={PSTopLevelPage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
       <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />

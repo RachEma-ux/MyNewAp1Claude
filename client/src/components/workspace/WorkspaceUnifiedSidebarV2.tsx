@@ -59,6 +59,7 @@ import {
   // Settings
   Eye,
   Shield,
+  ClipboardList,
 } from "lucide-react";
 import type { ShellViewData } from "@/components/workspace-shell/types";
 import { classifyParticipant } from "@/components/workspace-shell/types";
@@ -226,6 +227,7 @@ export function WorkspaceUnifiedSidebarV2({
                 { icon: <Package className="h-4 w-4" />, label: "Resources", path: `${base}/resources` },
                 { icon: <GitBranch className="h-4 w-4" />, label: "Workflows", path: `${base}/workflows` },
                 { icon: <Building2 className="h-4 w-4" />, label: "Org Management", path: `${base}/om` },
+                { icon: <ClipboardList className="h-4 w-4" />, label: "Projects System", path: `${base}/ps` },
                 { icon: <Heart className="h-4 w-4" />, label: "Culture Values", path: `${base}/cv` },
               ].map((item, i) => (
                 <DropdownMenuItem key={i} className={cn("gap-2 cursor-pointer", item.path && isActive(item.path) && "bg-accent")} onClick={() => item.path ? navigate(item.path) : undefined}>
@@ -246,6 +248,9 @@ export function WorkspaceUnifiedSidebarV2({
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/om`}><Button variant={isActive(`${base}/om`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Building2 className="h-4 w-4" /></Button></Link>
           </TooltipTrigger><TooltipContent side="right">Org Management</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>
+            <Link href={`${base}/ps`}><Button variant={isActive(`${base}/ps`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><ClipboardList className="h-4 w-4" /></Button></Link>
+          </TooltipTrigger><TooltipContent side="right">Projects System</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
             <Link href={`${base}/cv`}><Button variant={isActive(`${base}/cv`) ? "secondary" : "ghost"} size="icon" className="h-8 w-8"><Heart className="h-4 w-4" /></Button></Link>
           </TooltipTrigger><TooltipContent side="right">Culture Values</TooltipContent></Tooltip>
@@ -365,6 +370,7 @@ export function WorkspaceUnifiedSidebarV2({
           { icon: <Package className="h-4 w-4" />, label: "Resources", path: `${base}/resources` },
           { icon: <GitBranch className="h-4 w-4" />, label: "Workflows", path: `${base}/workflows` },
           { icon: <Building2 className="h-4 w-4" />, label: "Org Management", path: `${base}/om` },
+          { icon: <ClipboardList className="h-4 w-4" />, label: "Projects System", path: `${base}/ps` },
           { icon: <Heart className="h-4 w-4" />, label: "Culture Values", path: `${base}/cv` },
         ]}
       >
@@ -372,6 +378,7 @@ export function WorkspaceUnifiedSidebarV2({
         <NavItem icon={<Users className="h-4 w-4" />} label="Team" path={`${base}/team`} count={shell.teamCount} />
         <NavItem icon={<Cpu className="h-4 w-4" />} label="Crew" path={`${base}/crew`} count={shell.crewCount} />
         <NavItem icon={<Building2 className="h-4 w-4" />} label="Org Management" path={`${base}/om`} />
+        <NavItem icon={<ClipboardList className="h-4 w-4" />} label="Projects System" path={`${base}/ps`} />
         <NavItem icon={<Heart className="h-4 w-4" />} label="Culture Values" path={`${base}/cv`} />
         <NavItem icon={<CheckCircle2 className="h-4 w-4" />} label="Modules" path={`${base}/projects/settings`} count={shell.enabledModules.length} />
       </Section>
