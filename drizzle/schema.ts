@@ -38,3 +38,4 @@ export * from './tables/hr-talent';
 export * from './tables/hr-role-definitions';
 export * from './tables/workforce-assignment';
 export * from './tables/organization-management';
+export * from './tables/culture-values';

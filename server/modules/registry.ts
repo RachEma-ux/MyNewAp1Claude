@@ -20,10 +20,10 @@ import { createAppBlockerError } from "../_core/blockers";
 
 export const MODULE_PRESETS: Record<string, ModuleKey[]> = {
   personal: ["pmt", "knowledge", "reporting"],
-  team: ["pmt", "knowledge", "agents", "collaboration", "reporting", "hr", "om"],
-  project: ["pmt", "knowledge", "agents", "collaboration", "reporting", "hr", "om"],
+  team: ["pmt", "knowledge", "agents", "collaboration", "reporting", "hr", "om", "cv"],
+  project: ["pmt", "knowledge", "agents", "collaboration", "reporting", "hr", "om", "cv"],
   research: ["knowledge", "reporting"],
-  enterprise: ["pmt", "knowledge", "agents", "collaboration", "reporting", "hr", "om"],
+  enterprise: ["pmt", "knowledge", "agents", "collaboration", "reporting", "hr", "om", "cv"],
   sandbox: ["pmt", "knowledge", "agents"],
   readonly: ["reporting"],
 };

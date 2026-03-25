@@ -46,6 +46,7 @@ import { workspaceRouter, wsCatalogRouter } from "./workspace/workspace-router";
 import { hrRouter } from "./hr/router";
 import { workforceAssignmentRouter } from "./workforce-assignment/router";
 import { organizationManagementRouter } from "./organization-management/router";
+import { cultureValuesRouter } from "./culture-values/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -87,6 +88,7 @@ export const appRouter = router({
   hr: hrRouter, // Human Resources — global workforce backbone
   workforceAssignment: workforceAssignmentRouter, // Workforce Assignment Bridge — OM↔HR↔PS governed staffing
   organizationManagement: organizationManagementRouter, // Organization Management — structural backbone (entities, org units, jobs, positions, authority)
+  cultureValues: cultureValuesRouter, // Culture Values — enterprise values, behaviors, translations, operationalization
   modules: modulesRouter, // Platform Engines (PMT, Knowledge, Agents, Collaboration, Reporting, HR)
   orchestrator: orchestratorRouter, // Multi-Operator Autonomous Runtime
   models: modelsRouter, // Model Registry (governed)

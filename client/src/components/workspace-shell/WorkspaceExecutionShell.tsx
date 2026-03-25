@@ -75,6 +75,18 @@ import { WSCrewPage } from "@/pages/workspace/WSCrewPage";
 import { WSRulesPage } from "@/pages/workspace/WSRulesPage";
 import { OversightPage } from "@/pages/workspace/OversightPage";
 
+// OM — Organization Management
+import { OMPortfolioPage } from "@/pages/organization-management/OMPortfolioPage";
+import { OMControlPanelPage } from "@/pages/organization-management/OMControlPanelPage";
+import { OMListPage } from "@/pages/organization-management/OMListPage";
+import { OMWizardPage } from "@/pages/organization-management/OMWizardPage";
+import { OMSettingsPage } from "@/pages/organization-management/OMSettingsPage";
+
+// CV — Culture Values
+import { CVPortfolioPage } from "@/pages/culture-values/CVPortfolioPage";
+import { CVWizardPage } from "@/pages/culture-values/CVWizardPage";
+import { CVSettingsPage } from "@/pages/culture-values/CVSettingsPage";
+
 /** Fallback shell data while loading — renders skeleton context immediately */
 function makeLoadingShell(workspaceId: number): ShellViewData {
   return {
@@ -274,6 +286,18 @@ export default function WorkspaceExecutionShell() {
             <Route path={`${basePath}/team`}><WSTeamPage /></Route>
             <Route path={`${basePath}/crew`}><WSCrewPage /></Route>
             <Route path={`${basePath}/rules`}><WSRulesPage /></Route>
+
+            {/* ─── Organization Management ─── */}
+            <Route path={`${basePath}/om/wizard`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMWizardPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/om/control-panel`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMControlPanelPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/om/list`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMListPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/om/settings`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMSettingsPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/om`}><ModuleGate moduleKey="om" moduleName="Organization Management"><OMPortfolioPage workspaceId={workspaceId} /></ModuleGate></Route>
+
+            {/* ─── Culture Values ─── */}
+            <Route path={`${basePath}/cv/wizard`}><ModuleGate moduleKey="cv" moduleName="Culture Values"><CVWizardPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/cv/settings`}><ModuleGate moduleKey="cv" moduleName="Culture Values"><CVSettingsPage workspaceId={workspaceId} /></ModuleGate></Route>
+            <Route path={`${basePath}/cv`}><ModuleGate moduleKey="cv" moduleName="Culture Values"><CVPortfolioPage workspaceId={workspaceId} /></ModuleGate></Route>
 
             {/* ─── Governance / Oversight ─── */}
             <Route path={`${basePath}/governance`}><GovernancePage workspaceId={workspaceId} /></Route>
