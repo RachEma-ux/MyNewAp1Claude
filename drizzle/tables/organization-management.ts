@@ -262,3 +262,34 @@ export const omAuditLog = pgTable("om_audit_log", {
 
 export type OmAuditEntry = typeof omAuditLog.$inferSelect;
 export type InsertOmAuditEntry = typeof omAuditLog.$inferInsert;
+
+// ============================================================================
+// 9. OM Organization Templates — Reusable structure blueprints
+// ============================================================================
+
+export const omOrgTemplates = pgTable("om_org_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  structureModel: varchar("structure_model", { length: 50 }).notNull(), // functional | divisional | matrix | flat | network
+  description: text("description"),
+  isSystem: boolean("is_system").default(false).notNull(), // true = built-in, cannot be deleted
+  snapshot: json("snapshot").$type<{
+    legalEntity: { code: string; name: string; type: string };
+    orgUnits: { code: string; name: string; type: string; parentIndex?: number }[];
+    jobs: { code: string; title: string; family: string; level: string; levelRank: number }[];
+    positions: { code: string; title: string; jobIndex?: number; orgUnitIndex?: number }[];
+    reportingLines: { positionIndex: number; reportsToIndex: number; type: string }[];
+    costCenters: { code: string; name: string }[];
+    governanceNotes: string;
+    decisionRights: string;
+    escalationPath: string;
+  }>().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  modelIdx: index("om_template_model_idx").on(table.structureModel),
+  nameUniq: unique("om_template_name_uniq").on(table.name),
+}));
+
+export type OmOrgTemplate = typeof omOrgTemplates.$inferSelect;
+export type InsertOmOrgTemplate = typeof omOrgTemplates.$inferInsert;

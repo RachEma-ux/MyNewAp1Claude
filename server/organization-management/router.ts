@@ -31,6 +31,7 @@ import {
   omCostCenters,
   omStructureVersions,
   omAuditLog,
+  omOrgTemplates,
 } from "../../drizzle/tables/organization-management";
 import {
   validateLegalEntityTransition,
@@ -1410,6 +1411,38 @@ const settingsRouter = router({
 });
 
 // ============================================================================
+// Templates Sub-Router — Reusable org structure blueprints
+// ============================================================================
+
+const templatesRouter = router({
+  list: protectedProcedure
+    .input(z.object({ structureModel: z.string().optional() }).optional())
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) return [];
+      const conditions = [];
+      if (input?.structureModel) {
+        conditions.push(eq(omOrgTemplates.structureModel, input.structureModel));
+      }
+      return db.select().from(omOrgTemplates)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(asc(omOrgTemplates.name));
+    }),
+
+  get: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [tpl] = await db.select().from(omOrgTemplates)
+        .where(eq(omOrgTemplates.id, input.id))
+        .limit(1);
+      if (!tpl) throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
+      return tpl;
+    }),
+});
+
+// ============================================================================
 // Composed OM Router
 // ============================================================================
 
@@ -1424,4 +1457,5 @@ export const organizationManagementRouter = router({
   authority: authorityRouter,
   audit: auditRouter,
   settings: settingsRouter,
+  templates: templatesRouter,
 });

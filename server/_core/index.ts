@@ -222,6 +222,19 @@ async function startServer() {
     console.warn(`[AgentSeed] Skipped — ${error.message}`);
   }
 
+  // Seed OM organization templates (5 structure models)
+  try {
+    const { seedOmTemplates } = await import("../organization-management/seed-templates");
+    const omResult = await seedOmTemplates();
+    if (omResult.created > 0) {
+      console.log(`[OMTemplateSeed] Seeded ${omResult.created} new templates (${omResult.skipped} existing)`);
+    } else {
+      console.log(`[OMTemplateSeed] All ${omResult.skipped} templates already present`);
+    }
+  } catch (error: any) {
+    console.warn(`[OMTemplateSeed] Skipped — ${error.message}`);
+  }
+
   // Initialize Governance Engine (CGT v2)
   initializeGovernance();
 
