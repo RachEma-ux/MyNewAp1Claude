@@ -169,6 +169,20 @@
       "when": 1774294716325,
       "tag": "0024_concerned_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1774569600000,
+      "tag": "0025_ws_wizard_governance_meta",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1774656000000,
+      "tag": "0026_purpose_statement_column",
+      "breakpoints": true
     }
   ]
 }
