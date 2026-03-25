@@ -36,3 +36,4 @@ export * from './tables/hr-compliance';
 export * from './tables/hr-analytics';
 export * from './tables/hr-talent';
 export * from './tables/hr-role-definitions';
+export * from './tables/workforce-assignment';

@@ -23,6 +23,7 @@ import {
 import { getUserWorkspaceRole } from "../workspaces/permissions-service";
 import { resolveWorkspaceCapabilities } from "./capability-resolver";
 import { getWorkspaceModules } from "../modules/registry";
+import { resolveWorkspaceAssignments } from "./assignment-resolver";
 
 export interface ShellView {
   workspaceId: number;
@@ -67,6 +68,15 @@ export interface ShellView {
 
   teamCount: number;
   crewCount: number;
+
+  /** Bridge-sourced assignment staffing (read-only) */
+  staffing: {
+    assignmentCount: number;
+    activeAssignmentCount: number;
+    hasConflicts: boolean;
+    /** True if workspace has a linked project with bridge assignments */
+    bridgeConnected: boolean;
+  };
 }
 
 const DEFAULT_SIDEBAR = {
@@ -211,5 +221,39 @@ export async function getWorkspaceShellView(
 
     teamCount: teamMembers.length,
     crewCount: crewMembers.length,
+
+    // Bridge-sourced staffing summary
+    staffing: await resolveStaffingSummary(ws),
   };
+}
+
+/**
+ * Resolve bridge-sourced staffing summary for shell view.
+ * Read-only — workspace never writes to assignments.
+ */
+async function resolveStaffingSummary(
+  ws: Record<string, any>,
+): Promise<ShellView["staffing"]> {
+  const meta = ws.wizardMeta as Record<string, any> | null;
+  const projectId = ws.purposeRef
+    ? parseInt(ws.purposeRef, 10)
+    : meta?.anchorRef
+      ? parseInt(meta.anchorRef, 10)
+      : null;
+
+  if (!projectId || isNaN(projectId)) {
+    return { assignmentCount: 0, activeAssignmentCount: 0, hasConflicts: false, bridgeConnected: false };
+  }
+
+  try {
+    const staffing = await resolveWorkspaceAssignments(projectId);
+    return {
+      assignmentCount: staffing.summary.totalAssignments,
+      activeAssignmentCount: staffing.summary.activeAssignments,
+      hasConflicts: staffing.summary.hasConflicts,
+      bridgeConnected: true,
+    };
+  } catch {
+    return { assignmentCount: 0, activeAssignmentCount: 0, hasConflicts: false, bridgeConnected: false };
+  }
 }

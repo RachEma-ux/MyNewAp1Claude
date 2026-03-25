@@ -44,6 +44,7 @@ import { orchestratorRouter } from "./orchestrator/router";
 import { botsRouter } from "./routers/bots";
 import { workspaceRouter, wsCatalogRouter } from "./workspace/workspace-router";
 import { hrRouter } from "./hr/router";
+import { workforceAssignmentRouter } from "./workforce-assignment/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -83,6 +84,7 @@ export const appRouter = router({
   governance: governanceRouter, // Governance Engine (CGT v2)
   hq: hqRouter, // Digital HQ aggregation
   hr: hrRouter, // Human Resources — global workforce backbone
+  workforceAssignment: workforceAssignmentRouter, // Workforce Assignment Bridge — OM↔HR↔PS governed staffing
   modules: modulesRouter, // Platform Engines (PMT, Knowledge, Agents, Collaboration, Reporting, HR)
   orchestrator: orchestratorRouter, // Multi-Operator Autonomous Runtime
   models: modelsRouter, // Model Registry (governed)

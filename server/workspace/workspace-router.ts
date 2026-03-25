@@ -57,6 +57,7 @@ import { resolveWorkspaceContext } from "./workspace-contract";
 import { resolveWorkspaceCapabilities } from "./capability-resolver";
 import { seedWorkspaceModules, logActivity, getWorkspaceModules } from "../modules/registry";
 import { getWorkspaceShellView } from "./shell-view-resolver";
+import { resolveWorkspaceAssignments, getPendingRequests } from "./assignment-resolver";
 
 const workspaceStatusEnum = z.enum(WORKSPACE_STATUSES as unknown as [string, ...string[]]);
 const purposeTypeEnum = z.enum(WORKSPACE_PURPOSE_TYPES as unknown as [string, ...string[]]);
@@ -926,6 +927,79 @@ export const workspaceRouter = router({
         } as any);
         await logActivity({ workspaceId: input.workspaceId, actorId: ctx.user.id, action: "workspace.shell.config.update" }).catch(() => {});
         return { success: true };
+      }),
+  }),
+
+  // ============================================================================
+  // Staffing — Assignment-driven team view (READ-ONLY)
+  //
+  // Workspace consumes resource_assignments from the bridge.
+  // Workspace MUST NOT create, modify, or delete assignments.
+  // If it is not in resource_assignment, it does not exist in Workspace.
+  // ============================================================================
+
+  staffing: router({
+    /**
+     * Resolve all bridge-sourced assignments for this workspace's project.
+     * Returns team, conflicts, workload, and summary.
+     */
+    resolve: protectedProcedure
+      .input(z.object({
+        workspaceId: z.number(),
+        includeReleased: z.boolean().optional(),
+      }))
+      .query(async ({ ctx, input }) => {
+        const { workspace } = await requireReadableWorkspaceRoute(ctx.user.id, input.workspaceId);
+
+        // Derive projectId from workspace purposeRef or wizardMeta anchor
+        const meta = (workspace as any).wizardMeta as Record<string, any> | null;
+        const projectId = (workspace as any).purposeRef
+          ? parseInt((workspace as any).purposeRef, 10)
+          : meta?.anchorRef
+            ? parseInt(meta.anchorRef, 10)
+            : null;
+
+        if (!projectId || isNaN(projectId)) {
+          return {
+            assignments: [],
+            conflicts: [],
+            workload: [],
+            summary: { totalAssignments: 0, activeAssignments: 0, totalAllocation: 0, hasConflicts: false },
+            message: "No project linked to this workspace. Request resources via PM Central.",
+          };
+        }
+
+        const staffing = await resolveWorkspaceAssignments(projectId, {
+          includeReleased: input.includeReleased,
+        });
+
+        return {
+          ...staffing,
+          message: staffing.summary.totalAssignments === 0
+            ? "No team assigned yet — request resources via PM Central."
+            : undefined,
+        };
+      }),
+
+    /**
+     * Get pending resource requests for this workspace's project.
+     * Read-only view of demand pipeline.
+     */
+    pendingRequests: protectedProcedure
+      .input(z.object({ workspaceId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { workspace } = await requireReadableWorkspaceRoute(ctx.user.id, input.workspaceId);
+
+        const meta = (workspace as any).wizardMeta as Record<string, any> | null;
+        const projectId = (workspace as any).purposeRef
+          ? parseInt((workspace as any).purposeRef, 10)
+          : meta?.anchorRef
+            ? parseInt(meta.anchorRef, 10)
+            : null;
+
+        if (!projectId || isNaN(projectId)) return [];
+
+        return getPendingRequests(projectId);
       }),
   }),
 
