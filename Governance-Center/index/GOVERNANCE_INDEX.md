@@ -59,6 +59,7 @@ Navigational map of all governance-related content in this repository.
 | [Digital HQ](../modules/digital-hq/README.md) | Minimal | Dashboard display only |
 | [Governance Center](../modules/governance-center/README.md) | Full | Self-governed |
 | [Infrastructure](../modules/infrastructure/README.md) | Low | CRITICAL gaps (C2, C3) |
+| Organization Management | Full (governance-defined, pre-runtime) | Structural backbone module |
 
 ---
 
@@ -73,6 +74,7 @@ Navigational map of all governance-related content in this repository.
 | [Module Registry](../platform-domains/module-registry/README.md) | Catalog/registry system |
 | [Publication & Lifecycle](../platform-domains/publication-lifecycle/README.md) | Lifecycle states, publication gates |
 | [Runtime Agents](../platform-domains/runtime-agents/README.md) | Autonomous agents, operators, syscalls |
+| [Workforce Assignment](../platform-domains/workforce-assignment/README.md) | Cross-module staffing bridge (new) |
 
 ---
 

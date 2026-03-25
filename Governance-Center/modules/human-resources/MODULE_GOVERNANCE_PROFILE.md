@@ -119,3 +119,36 @@ HR uses a dedicated action-based permission model defined in `server/hr/permissi
 | Operational Compliance | HR follows periodic review cadence — see [MODULE_PERIODIC_CHECKS.md](MODULE_PERIODIC_CHECKS.md) |
 | Control Matrix | HR controls are the most complete entry in the platform control matrix |
 | Coverage Matrix | HR has full mutation + read governance coverage |
+
+---
+
+## Ownership Clarification (OM Alignment)
+
+HR owns **workforce reality** — the authoritative master data for:
+
+- Employees
+- Contracts
+- Worker classification
+- Skills
+- Certifications
+- Calendars
+- Availability
+- Performance
+- Employee status
+
+### Transitional Capabilities (Future OM-Owned)
+
+The following capabilities are **currently present in HR** but are **transitional**. They must be treated as future **Organization Management (OM)**-owned:
+
+| Capability | Current Owner | Long-Term Owner | Status |
+|---|---|---|---|
+| Organizational structure | HR (transitional) | OM | Pending OM implementation |
+| Job architecture | HR (transitional) | OM | Pending OM implementation |
+| Position management | HR (transitional) | OM | Pending OM implementation |
+
+**Rules:**
+
+- HR may expose or reference these concepts, but **does not own them** as long-term master data.
+- OM will become the authoritative source for these structures once implemented.
+- Until OM exists, HR acts as **custodian**, not owner.
+- Any module consuming org structure, job architecture, or position data must treat the source as transitional and prepare for future OM migration.

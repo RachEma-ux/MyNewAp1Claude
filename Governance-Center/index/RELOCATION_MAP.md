@@ -86,6 +86,14 @@ Files moved into Governance-Center and files intentionally left in place.
 | `Governance-Center/platform-domains/module-registry/README.md` | new doc |
 | `Governance-Center/platform-domains/publication-lifecycle/README.md` | new doc |
 | `Governance-Center/platform-domains/runtime-agents/README.md` | new doc |
+| `Governance-Center/platform-domains/workforce-assignment/README.md` | new doc |
+| `Governance-Center/platform-domains/workforce-assignment/MODULE_GOVERNANCE_PROFILE.md` | new doc |
+| `Governance-Center/platform-domains/workforce-assignment/MODULE_CONTROL_SURFACE.md` | new doc |
+| `Governance-Center/platform-domains/workforce-assignment/MODULE_AUDIT_MODEL.md` | new doc |
+| `Governance-Center/platform-domains/workforce-assignment/MODULE_PERIODIC_CHECKS.md` | new doc |
+| `Governance-Center/platform-domains/workforce-assignment/MODULE_RISKS.md` | new doc |
+| `Governance-Center/platform-domains/workforce-assignment/MODULE_OPEN_GAPS.md` | new doc |
+| `Governance-Center/platform-domains/workforce-assignment/MODULE_RUNTIME_REFERENCES.md` | new doc |
 
 ## Deleted
 
