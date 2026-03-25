@@ -1,0 +1,121 @@
+Session Summary — 2026-03-25 14:00
+====================================
+
+## Overview
+
+Three major phases executed in this session, all following the AGENTS.md 5-agent model
+(Planner → Builder → Reviewer → Tester → Governance). Combined output: 12 new files,
+7 modified files, 2,158+ lines of code/documentation added.
+
+---
+
+## Phase 3 — Governance Alignment + Workforce Assignment Bridge (Documentation)
+
+**Commit**: `2a615c1` — docs(governance): add workforce assignment bridge pack and lock HR/PM ownership boundaries
+
+**Purpose**: Lock ownership boundaries between HR, PM Central, and future Organization
+Management (OM). Create complete governance documentation for the workforce assignment
+bridge. Zero runtime changes.
+
+**Created (8 files)**:
+- `Governance-Center/platform-domains/workforce-assignment/README.md`
+- `Governance-Center/platform-domains/workforce-assignment/MODULE_GOVERNANCE_PROFILE.md`
+- `Governance-Center/platform-domains/workforce-assignment/MODULE_CONTROL_SURFACE.md`
+- `Governance-Center/platform-domains/workforce-assignment/MODULE_AUDIT_MODEL.md`
+- `Governance-Center/platform-domains/workforce-assignment/MODULE_PERIODIC_CHECKS.md`
+- `Governance-Center/platform-domains/workforce-assignment/MODULE_RISKS.md`
+- `Governance-Center/platform-domains/workforce-assignment/MODULE_OPEN_GAPS.md`
+- `Governance-Center/platform-domains/workforce-assignment/MODULE_RUNTIME_REFERENCES.md`
+
+**Modified (4 files)**:
+- `Governance-Center/modules/human-resources/MODULE_GOVERNANCE_PROFILE.md` — ownership clarification
+- `Governance-Center/modules/pm-central/README.md` — explicit non-ownership declaration
+- `Governance-Center/index/GOVERNANCE_INDEX.md` — OM + bridge entries
+- `Governance-Center/index/RELOCATION_MAP.md` — 8 new file entries
+
+---
+
+## Phase 4 — Bridge Runtime Implementation
+
+**Commit**: `7d05d3a` (combined with Phase 5)
+
+**Purpose**: Turn governance-defined workforce assignment bridge into real runtime.
+Schema, lifecycle engine, enforcement guards, tRPC API, validation, authority
+resolution, audit logging, and 30 test cases.
+
+**Core Rule**: PM Central must NOT directly assign employees. All staffing flows through
+`resource_request` → `resource_assignment` with governed approval gates.
+
+**Created (9 files)**:
+- `drizzle/tables/workforce-assignment.ts` — resource_requests (16 cols) + resource_assignments (19 cols) tables
+- `drizzle/0027_workforce_assignment_bridge.sql` — SQL migration with indexes
+- `server/workforce-assignment/lifecycle.ts` — state machine (REQUEST_TRANSITIONS, ASSIGNMENT_TRANSITIONS)
+- `server/workforce-assignment/enforcement.ts` — governed flow validation, self-approval prevention, allocation overflow
+- `server/workforce-assignment/authority.ts` — transitional OM resolver (role-based, marked for replacement)
+- `server/workforce-assignment/validation.ts` — employee eligibility via HR profiles + skills
+- `server/workforce-assignment/audit.ts` — bridge audit wrapping logHrAudit
+- `server/workforce-assignment/router.ts` — full tRPC API (687 lines): request, hrValidation, approval, assignment sub-routers
+- `server/workforce-assignment/__tests__/bridge.test.ts` — 30 test cases
+
+**Modified (3 files)**:
+- `drizzle/schema.ts` — export workforce-assignment tables
+- `server/routers.ts` — register workforceAssignment router
+- `drizzle/meta/_journal.json` — migration 0027 entry
+
+**Key Design Decisions**:
+- All mutations use `governedProcedure` (freeze check + action key + governance receipt)
+- Request statuses: draft → requested → under_hr_review → candidate_proposed → pending_approval → approved/rejected/cancelled
+- Assignment statuses: pending → active → released/completed/cancelled
+- Authority resolution is TEMPORARY — marked with `_transitional: true` and `_omDependency`
+- Self-approval explicitly blocked (separation of duties)
+- Allocation overflow detection (>100% across all active assignments)
+
+---
+
+## Phase 5 — Workspace Integration (Read-Only)
+
+**Commit**: `7d05d3a` (combined with Phase 4)
+
+**Purpose**: Make workspace consume bridge assignments as read-only data.
+Workspace reflects real assignments — never writes to assignment tables.
+
+**Created (2 files)**:
+- `server/workspace/assignment-resolver.ts` — resolves assignments from resource_assignments bridge, detects over-allocation conflicts, returns WorkspaceStaffingView
+- `server/workspace/__tests__/assignment-resolver.test.ts` — 10 test cases (contract, governance, lifecycle, conflict detection)
+
+**Modified (2 files)**:
+- `server/workspace/workspace-router.ts` — added `staffing` sub-router with query-only endpoints (resolve, pendingRequests)
+- `server/workspace/shell-view-resolver.ts` — extended ShellView with staffing summary (assignmentCount, hasConflicts, bridgeConnected), added resolveStaffingSummary helper
+
+**Key Design Decisions**:
+- Workspace is READ-ONLY for staffing data — no write exports, no .mutation() endpoints
+- Graceful fallback: returns empty view when DB unavailable or tables don't exist
+- Links workspace to project via purposeRef or wizardMeta.anchorRef
+- Default filter: only "pending" and "active" assignments (released/completed opt-in)
+
+---
+
+## Git History (This Session)
+
+```
+7d05d3a feat(bridge): implement workforce assignment bridge runtime + workspace integration
+36fa67d chore: add remaining uncommitted files (vite config, governance artifacts, workspace docs)
+2a615c1 docs(governance): add workforce assignment bridge pack and lock HR/PM ownership boundaries
+```
+
+## Environment Notes
+
+- Recurring `/tmp` EACCES permission errors in Termux sandbox — fixed with mkdir workarounds
+- Glob/Grep tools had ENOENT for ripgrep binary — fell back to Bash ls/grep
+- git push rejected once due to remote ahead — fixed with git stash + pull --rebase + stash pop
+
+## Stats
+
+| Metric | Count |
+|--------|-------|
+| New files created | 19 |
+| Existing files modified | 7 |
+| Lines added | ~2,500+ |
+| Test cases | 40 (30 bridge + 10 workspace) |
+| Runtime files changed | 0 (Phase 3), 12 (Phase 4+5) |
+| Commits | 3 |
