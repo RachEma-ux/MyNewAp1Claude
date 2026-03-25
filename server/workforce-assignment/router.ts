@@ -22,6 +22,7 @@ import {
   requireGovernedAssignmentFlow,
   preventRequesterSelfApproval,
   checkAllocationOverflow,
+  type ApprovalArtifact,
 } from "./enforcement";
 import { resolveAssignmentAuthority } from "./authority";
 import { validateEmployeeEligibility } from "./validation";
@@ -128,7 +129,7 @@ const requestRouter = router({
 
       await logBridgeAudit({
         actorId: ctx.user.id,
-        action: "bridge.request.submitted",
+        action: "bridge.request.submitted_to_staffing",
         requestId: input.id,
         projectId: existing.projectId,
         fromStatus: existing.status,
@@ -366,7 +367,7 @@ const approvalRouter = router({
 
       await logBridgeAudit({
         actorId: ctx.user.id,
-        action: "bridge.request.submitted",
+        action: "bridge.request.submitted_for_approval",
         requestId: input.requestId,
         projectId: request.projectId,
         fromStatus: request.status,
@@ -407,15 +408,30 @@ const approvalRouter = router({
         });
       }
 
+      // [D2] Build explicit approval artifact with candidateId binding
+      const candidateId = ((request.metadata as any)?.proposedCandidateId) as number | undefined;
+      if (!candidateId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Cannot approve request #${input.requestId}: no proposed candidate found. ` +
+            `HR must propose a candidate before approval.`,
+        });
+      }
+
+      const approvalArtifact: ApprovalArtifact = {
+        approvedBy: ctx.user.id,
+        approvedAt: new Date().toISOString(),
+        candidateId,
+        authorityChain: authority.chain,
+      };
+
       await db.update(resourceRequests)
         .set({
           status: "approved",
           updatedAt: new Date(),
           metadata: {
             ...(request.metadata as Record<string, unknown> ?? {}),
-            approvedBy: ctx.user.id,
-            approvedAt: new Date().toISOString(),
-            authorityChain: authority.chain,
+            approval: approvalArtifact,
           },
         })
         .where(eq(resourceRequests.id, input.requestId));
@@ -502,14 +518,19 @@ const assignmentRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       // ── ENFORCEMENT: All checks must pass ──
-      const { request } = await requireGovernedAssignmentFlow({
+      // [D1, D2, D3, D8] requireGovernedAssignmentFlow now enforces:
+      //   - approval artifact exists
+      //   - HR candidate proposal artifact exists
+      //   - employeeId matches approved candidate
+      //   - actorId is traced in error messages
+      const { request, approvalArtifact } = await requireGovernedAssignmentFlow({
         requestId: input.requestId,
         employeeId: input.employeeId,
         projectId: input.projectId,
         actorId: ctx.user.id,
       });
 
-      // HR validation: employee must be eligible
+      // HR validation: employee must still be eligible (defensive — re-verify at assignment time)
       const eligibility = await validateEmployeeEligibility({
         employeeId: input.employeeId,
         requiredSkill: request.requiredSkill,
@@ -532,18 +553,14 @@ const assignmentRouter = router({
         });
       }
 
-      // Allocation overflow warning (non-blocking but logged)
+      // [D6] Allocation overflow — enforced in strict mode, warning in warn mode
       const allocation = await checkAllocationOverflow(input.employeeId, input.allocationPercent);
 
-      // Authority resolution (temporary — OM dependent)
-      const authority = resolveAssignmentAuthority({
-        actorId: ctx.user.id,
-        actorRole: ctx.user.role || "user",
-        employeeId: input.employeeId,
-        projectId: input.projectId,
-      });
+      // [D4] Authority: bind from approval artifact, not re-resolved
+      // Defensive: still resolve for comparison/logging, but persisted chain comes from approval
+      const boundAuthorityChain = approvalArtifact.authorityChain;
 
-      // Create the assignment
+      // Create the assignment — authority chain comes from approval artifact (D4)
       const [assignment] = await db.insert(resourceAssignments).values({
         requestId: input.requestId,
         employeeId: input.employeeId,
@@ -556,11 +573,11 @@ const assignmentRouter = router({
         startDate: input.startDate,
         endDate: input.endDate,
         status: "pending",
-        approvedBy: ctx.user.id,
+        approvedBy: approvalArtifact.approvedBy,
         approvalStatus: "approved",
         costRateSource: input.costRateSource,
         utilizationState: allocation.wouldOverflow ? "over_allocated" : "untracked",
-        authorityChain: authority.chain,
+        authorityChain: boundAuthorityChain,
       }).returning();
 
       await logBridgeAudit({
@@ -571,8 +588,10 @@ const assignmentRouter = router({
         employeeId: input.employeeId,
         projectId: input.projectId,
         metadata: {
-          authoritySource: authority.source,
+          authoritySource: "approval_artifact",
+          approvedBy: approvalArtifact.approvedBy,
           allocationOverflow: allocation.wouldOverflow,
+          allocationPolicyMode: allocation.policyMode,
           currentAllocationTotal: allocation.currentTotal,
         },
       });

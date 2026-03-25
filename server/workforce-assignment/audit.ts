@@ -10,7 +10,8 @@ import { logHrAudit } from "../hr/audit";
 export type BridgeAuditAction =
   | "bridge.request.created"
   | "bridge.request.updated"
-  | "bridge.request.submitted"
+  | "bridge.request.submitted_to_staffing"    // D5: request submitted into staffing flow (draft → requested)
+  | "bridge.request.submitted_for_approval"   // D5: submitted for approval (candidate_proposed → pending_approval)
   | "bridge.request.cancelled"
   | "bridge.request.hr_review_started"
   | "bridge.candidate.validated"
@@ -22,7 +23,9 @@ export type BridgeAuditAction =
   | "bridge.assignment.released"
   | "bridge.assignment.completed"
   | "bridge.assignment.cancelled"
-  | "bridge.enforcement.blocked";
+  | "bridge.enforcement.blocked"
+  | "bridge.enforcement.candidate_binding_violation"
+  | "bridge.enforcement.allocation_overflow_blocked";
 
 export interface BridgeAuditParams {
   actorId: number;

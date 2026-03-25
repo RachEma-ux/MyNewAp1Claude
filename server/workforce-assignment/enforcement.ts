@@ -12,6 +12,62 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../db/connection";
 import { resourceRequests, resourceAssignments } from "../../drizzle/schema";
 
+// ============================================================================
+// Allocation Policy Configuration
+// ============================================================================
+
+/**
+ * Allocation overflow policy mode.
+ * - "warn": log warning but allow assignment (current default)
+ * - "strict": block assignment creation when allocation exceeds 100%
+ */
+export type AllocationPolicyMode = "warn" | "strict";
+
+/**
+ * Default allocation policy. Set to "warn" for backward compatibility.
+ * Change to "strict" to enforce hard allocation limits.
+ */
+export const ALLOCATION_POLICY_DEFAULT: AllocationPolicyMode = "warn";
+
+/** Runtime-overridable allocation policy. Tests and config can set this. */
+let _allocationPolicyMode: AllocationPolicyMode = ALLOCATION_POLICY_DEFAULT;
+
+export function setAllocationPolicyMode(mode: AllocationPolicyMode): void {
+  _allocationPolicyMode = mode;
+}
+
+export function getAllocationPolicyMode(): AllocationPolicyMode {
+  return _allocationPolicyMode;
+}
+
+// ============================================================================
+// Approval Artifact Shape
+// ============================================================================
+
+/**
+ * Explicit approval artifact stored on a request's metadata.
+ * This is the binding source of truth for assignment creation.
+ */
+export interface ApprovalArtifact {
+  approvedBy: number;
+  approvedAt: string;
+  candidateId: number;
+  authorityChain: Record<string, unknown>;
+}
+
+/**
+ * HR candidate proposal artifact stored on a request's metadata.
+ */
+export interface CandidateProposalArtifact {
+  proposedCandidateId: number;
+  proposedBy: number;
+  proposedAt: string;
+}
+
+// ============================================================================
+// Pre-check Contract
+// ============================================================================
+
 export interface AssignmentPreCheck {
   requestId: number;
   employeeId: number;
@@ -25,13 +81,21 @@ export interface AssignmentPreCheck {
  * Blocks:
  * - Assignment without approved request
  * - Assignment from non-approved request
- * - Assignment without HR validation (request must be past under_hr_review)
+ * - Assignment without HR candidate proposal artifact (D3)
+ * - Assignment without approval artifact (D2)
+ * - Assignment where employeeId != approved candidate (D1)
  * - Duplicate active assignment for same request
  * - Overlapping active assignments for same employee + project + time range
+ *
+ * Uses actorId for enforcement audit trace (D8).
  */
 export async function requireGovernedAssignmentFlow(
   check: AssignmentPreCheck,
-): Promise<{ request: typeof resourceRequests.$inferSelect }> {
+): Promise<{
+  request: typeof resourceRequests.$inferSelect;
+  approvalArtifact: ApprovalArtifact;
+  candidateProposal: CandidateProposalArtifact;
+}> {
   const db = getDb();
   if (!db) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -68,7 +132,39 @@ export async function requireGovernedAssignmentFlow(
     });
   }
 
-  // 4. No duplicate active assignment for this request
+  const metadata = (request.metadata ?? {}) as Record<string, unknown>;
+
+  // 4. [D3] HR candidate proposal artifact must exist
+  const candidateProposal = extractCandidateProposal(metadata);
+  if (!candidateProposal) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: `Resource request #${check.requestId} is missing HR candidate proposal artifact. ` +
+        `An HR-validated candidate must be proposed before assignment creation. Actor: #${check.actorId}`,
+    });
+  }
+
+  // 5. [D2] Approval artifact must exist
+  const approvalArtifact = extractApprovalArtifact(metadata);
+  if (!approvalArtifact) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: `Resource request #${check.requestId} is missing approval artifact. ` +
+        `Request must have a formal approval record before assignment creation. Actor: #${check.actorId}`,
+    });
+  }
+
+  // 6. [D1] Candidate binding: employeeId MUST equal approved candidate
+  if (check.employeeId !== approvalArtifact.candidateId) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Candidate binding violation: assignment targets employee #${check.employeeId} ` +
+        `but approved candidate is #${approvalArtifact.candidateId}. ` +
+        `Assignment must match the approved candidate. Actor: #${check.actorId}`,
+    });
+  }
+
+  // 7. No duplicate active assignment for this request
   const [existingForRequest] = await db
     .select({ id: resourceAssignments.id })
     .from(resourceAssignments)
@@ -88,7 +184,7 @@ export async function requireGovernedAssignmentFlow(
     });
   }
 
-  // 5. No overlapping active assignments for same employee + project
+  // 8. No overlapping active assignments for same employee + project
   const [overlap] = await db
     .select({ id: resourceAssignments.id })
     .from(resourceAssignments)
@@ -109,7 +205,65 @@ export async function requireGovernedAssignmentFlow(
     });
   }
 
-  return { request };
+  return { request, approvalArtifact, candidateProposal };
+}
+
+// ============================================================================
+// Artifact Extractors
+// ============================================================================
+
+/**
+ * Extract and validate the approval artifact from request metadata.
+ * Returns null if the artifact is missing or structurally invalid.
+ */
+export function extractApprovalArtifact(
+  metadata: Record<string, unknown>,
+): ApprovalArtifact | null {
+  const approval = metadata.approval as Record<string, unknown> | undefined;
+  if (!approval) return null;
+
+  const { approvedBy, approvedAt, candidateId, authorityChain } = approval;
+  if (
+    typeof approvedBy !== "number" ||
+    typeof approvedAt !== "string" ||
+    typeof candidateId !== "number" ||
+    !authorityChain || typeof authorityChain !== "object"
+  ) {
+    return null;
+  }
+
+  return {
+    approvedBy: approvedBy as number,
+    approvedAt: approvedAt as string,
+    candidateId: candidateId as number,
+    authorityChain: authorityChain as Record<string, unknown>,
+  };
+}
+
+/**
+ * Extract and validate the HR candidate proposal artifact from request metadata.
+ * Returns null if the artifact is missing or structurally invalid.
+ */
+export function extractCandidateProposal(
+  metadata: Record<string, unknown>,
+): CandidateProposalArtifact | null {
+  const proposedCandidateId = metadata.proposedCandidateId;
+  const proposedBy = metadata.proposedBy;
+  const proposedAt = metadata.proposedAt;
+
+  if (
+    typeof proposedCandidateId !== "number" ||
+    typeof proposedBy !== "number" ||
+    typeof proposedAt !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    proposedCandidateId: proposedCandidateId as number,
+    proposedBy: proposedBy as number,
+    proposedAt: proposedAt as string,
+  };
 }
 
 /**
@@ -131,13 +285,17 @@ export function preventRequesterSelfApproval(
 /**
  * Check total allocation for an employee across active assignments.
  * Returns current total and whether adding more would exceed 100%.
+ *
+ * In "strict" mode, throws a hard error if overflow is detected.
+ * In "warn" mode (default), returns the result without blocking.
  */
 export async function checkAllocationOverflow(
   employeeId: number,
   additionalPercent: number,
-): Promise<{ currentTotal: number; wouldOverflow: boolean }> {
+): Promise<{ currentTotal: number; wouldOverflow: boolean; policyMode: AllocationPolicyMode }> {
   const db = getDb();
-  if (!db) return { currentTotal: 0, wouldOverflow: false };
+  const mode = getAllocationPolicyMode();
+  if (!db) return { currentTotal: 0, wouldOverflow: false, policyMode: mode };
 
   const [result] = await db
     .select({
@@ -152,8 +310,20 @@ export async function checkAllocationOverflow(
     );
 
   const currentTotal = Number(result?.total ?? 0);
+  const wouldOverflow = currentTotal + additionalPercent > 100;
+
+  // [D6] Strict mode: block assignment if allocation would overflow
+  if (wouldOverflow && mode === "strict") {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `Allocation overflow blocked (strict mode): employee #${employeeId} ` +
+        `current allocation is ${currentTotal}%, adding ${additionalPercent}% would exceed 100%.`,
+    });
+  }
+
   return {
     currentTotal,
-    wouldOverflow: currentTotal + additionalPercent > 100,
+    wouldOverflow,
+    policyMode: mode,
   };
 }
