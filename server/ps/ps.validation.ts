@@ -238,6 +238,112 @@ export const getActiveMatrixQuestionsSchema = z.object({
   workspaceId: z.number().int().positive(),
 });
 
+// ── Matrix Admin ──────────────────────────────────────────────────
+
+export const getMatrixOverviewSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
+export const duplicateMatrixVersionSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  sourceVersionId: z.number().int().positive(),
+  newVersion: z.string().min(1).max(50),
+  newLabel: z.string().min(1).max(255),
+});
+
+export const archiveMatrixVersionSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
+export const updateMatrixScopeSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  id: z.number().int().positive(),
+  code: z.string().min(1).max(100).optional(),
+  label: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).optional(),
+  family: z.string().max(100).optional(),
+  isActive: z.number().int().min(0).max(1).optional(),
+});
+
+export const updateMatrixQuestionSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  id: z.number().int().positive(),
+  code: z.string().min(1).max(100).optional(),
+  label: z.string().min(1).max(500).optional(),
+  description: z.string().max(2000).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+  isActive: z.number().int().min(0).max(1).optional(),
+});
+
+export const reorderMatrixQuestionsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  orderedIds: z.array(z.number().int().positive()).min(1).max(500),
+});
+
+export const upsertMatrixCellSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  questionId: z.number().int().positive(),
+  scopeId: z.number().int().positive(),
+  weight: z.number().int(),
+});
+
+export const bulkUpsertMatrixCellsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  items: z.array(z.object({
+    questionId: z.number().int().positive(),
+    scopeId: z.number().int().positive(),
+    weight: z.number().int(),
+  })).min(1).max(5000),
+});
+
+export const getMatrixValidationReportSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+});
+
+export const previewMatrixImportSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  sourceType: z.enum(["json", "excel", "manual"]).default("json"),
+  sourceName: z.string().max(255).optional(),
+  payload: z.object({
+    scopes: z.array(z.object({
+      code: z.string().min(1).max(100),
+      label: z.string().min(1).max(255),
+      description: z.string().max(2000).optional(),
+      family: z.string().max(100).optional(),
+    })).min(1).max(200),
+    questions: z.array(z.object({
+      code: z.string().min(1).max(100),
+      label: z.string().min(1).max(500),
+      description: z.string().max(2000).optional(),
+      sortOrder: z.number().int().min(0).optional(),
+    })).min(1).max(500),
+    cells: z.array(z.object({
+      questionCode: z.string().min(1).max(100),
+      scopeCode: z.string().min(1).max(100),
+      weight: z.number().int(),
+    })).min(1).max(10000),
+  }),
+});
+
+export const commitMatrixImportSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  importId: z.number().int().positive(),
+  targetVersionId: z.number().int().positive().optional(),
+  newVersion: z.string().min(1).max(50).optional(),
+  newLabel: z.string().min(1).max(255).optional(),
+});
+
+export const listMatrixImportsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
 // ── Classification ──────────────────────────────────────────────────
 
 export const classifyScenarioSchema = z.object({

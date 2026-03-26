@@ -4,7 +4,7 @@
  * All DB access for PS domain. No business logic.
  */
 
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, count } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import {
   psSystems,
@@ -16,6 +16,7 @@ import {
   psScopeRegistry,
   psMatrixQuestions,
   psMatrixCells,
+  psMatrixImports,
   type PsSystem,
   type InsertPsSystem,
   type PsWizardRun,
@@ -33,6 +34,8 @@ import {
   type InsertPsMatrixQuestion,
   type PsMatrixCell,
   type InsertPsMatrixCell,
+  type PsMatrixImport,
+  type InsertPsMatrixImport,
 } from "../../drizzle/tables/ps";
 
 // ── Systems ──────────────────────────────────────────────────────────────
