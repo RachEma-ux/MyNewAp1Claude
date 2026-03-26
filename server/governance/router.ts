@@ -32,6 +32,7 @@ import { evaluatePublication } from "./publication-gate";
 import {
   validateTransition,
   getStageFromTags,
+  getTagForStage,
   canTransitionFromTags,
   LIFECYCLE_STAGES,
 } from "./lifecycle-guard";
@@ -587,6 +588,20 @@ export const governanceRouter = router({
           code: "CONFLICT",
           message: `Stage review for "${targetStage}" has not been approved yet. Complete the review before transitioning.`,
         });
+      }
+
+      // Idempotency: if the entry is already at (or past) the target stage,
+      // return success without re-running the lifecycle guard. This handles
+      // entries where the tag was already propagated by a prior approve action.
+      const currentStage = getStageFromTags(entry.tags);
+      const targetTag = getTagForStage(targetStage);
+      if (currentStage === targetStage || (targetTag && entry.tags.includes(targetTag))) {
+        return {
+          allowed: true,
+          newTags: entry.tags,
+          stageReview: { passed: true, score: 100, items: [], blockers: [], stage: targetStage },
+          reason: `Entry is already at stage "${targetStage}" — no transition needed`,
+        };
       }
 
       const result = await executeStageTransition(entry, targetStage, actor);

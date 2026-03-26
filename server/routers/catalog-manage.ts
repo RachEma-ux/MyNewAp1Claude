@@ -684,14 +684,12 @@ export const catalogManageRouter = router({
 
       // When register stage is approved, also flip top-level reviewState to "approved"
       // so the entry becomes eligible for activation (activate requires reviewState === "approved")
+      // NOTE: Do NOT add lifecycle tags ("registered", "validated", "published") here.
+      // Tag propagation happens ONLY via governance.stageTransition to avoid
+      // advancing the lifecycle stage before the explicit transition is requested.
       const updates: Record<string, any> = { stageReviews: updatedStageReviews };
       if (stage === "register") {
         updates.reviewState = "approved";
-        // Also propagate the "registered" tag
-        const currentTags = (entry.tags as string[]) || [];
-        if (!currentTags.includes("registered")) {
-          updates.tags = [...currentTags, "registered"];
-        }
       }
 
       await updateCatalogEntry(input.id, updates as any, 1);
