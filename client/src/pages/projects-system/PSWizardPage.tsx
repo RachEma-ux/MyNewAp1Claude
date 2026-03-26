@@ -42,6 +42,7 @@ export default function PSWizardPage() {
   const [answers, setAnswers] = useState<AnswerMap>({});
   const [overrideReason, setOverrideReason] = useState("");
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
+  const [createError, setCreateError] = useState("");
 
   const [parsingDone, setParsingDone] = useState(false);
   const [normalizedDimensions, setNormalizedDimensions] = useState<Record<string, string>>({
@@ -60,6 +61,7 @@ export default function PSWizardPage() {
   const classifyMutation = trpc.ps.classifyScenario.useMutation();
 
   // Real API: create PS project
+  const utils = trpc.useUtils();
   const createPSProject = trpc.ps.createPSProject.useMutation();
   const [, navigate] = useLocation();
 
@@ -118,6 +120,7 @@ export default function PSWizardPage() {
 
   async function handleCreateAndList() {
     if (!recommendation) return;
+    setCreateError("");
     try {
       await createPSProject.mutateAsync({
         name: generatedName || "Untitled Project",
@@ -128,9 +131,11 @@ export default function PSWizardPage() {
         answers,
         recommendation,
       });
+      await utils.ps.systems.list.invalidate();
       navigate("/ps/list");
-    } catch (err) {
-      console.error("Failed to create PS project:", err);
+    } catch (err: any) {
+      const msg = err?.message || "Failed to create PS project";
+      setCreateError(msg);
     }
   }
 
@@ -356,8 +361,13 @@ export default function PSWizardPage() {
 
               <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
                 <div>
-                  <div className="text-sm text-white/50">Project Name</div>
-                  <div className="font-semibold">{generatedName || "Auto-generated project name"}</div>
+                  <div className="text-sm text-white/50 mb-1">Project Name</div>
+                  <input
+                    value={generatedName}
+                    onChange={(e) => setGeneratedName(e.target.value)}
+                    placeholder="Enter project name"
+                    className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
+                  />
                 </div>
 
                 <div>
@@ -380,6 +390,12 @@ export default function PSWizardPage() {
                     <li>QA × 1</li>
                   </ul>
                 </div>
+
+                {createError && (
+                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                    {createError}
+                  </div>
+                )}
 
                 <button
                   type="button"

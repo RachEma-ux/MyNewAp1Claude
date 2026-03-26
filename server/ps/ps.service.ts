@@ -256,6 +256,8 @@ export async function createPSProject(input: {
   answers: Record<string, string>;
   recommendation: any;
 }, actorId: number) {
+  const baseName = input.name.trim() || "Untitled Project";
+
   // 1. Store wizard run for full traceability
   const wizardRun = await repo.createWizardRun({
     scenarioText: input.scenario,
@@ -270,14 +272,27 @@ export async function createPSProject(input: {
     createdBy: actorId,
   });
 
-  // 2. Create PS system record (shows up in PS List)
-  const system = await repo.createSystem({
-    name: input.name.trim() || "Untitled Project",
-    description: `Scope: ${input.scope} | Matrix: ${input.matrixVersion} | Wizard Run #${wizardRun.id}`,
+  // 2. Create PS system record — handle unique name constraint
+  const desc = `Scope: ${input.scope} | Matrix: ${input.matrixVersion} | Wizard Run #${wizardRun.id}`;
+  const sysData = {
     systemType: input.recommendation?.selectedScopeCode ?? "CUSTOM",
-    status: "draft",
+    status: "draft" as const,
     createdBy: actorId,
-  });
+  };
+
+  let system;
+  try {
+    system = await repo.createSystem({ name: baseName, description: desc, ...sysData });
+  } catch (firstErr: any) {
+    // Likely unique constraint on name — retry with suffix
+    const suffixedName = `${baseName} (#${wizardRun.id})`;
+    try {
+      system = await repo.createSystem({ name: suffixedName, description: desc, ...sysData });
+    } catch (secondErr: any) {
+      // Both failed — throw the original error
+      throw firstErr;
+    }
+  }
 
   await logPsAudit({
     actorId,
