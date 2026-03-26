@@ -517,3 +517,29 @@ export const psMatrixSimulations = pgTable("ps_matrix_simulations", {
 
 export type PsMatrixSimulation = typeof psMatrixSimulations.$inferSelect;
 export type InsertPsMatrixSimulation = typeof psMatrixSimulations.$inferInsert;
+
+// ============================================================================
+// 21. PS Wizard Overrides — User overrides of matrix recommendations
+// ============================================================================
+
+export const psWizardOverrides = pgTable("ps_wizard_overrides", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  wizardRunId: integer("wizard_run_id"),
+  recommendedScopeCode: varchar("recommended_scope_code", { length: 120 }).notNull(),
+  overriddenScopeCode: varchar("overridden_scope_code", { length: 120 }).notNull(),
+  reason: text("reason").notNull(),
+  recommendedConfidence: numeric("recommended_confidence", { precision: 5, scale: 2 }),
+  matrixVersion: varchar("matrix_version", { length: 50 }),
+  answersJson: json("answers_json").$type<Record<string, boolean | string | number>>(),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  wsIdx: index("ps_wizard_overrides_ws_idx").on(table.workspaceId),
+  wizardRunIdx: index("ps_wizard_overrides_run_idx").on(table.wizardRunId),
+  recommendedIdx: index("ps_wizard_overrides_recommended_idx").on(table.recommendedScopeCode),
+  overriddenIdx: index("ps_wizard_overrides_overridden_idx").on(table.overriddenScopeCode),
+}));
+
+export type PsWizardOverride = typeof psWizardOverrides.$inferSelect;
+export type InsertPsWizardOverride = typeof psWizardOverrides.$inferInsert;

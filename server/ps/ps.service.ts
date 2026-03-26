@@ -49,6 +49,11 @@ import {
   getAssignmentMetrics,
   getFulfillmentMetrics,
   getRecentActivity,
+  getOverrideRateMetrics,
+  getConfidenceTrends,
+  getScopeDistribution,
+  getDeadScopes,
+  getDeadQuestions,
   type MonitoringSummary,
 } from "./ps.monitoring";
 
@@ -1920,7 +1925,24 @@ export async function acceptWizardResult(
     assignmentPlaceholders.push(assignment);
   }
 
-  // 6. Audit trail
+  // 6. If override was applied, record it in the overrides table
+  if (input.overrideInfo) {
+    await overrideRecommendation(
+      {
+        workspaceId,
+        wizardRunId: wizardRun.id,
+        recommendedScopeCode: input.overrideInfo.scopeCode,
+        overriddenScopeCode: selectedScopeCode,
+        reason: input.overrideInfo.reason,
+        recommendedConfidence: input.confidence,
+        matrixVersion: input.matrixVersion,
+        answersJson: input.answers,
+      },
+      actorId,
+    );
+  }
+
+  // 7. Audit trail
   await logPsAudit({
     workspaceId,
     actorId,
@@ -1945,7 +1967,7 @@ export async function acceptWizardResult(
     targetId: system.id,
   });
 
-  // 7. Return full trace
+  // 8. Return full trace
   return {
     wizardRun: {
       id: wizardRun.id,
@@ -2217,14 +2239,78 @@ export async function getEvalRun(workspaceId: number, id: number) {
 // ── Monitoring ────────────────────────────────────────────────────────
 
 export async function getMonitoringSummary(workspaceId: number): Promise<MonitoringSummary> {
-  const [systems, wizard, demand, assignments, fulfillment, activity] = await Promise.all([
+  const [
+    systems, wizard, demand, assignments, fulfillment, activity,
+    overrideRate, confidenceTrends, scopeDistribution, deadScopes, deadQuestions,
+  ] = await Promise.all([
     getSystemMetrics(workspaceId),
     getWizardMetrics(workspaceId),
     getDemandMetrics(workspaceId),
     getAssignmentMetrics(workspaceId),
     getFulfillmentMetrics(workspaceId),
     getRecentActivity(workspaceId),
+    getOverrideRateMetrics(workspaceId),
+    getConfidenceTrends(workspaceId),
+    getScopeDistribution(workspaceId),
+    getDeadScopes(workspaceId),
+    getDeadQuestions(workspaceId),
   ]);
 
-  return { systems, wizard, demand, assignments, fulfillment, activity };
+  return {
+    systems, wizard, demand, assignments, fulfillment, activity,
+    overrideRate, confidenceTrends, scopeDistribution, deadScopes, deadQuestions,
+  };
+}
+
+// ── Overrides ─────────────────────────────────────────────────────────
+
+export async function overrideRecommendation(
+  input: {
+    workspaceId: number;
+    wizardRunId?: number;
+    recommendedScopeCode: string;
+    overriddenScopeCode: string;
+    reason: string;
+    recommendedConfidence?: number;
+    matrixVersion?: string;
+    answersJson?: Record<string, boolean | string | number>;
+  },
+  actorId: number,
+) {
+  const { recordOverride } = await import("./ps.override");
+  const created = await recordOverride(input, actorId);
+
+  await logPsAudit({
+    workspaceId: input.workspaceId,
+    actorId,
+    action: "wizard.override",
+    entityType: "ps_wizard_override",
+    entityId: created.id,
+    newValue: {
+      recommendedScope: input.recommendedScopeCode,
+      overriddenScope: input.overriddenScopeCode,
+      reason: input.reason,
+      wizardRunId: input.wizardRunId,
+    },
+  });
+  await logActivity({
+    workspaceId: input.workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "wizard.override",
+    targetType: "ps_wizard_override",
+    targetId: created.id,
+  });
+
+  return created;
+}
+
+export async function listOverrides(workspaceId: number) {
+  const { listOverrides: fetchOverrides } = await import("./ps.override");
+  return fetchOverrides(workspaceId);
+}
+
+export async function getOverridePatterns(workspaceId: number) {
+  const { getOverridePatterns: fetchPatterns } = await import("./ps.override");
+  return fetchPatterns(workspaceId);
 }

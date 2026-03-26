@@ -12,6 +12,11 @@ import {
   psWizardRuns,
   psResourceRequests,
   psResourceAssignments,
+  psMatrixVersions,
+  psScopeRegistry,
+  psMatrixQuestions,
+  psMatrixCells,
+  psWizardOverrides,
 } from "../../drizzle/tables/ps";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -61,6 +66,41 @@ export interface ActivityEntry {
   timestamp: string | null;
 }
 
+export interface OverrideRateMetrics {
+  totalWizardRuns: number;
+  totalOverrides: number;
+  overrideRate: number;
+  last30dOverrides: number;
+  last30dWizardRuns: number;
+  last30dOverrideRate: number;
+}
+
+export interface ConfidenceTrend {
+  period: string;  // e.g. "2026-03-W1"
+  avgConfidence: number;
+  runCount: number;
+}
+
+export interface ScopeDistributionEntry {
+  scopeCode: string;
+  count: number;
+  percent: number;
+}
+
+export interface DeadScopeEntry {
+  id: number;
+  code: string;
+  label: string;
+  reason: string;  // "never_selected" | "zero_weight_total" | "inactive"
+}
+
+export interface DeadQuestionEntry {
+  id: number;
+  code: string;
+  label: string;
+  reason: string;  // "all_zero_weights" | "never_answered" | "inactive"
+}
+
 export interface MonitoringSummary {
   systems: SystemMetrics;
   wizard: WizardMetrics;
@@ -68,6 +108,11 @@ export interface MonitoringSummary {
   assignments: AssignmentMetrics;
   fulfillment: FulfillmentMetrics;
   activity: ActivityEntry[];
+  overrideRate: OverrideRateMetrics;
+  confidenceTrends: ConfidenceTrend[];
+  scopeDistribution: ScopeDistributionEntry[];
+  deadScopes: DeadScopeEntry[];
+  deadQuestions: DeadQuestionEntry[];
 }
 
 // ── System Metrics ──────────────────────────────────────────────────────
@@ -298,4 +343,183 @@ export async function getRecentActivity(workspaceId: number): Promise<ActivityEn
   });
 
   return entries;
+}
+
+// ── Override Rate Metrics ─────────────────────────────────────────────
+
+export async function getOverrideRateMetrics(workspaceId: number): Promise<OverrideRateMetrics> {
+  const { getOverrideRate } = await import("./ps.override");
+  return getOverrideRate(workspaceId);
+}
+
+// ── Confidence Trends ─────────────────────────────────────────────────
+
+export async function getConfidenceTrends(workspaceId: number): Promise<ConfidenceTrend[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  // Weekly confidence averages for the last 12 weeks
+  const twelveWeeksAgo = new Date(Date.now() - 12 * 7 * 24 * 60 * 60 * 1000);
+
+  const rows = await db.select({
+    period: sql<string>`to_char(${psWizardRuns.createdAt}, 'IYYY-"W"IW')`,
+    avgConfidence: sql<string>`avg(${psWizardRuns.confidence}::numeric)`,
+    runCount: count(),
+  })
+  .from(psWizardRuns)
+  .where(and(
+    eq(psWizardRuns.workspaceId, workspaceId),
+    gte(psWizardRuns.createdAt, twelveWeeksAgo),
+  ))
+  .groupBy(sql`to_char(${psWizardRuns.createdAt}, 'IYYY-"W"IW')`)
+  .orderBy(sql`to_char(${psWizardRuns.createdAt}, 'IYYY-"W"IW')`);
+
+  return rows.map((r) => ({
+    period: r.period,
+    avgConfidence: r.avgConfidence ? Math.round(Number(r.avgConfidence) * 100) / 100 : 0,
+    runCount: Number(r.runCount),
+  }));
+}
+
+// ── Scope Distribution ────────────────────────────────────────────────
+
+export async function getScopeDistribution(workspaceId: number): Promise<ScopeDistributionEntry[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  const rows = await db.select({
+    scopeCode: psWizardRuns.selectedSystemType,
+    cnt: count(),
+  })
+  .from(psWizardRuns)
+  .where(eq(psWizardRuns.workspaceId, workspaceId))
+  .groupBy(psWizardRuns.selectedSystemType)
+  .orderBy(desc(count()));
+
+  const total = rows.reduce((sum, r) => sum + Number(r.cnt), 0);
+
+  return rows
+    .filter((r) => r.scopeCode)
+    .map((r) => ({
+      scopeCode: r.scopeCode!,
+      count: Number(r.cnt),
+      percent: total > 0
+        ? Math.round((Number(r.cnt) / total) * 10000) / 100
+        : 0,
+    }));
+}
+
+// ── Dead Scopes ──────────────────────────────────────────────────────
+
+export async function getDeadScopes(workspaceId: number): Promise<DeadScopeEntry[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  // Get active matrix version
+  const [activeVersion] = await db.select()
+    .from(psMatrixVersions)
+    .where(and(
+      eq(psMatrixVersions.workspaceId, workspaceId),
+      eq(psMatrixVersions.status, "active"),
+    ))
+    .limit(1);
+
+  if (!activeVersion) return [];
+
+  // Get all scopes for active version
+  const scopes = await db.select()
+    .from(psScopeRegistry)
+    .where(eq(psScopeRegistry.versionId, activeVersion.id));
+
+  // Get cells for active version
+  const cells = await db.select()
+    .from(psMatrixCells)
+    .where(eq(psMatrixCells.versionId, activeVersion.id));
+
+  // Get all wizard runs with selected system types
+  const wizardRuns = await db.select({ scopeCode: psWizardRuns.selectedSystemType })
+    .from(psWizardRuns)
+    .where(eq(psWizardRuns.workspaceId, workspaceId));
+
+  const selectedScopes = new Set(wizardRuns.map((r) => r.scopeCode).filter(Boolean));
+
+  // Build weight sum per scope
+  const weightByScopeId = new Map<number, number>();
+  for (const cell of cells) {
+    const current = weightByScopeId.get(cell.scopeId) ?? 0;
+    weightByScopeId.set(cell.scopeId, current + Math.abs(cell.weight));
+  }
+
+  const deadScopes: DeadScopeEntry[] = [];
+
+  for (const scope of scopes) {
+    if (scope.isActive === 0) {
+      deadScopes.push({ id: scope.id, code: scope.code, label: scope.label, reason: "inactive" });
+      continue;
+    }
+
+    const totalWeight = weightByScopeId.get(scope.id) ?? 0;
+    if (totalWeight === 0) {
+      deadScopes.push({ id: scope.id, code: scope.code, label: scope.label, reason: "zero_weight_total" });
+      continue;
+    }
+
+    if (!selectedScopes.has(scope.code)) {
+      deadScopes.push({ id: scope.id, code: scope.code, label: scope.label, reason: "never_selected" });
+    }
+  }
+
+  return deadScopes;
+}
+
+// ── Dead Questions ───────────────────────────────────────────────────
+
+export async function getDeadQuestions(workspaceId: number): Promise<DeadQuestionEntry[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  // Get active matrix version
+  const [activeVersion] = await db.select()
+    .from(psMatrixVersions)
+    .where(and(
+      eq(psMatrixVersions.workspaceId, workspaceId),
+      eq(psMatrixVersions.status, "active"),
+    ))
+    .limit(1);
+
+  if (!activeVersion) return [];
+
+  // Get all questions for active version
+  const { psMatrixQuestions: questionsTable } = await import("../../drizzle/tables/ps");
+  const questions = await db.select()
+    .from(questionsTable)
+    .where(eq(questionsTable.versionId, activeVersion.id));
+
+  // Get cells for active version
+  const cells = await db.select()
+    .from(psMatrixCells)
+    .where(eq(psMatrixCells.versionId, activeVersion.id));
+
+  // Build weight sum per question
+  const weightByQuestionId = new Map<number, number>();
+  for (const cell of cells) {
+    const current = weightByQuestionId.get(cell.questionId) ?? 0;
+    weightByQuestionId.set(cell.questionId, current + Math.abs(cell.weight));
+  }
+
+  const deadQuestions: DeadQuestionEntry[] = [];
+
+  for (const q of questions) {
+    if (q.isActive === 0) {
+      deadQuestions.push({ id: q.id, code: q.code, label: q.label, reason: "inactive" });
+      continue;
+    }
+
+    const totalWeight = weightByQuestionId.get(q.id) ?? 0;
+    if (totalWeight === 0) {
+      deadQuestions.push({ id: q.id, code: q.code, label: q.label, reason: "all_zero_weights" });
+    }
+  }
+
+  return deadQuestions;
 }

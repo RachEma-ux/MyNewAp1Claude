@@ -700,6 +700,27 @@ export const getEvalRunSchema = z.object({
   id: z.number().int().positive(),
 });
 
+// ── Overrides ───────────────────────────────────────────────────────
+
+export const overrideRecommendationSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  wizardRunId: z.number().int().positive().optional(),
+  recommendedScopeCode: z.string().min(1).max(120),
+  overriddenScopeCode: z.string().min(1).max(120),
+  reason: z.string().min(1).max(2000),
+  recommendedConfidence: z.number().min(0).max(100).optional(),
+  matrixVersion: z.string().max(50).optional(),
+  answersJson: z.record(z.union([z.boolean(), z.string(), z.number()])).optional(),
+});
+
+export const listOverridesSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
+export const getOverridePatternsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
 // ── Classification ──────────────────────────────────────────────────
 
 export const classifyScenarioSchema = z.object({

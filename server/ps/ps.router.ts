@@ -87,6 +87,10 @@ import {
   runEvaluationSuiteSchema,
   listEvalRunsSchema,
   getEvalRunSchema,
+  // Override schemas
+  overrideRecommendationSchema,
+  listOverridesSchema,
+  getOverridePatternsSchema,
   // Dimension schemas
   listDimensionsSchema,
   createDimensionSchema,
@@ -894,6 +898,28 @@ const evaluationRouter = router({
     }),
 });
 
+// ── Overrides Router ──────────────────────────────────────────────────
+
+const overridesRouter = router({
+  record: governedProcedure
+    .input(overrideRecommendationSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.overrideRecommendation(input, ctx.user.id);
+    }),
+
+  list: protectedProcedure
+    .input(listOverridesSchema)
+    .query(async ({ input }) => {
+      return service.listOverrides(input.workspaceId);
+    }),
+
+  patterns: protectedProcedure
+    .input(getOverridePatternsSchema)
+    .query(async ({ input }) => {
+      return service.getOverridePatterns(input.workspaceId);
+    }),
+});
+
 export const psRouter = router({
   systems: systemsRouter,
   wizardRuns: wizardRunsRouter,
@@ -903,6 +929,7 @@ export const psRouter = router({
   matrix: matrixRouter,
   simulation: simulationRouter,
   evaluation: evaluationRouter,
+  overrides: overridesRouter,
 
   classifyScenario: protectedProcedure
     .input(classifyScenarioSchema)
