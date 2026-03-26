@@ -1,0 +1,51 @@
+Session Summary — 2026-03-26 23:30
+====================================
+
+## Focus: PS Wizard → List Pipeline Fixes
+
+### Commits (all pushed to main)
+
+1. ed1492f — feat: enforce PS naming policy — auto-create, admin-rename, transactional
+   - Transactional createPSProject (wizard run + system in one tx)
+   - resolveUniqueName: auto-suffix 2, 3... for duplicates
+   - Admin rename mutation (ps.systems.updateName) with CONFLICT check
+   - InlineRename component in PSListPage (hover pencil, Enter/Escape)
+   - Governance registration (action-key-map + platform_action_registry.yaml)
+   - Wizard Step 5 name field made read-only
+
+2. 119608e — fix: wizard create — use scopeCode not label, add error visibility
+   - scope field was sending label string (could be null → "" → validation fail)
+   - Now sends selectedScopeCode first
+   - Missing recommendation shows visible error instead of silent return
+
+3. 8931d4a — fix: derive project name from scenario text instead of hardcoded mock
+   - runAutomaticProcessing always set "Customer Support Platform Modernization"
+   - Now extracts first sentence of user's scenario (max 80 chars)
+
+4. 9dd19fb — fix: list endpoint rejected undefined input — systems never displayed
+   - ROOT CAUSE: PSListPage called useQuery() with no args → undefined input
+   - listSystemsSchema was z.object({...}) which rejects undefined
+   - Added .optional().default({}) so undefined is accepted
+   - This was why "no new entry in list" — list query always silently failed
+
+### Files Changed (across all commits)
+- server/ps/ps.validation.ts — listSystemsSchema accepts undefined
+- server/ps/ps.service.ts — transactional createPSProject, updatePSProjectName
+- server/ps/ps.repository.ts — getSystemByName, updateSystemName
+- server/ps/ps.router.ts — systems.updateName endpoint, optional input handling
+- server/governance/action-key-map.ts — ps.systems.updateName mapping
+- config/governance/platform_action_registry.yaml — ps.system.update action
+- client/src/pages/projects-system/PSWizardPage.tsx — read-only name, scenario-derived name, scopeCode fix
+- client/src/pages/projects-system/PSListPage.tsx — InlineRename component
+
+### Key Debugging Insights
+- Backend API worked perfectly via curl — all creates succeeded
+- The list endpoint silently failed due to Zod validation mismatch (undefined vs object)
+- tRPC useQuery() with no args sends undefined, not {}
+- Fix pattern: add .optional().default({}) to any schema used by a no-arg useQuery()
+- Governance requires BOTH action-key-map.ts AND platform_action_registry.yaml entries
+
+### Repo State
+- Branch: main, fully pushed, working tree clean
+- Dev server running on localhost:3000
+- DB has test entries (can be cleaned with DELETE FROM ps_wizard_runs; DELETE FROM ps_systems;)
