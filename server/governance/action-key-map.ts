@@ -367,6 +367,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "ps.wizardRuns.create": "ps.wizardRun.create",
   "ps.demand.create": "ps.demand.create",
   "ps.demand.updateStatus": "ps.demand.updateStatus",
+  "ps.demand.generateForSystem": "ps.demand.generate",
 
   // ── Modules (Engine Binding) ─────────────────────────────────────────────
   "modules.manage.setEnabled": "module.setEnabled",

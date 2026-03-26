@@ -692,7 +692,7 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
         isFinalStep={currentStep === STEPS.length - 1}
         canPublish={!!classification && !isPublished}
         onPublish={handlePublish}
-        isSaving={createRunMut.isPending}
+        isSaving={createSystemMut.isPending || createRunMut.isPending}
       >
         {renderStep()}
       </ModuleWizardShell>

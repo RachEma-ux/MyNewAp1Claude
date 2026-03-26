@@ -96,6 +96,18 @@ const demandRouter = router({
     .query(async ({ input }) => {
       return service.getDemandSummary(input.workspaceId, input.psSystemId);
     }),
+
+  generateForSystem: governedProcedure
+    .input(getDemandSummarySchema)
+    .mutation(async ({ ctx, input }) => {
+      const system = await service.getSystem(input.workspaceId, input.psSystemId);
+      return service.generateDemandForSystem(
+        input.workspaceId,
+        input.psSystemId,
+        system.systemType,
+        ctx.user.id,
+      );
+    }),
 });
 
 export const psRouter = router({
