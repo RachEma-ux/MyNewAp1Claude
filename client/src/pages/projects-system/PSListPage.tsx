@@ -1,10 +1,10 @@
 /**
- * PS List — Systems list with demand counts (real data from tRPC)
+ * PS List — Systems list with demand and assignment-facing visibility (real data from tRPC)
  */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { ClipboardList, Loader2, Users, FolderOpen } from "lucide-react";
+import { ClipboardList, Loader2, Users, FolderOpen, UserCheck } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-green-500/10 text-green-600 border-green-500/30",
@@ -30,29 +30,43 @@ function DemandBadge({ workspaceId, psSystemId }: { workspaceId: number; psSyste
     return <Badge variant="outline" className="text-xs text-muted-foreground">No demand</Badge>;
   }
 
-  const open = summary.byStatus.draft + summary.byStatus.open;
-  const filled = summary.byStatus.filled;
-  const partial = summary.byStatus.partially_filled;
+  return (
+    <Badge variant="secondary" className="text-xs">
+      <Users className="w-3 h-3 mr-1" />
+      {summary.totalRequests} requests / {summary.totalQuantity} headcount
+    </Badge>
+  );
+}
+
+function AssignmentBadge({ workspaceId, psSystemId }: { workspaceId: number; psSystemId: number }) {
+  const { data: summary } = trpc.ps.assignments.summary.useQuery(
+    { workspaceId, psSystemId },
+    { staleTime: 30_000 },
+  );
+
+  if (!summary || summary.totalRequests === 0) {
+    return <span className="text-xs text-muted-foreground">--</span>;
+  }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5 flex-wrap">
       <Badge variant="secondary" className="text-xs">
-        <Users className="w-3 h-3 mr-1" />
-        {summary.totalQuantity} headcount
+        <UserCheck className="w-3 h-3 mr-1" />
+        {summary.totalAssignments} assigned
       </Badge>
-      {open > 0 && (
+      {summary.unfilledRequests > 0 && (
+        <Badge className="text-xs bg-red-500/10 text-red-600 border-red-500/30">
+          {summary.unfilledRequests} unfilled
+        </Badge>
+      )}
+      {summary.partiallyFilledRequests > 0 && (
         <Badge className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">
-          {open} open
+          {summary.partiallyFilledRequests} partial
         </Badge>
       )}
-      {partial > 0 && (
-        <Badge className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/30">
-          {partial} partial
-        </Badge>
-      )}
-      {filled > 0 && (
+      {summary.filledRequests > 0 && (
         <Badge className="text-xs bg-green-500/10 text-green-600 border-green-500/30">
-          {filled} filled
+          {summary.filledRequests} filled
         </Badge>
       )}
     </div>
@@ -95,6 +109,7 @@ export function PSListPage({ workspaceId }: { workspaceId: number }) {
                     <th className="pb-2 font-medium text-muted-foreground">System Type</th>
                     <th className="pb-2 font-medium text-muted-foreground">Status</th>
                     <th className="pb-2 font-medium text-muted-foreground">Demand</th>
+                    <th className="pb-2 font-medium text-muted-foreground">Assignments</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -113,6 +128,9 @@ export function PSListPage({ workspaceId }: { workspaceId: number }) {
                       </td>
                       <td className="py-2.5">
                         <DemandBadge workspaceId={workspaceId} psSystemId={s.id} />
+                      </td>
+                      <td className="py-2.5">
+                        <AssignmentBadge workspaceId={workspaceId} psSystemId={s.id} />
                       </td>
                     </tr>
                   ))}

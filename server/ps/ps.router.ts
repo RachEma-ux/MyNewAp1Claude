@@ -1,7 +1,8 @@
 /**
  * PS Module — tRPC Router
  *
- * Exposes PS systems CRUD, wizard runs, catalog, classification, and demand.
+ * Exposes PS systems CRUD, wizard runs, catalog, classification,
+ * demand, and assignment-facing flows.
  */
 
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
@@ -19,6 +20,14 @@ import {
   updateResourceRequestStatusSchema,
   getDemandSummarySchema,
   getMonitoringSummarySchema,
+  createResourceAssignmentSchema,
+  updateResourceAssignmentSchema,
+  updateResourceAssignmentStatusSchema,
+  listResourceAssignmentsSchema,
+  listResourceAssignmentsByRequestSchema,
+  listResourceAssignmentsBySystemSchema,
+  deleteResourceAssignmentSchema,
+  getAssignmentSummarySchema,
 } from "./ps.validation";
 import * as service from "./ps.service";
 
@@ -111,10 +120,66 @@ const demandRouter = router({
     }),
 });
 
+const assignmentsRouter = router({
+  create: governedProcedure
+    .input(createResourceAssignmentSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createResourceAssignment(input, ctx.user.id);
+    }),
+
+  list: protectedProcedure
+    .input(listResourceAssignmentsSchema)
+    .query(async ({ input }) => {
+      return service.listResourceAssignments(input.workspaceId, input.status);
+    }),
+
+  listByRequest: protectedProcedure
+    .input(listResourceAssignmentsByRequestSchema)
+    .query(async ({ input }) => {
+      return service.listResourceAssignmentsByRequest(input.workspaceId, input.resourceRequestId);
+    }),
+
+  listBySystem: protectedProcedure
+    .input(listResourceAssignmentsBySystemSchema)
+    .query(async ({ input }) => {
+      return service.listResourceAssignmentsBySystem(input.workspaceId, input.psSystemId);
+    }),
+
+  update: governedProcedure
+    .input(updateResourceAssignmentSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.updateResourceAssignment(input, ctx.user.id);
+    }),
+
+  updateStatus: governedProcedure
+    .input(updateResourceAssignmentStatusSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.updateResourceAssignmentStatus(
+        input.workspaceId,
+        input.id,
+        input.status,
+        ctx.user.id,
+      );
+    }),
+
+  delete: governedProcedure
+    .input(deleteResourceAssignmentSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.deleteResourceAssignment(input.workspaceId, input.id, ctx.user.id);
+    }),
+
+  summary: protectedProcedure
+    .input(getAssignmentSummarySchema)
+    .query(async ({ input }) => {
+      return service.getAssignmentSummary(input.workspaceId, input.psSystemId);
+    }),
+});
+
 export const psRouter = router({
   systems: systemsRouter,
   wizardRuns: wizardRunsRouter,
   demand: demandRouter,
+  assignments: assignmentsRouter,
 
   classifyScenario: protectedProcedure
     .input(classifyScenarioSchema)

@@ -14,10 +14,19 @@ import type {
   CreateWizardRunInput,
   ClassificationInput,
   CreateResourceRequestInput,
+  CreateResourceAssignmentInput,
+  UpdateResourceAssignmentInput,
   PsResourceRequestStatus,
+  PsAssignmentStatus,
   DemandSummary,
+  AssignmentSummary,
 } from "./ps.types";
 import { generateDemandSpecs, resolveQuantity } from "./ps.demand";
+import {
+  validateStatusTransition,
+  validateSystemMatch,
+  computeAssignmentSummary,
+} from "./ps.assignment";
 import {
   getSystemMetrics,
   getWizardMetrics,
@@ -317,6 +326,224 @@ export async function generateDemandForSystem(
   });
 
   return created;
+}
+
+// ── Resource Assignments ─────────────────────────────────────────────
+
+export async function createResourceAssignment(
+  input: CreateResourceAssignmentInput,
+  actorId: number,
+) {
+  if (!input.assignmentRole.trim()) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Assignment role is required" });
+  }
+
+  // Rule 1: Verify request exists
+  const request = await repo.getResourceRequestById(input.workspaceId, input.resourceRequestId);
+  if (!request) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Resource request not found" });
+  }
+
+  // Rule 2: Verify system match
+  validateSystemMatch(request.psSystemId, input.psSystemId);
+
+  // Verify system exists
+  const system = await repo.getSystemById(input.workspaceId, input.psSystemId);
+  if (!system) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "PS system not found" });
+  }
+
+  const assignment = await repo.createResourceAssignment({
+    workspaceId: input.workspaceId,
+    resourceRequestId: input.resourceRequestId,
+    psSystemId: input.psSystemId,
+    assignmentRole: input.assignmentRole.trim(),
+    assigneeRefType: input.assigneeRefType,
+    assigneeRefId: input.assigneeRefId || null,
+    assigneeDisplayName: input.assigneeDisplayName || null,
+    allocationPercentage: input.allocationPercentage ?? 100,
+    startDate: input.startDate || null,
+    endDate: input.endDate || null,
+    status: input.status || "proposed",
+    source: input.source || "manual",
+    notes: input.notes || null,
+    createdBy: actorId,
+    updatedBy: actorId,
+  });
+
+  await logPsAudit({
+    workspaceId: input.workspaceId,
+    actorId,
+    action: "resource_assignment.create",
+    entityType: "ps_resource_assignment",
+    entityId: assignment.id,
+    newValue: {
+      assignmentRole: assignment.assignmentRole,
+      assigneeRefType: assignment.assigneeRefType,
+      resourceRequestId: assignment.resourceRequestId,
+      psSystemId: assignment.psSystemId,
+    },
+  });
+  await logActivity({
+    workspaceId: input.workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "resource_assignment.create",
+    targetType: "ps_resource_assignment",
+    targetId: assignment.id,
+  });
+
+  return assignment;
+}
+
+export async function listResourceAssignments(workspaceId: number, status?: string) {
+  return repo.listResourceAssignments(workspaceId, status);
+}
+
+export async function listResourceAssignmentsByRequest(workspaceId: number, resourceRequestId: number) {
+  return repo.listResourceAssignmentsByRequest(workspaceId, resourceRequestId);
+}
+
+export async function listResourceAssignmentsBySystem(workspaceId: number, psSystemId: number) {
+  return repo.listResourceAssignmentsBySystem(workspaceId, psSystemId);
+}
+
+export async function updateResourceAssignment(
+  input: UpdateResourceAssignmentInput,
+  actorId: number,
+) {
+  const existing = await repo.getResourceAssignmentById(input.workspaceId, input.id);
+  if (!existing) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
+  }
+
+  const updateData: Record<string, any> = { updatedBy: actorId };
+  if (input.assignmentRole !== undefined) updateData.assignmentRole = input.assignmentRole.trim();
+  if (input.assigneeRefType !== undefined) updateData.assigneeRefType = input.assigneeRefType;
+  if (input.assigneeRefId !== undefined) updateData.assigneeRefId = input.assigneeRefId;
+  if (input.assigneeDisplayName !== undefined) updateData.assigneeDisplayName = input.assigneeDisplayName;
+  if (input.allocationPercentage !== undefined) updateData.allocationPercentage = input.allocationPercentage;
+  if (input.startDate !== undefined) updateData.startDate = input.startDate;
+  if (input.endDate !== undefined) updateData.endDate = input.endDate;
+  if (input.notes !== undefined) updateData.notes = input.notes;
+
+  const updated = await repo.updateResourceAssignment(input.workspaceId, input.id, updateData);
+  if (!updated) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
+  }
+
+  await logPsAudit({
+    workspaceId: input.workspaceId,
+    actorId,
+    action: "resource_assignment.update",
+    entityType: "ps_resource_assignment",
+    entityId: input.id,
+    previousValue: { assignmentRole: existing.assignmentRole, assigneeDisplayName: existing.assigneeDisplayName },
+    newValue: updateData,
+  });
+  await logActivity({
+    workspaceId: input.workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "resource_assignment.update",
+    targetType: "ps_resource_assignment",
+    targetId: input.id,
+  });
+
+  return updated;
+}
+
+export async function updateResourceAssignmentStatus(
+  workspaceId: number,
+  id: number,
+  status: PsAssignmentStatus,
+  actorId: number,
+) {
+  const existing = await repo.getResourceAssignmentById(workspaceId, id);
+  if (!existing) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
+  }
+
+  // Rule 3: Validate status transition
+  validateStatusTransition(existing.status as PsAssignmentStatus, status);
+
+  const updated = await repo.updateResourceAssignmentStatus(workspaceId, id, status, actorId);
+  if (!updated) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "resource_assignment.status_change",
+    entityType: "ps_resource_assignment",
+    entityId: id,
+    previousValue: { status: existing.status },
+    newValue: { status },
+  });
+  await logActivity({
+    workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "resource_assignment.status_change",
+    targetType: "ps_resource_assignment",
+    targetId: id,
+  });
+
+  return updated;
+}
+
+export async function deleteResourceAssignment(
+  workspaceId: number,
+  id: number,
+  actorId: number,
+) {
+  const existing = await repo.getResourceAssignmentById(workspaceId, id);
+  if (!existing) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
+  }
+
+  const deleted = await repo.deleteResourceAssignment(workspaceId, id);
+  if (!deleted) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "resource_assignment.delete",
+    entityType: "ps_resource_assignment",
+    entityId: id,
+    previousValue: {
+      assignmentRole: existing.assignmentRole,
+      assigneeDisplayName: existing.assigneeDisplayName,
+      status: existing.status,
+    },
+  });
+  await logActivity({
+    workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "resource_assignment.delete",
+    targetType: "ps_resource_assignment",
+    targetId: id,
+  });
+
+  return { success: true };
+}
+
+export async function getAssignmentSummary(
+  workspaceId: number,
+  psSystemId: number,
+): Promise<AssignmentSummary> {
+  const requests = await repo.listResourceRequestsBySystem(workspaceId, psSystemId);
+  const assignments = await repo.listResourceAssignmentsBySystem(workspaceId, psSystemId);
+
+  return computeAssignmentSummary(
+    psSystemId,
+    requests.map((r) => ({ id: r.id, role: r.role, quantity: r.quantity })),
+    assignments,
+  );
 }
 
 // ── Monitoring ────────────────────────────────────────────────────────
