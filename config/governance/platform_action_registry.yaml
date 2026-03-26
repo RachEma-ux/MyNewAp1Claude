@@ -2366,6 +2366,22 @@ actions:
     approval: none
     evidence: { required: false }
 
+  ps.demand.create:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.demand.updateStatus:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   # ═══════════════════════════════════════════════════════════════════════════
   # MODULES (ENGINE BINDING)
   # ═══════════════════════════════════════════════════════════════════════════

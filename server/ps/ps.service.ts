@@ -54,7 +54,15 @@ export async function createSystem(input: CreateSystemInput, actorId: number) {
     targetId: system.id,
   });
 
-  return system;
+  // Auto-generate demand based on system type
+  const demand = await generateDemandForSystem(
+    input.workspaceId,
+    system.id,
+    input.systemType,
+    actorId,
+  );
+
+  return { ...system, _generatedDemand: demand };
 }
 
 export async function getSystem(workspaceId: number, id: number) {
@@ -128,4 +136,176 @@ export function classifyScenario(input: ClassificationInput) {
 
 export async function getCatalog() {
   return repo.getCatalogSystemTypes();
+}
+
+// ── Resource Requests (Demand) ──────────────────────────────────────
+
+export async function createResourceRequest(input: CreateResourceRequestInput, actorId: number) {
+  if (!input.role.trim()) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Role is required" });
+  }
+
+  // Verify system exists
+  const system = await repo.getSystemById(input.workspaceId, input.psSystemId);
+  if (!system) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "PS system not found" });
+  }
+
+  const request = await repo.createResourceRequest({
+    workspaceId: input.workspaceId,
+    psSystemId: input.psSystemId,
+    role: input.role.trim(),
+    capabilityTags: input.capabilityTags || [],
+    quantity: input.quantity ?? 1,
+    seniorityLevel: input.seniorityLevel || "mid",
+    startDate: input.startDate || null,
+    endDate: input.endDate || null,
+    allocationPercentage: input.allocationPercentage ?? 100,
+    status: "draft",
+    createdBy: actorId,
+  });
+
+  await logPsAudit({
+    workspaceId: input.workspaceId,
+    actorId,
+    action: "resource_request.create",
+    entityType: "ps_resource_request",
+    entityId: request.id,
+    newValue: { role: request.role, quantity: request.quantity, psSystemId: request.psSystemId },
+  });
+  await logActivity({
+    workspaceId: input.workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "resource_request.create",
+    targetType: "ps_resource_request",
+    targetId: request.id,
+  });
+
+  return request;
+}
+
+export async function listResourceRequests(workspaceId: number, status?: string) {
+  return repo.listResourceRequests(workspaceId, status);
+}
+
+export async function listResourceRequestsBySystem(workspaceId: number, psSystemId: number) {
+  return repo.listResourceRequestsBySystem(workspaceId, psSystemId);
+}
+
+export async function updateResourceRequestStatus(
+  workspaceId: number,
+  id: number,
+  status: PsResourceRequestStatus,
+  actorId: number,
+) {
+  const updated = await repo.updateResourceRequestStatus(workspaceId, id, status);
+  if (!updated) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Resource request not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "resource_request.status_change",
+    entityType: "ps_resource_request",
+    entityId: id,
+    newValue: { status },
+  });
+  await logActivity({
+    workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "resource_request.status_change",
+    targetType: "ps_resource_request",
+    targetId: id,
+  });
+
+  return updated;
+}
+
+export async function getDemandSummary(workspaceId: number, psSystemId: number): Promise<DemandSummary> {
+  const requests = await repo.listResourceRequestsBySystem(workspaceId, psSystemId);
+
+  const byStatus: Record<PsResourceRequestStatus, number> = {
+    draft: 0,
+    open: 0,
+    partially_filled: 0,
+    filled: 0,
+    closed: 0,
+  };
+  let totalQuantity = 0;
+
+  for (const r of requests) {
+    const s = r.status as PsResourceRequestStatus;
+    if (byStatus[s] !== undefined) byStatus[s]++;
+    totalQuantity += r.quantity ?? 0;
+  }
+
+  return {
+    psSystemId,
+    totalRequests: requests.length,
+    totalQuantity,
+    byStatus,
+    roles: requests.map((r) => ({
+      role: r.role,
+      quantity: r.quantity ?? 1,
+      status: r.status,
+    })),
+  };
+}
+
+// ── Demand Generation ────────────────────────────────────────────────
+
+/**
+ * Generate resource requests for a system based on its type.
+ * Called during system creation or wizard completion.
+ */
+export async function generateDemandForSystem(
+  workspaceId: number,
+  psSystemId: number,
+  systemType: string,
+  actorId: number,
+) {
+  const specs = generateDemandSpecs(systemType);
+  if (specs.length === 0) return [];
+
+  const items = specs.map((spec) => ({
+    workspaceId,
+    psSystemId,
+    role: spec.role,
+    capabilityTags: spec.capabilityTags,
+    quantity: resolveQuantity(spec),
+    seniorityLevel: spec.seniorityLevel,
+    startDate: null as Date | null,
+    endDate: null as Date | null,
+    allocationPercentage: 100,
+    status: "draft",
+    createdBy: actorId,
+  }));
+
+  const created = await repo.createResourceRequestsBatch(items);
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "demand.generate",
+    entityType: "ps_system",
+    entityId: psSystemId,
+    newValue: {
+      systemType,
+      requestCount: created.length,
+      roles: created.map((r) => ({ role: r.role, quantity: r.quantity })),
+    },
+  });
+  await logActivity({
+    workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "demand.generate",
+    targetType: "ps_system",
+    targetId: psSystemId,
+  });
+
+  return created;
 }

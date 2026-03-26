@@ -1,7 +1,7 @@
 /**
  * PS Module — tRPC Router
  *
- * Exposes PS systems CRUD, wizard runs, catalog, and classification.
+ * Exposes PS systems CRUD, wizard runs, catalog, classification, and demand.
  */
 
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
@@ -13,6 +13,11 @@ import {
   getWizardRunSchema,
   listWizardRunsSchema,
   classifyScenarioSchema,
+  createResourceRequestSchema,
+  listResourceRequestsSchema,
+  listResourceRequestsBySystemSchema,
+  updateResourceRequestStatusSchema,
+  getDemandSummarySchema,
 } from "./ps.validation";
 import * as service from "./ps.service";
 
@@ -56,9 +61,47 @@ const wizardRunsRouter = router({
     }),
 });
 
+const demandRouter = router({
+  create: governedProcedure
+    .input(createResourceRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createResourceRequest(input, ctx.user.id);
+    }),
+
+  list: protectedProcedure
+    .input(listResourceRequestsSchema)
+    .query(async ({ input }) => {
+      return service.listResourceRequests(input.workspaceId, input.status);
+    }),
+
+  listBySystem: protectedProcedure
+    .input(listResourceRequestsBySystemSchema)
+    .query(async ({ input }) => {
+      return service.listResourceRequestsBySystem(input.workspaceId, input.psSystemId);
+    }),
+
+  updateStatus: governedProcedure
+    .input(updateResourceRequestStatusSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.updateResourceRequestStatus(
+        input.workspaceId,
+        input.id,
+        input.status,
+        ctx.user.id,
+      );
+    }),
+
+  summary: protectedProcedure
+    .input(getDemandSummarySchema)
+    .query(async ({ input }) => {
+      return service.getDemandSummary(input.workspaceId, input.psSystemId);
+    }),
+});
+
 export const psRouter = router({
   systems: systemsRouter,
   wizardRuns: wizardRunsRouter,
+  demand: demandRouter,
 
   classifyScenario: protectedProcedure
     .input(classifyScenarioSchema)
