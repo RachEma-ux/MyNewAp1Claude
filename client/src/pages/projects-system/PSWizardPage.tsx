@@ -1,26 +1,23 @@
 /**
- * PS Wizard — Dual-mode classification wizard
+ * PS Wizard — Matrix-first classification wizard
  *
- * Matrix Mode (when active matrix version exists):
- *   Step 1: Scenario — describe the project scenario
- *   Step 2: Questions — dynamically loaded from matrix DB
- *   Step 3: Recommendation — matrix engine result with score breakdown
- *   Step 4: Review — confirm and persist wizard run
+ * Runtime flow:
+ *   Step 0 — Scenario: describe the project, auto-generate name
+ *   Step 1 — Context: additional context / dimension normalisation
+ *   Step 2 — Questions: DB-driven question rendering + answer collection
+ *   Step 3 — Recommendation: matrix scoring, confidence, explainability, override
+ *   Step 4 — Review: confirm and persist wizard run
  *
- * Legacy Mode (fallback when no matrix version):
- *   Step 1: Scenario — describe the project scenario
- *   Step 2: Dimensions — select 6 classification dimensions
- *   Step 3: Recommendation — rule-based classifier result
- *   Step 4: Review — confirm and persist wizard run
+ * Legacy fallback when no active matrix version exists.
+ * All questions and scopes are DB-driven — zero hard-coded logic.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { ModuleWizardShell, type WizardStep } from "@/components/wizard/ModuleWizardShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -41,9 +38,19 @@ import {
   ClipboardList,
   BarChart3,
   Database,
+  Wand2,
+  FileText,
+  HelpCircle,
+  Sparkles,
 } from "lucide-react";
 
-// ── Dimension options (legacy mode) ──────────────────────────────────
+// ── New components ─────────────────────────────────────────────────────
+import { PSQuestionRenderer } from "./PSQuestionRenderer";
+import { PSExplainabilityPanel } from "./PSExplainabilityPanel";
+import { PSConfidenceBadge, PSConfidenceInline } from "./PSConfidenceBadge";
+import { PSOverrideDialog } from "./PSOverrideDialog";
+
+// ── Legacy dimension options ──────────────────────────────────────────
 
 const DOMAIN_OPTIONS = [
   { value: "software", label: "Software" },
@@ -96,41 +103,6 @@ const LIFECYCLE_FOCUS_OPTIONS = [
   { value: "operations", label: "Operations" },
 ] as const;
 
-// ── System type display mapping ───────────────────────────────────────
-
-const SYSTEM_TYPE_LABELS: Record<string, { label: string; color: string; description: string }> = {
-  PROJECT_GOVERNANCE: {
-    label: "Project Governance",
-    color: "bg-red-500/10 text-red-600 border-red-500/30",
-    description: "Structured governance with formal controls, stage gates, and compliance tracking",
-  },
-  SOFTWARE_DELIVERY: {
-    label: "Software Delivery",
-    color: "bg-blue-500/10 text-blue-600 border-blue-500/30",
-    description: "End-to-end software development lifecycle with CI/CD and release management",
-  },
-  SOFTWARE_LIFECYCLE: {
-    label: "Software Lifecycle",
-    color: "bg-blue-500/10 text-blue-600 border-blue-500/30",
-    description: "Full software development lifecycle management",
-  },
-  PROGRAM_MANAGEMENT: {
-    label: "Program Management",
-    color: "bg-purple-500/10 text-purple-600 border-purple-500/30",
-    description: "Multi-project coordination with cross-cutting governance and resource allocation",
-  },
-  AGILE_PRODUCT: {
-    label: "Agile Product",
-    color: "bg-green-500/10 text-green-600 border-green-500/30",
-    description: "Iterative product development with sprints, backlogs, and continuous delivery",
-  },
-  OPERATIONS_IMPROVEMENT: {
-    label: "Operations Improvement",
-    color: "bg-amber-500/10 text-amber-600 border-amber-500/30",
-    description: "Process optimization focused on efficiency, cost reduction, and operational excellence",
-  },
-};
-
 // ── Types ─────────────────────────────────────────────────────────────
 
 type DomainValue = (typeof DOMAIN_OPTIONS)[number]["value"];
@@ -156,79 +128,116 @@ interface LegacyClassificationResult {
   reasoning: string[];
 }
 
-interface MatrixResult {
-  selectedScope: string;
-  scores: Record<string, number>;
-  matchedQuestions: string[];
-  matrixVersion: string;
+// ── Enriched result (from evaluateEnriched) ───────────────────────────
+
+interface ScopeScore {
+  code: string;
+  label: string;
+  score: number;
+  rank: number;
 }
 
-// ── Confidence bar ────────────────────────────────────────────────────
+interface EnrichedResult {
+  selectedScope: string;
+  selectedScopeLabel: string;
+  top3: ScopeScore[];
+  ranking: ScopeScore[];
+  scores: Record<string, number>;
+  matchedQuestions: string[];
+  totalQuestions: number;
+  matrixVersion: string;
+  explainability: {
+    positiveSignals: Array<{ questionCode: string; questionLabel: string; weight: number; scopeCode: string }>;
+    negativeSignals: Array<{ questionCode: string; questionLabel: string; weight: number; scopeCode: string }>;
+    winnerMargin: number;
+    winnerCode: string;
+    runnerUpCode: string;
+  };
+  confidence: {
+    overall: number;
+    spread: number;
+    completeness: number;
+    ambiguity: number;
+  };
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+
+/** Auto-generate a project name from scenario text (NLP-light: first sentence or first N words) */
+function autoProjectName(scenario: string): string {
+  if (!scenario.trim()) return "";
+  // Try first sentence
+  const firstSentence = scenario.split(/[.!?\n]/)[0]?.trim() || "";
+  if (firstSentence.length <= 60) return firstSentence;
+  // Fallback: first 8 words
+  const words = scenario.trim().split(/\s+/).slice(0, 8);
+  return words.join(" ") + (scenario.trim().split(/\s+/).length > 8 ? "..." : "");
+}
+
+/** Extract key phrases from scenario for context hints */
+function extractContextHints(scenario: string): string[] {
+  const hints: string[] = [];
+  const lower = scenario.toLowerCase();
+  if (/\bagile\b/.test(lower)) hints.push("Agile");
+  if (/\bwaterfall\b/.test(lower)) hints.push("Waterfall");
+  if (/\bmigrat/.test(lower)) hints.push("Migration");
+  if (/\bcloud\b/.test(lower)) hints.push("Cloud");
+  if (/\bsoftware\b/.test(lower)) hints.push("Software");
+  if (/\bcompliance\b/.test(lower)) hints.push("Compliance");
+  if (/\binfrastructure\b/.test(lower)) hints.push("Infrastructure");
+  if (/\bdevops\b/.test(lower)) hints.push("DevOps");
+  if (/\bgovernance\b/.test(lower)) hints.push("Governance");
+  if (/\bcost\b/.test(lower)) hints.push("Cost-focused");
+  if (/\bprogram\b/.test(lower)) hints.push("Program");
+  if (/\bportfolio\b/.test(lower)) hints.push("Portfolio");
+  return hints.slice(0, 5);
+}
 
 function ConfidenceBar({ confidence }: { confidence: number }) {
-  const pct = Math.round(confidence * 100);
-  const color =
-    pct >= 80 ? "bg-green-500" : pct >= 65 ? "bg-amber-500" : "bg-red-500";
+  const pctVal = Math.round(confidence * 100);
+  const color = pctVal >= 80 ? "bg-green-500" : pctVal >= 65 ? "bg-amber-500" : "bg-red-500";
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
         <span className="text-muted-foreground">Confidence</span>
-        <span className="font-medium">{pct}%</span>
+        <span className="font-medium">{pctVal}%</span>
       </div>
       <div className="h-2 bg-muted rounded-full overflow-hidden">
-        <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+        <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pctVal}%` }} />
       </div>
     </div>
   );
 }
 
-// ── Score bar (for matrix mode) ──────────────────────────────────────
-
 function ScoreBar({ label, score, maxScore, isTop }: { label: string; score: number; maxScore: number; isTop: boolean }) {
-  const pct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+  const pctVal = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
   return (
     <div className="space-y-0.5">
       <div className="flex justify-between text-xs">
-        <span className={isTop ? "font-semibold" : "text-muted-foreground"}>
-          {SYSTEM_TYPE_LABELS[label]?.label || label}
-        </span>
+        <span className={isTop ? "font-semibold" : "text-muted-foreground"}>{label}</span>
         <span className={isTop ? "font-semibold" : "text-muted-foreground"}>{score}</span>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${isTop ? "bg-indigo-500" : "bg-muted-foreground/30"}`}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={`h-full rounded-full transition-all ${isTop ? "bg-indigo-500" : "bg-muted-foreground/30"}`} style={{ width: `${pctVal}%` }} />
       </div>
     </div>
   );
 }
 
-// ── DimensionSelector (legacy mode) ──────────────────────────────────
-
 function DimensionSelector({
-  label,
-  value,
-  onChange,
-  options,
+  label, value, onChange, options,
 }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
+  label: string; value: string; onChange: (v: string) => void;
   options: readonly { value: string; label: string }[];
 }) {
   return (
     <div className="space-y-1.5">
       <Label className="text-sm">{label}</Label>
       <Select value={value || undefined} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue placeholder={`Select ${label.toLowerCase()}...`} />
-        </SelectTrigger>
+        <SelectTrigger><SelectValue placeholder={`Select ${label.toLowerCase()}...`} /></SelectTrigger>
         <SelectContent>
           {options.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value}>
-              {opt.label}
-            </SelectItem>
+            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -242,21 +251,19 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [scenarioText, setScenarioText] = useState("");
   const [systemName, setSystemName] = useState("");
+  const [autoNameGenerated, setAutoNameGenerated] = useState(false);
+  const [contextTags, setContextTags] = useState<string[]>([]);
 
   // Legacy mode state
   const [dimensions, setDimensions] = useState<Dimensions>({
-    domain: "",
-    orgLevel: "",
-    criticality: "",
-    deliveryStyle: "",
-    valueOrientation: "",
-    lifecycleFocus: "",
+    domain: "", orgLevel: "", criticality: "", deliveryStyle: "", valueOrientation: "", lifecycleFocus: "",
   });
   const [legacyClassification, setLegacyClassification] = useState<LegacyClassificationResult | null>(null);
 
   // Matrix mode state
-  const [matrixAnswers, setMatrixAnswers] = useState<Record<string, boolean>>({});
-  const [matrixResult, setMatrixResult] = useState<MatrixResult | null>(null);
+  const [matrixAnswers, setMatrixAnswers] = useState<Record<string, boolean | string | number>>({});
+  const [enrichedResult, setEnrichedResult] = useState<EnrichedResult | null>(null);
+  const [overrideInfo, setOverrideInfo] = useState<{ scopeCode: string; reason: string } | null>(null);
 
   // Shared state
   const [isClassifying, setIsClassifying] = useState(false);
@@ -265,7 +272,7 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
 
   const utils = trpc.useUtils();
 
-  // ── Check if matrix mode is available ──────────────────────────────
+  // ── Check if matrix mode is available ─────────────────────────────
   const activeQuestionsQuery = trpc.ps.matrix.getActiveQuestions.useQuery(
     { workspaceId },
     { staleTime: 60_000 },
@@ -273,115 +280,109 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
 
   const isMatrixMode = activeQuestionsQuery.data?.available === true;
   const matrixQuestions = activeQuestionsQuery.data?.questions || [];
+  const matrixDimensions = (activeQuestionsQuery.data as any)?.dimensions || [];
   const matrixScopes = activeQuestionsQuery.data?.scopes || [];
   const matrixVersionLabel = activeQuestionsQuery.data?.version || null;
 
-  // ── Steps (adapt labels based on mode) ─────────────────────────────
-  const STEPS: WizardStep[] = useMemo(() => [
-    { id: "scenario", label: "Scenario", description: "Describe the project scenario and objectives" },
-    {
-      id: "questions",
-      label: isMatrixMode ? "Questions" : "Dimensions",
-      description: isMatrixMode
-        ? "Answer matrix-based classification questions"
-        : "Select classification dimensions",
-    },
-    { id: "recommendation", label: "Recommendation", description: "Review the system recommendation" },
-    { id: "review", label: "Review", description: "Confirm and persist" },
-  ], [isMatrixMode]);
-
-  // ── Legacy classification query ────────────────────────────────────
-  const classifyQuery = trpc.ps.classifyScenario.useQuery(
-    {
-      workspaceId,
-      scenarioText,
-      dimensions: dimensions as any,
-    },
-    {
-      enabled: false,
-      retry: false,
-    },
-  );
-
-  // ── Matrix evaluation query ────────────────────────────────────────
-  const matrixEvalQuery = trpc.ps.matrix.evaluate.useQuery(
-    {
-      workspaceId,
-      answers: matrixAnswers,
-    },
-    {
-      enabled: false,
-      retry: false,
-    },
-  );
-
-  // ── Mutations ──────────────────────────────────────────────────────
-  const createSystemMut = trpc.ps.systems.create.useMutation({
-    onError: (e) => toast.error(e.message),
-  });
-
-  const generateDemandMut = trpc.ps.demand.generateForSystem.useMutation({
-    onError: (e) => toast.error(e.message),
-  });
-
-  const createRunMut = trpc.ps.wizardRuns.create.useMutation({
-    onError: (e) => toast.error(e.message),
-  });
-
-  // ── Dimension completeness check (legacy mode) ─────────────────────
-  const allDimensionsFilled =
-    dimensions.domain !== "" &&
-    dimensions.orgLevel !== "" &&
-    dimensions.criticality !== "" &&
-    dimensions.deliveryStyle !== "" &&
-    dimensions.valueOrientation !== "" &&
-    dimensions.lifecycleFocus !== "";
-
-  const filledCount = Object.values(dimensions).filter((v) => v !== "").length;
-
-  // ── Matrix answers count ───────────────────────────────────────────
-  const answeredCount = Object.values(matrixAnswers).filter(Boolean).length;
-  const hasAnyAnswer = answeredCount > 0;
-
-  // ── Effective result (matrix or legacy) ────────────────────────────
-  const effectiveSystemType = isMatrixMode
-    ? matrixResult?.selectedScope || ""
-    : legacyClassification?.systemType || "";
-
-  const hasResult = isMatrixMode ? matrixResult !== null : legacyClassification !== null;
-
-  // ── Step validity ──────────────────────────────────────────────────
-  const stepsWithValidity = STEPS.map((s, i) => ({
-    ...s,
-    isValid:
-      i === 0
-        ? scenarioText.trim().length > 0 && systemName.trim().length > 0
-        : i === 1
-        ? isMatrixMode ? true : allDimensionsFilled
-        : i === 2
-        ? hasResult
-        : i === 3
-        ? isPublished
-        : false,
-  }));
-
-  // ── Handle step change ─────────────────────────────────────────────
-  const handleStepChange = async (step: number) => {
-    if (step === 2 && !hasResult) {
-      await runClassification();
+  // ── Scope label map ───────────────────────────────────────────────
+  const scopeLabels = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const s of matrixScopes) map[s.code] = s.label;
+    if (enrichedResult) {
+      for (const r of enrichedResult.ranking) map[r.code] = r.label;
     }
-    setCurrentStep(step);
-  };
+    return map;
+  }, [matrixScopes, enrichedResult]);
 
-  // ── Classification logic ───────────────────────────────────────────
+  // ── Steps ─────────────────────────────────────────────────────────
+  const STEPS: WizardStep[] = useMemo(() => {
+    if (isMatrixMode) {
+      return [
+        { id: "scenario", label: "Scenario", description: "Describe the project scenario" },
+        { id: "context", label: "Context", description: "Review context and project name" },
+        { id: "questions", label: "Questions", description: "Answer classification questions" },
+        { id: "recommendation", label: "Recommendation", description: "Review scoring and explainability" },
+        { id: "review", label: "Review", description: "Confirm and persist" },
+      ];
+    }
+    return [
+      { id: "scenario", label: "Scenario", description: "Describe the project scenario" },
+      { id: "dimensions", label: "Dimensions", description: "Select classification dimensions" },
+      { id: "recommendation", label: "Recommendation", description: "Review the recommendation" },
+      { id: "review", label: "Review", description: "Confirm and persist" },
+    ];
+  }, [isMatrixMode]);
+
+  // ── Queries ───────────────────────────────────────────────────────
+  const classifyQuery = trpc.ps.classifyScenario.useQuery(
+    { workspaceId, scenarioText, dimensions: dimensions as any },
+    { enabled: false, retry: false },
+  );
+
+  const matrixEvalQuery = trpc.ps.matrix.evaluateEnriched.useQuery(
+    { workspaceId, answers: matrixAnswers },
+    { enabled: false, retry: false },
+  );
+
+  // ── Mutations ─────────────────────────────────────────────────────
+  const createSystemMut = trpc.ps.systems.create.useMutation({ onError: (e) => toast.error(e.message) });
+  const generateDemandMut = trpc.ps.demand.generateForSystem.useMutation({ onError: (e) => toast.error(e.message) });
+  const createRunMut = trpc.ps.wizardRuns.create.useMutation({ onError: (e) => toast.error(e.message) });
+
+  // ── Derived state ─────────────────────────────────────────────────
+  const allDimensionsFilled = Object.values(dimensions).every((v) => v !== "");
+  const filledCount = Object.values(dimensions).filter((v) => v !== "").length;
+  const answeredCount = Object.entries(matrixAnswers).filter(
+    ([, v]) => v === true || (typeof v === "number" && v > 0),
+  ).length;
+
+  const effectiveScope = overrideInfo?.scopeCode || enrichedResult?.selectedScope || "";
+  const effectiveScopeLabel = scopeLabels[effectiveScope] || effectiveScope;
+  const effectiveSystemType = isMatrixMode ? effectiveScope : (legacyClassification?.systemType || "");
+  const hasResult = isMatrixMode ? enrichedResult !== null : legacyClassification !== null;
+
+  // ── Step validity ─────────────────────────────────────────────────
+  const stepsWithValidity = STEPS.map((s, i) => {
+    let isValid = false;
+    if (isMatrixMode) {
+      if (i === 0) isValid = scenarioText.trim().length > 0;
+      else if (i === 1) isValid = systemName.trim().length > 0;
+      else if (i === 2) isValid = true; // can proceed even with no answers
+      else if (i === 3) isValid = hasResult;
+      else if (i === 4) isValid = isPublished;
+    } else {
+      if (i === 0) isValid = scenarioText.trim().length > 0 && systemName.trim().length > 0;
+      else if (i === 1) isValid = allDimensionsFilled;
+      else if (i === 2) isValid = hasResult;
+      else if (i === 3) isValid = isPublished;
+    }
+    return { ...s, isValid };
+  });
+
+  // ── Auto-name on leaving scenario step ────────────────────────────
+  const handleAutoName = useCallback(() => {
+    if (!autoNameGenerated && !systemName.trim() && scenarioText.trim()) {
+      const generated = autoProjectName(scenarioText);
+      if (generated) {
+        setSystemName(generated);
+        setAutoNameGenerated(true);
+      }
+    }
+    // Extract context hints
+    if (scenarioText.trim()) {
+      setContextTags(extractContextHints(scenarioText));
+    }
+  }, [scenarioText, systemName, autoNameGenerated]);
+
+  // ── Classification logic ──────────────────────────────────────────
   const runClassification = async () => {
     setIsClassifying(true);
-
     try {
       if (isMatrixMode) {
         const result = await matrixEvalQuery.refetch();
         if (result.data) {
-          setMatrixResult(result.data);
+          setEnrichedResult(result.data as any);
+          setOverrideInfo(null); // reset override on re-classify
         }
       } else {
         if (!allDimensionsFilled) {
@@ -390,9 +391,7 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
           return;
         }
         const result = await classifyQuery.refetch();
-        if (result.data) {
-          setLegacyClassification(result.data);
-        }
+        if (result.data) setLegacyClassification(result.data);
       }
     } catch (err: any) {
       toast.error("Classification failed: " + (err?.message || "Unknown error"));
@@ -402,22 +401,36 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
   };
 
   const handleReclassify = async () => {
-    if (isMatrixMode) {
-      setMatrixResult(null);
-    } else {
-      setLegacyClassification(null);
-    }
+    if (isMatrixMode) setEnrichedResult(null);
+    else setLegacyClassification(null);
     await runClassification();
   };
 
-  // ── Publish handler ────────────────────────────────────────────────
+  // ── Step change ───────────────────────────────────────────────────
+  const handleStepChange = async (step: number) => {
+    // Auto-name on leaving scenario step (step 0)
+    if (currentStep === 0 && step > 0) {
+      handleAutoName();
+    }
+    // Auto-classify when entering recommendation step
+    const recStepIdx = isMatrixMode ? 3 : 2;
+    if (step === recStepIdx && !hasResult) {
+      await runClassification();
+    }
+    setCurrentStep(step);
+  };
+
+  // ── Override handler ──────────────────────────────────────────────
+  const handleOverride = (scopeCode: string, reason: string) => {
+    setOverrideInfo({ scopeCode, reason });
+    toast.success(`Overridden to ${scopeLabels[scopeCode] || scopeCode}`);
+  };
+
+  // ── Publish ───────────────────────────────────────────────────────
   const handlePublish = async () => {
     if (!hasResult) return;
-
     try {
       const systemType = effectiveSystemType;
-
-      // 1. Create the PS system
       const system = await createSystemMut.mutateAsync({
         workspaceId,
         name: systemName.trim(),
@@ -427,34 +440,27 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
         governanceProfile: isMatrixMode ? undefined : dimensions.criticality || undefined,
       });
 
-      // 2. Generate demand for the system
-      const demand = await generateDemandMut.mutateAsync({
-        workspaceId,
-        psSystemId: system.id,
-      });
-
+      const demand = await generateDemandMut.mutateAsync({ workspaceId, psSystemId: system.id });
       if (Array.isArray(demand) && demand.length > 0) {
         setGeneratedDemand(demand.map((d: any) => ({ role: d.role, quantity: d.quantity ?? 1 })));
       }
 
-      // 3. Persist the wizard run
       await createRunMut.mutateAsync({
         workspaceId,
         scenarioText: scenarioText.trim(),
         inputPayload: isMatrixMode
-          ? { answers: matrixAnswers, mode: "matrix" }
+          ? { answers: matrixAnswers, mode: "matrix", contextTags, overrideInfo }
           : { dimensions, mode: "legacy" },
-        resultPayload: isMatrixMode
-          ? (matrixResult as any)
-          : (legacyClassification as any),
-        confidence: isMatrixMode ? undefined : Math.round((legacyClassification?.confidence || 0) * 100),
+        resultPayload: isMatrixMode ? (enrichedResult as any) : (legacyClassification as any),
+        confidence: isMatrixMode
+          ? Math.round((enrichedResult?.confidence.overall || 0) * 100)
+          : Math.round((legacyClassification?.confidence || 0) * 100),
         selectedSystemType: systemType,
-        matrixVersion: isMatrixMode ? matrixResult?.matrixVersion : undefined,
+        matrixVersion: isMatrixMode ? enrichedResult?.matrixVersion : undefined,
       });
 
       utils.ps.systems.list.invalidate();
       utils.ps.demand.list.invalidate();
-
       setIsPublished(true);
       toast.success(`System created with ${demand.length} resource requests`);
     } catch {
@@ -464,264 +470,201 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
 
   const isSaving = createSystemMut.isPending || generateDemandMut.isPending || createRunMut.isPending;
 
-  // ── Dimension label helper (legacy) ────────────────────────────────
+  // ── Legacy dimension label helper ─────────────────────────────────
   const dimLabel = (key: keyof Dimensions) => {
     const allOpts: Record<string, readonly { value: string; label: string }[]> = {
-      domain: DOMAIN_OPTIONS,
-      orgLevel: ORG_LEVEL_OPTIONS,
-      criticality: CRITICALITY_OPTIONS,
-      deliveryStyle: DELIVERY_STYLE_OPTIONS,
-      valueOrientation: VALUE_ORIENTATION_OPTIONS,
-      lifecycleFocus: LIFECYCLE_FOCUS_OPTIONS,
+      domain: DOMAIN_OPTIONS, orgLevel: ORG_LEVEL_OPTIONS, criticality: CRITICALITY_OPTIONS,
+      deliveryStyle: DELIVERY_STYLE_OPTIONS, valueOrientation: VALUE_ORIENTATION_OPTIONS, lifecycleFocus: LIFECYCLE_FOCUS_OPTIONS,
     };
-    const val = dimensions[key];
-    return allOpts[key]?.find((o) => o.value === val)?.label || val || "—";
+    return allOpts[key]?.find((o) => o.value === dimensions[key])?.label || dimensions[key] || "—";
   };
 
-  // ── Matrix score helpers ───────────────────────────────────────────
-  const maxScore = matrixResult
-    ? Math.max(...Object.values(matrixResult.scores), 1)
-    : 1;
+  // ── Score helpers ─────────────────────────────────────────────────
+  const maxScore = enrichedResult ? Math.max(...Object.values(enrichedResult.scores), 1) : 1;
 
-  const sortedScores = matrixResult
-    ? Object.entries(matrixResult.scores)
-        .sort(([, a], [, b]) => b - a)
-    : [];
-
-  // ── Step content ───────────────────────────────────────────────────
+  // ── Step content ──────────────────────────────────────────────────
   const renderStep = () => {
-    switch (currentStep) {
-      // ── Step 0: Scenario ──────────────────────────────────────────
-      case 0:
-        return (
-          <div className="space-y-4">
-            {/* Mode indicator */}
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className={isMatrixMode
-                ? "text-indigo-600 border-indigo-500/30"
-                : "text-amber-600 border-amber-500/30"
-              }>
-                {isMatrixMode ? (
-                  <><Database className="w-3 h-3 mr-1" /> Matrix Mode (v{matrixVersionLabel})</>
-                ) : (
-                  <><Brain className="w-3 h-3 mr-1" /> Legacy Mode</>
-                )}
-              </Badge>
-              {activeQuestionsQuery.isLoading && (
-                <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-              )}
-            </div>
+    // Matrix mode steps: 0=scenario, 1=context, 2=questions, 3=recommendation, 4=review
+    // Legacy mode steps: 0=scenario, 1=dimensions, 2=recommendation, 3=review
 
-            <div>
-              <Label>System Name</Label>
-              <Input
-                value={systemName}
-                onChange={(e) => setSystemName(e.target.value)}
-                placeholder="E.g.: Platform Migration System"
-                className="mt-1"
-                maxLength={255}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                A short name for the project system being defined.
-              </p>
-            </div>
-            <div>
-              <Label>Scenario Description</Label>
-              <textarea
-                value={scenarioText}
-                onChange={(e) => setScenarioText(e.target.value)}
-                placeholder="Describe the project scenario, objectives, and context..."
-                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[140px] resize-none"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                {scenarioText.length}/5000 characters
-              </p>
-            </div>
-          </div>
-        );
-
-      // ── Step 1: Questions (matrix) or Dimensions (legacy) ─────────
-      case 1:
-        if (isMatrixMode) {
+    if (isMatrixMode) {
+      switch (currentStep) {
+        // ── Step 0: Scenario Input ──────────────────────────────────
+        case 0:
           return (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="secondary">
-                  {answeredCount}/{matrixQuestions.length} answered
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-indigo-600 border-indigo-500/30">
+                  <Database className="w-3 h-3 mr-1" /> Matrix Mode (v{matrixVersionLabel})
                 </Badge>
+                {activeQuestionsQuery.isLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+              </div>
+
+              <div>
+                <Label>Scenario Description</Label>
+                <textarea
+                  value={scenarioText}
+                  onChange={(e) => { setScenarioText(e.target.value); setAutoNameGenerated(false); }}
+                  placeholder="Describe the project scenario, objectives, and context..."
+                  className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[160px] resize-none"
+                />
+                <p className="text-xs text-muted-foreground mt-1">{scenarioText.length}/5000 characters</p>
+              </div>
+            </div>
+          );
+
+        // ── Step 1: Context + Auto Name ─────────────────────────────
+        case 1:
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Wand2 className="w-4 h-4 text-indigo-500" />
+                <h3 className="text-sm font-medium">Context & Project Name</h3>
+              </div>
+
+              <div>
+                <Label>Project Name</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    value={systemName}
+                    onChange={(e) => setSystemName(e.target.value)}
+                    placeholder="E.g.: Platform Migration System"
+                    maxLength={255}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const generated = autoProjectName(scenarioText);
+                      if (generated) { setSystemName(generated); toast.success("Name generated from scenario"); }
+                    }}
+                    disabled={!scenarioText.trim()}
+                    title="Auto-generate from scenario"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Auto-generated from your scenario. Edit as needed.</p>
+              </div>
+
+              {/* Context hints extracted via NLP-light */}
+              {contextTags.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Detected Context</Label>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {contextTags.map((tag) => (
+                      <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Scenario preview */}
+              <div>
+                <Label className="text-xs text-muted-foreground">Scenario Preview</Label>
+                <Card className="mt-1">
+                  <CardContent className="pt-3 pb-3">
+                    <p className="text-sm text-muted-foreground">{scenarioText || "No scenario entered."}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Dimension normalisation: show available dimensions from DB */}
+              {matrixDimensions.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Available Dimensions ({matrixDimensions.length})</Label>
+                  <div className="mt-1 space-y-1">
+                    {matrixDimensions.map((dim: any) => (
+                      <div key={dim.id} className="flex items-center gap-2 text-xs">
+                        <span className="font-mono text-muted-foreground">{dim.dimensionKey}</span>
+                        <span>{dim.dimensionLabel}</span>
+                        {dim.values.length > 0 && (
+                          <Badge variant="outline" className="text-[10px]">{dim.values.length} values</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+
+        // ── Step 2: Question Rendering + Answer Collection ──────────
+        case 2:
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-1">
                 <Badge variant="outline" className="text-indigo-600 border-indigo-500/30">
                   <Database className="w-3 h-3 mr-1" /> Matrix v{matrixVersionLabel}
                 </Badge>
               </div>
 
-              <p className="text-sm text-muted-foreground">
-                Select all questions that apply to your project scenario. The matrix engine will compute
-                the best matching scope based on weighted scores.
-              </p>
-
-              <div className="space-y-2">
-                {matrixQuestions.map((q) => (
-                  <Card key={q.code} className="cursor-pointer hover:border-indigo-500/30 transition-colors">
-                    <CardContent className="pt-3 pb-3">
-                      <label className="flex items-start gap-3 cursor-pointer">
-                        <Checkbox
-                          checked={!!matrixAnswers[q.code]}
-                          onCheckedChange={(checked) => {
-                            setMatrixAnswers((prev) => ({
-                              ...prev,
-                              [q.code]: !!checked,
-                            }));
-                            // Reset result when answers change
-                            setMatrixResult(null);
-                          }}
-                          className="mt-0.5"
-                        />
-                        <div className="space-y-0.5">
-                          <p className="text-sm font-medium">{q.label}</p>
-                          {q.description && (
-                            <p className="text-xs text-muted-foreground">{q.description}</p>
-                          )}
-                        </div>
-                      </label>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {matrixQuestions.length === 0 && (
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <AlertTriangle className="w-6 h-6 text-amber-500 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      No questions defined in the active matrix. Contact your administrator.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+              <PSQuestionRenderer
+                questions={matrixQuestions}
+                dimensions={matrixDimensions}
+                answers={matrixAnswers}
+                onAnswerChange={(code, value) => {
+                  setMatrixAnswers((prev) => ({ ...prev, [code]: value }));
+                  setEnrichedResult(null); // reset on answer change
+                  setOverrideInfo(null);
+                }}
+              />
             </div>
           );
-        }
 
-        // Legacy mode: dimension selectors
-        return (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Badge variant="secondary">{filledCount}/6 dimensions</Badge>
-              {allDimensionsFilled && (
-                <Badge variant="outline" className="text-green-600 border-green-500/30">
-                  <CheckCircle2 className="w-3 h-3 mr-1" /> Complete
-                </Badge>
-              )}
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <DimensionSelector
-                label="Domain"
-                value={dimensions.domain}
-                onChange={(v) => {
-                  setDimensions((d) => ({ ...d, domain: v as DomainValue }));
-                  setLegacyClassification(null);
-                }}
-                options={DOMAIN_OPTIONS}
-              />
-              <DimensionSelector
-                label="Organizational Level"
-                value={dimensions.orgLevel}
-                onChange={(v) => {
-                  setDimensions((d) => ({ ...d, orgLevel: v as OrgLevelValue }));
-                  setLegacyClassification(null);
-                }}
-                options={ORG_LEVEL_OPTIONS}
-              />
-              <DimensionSelector
-                label="Criticality"
-                value={dimensions.criticality}
-                onChange={(v) => {
-                  setDimensions((d) => ({ ...d, criticality: v as CriticalityValue }));
-                  setLegacyClassification(null);
-                }}
-                options={CRITICALITY_OPTIONS}
-              />
-              <DimensionSelector
-                label="Delivery Style"
-                value={dimensions.deliveryStyle}
-                onChange={(v) => {
-                  setDimensions((d) => ({ ...d, deliveryStyle: v as DeliveryStyleValue }));
-                  setLegacyClassification(null);
-                }}
-                options={DELIVERY_STYLE_OPTIONS}
-              />
-              <DimensionSelector
-                label="Value Orientation"
-                value={dimensions.valueOrientation}
-                onChange={(v) => {
-                  setDimensions((d) => ({ ...d, valueOrientation: v as ValueOrientationValue }));
-                  setLegacyClassification(null);
-                }}
-                options={VALUE_ORIENTATION_OPTIONS}
-              />
-              <DimensionSelector
-                label="Lifecycle Focus"
-                value={dimensions.lifecycleFocus}
-                onChange={(v) => {
-                  setDimensions((d) => ({ ...d, lifecycleFocus: v as LifecycleFocusValue }));
-                  setLegacyClassification(null);
-                }}
-                options={LIFECYCLE_FOCUS_OPTIONS}
-              />
-            </div>
-          </div>
-        );
-
-      // ── Step 2: Recommendation ─────────────────────────────────────
-      case 2:
-        return (
-          <div className="space-y-4">
-            {isClassifying ? (
-              <Card>
-                <CardContent className="pt-6 flex flex-col items-center gap-3">
-                  <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-                  <p className="text-sm text-muted-foreground">
-                    {isMatrixMode ? "Evaluating matrix..." : "Classifying scenario..."}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : hasResult ? (
-              <>
-                {/* System Type / Scope Result */}
+        // ── Step 3: Recommendation (scoring + explainability + confidence)
+        case 3:
+          return (
+            <div className="space-y-4">
+              {isClassifying ? (
                 <Card>
-                  <CardContent className="pt-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Target className="w-5 h-5 text-indigo-500" />
-                      <h3 className="font-semibold">
-                        {isMatrixMode ? "Selected Scope" : "Recommended System Type"}
-                      </h3>
-                      {isMatrixMode && (
-                        <Badge variant="outline" className="text-xs text-indigo-600 border-indigo-500/30">
-                          <Database className="w-3 h-3 mr-0.5" /> Matrix
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        className={`text-sm px-3 py-1 ${SYSTEM_TYPE_LABELS[effectiveSystemType]?.color || "bg-indigo-500/10 text-indigo-600 border-indigo-500/30"}`}
-                      >
-                        {SYSTEM_TYPE_LABELS[effectiveSystemType]?.label || effectiveSystemType}
-                      </Badge>
-                    </div>
-                    {SYSTEM_TYPE_LABELS[effectiveSystemType]?.description && (
-                      <p className="text-sm text-muted-foreground">
-                        {SYSTEM_TYPE_LABELS[effectiveSystemType].description}
-                      </p>
-                    )}
-                    {!isMatrixMode && legacyClassification && (
-                      <ConfidenceBar confidence={legacyClassification.confidence} />
-                    )}
+                  <CardContent className="pt-6 flex flex-col items-center gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                    <p className="text-sm text-muted-foreground">Evaluating matrix...</p>
                   </CardContent>
                 </Card>
+              ) : enrichedResult ? (
+                <>
+                  {/* Selected Scope */}
+                  <Card>
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Target className="w-5 h-5 text-indigo-500" />
+                          <h3 className="font-semibold">Selected Scope</h3>
+                          <Badge variant="outline" className="text-xs text-indigo-600 border-indigo-500/30">
+                            <Database className="w-3 h-3 mr-0.5" /> Matrix
+                          </Badge>
+                        </div>
+                        <PSOverrideDialog
+                          ranking={enrichedResult.ranking}
+                          currentScope={effectiveScope}
+                          onOverride={handleOverride}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className="text-sm px-3 py-1 bg-indigo-500/10 text-indigo-600 border-indigo-500/30">
+                          {effectiveScopeLabel}
+                        </Badge>
+                        {overrideInfo && (
+                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/30">
+                            Overridden
+                          </Badge>
+                        )}
+                      </div>
+                      {overrideInfo && (
+                        <p className="text-xs text-muted-foreground">
+                          Original: {enrichedResult.selectedScopeLabel} — Override reason: {overrideInfo.reason}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                {/* Matrix mode: Score breakdown */}
-                {isMatrixMode && matrixResult && (
+                  {/* Confidence Badge */}
+                  <PSConfidenceBadge report={enrichedResult.confidence} />
+
+                  {/* Score Ranking */}
                   <Card>
                     <CardContent className="pt-4 space-y-3">
                       <div className="flex items-center gap-2">
@@ -729,325 +672,298 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
                         <h4 className="text-sm font-medium">Score Ranking</h4>
                       </div>
                       <div className="space-y-2">
-                        {sortedScores.map(([code, score], idx) => (
+                        {enrichedResult.ranking.map((r) => (
                           <ScoreBar
-                            key={code}
-                            label={code}
-                            score={score}
+                            key={r.code}
+                            label={r.label}
+                            score={r.score}
                             maxScore={maxScore}
-                            isTop={idx === 0}
+                            isTop={r.code === effectiveScope}
                           />
                         ))}
                       </div>
                     </CardContent>
                   </Card>
-                )}
 
-                {/* Matrix mode: Matched questions */}
-                {isMatrixMode && matrixResult && matrixResult.matchedQuestions.length > 0 && (
-                  <Card>
-                    <CardContent className="pt-4 space-y-2">
-                      <h4 className="text-sm font-medium">Contributing Questions ({matrixResult.matchedQuestions.length})</h4>
-                      <div className="space-y-1">
-                        {matrixResult.matchedQuestions.map((qCode) => {
-                          const q = matrixQuestions.find((mq) => mq.code === qCode);
-                          return (
-                            <div key={qCode} className="flex items-start gap-2 text-sm">
-                              <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-green-500 shrink-0" />
-                              <span className="text-muted-foreground">{q?.label || qCode}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                  {/* Explainability */}
+                  <PSExplainabilityPanel
+                    report={enrichedResult.explainability}
+                    scopeLabels={scopeLabels}
+                  />
 
-                {/* Legacy mode: Matched Dimensions + Reasoning */}
-                {!isMatrixMode && legacyClassification && (
-                  <>
-                    <Card>
-                      <CardContent className="pt-4 space-y-2">
-                        <h4 className="text-sm font-medium">Matched Dimensions</h4>
-                        <div className="flex flex-wrap gap-1.5">
-                          {legacyClassification.matchedDimensions.map((dim) => (
-                            <Badge key={dim} variant="outline" className="text-xs">
-                              {dim}
-                            </Badge>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardContent className="pt-4 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Brain className="w-4 h-4 text-indigo-500" />
-                          <h4 className="text-sm font-medium">Reasoning</h4>
-                        </div>
-                        <ul className="space-y-1.5">
-                          {legacyClassification.reasoning.map((reason, i) => (
-                            <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                              <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-green-500 shrink-0" />
-                              <span>{reason}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  </>
-                )}
-
-                {/* Matrix version info */}
-                {isMatrixMode && matrixResult && (
+                  {/* Matrix version info */}
                   <div className="text-xs text-muted-foreground">
-                    Matrix version: {matrixResult.matrixVersion}
+                    Matrix version: {enrichedResult.matrixVersion} | {enrichedResult.matchedQuestions.length}/{enrichedResult.totalQuestions} questions matched
                   </div>
-                )}
 
-                <Button variant="outline" size="sm" onClick={handleReclassify}>
-                  Re-classify
-                </Button>
+                  <Button variant="outline" size="sm" onClick={handleReclassify}>
+                    Re-classify
+                  </Button>
+                </>
+              ) : (
+                <Card>
+                  <CardContent className="pt-6 space-y-3">
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <AlertTriangle className="w-5 h-5" />
+                      <p className="text-sm font-medium">No classification yet</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Click below to evaluate your answers against the matrix.
+                    </p>
+                    <Button size="sm" onClick={handleReclassify}>
+                      <Brain className="w-4 h-4 mr-1" /> Evaluate Matrix
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          );
+
+        // ── Step 4: Review + Persist ────────────────────────────────
+        case 4:
+          return renderReviewStep();
+
+        default:
+          return null;
+      }
+    }
+
+    // Legacy mode steps
+    switch (currentStep) {
+      case 0:
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-amber-600 border-amber-500/30">
+                <Brain className="w-3 h-3 mr-1" /> Legacy Mode
+              </Badge>
+            </div>
+            <div>
+              <Label>System Name</Label>
+              <Input value={systemName} onChange={(e) => setSystemName(e.target.value)} placeholder="E.g.: Platform Migration System" className="mt-1" maxLength={255} />
+            </div>
+            <div>
+              <Label>Scenario Description</Label>
+              <textarea value={scenarioText} onChange={(e) => setScenarioText(e.target.value)} placeholder="Describe the project scenario..." className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[140px] resize-none" />
+              <p className="text-xs text-muted-foreground mt-1">{scenarioText.length}/5000 characters</p>
+            </div>
+          </div>
+        );
+
+      case 1:
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="secondary">{filledCount}/6 dimensions</Badge>
+              {allDimensionsFilled && <Badge variant="outline" className="text-green-600 border-green-500/30"><CheckCircle2 className="w-3 h-3 mr-1" /> Complete</Badge>}
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <DimensionSelector label="Domain" value={dimensions.domain} onChange={(v) => { setDimensions((d) => ({ ...d, domain: v as DomainValue })); setLegacyClassification(null); }} options={DOMAIN_OPTIONS} />
+              <DimensionSelector label="Organizational Level" value={dimensions.orgLevel} onChange={(v) => { setDimensions((d) => ({ ...d, orgLevel: v as OrgLevelValue })); setLegacyClassification(null); }} options={ORG_LEVEL_OPTIONS} />
+              <DimensionSelector label="Criticality" value={dimensions.criticality} onChange={(v) => { setDimensions((d) => ({ ...d, criticality: v as CriticalityValue })); setLegacyClassification(null); }} options={CRITICALITY_OPTIONS} />
+              <DimensionSelector label="Delivery Style" value={dimensions.deliveryStyle} onChange={(v) => { setDimensions((d) => ({ ...d, deliveryStyle: v as DeliveryStyleValue })); setLegacyClassification(null); }} options={DELIVERY_STYLE_OPTIONS} />
+              <DimensionSelector label="Value Orientation" value={dimensions.valueOrientation} onChange={(v) => { setDimensions((d) => ({ ...d, valueOrientation: v as ValueOrientationValue })); setLegacyClassification(null); }} options={VALUE_ORIENTATION_OPTIONS} />
+              <DimensionSelector label="Lifecycle Focus" value={dimensions.lifecycleFocus} onChange={(v) => { setDimensions((d) => ({ ...d, lifecycleFocus: v as LifecycleFocusValue })); setLegacyClassification(null); }} options={LIFECYCLE_FOCUS_OPTIONS} />
+            </div>
+          </div>
+        );
+
+      case 2:
+        return (
+          <div className="space-y-4">
+            {isClassifying ? (
+              <Card>
+                <CardContent className="pt-6 flex flex-col items-center gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                  <p className="text-sm text-muted-foreground">Classifying scenario...</p>
+                </CardContent>
+              </Card>
+            ) : legacyClassification ? (
+              <>
+                <Card>
+                  <CardContent className="pt-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-5 h-5 text-indigo-500" />
+                      <h3 className="font-semibold">Recommended System Type</h3>
+                    </div>
+                    <Badge className="text-sm px-3 py-1">{legacyClassification.systemType}</Badge>
+                    <ConfidenceBar confidence={legacyClassification.confidence} />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4 space-y-2">
+                    <h4 className="text-sm font-medium">Matched Dimensions</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {legacyClassification.matchedDimensions.map((dim) => (
+                        <Badge key={dim} variant="outline" className="text-xs">{dim}</Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4 space-y-2">
+                    <div className="flex items-center gap-2"><Brain className="w-4 h-4 text-indigo-500" /><h4 className="text-sm font-medium">Reasoning</h4></div>
+                    <ul className="space-y-1.5">
+                      {legacyClassification.reasoning.map((reason, i) => (
+                        <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                          <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-green-500 shrink-0" />
+                          <span>{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+                <Button variant="outline" size="sm" onClick={handleReclassify}>Re-classify</Button>
               </>
             ) : (
               <Card>
                 <CardContent className="pt-6 space-y-3">
-                  <div className="flex items-center gap-2 text-amber-600">
-                    <AlertTriangle className="w-5 h-5" />
-                    <p className="text-sm font-medium">No classification yet</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {isMatrixMode
-                      ? "Click below to evaluate your answers against the matrix."
-                      : allDimensionsFilled
-                        ? "Click below to classify the scenario."
-                        : "Go back to Step 2 and fill all 6 dimensions first."}
-                  </p>
-                  {(isMatrixMode || allDimensionsFilled) && (
-                    <Button size="sm" onClick={handleReclassify}>
-                      <Brain className="w-4 h-4 mr-1" />
-                      {isMatrixMode ? "Evaluate Matrix" : "Classify Now"}
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2 text-amber-600"><AlertTriangle className="w-5 h-5" /><p className="text-sm font-medium">No classification yet</p></div>
+                  <p className="text-sm text-muted-foreground">{allDimensionsFilled ? "Click below to classify." : "Go back and fill all 6 dimensions."}</p>
+                  {allDimensionsFilled && <Button size="sm" onClick={handleReclassify}><Brain className="w-4 h-4 mr-1" /> Classify Now</Button>}
                 </CardContent>
               </Card>
             )}
           </div>
         );
 
-      // ── Step 3: Review ─────────────────────────────────────────────
       case 3:
-        return (
-          <div className="space-y-3">
-            {isPublished ? (
-              <>
-                <Card>
-                  <CardContent className="pt-4 space-y-2">
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle2 className="w-5 h-5" />
-                      <h3 className="font-semibold">System Created</h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      PS system "<span className="font-medium text-foreground">{systemName}</span>" has been created
-                      and {generatedDemand.length} resource requests generated.
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {generatedDemand.length > 0 && (
-                  <Card>
-                    <CardContent className="pt-4 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-5 h-5 text-indigo-500" />
-                        <h3 className="font-semibold">Demand Generated</h3>
-                        <Badge variant="secondary">{generatedDemand.length} roles requested</Badge>
-                      </div>
-                      <div className="space-y-1.5">
-                        {generatedDemand.map((d, i) => (
-                          <div key={i} className="flex justify-between text-sm">
-                            <span>{d.role}</span>
-                            <Badge variant="outline" className="text-xs">{d.quantity}x</Badge>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="pt-1 border-t">
-                        <div className="flex justify-between text-sm font-medium">
-                          <span>Total headcount</span>
-                          <span>{generatedDemand.reduce((s, d) => s + d.quantity, 0)}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                <Card>
-                  <CardContent className="pt-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <UserCheck className="w-5 h-5 text-amber-500" />
-                      <h3 className="font-semibold">Assignment Readiness</h3>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Demand requests</span>
-                        <Badge variant="secondary" className="text-xs">
-                          <ClipboardList className="w-3 h-3 mr-1" />
-                          {generatedDemand.length} created
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Assignments</span>
-                        <Badge className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">
-                          0 — not yet created
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Fulfillment</span>
-                        <Badge className="text-xs bg-red-500/10 text-red-600 border-red-500/30">
-                          Unfilled
-                        </Badge>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground pt-1">
-                      Navigate to the PS Systems list to create assignments against these demand requests.
-                    </p>
-                  </CardContent>
-                </Card>
-              </>
-            ) : (
-              <>
-                <Card>
-                  <CardContent className="pt-4 space-y-2 text-sm">
-                    <h4 className="font-medium mb-2">Summary</h4>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">System Name</span>
-                      <span className="font-medium">{systemName || "—"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Scenario</span>
-                      <span className="font-medium max-w-[60%] text-right truncate">
-                        {scenarioText.slice(0, 80)}{scenarioText.length > 80 ? "..." : ""}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Classification Mode</span>
-                      <Badge variant="outline" className="text-xs">
-                        {isMatrixMode ? "Matrix" : "Legacy"}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        {isMatrixMode ? "Selected Scope" : "System Type"}
-                      </span>
-                      <Badge className={SYSTEM_TYPE_LABELS[effectiveSystemType]?.color || "bg-indigo-500/10 text-indigo-600 border-indigo-500/30"}>
-                        {SYSTEM_TYPE_LABELS[effectiveSystemType]?.label || effectiveSystemType || "—"}
-                      </Badge>
-                    </div>
-                    {!isMatrixMode && legacyClassification && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Confidence</span>
-                        <span className="font-medium">{Math.round(legacyClassification.confidence * 100)}%</span>
-                      </div>
-                    )}
-                    {isMatrixMode && matrixResult && (
-                      <>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Matrix Version</span>
-                          <span className="font-medium">{matrixResult.matrixVersion}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Questions Answered</span>
-                          <span className="font-medium">{matrixResult.matchedQuestions.length}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Top Score</span>
-                          <span className="font-medium">
-                            {matrixResult.scores[matrixResult.selectedScope] || 0}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                    {!isMatrixMode && legacyClassification && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Rules Matched</span>
-                        <span className="font-medium">{legacyClassification.reasoning.length}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Legacy mode: selected dimensions */}
-                {!isMatrixMode && (
-                  <Card>
-                    <CardContent className="pt-4 space-y-2 text-sm">
-                      <h4 className="font-medium mb-2">Selected Dimensions</h4>
-                      {(["domain", "orgLevel", "criticality", "deliveryStyle", "valueOrientation", "lifecycleFocus"] as const).map((key) => (
-                        <div key={key} className="flex justify-between">
-                          <span className="text-muted-foreground capitalize">{key.replace(/([A-Z])/g, " $1").trim()}</span>
-                          <Badge variant="outline" className="text-xs">{dimLabel(key)}</Badge>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Matrix mode: answered questions */}
-                {isMatrixMode && matrixResult && (
-                  <Card>
-                    <CardContent className="pt-4 space-y-2 text-sm">
-                      <h4 className="font-medium mb-2">Answered Questions</h4>
-                      {matrixResult.matchedQuestions.map((qCode) => {
-                        const q = matrixQuestions.find((mq) => mq.code === qCode);
-                        return (
-                          <div key={qCode} className="flex items-start gap-2">
-                            <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-green-500 shrink-0" />
-                            <span className="text-muted-foreground">{q?.label || qCode}</span>
-                          </div>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </div>
-        );
+        return renderReviewStep();
 
       default:
         return null;
     }
   };
 
-  // ── Preview Panel ──────────────────────────────────────────────────
+  // ── Review step (shared between modes) ────────────────────────────
+  const renderReviewStep = () => (
+    <div className="space-y-3">
+      {isPublished ? (
+        <>
+          <Card>
+            <CardContent className="pt-4 space-y-2">
+              <div className="flex items-center gap-2 text-green-600"><CheckCircle2 className="w-5 h-5" /><h3 className="font-semibold">System Created</h3></div>
+              <p className="text-sm text-muted-foreground">
+                PS system "<span className="font-medium text-foreground">{systemName}</span>" has been created and {generatedDemand.length} resource requests generated.
+              </p>
+            </CardContent>
+          </Card>
+          {generatedDemand.length > 0 && (
+            <Card>
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center gap-2"><Users className="w-5 h-5 text-indigo-500" /><h3 className="font-semibold">Demand Generated</h3><Badge variant="secondary">{generatedDemand.length} roles</Badge></div>
+                <div className="space-y-1.5">
+                  {generatedDemand.map((d, i) => (
+                    <div key={i} className="flex justify-between text-sm"><span>{d.role}</span><Badge variant="outline" className="text-xs">{d.quantity}x</Badge></div>
+                  ))}
+                </div>
+                <div className="pt-1 border-t"><div className="flex justify-between text-sm font-medium"><span>Total headcount</span><span>{generatedDemand.reduce((s, d) => s + d.quantity, 0)}</span></div></div>
+              </CardContent>
+            </Card>
+          )}
+          <Card>
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex items-center gap-2"><UserCheck className="w-5 h-5 text-amber-500" /><h3 className="font-semibold">Assignment Readiness</h3></div>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between"><span className="text-muted-foreground">Demand requests</span><Badge variant="secondary" className="text-xs"><ClipboardList className="w-3 h-3 mr-1" />{generatedDemand.length} created</Badge></div>
+                <div className="flex items-center justify-between"><span className="text-muted-foreground">Assignments</span><Badge className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">0 — not yet created</Badge></div>
+                <div className="flex items-center justify-between"><span className="text-muted-foreground">Fulfillment</span><Badge className="text-xs bg-red-500/10 text-red-600 border-red-500/30">Unfilled</Badge></div>
+              </div>
+              <p className="text-xs text-muted-foreground pt-1">Navigate to the PS Systems list to create assignments.</p>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <>
+          <Card>
+            <CardContent className="pt-4 space-y-2 text-sm">
+              <h4 className="font-medium mb-2">Summary</h4>
+              <div className="flex justify-between"><span className="text-muted-foreground">System Name</span><span className="font-medium">{systemName || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Scenario</span><span className="font-medium max-w-[60%] text-right truncate">{scenarioText.slice(0, 80)}{scenarioText.length > 80 ? "..." : ""}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Mode</span><Badge variant="outline" className="text-xs">{isMatrixMode ? "Matrix" : "Legacy"}</Badge></div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{isMatrixMode ? "Selected Scope" : "System Type"}</span>
+                <Badge className="bg-indigo-500/10 text-indigo-600 border-indigo-500/30">{effectiveScopeLabel || effectiveSystemType || "—"}</Badge>
+              </div>
+              {overrideInfo && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Override</span><Badge variant="outline" className="text-xs text-amber-600">Yes — {overrideInfo.reason.slice(0, 40)}</Badge></div>
+              )}
+              {isMatrixMode && enrichedResult && (
+                <>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Confidence</span><PSConfidenceInline overall={enrichedResult.confidence.overall} /></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Matrix Version</span><span className="font-medium">{enrichedResult.matrixVersion}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Questions Matched</span><span className="font-medium">{enrichedResult.matchedQuestions.length}/{enrichedResult.totalQuestions}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Winner Margin</span><span className="font-medium">+{enrichedResult.explainability.winnerMargin}</span></div>
+                </>
+              )}
+              {!isMatrixMode && legacyClassification && (
+                <>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Confidence</span><span className="font-medium">{Math.round(legacyClassification.confidence * 100)}%</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Rules Matched</span><span className="font-medium">{legacyClassification.reasoning.length}</span></div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Legacy dimension summary */}
+          {!isMatrixMode && (
+            <Card>
+              <CardContent className="pt-4 space-y-2 text-sm">
+                <h4 className="font-medium mb-2">Selected Dimensions</h4>
+                {(["domain", "orgLevel", "criticality", "deliveryStyle", "valueOrientation", "lifecycleFocus"] as const).map((key) => (
+                  <div key={key} className="flex justify-between">
+                    <span className="text-muted-foreground capitalize">{key.replace(/([A-Z])/g, " $1").trim()}</span>
+                    <Badge variant="outline" className="text-xs">{dimLabel(key)}</Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Matrix answered questions summary */}
+          {isMatrixMode && enrichedResult && (
+            <Card>
+              <CardContent className="pt-4 space-y-2 text-sm">
+                <h4 className="font-medium mb-2">Answered Questions</h4>
+                {enrichedResult.matchedQuestions.map((qCode) => {
+                  const q = matrixQuestions.find((mq) => mq.code === qCode);
+                  return (
+                    <div key={qCode} className="flex items-start gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-green-500 shrink-0" />
+                      <span className="text-muted-foreground">{q?.label || qCode}</span>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  // ── Preview Panel ─────────────────────────────────────────────────
   const previewPanel = (
     <div className="space-y-4">
       <div>
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">System</p>
         <p className="text-sm font-medium">{systemName || "Not named yet"}</p>
       </div>
-
       <div>
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Scenario</p>
         <p className="text-sm">{scenarioText ? scenarioText.slice(0, 120) + (scenarioText.length > 120 ? "..." : "") : "Not entered yet"}</p>
       </div>
-
       <div>
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Mode</p>
-        <Badge variant="outline" className="text-xs">
-          {isMatrixMode ? `Matrix v${matrixVersionLabel}` : "Legacy"}
-        </Badge>
+        <Badge variant="outline" className="text-xs">{isMatrixMode ? `Matrix v${matrixVersionLabel}` : "Legacy"}</Badge>
       </div>
-
       {isMatrixMode ? (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Questions ({answeredCount}/{matrixQuestions.length})
-          </p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Questions ({answeredCount}/{matrixQuestions.length})</p>
         </div>
       ) : (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Dimensions ({filledCount}/6)
-          </p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Dimensions ({filledCount}/6)</p>
           <div className="space-y-1">
             {(["domain", "orgLevel", "criticality", "deliveryStyle", "valueOrientation", "lifecycleFocus"] as const).map((key) => (
               <div key={key} className="flex justify-between text-xs">
@@ -1058,36 +974,29 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
           </div>
         </div>
       )}
-
       {hasResult && (
         <div>
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             {isMatrixMode ? "Selected Scope" : "Predicted System"}
           </p>
-          <Badge className={`text-xs ${SYSTEM_TYPE_LABELS[effectiveSystemType]?.color || "bg-indigo-500/10 text-indigo-600"}`}>
-            {SYSTEM_TYPE_LABELS[effectiveSystemType]?.label || effectiveSystemType}
+          <Badge className="text-xs bg-indigo-500/10 text-indigo-600">
+            {isMatrixMode ? effectiveScopeLabel : effectiveSystemType}
           </Badge>
-          {!isMatrixMode && legacyClassification && (
-            <div className="mt-2">
-              <ConfidenceBar confidence={legacyClassification.confidence} />
-            </div>
+          {isMatrixMode && enrichedResult && (
+            <div className="mt-2"><PSConfidenceInline overall={enrichedResult.confidence.overall} /></div>
           )}
-          {isMatrixMode && matrixResult && (
-            <div className="mt-1 text-xs text-muted-foreground">
-              Score: {matrixResult.scores[matrixResult.selectedScope] || 0}
-            </div>
+          {!isMatrixMode && legacyClassification && (
+            <div className="mt-2"><ConfidenceBar confidence={legacyClassification.confidence} /></div>
+          )}
+          {overrideInfo && (
+            <div className="mt-1"><Badge variant="outline" className="text-[10px] text-amber-600">Overridden</Badge></div>
           )}
         </div>
       )}
-
-      {generatedDemand.length > 0 && (
+      {contextTags.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Demand Generated
-          </p>
-          <p className="text-sm font-medium text-green-600">
-            {generatedDemand.length} roles, {generatedDemand.reduce((s, d) => s + d.quantity, 0)} headcount
-          </p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Context Tags</p>
+          <div className="flex flex-wrap gap-1">{contextTags.map((t) => <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>)}</div>
         </div>
       )}
     </div>
@@ -1106,10 +1015,9 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
           <span>
             Step {currentStep + 1} of {STEPS.length} — {STEPS[currentStep]?.label}
             {hasResult && (
-              <> | {SYSTEM_TYPE_LABELS[effectiveSystemType]?.label || effectiveSystemType}
-                {!isMatrixMode && legacyClassification && (
-                  <> ({Math.round(legacyClassification.confidence * 100)}%)</>
-                )}
+              <> | {isMatrixMode ? effectiveScopeLabel : effectiveSystemType}
+                {isMatrixMode && enrichedResult && <> ({Math.round(enrichedResult.confidence.overall * 100)}%)</>}
+                {!isMatrixMode && legacyClassification && <> ({Math.round(legacyClassification.confidence * 100)}%)</>}
               </>
             )}
           </span>
