@@ -29,6 +29,8 @@ import {
   Loader2,
   Brain,
   Users,
+  UserCheck,
+  ClipboardList,
 } from "lucide-react";
 
 // ── Dimension options ─────────────────────────────────────────────────
@@ -615,6 +617,40 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Assignment Readiness */}
+                <Card>
+                  <CardContent className="pt-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="w-5 h-5 text-amber-500" />
+                      <h3 className="font-semibold">Assignment Readiness</h3>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Demand requests</span>
+                        <Badge variant="secondary" className="text-xs">
+                          <ClipboardList className="w-3 h-3 mr-1" />
+                          {generatedDemand.length} created
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Assignments</span>
+                        <Badge className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">
+                          0 — not yet created
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Fulfillment</span>
+                        <Badge className="text-xs bg-red-500/10 text-red-600 border-red-500/30">
+                          Unfilled
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground pt-1">
+                      Navigate to the PS Systems list to create assignments against these demand requests.
+                    </p>
+                  </CardContent>
+                </Card>
               </>
             ) : (
               <>
