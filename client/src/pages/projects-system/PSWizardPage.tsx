@@ -28,6 +28,7 @@ import {
   Target,
   Loader2,
   Brain,
+  Users,
 } from "lucide-react";
 
 // ── Dimension options ─────────────────────────────────────────────────
@@ -214,6 +215,7 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
   const [classification, setClassification] = useState<ClassificationResult | null>(null);
   const [isClassifying, setIsClassifying] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
+  const [generatedDemand, setGeneratedDemand] = useState<Array<{ role: string; quantity: number }>>([]);
 
   const utils = trpc.useUtils();
 
@@ -230,10 +232,15 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
     },
   );
 
+  // System creation mutation (auto-generates demand)
+  const createSystemMut = trpc.ps.systems.create.useMutation({
+    onError: (e) => toast.error(e.message),
+  });
+
   // Wizard run creation mutation
   const createRunMut = trpc.ps.wizardRuns.create.useMutation({
     onSuccess: () => {
-      toast.success("Wizard run saved successfully");
+      toast.success("System created with demand generated");
       setIsPublished(true);
     },
     onError: (e) => toast.error(e.message),
@@ -304,16 +311,36 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
   };
 
   // ── Publish handler ─────────────────────────────────────────────
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!classification) return;
-    createRunMut.mutate({
-      workspaceId,
-      scenarioText: scenarioText.trim(),
-      inputPayload: { dimensions },
-      resultPayload: classification as any,
-      confidence: Math.round(classification.confidence * 100),
-      selectedSystemType: classification.systemType,
-    });
+
+    try {
+      // 1. Create the PS system (auto-generates demand on backend)
+      const systemResult = await createSystemMut.mutateAsync({
+        workspaceId,
+        name: scenarioText.trim().slice(0, 80),
+        description: scenarioText.trim(),
+        systemType: classification.systemType,
+      });
+
+      // Capture generated demand from the system creation response
+      const demand = (systemResult as any)?._generatedDemand;
+      if (Array.isArray(demand) && demand.length > 0) {
+        setGeneratedDemand(demand.map((d: any) => ({ role: d.role, quantity: d.quantity ?? 1 })));
+      }
+
+      // 2. Persist the wizard run
+      createRunMut.mutate({
+        workspaceId,
+        scenarioText: scenarioText.trim(),
+        inputPayload: { dimensions },
+        resultPayload: classification as any,
+        confidence: Math.round(classification.confidence * 100),
+        selectedSystemType: classification.systemType,
+      });
+    } catch {
+      // Error already shown by mutation onError
+    }
   };
 
   // ── Dimension label helper ──────────────────────────────────────
