@@ -545,17 +545,45 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
         return (
           <div className="space-y-3">
             {isPublished ? (
-              <Card>
-                <CardContent className="pt-4 space-y-2">
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle2 className="w-5 h-5" />
-                    <h3 className="font-semibold">Wizard Run Saved</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    The classification has been persisted. You can view it in PS History.
-                  </p>
-                </CardContent>
-              </Card>
+              <>
+                <Card>
+                  <CardContent className="pt-4 space-y-2">
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle2 className="w-5 h-5" />
+                      <h3 className="font-semibold">System Created</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      The PS system and classification have been persisted.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {generatedDemand.length > 0 && (
+                  <Card>
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-5 h-5 text-indigo-500" />
+                        <h3 className="font-semibold">Demand Generated</h3>
+                        <Badge variant="secondary">{generatedDemand.length} roles requested</Badge>
+                      </div>
+                      <div className="space-y-1.5">
+                        {generatedDemand.map((d, i) => (
+                          <div key={i} className="flex justify-between text-sm">
+                            <span>{d.role}</span>
+                            <Badge variant="outline" className="text-xs">{d.quantity}x</Badge>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="pt-1 border-t">
+                        <div className="flex justify-between text-sm font-medium">
+                          <span>Total headcount</span>
+                          <span>{generatedDemand.reduce((s, d) => s + d.quantity, 0)}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             ) : (
               <>
                 <Card>
