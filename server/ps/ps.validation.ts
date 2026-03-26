@@ -572,6 +572,45 @@ export const deleteCellSchema = z.object({
   id: z.number().int().positive(),
 });
 
+// ── Wizard Accept ──────────────────────────────────────────────────
+
+export const acceptWizardResultSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  scenarioText: z.string().min(1).max(5000),
+  projectName: z.string().min(1).max(255),
+  selectedScopeCode: z.string().min(1).max(120),
+  selectedScopeLabel: z.string().min(1).max(255),
+  matrixVersion: z.string().min(1).max(50),
+  answers: z.record(z.union([z.boolean(), z.string(), z.number()])),
+  confidence: z.number().min(0).max(100),
+  overrideInfo: z.object({
+    scopeCode: z.string().min(1).max(120),
+    reason: z.string().min(1).max(500),
+  }).nullable().optional(),
+  inputPayload: z.record(z.unknown()).optional(),
+  resultPayload: z.record(z.unknown()).optional(),
+});
+
+// ── Scope Template Mappings ──────────────────────────────────────────
+
+export const createScopeTemplateMappingSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  scopeCode: z.string().min(1).max(120),
+  systemType: z.string().min(1).max(100),
+  lifecycleType: z.string().max(100).optional(),
+  governanceProfile: z.string().max(100).optional(),
+  demandTemplateJson: z.array(z.object({
+    role: z.string().min(1).max(200),
+    capabilityTags: z.array(z.string().max(100)).max(20),
+    quantity: z.number().int().min(1).max(100),
+    seniorityLevel: z.string().max(50),
+  })).optional(),
+});
+
+export const listScopeTemplateMappingsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
 // ── Classification ──────────────────────────────────────────────────
 
 export const classifyScenarioSchema = z.object({

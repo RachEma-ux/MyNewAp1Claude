@@ -537,6 +537,38 @@ export interface MatrixImportQuestionPresentationRow {
 
 export type MatrixImportType = "scope_matrix" | "scoring_matrix";
 
+// ── Wizard Accept (Decision → Operational Output) ──────────────────────
+
+export interface AcceptWizardInput {
+  workspaceId: number;
+  scenarioText: string;
+  projectName: string;
+  selectedScopeCode: string;
+  selectedScopeLabel: string;
+  matrixVersion: string;
+  answers: Record<string, boolean | string | number>;
+  confidence: number;
+  overrideInfo?: { scopeCode: string; reason: string } | null;
+  inputPayload?: Record<string, unknown>;
+  resultPayload?: Record<string, unknown>;
+}
+
+export interface AcceptWizardResult {
+  wizardRun: { id: number; scenarioText: string; selectedSystemType: string | null };
+  system: { id: number; name: string; systemType: string; status: string };
+  demandGenerated: Array<{ id: number; role: string; quantity: number | null }>;
+  assignmentPlaceholders: Array<{ id: number; assignmentRole: string; status: string }>;
+  trace: {
+    wizardRunId: number;
+    systemId: number;
+    demandCount: number;
+    assignmentCount: number;
+    scopeCode: string;
+    templateUsed: string;
+    overrideApplied: boolean;
+  };
+}
+
 export interface CreateMatrixImportRecordInput {
   workspaceId: number;
   versionId?: number;

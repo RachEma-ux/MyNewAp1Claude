@@ -418,3 +418,31 @@ export const psMatrixQuestionPresentations = pgTable("ps_matrix_question_present
 
 export type PsMatrixQuestionPresentation = typeof psMatrixQuestionPresentations.$inferSelect;
 export type InsertPsMatrixQuestionPresentation = typeof psMatrixQuestionPresentations.$inferInsert;
+
+// ============================================================================
+// 17. PS Scope Template Mappings — Scope → operational template
+// ============================================================================
+
+export const psScopeTemplateMappings = pgTable("ps_scope_template_mappings", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  scopeCode: varchar("scope_code", { length: 120 }).notNull(),
+  systemType: varchar("system_type", { length: 100 }).notNull(),
+  lifecycleType: varchar("lifecycle_type", { length: 100 }),
+  governanceProfile: varchar("governance_profile", { length: 100 }),
+  demandTemplateJson: json("demand_template_json").$type<Array<{
+    role: string;
+    capabilityTags: string[];
+    quantity: number;
+    seniorityLevel: string;
+  }>>(),
+  isActive: integer("is_active").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  wsIdx: index("ps_scope_template_ws_idx").on(table.workspaceId),
+  scopeUniq: unique("ps_scope_template_scope_uniq").on(table.workspaceId, table.scopeCode),
+}));
+
+export type PsScopeTemplateMapping = typeof psScopeTemplateMappings.$inferSelect;
+export type InsertPsScopeTemplateMapping = typeof psScopeTemplateMappings.$inferInsert;

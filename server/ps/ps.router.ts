@@ -65,6 +65,11 @@ import {
   parseMatrixHeadersSchema,
   // Seed schema
   seedScopeMatrixSchema,
+  // Accept wizard result schema
+  acceptWizardResultSchema,
+  // Scope template mapping schemas
+  createScopeTemplateMappingSchema,
+  listScopeTemplateMappingsSchema,
   // Dimension schemas
   listDimensionsSchema,
   createDimensionSchema,
@@ -118,6 +123,12 @@ const wizardRunsRouter = router({
       return service.createWizardRun(input, ctx.user.id);
     }),
 
+  accept: governedProcedure
+    .input(acceptWizardResultSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.acceptWizardResult(input, ctx.user.id);
+    }),
+
   get: protectedProcedure
     .input(getWizardRunSchema)
     .query(async ({ input }) => {
@@ -128,6 +139,20 @@ const wizardRunsRouter = router({
     .input(listWizardRunsSchema)
     .query(async ({ input }) => {
       return service.listWizardRuns(input.workspaceId);
+    }),
+});
+
+const templatesRouter = router({
+  list: protectedProcedure
+    .input(listScopeTemplateMappingsSchema)
+    .query(async ({ input }) => {
+      return service.listScopeTemplateMappings(input.workspaceId);
+    }),
+
+  create: governedProcedure
+    .input(createScopeTemplateMappingSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createScopeTemplateMapping(input, ctx.user.id);
     }),
 });
 
@@ -758,6 +783,7 @@ export const psRouter = router({
   wizardRuns: wizardRunsRouter,
   demand: demandRouter,
   assignments: assignmentsRouter,
+  templates: templatesRouter,
   matrix: matrixRouter,
 
   classifyScenario: protectedProcedure
