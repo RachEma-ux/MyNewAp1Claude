@@ -183,6 +183,8 @@ export const psMatrixVersions = pgTable("ps_matrix_versions", {
   version: varchar("version", { length: 50 }).notNull(),
   label: varchar("label", { length: 255 }).notNull(),
   status: varchar("status", { length: 30 }).default("draft").notNull(), // draft | active | archived
+  sourceType: varchar("source_type", { length: 20 }), // excel | json | manual
+  sourceName: varchar("source_name", { length: 255 }),
   createdBy: integer("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   activatedAt: timestamp("activated_at"),
@@ -202,11 +204,14 @@ export type InsertPsMatrixVersion = typeof psMatrixVersions.$inferInsert;
 export const psScopeRegistry = pgTable("ps_scope_registry", {
   id: serial("id").primaryKey(),
   versionId: integer("version_id").notNull(),
-  code: varchar("code", { length: 100 }).notNull(),
+  code: varchar("code", { length: 120 }).notNull(),
   label: varchar("label", { length: 255 }).notNull(),
   description: text("description"),
-  family: varchar("family", { length: 100 }),
+  family: varchar("family", { length: 120 }),
   isActive: integer("is_active").default(1).notNull(), // 1=active, 0=inactive
+  sourceRowNumber: integer("source_row_number"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   versionIdx: index("ps_scope_registry_version_idx").on(table.versionId),
   codeUniq: unique("ps_scope_registry_code_uniq").on(table.versionId, table.code),
@@ -264,10 +269,15 @@ export const psMatrixImports = pgTable("ps_matrix_imports", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id").notNull(),
   versionId: integer("version_id"),
+  importType: varchar("import_type", { length: 20 }), // scope_matrix | scoring_matrix
   sourceType: varchar("source_type", { length: 30 }).notNull(), // json | excel | manual
   sourceName: varchar("source_name", { length: 255 }),
+  sheetName: varchar("sheet_name", { length: 255 }),
   rawPayloadJson: json("raw_payload_json").$type<Record<string, unknown>>(),
   importStatus: varchar("import_status", { length: 30 }).default("pending").notNull(), // pending | previewed | committed | failed
+  totalRows: integer("total_rows").default(0),
+  importedRows: integer("imported_rows").default(0),
+  skippedRows: integer("skipped_rows").default(0),
   scopesCount: integer("scopes_count").default(0),
   questionsCount: integer("questions_count").default(0),
   cellsCount: integer("cells_count").default(0),
@@ -284,3 +294,63 @@ export const psMatrixImports = pgTable("ps_matrix_imports", {
 
 export type PsMatrixImport = typeof psMatrixImports.$inferSelect;
 export type InsertPsMatrixImport = typeof psMatrixImports.$inferInsert;
+
+// ============================================================================
+// 12. PS Scope Matrix Profile — Standards/methods/frameworks per scope
+// ============================================================================
+
+export const psScopeMatrixProfile = pgTable("ps_scope_matrix_profile", {
+  id: serial("id").primaryKey(),
+  scopeId: integer("scope_id").notNull(),
+  // Standards (columns B–G from Excel)
+  pmiValue: varchar("pmi_value", { length: 255 }),
+  prince2Value: varchar("prince2_value", { length: 255 }),
+  isoValue: varchar("iso_value", { length: 255 }),
+  ipmaValue: varchar("ipma_value", { length: 255 }),
+  cmmiValue: varchar("cmmi_value", { length: 255 }),
+  aspiceValue: varchar("aspice_value", { length: 255 }),
+  // Methods & Frameworks (columns H–L)
+  leanMethodValue: varchar("lean_method_value", { length: 255 }),
+  agileFrameworkValue: varchar("agile_framework_value", { length: 255 }),
+  traditionalMethodValue: varchar("traditional_method_value", { length: 255 }),
+  agileFrameworksValue: varchar("agile_frameworks_value", { length: 255 }),
+  hybridMethodValue: varchar("hybrid_method_value", { length: 255 }),
+  // Case scenario & selected outputs (columns M–O)
+  caseScenario: text("case_scenario"),
+  selectedStandards: varchar("selected_standards", { length: 255 }),
+  selectedFrameworks: varchar("selected_frameworks", { length: 255 }),
+  // Traceability
+  rawRowJson: json("raw_row_json").$type<Record<string, unknown>>(),
+  // Type classification map: header_key → type (Standard|Method|Framework|Standards|Methods|Frameworks)
+  typeMapJson: json("type_map_json").$type<Record<string, string>>().notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  scopeIdx: index("ps_scope_matrix_profile_scope_idx").on(table.scopeId),
+  scopeUniq: unique("ps_scope_matrix_profile_scope_uniq").on(table.scopeId),
+}));
+
+export type PsScopeMatrixProfile = typeof psScopeMatrixProfile.$inferSelect;
+export type InsertPsScopeMatrixProfile = typeof psScopeMatrixProfile.$inferInsert;
+
+// ============================================================================
+// 13. PS Scope Matrix Headers — Normalized header definitions per version
+// ============================================================================
+
+export const psScopeMatrixHeaders = pgTable("ps_scope_matrix_headers", {
+  id: serial("id").primaryKey(),
+  versionId: integer("version_id").notNull(),
+  headerKey: varchar("header_key", { length: 120 }).notNull(),
+  headerLabel: varchar("header_label", { length: 255 }).notNull(),
+  headerType: varchar("header_type", { length: 50 }), // Standard | Method | Framework | Standards | Methods | Frameworks | null
+  isActive: integer("is_active").default(1).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  versionIdx: index("ps_scope_matrix_headers_version_idx").on(table.versionId),
+  keyUniq: unique("ps_scope_matrix_headers_key_uniq").on(table.versionId, table.headerKey),
+  sortIdx: index("ps_scope_matrix_headers_sort_idx").on(table.versionId, table.sortOrder),
+}));
+
+export type PsScopeMatrixHeader = typeof psScopeMatrixHeaders.$inferSelect;
+export type InsertPsScopeMatrixHeader = typeof psScopeMatrixHeaders.$inferInsert;

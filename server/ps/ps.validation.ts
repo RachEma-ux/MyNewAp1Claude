@@ -344,6 +344,62 @@ export const listMatrixImportsSchema = z.object({
   workspaceId: z.number().int().positive(),
 });
 
+// ── Scope Matrix Profile ──────────────────────────────────────────
+
+export const getMatrixVersionByIdSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
+export const getScopeProfileSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  scopeId: z.number().int().positive(),
+});
+
+export const listScopeProfilesSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+});
+
+export const createMatrixImportRecordSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive().optional(),
+  importType: z.enum(["scope_matrix", "scoring_matrix"]),
+  sourceType: z.enum(["json", "excel", "manual"]).default("excel"),
+  sourceName: z.string().min(1).max(255),
+  sheetName: z.string().min(1).max(255),
+  totalRows: z.number().int().min(0),
+  importedRows: z.number().int().min(0),
+  skippedRows: z.number().int().min(0),
+  warningsJson: z.array(z.string()).optional(),
+  rawPayloadJson: z.record(z.unknown()).optional(),
+});
+
+// ── Matrix Headers ──────────────────────────────────────────────────
+
+export const listMatrixHeadersSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+});
+
+export const listMatrixHeadersByTypeSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  headerType: z.enum(["Standard", "Method", "Framework", "Standards", "Methods", "Frameworks"]),
+});
+
+export const parseMatrixHeadersSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  rawHeaders: z.array(z.string()).min(1).max(50),
+});
+
+// ── Seed ──────────────────────────────────────────────────────────────
+
+export const seedScopeMatrixSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
 // ── Classification ──────────────────────────────────────────────────
 
 export const classifyScenarioSchema = z.object({

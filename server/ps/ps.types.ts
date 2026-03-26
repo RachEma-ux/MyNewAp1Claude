@@ -342,3 +342,63 @@ export interface MatrixImportCommitResult {
   questionsCreated: number;
   cellsCreated: number;
 }
+
+// ── Scope Matrix Profile Types ──────────────────────────────────────────
+
+export interface ScopeMatrixProfileData {
+  pmiValue?: string | null;
+  prince2Value?: string | null;
+  isoValue?: string | null;
+  ipmaValue?: string | null;
+  cmmiValue?: string | null;
+  aspiceValue?: string | null;
+  leanMethodValue?: string | null;
+  agileFrameworkValue?: string | null;
+  traditionalMethodValue?: string | null;
+  agileFrameworksValue?: string | null;
+  hybridMethodValue?: string | null;
+  caseScenario?: string | null;
+  selectedStandards?: string | null;
+  selectedFrameworks?: string | null;
+  rawRowJson?: Record<string, unknown> | null;
+  typeMapJson?: Record<string, string>;
+}
+
+export interface CreateScopeMatrixProfileInput extends ScopeMatrixProfileData {
+  scopeId: number;
+}
+
+// ── Matrix Header Types ──────────────────────────────────────────────────
+
+export const MATRIX_HEADER_TYPES = [
+  "Standard",
+  "Method",
+  "Framework",
+  "Standards",
+  "Methods",
+  "Frameworks",
+] as const;
+export type MatrixHeaderType = (typeof MATRIX_HEADER_TYPES)[number];
+
+export interface MatrixHeaderDefinition {
+  headerKey: string;
+  headerLabel: string;
+  headerType: MatrixHeaderType | null;
+  sortOrder: number;
+}
+
+export type MatrixImportType = "scope_matrix" | "scoring_matrix";
+
+export interface CreateMatrixImportRecordInput {
+  workspaceId: number;
+  versionId?: number;
+  importType: MatrixImportType;
+  sourceType: MatrixImportSourceType;
+  sourceName: string;
+  sheetName: string;
+  totalRows: number;
+  importedRows: number;
+  skippedRows: number;
+  warningsJson?: string[];
+  rawPayloadJson?: Record<string, unknown>;
+}

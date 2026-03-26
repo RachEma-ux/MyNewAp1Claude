@@ -54,6 +54,17 @@ import {
   previewMatrixImportSchema,
   commitMatrixImportSchema,
   listMatrixImportsSchema,
+  // Scope profile schemas
+  getMatrixVersionByIdSchema,
+  getScopeProfileSchema,
+  listScopeProfilesSchema,
+  createMatrixImportRecordSchema,
+  // Header schemas
+  listMatrixHeadersSchema,
+  listMatrixHeadersByTypeSchema,
+  parseMatrixHeadersSchema,
+  // Seed schema
+  seedScopeMatrixSchema,
 } from "./ps.validation";
 import * as service from "./ps.service";
 import { loadActiveMatrix } from "./ps.matrix-engine";
@@ -338,6 +349,69 @@ const matrixRouter = router({
         scopes: matrix.scopes,
         version: matrix.version,
       };
+    }),
+
+  // ── Get version by ID ───────────────────────────────────────────────
+
+  getVersion: protectedProcedure
+    .input(getMatrixVersionByIdSchema)
+    .query(async ({ input }) => {
+      return service.getMatrixVersionById(input.workspaceId, input.id);
+    }),
+
+  // ── Scope Matrix Profile endpoints ─────────────────────────────────
+
+  getScopeProfile: protectedProcedure
+    .input(getScopeProfileSchema)
+    .query(async ({ input }) => {
+      return service.getScopeProfile(input.workspaceId, input.scopeId);
+    }),
+
+  listScopeProfiles: protectedProcedure
+    .input(listScopeProfilesSchema)
+    .query(async ({ input }) => {
+      return service.listScopeProfiles(input.workspaceId, input.versionId);
+    }),
+
+  // ── Import record creation ─────────────────────────────────────────
+
+  createImportRecord: governedProcedure
+    .input(createMatrixImportRecordSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createMatrixImportRecord(input, ctx.user.id);
+    }),
+
+  // ── Matrix Header endpoints ────────────────────────────────────────
+
+  listHeaders: protectedProcedure
+    .input(listMatrixHeadersSchema)
+    .query(async ({ input }) => {
+      return service.listMatrixHeaders(input.workspaceId, input.versionId);
+    }),
+
+  listHeadersByType: protectedProcedure
+    .input(listMatrixHeadersByTypeSchema)
+    .query(async ({ input }) => {
+      return service.listMatrixHeadersByType(input.workspaceId, input.versionId, input.headerType);
+    }),
+
+  parseHeaders: governedProcedure
+    .input(parseMatrixHeadersSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.parseAndStoreHeaders(
+        input.workspaceId,
+        input.versionId,
+        input.rawHeaders,
+        ctx.user.id,
+      );
+    }),
+
+  // ── Seed endpoint ───────────────────────────────────────────────────
+
+  seedScopeMatrix: governedProcedure
+    .input(seedScopeMatrixSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.seedScopeMatrix(input.workspaceId, ctx.user.id);
     }),
 
   // ── Control Panel Admin endpoints ─────────────────────────────────

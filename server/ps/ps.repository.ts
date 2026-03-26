@@ -17,6 +17,8 @@ import {
   psMatrixQuestions,
   psMatrixCells,
   psMatrixImports,
+  psScopeMatrixProfile,
+  psScopeMatrixHeaders,
   type PsSystem,
   type InsertPsSystem,
   type PsWizardRun,
@@ -36,6 +38,10 @@ import {
   type InsertPsMatrixCell,
   type PsMatrixImport,
   type InsertPsMatrixImport,
+  type PsScopeMatrixProfile,
+  type InsertPsScopeMatrixProfile,
+  type PsScopeMatrixHeader,
+  type InsertPsScopeMatrixHeader,
 } from "../../drizzle/tables/ps";
 
 // ── Systems ──────────────────────────────────────────────────────────────
@@ -713,4 +719,119 @@ export async function getLastImportDate(workspaceId: number): Promise<string | n
     .orderBy(desc(psMatrixImports.committedAt))
     .limit(1);
   return imp?.committedAt?.toISOString() ?? null;
+}
+
+// ── Scope Matrix Profile ──────────────────────────────────────────────
+
+export async function getScopeProfileByScopeId(scopeId: number): Promise<PsScopeMatrixProfile | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [profile] = await db.select().from(psScopeMatrixProfile)
+    .where(eq(psScopeMatrixProfile.scopeId, scopeId))
+    .limit(1);
+  return profile ?? null;
+}
+
+export async function listScopeProfilesByVersion(versionId: number): Promise<PsScopeMatrixProfile[]> {
+  const db = getDb();
+  if (!db) return [];
+  // Join through scope_registry to get profiles for a specific version
+  const scopes = await db.select().from(psScopeRegistry)
+    .where(eq(psScopeRegistry.versionId, versionId));
+  if (scopes.length === 0) return [];
+
+  const scopeIds = scopes.map((s) => s.id);
+  const profiles: PsScopeMatrixProfile[] = [];
+  for (const sid of scopeIds) {
+    const [p] = await db.select().from(psScopeMatrixProfile)
+      .where(eq(psScopeMatrixProfile.scopeId, sid))
+      .limit(1);
+    if (p) profiles.push(p);
+  }
+  return profiles;
+}
+
+export async function createScopeProfile(data: InsertPsScopeMatrixProfile): Promise<PsScopeMatrixProfile> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psScopeMatrixProfile).values({
+    ...data,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }).returning();
+  return created;
+}
+
+export async function updateScopeProfile(
+  scopeId: number,
+  data: Partial<InsertPsScopeMatrixProfile>,
+): Promise<PsScopeMatrixProfile | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psScopeMatrixProfile)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(psScopeMatrixProfile.scopeId, scopeId))
+    .returning();
+  return updated ?? null;
+}
+
+// ── Scope Matrix Headers ──────────────────────────────────────────────
+
+export async function listHeadersByVersion(versionId: number): Promise<PsScopeMatrixHeader[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psScopeMatrixHeaders)
+    .where(and(
+      eq(psScopeMatrixHeaders.versionId, versionId),
+      eq(psScopeMatrixHeaders.isActive, 1),
+    ))
+    .orderBy(psScopeMatrixHeaders.sortOrder);
+}
+
+export async function listAllHeadersByVersion(versionId: number): Promise<PsScopeMatrixHeader[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psScopeMatrixHeaders)
+    .where(eq(psScopeMatrixHeaders.versionId, versionId))
+    .orderBy(psScopeMatrixHeaders.sortOrder);
+}
+
+export async function listHeadersByType(
+  versionId: number,
+  headerType: string,
+): Promise<PsScopeMatrixHeader[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psScopeMatrixHeaders)
+    .where(and(
+      eq(psScopeMatrixHeaders.versionId, versionId),
+      eq(psScopeMatrixHeaders.headerType, headerType),
+      eq(psScopeMatrixHeaders.isActive, 1),
+    ))
+    .orderBy(psScopeMatrixHeaders.sortOrder);
+}
+
+export async function createHeader(data: InsertPsScopeMatrixHeader): Promise<PsScopeMatrixHeader> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psScopeMatrixHeaders).values({
+    ...data,
+    createdAt: new Date(),
+  }).returning();
+  return created;
+}
+
+export async function createHeadersBatch(items: InsertPsScopeMatrixHeader[]): Promise<PsScopeMatrixHeader[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  if (items.length === 0) return [];
+  const now = new Date();
+  const rows = items.map((item) => ({ ...item, createdAt: now }));
+  return db.insert(psScopeMatrixHeaders).values(rows).returning();
+}
+
+export async function deleteHeadersByVersion(versionId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  await db.delete(psScopeMatrixHeaders).where(eq(psScopeMatrixHeaders.versionId, versionId));
 }

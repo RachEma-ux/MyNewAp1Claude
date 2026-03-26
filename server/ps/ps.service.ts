@@ -28,6 +28,7 @@ import type {
   PsMatrixVersionStatus,
   MatrixImportSourceType,
   MatrixImportPayload,
+  CreateMatrixImportRecordInput,
 } from "./ps.types";
 import { generateDemandSpecs, resolveQuantity } from "./ps.demand";
 import {
@@ -1098,6 +1099,198 @@ export async function commitMatrixImport(
 
 export async function listMatrixImports(workspaceId: number) {
   return repo.listMatrixImports(workspaceId);
+}
+
+// ── Matrix Version by ID ──────────────────────────────────────────────
+
+export async function getMatrixVersionById(workspaceId: number, id: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, id);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return version;
+}
+
+// ── Scope Matrix Profile ──────────────────────────────────────────────
+
+export async function getScopeProfile(workspaceId: number, scopeId: number) {
+  // Verify scope exists by checking the registry (scope → version → workspace)
+  const profile = await repo.getScopeProfileByScopeId(scopeId);
+  if (!profile) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Scope matrix profile not found" });
+  }
+  return profile;
+}
+
+export async function listScopeProfiles(workspaceId: number, versionId: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.listScopeProfilesByVersion(versionId);
+}
+
+// ── Matrix Headers ────────────────────────────────────────────────────
+
+export async function listMatrixHeaders(workspaceId: number, versionId: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.listHeadersByVersion(versionId);
+}
+
+export async function listMatrixHeadersByType(
+  workspaceId: number,
+  versionId: number,
+  headerType: string,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.listHeadersByType(versionId, headerType);
+}
+
+export async function parseAndStoreHeaders(
+  workspaceId: number,
+  versionId: number,
+  rawHeaders: string[],
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  // Use the header parsing engine
+  const { parseHeaderRow } = await import("./ps.matrix-headers");
+  const result = parseHeaderRow(rawHeaders);
+
+  if (!result.isValid) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Header parsing failed: ${result.errors.join("; ")}`,
+    });
+  }
+
+  // Clear existing headers for this version, then insert fresh
+  await repo.deleteHeadersByVersion(versionId);
+
+  const headerRows = result.headers.map((h) => ({
+    versionId,
+    headerKey: h.headerKey,
+    headerLabel: h.headerLabel,
+    headerType: h.headerType,
+    isActive: 1,
+    sortOrder: h.sortOrder,
+  }));
+
+  const created = await repo.createHeadersBatch(headerRows);
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_headers.parse_and_store",
+    entityType: "ps_scope_matrix_headers",
+    entityId: versionId,
+    newValue: {
+      headerCount: created.length,
+      typeMap: result.typeMap,
+    },
+  });
+  await logActivity({
+    workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "matrix_headers.parse_and_store",
+    targetType: "ps_matrix_version",
+    targetId: versionId,
+  });
+
+  return {
+    headers: created,
+    typeMap: result.typeMap,
+    warnings: result.warnings,
+  };
+}
+
+// ── Import Record Creation ────────────────────────────────────────────
+
+export async function createMatrixImportRecord(
+  input: CreateMatrixImportRecordInput,
+  actorId: number,
+) {
+  const record = await repo.createMatrixImport({
+    workspaceId: input.workspaceId,
+    versionId: input.versionId ?? null,
+    importType: input.importType,
+    sourceType: input.sourceType,
+    sourceName: input.sourceName,
+    sheetName: input.sheetName,
+    totalRows: input.totalRows,
+    importedRows: input.importedRows,
+    skippedRows: input.skippedRows,
+    rawPayloadJson: input.rawPayloadJson ?? null,
+    importStatus: "pending",
+    warningsJson: input.warningsJson ?? null,
+    createdBy: actorId,
+  });
+
+  await logPsAudit({
+    workspaceId: input.workspaceId,
+    actorId,
+    action: "matrix_import.create_record",
+    entityType: "ps_matrix_import",
+    entityId: record.id,
+    newValue: {
+      importType: input.importType,
+      sourceType: input.sourceType,
+      sheetName: input.sheetName,
+      totalRows: input.totalRows,
+    },
+  });
+  await logActivity({
+    workspaceId: input.workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "matrix_import.create_record",
+    targetType: "ps_matrix_import",
+    targetId: record.id,
+  });
+
+  return record;
+}
+
+// ── Seed ──────────────────────────────────────────────────────────────
+
+export async function seedScopeMatrix(workspaceId: number, actorId: number) {
+  const { seedScopeMatrix: runSeed } = await import("./ps.seed");
+  const result = await runSeed(workspaceId, actorId);
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "scope_matrix.seed",
+    entityType: "ps_matrix_version",
+    entityId: result.versionId,
+    newValue: {
+      version: result.version,
+      scopesInserted: result.scopesInserted,
+      profilesInserted: result.profilesInserted,
+      importRecordId: result.importRecordId,
+    },
+  });
+  await logActivity({
+    workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "scope_matrix.seed",
+    targetType: "ps_matrix_version",
+    targetId: result.versionId,
+  });
+
+  return result;
 }
 
 // ── Monitoring ────────────────────────────────────────────────────────
