@@ -333,7 +333,7 @@ export interface MatrixOverview {
 }
 
 export interface MatrixValidationError {
-  type: "duplicate_scope_code" | "duplicate_question_code" | "missing_cells" | "invalid_weight" | "no_active_scopes" | "no_questions" | "no_cells" | "empty_version";
+  type: "duplicate_scope_code" | "duplicate_question_code" | "missing_cells" | "invalid_weight" | "no_active_scopes" | "no_questions" | "no_cells" | "empty_version" | "orphan_cell" | "orphan_template_mapping";
   message: string;
   details?: Record<string, unknown>;
 }
@@ -352,6 +352,54 @@ export interface MatrixValidationReport {
     expectedCellCount: number;
     coveragePercent: number;
   };
+}
+
+// ── Matrix Version Comparison ──────────────────────────────────────────
+
+export interface VersionComparisonItem {
+  code: string;
+  label: string;
+  status: "added" | "removed" | "changed" | "unchanged";
+  oldValue?: string | number | null;
+  newValue?: string | number | null;
+}
+
+export interface VersionComparison {
+  baseVersionId: number;
+  baseVersion: string;
+  targetVersionId: number;
+  targetVersion: string;
+  scopes: {
+    added: VersionComparisonItem[];
+    removed: VersionComparisonItem[];
+    changed: VersionComparisonItem[];
+    unchanged: number;
+  };
+  questions: {
+    added: VersionComparisonItem[];
+    removed: VersionComparisonItem[];
+    changed: VersionComparisonItem[];
+    unchanged: number;
+  };
+  cells: {
+    added: number;
+    removed: number;
+    weightChanged: number;
+    unchanged: number;
+  };
+  dimensions: {
+    added: VersionComparisonItem[];
+    removed: VersionComparisonItem[];
+    unchanged: number;
+  };
+  summary: string;
+}
+
+export interface RollbackResult {
+  previousVersionId: number;
+  previousVersion: string;
+  rolledBackFromId: number;
+  rolledBackFromVersion: string;
 }
 
 // ── Matrix Import Types ────────────────────────────────────────────────

@@ -572,6 +572,28 @@ export const deleteCellSchema = z.object({
   id: z.number().int().positive(),
 });
 
+// ── Matrix Versioning ──────────────────────────────────────────────
+
+export const deepValidateMatrixSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+});
+
+export const safeActivateMatrixSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+});
+
+export const rollbackMatrixSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
+export const compareMatrixVersionsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  baseVersionId: z.number().int().positive(),
+  targetVersionId: z.number().int().positive(),
+});
+
 // ── Wizard Accept ──────────────────────────────────────────────────
 
 export const acceptWizardResultSchema = z.object({

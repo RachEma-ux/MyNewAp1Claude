@@ -12,6 +12,7 @@ import { classifyScenario as runLegacyClassifier } from "./ps.classifier";
 import { loadActiveMatrix, evaluateMatrix, evaluateMatrixEnriched } from "./ps.matrix-engine";
 import * as matrixAdmin from "./ps.matrix-admin";
 import * as matrixImport from "./ps.matrix-import";
+import * as versioning from "./ps.versioning";
 import type {
   CreateSystemInput,
   CreateWizardRunInput,
@@ -937,6 +938,32 @@ export async function activateMatrixVersionValidated(
 
 export async function getMatrixValidationReport(workspaceId: number, versionId: number) {
   return matrixAdmin.validateMatrixVersion(workspaceId, versionId);
+}
+
+// ── Safe Matrix Versioning ────────────────────────────────────────────
+
+export async function deepValidateMatrix(workspaceId: number, versionId: number) {
+  return versioning.deepValidateMatrix(workspaceId, versionId);
+}
+
+export async function safeActivateMatrix(
+  workspaceId: number,
+  versionId: number,
+  actorId: number,
+) {
+  return versioning.safeActivateMatrix(workspaceId, versionId, actorId);
+}
+
+export async function rollbackMatrixVersion(workspaceId: number, actorId: number) {
+  return versioning.rollbackMatrixVersion(workspaceId, actorId);
+}
+
+export async function compareMatrixVersions(
+  workspaceId: number,
+  baseVersionId: number,
+  targetVersionId: number,
+) {
+  return versioning.compareMatrixVersions(workspaceId, baseVersionId, targetVersionId);
 }
 
 // ── Scope Editing ─────────────────────────────────────────────────────

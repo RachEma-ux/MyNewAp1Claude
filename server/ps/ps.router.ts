@@ -65,6 +65,11 @@ import {
   parseMatrixHeadersSchema,
   // Seed schema
   seedScopeMatrixSchema,
+  // Matrix versioning schemas
+  deepValidateMatrixSchema,
+  safeActivateMatrixSchema,
+  rollbackMatrixSchema,
+  compareMatrixVersionsSchema,
   // Accept wizard result schema
   acceptWizardResultSchema,
   // Scope template mapping schemas
@@ -498,6 +503,36 @@ const matrixRouter = router({
     .input(getMatrixValidationReportSchema)
     .query(async ({ input }) => {
       return service.getMatrixValidationReport(input.workspaceId, input.versionId);
+    }),
+
+  // ── Safe Matrix Versioning ──────────────────────────────────────────
+
+  deepValidate: protectedProcedure
+    .input(deepValidateMatrixSchema)
+    .query(async ({ input }) => {
+      return service.deepValidateMatrix(input.workspaceId, input.versionId);
+    }),
+
+  safeActivate: governedProcedure
+    .input(safeActivateMatrixSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.safeActivateMatrix(input.workspaceId, input.versionId, ctx.user.id);
+    }),
+
+  rollback: governedProcedure
+    .input(rollbackMatrixSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.rollbackMatrixVersion(input.workspaceId, ctx.user.id);
+    }),
+
+  compareVersions: protectedProcedure
+    .input(compareMatrixVersionsSchema)
+    .query(async ({ input }) => {
+      return service.compareMatrixVersions(
+        input.workspaceId,
+        input.baseVersionId,
+        input.targetVersionId,
+      );
     }),
 
   // Admin scope operations (include inactive)
