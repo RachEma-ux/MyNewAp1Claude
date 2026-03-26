@@ -6,7 +6,7 @@
 import { useParams } from "wouter";
 import { PSCatalogPage } from "./PSCatalogPage";
 import { PSControlPanelPage } from "./PSControlPanelPage";
-import { PSWizardPage } from "./PSWizardPage";
+import PSWizardPage from "./PSWizardPage";
 import { PSListPage } from "./PSListPage";
 
 
