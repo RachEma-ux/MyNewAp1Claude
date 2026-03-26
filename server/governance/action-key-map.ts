@@ -43,6 +43,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "models.update": "model.update",
   "models.delete": "model.delete",
   "models.startDownload": "model.startDownload",
+  "models.importToCatalog": "model.importToCatalog",
 
   // ── Providers ────────────────────────────────────────────────────────────
   "providers.create": "provider.create",
@@ -55,6 +56,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "providers.updateModelConfig": "provider.updateModelConfig",
   "providers.updateRateLimits": "provider.updateRateLimits",
   "providers.resetStats": "provider.resetStats",
+  "providers.importToCatalog": "provider.importToCatalog",
   "providers.refreshModels": "provider.refreshModels",
   "providers.batchToggle": "provider.batchToggle",
 
@@ -97,6 +99,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "agents.controlPlane.promote": "agent.controlPlane.promote",
   "agents.disable": "agent.disable",
   "agents.diff": "agent.diff",
+  "agents.importToCatalog": "agent.importToCatalog",
 
   // ── Agent Promotions ─────────────────────────────────────────────────────
   "agentPromotions.createRequest": "agentPromotion.createRequest",
@@ -194,6 +197,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "llm.updatePricing": "llm.updatePricing",
   "llm.setDefault": "llm.setDefault",
   "llm.configureRouting": "llm.configureRouting",
+  "llm.importToCatalog": "llm.importToCatalog",
 
   // ── LLM Providers ───────────────────────────────────────────────────────
   "llm.providers.register": "llmProvider.register",
@@ -222,6 +226,11 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "deploy.trigger": "deploy.trigger",
   "deploy.cancel": "deploy.cancel",
   "deploy.rerun": "deploy.rerun",
+
+  // ── Bots ───────────────────────────────────────────────────────────────
+  "bots.create": "bot.create",
+  "bots.updateStatus": "bot.updateStatus",
+  "bots.importToCatalog": "bot.importToCatalog",
 
   // ── Catalog Management ───────────────────────────────────────────────────
   "catalogManage.discoverProvider": "catalog.discover",

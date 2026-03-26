@@ -612,6 +612,62 @@ actions:
     approval: none
     evidence: { required: false }
 
+  agent.importToCatalog:
+    domain: agent
+    risk: R2
+    capability: agent.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  model.importToCatalog:
+    domain: model
+    risk: R2
+    capability: model.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  provider.importToCatalog:
+    domain: provider
+    risk: R2
+    capability: provider.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  llm.importToCatalog:
+    domain: llm
+    risk: R2
+    capability: llm.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  bot.create:
+    domain: bot
+    risk: R2
+    capability: bot.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  bot.updateStatus:
+    domain: bot
+    risk: R2
+    capability: bot.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  bot.importToCatalog:
+    domain: bot
+    risk: R2
+    capability: bot.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   # Agent Promotions
   agentPromotion.createRequest:
     domain: agent
