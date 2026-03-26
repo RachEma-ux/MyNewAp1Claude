@@ -186,7 +186,7 @@ export async function evaluateMatrixClassification(
   if (!matrix) {
     throw new TRPCError({
       code: "NOT_FOUND",
-      message: "No active matrix version found. Falling back to legacy classifier is required.",
+      message: "No active matrix version found. Create and activate a matrix version first.",
     });
   }
 

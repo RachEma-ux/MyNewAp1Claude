@@ -16,7 +16,6 @@ import {
   psScopeRegistry,
   psMatrixQuestions,
   psMatrixCells,
-  psWizardOverrides,
 } from "../../drizzle/tables/ps";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -490,10 +489,9 @@ export async function getDeadQuestions(workspaceId: number): Promise<DeadQuestio
   if (!activeVersion) return [];
 
   // Get all questions for active version
-  const { psMatrixQuestions: questionsTable } = await import("../../drizzle/tables/ps");
   const questions = await db.select()
-    .from(questionsTable)
-    .where(eq(questionsTable.versionId, activeVersion.id));
+    .from(psMatrixQuestions)
+    .where(eq(psMatrixQuestions.versionId, activeVersion.id));
 
   // Get cells for active version
   const cells = await db.select()
