@@ -77,8 +77,8 @@ export function OMWizardPage({ workspaceId }: { workspaceId: number }) {
   const publishVersion = trpc.organizationManagement.structureVersions.publish.useMutation();
 
   const steps: WizardStep[] = [
-    { id: "context", label: "Structure Context", description: "Name your structure version and define the legal entity", isValid: !!draft.versionName && !!draft.legalEntityCode && !!draft.legalEntityName },
     { id: "model", label: "Structure Model", description: "Choose your organizational structure model", isValid: !!draft.structureModel },
+    { id: "context", label: "Structure Context", description: "Name your structure version and define the legal entity", isValid: !!draft.versionName && !!draft.legalEntityCode && !!draft.legalEntityName },
     { id: "governance", label: "Governance & Decision Design", description: "Define decision rights and escalation paths", isValid: !!draft.governanceNotes },
     { id: "org-units", label: "Org Units", description: "Create departments, divisions, and teams", isValid: draft.orgUnits.length > 0 },
     { id: "jobs", label: "Jobs", description: "Define job families and role levels", isValid: draft.jobs.length > 0 },
@@ -210,6 +210,23 @@ export function OMWizardPage({ workspaceId }: { workspaceId: number }) {
   function renderStep() {
     switch (currentStep) {
       case 0: return (
+        <div className="space-y-3">
+          {STRUCTURE_MODELS.map(m => (
+            <button key={m.id} onClick={() => set("structureModel", m.id)}
+              className={`w-full text-left p-4 rounded-lg border transition-colors ${draft.structureModel === m.id ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30"}`}>
+              <div className="flex items-center gap-3">
+                <Network className={`w-5 h-5 ${draft.structureModel === m.id ? "text-primary" : "text-muted-foreground"}`} />
+                <div>
+                  <p className="font-medium text-sm">{m.label}</p>
+                  <p className="text-xs text-muted-foreground">{m.desc}</p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      );
+
+      case 1: return (
         <div className="space-y-4">
           <div><Label>Version Name</Label><Input value={draft.versionName} onChange={e => set("versionName", e.target.value)} placeholder="e.g. Q1 2026 Structure" /></div>
           <div><Label>Version Description</Label><Textarea value={draft.versionDescription} onChange={e => set("versionDescription", e.target.value)} placeholder="What this version represents..." rows={3} /></div>
@@ -230,23 +247,6 @@ export function OMWizardPage({ workspaceId }: { workspaceId: number }) {
               </SelectContent>
             </Select>
           </div>
-        </div>
-      );
-
-      case 1: return (
-        <div className="space-y-3">
-          {STRUCTURE_MODELS.map(m => (
-            <button key={m.id} onClick={() => set("structureModel", m.id)}
-              className={`w-full text-left p-4 rounded-lg border transition-colors ${draft.structureModel === m.id ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30"}`}>
-              <div className="flex items-center gap-3">
-                <Network className={`w-5 h-5 ${draft.structureModel === m.id ? "text-primary" : "text-muted-foreground"}`} />
-                <div>
-                  <p className="font-medium text-sm">{m.label}</p>
-                  <p className="text-xs text-muted-foreground">{m.desc}</p>
-                </div>
-              </div>
-            </button>
-          ))}
         </div>
       );
 
