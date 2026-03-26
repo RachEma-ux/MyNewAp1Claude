@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html><head><title>Clearing cache...</title></head>
+<body>
+<script>
+  caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))).then(() => {
+    window.location.href = '/ps/wizard?t=' + Date.now();
+  });
+</script>
+<p>Clearing browser cache and redirecting to PS Wizard...</p>
+</body>
+</html>
