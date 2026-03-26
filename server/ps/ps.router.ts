@@ -133,7 +133,7 @@ const systemsRouter = router({
   list: protectedProcedure
     .input(listSystemsSchema)
     .query(async ({ input }) => {
-      return service.listSystems(input.status);
+      return service.listSystems(input?.status);
     }),
 
   updateName: governedProcedure

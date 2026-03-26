@@ -19,9 +19,8 @@ export const getSystemSchema = z.object({
 });
 
 export const listSystemsSchema = z.object({
-
   status: z.enum(["draft", "active", "archived"]).optional(),
-});
+}).optional().default({});
 
 export const createWizardRunSchema = z.object({
 
