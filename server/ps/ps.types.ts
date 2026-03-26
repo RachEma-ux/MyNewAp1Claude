@@ -251,12 +251,72 @@ export interface MatrixEvaluationResult {
   matrixVersion: string;
 }
 
+// ── Enhanced Matrix Engine Result Types ──────────────────────────────
+
+export interface ScopeScore {
+  code: string;
+  label: string;
+  score: number;
+  rank: number;
+}
+
+export interface ExplainabilitySignal {
+  questionCode: string;
+  questionLabel: string;
+  weight: number;
+  /** The scope this signal favours */
+  scopeCode: string;
+}
+
+export interface ExplainabilityReport {
+  /** Questions where the winning scope gained weight */
+  positiveSignals: ExplainabilitySignal[];
+  /** Questions where a competing scope gained more weight than the winner */
+  negativeSignals: ExplainabilitySignal[];
+  /** Score difference between #1 and #2 (0 if only one scope) */
+  winnerMargin: number;
+  winnerCode: string;
+  runnerUpCode: string;
+}
+
+export interface ConfidenceReport {
+  /** Composite confidence 0..1 */
+  overall: number;
+  /** Normalised score spread (higher = more differentiated) 0..1 */
+  spread: number;
+  /** Fraction of matrix questions that were answered 0..1 */
+  completeness: number;
+  /** How close the top 2 scores are (0 = clear winner, 1 = tied) */
+  ambiguity: number;
+}
+
+export interface EnrichedMatrixResult {
+  selectedScope: string;
+  selectedScopeLabel: string;
+  top3: ScopeScore[];
+  ranking: ScopeScore[];
+  scores: Record<string, number>;
+  matchedQuestions: string[];
+  totalQuestions: number;
+  matrixVersion: string;
+  explainability: ExplainabilityReport;
+  confidence: ConfidenceReport;
+}
+
+export interface LoadedMatrixDimension {
+  id: number;
+  dimensionKey: string;
+  dimensionLabel: string;
+  values: Array<{ id: number; valueKey: string; valueLabel: string }>;
+}
+
 export interface LoadedMatrix {
   versionId: number;
   version: string;
   scopes: Array<{ id: number; code: string; label: string; family: string | null }>;
   questions: Array<{ id: number; code: string; label: string; description: string | null }>;
   cells: Array<{ questionId: number; scopeId: number; weight: number }>;
+  dimensions: LoadedMatrixDimension[];
 }
 
 // ── Matrix Admin Types ─────────────────────────────────────────────────

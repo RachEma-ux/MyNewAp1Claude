@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { evaluateMatrix, rankScopes } from "./ps.matrix-engine";
+import { evaluateMatrix, evaluateMatrixEnriched, rankScopes } from "./ps.matrix-engine";
 import type { LoadedMatrix } from "./ps.types";
 
 // ── Test Matrix Setup ────────────────────────────────────────────────
@@ -71,6 +71,7 @@ function buildTestMatrix(): LoadedMatrix {
       { questionId: 17, scopeId: 2, weight: 1 },
       { questionId: 17, scopeId: 3, weight: 9 },
     ],
+    dimensions: [],
   };
 }
 
@@ -150,6 +151,7 @@ describe("Matrix Engine - Test 3: Conflicting Answers", () => {
         { questionId: 10, scopeId: 1, weight: 5 },
         { questionId: 10, scopeId: 2, weight: 5 },
       ],
+      dimensions: [],
     };
 
     const result = evaluateMatrix(matrix, { Q1: true });
@@ -237,5 +239,97 @@ describe("Matrix Engine - Operations Profile", () => {
     expect(result.scores["OPERATIONS_IMPROVEMENT"]).toBe(10 + 9); // 19
     expect(result.matchedQuestions).toContain("Q_PROCESS_OPT");
     expect(result.matchedQuestions).toContain("Q_COST_REDUCE");
+  });
+});
+
+// ── Enriched Evaluation Tests ─────────────────────────────────────────
+
+describe("Matrix Engine - Enriched Evaluation", () => {
+  it("should return top 3, ranking, explainability and confidence", () => {
+    const matrix = buildTestMatrix();
+    const result = evaluateMatrixEnriched(matrix, {
+      Q_SDLC: true,
+      Q_CI_CD: true,
+      Q_AGILE: true,
+    });
+
+    expect(result.selectedScope).toBe("SOFTWARE_LIFECYCLE");
+    expect(result.selectedScopeLabel).toBe("Software Lifecycle");
+    expect(result.top3.length).toBe(3);
+    expect(result.top3[0].code).toBe("SOFTWARE_LIFECYCLE");
+    expect(result.top3[0].rank).toBe(1);
+    expect(result.top3[1].rank).toBe(2);
+    expect(result.top3[2].rank).toBe(3);
+    expect(result.ranking.length).toBe(3);
+    expect(result.totalQuestions).toBe(8);
+    expect(result.matchedQuestions.length).toBe(3);
+  });
+
+  it("should produce positive signals for the winner", () => {
+    const matrix = buildTestMatrix();
+    const result = evaluateMatrixEnriched(matrix, {
+      Q_SDLC: true,
+      Q_CI_CD: true,
+    });
+
+    // Winner is SOFTWARE_LIFECYCLE with score 18
+    expect(result.explainability.winnerCode).toBe("SOFTWARE_LIFECYCLE");
+    expect(result.explainability.positiveSignals.length).toBeGreaterThan(0);
+    // Q_SDLC has weight 10 for SOFTWARE_LIFECYCLE
+    const sdlcSignal = result.explainability.positiveSignals.find(
+      (s) => s.questionCode === "Q_SDLC",
+    );
+    expect(sdlcSignal).toBeDefined();
+    expect(sdlcSignal!.weight).toBe(10);
+  });
+
+  it("should report winner margin correctly", () => {
+    const matrix = buildTestMatrix();
+    const result = evaluateMatrixEnriched(matrix, {
+      Q_SDLC: true,
+      Q_CI_CD: true,
+      Q_AGILE: true,
+    });
+
+    // SW=23, PM=6 → margin = 17
+    expect(result.explainability.winnerMargin).toBe(17);
+  });
+
+  it("should produce confidence metrics in 0..1 range", () => {
+    const matrix = buildTestMatrix();
+    const result = evaluateMatrixEnriched(matrix, {
+      Q_SDLC: true,
+      Q_CI_CD: true,
+    });
+
+    expect(result.confidence.overall).toBeGreaterThanOrEqual(0);
+    expect(result.confidence.overall).toBeLessThanOrEqual(1);
+    expect(result.confidence.spread).toBeGreaterThanOrEqual(0);
+    expect(result.confidence.spread).toBeLessThanOrEqual(1);
+    expect(result.confidence.completeness).toBeGreaterThanOrEqual(0);
+    expect(result.confidence.completeness).toBeLessThanOrEqual(1);
+    expect(result.confidence.ambiguity).toBeGreaterThanOrEqual(0);
+    expect(result.confidence.ambiguity).toBeLessThanOrEqual(1);
+  });
+
+  it("should report completeness as fraction of answered questions", () => {
+    const matrix = buildTestMatrix();
+    // Answer 3 of 8 questions
+    const result = evaluateMatrixEnriched(matrix, {
+      Q_SDLC: true,
+      Q_CI_CD: true,
+      Q_AGILE: true,
+    });
+
+    expect(result.confidence.completeness).toBeCloseTo(3 / 8, 3);
+  });
+
+  it("should handle empty answers for enriched eval", () => {
+    const matrix = buildTestMatrix();
+    const result = evaluateMatrixEnriched(matrix, {});
+
+    expect(result.confidence.completeness).toBe(0);
+    expect(result.explainability.positiveSignals.length).toBe(0);
+    expect(result.explainability.negativeSignals.length).toBe(0);
   });
 });

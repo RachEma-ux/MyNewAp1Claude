@@ -354,6 +354,12 @@ const matrixRouter = router({
       return service.evaluateMatrixClassification(input);
     }),
 
+  evaluateEnriched: protectedProcedure
+    .input(evaluateMatrixSchema)
+    .query(async ({ input }) => {
+      return service.evaluateMatrixClassificationEnriched(input);
+    }),
+
   hasActive: protectedProcedure
     .input(hasActiveMatrixSchema)
     .query(async ({ input }) => {
@@ -364,11 +370,12 @@ const matrixRouter = router({
     .input(getActiveMatrixQuestionsSchema)
     .query(async ({ input }) => {
       const matrix = await loadActiveMatrix(input.workspaceId);
-      if (!matrix) return { available: false as const, questions: [], scopes: [], version: null };
+      if (!matrix) return { available: false as const, questions: [], scopes: [], dimensions: [], version: null };
       return {
         available: true as const,
         questions: matrix.questions,
         scopes: matrix.scopes,
+        dimensions: matrix.dimensions,
         version: matrix.version,
       };
     }),

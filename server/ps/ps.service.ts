@@ -9,7 +9,7 @@ import * as repo from "./ps.repository";
 import { logPsAudit } from "./ps.audit";
 import { logActivity } from "../modules/registry";
 import { classifyScenario as runLegacyClassifier } from "./ps.classifier";
-import { loadActiveMatrix, evaluateMatrix } from "./ps.matrix-engine";
+import { loadActiveMatrix, evaluateMatrix, evaluateMatrixEnriched } from "./ps.matrix-engine";
 import * as matrixAdmin from "./ps.matrix-admin";
 import * as matrixImport from "./ps.matrix-import";
 import type {
@@ -25,6 +25,7 @@ import type {
   AssignmentSummary,
   MatrixEvaluationInput,
   MatrixEvaluationResult,
+  EnrichedMatrixResult,
   PsMatrixVersionStatus,
   MatrixImportSourceType,
   MatrixImportPayload,
@@ -196,6 +197,39 @@ export async function evaluateMatrixClassification(
   }
 
   return evaluateMatrix(matrix, input.answers);
+}
+
+/**
+ * Enriched matrix evaluation with explainability + confidence.
+ * Primary entry point for the classification API.
+ */
+export async function evaluateMatrixClassificationEnriched(
+  input: MatrixEvaluationInput,
+): Promise<EnrichedMatrixResult> {
+  const matrix = await loadActiveMatrix(input.workspaceId);
+
+  if (!matrix) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "No active matrix version found. Create and activate a matrix version first.",
+    });
+  }
+
+  if (matrix.questions.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Active matrix has no questions defined",
+    });
+  }
+
+  if (matrix.scopes.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Active matrix has no scopes defined",
+    });
+  }
+
+  return evaluateMatrixEnriched(matrix, input.answers);
 }
 
 /**
