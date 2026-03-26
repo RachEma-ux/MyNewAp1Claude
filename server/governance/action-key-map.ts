@@ -362,6 +362,10 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "modules.reporting.riskHeatmap.view": "reporting.riskHeatmap.view",
   "modules.reporting.export": "reporting.export",
 
+  // ── Projects System (PS) ───────────────────────────────────────────────
+  "ps.systems.create": "ps.system.create",
+  "ps.wizardRuns.create": "ps.wizardRun.create",
+
   // ── Modules (Engine Binding) ─────────────────────────────────────────────
   "modules.manage.setEnabled": "module.setEnabled",
   "modules.manage.seed": "module.seed",
