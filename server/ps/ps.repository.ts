@@ -4,7 +4,7 @@
  * All DB access for PS domain. No business logic.
  */
 
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, asc, count } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import {
   psSystems,
@@ -1134,4 +1134,65 @@ export async function listMatrixSimulations(): Promise<PsMatrixSimulation[]> {
   if (!db) return [];
   return db.select().from(psMatrixSimulations)
     .orderBy(desc(psMatrixSimulations.createdAt));
+}
+
+// ── Wizard Classification Queries ────────────────────────────────────
+
+export async function listActiveQuestionsByVersion(versionId: number) {
+  const db = getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: psMatrixQuestions.id,
+      code: psMatrixQuestions.code,
+      label: psMatrixQuestions.label,
+      sortOrder: psMatrixQuestions.sortOrder,
+    })
+    .from(psMatrixQuestions)
+    .where(
+      and(
+        eq(psMatrixQuestions.versionId, versionId),
+        eq(psMatrixQuestions.isActive, 1),
+      )
+    )
+    .orderBy(asc(psMatrixQuestions.sortOrder), asc(psMatrixQuestions.id));
+}
+
+export async function listCellsWithQuestionsByVersion(versionId: number) {
+  const db = getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: psMatrixCells.id,
+      scopeId: psMatrixCells.scopeId,
+      questionId: psMatrixCells.questionId,
+      weight: psMatrixCells.weight,
+      questionCode: psMatrixQuestions.code,
+      questionLabel: psMatrixQuestions.label,
+    })
+    .from(psMatrixCells)
+    .innerJoin(
+      psMatrixQuestions,
+      eq(psMatrixCells.questionId, psMatrixQuestions.id),
+    )
+    .where(eq(psMatrixCells.versionId, versionId));
+}
+
+export async function listActiveScopesByVersion(versionId: number) {
+  const db = getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: psScopeRegistry.id,
+      code: psScopeRegistry.code,
+      label: psScopeRegistry.label,
+    })
+    .from(psScopeRegistry)
+    .where(
+      and(
+        eq(psScopeRegistry.versionId, versionId),
+        eq(psScopeRegistry.isActive, 1),
+      )
+    )
+    .orderBy(asc(psScopeRegistry.id));
 }

@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import { useState } from "react";
+import { trpc } from "@/lib/trpc";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -11,11 +12,18 @@ type ContextState = {
 
 type AnswerMap = Record<string, string>;
 
-type Question = {
-  id: string;
-  code: string;
-  label: string;
-  helpText?: string;
+type Recommendation = {
+  matrixVersionId: number;
+  matrixVersion: string;
+  selectedScope: string | null;
+  selectedScopeCode: string | null;
+  top3: Array<{ scopeId: number; scopeCode: string; scopeLabel: string; score: number }>;
+  confidence: string;
+  winnerMargin: number;
+  explainability: {
+    positiveContributors: string[];
+    negativeContributors: string[];
+  };
 };
 
 export default function PSWizardPage() {
@@ -32,6 +40,7 @@ export default function PSWizardPage() {
   const [generatedName, setGeneratedName] = useState("");
   const [answers, setAnswers] = useState<AnswerMap>({});
   const [overrideReason, setOverrideReason] = useState("");
+  const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
 
   const [parsingDone, setParsingDone] = useState(false);
   const [normalizedDimensions, setNormalizedDimensions] = useState<Record<string, string>>({
@@ -43,34 +52,11 @@ export default function PSWizardPage() {
     LIFECYCLE_FOCUS: "—",
   });
 
-  const [recommendation] = useState({
-    selectedScope: "Agile Product Delivery",
-    top3: [
-      "Agile Product Delivery",
-      "Software Lifecycle",
-      "Project Governance",
-    ],
-    confidence: "High",
-    winnerMargin: "+3",
-    positives: [
-      "Evolving requirements",
-      "Speed / agility focus",
-      "Multi-team coordination",
-    ],
-    negatives: ["Lower governance-only signal"],
-  });
+  // Real API: fetch questions from active matrix
+  const { data: questions = [] } = trpc.ps.getActiveQuestions.useQuery(undefined);
 
-  // Replace with real query later
-  const questions: Question[] = useMemo(
-    () => [
-      { id: "1", code: "EVOLVING_REQUIREMENTS", label: "Are requirements expected to evolve during delivery?" },
-      { id: "2", code: "SOFTWARE_CENTRIC", label: "Is the work software / service centric?" },
-      { id: "3", code: "MULTI_TEAM", label: "Does the initiative involve multiple coordinated teams?" },
-      { id: "4", code: "HIGH_COMPLIANCE", label: "Is high compliance / control required?" },
-      { id: "5", code: "NEED_SPEED", label: "Is speed / agility a major objective?" },
-    ],
-    []
-  );
+  // Real API: classify scenario mutation
+  const classifyMutation = trpc.ps.classifyScenario.useMutation();
 
   const stepLabels = ["Scenario", "Context", "Questions", "Recommendation", "Create"];
 
@@ -83,6 +69,10 @@ export default function PSWizardPage() {
 
   function nextStep() {
     if (!canGoNext) return;
+    if (step === 3) {
+      handleRunRecommendation();
+      return;
+    }
     if (step < 5) setStep((s) => (s + 1) as Step);
   }
 
@@ -105,6 +95,20 @@ export default function PSWizardPage() {
 
   function setAnswer(code: string, value: string) {
     setAnswers((prev) => ({ ...prev, [code]: value }));
+  }
+
+  async function handleRunRecommendation() {
+    try {
+      const result = await classifyMutation.mutateAsync({
+        scenario,
+        context,
+        answers,
+      });
+      setRecommendation(result);
+      setStep(4);
+    } catch (err) {
+      console.error("Classification failed:", err);
+    }
   }
 
   return (
@@ -258,58 +262,68 @@ export default function PSWizardPage() {
             <div className="space-y-4">
               <h2 className="text-2xl font-semibold">Recommendation</h2>
 
-              <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-                <div className="text-sm text-white/50">Selected Scope</div>
-                <div className="mt-1 text-2xl font-bold text-indigo-300">
-                  {recommendation.selectedScope}
-                </div>
-
-                <div className="mt-4 text-sm text-white/50">Top 3</div>
-                <ol className="mt-2 list-decimal space-y-1 pl-5">
-                  {recommendation.top3.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ol>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div>
-                    <div className="text-sm text-white/50">Confidence</div>
-                    <div className="font-semibold">{recommendation.confidence}</div>
+              {recommendation ? (
+                <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+                  <div className="text-sm text-white/50">Selected Scope</div>
+                  <div className="mt-1 text-2xl font-bold text-indigo-300">
+                    {recommendation.selectedScope}
                   </div>
-                  <div>
-                    <div className="text-sm text-white/50">Winner Margin</div>
-                    <div className="font-semibold">{recommendation.winnerMargin}</div>
+
+                  <div className="mt-4 text-sm text-white/50">Top 3</div>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5">
+                    {recommendation.top3.map((item) => (
+                      <li key={item.scopeId}>
+                        {item.scopeLabel} (score: {item.score})
+                      </li>
+                    ))}
+                  </ol>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <div className="text-sm text-white/50">Confidence</div>
+                      <div className="font-semibold">{recommendation.confidence}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-white/50">Winner Margin</div>
+                      <div className="font-semibold">+{recommendation.winnerMargin}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="text-sm text-white/50">Positive contributors</div>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      {recommendation.explainability.positiveContributors.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {recommendation.explainability.negativeContributors.length > 0 && (
+                    <div className="mt-4">
+                      <div className="text-sm text-white/50">Negative / missing contributors</div>
+                      <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {recommendation.explainability.negativeContributors.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="mt-4">
+                    <textarea
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      placeholder="Override reason (optional)"
+                      rows={4}
+                      className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
+                    />
                   </div>
                 </div>
-
-                <div className="mt-4">
-                  <div className="text-sm text-white/50">Positive contributors</div>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {recommendation.positives.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
+              ) : (
+                <div className="text-white/50">
+                  {classifyMutation.isPending ? "Running classification..." : "No recommendation yet"}
                 </div>
-
-                <div className="mt-4">
-                  <div className="text-sm text-white/50">Negative / missing contributors</div>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {recommendation.negatives.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="mt-4">
-                  <textarea
-                    value={overrideReason}
-                    onChange={(e) => setOverrideReason(e.target.value)}
-                    placeholder="Override reason (optional)"
-                    rows={4}
-                    className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
-                  />
-                </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -325,12 +339,12 @@ export default function PSWizardPage() {
 
                 <div>
                   <div className="text-sm text-white/50">Scope</div>
-                  <div className="font-semibold">{recommendation.selectedScope}</div>
+                  <div className="font-semibold">{recommendation?.selectedScope ?? "—"}</div>
                 </div>
 
                 <div>
                   <div className="text-sm text-white/50">Matrix Version</div>
-                  <div className="font-semibold">v1.0.0</div>
+                  <div className="font-semibold">{recommendation?.matrixVersion ?? "—"}</div>
                 </div>
 
                 <div>
@@ -372,10 +386,10 @@ export default function PSWizardPage() {
             <button
               type="button"
               onClick={nextStep}
-              disabled={!canGoNext || step === 5}
+              disabled={!canGoNext || step === 5 || (step === 3 && classifyMutation.isPending)}
               className="rounded-xl bg-blue-600 px-5 py-2 font-medium disabled:opacity-40"
             >
-              Next
+              {step === 3 ? "Classify" : "Next"}
             </button>
           </div>
         </div>

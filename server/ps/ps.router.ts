@@ -6,6 +6,7 @@
  * and matrix admin/import operations for the Control Panel.
  */
 
+import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import {
   createSystemSchema,
@@ -14,7 +15,6 @@ import {
   createWizardRunSchema,
   getWizardRunSchema,
   listWizardRunsSchema,
-  classifyScenarioSchema,
   createResourceRequestSchema,
   listResourceRequestsSchema,
   listResourceRequestsBySystemSchema,
@@ -908,13 +908,25 @@ export const psRouter = router({
   evaluation: evaluationRouter,
   overrides: overridesRouter,
 
+  getActiveQuestions: protectedProcedure
+    .input(z.void())
+    .query(async () => {
+      return service.getWizardActiveQuestions();
+    }),
+
   classifyScenario: protectedProcedure
-    .input(classifyScenarioSchema)
-    .query(({ input }) => {
-      return service.classifyScenario({
-        scenarioText: input.scenarioText,
-        dimensions: input.dimensions,
-      });
+    .input(z.object({
+      scenario: z.string().min(1),
+      context: z.object({
+        businessUnit: z.string().optional().default(""),
+        region: z.string().optional().default(""),
+        strategicImportance: z.string().optional().default(""),
+        existingSituation: z.string().optional().default(""),
+      }),
+      answers: z.record(z.string(), z.string()).default({}),
+    }))
+    .mutation(async ({ input }) => {
+      return service.classifyWizardScenario(input);
     }),
 
   catalog: protectedProcedure

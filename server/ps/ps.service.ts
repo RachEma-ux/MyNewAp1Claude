@@ -154,6 +154,97 @@ export function classifyScenario(input: ClassificationInput) {
   return runLegacyClassifier(input);
 }
 
+// ── Wizard Classification (matrix-based) ─────────────────────────────
+
+export async function getWizardActiveQuestions() {
+  const activeVersion = await repo.getActiveMatrixVersion();
+  if (!activeVersion) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "No active PS matrix version found." });
+  }
+  return repo.listActiveQuestionsByVersion(activeVersion.id);
+}
+
+type WizardClassifyInput = {
+  scenario: string;
+  context: {
+    businessUnit?: string;
+    region?: string;
+    strategicImportance?: string;
+    existingSituation?: string;
+  };
+  answers: Record<string, string>;
+};
+
+export async function classifyWizardScenario(input: WizardClassifyInput) {
+  const activeVersion = await repo.getActiveMatrixVersion();
+  if (!activeVersion) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "No active PS matrix version found." });
+  }
+
+  const questions = await repo.listActiveQuestionsByVersion(activeVersion.id);
+  const cells = await repo.listCellsWithQuestionsByVersion(activeVersion.id);
+  const scopes = await repo.listActiveScopesByVersion(activeVersion.id);
+
+  const scoreByScope = new Map<number, number>();
+  for (const scope of scopes) {
+    scoreByScope.set(scope.id, 0);
+  }
+
+  for (const cell of cells) {
+    const answer = input.answers[cell.questionCode];
+    if (answer === "Yes") {
+      scoreByScope.set(
+        cell.scopeId,
+        (scoreByScope.get(cell.scopeId) ?? 0) + Number(cell.weight ?? 0),
+      );
+    }
+  }
+
+  const ranked = scopes
+    .map((scope) => ({
+      scopeId: scope.id,
+      scopeCode: scope.code,
+      scopeLabel: scope.label,
+      score: scoreByScope.get(scope.id) ?? 0,
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const winner = ranked[0];
+  const runnerUp = ranked[1];
+  const winnerMargin = winner && runnerUp ? winner.score - runnerUp.score : winner?.score ?? 0;
+
+  const answeredCount = Object.keys(input.answers).length;
+  const totalQuestions = questions.length;
+  const completeness = totalQuestions > 0 ? answeredCount / totalQuestions : 0;
+
+  let confidence = "Low";
+  if (winnerMargin >= 3 && completeness >= 0.6) confidence = "High";
+  else if (winnerMargin >= 1 && completeness >= 0.4) confidence = "Medium";
+
+  const positiveContributors = cells
+    .filter((cell) => {
+      const answer = input.answers[cell.questionCode];
+      return answer === "Yes" && cell.scopeId === winner?.scopeId && Number(cell.weight) > 0;
+    })
+    .sort((a, b) => Number(b.weight) - Number(a.weight))
+    .slice(0, 5)
+    .map((cell) => cell.questionLabel);
+
+  return {
+    matrixVersionId: activeVersion.id,
+    matrixVersion: activeVersion.version,
+    selectedScope: winner?.scopeLabel ?? null,
+    selectedScopeCode: winner?.scopeCode ?? null,
+    top3: ranked.slice(0, 3),
+    confidence,
+    winnerMargin,
+    explainability: {
+      positiveContributors,
+      negativeContributors: [] as string[],
+    },
+  };
+}
+
 // ── Matrix Classification Engine ─────────────────────────────────────
 
 export async function evaluateMatrixClassification(
