@@ -119,12 +119,16 @@ export default function PSWizardPage() {
   }
 
   async function handleCreateAndList() {
-    if (!recommendation) return;
+    if (!recommendation) {
+      setCreateError("No recommendation available — please go back to Step 3 and classify first.");
+      return;
+    }
     setCreateError("");
     try {
+      const projectName = generatedName.trim() || recommendation.selectedScope || "Untitled Project";
       await createPSProject.mutateAsync({
-        name: generatedName || "Untitled Project",
-        scope: recommendation.selectedScope ?? "",
+        name: projectName,
+        scope: recommendation.selectedScopeCode ?? recommendation.selectedScope ?? "CUSTOM",
         matrixVersion: recommendation.matrixVersion ?? "v1.0.0",
         scenario,
         context,
