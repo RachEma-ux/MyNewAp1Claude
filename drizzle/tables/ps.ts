@@ -255,3 +255,32 @@ export const psMatrixCells = pgTable("ps_matrix_cells", {
 
 export type PsMatrixCell = typeof psMatrixCells.$inferSelect;
 export type InsertPsMatrixCell = typeof psMatrixCells.$inferInsert;
+
+// ============================================================================
+// 11. PS Matrix Imports — Import traceability
+// ============================================================================
+
+export const psMatrixImports = pgTable("ps_matrix_imports", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  versionId: integer("version_id"),
+  sourceType: varchar("source_type", { length: 30 }).notNull(), // json | excel | manual
+  sourceName: varchar("source_name", { length: 255 }),
+  rawPayloadJson: json("raw_payload_json").$type<Record<string, unknown>>(),
+  importStatus: varchar("import_status", { length: 30 }).default("pending").notNull(), // pending | previewed | committed | failed
+  scopesCount: integer("scopes_count").default(0),
+  questionsCount: integer("questions_count").default(0),
+  cellsCount: integer("cells_count").default(0),
+  warningsJson: json("warnings_json").$type<string[]>(),
+  errorsJson: json("errors_json").$type<string[]>(),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  committedAt: timestamp("committed_at"),
+}, (table) => ({
+  wsIdx: index("ps_matrix_imports_ws_idx").on(table.workspaceId),
+  versionIdx: index("ps_matrix_imports_version_idx").on(table.versionId),
+  statusIdx: index("ps_matrix_imports_status_idx").on(table.importStatus),
+}));
+
+export type PsMatrixImport = typeof psMatrixImports.$inferSelect;
+export type InsertPsMatrixImport = typeof psMatrixImports.$inferInsert;

@@ -258,3 +258,87 @@ export interface LoadedMatrix {
   questions: Array<{ id: number; code: string; label: string; description: string | null }>;
   cells: Array<{ questionId: number; scopeId: number; weight: number }>;
 }
+
+// ── Matrix Admin Types ─────────────────────────────────────────────────
+
+export interface MatrixOverview {
+  activeVersion: { id: number; version: string; label: string; activatedAt: string | null } | null;
+  totalVersions: number;
+  totalScopes: number;
+  totalQuestions: number;
+  totalCells: number;
+  lastImportAt: string | null;
+  lastActivationAt: string | null;
+}
+
+export interface MatrixValidationError {
+  type: "duplicate_scope_code" | "duplicate_question_code" | "missing_cells" | "invalid_weight" | "no_active_scopes" | "no_questions" | "no_cells" | "empty_version";
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface MatrixValidationReport {
+  versionId: number;
+  isValid: boolean;
+  errors: MatrixValidationError[];
+  warnings: string[];
+  stats: {
+    scopeCount: number;
+    activeScopeCount: number;
+    questionCount: number;
+    activeQuestionCount: number;
+    cellCount: number;
+    expectedCellCount: number;
+    coveragePercent: number;
+  };
+}
+
+// ── Matrix Import Types ────────────────────────────────────────────────
+
+export type MatrixImportSourceType = "json" | "excel" | "manual";
+export type MatrixImportStatus = "pending" | "previewed" | "committed" | "failed";
+
+export interface MatrixImportScopeRow {
+  code: string;
+  label: string;
+  description?: string;
+  family?: string;
+}
+
+export interface MatrixImportQuestionRow {
+  code: string;
+  label: string;
+  description?: string;
+  sortOrder?: number;
+}
+
+export interface MatrixImportCellRow {
+  questionCode: string;
+  scopeCode: string;
+  weight: number;
+}
+
+export interface MatrixImportPayload {
+  scopes: MatrixImportScopeRow[];
+  questions: MatrixImportQuestionRow[];
+  cells: MatrixImportCellRow[];
+}
+
+export interface MatrixImportPreview {
+  importId: number;
+  sourceType: MatrixImportSourceType;
+  scopesCount: number;
+  questionsCount: number;
+  cellsCount: number;
+  warnings: string[];
+  errors: string[];
+  isValid: boolean;
+}
+
+export interface MatrixImportCommitResult {
+  importId: number;
+  versionId: number;
+  scopesCreated: number;
+  questionsCreated: number;
+  cellsCreated: number;
+}
