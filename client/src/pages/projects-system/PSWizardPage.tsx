@@ -1,14 +1,15 @@
 /**
  * PS Wizard — Matrix-first classification wizard
  *
- * Runtime flow:
- *   Step 0 — Scenario: describe the project, auto-generate name
- *   Step 1 — Context: additional context / dimension normalisation
+ * Runtime flow (matrix mode):
+ *   Step 0 — Scenario: describe the project
+ *   Step 1 — Context: auto-generate name, review context tags / dimensions
  *   Step 2 — Questions: DB-driven question rendering + answer collection
  *   Step 3 — Recommendation: matrix scoring, confidence, explainability, override
- *   Step 4 — Review: confirm and persist wizard run
+ *   Step 4 — Review & Accept: calls acceptWizardResult → atomic persist
+ *            (template resolution → wizard run → system → demand → assignments → override → audit)
  *
- * Legacy fallback when no active matrix version exists.
+ * Legacy fallback (no active matrix): scenario + dimensions → rule-based classify → manual persist.
  * All questions and scopes are DB-driven — zero hard-coded logic.
  */
 import { useState, useMemo, useCallback } from "react";
@@ -269,6 +270,13 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
   const [isClassifying, setIsClassifying] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const [generatedDemand, setGeneratedDemand] = useState<Array<{ role: string; quantity: number }>>([]);
+  const [acceptResult, setAcceptResult] = useState<{
+    wizardRun: { id: number; scenarioText: string; selectedSystemType: string | null };
+    system: { id: number; name: string; systemType: string; status: string };
+    demandGenerated: Array<{ id: number; role: string; quantity: number | null }>;
+    assignmentPlaceholders: Array<{ id: number; assignmentRole: string; status: string }>;
+    trace: { wizardRunId: number; systemId: number; demandCount: number; assignmentCount: number; scopeCode: string; templateUsed: string; overrideApplied: boolean };
+  } | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -325,6 +333,9 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
   );
 
   // ── Mutations ─────────────────────────────────────────────────────
+  // Matrix mode: single atomic operation (template resolution → wizard run → system → demand → assignments → override)
+  const acceptMut = trpc.ps.wizardRuns.accept.useMutation({ onError: (e) => toast.error(e.message) });
+  // Legacy mode: 3-step manual flow (kept for backward compat when no active matrix)
   const createSystemMut = trpc.ps.systems.create.useMutation({ onError: (e) => toast.error(e.message) });
   const generateDemandMut = trpc.ps.demand.generateForSystem.useMutation({ onError: (e) => toast.error(e.message) });
   const createRunMut = trpc.ps.wizardRuns.create.useMutation({ onError: (e) => toast.error(e.message) });
@@ -430,45 +441,68 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
   const handlePublish = async () => {
     if (!hasResult) return;
     try {
-      const systemType = effectiveSystemType;
-      const system = await createSystemMut.mutateAsync({
-        workspaceId,
-        name: systemName.trim(),
-        description: scenarioText.trim(),
-        systemType,
-        lifecycleType: isMatrixMode ? undefined : dimensions.lifecycleFocus || undefined,
-        governanceProfile: isMatrixMode ? undefined : dimensions.criticality || undefined,
-      });
+      if (isMatrixMode && enrichedResult) {
+        // Canonical atomic flow: template resolution → wizard run → system → demand → assignments → override → audit
+        const result = await acceptMut.mutateAsync({
+          workspaceId,
+          scenarioText: scenarioText.trim(),
+          projectName: systemName.trim(),
+          selectedScopeCode: effectiveScope,
+          selectedScopeLabel: effectiveScopeLabel,
+          matrixVersion: enrichedResult.matrixVersion,
+          answers: matrixAnswers,
+          confidence: Math.round(enrichedResult.confidence.overall * 100),
+          overrideInfo: overrideInfo
+            ? { scopeCode: enrichedResult.selectedScope, reason: overrideInfo.reason }
+            : null,
+          resultPayload: enrichedResult as any,
+        });
+        setAcceptResult(result);
+        setGeneratedDemand(
+          result.demandGenerated.map((d: any) => ({ role: d.role, quantity: d.quantity ?? 1 })),
+        );
+        utils.ps.systems.list.invalidate();
+        setIsPublished(true);
+        toast.success(
+          `System "${result.system.name}" provisioned — ${result.demandGenerated.length} demand, ${result.assignmentPlaceholders.length} assignments`,
+        );
+      } else {
+        // Legacy fallback (no active matrix): 3-step manual flow
+        const systemType = effectiveSystemType;
+        const system = await createSystemMut.mutateAsync({
+          workspaceId,
+          name: systemName.trim(),
+          description: scenarioText.trim(),
+          systemType,
+          lifecycleType: dimensions.lifecycleFocus || undefined,
+          governanceProfile: dimensions.criticality || undefined,
+        });
 
-      const demand = await generateDemandMut.mutateAsync({ workspaceId, psSystemId: system.id });
-      if (Array.isArray(demand) && demand.length > 0) {
-        setGeneratedDemand(demand.map((d: any) => ({ role: d.role, quantity: d.quantity ?? 1 })));
+        const demand = await generateDemandMut.mutateAsync({ workspaceId, psSystemId: system.id });
+        if (Array.isArray(demand) && demand.length > 0) {
+          setGeneratedDemand(demand.map((d: any) => ({ role: d.role, quantity: d.quantity ?? 1 })));
+        }
+
+        await createRunMut.mutateAsync({
+          workspaceId,
+          scenarioText: scenarioText.trim(),
+          inputPayload: { dimensions, mode: "legacy" },
+          resultPayload: legacyClassification as any,
+          confidence: Math.round((legacyClassification?.confidence || 0) * 100),
+          selectedSystemType: systemType,
+        });
+
+        utils.ps.systems.list.invalidate();
+        utils.ps.demand.list.invalidate();
+        setIsPublished(true);
+        toast.success(`System created with ${(demand as any[]).length} resource requests`);
       }
-
-      await createRunMut.mutateAsync({
-        workspaceId,
-        scenarioText: scenarioText.trim(),
-        inputPayload: isMatrixMode
-          ? { answers: matrixAnswers, mode: "matrix", contextTags, overrideInfo }
-          : { dimensions, mode: "legacy" },
-        resultPayload: isMatrixMode ? (enrichedResult as any) : (legacyClassification as any),
-        confidence: isMatrixMode
-          ? Math.round((enrichedResult?.confidence.overall || 0) * 100)
-          : Math.round((legacyClassification?.confidence || 0) * 100),
-        selectedSystemType: systemType,
-        matrixVersion: isMatrixMode ? enrichedResult?.matrixVersion : undefined,
-      });
-
-      utils.ps.systems.list.invalidate();
-      utils.ps.demand.list.invalidate();
-      setIsPublished(true);
-      toast.success(`System created with ${demand.length} resource requests`);
     } catch {
       // Error shown by mutation onError
     }
   };
 
-  const isSaving = createSystemMut.isPending || generateDemandMut.isPending || createRunMut.isPending;
+  const isSaving = acceptMut.isPending || createSystemMut.isPending || generateDemandMut.isPending || createRunMut.isPending;
 
   // ── Legacy dimension label helper ─────────────────────────────────
   const dimLabel = (key: keyof Dimensions) => {
@@ -842,10 +876,21 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
         <>
           <Card>
             <CardContent className="pt-4 space-y-2">
-              <div className="flex items-center gap-2 text-green-600"><CheckCircle2 className="w-5 h-5" /><h3 className="font-semibold">System Created</h3></div>
+              <div className="flex items-center gap-2 text-green-600"><CheckCircle2 className="w-5 h-5" /><h3 className="font-semibold">{isMatrixMode ? "Wizard Complete" : "System Created"}</h3></div>
               <p className="text-sm text-muted-foreground">
-                PS system "<span className="font-medium text-foreground">{systemName}</span>" has been created and {generatedDemand.length} resource requests generated.
+                {isMatrixMode && acceptResult ? (
+                  <>PS system "<span className="font-medium text-foreground">{acceptResult.system.name}</span>" provisioned via scope template. {acceptResult.trace.demandCount} demand requests and {acceptResult.trace.assignmentCount} assignment placeholders created.</>
+                ) : (
+                  <>PS system "<span className="font-medium text-foreground">{systemName}</span>" created with {generatedDemand.length} resource requests.</>
+                )}
               </p>
+              {isMatrixMode && acceptResult && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <Badge variant="outline" className="text-xs">Scope: {acceptResult.trace.scopeCode}</Badge>
+                  <Badge variant="outline" className="text-xs">Template: {acceptResult.trace.templateUsed}</Badge>
+                  {acceptResult.trace.overrideApplied && <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/30">Override applied</Badge>}
+                </div>
+              )}
             </CardContent>
           </Card>
           {generatedDemand.length > 0 && (
@@ -863,15 +908,44 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
           )}
           <Card>
             <CardContent className="pt-4 space-y-3">
-              <div className="flex items-center gap-2"><UserCheck className="w-5 h-5 text-amber-500" /><h3 className="font-semibold">Assignment Readiness</h3></div>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between"><span className="text-muted-foreground">Demand requests</span><Badge variant="secondary" className="text-xs"><ClipboardList className="w-3 h-3 mr-1" />{generatedDemand.length} created</Badge></div>
-                <div className="flex items-center justify-between"><span className="text-muted-foreground">Assignments</span><Badge className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">0 — not yet created</Badge></div>
-                <div className="flex items-center justify-between"><span className="text-muted-foreground">Fulfillment</span><Badge className="text-xs bg-red-500/10 text-red-600 border-red-500/30">Unfilled</Badge></div>
-              </div>
-              <p className="text-xs text-muted-foreground pt-1">Navigate to the PS Systems list to create assignments.</p>
+              <div className="flex items-center gap-2"><UserCheck className="w-5 h-5 text-indigo-500" /><h3 className="font-semibold">Assignments</h3></div>
+              {isMatrixMode && acceptResult ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Demand requests</span><Badge variant="secondary" className="text-xs"><ClipboardList className="w-3 h-3 mr-1" />{acceptResult.trace.demandCount} created</Badge></div>
+                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Assignment placeholders</span><Badge variant="secondary" className="text-xs"><UserCheck className="w-3 h-3 mr-1" />{acceptResult.trace.assignmentCount} created</Badge></div>
+                  {acceptResult.assignmentPlaceholders.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t">
+                      {acceptResult.assignmentPlaceholders.map((a, i) => (
+                        <div key={i} className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">{a.assignmentRole}</span>
+                          <Badge variant="outline" className="text-[10px]">{a.status}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground pt-1">Placeholders auto-created. Navigate to PS Systems to assign people.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Demand requests</span><Badge variant="secondary" className="text-xs"><ClipboardList className="w-3 h-3 mr-1" />{generatedDemand.length} created</Badge></div>
+                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Assignments</span><Badge className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">0 — not yet created</Badge></div>
+                  <p className="text-xs text-muted-foreground pt-1">Navigate to PS Systems to create assignments.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
+          {isMatrixMode && acceptResult && (
+            <Card>
+              <CardContent className="pt-4 space-y-2 text-xs text-muted-foreground">
+                <h4 className="font-medium text-foreground text-sm">Trace</h4>
+                <div className="flex justify-between"><span>Wizard Run</span><span className="font-mono">#{acceptResult.trace.wizardRunId}</span></div>
+                <div className="flex justify-between"><span>System ID</span><span className="font-mono">#{acceptResult.trace.systemId}</span></div>
+                <div className="flex justify-between"><span>Scope</span><span className="font-mono">{acceptResult.trace.scopeCode}</span></div>
+                <div className="flex justify-between"><span>Template</span><span className="font-mono">{acceptResult.trace.templateUsed}</span></div>
+                <div className="flex justify-between"><span>Override</span><span>{acceptResult.trace.overrideApplied ? "Yes" : "No"}</span></div>
+              </CardContent>
+            </Card>
+          )}
         </>
       ) : (
         <>
