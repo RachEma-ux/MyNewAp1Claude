@@ -18,6 +18,11 @@ import {
   omJobs,
   omLegalEntities,
   omCostCenters,
+  omAlignmentMatrixVersions,
+  omAlignmentTypes,
+  omAlignmentAttributes,
+  omAlignmentCells,
+  omStructureVersions,
 } from "../../drizzle/tables/organization-management";
 
 /**
@@ -146,5 +151,94 @@ export async function validateCostCenterRef(workspaceId: number, costCenterId: n
       code: "BAD_REQUEST",
       message: `Referenced cost center (id=${costCenterId}) is closed`,
     });
+  }
+}
+
+// ============================================================================
+// Alignment Matrix Validators
+// ============================================================================
+
+export async function validateAlignmentMatrixVersionRef(workspaceId: number, matrixVersionId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  const [ver] = await db.select({ id: omAlignmentMatrixVersions.id })
+    .from(omAlignmentMatrixVersions)
+    .where(and(eq(omAlignmentMatrixVersions.id, matrixVersionId), eq(omAlignmentMatrixVersions.workspaceId, workspaceId)))
+    .limit(1);
+  if (!ver) throw new TRPCError({ code: "BAD_REQUEST", message: `Alignment matrix version (id=${matrixVersionId}) not found` });
+}
+
+export async function validateAlignmentTypeRef(workspaceId: number, matrixVersionId: number, typeId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  const [t] = await db.select({ id: omAlignmentTypes.id })
+    .from(omAlignmentTypes)
+    .where(and(eq(omAlignmentTypes.id, typeId), eq(omAlignmentTypes.matrixVersionId, matrixVersionId), eq(omAlignmentTypes.workspaceId, workspaceId)))
+    .limit(1);
+  if (!t) throw new TRPCError({ code: "BAD_REQUEST", message: `Alignment type (id=${typeId}) not found in matrix version ${matrixVersionId}` });
+}
+
+export async function validateAlignmentAttributeRef(workspaceId: number, matrixVersionId: number, attributeId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  const [a] = await db.select({ id: omAlignmentAttributes.id })
+    .from(omAlignmentAttributes)
+    .where(and(eq(omAlignmentAttributes.id, attributeId), eq(omAlignmentAttributes.matrixVersionId, matrixVersionId), eq(omAlignmentAttributes.workspaceId, workspaceId)))
+    .limit(1);
+  if (!a) throw new TRPCError({ code: "BAD_REQUEST", message: `Alignment attribute (id=${attributeId}) not found in matrix version ${matrixVersionId}` });
+}
+
+export async function requireSingleActiveAlignmentMatrixVersion(workspaceId: number): Promise<{ id: number }> {
+  const db = getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+  const [ver] = await db.select({ id: omAlignmentMatrixVersions.id })
+    .from(omAlignmentMatrixVersions)
+    .where(and(eq(omAlignmentMatrixVersions.workspaceId, workspaceId), eq(omAlignmentMatrixVersions.status, "active")))
+    .limit(1);
+  if (!ver) throw new TRPCError({ code: "BAD_REQUEST", message: "No active alignment matrix version exists for this workspace" });
+  return ver;
+}
+
+export async function requireStructureVersionDraft(workspaceId: number, structureVersionId: number): Promise<{ id: number }> {
+  const db = getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+  const [ver] = await db.select({ id: omStructureVersions.id, status: omStructureVersions.status })
+    .from(omStructureVersions)
+    .where(and(eq(omStructureVersions.id, structureVersionId), eq(omStructureVersions.workspaceId, workspaceId)))
+    .limit(1);
+  if (!ver) throw new TRPCError({ code: "NOT_FOUND", message: "Structure version not found" });
+  if (ver.status !== "draft") throw new TRPCError({ code: "BAD_REQUEST", message: "Structure version is not in draft status" });
+  return ver;
+}
+
+export async function requireSelectionValueAllowed(workspaceId: number, matrixVersionId: number, attributeId: number, selectedValueText: string): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  const cells = await db.select({ valueText: omAlignmentCells.valueText })
+    .from(omAlignmentCells)
+    .where(and(eq(omAlignmentCells.matrixVersionId, matrixVersionId), eq(omAlignmentCells.attributeId, attributeId)));
+  const allowed = cells.map(c => c.valueText);
+  if (!allowed.includes(selectedValueText)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: `Value "${selectedValueText}" is not in the allowed set for this attribute` });
+  }
+}
+
+export async function requireCompleteAlignmentMatrixVersion(workspaceId: number, matrixVersionId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  const types = await db.select({ id: omAlignmentTypes.id })
+    .from(omAlignmentTypes)
+    .where(and(eq(omAlignmentTypes.matrixVersionId, matrixVersionId), eq(omAlignmentTypes.isActive, true)));
+  const attrs = await db.select({ id: omAlignmentAttributes.id })
+    .from(omAlignmentAttributes)
+    .where(and(eq(omAlignmentAttributes.matrixVersionId, matrixVersionId), eq(omAlignmentAttributes.isActive, true)));
+  if (types.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Matrix version has no active types" });
+  if (attrs.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Matrix version has no active attributes" });
+  const cells = await db.select({ id: omAlignmentCells.id })
+    .from(omAlignmentCells)
+    .where(eq(omAlignmentCells.matrixVersionId, matrixVersionId));
+  const expected = types.length * attrs.length;
+  if (cells.length < expected) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: `Matrix is incomplete: ${cells.length}/${expected} cells filled` });
   }
 }

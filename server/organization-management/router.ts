@@ -1446,6 +1446,8 @@ const templatesRouter = router({
 // Composed OM Router
 // ============================================================================
 
+import { alignmentMatrixRouter } from "./alignment-matrix-router";
+
 export const organizationManagementRouter = router({
   legalEntities: legalEntitiesRouter,
   orgUnits: orgUnitsRouter,
@@ -1458,4 +1460,5 @@ export const organizationManagementRouter = router({
   audit: auditRouter,
   settings: settingsRouter,
   templates: templatesRouter,
+  alignmentMatrix: alignmentMatrixRouter,
 });

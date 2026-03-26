@@ -6,7 +6,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, GitBranch, ChevronDown, ChevronRight, Users, Briefcase, DollarSign, ShieldCheck, ArrowUpRight } from "lucide-react";
+import { Loader2, Building2, GitBranch, ChevronDown, ChevronRight, Users, Briefcase, DollarSign, ShieldCheck, Target, TrendingUp, AlertTriangle, ThumbsUp, ThumbsDown, Sparkles, Flame } from "lucide-react";
 
 const MODEL_COLORS: Record<string, string> = {
   functional: "bg-blue-500/10 text-blue-600 border-blue-500/30",
@@ -94,6 +94,78 @@ export function OMTemplatesPage({ workspaceId }: { workspaceId: number }) {
 
                 {isExpanded && snap && (
                   <div className="border-t bg-muted/30 px-6 py-4 space-y-4">
+                    {/* Matrix alignment metadata */}
+                    {(snap.operationalCategory || snap.growthIntent || snap.keyFocus) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {snap.operationalCategory && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <Target className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                            <div><span className="font-medium">Category:</span> {snap.operationalCategory}</div>
+                          </div>
+                        )}
+                        {snap.commonLegalStructure && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <Building2 className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                            <div><span className="font-medium">Legal Structure:</span> {snap.commonLegalStructure}</div>
+                          </div>
+                        )}
+                        {snap.growthIntent && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <TrendingUp className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                            <div><span className="font-medium">Growth Intent:</span> {snap.growthIntent}</div>
+                          </div>
+                        )}
+                        {snap.keyFocus && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <Target className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
+                            <div><span className="font-medium">Key Focus:</span> {snap.keyFocus}</div>
+                          </div>
+                        )}
+                        {snap.reportingLineSummary && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <GitBranch className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                            <div><span className="font-medium">Reporting:</span> {snap.reportingLineSummary}</div>
+                          </div>
+                        )}
+                        {snap.bestFor && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <Sparkles className="w-4 h-4 text-yellow-500 mt-0.5 shrink-0" />
+                            <div><span className="font-medium">Best For:</span> {snap.bestFor}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Pros / Cons / Vibe / Risk */}
+                    {(snap.pros || snap.cons || snap.theVibe || snap.biggestRisk) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {snap.theVibe && (
+                          <div className="flex items-start gap-2 text-sm md:col-span-2">
+                            <Sparkles className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
+                            <div><span className="font-medium">The Vibe:</span> <em>"{snap.theVibe}"</em></div>
+                          </div>
+                        )}
+                        {snap.pros && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <ThumbsUp className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                            <div><span className="font-medium">Pros:</span> {snap.pros}</div>
+                          </div>
+                        )}
+                        {snap.cons && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <ThumbsDown className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                            <div><span className="font-medium">Cons:</span> {snap.cons}</div>
+                          </div>
+                        )}
+                        {snap.biggestRisk && (
+                          <div className="flex items-start gap-2 text-sm md:col-span-2">
+                            <Flame className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                            <div><span className="font-medium">Biggest Risk:</span> {snap.biggestRisk}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Stats row */}
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                       <div className="flex items-center gap-2 text-sm">
