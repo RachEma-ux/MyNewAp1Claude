@@ -368,7 +368,7 @@ export async function getConfidenceTrends(): Promise<ConfidenceTrend[]> {
   .from(psWizardRuns)
   .where(
     gte(psWizardRuns.createdAt, twelveWeeksAgo),
-  ))
+  )
   .groupBy(sql`to_char(${psWizardRuns.createdAt}, 'IYYY-"W"IW')`)
   .orderBy(sql`to_char(${psWizardRuns.createdAt}, 'IYYY-"W"IW')`);
 
@@ -416,9 +416,7 @@ export async function getDeadScopes(): Promise<DeadScopeEntry[]> {
   // Get active matrix version
   const [activeVersion] = await db.select()
     .from(psMatrixVersions)
-    .where(and(
-      eq(psMatrixVersions.status, "active"),
-    ))
+    .where(eq(psMatrixVersions.status, "active"))
     .limit(1);
 
   if (!activeVersion) return [];
@@ -478,9 +476,7 @@ export async function getDeadQuestions(): Promise<DeadQuestionEntry[]> {
   // Get active matrix version
   const [activeVersion] = await db.select()
     .from(psMatrixVersions)
-    .where(and(
-      eq(psMatrixVersions.status, "active"),
-    ))
+    .where(eq(psMatrixVersions.status, "active"))
     .limit(1);
 
   if (!activeVersion) return [];
