@@ -76,6 +76,82 @@ export const getDemandSummarySchema = z.object({
   psSystemId: z.number().int().positive(),
 });
 
+// ── Resource Assignments ──────────────────────────────────────────
+
+const assignmentStatusEnum = z.enum([
+  "proposed", "requested", "confirmed", "active", "rejected", "cancelled", "completed",
+]);
+
+const assigneeRefTypeEnum = z.enum([
+  "person", "team", "org_unit", "external", "placeholder",
+]);
+
+const assignmentSourceEnum = z.enum([
+  "wizard", "manual", "import", "future_hr_sync",
+]);
+
+export const createResourceAssignmentSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  resourceRequestId: z.number().int().positive(),
+  psSystemId: z.number().int().positive(),
+  assignmentRole: z.string().min(1, "Assignment role is required").max(200),
+  assigneeRefType: assigneeRefTypeEnum,
+  assigneeRefId: z.string().max(200).optional(),
+  assigneeDisplayName: z.string().max(300).optional(),
+  allocationPercentage: z.number().int().min(1).max(100).optional(),
+  startDate: z.date().optional(),
+  endDate: z.date().optional(),
+  status: assignmentStatusEnum.optional(),
+  source: assignmentSourceEnum.optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const updateResourceAssignmentSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+  assignmentRole: z.string().min(1).max(200).optional(),
+  assigneeRefType: assigneeRefTypeEnum.optional(),
+  assigneeRefId: z.string().max(200).optional(),
+  assigneeDisplayName: z.string().max(300).optional(),
+  allocationPercentage: z.number().int().min(1).max(100).optional(),
+  startDate: z.date().optional(),
+  endDate: z.date().optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const updateResourceAssignmentStatusSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+  status: assignmentStatusEnum,
+});
+
+export const listResourceAssignmentsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  status: assignmentStatusEnum.optional(),
+});
+
+export const listResourceAssignmentsByRequestSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  resourceRequestId: z.number().int().positive(),
+});
+
+export const listResourceAssignmentsBySystemSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  psSystemId: z.number().int().positive(),
+});
+
+export const deleteResourceAssignmentSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
+export const getAssignmentSummarySchema = z.object({
+  workspaceId: z.number().int().positive(),
+  psSystemId: z.number().int().positive(),
+});
+
+// ── Classification ──────────────────────────────────────────────────
+
 export const classifyScenarioSchema = z.object({
   workspaceId: z.number().int().positive(),
   scenarioText: z.string().min(1, "Scenario text is required").max(5000),

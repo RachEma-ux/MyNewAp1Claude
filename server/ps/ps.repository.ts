@@ -11,6 +11,7 @@ import {
   psWizardRuns,
   psCatalogSystemTypes,
   psResourceRequests,
+  psResourceAssignments,
   type PsSystem,
   type InsertPsSystem,
   type PsWizardRun,
@@ -18,6 +19,8 @@ import {
   type PsCatalogSystemType,
   type PsResourceRequest,
   type InsertPsResourceRequest,
+  type PsResourceAssignment,
+  type InsertPsResourceAssignment,
 } from "../../drizzle/tables/ps";
 
 // ── Systems ──────────────────────────────────────────────────────────────
@@ -163,4 +166,142 @@ export async function updateResourceRequestStatus(
     ))
     .returning();
   return updated ?? null;
+}
+
+export async function getResourceRequestById(
+  workspaceId: number,
+  id: number,
+): Promise<PsResourceRequest | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [request] = await db.select().from(psResourceRequests)
+    .where(and(
+      eq(psResourceRequests.id, id),
+      eq(psResourceRequests.workspaceId, workspaceId),
+    ))
+    .limit(1);
+  return request ?? null;
+}
+
+// ── Resource Assignments ──────────────────────────────────────────
+
+export async function createResourceAssignment(
+  data: InsertPsResourceAssignment,
+): Promise<PsResourceAssignment> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psResourceAssignments).values({
+    ...data,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }).returning();
+  return created;
+}
+
+export async function getResourceAssignmentById(
+  workspaceId: number,
+  id: number,
+): Promise<PsResourceAssignment | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [assignment] = await db.select().from(psResourceAssignments)
+    .where(and(
+      eq(psResourceAssignments.id, id),
+      eq(psResourceAssignments.workspaceId, workspaceId),
+    ))
+    .limit(1);
+  return assignment ?? null;
+}
+
+export async function listResourceAssignments(
+  workspaceId: number,
+  status?: string,
+): Promise<PsResourceAssignment[]> {
+  const db = getDb();
+  if (!db) return [];
+  const conditions = [eq(psResourceAssignments.workspaceId, workspaceId)];
+  if (status) {
+    conditions.push(eq(psResourceAssignments.status, status));
+  }
+  return db.select().from(psResourceAssignments)
+    .where(and(...conditions))
+    .orderBy(desc(psResourceAssignments.createdAt));
+}
+
+export async function listResourceAssignmentsByRequest(
+  workspaceId: number,
+  resourceRequestId: number,
+): Promise<PsResourceAssignment[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psResourceAssignments)
+    .where(and(
+      eq(psResourceAssignments.workspaceId, workspaceId),
+      eq(psResourceAssignments.resourceRequestId, resourceRequestId),
+    ))
+    .orderBy(desc(psResourceAssignments.createdAt));
+}
+
+export async function listResourceAssignmentsBySystem(
+  workspaceId: number,
+  psSystemId: number,
+): Promise<PsResourceAssignment[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psResourceAssignments)
+    .where(and(
+      eq(psResourceAssignments.workspaceId, workspaceId),
+      eq(psResourceAssignments.psSystemId, psSystemId),
+    ))
+    .orderBy(desc(psResourceAssignments.createdAt));
+}
+
+export async function updateResourceAssignment(
+  workspaceId: number,
+  id: number,
+  data: Partial<InsertPsResourceAssignment>,
+): Promise<PsResourceAssignment | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psResourceAssignments)
+    .set({ ...data, updatedAt: new Date() })
+    .where(and(
+      eq(psResourceAssignments.id, id),
+      eq(psResourceAssignments.workspaceId, workspaceId),
+    ))
+    .returning();
+  return updated ?? null;
+}
+
+export async function updateResourceAssignmentStatus(
+  workspaceId: number,
+  id: number,
+  status: string,
+  updatedBy: number,
+): Promise<PsResourceAssignment | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psResourceAssignments)
+    .set({ status, updatedBy, updatedAt: new Date() })
+    .where(and(
+      eq(psResourceAssignments.id, id),
+      eq(psResourceAssignments.workspaceId, workspaceId),
+    ))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteResourceAssignment(
+  workspaceId: number,
+  id: number,
+): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const result = await db.delete(psResourceAssignments)
+    .where(and(
+      eq(psResourceAssignments.id, id),
+      eq(psResourceAssignments.workspaceId, workspaceId),
+    ))
+    .returning();
+  return result.length > 0;
 }

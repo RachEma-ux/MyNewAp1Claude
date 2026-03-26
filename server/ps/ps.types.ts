@@ -151,3 +151,84 @@ export interface DemandSummary {
   byStatus: Record<PsResourceRequestStatus, number>;
   roles: Array<{ role: string; quantity: number; status: string }>;
 }
+
+// ── Resource Assignment (Assignment-Facing) ─────────────────────────
+
+export const PS_ASSIGNMENT_STATUSES = [
+  "proposed",
+  "requested",
+  "confirmed",
+  "active",
+  "rejected",
+  "cancelled",
+  "completed",
+] as const;
+export type PsAssignmentStatus = (typeof PS_ASSIGNMENT_STATUSES)[number];
+
+export const PS_ASSIGNEE_REF_TYPES = [
+  "person",
+  "team",
+  "org_unit",
+  "external",
+  "placeholder",
+] as const;
+export type PsAssigneeRefType = (typeof PS_ASSIGNEE_REF_TYPES)[number];
+
+export const PS_ASSIGNMENT_SOURCES = [
+  "wizard",
+  "manual",
+  "import",
+  "future_hr_sync",
+] as const;
+export type PsAssignmentSource = (typeof PS_ASSIGNMENT_SOURCES)[number];
+
+export interface CreateResourceAssignmentInput {
+  workspaceId: number;
+  resourceRequestId: number;
+  psSystemId: number;
+  assignmentRole: string;
+  assigneeRefType: PsAssigneeRefType;
+  assigneeRefId?: string;
+  assigneeDisplayName?: string;
+  allocationPercentage?: number;
+  startDate?: Date;
+  endDate?: Date;
+  status?: PsAssignmentStatus;
+  source?: PsAssignmentSource;
+  notes?: string;
+}
+
+export interface UpdateResourceAssignmentInput {
+  workspaceId: number;
+  id: number;
+  assignmentRole?: string;
+  assigneeRefType?: PsAssigneeRefType;
+  assigneeRefId?: string;
+  assigneeDisplayName?: string;
+  allocationPercentage?: number;
+  startDate?: Date;
+  endDate?: Date;
+  notes?: string;
+}
+
+export type RequestFulfillmentState = "unfilled" | "partially_filled" | "filled";
+
+export interface RequestFulfillment {
+  requestId: number;
+  role: string;
+  requestedQuantity: number;
+  activeAssignmentCount: number;
+  totalAssignmentCount: number;
+  fulfillmentState: RequestFulfillmentState;
+}
+
+export interface AssignmentSummary {
+  psSystemId: number;
+  totalRequests: number;
+  totalAssignments: number;
+  unfilledRequests: number;
+  partiallyFilledRequests: number;
+  filledRequests: number;
+  byAssignmentStatus: Record<PsAssignmentStatus, number>;
+  lastAssignmentDate: string | null;
+}

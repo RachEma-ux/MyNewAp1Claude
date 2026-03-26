@@ -6,6 +6,8 @@
  * - ps_wizard_runs: Wizard execution history
  * - ps_catalog_system_types: Reference catalog of system types
  * - ps_audit_log: PS-specific audit trail
+ * - ps_resource_requests: Demand owned by PS
+ * - ps_resource_assignments: Assignment-facing records linked to demand
  */
 
 import {
@@ -137,3 +139,36 @@ export const psResourceRequests = pgTable("ps_resource_requests", {
 
 export type PsResourceRequest = typeof psResourceRequests.$inferSelect;
 export type InsertPsResourceRequest = typeof psResourceRequests.$inferInsert;
+
+// ============================================================================
+// 6. PS Resource Assignments — Assignment-facing records linked to demand
+// ============================================================================
+
+export const psResourceAssignments = pgTable("ps_resource_assignments", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  resourceRequestId: integer("resource_request_id").notNull(),
+  psSystemId: integer("ps_system_id").notNull(),
+  assignmentRole: varchar("assignment_role", { length: 200 }).notNull(),
+  assigneeRefType: varchar("assignee_ref_type", { length: 50 }).notNull(), // person | team | org_unit | external | placeholder
+  assigneeRefId: varchar("assignee_ref_id", { length: 200 }),
+  assigneeDisplayName: varchar("assignee_display_name", { length: 300 }),
+  allocationPercentage: integer("allocation_percentage").default(100),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  status: varchar("status", { length: 30 }).default("proposed").notNull(), // proposed | requested | confirmed | active | rejected | cancelled | completed
+  source: varchar("source", { length: 50 }).default("manual").notNull(), // wizard | manual | import | future_hr_sync
+  notes: text("notes"),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedBy: integer("updated_by"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  wsIdx: index("ps_resource_assignments_ws_idx").on(table.workspaceId),
+  requestIdx: index("ps_resource_assignments_request_idx").on(table.resourceRequestId),
+  systemIdx: index("ps_resource_assignments_system_idx").on(table.psSystemId),
+  statusIdx: index("ps_resource_assignments_status_idx").on(table.status),
+}));
+
+export type PsResourceAssignment = typeof psResourceAssignments.$inferSelect;
+export type InsertPsResourceAssignment = typeof psResourceAssignments.$inferInsert;

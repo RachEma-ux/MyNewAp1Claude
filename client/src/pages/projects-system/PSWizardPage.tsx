@@ -204,6 +204,7 @@ function DimensionSelector({
 export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [scenarioText, setScenarioText] = useState("");
+  const [systemName, setSystemName] = useState("");
   const [dimensions, setDimensions] = useState<Dimensions>({
     domain: "",
     orgLevel: "",
@@ -232,17 +233,18 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
     },
   );
 
-  // System creation mutation (auto-generates demand)
+  // System creation mutation
   const createSystemMut = trpc.ps.systems.create.useMutation({
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Demand generation mutation
+  const generateDemandMut = trpc.ps.demand.generateForSystem.useMutation({
     onError: (e) => toast.error(e.message),
   });
 
   // Wizard run creation mutation
   const createRunMut = trpc.ps.wizardRuns.create.useMutation({
-    onSuccess: () => {
-      toast.success("System created with demand generated");
-      setIsPublished(true);
-    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -262,7 +264,7 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
     ...s,
     isValid:
       i === 0
-        ? scenarioText.trim().length > 0
+        ? scenarioText.trim().length > 0 && systemName.trim().length > 0
         : i === 1
         ? allDimensionsFilled
         : i === 2
@@ -310,27 +312,34 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
     }
   };
 
-  // ── Publish handler ─────────────────────────────────────────────
+  // ── Publish handler — chains: create system → generate demand → save wizard run
   const handlePublish = async () => {
     if (!classification) return;
 
     try {
-      // 1. Create the PS system (auto-generates demand on backend)
-      const systemResult = await createSystemMut.mutateAsync({
+      // 1. Create the PS system
+      const system = await createSystemMut.mutateAsync({
         workspaceId,
-        name: scenarioText.trim().slice(0, 80),
+        name: systemName.trim(),
         description: scenarioText.trim(),
         systemType: classification.systemType,
+        lifecycleType: dimensions.lifecycleFocus || undefined,
+        governanceProfile: dimensions.criticality || undefined,
       });
 
-      // Capture generated demand from the system creation response
-      const demand = (systemResult as any)?._generatedDemand;
+      // 2. Generate demand for the system
+      const demand = await generateDemandMut.mutateAsync({
+        workspaceId,
+        psSystemId: system.id,
+      });
+
+      // Capture generated demand for display
       if (Array.isArray(demand) && demand.length > 0) {
         setGeneratedDemand(demand.map((d: any) => ({ role: d.role, quantity: d.quantity ?? 1 })));
       }
 
-      // 2. Persist the wizard run
-      createRunMut.mutate({
+      // 3. Persist the wizard run
+      await createRunMut.mutateAsync({
         workspaceId,
         scenarioText: scenarioText.trim(),
         inputPayload: { dimensions },
@@ -338,10 +347,19 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
         confidence: Math.round(classification.confidence * 100),
         selectedSystemType: classification.systemType,
       });
+
+      // Invalidate relevant queries
+      utils.ps.systems.list.invalidate();
+      utils.ps.demand.list.invalidate();
+
+      setIsPublished(true);
+      toast.success(`System created with ${demand.length} resource requests`);
     } catch {
       // Error already shown by mutation onError
     }
   };
+
+  const isSaving = createSystemMut.isPending || generateDemandMut.isPending || createRunMut.isPending;
 
   // ── Dimension label helper ──────────────────────────────────────
   const dimLabel = (key: keyof Dimensions) => {
@@ -363,6 +381,19 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
       case 0:
         return (
           <div className="space-y-4">
+            <div>
+              <Label>System Name</Label>
+              <Input
+                value={systemName}
+                onChange={(e) => setSystemName(e.target.value)}
+                placeholder="E.g.: Platform Migration System"
+                className="mt-1"
+                maxLength={255}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                A short name for the project system being defined.
+              </p>
+            </div>
             <div>
               <Label>Scenario Description</Label>
               <textarea
@@ -553,7 +584,8 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
                       <h3 className="font-semibold">System Created</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      The PS system and classification have been persisted.
+                      PS system "<span className="font-medium text-foreground">{systemName}</span>" has been created
+                      and {generatedDemand.length} resource requests generated.
                     </p>
                   </CardContent>
                 </Card>
@@ -589,6 +621,10 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
                 <Card>
                   <CardContent className="pt-4 space-y-2 text-sm">
                     <h4 className="font-medium mb-2">Summary</h4>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">System Name</span>
+                      <span className="font-medium">{systemName || "—"}</span>
+                    </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Scenario</span>
                       <span className="font-medium max-w-[60%] text-right truncate">{scenarioText.slice(0, 80)}{scenarioText.length > 80 ? "..." : ""}</span>
@@ -634,6 +670,12 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
   // ── Preview Panel (live) ────────────────────────────────────────
   const previewPanel = (
     <div className="space-y-4">
+      {/* System Name Preview */}
+      <div>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">System</p>
+        <p className="text-sm font-medium">{systemName || "Not named yet"}</p>
+      </div>
+
       {/* Scenario Preview */}
       <div>
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Scenario</p>
@@ -669,6 +711,18 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
           </div>
         </div>
       )}
+
+      {/* Demand Preview */}
+      {generatedDemand.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+            Demand Generated
+          </p>
+          <p className="text-sm font-medium text-green-600">
+            {generatedDemand.length} roles, {generatedDemand.reduce((s, d) => s + d.quantity, 0)} headcount
+          </p>
+        </div>
+      )}
     </div>
   );
 
@@ -692,7 +746,7 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
         isFinalStep={currentStep === STEPS.length - 1}
         canPublish={!!classification && !isPublished}
         onPublish={handlePublish}
-        isSaving={createSystemMut.isPending || createRunMut.isPending}
+        isSaving={isSaving}
       >
         {renderStep()}
       </ModuleWizardShell>
