@@ -1681,6 +1681,101 @@ export async function updateQuestionPresentation(
   return updated;
 }
 
+// ── Delete Operations (draft-only enforced) ──────────────────────────
+
+export async function deleteMatrixScope(
+  workspaceId: number,
+  versionId: number,
+  id: number,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  if (version.status === "active") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete from active version" });
+
+  // Delete cells referencing this scope first
+  const cells = await repo.listCellsByVersion(versionId);
+  for (const c of cells) {
+    if (c.scopeId === id) await repo.deleteCell(c.id, versionId);
+  }
+
+  const deleted = await repo.deleteScope(id, versionId);
+  if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Scope not found" });
+
+  await logPsAudit({ workspaceId, actorId, action: "matrix_scope.delete", entityType: "ps_scope_registry", entityId: id });
+  return { success: true };
+}
+
+export async function deleteMatrixQuestion(
+  workspaceId: number,
+  versionId: number,
+  id: number,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  if (version.status === "active") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete from active version" });
+
+  // Delete cells referencing this question first
+  const cells = await repo.listCellsByVersion(versionId);
+  for (const c of cells) {
+    if (c.questionId === id) await repo.deleteCell(c.id, versionId);
+  }
+
+  const deleted = await repo.deleteQuestion(id, versionId);
+  if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Question not found" });
+
+  await logPsAudit({ workspaceId, actorId, action: "matrix_question.delete", entityType: "ps_matrix_question", entityId: id });
+  return { success: true };
+}
+
+export async function deleteMatrixDimension(
+  workspaceId: number,
+  versionId: number,
+  id: number,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  if (version.status === "active") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete from active version" });
+
+  const deleted = await repo.deleteDimension(id, versionId);
+  if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Dimension not found" });
+
+  await logPsAudit({ workspaceId, actorId, action: "dimension.delete", entityType: "ps_dimension", entityId: id });
+  return { success: true };
+}
+
+export async function deleteMatrixDimensionValue(
+  workspaceId: number,
+  dimensionId: number,
+  id: number,
+  actorId: number,
+) {
+  const deleted = await repo.deleteDimensionValue(id, dimensionId);
+  if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Dimension value not found" });
+
+  await logPsAudit({ workspaceId, actorId, action: "dimension_value.delete", entityType: "ps_dimension_value", entityId: id });
+  return { success: true };
+}
+
+export async function deleteMatrixCell(
+  workspaceId: number,
+  versionId: number,
+  id: number,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  if (version.status === "active") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete from active version" });
+
+  const deleted = await repo.deleteCell(id, versionId);
+  if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Cell not found" });
+
+  await logPsAudit({ workspaceId, actorId, action: "matrix_cell.delete", entityType: "ps_matrix_cell", entityId: id });
+  return { success: true };
+}
+
 // ── Monitoring ────────────────────────────────────────────────────────
 
 export async function getMonitoringSummary(workspaceId: number): Promise<MonitoringSummary> {

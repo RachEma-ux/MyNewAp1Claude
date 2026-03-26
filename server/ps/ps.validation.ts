@@ -540,6 +540,38 @@ export const updateQuestionPresentationSchema = z.object({
   isActive: z.number().int().min(0).max(1).optional(),
 });
 
+// ── Delete Operations ──────────────────────────────────────────────
+
+export const deleteScopeSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
+export const deleteQuestionSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
+export const deleteDimensionSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
+export const deleteDimensionValueSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  dimensionId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
+export const deleteCellSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
 // ── Classification ──────────────────────────────────────────────────
 
 export const classifyScenarioSchema = z.object({

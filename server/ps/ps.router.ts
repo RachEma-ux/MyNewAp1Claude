@@ -75,6 +75,12 @@ import {
   createDimensionValueSchema,
   createDimensionValuesBatchSchema,
   updateDimensionValueSchema,
+  // Delete schemas
+  deleteScopeSchema,
+  deleteQuestionSchema,
+  deleteDimensionSchema,
+  deleteDimensionValueSchema,
+  deleteCellSchema,
   // Question presentation schemas
   getQuestionPresentationSchema,
   listQuestionPresentationsSchema,
@@ -705,6 +711,38 @@ const matrixRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { workspaceId, questionId, ...data } = input;
       return service.updateQuestionPresentation(workspaceId, questionId, data, ctx.user.id);
+    }),
+
+  // ── Delete Operations (draft-only) ──────────────────────────────────
+
+  deleteScope: governedProcedure
+    .input(deleteScopeSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.deleteMatrixScope(input.workspaceId, input.versionId, input.id, ctx.user.id);
+    }),
+
+  deleteQuestion: governedProcedure
+    .input(deleteQuestionSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.deleteMatrixQuestion(input.workspaceId, input.versionId, input.id, ctx.user.id);
+    }),
+
+  deleteDimension: governedProcedure
+    .input(deleteDimensionSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.deleteMatrixDimension(input.workspaceId, input.versionId, input.id, ctx.user.id);
+    }),
+
+  deleteDimensionValue: governedProcedure
+    .input(deleteDimensionValueSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.deleteMatrixDimensionValue(input.workspaceId, input.dimensionId, input.id, ctx.user.id);
+    }),
+
+  deleteCell: governedProcedure
+    .input(deleteCellSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.deleteMatrixCell(input.workspaceId, input.versionId, input.id, ctx.user.id);
     }),
 });
 

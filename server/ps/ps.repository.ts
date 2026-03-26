@@ -675,6 +675,56 @@ export async function deleteQuestionsByVersion(versionId: number): Promise<void>
   await db.delete(psMatrixQuestions).where(eq(psMatrixQuestions.versionId, versionId));
 }
 
+export async function deleteScope(id: number, versionId: number): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const result = await db.delete(psScopeRegistry)
+    .where(and(eq(psScopeRegistry.id, id), eq(psScopeRegistry.versionId, versionId)))
+    .returning();
+  return result.length > 0;
+}
+
+export async function deleteQuestion(id: number, versionId: number): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  // Delete any presentation for this question first
+  await db.delete(psMatrixQuestionPresentations)
+    .where(eq(psMatrixQuestionPresentations.questionId, id));
+  const result = await db.delete(psMatrixQuestions)
+    .where(and(eq(psMatrixQuestions.id, id), eq(psMatrixQuestions.versionId, versionId)))
+    .returning();
+  return result.length > 0;
+}
+
+export async function deleteDimension(id: number, versionId: number): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  // Delete values first
+  await db.delete(psDimensionValues).where(eq(psDimensionValues.dimensionId, id));
+  const result = await db.delete(psDimensions)
+    .where(and(eq(psDimensions.id, id), eq(psDimensions.versionId, versionId)))
+    .returning();
+  return result.length > 0;
+}
+
+export async function deleteDimensionValue(id: number, dimensionId: number): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const result = await db.delete(psDimensionValues)
+    .where(and(eq(psDimensionValues.id, id), eq(psDimensionValues.dimensionId, dimensionId)))
+    .returning();
+  return result.length > 0;
+}
+
+export async function deleteCell(id: number, versionId: number): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const result = await db.delete(psMatrixCells)
+    .where(and(eq(psMatrixCells.id, id), eq(psMatrixCells.versionId, versionId)))
+    .returning();
+  return result.length > 0;
+}
+
 // ── Matrix Imports ────────────────────────────────────────────────────
 
 export async function createMatrixImport(data: InsertPsMatrixImport): Promise<PsMatrixImport> {
