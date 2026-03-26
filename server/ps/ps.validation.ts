@@ -38,9 +38,7 @@ export const getWizardRunSchema = z.object({
   id: z.number().int().positive(),
 });
 
-export const listWizardRunsSchema = z.object({
-
-});
+export const listWizardRunsSchema = z.void();
 
 // ── Resource Requests (Demand) ──────────────────────────────────────
 
@@ -153,9 +151,7 @@ export const getAssignmentSummarySchema = z.object({
 
 // ── Monitoring ──────────────────────────────────────────────────────
 
-export const getMonitoringSummarySchema = z.object({
-
-});
+export const getMonitoringSummarySchema = z.void();
 
 // ── Matrix Engine ──────────────────────────────────────────────────
 
@@ -230,19 +226,13 @@ export const evaluateMatrixSchema = z.object({
   answers: z.record(z.union([z.boolean(), z.string(), z.number()])),
 });
 
-export const hasActiveMatrixSchema = z.object({
+export const hasActiveMatrixSchema = z.void();
 
-});
-
-export const getActiveMatrixQuestionsSchema = z.object({
-
-});
+export const getActiveMatrixQuestionsSchema = z.void();
 
 // ── Matrix Admin ──────────────────────────────────────────────────
 
-export const getMatrixOverviewSchema = z.object({
-
-});
+export const getMatrixOverviewSchema = z.void();
 
 export const duplicateMatrixVersionSchema = z.object({
 
@@ -358,9 +348,7 @@ export const commitMatrixImportSchema = z.object({
   newLabel: z.string().min(1).max(255).optional(),
 });
 
-export const listMatrixImportsSchema = z.object({
-
-});
+export const listMatrixImportsSchema = z.void();
 
 // ── Scope Matrix Profile ──────────────────────────────────────────
 
@@ -414,9 +402,7 @@ export const parseMatrixHeadersSchema = z.object({
 
 // ── Seed ──────────────────────────────────────────────────────────────
 
-export const seedScopeMatrixSchema = z.object({
-
-});
+export const seedScopeMatrixSchema = z.void();
 
 // ── Dimensions ──────────────────────────────────────────────────────
 
@@ -584,9 +570,7 @@ export const safeActivateMatrixSchema = z.object({
   versionId: z.number().int().positive(),
 });
 
-export const rollbackMatrixSchema = z.object({
-
-});
+export const rollbackMatrixSchema = z.void();
 
 export const compareMatrixVersionsSchema = z.object({
 
@@ -629,9 +613,7 @@ export const createScopeTemplateMappingSchema = z.object({
   })).optional(),
 });
 
-export const listScopeTemplateMappingsSchema = z.object({
-
-});
+export const listScopeTemplateMappingsSchema = z.void();
 
 // ── Simulation ──────────────────────────────────────────────────────
 
@@ -642,9 +624,7 @@ export const runSimulationSchema = z.object({
   answers: z.record(z.union([z.boolean(), z.string(), z.number()])),
 });
 
-export const listSimulationsSchema = z.object({
-
-});
+export const listSimulationsSchema = z.void();
 
 // ── Evaluation Cases ────────────────────────────────────────────────
 
@@ -662,9 +642,7 @@ export const getEvalCaseSchema = z.object({
   id: z.number().int().positive(),
 });
 
-export const listEvalCasesSchema = z.object({
-
-});
+export const listEvalCasesSchema = z.void();
 
 export const updateEvalCaseSchema = z.object({
 
@@ -691,9 +669,7 @@ export const runEvaluationSuiteSchema = z.object({
   tags: z.array(z.string().max(50)).max(20).optional(),
 });
 
-export const listEvalRunsSchema = z.object({
-
-});
+export const listEvalRunsSchema = z.void();
 
 export const getEvalRunSchema = z.object({
 
@@ -713,13 +689,9 @@ export const overrideRecommendationSchema = z.object({
   answersJson: z.record(z.union([z.boolean(), z.string(), z.number()])).optional(),
 });
 
-export const listOverridesSchema = z.object({
+export const listOverridesSchema = z.void();
 
-});
-
-export const getOverridePatternsSchema = z.object({
-
-});
+export const getOverridePatternsSchema = z.void();
 
 // ── Classification ──────────────────────────────────────────────────
 
