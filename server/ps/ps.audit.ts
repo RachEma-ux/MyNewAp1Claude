@@ -13,6 +13,10 @@ export const PS_AUDIT_ACTIONS = [
   "resource_request.create",
   "resource_request.status_change",
   "demand.generate",
+  "resource_assignment.create",
+  "resource_assignment.update",
+  "resource_assignment.status_change",
+  "resource_assignment.delete",
 ] as const;
 
 export type PsAuditAction = (typeof PS_AUDIT_ACTIONS)[number];

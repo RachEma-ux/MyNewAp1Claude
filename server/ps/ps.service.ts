@@ -18,6 +18,15 @@ import type {
   DemandSummary,
 } from "./ps.types";
 import { generateDemandSpecs, resolveQuantity } from "./ps.demand";
+import {
+  getSystemMetrics,
+  getWizardMetrics,
+  getDemandMetrics,
+  getAssignmentMetrics,
+  getFulfillmentMetrics,
+  getRecentActivity,
+  type MonitoringSummary,
+} from "./ps.monitoring";
 
 // ── Systems ──────────────────────────────────────────────────────────────
 
@@ -308,4 +317,19 @@ export async function generateDemandForSystem(
   });
 
   return created;
+}
+
+// ── Monitoring ────────────────────────────────────────────────────────
+
+export async function getMonitoringSummary(workspaceId: number): Promise<MonitoringSummary> {
+  const [systems, wizard, demand, assignments, fulfillment, activity] = await Promise.all([
+    getSystemMetrics(workspaceId),
+    getWizardMetrics(workspaceId),
+    getDemandMetrics(workspaceId),
+    getAssignmentMetrics(workspaceId),
+    getFulfillmentMetrics(workspaceId),
+    getRecentActivity(workspaceId),
+  ]);
+
+  return { systems, wizard, demand, assignments, fulfillment, activity };
 }

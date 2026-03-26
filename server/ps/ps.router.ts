@@ -18,6 +18,7 @@ import {
   listResourceRequestsBySystemSchema,
   updateResourceRequestStatusSchema,
   getDemandSummarySchema,
+  getMonitoringSummarySchema,
 } from "./ps.validation";
 import * as service from "./ps.service";
 
@@ -127,5 +128,11 @@ export const psRouter = router({
   catalog: protectedProcedure
     .query(async () => {
       return service.getCatalog();
+    }),
+
+  getMonitoringSummary: protectedProcedure
+    .input(getMonitoringSummarySchema)
+    .query(async ({ input }) => {
+      return service.getMonitoringSummary(input.workspaceId);
     }),
 });

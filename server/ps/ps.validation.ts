@@ -150,6 +150,12 @@ export const getAssignmentSummarySchema = z.object({
   psSystemId: z.number().int().positive(),
 });
 
+// ── Monitoring ──────────────────────────────────────────────────────
+
+export const getMonitoringSummarySchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
 // ── Classification ──────────────────────────────────────────────────
 
 export const classifyScenarioSchema = z.object({
