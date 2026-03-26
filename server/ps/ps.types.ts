@@ -5,7 +5,7 @@
 export type PsSystemStatus = "draft" | "active" | "archived";
 
 export interface CreateSystemInput {
-  workspaceId: number;
+
   name: string;
   description?: string;
   systemType: string;
@@ -14,7 +14,7 @@ export interface CreateSystemInput {
 }
 
 export interface CreateWizardRunInput {
-  workspaceId: number;
+
   scenarioText: string;
   inputPayload?: Record<string, unknown>;
   resultPayload?: Record<string, unknown>;
@@ -126,7 +126,7 @@ export const PS_RESOURCE_REQUEST_STATUSES = [
 export type PsResourceRequestStatus = (typeof PS_RESOURCE_REQUEST_STATUSES)[number];
 
 export interface CreateResourceRequestInput {
-  workspaceId: number;
+
   psSystemId: number;
   role: string;
   capabilityTags?: string[];
@@ -184,7 +184,7 @@ export const PS_ASSIGNMENT_SOURCES = [
 export type PsAssignmentSource = (typeof PS_ASSIGNMENT_SOURCES)[number];
 
 export interface CreateResourceAssignmentInput {
-  workspaceId: number;
+
   resourceRequestId: number;
   psSystemId: number;
   assignmentRole: string;
@@ -200,7 +200,7 @@ export interface CreateResourceAssignmentInput {
 }
 
 export interface UpdateResourceAssignmentInput {
-  workspaceId: number;
+
   id: number;
   assignmentRole?: string;
   assigneeRefType?: PsAssigneeRefType;
@@ -240,7 +240,7 @@ export const PS_MATRIX_VERSION_STATUSES = ["draft", "active", "archived"] as con
 export type PsMatrixVersionStatus = (typeof PS_MATRIX_VERSION_STATUSES)[number];
 
 export interface MatrixEvaluationInput {
-  workspaceId: number;
+
   answers: Record<string, boolean | string | number>;
 }
 
@@ -588,7 +588,7 @@ export type MatrixImportType = "scope_matrix" | "scoring_matrix";
 // ── Wizard Accept (Decision → Operational Output) ──────────────────────
 
 export interface AcceptWizardInput {
-  workspaceId: number;
+
   scenarioText: string;
   projectName: string;
   selectedScopeCode: string;
@@ -620,7 +620,7 @@ export interface AcceptWizardResult {
 // ── Simulation Types ──────────────────────────────────────────────────
 
 export interface SimulationInput {
-  workspaceId: number;
+
   versionId: number;
   compareVersionId?: number;
   answers: Record<string, boolean | string | number>;
@@ -654,7 +654,7 @@ export interface SimulationDiff {
 // ── Evaluation Types ──────────────────────────────────────────────────
 
 export interface EvalCaseInput {
-  workspaceId: number;
+
   name: string;
   description?: string;
   answersJson: Record<string, boolean | string | number>;
@@ -674,7 +674,7 @@ export interface EvalCaseResult {
 }
 
 export interface EvalSuiteInput {
-  workspaceId: number;
+
   versionId: number;
   caseIds?: number[];
   tags?: string[];
@@ -698,7 +698,7 @@ export interface EvalSuiteResult {
 }
 
 export interface CreateMatrixImportRecordInput {
-  workspaceId: number;
+
   versionId?: number;
   importType: MatrixImportType;
   sourceType: MatrixImportSourceType;

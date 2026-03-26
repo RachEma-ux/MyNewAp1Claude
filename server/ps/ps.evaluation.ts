@@ -22,7 +22,6 @@ export async function createEvalCase(
   actorId: number,
 ) {
   return repo.createEvalCase({
-    workspaceId: input.workspaceId,
     name: input.name,
     description: input.description ?? null,
     answersJson: input.answersJson,
@@ -33,16 +32,15 @@ export async function createEvalCase(
   });
 }
 
-export async function listEvalCases(workspaceId: number) {
-  return repo.listEvalCases(workspaceId);
+export async function listEvalCases() {
+  return repo.listEvalCases();
 }
 
-export async function getEvalCase(workspaceId: number, id: number) {
-  return repo.getEvalCaseById(workspaceId, id);
+export async function getEvalCase(id: number) {
+  return repo.getEvalCaseById(id);
 }
 
 export async function updateEvalCase(
-  workspaceId: number,
   id: number,
   data: {
     name?: string;
@@ -53,11 +51,11 @@ export async function updateEvalCase(
     isActive?: number;
   },
 ) {
-  return repo.updateEvalCase(workspaceId, id, data);
+  return repo.updateEvalCase(id, data);
 }
 
-export async function deleteEvalCase(workspaceId: number, id: number) {
-  return repo.deleteEvalCase(workspaceId, id);
+export async function deleteEvalCase(id: number) {
+  return repo.deleteEvalCase(id);
 }
 
 // ── Run Evaluation Suite ─────────────────────────────────────────────
@@ -70,10 +68,10 @@ export async function runEvaluationSuite(
   input: EvalSuiteInput,
   actorId: number,
 ): Promise<EvalSuiteResult> {
-  const { workspaceId, versionId, caseIds, tags } = input;
+  const { versionId, caseIds, tags } = input;
 
   // Load matrix
-  const matrix = await loadMatrixByVersionId(workspaceId, versionId);
+  const matrix = await loadMatrixByVersionId(versionId);
   if (!matrix) {
     throw new Error(`Matrix version ${versionId} not found`);
   }
@@ -82,7 +80,7 @@ export async function runEvaluationSuite(
   }
 
   // Load eval cases
-  let cases = await repo.listEvalCases(workspaceId);
+  let cases = await repo.listEvalCases();
 
   // Filter by specific IDs
   if (caseIds && caseIds.length > 0) {
@@ -146,7 +144,6 @@ export async function runEvaluationSuite(
 
   // Persist eval run record
   const evalRun = await repo.createEvalRun({
-    workspaceId,
     versionId,
     totalCases,
     passedCases,
@@ -179,10 +176,10 @@ export async function runEvaluationSuite(
 
 // ── List Eval Runs ──────────────────────────────────────────────────
 
-export async function listEvalRuns(workspaceId: number) {
-  return repo.listEvalRuns(workspaceId);
+export async function listEvalRuns() {
+  return repo.listEvalRuns();
 }
 
-export async function getEvalRun(workspaceId: number, id: number) {
-  return repo.getEvalRunById(workspaceId, id);
+export async function getEvalRun(id: number) {
+  return repo.getEvalRunById(id);
 }

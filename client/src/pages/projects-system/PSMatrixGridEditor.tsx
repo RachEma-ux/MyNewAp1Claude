@@ -22,17 +22,15 @@ import { Loader2, Save } from "lucide-react";
 import { PSVersionSelector } from "./PSControlPanelPage";
 
 export function PSMatrixGridEditor({
-  workspaceId,
   selectedVersionId,
   onSelectVersion,
 }: {
-  workspaceId: number;
   selectedVersionId: number | null;
   onSelectVersion: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
   const { data: grid, isLoading } = trpc.ps.matrix.getGrid.useQuery(
-    { workspaceId, versionId: selectedVersionId! },
+    { versionId: selectedVersionId! },
     { enabled: !!selectedVersionId },
   );
 
@@ -82,7 +80,7 @@ export function PSMatrixGridEditor({
       const [qId, sId] = key.split("-").map(Number);
       return { questionId: qId, scopeId: sId, weight };
     });
-    upsertMut.mutate({ workspaceId, versionId: selectedVersionId, items });
+    upsertMut.mutate({ versionId: selectedVersionId, items });
   };
 
   const activeScopes = grid?.scopes?.filter((s) => s.isActive === 1) ?? [];
@@ -90,7 +88,7 @@ export function PSMatrixGridEditor({
 
   return (
     <div className="space-y-4">
-      <PSVersionSelector workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} />
+      <PSVersionSelector selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} />
       {!selectedVersionId ? null : isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
         <>
           <div className="flex items-center justify-between">

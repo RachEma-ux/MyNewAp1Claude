@@ -18,7 +18,6 @@ import {
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface OverrideInput {
-  workspaceId: number;
   wizardRunId?: number;
   recommendedScopeCode: string;
   overriddenScopeCode: string;
@@ -53,7 +52,6 @@ export async function recordOverride(
   if (!db) throw new Error("Database unavailable");
 
   const [created] = await db.insert(psWizardOverrides).values({
-    workspaceId: input.workspaceId,
     wizardRunId: input.wizardRunId ?? null,
     recommendedScopeCode: input.recommendedScopeCode,
     overriddenScopeCode: input.overriddenScopeCode,
@@ -73,23 +71,19 @@ export async function recordOverride(
 // ── List Overrides ──────────────────────────────────────────────────
 
 export async function listOverrides(
-  workspaceId: number,
   limit = 50,
 ): Promise<PsWizardOverride[]> {
   const db = getDb();
   if (!db) return [];
 
   return db.select().from(psWizardOverrides)
-    .where(eq(psWizardOverrides.workspaceId, workspaceId))
     .orderBy(desc(psWizardOverrides.createdAt))
     .limit(limit);
 }
 
 // ── Override Rate ───────────────────────────────────────────────────
 
-export async function getOverrideRate(
-  workspaceId: number,
-): Promise<OverrideRateMetrics> {
+export async function getOverrideRate(): Promise<OverrideRateMetrics> {
   const db = getDb();
   if (!db) {
     return {
@@ -105,15 +99,13 @@ export async function getOverrideRate(
       total: count(),
       last30d: sql<number>`count(*) filter (where ${psWizardRuns.createdAt} >= ${thirtyDaysAgo})`,
     })
-    .from(psWizardRuns)
-    .where(eq(psWizardRuns.workspaceId, workspaceId)),
+    .from(psWizardRuns),
 
     db.select({
       total: count(),
       last30d: sql<number>`count(*) filter (where ${psWizardOverrides.createdAt} >= ${thirtyDaysAgo})`,
     })
-    .from(psWizardOverrides)
-    .where(eq(psWizardOverrides.workspaceId, workspaceId)),
+    .from(psWizardOverrides),
   ]);
 
   const totalWizardRuns = Number(wizardRow?.total ?? 0);
@@ -137,9 +129,7 @@ export async function getOverrideRate(
 
 // ── Override Patterns ───────────────────────────────────────────────
 
-export async function getOverridePatterns(
-  workspaceId: number,
-): Promise<OverridePattern[]> {
+export async function getOverridePatterns(): Promise<OverridePattern[]> {
   const db = getDb();
   if (!db) return [];
 
@@ -149,7 +139,6 @@ export async function getOverridePatterns(
     cnt: count(),
   })
   .from(psWizardOverrides)
-  .where(eq(psWizardOverrides.workspaceId, workspaceId))
   .groupBy(psWizardOverrides.recommendedScopeCode, psWizardOverrides.overriddenScopeCode)
   .orderBy(desc(count()));
 

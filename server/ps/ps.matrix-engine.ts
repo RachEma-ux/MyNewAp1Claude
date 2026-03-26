@@ -26,8 +26,8 @@ import type {
  * Load the active matrix version with all scopes, questions, cells,
  * dimensions, and dimension values in a single batch.
  */
-export async function loadActiveMatrix(workspaceId: number): Promise<LoadedMatrix | null> {
-  const version = await repo.getActiveMatrixVersion(workspaceId);
+export async function loadActiveMatrix(): Promise<LoadedMatrix | null> {
+  const version = await repo.getActiveMatrixVersion();
   if (!version) return null;
 
   const [scopes, questions, cells, dimensions] = await Promise.all([

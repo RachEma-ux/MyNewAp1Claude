@@ -19,7 +19,6 @@ import {
 } from "../../drizzle/tables/ps";
 import { buildCanonicalTypeMap, CANONICAL_HEADERS } from "./ps.matrix-headers";
 import { logPsAudit } from "./ps.audit";
-import { logActivity } from "../modules/registry";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -148,7 +147,6 @@ function buildRawRowJson(record: SeedRecord): Record<string, unknown> {
 // ── Main Seed Function ───────────────────────────────────────────────
 
 export async function seedScopeMatrix(
-  workspaceId: number,
   actorId: number,
   seedData?: SeedPayload,
 ): Promise<SeedResult> {
@@ -178,7 +176,6 @@ export async function seedScopeMatrix(
   return await db.transaction(async (tx) => {
     // ── Step 1: Create matrix version ────────────────────────────────
     const [version] = await tx.insert(psMatrixVersions).values({
-      workspaceId,
       version: data.matrixVersionSeed.version,
       label: data.matrixVersionSeed.label,
       status: "draft",
@@ -261,7 +258,6 @@ export async function seedScopeMatrix(
 
     // ── Step 4: Insert import audit record ───────────────────────────
     const [importRecord] = await tx.insert(psMatrixImports).values({
-      workspaceId,
       versionId,
       importType: "scope_matrix",
       sourceType: data.matrixVersionSeed.sourceType || "excel",

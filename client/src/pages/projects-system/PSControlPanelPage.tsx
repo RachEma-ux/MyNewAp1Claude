@@ -47,15 +47,13 @@ function formatDate(ts: string | Date | null | undefined): string {
 // ── Exported Version Selector (used by child components) ─────────────
 
 export function PSVersionSelector({
-  workspaceId,
   selectedVersionId,
   onSelectVersion,
 }: {
-  workspaceId: number;
   selectedVersionId: number | null;
   onSelectVersion: (id: number) => void;
 }) {
-  const { data: versions } = trpc.ps.matrix.listVersions.useQuery({ workspaceId });
+  const { data: versions } = trpc.ps.matrix.listVersions.useQuery();
 
   if (!versions || versions.length === 0) {
     return <p className="text-sm text-muted-foreground">No versions. Create one in the Versions tab.</p>;
@@ -87,7 +85,7 @@ export function PSVersionSelector({
 
 // ── Main Component ───────────────────────────────────────────────────
 
-export function PSControlPanelPage({ workspaceId }: { workspaceId: number }) {
+export function PSControlPanelPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
 
@@ -113,28 +111,28 @@ export function PSControlPanelPage({ workspaceId }: { workspaceId: number }) {
         </TabsList>
 
         <TabsContent value="overview">
-          <OverviewTab workspaceId={workspaceId} onSelectVersion={setSelectedVersionId} onChangeTab={setActiveTab} />
+          <OverviewTab onSelectVersion={setSelectedVersionId} onChangeTab={setActiveTab} />
         </TabsContent>
         <TabsContent value="versions">
-          <PSMatrixVersionManager workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
+          <PSMatrixVersionManager selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
         </TabsContent>
         <TabsContent value="import">
-          <PSImportPreviewPanel workspaceId={workspaceId} />
+          <PSImportPreviewPanel />
         </TabsContent>
         <TabsContent value="scopes">
-          <PSScopeRegistryEditor workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
+          <PSScopeRegistryEditor selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
         </TabsContent>
         <TabsContent value="questions">
-          <PSQuestionEditor workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
+          <PSQuestionEditor selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
         </TabsContent>
         <TabsContent value="dimensions">
-          <PSDimensionEditor workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
+          <PSDimensionEditor selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
         </TabsContent>
         <TabsContent value="grid">
-          <PSMatrixGridEditor workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
+          <PSMatrixGridEditor selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
         </TabsContent>
         <TabsContent value="validation">
-          <ValidationTab workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
+          <ValidationTab selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
         </TabsContent>
       </Tabs>
     </div>
@@ -144,15 +142,13 @@ export function PSControlPanelPage({ workspaceId }: { workspaceId: number }) {
 // ── A. Overview Tab (kept inline — small, uses formatDate) ───────────
 
 function OverviewTab({
-  workspaceId,
   onSelectVersion,
   onChangeTab,
 }: {
-  workspaceId: number;
   onSelectVersion: (id: number) => void;
   onChangeTab: (tab: string) => void;
 }) {
-  const { data, isLoading } = trpc.ps.matrix.getOverview.useQuery({ workspaceId });
+  const { data, isLoading } = trpc.ps.matrix.getOverview.useQuery();
 
   if (isLoading) return <Loader2 className="w-5 h-5 animate-spin mx-auto mt-8" />;
   if (!data) return <p className="text-sm text-muted-foreground">Unable to load overview.</p>;
@@ -207,17 +203,15 @@ function OverviewTab({
 // ── G. Validation Tab (kept inline — uses PSVersionSelector) ─────────
 
 function ValidationTab({
-  workspaceId,
   selectedVersionId,
   onSelectVersion,
 }: {
-  workspaceId: number;
   selectedVersionId: number | null;
   onSelectVersion: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
   const { data: report, isLoading, refetch } = trpc.ps.matrix.getValidationReport.useQuery(
-    { workspaceId, versionId: selectedVersionId! },
+    { versionId: selectedVersionId! },
     { enabled: !!selectedVersionId },
   );
 
@@ -232,7 +226,7 @@ function ValidationTab({
 
   return (
     <div className="space-y-4">
-      <PSVersionSelector workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} />
+      <PSVersionSelector selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} />
       {!selectedVersionId ? null : isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : !report ? <p className="text-sm text-muted-foreground">Unable to load validation report.</p> : (
         <>
           <div className="flex items-center justify-between">
@@ -240,7 +234,7 @@ function ValidationTab({
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={() => refetch()}>Re-validate</Button>
               {report.isValid && (
-                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => activateMut.mutate({ workspaceId, id: selectedVersionId! })} disabled={activateMut.isPending}>
+                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => activateMut.mutate({ id: selectedVersionId! })} disabled={activateMut.isPending}>
                   {activateMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
                   Activate Version
                 </Button>

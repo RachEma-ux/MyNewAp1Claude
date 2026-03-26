@@ -97,11 +97,10 @@ const DEFAULT_TEMPLATES: Record<string, ScopeTemplate> = {
  * Priority: DB mapping → built-in defaults → generic fallback.
  */
 export async function resolveTemplate(
-  workspaceId: number,
   scopeCode: string,
 ): Promise<ScopeTemplate> {
   // 1. Try DB mapping first
-  const dbMapping = await getTemplateByScopeCode(workspaceId, scopeCode);
+  const dbMapping = await getTemplateByScopeCode(scopeCode);
   if (dbMapping) {
     return dbMappingToTemplate(dbMapping);
   }
@@ -143,14 +142,12 @@ function dbMappingToTemplate(mapping: PsScopeTemplateMapping): ScopeTemplate {
 // ── Repository Functions ───────────────────────────────────────────────
 
 export async function getTemplateByScopeCode(
-  workspaceId: number,
   scopeCode: string,
 ): Promise<PsScopeTemplateMapping | null> {
   const db = getDb();
   if (!db) return null;
   const [mapping] = await db.select().from(psScopeTemplateMappings)
     .where(and(
-      eq(psScopeTemplateMappings.workspaceId, workspaceId),
       eq(psScopeTemplateMappings.scopeCode, scopeCode),
       eq(psScopeTemplateMappings.isActive, 1),
     ))
@@ -158,14 +155,11 @@ export async function getTemplateByScopeCode(
   return mapping ?? null;
 }
 
-export async function listTemplates(workspaceId: number): Promise<PsScopeTemplateMapping[]> {
+export async function listTemplates(): Promise<PsScopeTemplateMapping[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(psScopeTemplateMappings)
-    .where(and(
-      eq(psScopeTemplateMappings.workspaceId, workspaceId),
-      eq(psScopeTemplateMappings.isActive, 1),
-    ));
+    .where(eq(psScopeTemplateMappings.isActive, 1));
 }
 
 export async function createTemplate(
@@ -180,7 +174,6 @@ export async function createTemplate(
 }
 
 export async function updateTemplate(
-  workspaceId: number,
   id: number,
   data: Partial<InsertPsScopeTemplateMapping>,
 ): Promise<PsScopeTemplateMapping | null> {
@@ -188,10 +181,7 @@ export async function updateTemplate(
   if (!db) return null;
   const [updated] = await db.update(psScopeTemplateMappings)
     .set({ ...data, updatedAt: new Date() })
-    .where(and(
-      eq(psScopeTemplateMappings.id, id),
-      eq(psScopeTemplateMappings.workspaceId, workspaceId),
-    ))
+    .where(eq(psScopeTemplateMappings.id, id))
     .returning();
   return updated ?? null;
 }

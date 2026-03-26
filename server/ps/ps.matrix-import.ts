@@ -8,7 +8,6 @@
 import { TRPCError } from "@trpc/server";
 import * as repo from "./ps.repository";
 import { logPsAudit } from "./ps.audit";
-import { logActivity } from "../modules/registry";
 import type {
   MatrixImportPayload,
   MatrixImportPreview,
@@ -19,7 +18,6 @@ import type {
 // ── Preview Import ─────────────────────────────────────────────────────
 
 export async function previewMatrixImport(
-  workspaceId: number,
   sourceType: MatrixImportSourceType,
   sourceName: string | undefined,
   payload: MatrixImportPayload,
@@ -113,7 +111,6 @@ export async function previewMatrixImport(
 
   // Save import record
   const imp = await repo.createMatrixImport({
-    workspaceId,
     versionId: null,
     sourceType,
     sourceName: sourceName || null,
@@ -144,7 +141,6 @@ export async function previewMatrixImport(
 // ── Commit Import ─────────────────────────────────────────────────────
 
 export async function commitMatrixImport(
-  workspaceId: number,
   importId: number,
   targetVersionId: number | undefined,
   newVersion: string | undefined,
@@ -155,9 +151,6 @@ export async function commitMatrixImport(
   const imp = await repo.getMatrixImportById(importId);
   if (!imp) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Import record not found" });
-  }
-  if (imp.workspaceId !== workspaceId) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Import belongs to a different workspace" });
   }
   if (imp.importStatus !== "previewed") {
     throw new TRPCError({
@@ -175,7 +168,7 @@ export async function commitMatrixImport(
   // Determine target version
   let versionId: number;
   if (targetVersionId) {
-    const version = await repo.getMatrixVersionById(workspaceId, targetVersionId);
+    const version = await repo.getMatrixVersionById(targetVersionId);
     if (!version) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Target version not found" });
     }
@@ -196,7 +189,6 @@ export async function commitMatrixImport(
   } else if (newVersion && newLabel) {
     // Create new draft version
     const created = await repo.createMatrixVersion({
-      workspaceId,
       version: newVersion,
       label: newLabel,
       status: "draft",
@@ -319,7 +311,6 @@ export async function commitMatrixImport(
 
   // Audit
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_import.commit",
     entityType: "ps_matrix_import",
@@ -333,14 +324,6 @@ export async function commitMatrixImport(
       dimensionValuesCreated,
       presentationsCreated,
     },
-  });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "matrix_import.commit",
-    targetType: "ps_matrix_import",
-    targetId: importId,
   });
 
   return {

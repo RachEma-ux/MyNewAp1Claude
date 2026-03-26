@@ -30,21 +30,19 @@ import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { PSVersionSelector } from "./PSControlPanelPage";
 
 export function PSScopeRegistryEditor({
-  workspaceId,
   selectedVersionId,
   onSelectVersion,
 }: {
-  workspaceId: number;
   selectedVersionId: number | null;
   onSelectVersion: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
   const { data: scopes, isLoading } = trpc.ps.matrix.getAllScopes.useQuery(
-    { workspaceId, versionId: selectedVersionId! },
+    { versionId: selectedVersionId! },
     { enabled: !!selectedVersionId },
   );
   const { data: version } = trpc.ps.matrix.getVersion.useQuery(
-    { workspaceId, id: selectedVersionId! },
+    { id: selectedVersionId! },
     { enabled: !!selectedVersionId },
   );
 
@@ -86,7 +84,7 @@ export function PSScopeRegistryEditor({
 
   return (
     <div className="space-y-4">
-      <PSVersionSelector workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} />
+      <PSVersionSelector selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} />
       {!selectedVersionId ? null : isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
         <>
           <div className="flex items-center justify-between">
@@ -110,7 +108,7 @@ export function PSScopeRegistryEditor({
                         <TableCell><Input value={editFamily} onChange={(e) => setEditFamily(e.target.value)} className="h-7 text-xs" /></TableCell>
                         <TableCell>{s.isActive === 1 ? "Yes" : "No"}</TableCell>
                         <TableCell className="flex gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => updateMut.mutate({ workspaceId, versionId: selectedVersionId!, id: s.id, code: editCode, label: editLabel, description: editDesc, family: editFamily })} disabled={updateMut.isPending}><Save className="w-3.5 h-3.5" /></Button>
+                          <Button size="sm" variant="ghost" onClick={() => updateMut.mutate({ versionId: selectedVersionId!, id: s.id, code: editCode, label: editLabel, description: editDesc, family: editFamily })} disabled={updateMut.isPending}><Save className="w-3.5 h-3.5" /></Button>
                           <Button size="sm" variant="ghost" onClick={() => setEditId(null)}>X</Button>
                         </TableCell>
                       </>
@@ -120,14 +118,14 @@ export function PSScopeRegistryEditor({
                         <TableCell>{s.label}</TableCell>
                         <TableCell className="text-muted-foreground">{s.family || "\u2014"}</TableCell>
                         <TableCell>
-                          <Button size="sm" variant="ghost" onClick={() => toggleMut.mutate({ workspaceId, versionId: selectedVersionId!, id: s.id, isActive: s.isActive === 1 ? 0 : 1 })} disabled={!isDraft}>
+                          <Button size="sm" variant="ghost" onClick={() => toggleMut.mutate({ versionId: selectedVersionId!, id: s.id, isActive: s.isActive === 1 ? 0 : 1 })} disabled={!isDraft}>
                             <Badge variant="outline" className={s.isActive === 1 ? "text-green-600" : "text-red-600"}>{s.isActive === 1 ? "Yes" : "No"}</Badge>
                           </Button>
                         </TableCell>
                         <TableCell className="flex gap-1">
                           <Button size="sm" variant="ghost" onClick={() => { setEditId(s.id); setEditCode(s.code); setEditLabel(s.label); setEditDesc(s.description || ""); setEditFamily(s.family || ""); }} disabled={!isDraft}>Edit</Button>
                           {isDraft && (
-                            <Button size="sm" variant="ghost" className="text-red-600" onClick={() => { if (confirm(`Delete scope "${s.code}"?`)) deleteMut.mutate({ workspaceId, versionId: selectedVersionId!, id: s.id }); }} disabled={deleteMut.isPending}><Trash2 className="w-3.5 h-3.5" /></Button>
+                            <Button size="sm" variant="ghost" className="text-red-600" onClick={() => { if (confirm(`Delete scope "${s.code}"?`)) deleteMut.mutate({ versionId: selectedVersionId!, id: s.id }); }} disabled={deleteMut.isPending}><Trash2 className="w-3.5 h-3.5" /></Button>
                           )}
                         </TableCell>
                       </>
@@ -149,7 +147,7 @@ export function PSScopeRegistryEditor({
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-                <Button onClick={() => createMut.mutate({ workspaceId, versionId: selectedVersionId!, code: newCode, label: newLabel, description: newDesc || undefined, family: newFamily || undefined })} disabled={!newCode.trim() || !newLabel.trim() || createMut.isPending}>Add</Button>
+                <Button onClick={() => createMut.mutate({ versionId: selectedVersionId!, code: newCode, label: newLabel, description: newDesc || undefined, family: newFamily || undefined })} disabled={!newCode.trim() || !newLabel.trim() || createMut.isPending}>Add</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

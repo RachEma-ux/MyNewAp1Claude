@@ -7,7 +7,6 @@
 import { TRPCError } from "@trpc/server";
 import * as repo from "./ps.repository";
 import { logPsAudit } from "./ps.audit";
-import { logActivity } from "../modules/registry";
 import type {
   MatrixOverview,
   MatrixValidationReport,
@@ -16,9 +15,9 @@ import type {
 
 // ── Matrix Overview ────────────────────────────────────────────────────
 
-export async function getMatrixOverview(workspaceId: number): Promise<MatrixOverview> {
-  const activeVersion = await repo.getActiveMatrixVersion(workspaceId);
-  const allVersions = await repo.listMatrixVersions(workspaceId);
+export async function getMatrixOverview(): Promise<MatrixOverview> {
+  const activeVersion = await repo.getActiveMatrixVersion();
+  const allVersions = await repo.listMatrixVersions();
 
   let totalScopes = 0;
   let totalQuestions = 0;
@@ -32,7 +31,7 @@ export async function getMatrixOverview(workspaceId: number): Promise<MatrixOver
     totalDimensions = await repo.countDimensionsByVersion(activeVersion.id);
   }
 
-  const lastImportAt = await repo.getLastImportDate(workspaceId);
+  const lastImportAt = await repo.getLastImportDate();
 
   // Find last activation date across all versions
   let lastActivationAt: string | null = null;
@@ -71,20 +70,18 @@ export async function getMatrixOverview(workspaceId: number): Promise<MatrixOver
 // ── Duplicate Matrix Version ─────────────────────────────────────────
 
 export async function duplicateMatrixVersion(
-  workspaceId: number,
   sourceVersionId: number,
   newVersion: string,
   newLabel: string,
   actorId: number,
 ) {
-  const source = await repo.getMatrixVersionById(workspaceId, sourceVersionId);
+  const source = await repo.getMatrixVersionById(sourceVersionId);
   if (!source) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Source matrix version not found" });
   }
 
   // Create new draft version
   const created = await repo.createMatrixVersion({
-    workspaceId,
     version: newVersion,
     label: newLabel,
     status: "draft",
@@ -197,7 +194,6 @@ export async function duplicateMatrixVersion(
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_version.duplicate",
     entityType: "ps_matrix_version",
@@ -212,14 +208,6 @@ export async function duplicateMatrixVersion(
       presentationsCopied: presentations.length,
     },
   });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "matrix_version.duplicate",
-    targetType: "ps_matrix_version",
-    targetId: created.id,
-  });
 
   return created;
 }
@@ -227,11 +215,10 @@ export async function duplicateMatrixVersion(
 // ── Archive Matrix Version ────────────────────────────────────────────
 
 export async function archiveMatrixVersion(
-  workspaceId: number,
   id: number,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, id);
+  const version = await repo.getMatrixVersionById(id);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -242,27 +229,18 @@ export async function archiveMatrixVersion(
     });
   }
 
-  const archived = await repo.archiveMatrixVersion(workspaceId, id);
+  const archived = await repo.archiveMatrixVersion(id);
   if (!archived) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_version.archive",
     entityType: "ps_matrix_version",
     entityId: id,
     previousValue: { status: version.status },
     newValue: { status: "archived" },
-  });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "matrix_version.archive",
-    targetType: "ps_matrix_version",
-    targetId: id,
   });
 
   return archived;
@@ -271,10 +249,9 @@ export async function archiveMatrixVersion(
 // ── Validate Matrix Version ──────────────────────────────────────────
 
 export async function validateMatrixVersion(
-  workspaceId: number,
   versionId: number,
 ): Promise<MatrixValidationReport> {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -408,11 +385,10 @@ export async function validateMatrixVersion(
 // ── Activate with Validation ─────────────────────────────────────────
 
 export async function activateMatrixVersionWithValidation(
-  workspaceId: number,
   id: number,
   actorId: number,
 ) {
-  const report = await validateMatrixVersion(workspaceId, id);
+  const report = await validateMatrixVersion(id);
   if (!report.isValid) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -420,5 +396,5 @@ export async function activateMatrixVersionWithValidation(
     });
   }
 
-  return repo.activateMatrixVersion(workspaceId, id);
+  return repo.activateMatrixVersion(id);
 }

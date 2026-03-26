@@ -29,7 +29,6 @@ import {
 
 export const psSystems = pgTable("ps_systems", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   systemType: varchar("system_type", { length: 100 }).notNull(),
@@ -40,10 +39,9 @@ export const psSystems = pgTable("ps_systems", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  wsIdx: index("ps_systems_ws_idx").on(table.workspaceId),
   statusIdx: index("ps_systems_status_idx").on(table.status),
   typeIdx: index("ps_systems_type_idx").on(table.systemType),
-  nameUniq: unique("ps_systems_name_uniq").on(table.workspaceId, table.name),
+  nameUniq: unique("ps_systems_name_uniq").on(table.name),
 }));
 
 export type PsSystem = typeof psSystems.$inferSelect;
@@ -55,7 +53,6 @@ export type InsertPsSystem = typeof psSystems.$inferInsert;
 
 export const psWizardRuns = pgTable("ps_wizard_runs", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   scenarioText: text("scenario_text").notNull(),
   inputPayload: json("input_payload").$type<Record<string, unknown>>(),
   resultPayload: json("result_payload").$type<Record<string, unknown>>(),
@@ -64,7 +61,6 @@ export const psWizardRuns = pgTable("ps_wizard_runs", {
   createdBy: integer("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  wsIdx: index("ps_wizard_runs_ws_idx").on(table.workspaceId),
   typeIdx: index("ps_wizard_runs_type_idx").on(table.selectedSystemType),
 }));
 
@@ -94,7 +90,6 @@ export type InsertPsCatalogSystemType = typeof psCatalogSystemTypes.$inferInsert
 
 export const psAuditLog = pgTable("ps_audit_log", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id"),
   actorId: integer("actor_id"),
   action: varchar("action", { length: 100 }).notNull(),
   entityType: varchar("entity_type", { length: 50 }),
@@ -105,7 +100,6 @@ export const psAuditLog = pgTable("ps_audit_log", {
   metadata: json("metadata").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  wsIdx: index("ps_audit_ws_idx").on(table.workspaceId),
   actionIdx: index("ps_audit_action_idx").on(table.action),
 }));
 
@@ -118,7 +112,6 @@ export type InsertPsAuditEntry = typeof psAuditLog.$inferInsert;
 
 export const psResourceRequests = pgTable("ps_resource_requests", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   psSystemId: integer("ps_system_id").notNull(),
   role: varchar("role", { length: 200 }).notNull(),
   capabilityTags: json("capability_tags").$type<string[]>().default([]),
@@ -132,7 +125,6 @@ export const psResourceRequests = pgTable("ps_resource_requests", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  wsIdx: index("ps_resource_requests_ws_idx").on(table.workspaceId),
   systemIdx: index("ps_resource_requests_system_idx").on(table.psSystemId),
   statusIdx: index("ps_resource_requests_status_idx").on(table.status),
 }));
@@ -146,7 +138,6 @@ export type InsertPsResourceRequest = typeof psResourceRequests.$inferInsert;
 
 export const psResourceAssignments = pgTable("ps_resource_assignments", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   resourceRequestId: integer("resource_request_id").notNull(),
   psSystemId: integer("ps_system_id").notNull(),
   assignmentRole: varchar("assignment_role", { length: 200 }).notNull(),
@@ -164,7 +155,6 @@ export const psResourceAssignments = pgTable("ps_resource_assignments", {
   updatedBy: integer("updated_by"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  wsIdx: index("ps_resource_assignments_ws_idx").on(table.workspaceId),
   requestIdx: index("ps_resource_assignments_request_idx").on(table.resourceRequestId),
   systemIdx: index("ps_resource_assignments_system_idx").on(table.psSystemId),
   statusIdx: index("ps_resource_assignments_status_idx").on(table.status),
@@ -179,7 +169,6 @@ export type InsertPsResourceAssignment = typeof psResourceAssignments.$inferInse
 
 export const psMatrixVersions = pgTable("ps_matrix_versions", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   version: varchar("version", { length: 50 }).notNull(),
   label: varchar("label", { length: 255 }).notNull(),
   status: varchar("status", { length: 30 }).default("draft").notNull(), // draft | active | archived
@@ -189,9 +178,8 @@ export const psMatrixVersions = pgTable("ps_matrix_versions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   activatedAt: timestamp("activated_at"),
 }, (table) => ({
-  wsIdx: index("ps_matrix_versions_ws_idx").on(table.workspaceId),
   statusIdx: index("ps_matrix_versions_status_idx").on(table.status),
-  versionUniq: unique("ps_matrix_versions_uniq").on(table.workspaceId, table.version),
+  versionUniq: unique("ps_matrix_versions_uniq").on(table.version),
 }));
 
 export type PsMatrixVersion = typeof psMatrixVersions.$inferSelect;
@@ -267,7 +255,6 @@ export type InsertPsMatrixCell = typeof psMatrixCells.$inferInsert;
 
 export const psMatrixImports = pgTable("ps_matrix_imports", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   versionId: integer("version_id"),
   importType: varchar("import_type", { length: 20 }), // scope_matrix | scoring_matrix
   sourceType: varchar("source_type", { length: 30 }).notNull(), // json | excel | manual
@@ -287,7 +274,6 @@ export const psMatrixImports = pgTable("ps_matrix_imports", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   committedAt: timestamp("committed_at"),
 }, (table) => ({
-  wsIdx: index("ps_matrix_imports_ws_idx").on(table.workspaceId),
   versionIdx: index("ps_matrix_imports_version_idx").on(table.versionId),
   statusIdx: index("ps_matrix_imports_status_idx").on(table.importStatus),
 }));
@@ -425,7 +411,6 @@ export type InsertPsMatrixQuestionPresentation = typeof psMatrixQuestionPresenta
 
 export const psScopeTemplateMappings = pgTable("ps_scope_template_mappings", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   scopeCode: varchar("scope_code", { length: 120 }).notNull(),
   systemType: varchar("system_type", { length: 100 }).notNull(),
   lifecycleType: varchar("lifecycle_type", { length: 100 }),
@@ -440,8 +425,7 @@ export const psScopeTemplateMappings = pgTable("ps_scope_template_mappings", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  wsIdx: index("ps_scope_template_ws_idx").on(table.workspaceId),
-  scopeUniq: unique("ps_scope_template_scope_uniq").on(table.workspaceId, table.scopeCode),
+  scopeUniq: unique("ps_scope_template_scope_uniq").on(table.scopeCode),
 }));
 
 export type PsScopeTemplateMapping = typeof psScopeTemplateMappings.$inferSelect;
@@ -453,7 +437,6 @@ export type InsertPsScopeTemplateMapping = typeof psScopeTemplateMappings.$infer
 
 export const psEvalCases = pgTable("ps_eval_cases", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   answersJson: json("answers_json").$type<Record<string, boolean | string | number>>().notNull(),
@@ -464,8 +447,7 @@ export const psEvalCases = pgTable("ps_eval_cases", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  wsIdx: index("ps_eval_cases_ws_idx").on(table.workspaceId),
-  nameUniq: unique("ps_eval_cases_name_uniq").on(table.workspaceId, table.name),
+  nameUniq: unique("ps_eval_cases_name_uniq").on(table.name),
 }));
 
 export type PsEvalCase = typeof psEvalCases.$inferSelect;
@@ -477,7 +459,6 @@ export type InsertPsEvalCase = typeof psEvalCases.$inferInsert;
 
 export const psEvalRuns = pgTable("ps_eval_runs", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   versionId: integer("version_id").notNull(),
   totalCases: integer("total_cases").notNull().default(0),
   passedCases: integer("passed_cases").notNull().default(0),
@@ -488,7 +469,6 @@ export const psEvalRuns = pgTable("ps_eval_runs", {
   createdBy: integer("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  wsIdx: index("ps_eval_runs_ws_idx").on(table.workspaceId),
   versionIdx: index("ps_eval_runs_version_idx").on(table.versionId),
 }));
 
@@ -501,7 +481,6 @@ export type InsertPsEvalRun = typeof psEvalRuns.$inferInsert;
 
 export const psMatrixSimulations = pgTable("ps_matrix_simulations", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   versionId: integer("version_id").notNull(),
   compareVersionId: integer("compare_version_id"),
   answersJson: json("answers_json").$type<Record<string, boolean | string | number>>().notNull(),
@@ -511,7 +490,6 @@ export const psMatrixSimulations = pgTable("ps_matrix_simulations", {
   createdBy: integer("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  wsIdx: index("ps_matrix_simulations_ws_idx").on(table.workspaceId),
   versionIdx: index("ps_matrix_simulations_version_idx").on(table.versionId),
 }));
 
@@ -524,7 +502,6 @@ export type InsertPsMatrixSimulation = typeof psMatrixSimulations.$inferInsert;
 
 export const psWizardOverrides = pgTable("ps_wizard_overrides", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
   wizardRunId: integer("wizard_run_id"),
   recommendedScopeCode: varchar("recommended_scope_code", { length: 120 }).notNull(),
   overriddenScopeCode: varchar("overridden_scope_code", { length: 120 }).notNull(),
@@ -535,7 +512,6 @@ export const psWizardOverrides = pgTable("ps_wizard_overrides", {
   createdBy: integer("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  wsIdx: index("ps_wizard_overrides_ws_idx").on(table.workspaceId),
   wizardRunIdx: index("ps_wizard_overrides_run_idx").on(table.wizardRunId),
   recommendedIdx: index("ps_wizard_overrides_recommended_idx").on(table.recommendedScopeCode),
   overriddenIdx: index("ps_wizard_overrides_overridden_idx").on(table.overriddenScopeCode),

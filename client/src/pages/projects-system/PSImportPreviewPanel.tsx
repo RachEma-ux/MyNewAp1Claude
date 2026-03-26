@@ -17,7 +17,7 @@ import {
   Upload,
 } from "lucide-react";
 
-export function PSImportPreviewPanel({ workspaceId }: { workspaceId: number }) {
+export function PSImportPreviewPanel() {
   const utils = trpc.useUtils();
   const [jsonInput, setJsonInput] = useState("");
   const [preview, setPreview] = useState<any>(null);
@@ -49,7 +49,7 @@ export function PSImportPreviewPanel({ workspaceId }: { workspaceId: number }) {
         toast.error("JSON must have scopes, questions, and cells arrays");
         return;
       }
-      previewMut.mutate({ workspaceId, sourceType: "json", sourceName: "manual-paste", payload });
+      previewMut.mutate({ sourceType: "json", sourceName: "manual-paste", payload });
     } catch {
       toast.error("Invalid JSON");
     }
@@ -107,7 +107,7 @@ export function PSImportPreviewPanel({ workspaceId }: { workspaceId: number }) {
                   <Input placeholder="Version code" value={commitVersion} onChange={(e) => setCommitVersion(e.target.value)} className="max-w-[200px]" />
                   <Input placeholder="Label" value={commitLabel} onChange={(e) => setCommitLabel(e.target.value)} className="max-w-[300px]" />
                   <Button
-                    onClick={() => commitMut.mutate({ workspaceId, importId: preview.importId, newVersion: commitVersion, newLabel: commitLabel })}
+                    onClick={() => commitMut.mutate({ importId: preview.importId, newVersion: commitVersion, newLabel: commitLabel })}
                     disabled={!commitVersion.trim() || !commitLabel.trim() || commitMut.isPending}
                   >
                     {commitMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Download className="w-4 h-4 mr-1" />}

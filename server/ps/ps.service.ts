@@ -7,7 +7,6 @@
 import { TRPCError } from "@trpc/server";
 import * as repo from "./ps.repository";
 import { logPsAudit } from "./ps.audit";
-import { logActivity } from "../modules/registry";
 import { classifyScenario as runLegacyClassifier } from "./ps.classifier";
 import { loadActiveMatrix, evaluateMatrix, evaluateMatrixEnriched } from "./ps.matrix-engine";
 import * as matrixAdmin from "./ps.matrix-admin";
@@ -65,7 +64,6 @@ export async function createSystem(input: CreateSystemInput, actorId: number) {
   }
 
   const system = await repo.createSystem({
-    workspaceId: input.workspaceId,
     name: input.name.trim(),
     description: input.description?.trim() || null,
     systemType: input.systemType,
@@ -76,25 +74,15 @@ export async function createSystem(input: CreateSystemInput, actorId: number) {
   });
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "system.create",
     entityType: "ps_system",
     entityId: system.id,
     newValue: { name: system.name, systemType: system.systemType },
   });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "system.create",
-    targetType: "ps_system",
-    targetId: system.id,
-  });
 
   // Auto-generate demand based on system type
   const demand = await generateDemandForSystem(
-    input.workspaceId,
     system.id,
     input.systemType,
     actorId,
@@ -103,16 +91,16 @@ export async function createSystem(input: CreateSystemInput, actorId: number) {
   return { ...system, _generatedDemand: demand };
 }
 
-export async function getSystem(workspaceId: number, id: number) {
-  const system = await repo.getSystemById(workspaceId, id);
+export async function getSystem(id: number) {
+  const system = await repo.getSystemById(id);
   if (!system) {
     throw new TRPCError({ code: "NOT_FOUND", message: "PS system not found" });
   }
   return system;
 }
 
-export async function listSystems(workspaceId: number, status?: string) {
-  return repo.listSystems(workspaceId, status);
+export async function listSystems(status?: string) {
+  return repo.listSystems(status);
 }
 
 // ── Wizard Runs ──────────────────────────────────────────────────────────
@@ -129,7 +117,6 @@ export async function createWizardRun(input: CreateWizardRunInput, actorId: numb
   }
 
   const run = await repo.createWizardRun({
-    workspaceId: input.workspaceId,
     scenarioText: input.scenarioText.trim(),
     inputPayload: input.inputPayload,
     resultPayload,
@@ -139,35 +126,26 @@ export async function createWizardRun(input: CreateWizardRunInput, actorId: numb
   });
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "wizard_run.create",
     entityType: "ps_wizard_run",
     entityId: run.id,
     newValue: { scenarioText: run.scenarioText, selectedSystemType: run.selectedSystemType },
   });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "wizard_run.create",
-    targetType: "ps_wizard_run",
-    targetId: run.id,
-  });
 
   return run;
 }
 
-export async function getWizardRun(workspaceId: number, id: number) {
-  const run = await repo.getWizardRunById(workspaceId, id);
+export async function getWizardRun(id: number) {
+  const run = await repo.getWizardRunById(id);
   if (!run) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Wizard run not found" });
   }
   return run;
 }
 
-export async function listWizardRuns(workspaceId: number) {
-  return repo.listWizardRuns(workspaceId);
+export async function listWizardRuns() {
+  return repo.listWizardRuns();
 }
 
 // ── Classification (legacy fallback) ──────────────────────────────────
@@ -181,7 +159,7 @@ export function classifyScenario(input: ClassificationInput) {
 export async function evaluateMatrixClassification(
   input: MatrixEvaluationInput,
 ): Promise<MatrixEvaluationResult> {
-  const matrix = await loadActiveMatrix(input.workspaceId);
+  const matrix = await loadActiveMatrix();
 
   if (!matrix) {
     throw new TRPCError({
@@ -214,7 +192,7 @@ export async function evaluateMatrixClassification(
 export async function evaluateMatrixClassificationEnriched(
   input: MatrixEvaluationInput,
 ): Promise<EnrichedMatrixResult> {
-  const matrix = await loadActiveMatrix(input.workspaceId);
+  const matrix = await loadActiveMatrix();
 
   if (!matrix) {
     throw new TRPCError({
@@ -244,29 +222,27 @@ export async function evaluateMatrixClassificationEnriched(
  * Check if a matrix-based classification is available.
  * Used by the wizard to decide between matrix mode and legacy mode.
  */
-export async function hasActiveMatrix(workspaceId: number): Promise<boolean> {
-  const version = await repo.getActiveMatrixVersion(workspaceId);
+export async function hasActiveMatrix(): Promise<boolean> {
+  const version = await repo.getActiveMatrixVersion();
   return version !== null;
 }
 
 // ── Matrix Version Management ────────────────────────────────────────
 
-export async function getActiveMatrixVersion(workspaceId: number) {
-  return repo.getActiveMatrixVersion(workspaceId);
+export async function getActiveMatrixVersion() {
+  return repo.getActiveMatrixVersion();
 }
 
-export async function listMatrixVersions(workspaceId: number) {
-  return repo.listMatrixVersions(workspaceId);
+export async function listMatrixVersions() {
+  return repo.listMatrixVersions();
 }
 
 export async function createMatrixVersion(
-  workspaceId: number,
   version: string,
   label: string,
   actorId: number,
 ) {
   const created = await repo.createMatrixVersion({
-    workspaceId,
     version,
     label,
     status: "draft",
@@ -274,50 +250,31 @@ export async function createMatrixVersion(
   });
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_version.create",
     entityType: "ps_matrix_version",
     entityId: created.id,
     newValue: { version: created.version, label: created.label },
   });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "matrix_version.create",
-    targetType: "ps_matrix_version",
-    targetId: created.id,
-  });
 
   return created;
 }
 
 export async function activateMatrixVersion(
-  workspaceId: number,
   id: number,
   actorId: number,
 ) {
-  const activated = await repo.activateMatrixVersion(workspaceId, id);
+  const activated = await repo.activateMatrixVersion(id);
   if (!activated) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_version.activate",
     entityType: "ps_matrix_version",
     entityId: id,
     newValue: { status: "active" },
-  });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "matrix_version.activate",
-    targetType: "ps_matrix_version",
-    targetId: id,
   });
 
   return activated;
@@ -325,9 +282,9 @@ export async function activateMatrixVersion(
 
 // ── Scope Management ─────────────────────────────────────────────────
 
-export async function listMatrixScopes(workspaceId: number, versionId: number) {
-  // Verify version exists and belongs to workspace
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function listMatrixScopes(versionId: number) {
+  // Verify version exists
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -335,7 +292,6 @@ export async function listMatrixScopes(workspaceId: number, versionId: number) {
 }
 
 export async function createMatrixScope(
-  workspaceId: number,
   versionId: number,
   code: string,
   label: string,
@@ -343,7 +299,7 @@ export async function createMatrixScope(
   family: string | null,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -358,7 +314,6 @@ export async function createMatrixScope(
   });
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_scope.create",
     entityType: "ps_scope_registry",
@@ -370,12 +325,11 @@ export async function createMatrixScope(
 }
 
 export async function createMatrixScopesBatch(
-  workspaceId: number,
   versionId: number,
   items: Array<{ code: string; label: string; description?: string; family?: string }>,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -394,8 +348,8 @@ export async function createMatrixScopesBatch(
 
 // ── Question Management ──────────────────────────────────────────────
 
-export async function listMatrixQuestions(workspaceId: number, versionId: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function listMatrixQuestions(versionId: number) {
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -403,7 +357,6 @@ export async function listMatrixQuestions(workspaceId: number, versionId: number
 }
 
 export async function createMatrixQuestion(
-  workspaceId: number,
   versionId: number,
   code: string,
   label: string,
@@ -411,7 +364,7 @@ export async function createMatrixQuestion(
   sortOrder: number,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -426,7 +379,6 @@ export async function createMatrixQuestion(
   });
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_question.create",
     entityType: "ps_matrix_question",
@@ -438,12 +390,11 @@ export async function createMatrixQuestion(
 }
 
 export async function createMatrixQuestionsBatch(
-  workspaceId: number,
   versionId: number,
   items: Array<{ code: string; label: string; description?: string; sortOrder?: number }>,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -462,8 +413,8 @@ export async function createMatrixQuestionsBatch(
 
 // ── Cell Management ──────────────────────────────────────────────────
 
-export async function listMatrixCells(workspaceId: number, versionId: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function listMatrixCells(versionId: number) {
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -471,12 +422,11 @@ export async function listMatrixCells(workspaceId: number, versionId: number) {
 }
 
 export async function createMatrixCellsBatch(
-  workspaceId: number,
   versionId: number,
   items: Array<{ questionId: number; scopeId: number; weight: number }>,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -505,13 +455,12 @@ export async function createResourceRequest(input: CreateResourceRequestInput, a
   }
 
   // Verify system exists
-  const system = await repo.getSystemById(input.workspaceId, input.psSystemId);
+  const system = await repo.getSystemById(input.psSystemId);
   if (!system) {
     throw new TRPCError({ code: "NOT_FOUND", message: "PS system not found" });
   }
 
   const request = await repo.createResourceRequest({
-    workspaceId: input.workspaceId,
     psSystemId: input.psSystemId,
     role: input.role.trim(),
     capabilityTags: input.capabilityTags || [],
@@ -525,66 +474,47 @@ export async function createResourceRequest(input: CreateResourceRequestInput, a
   });
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "resource_request.create",
     entityType: "ps_resource_request",
     entityId: request.id,
     newValue: { role: request.role, quantity: request.quantity, psSystemId: request.psSystemId },
   });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "resource_request.create",
-    targetType: "ps_resource_request",
-    targetId: request.id,
-  });
 
   return request;
 }
 
-export async function listResourceRequests(workspaceId: number, status?: string) {
-  return repo.listResourceRequests(workspaceId, status);
+export async function listResourceRequests(status?: string) {
+  return repo.listResourceRequests(status);
 }
 
-export async function listResourceRequestsBySystem(workspaceId: number, psSystemId: number) {
-  return repo.listResourceRequestsBySystem(workspaceId, psSystemId);
+export async function listResourceRequestsBySystem(psSystemId: number) {
+  return repo.listResourceRequestsBySystem(psSystemId);
 }
 
 export async function updateResourceRequestStatus(
-  workspaceId: number,
   id: number,
   status: PsResourceRequestStatus,
   actorId: number,
 ) {
-  const updated = await repo.updateResourceRequestStatus(workspaceId, id, status);
+  const updated = await repo.updateResourceRequestStatus(id, status);
   if (!updated) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Resource request not found" });
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "resource_request.status_change",
     entityType: "ps_resource_request",
     entityId: id,
     newValue: { status },
   });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "resource_request.status_change",
-    targetType: "ps_resource_request",
-    targetId: id,
-  });
 
   return updated;
 }
 
-export async function getDemandSummary(workspaceId: number, psSystemId: number): Promise<DemandSummary> {
-  const requests = await repo.listResourceRequestsBySystem(workspaceId, psSystemId);
+export async function getDemandSummary(psSystemId: number): Promise<DemandSummary> {
+  const requests = await repo.listResourceRequestsBySystem(psSystemId);
 
   const byStatus: Record<PsResourceRequestStatus, number> = {
     draft: 0,
@@ -621,7 +551,6 @@ export async function getDemandSummary(workspaceId: number, psSystemId: number):
  * Called during system creation or wizard completion.
  */
 export async function generateDemandForSystem(
-  workspaceId: number,
   psSystemId: number,
   systemType: string,
   actorId: number,
@@ -630,7 +559,6 @@ export async function generateDemandForSystem(
   if (specs.length === 0) return [];
 
   const items = specs.map((spec) => ({
-    workspaceId,
     psSystemId,
     role: spec.role,
     capabilityTags: spec.capabilityTags,
@@ -646,7 +574,6 @@ export async function generateDemandForSystem(
   const created = await repo.createResourceRequestsBatch(items);
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "demand.generate",
     entityType: "ps_system",
@@ -656,14 +583,6 @@ export async function generateDemandForSystem(
       requestCount: created.length,
       roles: created.map((r) => ({ role: r.role, quantity: r.quantity })),
     },
-  });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "demand.generate",
-    targetType: "ps_system",
-    targetId: psSystemId,
   });
 
   return created;
@@ -680,7 +599,7 @@ export async function createResourceAssignment(
   }
 
   // Rule 1: Verify request exists
-  const request = await repo.getResourceRequestById(input.workspaceId, input.resourceRequestId);
+  const request = await repo.getResourceRequestById(input.resourceRequestId);
   if (!request) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Resource request not found" });
   }
@@ -689,13 +608,12 @@ export async function createResourceAssignment(
   validateSystemMatch(request.psSystemId, input.psSystemId);
 
   // Verify system exists
-  const system = await repo.getSystemById(input.workspaceId, input.psSystemId);
+  const system = await repo.getSystemById(input.psSystemId);
   if (!system) {
     throw new TRPCError({ code: "NOT_FOUND", message: "PS system not found" });
   }
 
   const assignment = await repo.createResourceAssignment({
-    workspaceId: input.workspaceId,
     resourceRequestId: input.resourceRequestId,
     psSystemId: input.psSystemId,
     assignmentRole: input.assignmentRole.trim(),
@@ -713,7 +631,6 @@ export async function createResourceAssignment(
   });
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "resource_assignment.create",
     entityType: "ps_resource_assignment",
@@ -725,35 +642,27 @@ export async function createResourceAssignment(
       psSystemId: assignment.psSystemId,
     },
   });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "resource_assignment.create",
-    targetType: "ps_resource_assignment",
-    targetId: assignment.id,
-  });
 
   return assignment;
 }
 
-export async function listResourceAssignments(workspaceId: number, status?: string) {
-  return repo.listResourceAssignments(workspaceId, status);
+export async function listResourceAssignments(status?: string) {
+  return repo.listResourceAssignments(status);
 }
 
-export async function listResourceAssignmentsByRequest(workspaceId: number, resourceRequestId: number) {
-  return repo.listResourceAssignmentsByRequest(workspaceId, resourceRequestId);
+export async function listResourceAssignmentsByRequest(resourceRequestId: number) {
+  return repo.listResourceAssignmentsByRequest(resourceRequestId);
 }
 
-export async function listResourceAssignmentsBySystem(workspaceId: number, psSystemId: number) {
-  return repo.listResourceAssignmentsBySystem(workspaceId, psSystemId);
+export async function listResourceAssignmentsBySystem(psSystemId: number) {
+  return repo.listResourceAssignmentsBySystem(psSystemId);
 }
 
 export async function updateResourceAssignment(
   input: UpdateResourceAssignmentInput,
   actorId: number,
 ) {
-  const existing = await repo.getResourceAssignmentById(input.workspaceId, input.id);
+  const existing = await repo.getResourceAssignmentById(input.id);
   if (!existing) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
   }
@@ -768,13 +677,12 @@ export async function updateResourceAssignment(
   if (input.endDate !== undefined) updateData.endDate = input.endDate;
   if (input.notes !== undefined) updateData.notes = input.notes;
 
-  const updated = await repo.updateResourceAssignment(input.workspaceId, input.id, updateData);
+  const updated = await repo.updateResourceAssignment(input.id, updateData);
   if (!updated) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
   }
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "resource_assignment.update",
     entityType: "ps_resource_assignment",
@@ -782,25 +690,16 @@ export async function updateResourceAssignment(
     previousValue: { assignmentRole: existing.assignmentRole, assigneeDisplayName: existing.assigneeDisplayName },
     newValue: updateData,
   });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "resource_assignment.update",
-    targetType: "ps_resource_assignment",
-    targetId: input.id,
-  });
 
   return updated;
 }
 
 export async function updateResourceAssignmentStatus(
-  workspaceId: number,
   id: number,
   status: PsAssignmentStatus,
   actorId: number,
 ) {
-  const existing = await repo.getResourceAssignmentById(workspaceId, id);
+  const existing = await repo.getResourceAssignmentById(id);
   if (!existing) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
   }
@@ -808,13 +707,12 @@ export async function updateResourceAssignmentStatus(
   // Rule 3: Validate status transition
   validateStatusTransition(existing.status as PsAssignmentStatus, status);
 
-  const updated = await repo.updateResourceAssignmentStatus(workspaceId, id, status, actorId);
+  const updated = await repo.updateResourceAssignmentStatus(id, status, actorId);
   if (!updated) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "resource_assignment.status_change",
     entityType: "ps_resource_assignment",
@@ -822,35 +720,25 @@ export async function updateResourceAssignmentStatus(
     previousValue: { status: existing.status },
     newValue: { status },
   });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "resource_assignment.status_change",
-    targetType: "ps_resource_assignment",
-    targetId: id,
-  });
 
   return updated;
 }
 
 export async function deleteResourceAssignment(
-  workspaceId: number,
   id: number,
   actorId: number,
 ) {
-  const existing = await repo.getResourceAssignmentById(workspaceId, id);
+  const existing = await repo.getResourceAssignmentById(id);
   if (!existing) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
   }
 
-  const deleted = await repo.deleteResourceAssignment(workspaceId, id);
+  const deleted = await repo.deleteResourceAssignment(id);
   if (!deleted) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Resource assignment not found" });
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "resource_assignment.delete",
     entityType: "ps_resource_assignment",
@@ -861,24 +749,15 @@ export async function deleteResourceAssignment(
       status: existing.status,
     },
   });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "resource_assignment.delete",
-    targetType: "ps_resource_assignment",
-    targetId: id,
-  });
 
   return { success: true };
 }
 
 export async function getAssignmentSummary(
-  workspaceId: number,
   psSystemId: number,
 ): Promise<AssignmentSummary> {
-  const requests = await repo.listResourceRequestsBySystem(workspaceId, psSystemId);
-  const assignments = await repo.listResourceAssignmentsBySystem(workspaceId, psSystemId);
+  const requests = await repo.listResourceRequestsBySystem(psSystemId);
+  const assignments = await repo.listResourceAssignmentsBySystem(psSystemId);
 
   return computeAssignmentSummary(
     psSystemId,
@@ -889,98 +768,83 @@ export async function getAssignmentSummary(
 
 // ── Matrix Admin — Extended Operations ──────────────────────────────
 
-export async function getMatrixOverview(workspaceId: number) {
-  return matrixAdmin.getMatrixOverview(workspaceId);
+export async function getMatrixOverview() {
+  return matrixAdmin.getMatrixOverview();
 }
 
 export async function duplicateMatrixVersion(
-  workspaceId: number,
   sourceVersionId: number,
   newVersion: string,
   newLabel: string,
   actorId: number,
 ) {
-  return matrixAdmin.duplicateMatrixVersion(workspaceId, sourceVersionId, newVersion, newLabel, actorId);
+  return matrixAdmin.duplicateMatrixVersion(sourceVersionId, newVersion, newLabel, actorId);
 }
 
 export async function archiveMatrixVersion(
-  workspaceId: number,
   id: number,
   actorId: number,
 ) {
-  return matrixAdmin.archiveMatrixVersion(workspaceId, id, actorId);
+  return matrixAdmin.archiveMatrixVersion(id, actorId);
 }
 
 export async function activateMatrixVersionValidated(
-  workspaceId: number,
   id: number,
   actorId: number,
 ) {
-  const result = await matrixAdmin.activateMatrixVersionWithValidation(workspaceId, id, actorId);
+  const result = await matrixAdmin.activateMatrixVersionWithValidation(id, actorId);
   if (!result) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_version.activate",
     entityType: "ps_matrix_version",
     entityId: id,
     newValue: { status: "active" },
   });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "matrix_version.activate",
-    targetType: "ps_matrix_version",
-    targetId: id,
-  });
 
   return result;
 }
 
-export async function getMatrixValidationReport(workspaceId: number, versionId: number) {
-  return matrixAdmin.validateMatrixVersion(workspaceId, versionId);
+export async function getMatrixValidationReport(versionId: number) {
+  return matrixAdmin.validateMatrixVersion(versionId);
 }
 
 // ── Safe Matrix Versioning ────────────────────────────────────────────
 
-export async function deepValidateMatrix(workspaceId: number, versionId: number) {
-  return versioning.deepValidateMatrix(workspaceId, versionId);
+export async function deepValidateMatrix(versionId: number) {
+  return versioning.deepValidateMatrix(versionId);
 }
 
 export async function safeActivateMatrix(
-  workspaceId: number,
   versionId: number,
   actorId: number,
 ) {
-  return versioning.safeActivateMatrix(workspaceId, versionId, actorId);
+  return versioning.safeActivateMatrix(versionId, actorId);
 }
 
-export async function rollbackMatrixVersion(workspaceId: number, actorId: number) {
-  return versioning.rollbackMatrixVersion(workspaceId, actorId);
+export async function rollbackMatrixVersion(actorId: number) {
+  return versioning.rollbackMatrixVersion(actorId);
 }
 
 export async function compareMatrixVersions(
-  workspaceId: number,
   baseVersionId: number,
   targetVersionId: number,
 ) {
-  return versioning.compareMatrixVersions(workspaceId, baseVersionId, targetVersionId);
+  return versioning.compareMatrixVersions(baseVersionId, targetVersionId);
 }
 
 // ── Scope Editing ─────────────────────────────────────────────────────
 
 export async function updateMatrixScope(
-  workspaceId: number,
   versionId: number,
   id: number,
   data: { code?: string; label?: string; description?: string; family?: string; isActive?: number },
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -991,7 +855,6 @@ export async function updateMatrixScope(
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_scope.update",
     entityType: "ps_scope_registry",
@@ -1002,8 +865,8 @@ export async function updateMatrixScope(
   return updated;
 }
 
-export async function listAllMatrixScopes(workspaceId: number, versionId: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function listAllMatrixScopes(versionId: number) {
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1013,13 +876,12 @@ export async function listAllMatrixScopes(workspaceId: number, versionId: number
 // ── Question Editing ──────────────────────────────────────────────────
 
 export async function updateMatrixQuestion(
-  workspaceId: number,
   versionId: number,
   id: number,
   data: { code?: string; label?: string; description?: string; sortOrder?: number; isActive?: number },
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1030,7 +892,6 @@ export async function updateMatrixQuestion(
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_question.update",
     entityType: "ps_matrix_question",
@@ -1041,8 +902,8 @@ export async function updateMatrixQuestion(
   return updated;
 }
 
-export async function listAllMatrixQuestions(workspaceId: number, versionId: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function listAllMatrixQuestions(versionId: number) {
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1050,19 +911,17 @@ export async function listAllMatrixQuestions(workspaceId: number, versionId: num
 }
 
 export async function reorderMatrixQuestions(
-  workspaceId: number,
   versionId: number,
   orderedIds: number[],
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
   await repo.updateQuestionSortOrders(versionId, orderedIds);
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_question.reorder",
     entityType: "ps_matrix_question",
@@ -1076,14 +935,13 @@ export async function reorderMatrixQuestions(
 // ── Cell Editing ──────────────────────────────────────────────────────
 
 export async function upsertMatrixCell(
-  workspaceId: number,
   versionId: number,
   questionId: number,
   scopeId: number,
   weight: number,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1091,7 +949,6 @@ export async function upsertMatrixCell(
   const cell = await repo.upsertCell(versionId, questionId, scopeId, weight);
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_cell.upsert",
     entityType: "ps_matrix_cell",
@@ -1103,12 +960,11 @@ export async function upsertMatrixCell(
 }
 
 export async function bulkUpsertMatrixCells(
-  workspaceId: number,
   versionId: number,
   items: Array<{ questionId: number; scopeId: number; weight: number }>,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1116,7 +972,6 @@ export async function bulkUpsertMatrixCells(
   const results = await repo.upsertCellsBatch(versionId, items);
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_cell.bulk_upsert",
     entityType: "ps_matrix_cell",
@@ -1129,8 +984,8 @@ export async function bulkUpsertMatrixCells(
 
 // ── Matrix Grid (for grid editor UI) ──────────────────────────────────
 
-export async function getMatrixGrid(workspaceId: number, versionId: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function getMatrixGrid(versionId: number) {
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1148,34 +1003,32 @@ export async function getMatrixGrid(workspaceId: number, versionId: number) {
 // ── Import Operations ─────────────────────────────────────────────────
 
 export async function previewMatrixImport(
-  workspaceId: number,
   sourceType: MatrixImportSourceType,
   sourceName: string | undefined,
   payload: MatrixImportPayload,
   actorId: number,
 ) {
-  return matrixImport.previewMatrixImport(workspaceId, sourceType, sourceName, payload, actorId);
+  return matrixImport.previewMatrixImport(sourceType, sourceName, payload, actorId);
 }
 
 export async function commitMatrixImport(
-  workspaceId: number,
   importId: number,
   targetVersionId: number | undefined,
   newVersion: string | undefined,
   newLabel: string | undefined,
   actorId: number,
 ) {
-  return matrixImport.commitMatrixImport(workspaceId, importId, targetVersionId, newVersion, newLabel, actorId);
+  return matrixImport.commitMatrixImport(importId, targetVersionId, newVersion, newLabel, actorId);
 }
 
-export async function listMatrixImports(workspaceId: number) {
-  return repo.listMatrixImports(workspaceId);
+export async function listMatrixImports() {
+  return repo.listMatrixImports();
 }
 
 // ── Matrix Version by ID ──────────────────────────────────────────────
 
-export async function getMatrixVersionById(workspaceId: number, id: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, id);
+export async function getMatrixVersionById(id: number) {
+  const version = await repo.getMatrixVersionById(id);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1184,8 +1037,8 @@ export async function getMatrixVersionById(workspaceId: number, id: number) {
 
 // ── Scope Matrix Profile ──────────────────────────────────────────────
 
-export async function getScopeProfile(workspaceId: number, scopeId: number) {
-  // Verify scope exists by checking the registry (scope → version → workspace)
+export async function getScopeProfile(scopeId: number) {
+  // Verify scope exists by checking the registry
   const profile = await repo.getScopeProfileByScopeId(scopeId);
   if (!profile) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Scope matrix profile not found" });
@@ -1193,8 +1046,8 @@ export async function getScopeProfile(workspaceId: number, scopeId: number) {
   return profile;
 }
 
-export async function listScopeProfiles(workspaceId: number, versionId: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function listScopeProfiles(versionId: number) {
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1203,8 +1056,8 @@ export async function listScopeProfiles(workspaceId: number, versionId: number) 
 
 // ── Matrix Headers ────────────────────────────────────────────────────
 
-export async function listMatrixHeaders(workspaceId: number, versionId: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function listMatrixHeaders(versionId: number) {
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1212,11 +1065,10 @@ export async function listMatrixHeaders(workspaceId: number, versionId: number) 
 }
 
 export async function listMatrixHeadersByType(
-  workspaceId: number,
   versionId: number,
   headerType: string,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1224,12 +1076,11 @@ export async function listMatrixHeadersByType(
 }
 
 export async function parseAndStoreHeaders(
-  workspaceId: number,
   versionId: number,
   rawHeaders: string[],
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1260,7 +1111,6 @@ export async function parseAndStoreHeaders(
   const created = await repo.createHeadersBatch(headerRows);
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_headers.parse_and_store",
     entityType: "ps_scope_matrix_headers",
@@ -1269,14 +1119,6 @@ export async function parseAndStoreHeaders(
       headerCount: created.length,
       typeMap: result.typeMap,
     },
-  });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "matrix_headers.parse_and_store",
-    targetType: "ps_matrix_version",
-    targetId: versionId,
   });
 
   return {
@@ -1293,7 +1135,6 @@ export async function createMatrixImportRecord(
   actorId: number,
 ) {
   const record = await repo.createMatrixImport({
-    workspaceId: input.workspaceId,
     versionId: input.versionId ?? null,
     importType: input.importType,
     sourceType: input.sourceType,
@@ -1309,7 +1150,6 @@ export async function createMatrixImportRecord(
   });
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "matrix_import.create_record",
     entityType: "ps_matrix_import",
@@ -1321,26 +1161,17 @@ export async function createMatrixImportRecord(
       totalRows: input.totalRows,
     },
   });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "matrix_import.create_record",
-    targetType: "ps_matrix_import",
-    targetId: record.id,
-  });
 
   return record;
 }
 
 // ── Seed ──────────────────────────────────────────────────────────────
 
-export async function seedScopeMatrix(workspaceId: number, actorId: number) {
+export async function seedScopeMatrix(actorId: number) {
   const { seedScopeMatrix: runSeed } = await import("./ps.seed");
-  const result = await runSeed(workspaceId, actorId);
+  const result = await runSeed(actorId);
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "scope_matrix.seed",
     entityType: "ps_matrix_version",
@@ -1352,30 +1183,22 @@ export async function seedScopeMatrix(workspaceId: number, actorId: number) {
       importRecordId: result.importRecordId,
     },
   });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "scope_matrix.seed",
-    targetType: "ps_matrix_version",
-    targetId: result.versionId,
-  });
 
   return result;
 }
 
 // ── Dimensions ────────────────────────────────────────────────────────
 
-export async function listDimensions(workspaceId: number, versionId: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function listDimensions(versionId: number) {
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
   return repo.listDimensionsByVersion(versionId);
 }
 
-export async function listAllDimensions(workspaceId: number, versionId: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function listAllDimensions(versionId: number) {
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1383,10 +1206,9 @@ export async function listAllDimensions(workspaceId: number, versionId: number) 
 }
 
 export async function listDimensionsWithValues(
-  workspaceId: number,
   versionId: number,
 ): Promise<DimensionDefinition[]> {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1419,7 +1241,6 @@ export async function listDimensionsWithValues(
 }
 
 export async function createDimension(
-  workspaceId: number,
   versionId: number,
   dimensionKey: string,
   dimensionLabel: string,
@@ -1427,7 +1248,7 @@ export async function createDimension(
   sortOrder: number,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1442,7 +1263,6 @@ export async function createDimension(
   });
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "dimension.create",
     entityType: "ps_dimension",
@@ -1454,7 +1274,6 @@ export async function createDimension(
 }
 
 export async function createDimensionsBatch(
-  workspaceId: number,
   versionId: number,
   items: Array<{
     dimensionKey: string;
@@ -1470,7 +1289,7 @@ export async function createDimensionsBatch(
   }>,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1504,7 +1323,6 @@ export async function createDimensionsBatch(
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "dimension.batch_create",
     entityType: "ps_dimension",
@@ -1516,13 +1334,12 @@ export async function createDimensionsBatch(
 }
 
 export async function updateDimension(
-  workspaceId: number,
   versionId: number,
   id: number,
   data: { dimensionKey?: string; dimensionLabel?: string; description?: string; sortOrder?: number; isActive?: number },
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1533,7 +1350,6 @@ export async function updateDimension(
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "dimension.update",
     entityType: "ps_dimension",
@@ -1546,16 +1362,15 @@ export async function updateDimension(
 
 // ── Dimension Values ──────────────────────────────────────────────────
 
-export async function listDimensionValues(workspaceId: number, dimensionId: number) {
+export async function listDimensionValues(dimensionId: number) {
   return repo.listDimensionValues(dimensionId);
 }
 
-export async function listAllDimensionValues(workspaceId: number, dimensionId: number) {
+export async function listAllDimensionValues(dimensionId: number) {
   return repo.getAllDimensionValues(dimensionId);
 }
 
 export async function createDimensionValue(
-  workspaceId: number,
   dimensionId: number,
   valueKey: string,
   valueLabel: string,
@@ -1573,7 +1388,6 @@ export async function createDimensionValue(
   });
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "dimension_value.create",
     entityType: "ps_dimension_value",
@@ -1585,7 +1399,6 @@ export async function createDimensionValue(
 }
 
 export async function createDimensionValuesBatch(
-  workspaceId: number,
   dimensionId: number,
   items: Array<{ valueKey: string; valueLabel: string; description?: string; sortOrder?: number }>,
   actorId: number,
@@ -1602,7 +1415,6 @@ export async function createDimensionValuesBatch(
   const created = await repo.createDimensionValuesBatch(valRows);
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "dimension_value.batch_create",
     entityType: "ps_dimension_value",
@@ -1614,7 +1426,6 @@ export async function createDimensionValuesBatch(
 }
 
 export async function updateDimensionValue(
-  workspaceId: number,
   dimensionId: number,
   id: number,
   data: { valueKey?: string; valueLabel?: string; description?: string; sortOrder?: number; isActive?: number },
@@ -1626,7 +1437,6 @@ export async function updateDimensionValue(
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "dimension_value.update",
     entityType: "ps_dimension_value",
@@ -1639,7 +1449,7 @@ export async function updateDimensionValue(
 
 // ── Question Presentations ────────────────────────────────────────────
 
-export async function getQuestionPresentation(workspaceId: number, questionId: number) {
+export async function getQuestionPresentation(questionId: number) {
   const pres = await repo.getQuestionPresentation(questionId);
   if (!pres) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Question presentation not found" });
@@ -1647,8 +1457,8 @@ export async function getQuestionPresentation(workspaceId: number, questionId: n
   return pres;
 }
 
-export async function listQuestionPresentations(workspaceId: number, versionId: number) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+export async function listQuestionPresentations(versionId: number) {
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1656,7 +1466,6 @@ export async function listQuestionPresentations(workspaceId: number, versionId: 
 }
 
 export async function createQuestionPresentation(
-  workspaceId: number,
   questionId: number,
   presentationType: PresentationType,
   dimensionId: number | null,
@@ -1672,7 +1481,6 @@ export async function createQuestionPresentation(
   });
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "question_presentation.create",
     entityType: "ps_matrix_question_presentation",
@@ -1684,7 +1492,6 @@ export async function createQuestionPresentation(
 }
 
 export async function createQuestionPresentationsBatch(
-  workspaceId: number,
   versionId: number,
   items: Array<{
     questionId: number;
@@ -1694,7 +1501,7 @@ export async function createQuestionPresentationsBatch(
   }>,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -1710,7 +1517,6 @@ export async function createQuestionPresentationsBatch(
   const created = await repo.createQuestionPresentationsBatch(presRows);
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "question_presentation.batch_create",
     entityType: "ps_matrix_question_presentation",
@@ -1722,7 +1528,6 @@ export async function createQuestionPresentationsBatch(
 }
 
 export async function updateQuestionPresentation(
-  workspaceId: number,
   questionId: number,
   data: {
     presentationType?: PresentationType;
@@ -1738,7 +1543,6 @@ export async function updateQuestionPresentation(
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "question_presentation.update",
     entityType: "ps_matrix_question_presentation",
@@ -1752,12 +1556,11 @@ export async function updateQuestionPresentation(
 // ── Delete Operations (draft-only enforced) ──────────────────────────
 
 export async function deleteMatrixScope(
-  workspaceId: number,
   versionId: number,
   id: number,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   if (version.status === "active") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete from active version" });
 
@@ -1770,17 +1573,16 @@ export async function deleteMatrixScope(
   const deleted = await repo.deleteScope(id, versionId);
   if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Scope not found" });
 
-  await logPsAudit({ workspaceId, actorId, action: "matrix_scope.delete", entityType: "ps_scope_registry", entityId: id });
+  await logPsAudit({ actorId, action: "matrix_scope.delete", entityType: "ps_scope_registry", entityId: id });
   return { success: true };
 }
 
 export async function deleteMatrixQuestion(
-  workspaceId: number,
   versionId: number,
   id: number,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   if (version.status === "active") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete from active version" });
 
@@ -1793,29 +1595,27 @@ export async function deleteMatrixQuestion(
   const deleted = await repo.deleteQuestion(id, versionId);
   if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Question not found" });
 
-  await logPsAudit({ workspaceId, actorId, action: "matrix_question.delete", entityType: "ps_matrix_question", entityId: id });
+  await logPsAudit({ actorId, action: "matrix_question.delete", entityType: "ps_matrix_question", entityId: id });
   return { success: true };
 }
 
 export async function deleteMatrixDimension(
-  workspaceId: number,
   versionId: number,
   id: number,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   if (version.status === "active") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete from active version" });
 
   const deleted = await repo.deleteDimension(id, versionId);
   if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Dimension not found" });
 
-  await logPsAudit({ workspaceId, actorId, action: "dimension.delete", entityType: "ps_dimension", entityId: id });
+  await logPsAudit({ actorId, action: "dimension.delete", entityType: "ps_dimension", entityId: id });
   return { success: true };
 }
 
 export async function deleteMatrixDimensionValue(
-  workspaceId: number,
   dimensionId: number,
   id: number,
   actorId: number,
@@ -1823,24 +1623,23 @@ export async function deleteMatrixDimensionValue(
   const deleted = await repo.deleteDimensionValue(id, dimensionId);
   if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Dimension value not found" });
 
-  await logPsAudit({ workspaceId, actorId, action: "dimension_value.delete", entityType: "ps_dimension_value", entityId: id });
+  await logPsAudit({ actorId, action: "dimension_value.delete", entityType: "ps_dimension_value", entityId: id });
   return { success: true };
 }
 
 export async function deleteMatrixCell(
-  workspaceId: number,
   versionId: number,
   id: number,
   actorId: number,
 ) {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   if (version.status === "active") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete from active version" });
 
   const deleted = await repo.deleteCell(id, versionId);
   if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Cell not found" });
 
-  await logPsAudit({ workspaceId, actorId, action: "matrix_cell.delete", entityType: "ps_matrix_cell", entityId: id });
+  await logPsAudit({ actorId, action: "matrix_cell.delete", entityType: "ps_matrix_cell", entityId: id });
   return { success: true };
 }
 
@@ -1854,15 +1653,14 @@ export async function acceptWizardResult(
   input: AcceptWizardInput,
   actorId: number,
 ): Promise<AcceptWizardResult> {
-  const { workspaceId, selectedScopeCode } = input;
+  const { selectedScopeCode } = input;
 
   // 1. Resolve scope → operational template
-  const template = await resolveTemplate(workspaceId, selectedScopeCode);
+  const template = await resolveTemplate(selectedScopeCode);
 
   // 2. Create wizard run (trace)
   const wizardRun = await createWizardRun(
     {
-      workspaceId,
       scenarioText: input.scenarioText,
       inputPayload: {
         answers: input.answers,
@@ -1889,7 +1687,6 @@ export async function acceptWizardResult(
   // 3. Create PS system from template
   const system = await createSystem(
     {
-      workspaceId,
       name: input.projectName,
       description: `Created from PS Wizard. Scope: ${input.selectedScopeLabel} (${selectedScopeCode})`,
       systemType: template.systemType,
@@ -1900,13 +1697,12 @@ export async function acceptWizardResult(
   );
 
   // 4. Collect demand (already auto-generated by createSystem)
-  const demandRequests = await repo.listResourceRequestsBySystem(workspaceId, system.id);
+  const demandRequests = await repo.listResourceRequestsBySystem(system.id);
 
   // 5. Create assignment placeholders for each demand request
   const assignmentPlaceholders = [];
   for (const req of demandRequests) {
     const assignment = await repo.createResourceAssignment({
-      workspaceId,
       resourceRequestId: req.id,
       psSystemId: system.id,
       assignmentRole: req.role,
@@ -1929,7 +1725,6 @@ export async function acceptWizardResult(
   if (input.overrideInfo) {
     await overrideRecommendation(
       {
-        workspaceId,
         wizardRunId: wizardRun.id,
         recommendedScopeCode: input.overrideInfo.scopeCode,
         overriddenScopeCode: selectedScopeCode,
@@ -1944,7 +1739,6 @@ export async function acceptWizardResult(
 
   // 7. Audit trail
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "wizard.accept",
     entityType: "ps_system",
@@ -1957,14 +1751,6 @@ export async function acceptWizardResult(
       assignmentCount: assignmentPlaceholders.length,
       overrideApplied: !!input.overrideInfo,
     },
-  });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "wizard.accept",
-    targetType: "ps_system",
-    targetId: system.id,
   });
 
   // 8. Return full trace
@@ -2004,13 +1790,12 @@ export async function acceptWizardResult(
 
 // ── Scope Template Mappings ──────────────────────────────────────────
 
-export async function listScopeTemplateMappings(workspaceId: number) {
-  return listScopeTemplates(workspaceId);
+export async function listScopeTemplateMappings() {
+  return listScopeTemplates();
 }
 
 export async function createScopeTemplateMapping(
   input: {
-    workspaceId: number;
     scopeCode: string;
     systemType: string;
     lifecycleType?: string;
@@ -2025,7 +1810,6 @@ export async function createScopeTemplateMapping(
   actorId: number,
 ) {
   const created = await createTemplate({
-    workspaceId: input.workspaceId,
     scopeCode: input.scopeCode,
     systemType: input.systemType,
     lifecycleType: input.lifecycleType || null,
@@ -2035,20 +1819,11 @@ export async function createScopeTemplateMapping(
   });
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "scope_template.create",
     entityType: "ps_scope_template_mapping",
     entityId: created.id,
     newValue: { scopeCode: input.scopeCode, systemType: input.systemType },
-  });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "scope_template.create",
-    targetType: "ps_scope_template_mapping",
-    targetId: created.id,
   });
 
   return created;
@@ -2064,7 +1839,6 @@ export async function runMatrixSimulation(
   const result = await runSimulation(input, actorId);
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "simulation.run",
     entityType: "ps_matrix_simulation",
@@ -2076,21 +1850,13 @@ export async function runMatrixSimulation(
       scopeChanged: result.diff?.selectedScopeChanged,
     },
   });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "simulation.run",
-    targetType: "ps_matrix_simulation",
-    targetId: result.simulationId,
-  });
 
   return result;
 }
 
-export async function listMatrixSimulations(workspaceId: number) {
+export async function listMatrixSimulations() {
   const { listSimulations } = await import("./ps.simulation");
-  return listSimulations(workspaceId);
+  return listSimulations();
 }
 
 // ── Evaluation ────────────────────────────────────────────────────────
@@ -2103,33 +1869,24 @@ export async function createEvalCase(
   const created = await evaluation.createEvalCase(input, actorId);
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "eval_case.create",
     entityType: "ps_eval_case",
     entityId: created.id,
     newValue: { name: input.name, expectedScopeCode: input.expectedScopeCode },
   });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "eval_case.create",
-    targetType: "ps_eval_case",
-    targetId: created.id,
-  });
 
   return created;
 }
 
-export async function listEvalCases(workspaceId: number) {
+export async function listEvalCases() {
   const evaluation = await import("./ps.evaluation");
-  return evaluation.listEvalCases(workspaceId);
+  return evaluation.listEvalCases();
 }
 
-export async function getEvalCase(workspaceId: number, id: number) {
+export async function getEvalCase(id: number) {
   const evaluation = await import("./ps.evaluation");
-  const found = await evaluation.getEvalCase(workspaceId, id);
+  const found = await evaluation.getEvalCase(id);
   if (!found) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Eval case not found" });
   }
@@ -2137,7 +1894,6 @@ export async function getEvalCase(workspaceId: number, id: number) {
 }
 
 export async function updateEvalCase(
-  workspaceId: number,
   id: number,
   data: {
     name?: string;
@@ -2150,13 +1906,12 @@ export async function updateEvalCase(
   actorId: number,
 ) {
   const evaluation = await import("./ps.evaluation");
-  const updated = await evaluation.updateEvalCase(workspaceId, id, data);
+  const updated = await evaluation.updateEvalCase(id, data);
   if (!updated) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Eval case not found" });
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "eval_case.update",
     entityType: "ps_eval_case",
@@ -2168,18 +1923,16 @@ export async function updateEvalCase(
 }
 
 export async function deleteEvalCase(
-  workspaceId: number,
   id: number,
   actorId: number,
 ) {
   const evaluation = await import("./ps.evaluation");
-  const deleted = await evaluation.deleteEvalCase(workspaceId, id);
+  const deleted = await evaluation.deleteEvalCase(id);
   if (!deleted) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Eval case not found" });
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "eval_case.delete",
     entityType: "ps_eval_case",
@@ -2197,7 +1950,6 @@ export async function runEvaluationSuite(
   const result = await evaluation.runEvaluationSuite(input, actorId);
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "eval_suite.run",
     entityType: "ps_eval_run",
@@ -2210,26 +1962,18 @@ export async function runEvaluationSuite(
       passRate: result.passRate,
     },
   });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "eval_suite.run",
-    targetType: "ps_eval_run",
-    targetId: result.evalRunId,
-  });
 
   return result;
 }
 
-export async function listEvalRuns(workspaceId: number) {
+export async function listEvalRuns() {
   const evaluation = await import("./ps.evaluation");
-  return evaluation.listEvalRuns(workspaceId);
+  return evaluation.listEvalRuns();
 }
 
-export async function getEvalRun(workspaceId: number, id: number) {
+export async function getEvalRun(id: number) {
   const evaluation = await import("./ps.evaluation");
-  const found = await evaluation.getEvalRun(workspaceId, id);
+  const found = await evaluation.getEvalRun(id);
   if (!found) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Eval run not found" });
   }
@@ -2238,22 +1982,22 @@ export async function getEvalRun(workspaceId: number, id: number) {
 
 // ── Monitoring ────────────────────────────────────────────────────────
 
-export async function getMonitoringSummary(workspaceId: number): Promise<MonitoringSummary> {
+export async function getMonitoringSummary(): Promise<MonitoringSummary> {
   const [
     systems, wizard, demand, assignments, fulfillment, activity,
     overrideRate, confidenceTrends, scopeDistribution, deadScopes, deadQuestions,
   ] = await Promise.all([
-    getSystemMetrics(workspaceId),
-    getWizardMetrics(workspaceId),
-    getDemandMetrics(workspaceId),
-    getAssignmentMetrics(workspaceId),
-    getFulfillmentMetrics(workspaceId),
-    getRecentActivity(workspaceId),
-    getOverrideRateMetrics(workspaceId),
-    getConfidenceTrends(workspaceId),
-    getScopeDistribution(workspaceId),
-    getDeadScopes(workspaceId),
-    getDeadQuestions(workspaceId),
+    getSystemMetrics(),
+    getWizardMetrics(),
+    getDemandMetrics(),
+    getAssignmentMetrics(),
+    getFulfillmentMetrics(),
+    getRecentActivity(),
+    getOverrideRateMetrics(),
+    getConfidenceTrends(),
+    getScopeDistribution(),
+    getDeadScopes(),
+    getDeadQuestions(),
   ]);
 
   return {
@@ -2266,7 +2010,6 @@ export async function getMonitoringSummary(workspaceId: number): Promise<Monitor
 
 export async function overrideRecommendation(
   input: {
-    workspaceId: number;
     wizardRunId?: number;
     recommendedScopeCode: string;
     overriddenScopeCode: string;
@@ -2281,7 +2024,6 @@ export async function overrideRecommendation(
   const created = await recordOverride(input, actorId);
 
   await logPsAudit({
-    workspaceId: input.workspaceId,
     actorId,
     action: "wizard.override",
     entityType: "ps_wizard_override",
@@ -2293,24 +2035,16 @@ export async function overrideRecommendation(
       wizardRunId: input.wizardRunId,
     },
   });
-  await logActivity({
-    workspaceId: input.workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "wizard.override",
-    targetType: "ps_wizard_override",
-    targetId: created.id,
-  });
 
   return created;
 }
 
-export async function listOverrides(workspaceId: number) {
+export async function listOverrides() {
   const { listOverrides: fetchOverrides } = await import("./ps.override");
-  return fetchOverrides(workspaceId);
+  return fetchOverrides();
 }
 
-export async function getOverridePatterns(workspaceId: number) {
+export async function getOverridePatterns() {
   const { getOverridePatterns: fetchPatterns } = await import("./ps.override");
-  return fetchPatterns(workspaceId);
+  return fetchPatterns();
 }

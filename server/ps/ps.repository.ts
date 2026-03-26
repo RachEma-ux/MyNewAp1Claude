@@ -75,24 +75,24 @@ export async function createSystem(data: InsertPsSystem): Promise<PsSystem> {
   return created;
 }
 
-export async function getSystemById(workspaceId: number, id: number): Promise<PsSystem | null> {
+export async function getSystemById(id: number): Promise<PsSystem | null> {
   const db = getDb();
   if (!db) return null;
   const [system] = await db.select().from(psSystems)
-    .where(and(eq(psSystems.id, id), eq(psSystems.workspaceId, workspaceId)))
+    .where(eq(psSystems.id, id))
     .limit(1);
   return system ?? null;
 }
 
-export async function listSystems(workspaceId: number, status?: string): Promise<PsSystem[]> {
+export async function listSystems(status?: string): Promise<PsSystem[]> {
   const db = getDb();
   if (!db) return [];
-  const conditions = [eq(psSystems.workspaceId, workspaceId)];
   if (status) {
-    conditions.push(eq(psSystems.status, status));
+    return db.select().from(psSystems)
+      .where(eq(psSystems.status, status))
+      .orderBy(desc(psSystems.createdAt));
   }
   return db.select().from(psSystems)
-    .where(and(...conditions))
     .orderBy(desc(psSystems.createdAt));
 }
 
@@ -108,20 +108,19 @@ export async function createWizardRun(data: InsertPsWizardRun): Promise<PsWizard
   return created;
 }
 
-export async function getWizardRunById(workspaceId: number, id: number): Promise<PsWizardRun | null> {
+export async function getWizardRunById(id: number): Promise<PsWizardRun | null> {
   const db = getDb();
   if (!db) return null;
   const [run] = await db.select().from(psWizardRuns)
-    .where(and(eq(psWizardRuns.id, id), eq(psWizardRuns.workspaceId, workspaceId)))
+    .where(eq(psWizardRuns.id, id))
     .limit(1);
   return run ?? null;
 }
 
-export async function listWizardRuns(workspaceId: number): Promise<PsWizardRun[]> {
+export async function listWizardRuns(): Promise<PsWizardRun[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(psWizardRuns)
-    .where(eq(psWizardRuns.workspaceId, workspaceId))
     .orderBy(desc(psWizardRuns.createdAt));
 }
 
@@ -162,36 +161,30 @@ export async function createResourceRequestsBatch(
 }
 
 export async function listResourceRequests(
-  workspaceId: number,
   status?: string,
 ): Promise<PsResourceRequest[]> {
   const db = getDb();
   if (!db) return [];
-  const conditions = [eq(psResourceRequests.workspaceId, workspaceId)];
   if (status) {
-    conditions.push(eq(psResourceRequests.status, status));
+    return db.select().from(psResourceRequests)
+      .where(eq(psResourceRequests.status, status))
+      .orderBy(desc(psResourceRequests.createdAt));
   }
   return db.select().from(psResourceRequests)
-    .where(and(...conditions))
     .orderBy(desc(psResourceRequests.createdAt));
 }
 
 export async function listResourceRequestsBySystem(
-  workspaceId: number,
   psSystemId: number,
 ): Promise<PsResourceRequest[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(psResourceRequests)
-    .where(and(
-      eq(psResourceRequests.workspaceId, workspaceId),
-      eq(psResourceRequests.psSystemId, psSystemId),
-    ))
+    .where(eq(psResourceRequests.psSystemId, psSystemId))
     .orderBy(desc(psResourceRequests.createdAt));
 }
 
 export async function updateResourceRequestStatus(
-  workspaceId: number,
   id: number,
   status: string,
 ): Promise<PsResourceRequest | null> {
@@ -199,25 +192,18 @@ export async function updateResourceRequestStatus(
   if (!db) return null;
   const [updated] = await db.update(psResourceRequests)
     .set({ status, updatedAt: new Date() })
-    .where(and(
-      eq(psResourceRequests.id, id),
-      eq(psResourceRequests.workspaceId, workspaceId),
-    ))
+    .where(eq(psResourceRequests.id, id))
     .returning();
   return updated ?? null;
 }
 
 export async function getResourceRequestById(
-  workspaceId: number,
   id: number,
 ): Promise<PsResourceRequest | null> {
   const db = getDb();
   if (!db) return null;
   const [request] = await db.select().from(psResourceRequests)
-    .where(and(
-      eq(psResourceRequests.id, id),
-      eq(psResourceRequests.workspaceId, workspaceId),
-    ))
+    .where(eq(psResourceRequests.id, id))
     .limit(1);
   return request ?? null;
 }
@@ -238,65 +224,51 @@ export async function createResourceAssignment(
 }
 
 export async function getResourceAssignmentById(
-  workspaceId: number,
   id: number,
 ): Promise<PsResourceAssignment | null> {
   const db = getDb();
   if (!db) return null;
   const [assignment] = await db.select().from(psResourceAssignments)
-    .where(and(
-      eq(psResourceAssignments.id, id),
-      eq(psResourceAssignments.workspaceId, workspaceId),
-    ))
+    .where(eq(psResourceAssignments.id, id))
     .limit(1);
   return assignment ?? null;
 }
 
 export async function listResourceAssignments(
-  workspaceId: number,
   status?: string,
 ): Promise<PsResourceAssignment[]> {
   const db = getDb();
   if (!db) return [];
-  const conditions = [eq(psResourceAssignments.workspaceId, workspaceId)];
   if (status) {
-    conditions.push(eq(psResourceAssignments.status, status));
+    return db.select().from(psResourceAssignments)
+      .where(eq(psResourceAssignments.status, status))
+      .orderBy(desc(psResourceAssignments.createdAt));
   }
   return db.select().from(psResourceAssignments)
-    .where(and(...conditions))
     .orderBy(desc(psResourceAssignments.createdAt));
 }
 
 export async function listResourceAssignmentsByRequest(
-  workspaceId: number,
   resourceRequestId: number,
 ): Promise<PsResourceAssignment[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(psResourceAssignments)
-    .where(and(
-      eq(psResourceAssignments.workspaceId, workspaceId),
-      eq(psResourceAssignments.resourceRequestId, resourceRequestId),
-    ))
+    .where(eq(psResourceAssignments.resourceRequestId, resourceRequestId))
     .orderBy(desc(psResourceAssignments.createdAt));
 }
 
 export async function listResourceAssignmentsBySystem(
-  workspaceId: number,
   psSystemId: number,
 ): Promise<PsResourceAssignment[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(psResourceAssignments)
-    .where(and(
-      eq(psResourceAssignments.workspaceId, workspaceId),
-      eq(psResourceAssignments.psSystemId, psSystemId),
-    ))
+    .where(eq(psResourceAssignments.psSystemId, psSystemId))
     .orderBy(desc(psResourceAssignments.createdAt));
 }
 
 export async function updateResourceAssignment(
-  workspaceId: number,
   id: number,
   data: Partial<InsertPsResourceAssignment>,
 ): Promise<PsResourceAssignment | null> {
@@ -304,16 +276,12 @@ export async function updateResourceAssignment(
   if (!db) return null;
   const [updated] = await db.update(psResourceAssignments)
     .set({ ...data, updatedAt: new Date() })
-    .where(and(
-      eq(psResourceAssignments.id, id),
-      eq(psResourceAssignments.workspaceId, workspaceId),
-    ))
+    .where(eq(psResourceAssignments.id, id))
     .returning();
   return updated ?? null;
 }
 
 export async function updateResourceAssignmentStatus(
-  workspaceId: number,
   id: number,
   status: string,
   updatedBy: number,
@@ -322,60 +290,46 @@ export async function updateResourceAssignmentStatus(
   if (!db) return null;
   const [updated] = await db.update(psResourceAssignments)
     .set({ status, updatedBy, updatedAt: new Date() })
-    .where(and(
-      eq(psResourceAssignments.id, id),
-      eq(psResourceAssignments.workspaceId, workspaceId),
-    ))
+    .where(eq(psResourceAssignments.id, id))
     .returning();
   return updated ?? null;
 }
 
 export async function deleteResourceAssignment(
-  workspaceId: number,
   id: number,
 ): Promise<boolean> {
   const db = getDb();
   if (!db) return false;
   const result = await db.delete(psResourceAssignments)
-    .where(and(
-      eq(psResourceAssignments.id, id),
-      eq(psResourceAssignments.workspaceId, workspaceId),
-    ))
+    .where(eq(psResourceAssignments.id, id))
     .returning();
   return result.length > 0;
 }
 
 // ── Matrix Versions ──────────────────────────────────────────────────
 
-export async function getActiveMatrixVersion(workspaceId: number): Promise<PsMatrixVersion | null> {
+export async function getActiveMatrixVersion(): Promise<PsMatrixVersion | null> {
   const db = getDb();
   if (!db) return null;
   const [version] = await db.select().from(psMatrixVersions)
-    .where(and(
-      eq(psMatrixVersions.workspaceId, workspaceId),
-      eq(psMatrixVersions.status, "active"),
-    ))
+    .where(eq(psMatrixVersions.status, "active"))
     .limit(1);
   return version ?? null;
 }
 
-export async function getMatrixVersionById(workspaceId: number, id: number): Promise<PsMatrixVersion | null> {
+export async function getMatrixVersionById(id: number): Promise<PsMatrixVersion | null> {
   const db = getDb();
   if (!db) return null;
   const [version] = await db.select().from(psMatrixVersions)
-    .where(and(
-      eq(psMatrixVersions.id, id),
-      eq(psMatrixVersions.workspaceId, workspaceId),
-    ))
+    .where(eq(psMatrixVersions.id, id))
     .limit(1);
   return version ?? null;
 }
 
-export async function listMatrixVersions(workspaceId: number): Promise<PsMatrixVersion[]> {
+export async function listMatrixVersions(): Promise<PsMatrixVersion[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(psMatrixVersions)
-    .where(eq(psMatrixVersions.workspaceId, workspaceId))
     .orderBy(desc(psMatrixVersions.createdAt));
 }
 
@@ -389,23 +343,17 @@ export async function createMatrixVersion(data: InsertPsMatrixVersion): Promise<
   return created;
 }
 
-export async function activateMatrixVersion(workspaceId: number, id: number): Promise<PsMatrixVersion | null> {
+export async function activateMatrixVersion(id: number): Promise<PsMatrixVersion | null> {
   const db = getDb();
   if (!db) return null;
-  // Deactivate all existing active versions for this workspace
+  // Deactivate all existing active versions
   await db.update(psMatrixVersions)
     .set({ status: "archived" })
-    .where(and(
-      eq(psMatrixVersions.workspaceId, workspaceId),
-      eq(psMatrixVersions.status, "active"),
-    ));
+    .where(eq(psMatrixVersions.status, "active"));
   // Activate the target version
   const [updated] = await db.update(psMatrixVersions)
     .set({ status: "active", activatedAt: new Date() })
-    .where(and(
-      eq(psMatrixVersions.id, id),
-      eq(psMatrixVersions.workspaceId, workspaceId),
-    ))
+    .where(eq(psMatrixVersions.id, id))
     .returning();
   return updated ?? null;
 }
@@ -488,21 +436,17 @@ export async function createCellsBatch(items: InsertPsMatrixCell[]): Promise<PsM
 
 // ── Matrix Admin — Extended Operations ─────────────────────────────
 
-export async function archiveMatrixVersion(workspaceId: number, id: number): Promise<PsMatrixVersion | null> {
+export async function archiveMatrixVersion(id: number): Promise<PsMatrixVersion | null> {
   const db = getDb();
   if (!db) return null;
   const [updated] = await db.update(psMatrixVersions)
     .set({ status: "archived" })
-    .where(and(
-      eq(psMatrixVersions.id, id),
-      eq(psMatrixVersions.workspaceId, workspaceId),
-    ))
+    .where(eq(psMatrixVersions.id, id))
     .returning();
   return updated ?? null;
 }
 
 export async function updateMatrixVersionStatus(
-  workspaceId: number,
   id: number,
   status: string,
 ): Promise<PsMatrixVersion | null> {
@@ -512,10 +456,7 @@ export async function updateMatrixVersionStatus(
   if (status === "active") setData.activatedAt = new Date();
   const [updated] = await db.update(psMatrixVersions)
     .set(setData)
-    .where(and(
-      eq(psMatrixVersions.id, id),
-      eq(psMatrixVersions.workspaceId, workspaceId),
-    ))
+    .where(eq(psMatrixVersions.id, id))
     .returning();
   return updated ?? null;
 }
@@ -768,22 +709,18 @@ export async function updateMatrixImport(
   return updated ?? null;
 }
 
-export async function listMatrixImports(workspaceId: number): Promise<PsMatrixImport[]> {
+export async function listMatrixImports(): Promise<PsMatrixImport[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(psMatrixImports)
-    .where(eq(psMatrixImports.workspaceId, workspaceId))
     .orderBy(desc(psMatrixImports.createdAt));
 }
 
-export async function getLastImportDate(workspaceId: number): Promise<string | null> {
+export async function getLastImportDate(): Promise<string | null> {
   const db = getDb();
   if (!db) return null;
   const [imp] = await db.select().from(psMatrixImports)
-    .where(and(
-      eq(psMatrixImports.workspaceId, workspaceId),
-      eq(psMatrixImports.importStatus, "committed"),
-    ))
+    .where(eq(psMatrixImports.importStatus, "committed"))
     .orderBy(desc(psMatrixImports.committedAt))
     .limit(1);
   return imp?.committedAt?.toISOString() ?? null;
@@ -1112,25 +1049,24 @@ export async function createEvalCase(data: InsertPsEvalCase): Promise<PsEvalCase
   return created;
 }
 
-export async function listEvalCases(workspaceId: number): Promise<PsEvalCase[]> {
+export async function listEvalCases(): Promise<PsEvalCase[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(psEvalCases)
-    .where(and(eq(psEvalCases.workspaceId, workspaceId), eq(psEvalCases.isActive, 1)))
+    .where(eq(psEvalCases.isActive, 1))
     .orderBy(psEvalCases.name);
 }
 
-export async function getEvalCaseById(workspaceId: number, id: number): Promise<PsEvalCase | null> {
+export async function getEvalCaseById(id: number): Promise<PsEvalCase | null> {
   const db = getDb();
   if (!db) return null;
   const [found] = await db.select().from(psEvalCases)
-    .where(and(eq(psEvalCases.id, id), eq(psEvalCases.workspaceId, workspaceId)))
+    .where(eq(psEvalCases.id, id))
     .limit(1);
   return found ?? null;
 }
 
 export async function updateEvalCase(
-  workspaceId: number,
   id: number,
   data: Partial<InsertPsEvalCase>,
 ): Promise<PsEvalCase | null> {
@@ -1138,17 +1074,17 @@ export async function updateEvalCase(
   if (!db) return null;
   const [updated] = await db.update(psEvalCases)
     .set({ ...data, updatedAt: new Date() })
-    .where(and(eq(psEvalCases.id, id), eq(psEvalCases.workspaceId, workspaceId)))
+    .where(eq(psEvalCases.id, id))
     .returning();
   return updated ?? null;
 }
 
-export async function deleteEvalCase(workspaceId: number, id: number): Promise<boolean> {
+export async function deleteEvalCase(id: number): Promise<boolean> {
   const db = getDb();
   if (!db) return false;
   const [deleted] = await db.update(psEvalCases)
     .set({ isActive: 0, updatedAt: new Date() })
-    .where(and(eq(psEvalCases.id, id), eq(psEvalCases.workspaceId, workspaceId)))
+    .where(eq(psEvalCases.id, id))
     .returning();
   return !!deleted;
 }
@@ -1165,19 +1101,18 @@ export async function createEvalRun(data: InsertPsEvalRun): Promise<PsEvalRun> {
   return created;
 }
 
-export async function listEvalRuns(workspaceId: number): Promise<PsEvalRun[]> {
+export async function listEvalRuns(): Promise<PsEvalRun[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(psEvalRuns)
-    .where(eq(psEvalRuns.workspaceId, workspaceId))
     .orderBy(desc(psEvalRuns.createdAt));
 }
 
-export async function getEvalRunById(workspaceId: number, id: number): Promise<PsEvalRun | null> {
+export async function getEvalRunById(id: number): Promise<PsEvalRun | null> {
   const db = getDb();
   if (!db) return null;
   const [found] = await db.select().from(psEvalRuns)
-    .where(and(eq(psEvalRuns.id, id), eq(psEvalRuns.workspaceId, workspaceId)))
+    .where(eq(psEvalRuns.id, id))
     .limit(1);
   return found ?? null;
 }
@@ -1194,10 +1129,9 @@ export async function createMatrixSimulation(data: InsertPsMatrixSimulation): Pr
   return created;
 }
 
-export async function listMatrixSimulations(workspaceId: number): Promise<PsMatrixSimulation[]> {
+export async function listMatrixSimulations(): Promise<PsMatrixSimulation[]> {
   const db = getDb();
   if (!db) return [];
   return db.select().from(psMatrixSimulations)
-    .where(eq(psMatrixSimulations.workspaceId, workspaceId))
     .orderBy(desc(psMatrixSimulations.createdAt));
 }

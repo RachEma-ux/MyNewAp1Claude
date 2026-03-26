@@ -23,10 +23,9 @@ import type {
  * Reuses the same structure as loadActiveMatrix but for any version.
  */
 export async function loadMatrixByVersionId(
-  workspaceId: number,
   versionId: number,
 ): Promise<LoadedMatrix | null> {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) return null;
 
   const [scopes, questions, cells, dimensions] = await Promise.all([
@@ -83,10 +82,10 @@ export async function runSimulation(
   input: SimulationInput,
   actorId: number,
 ): Promise<SimulationResult> {
-  const { workspaceId, versionId, answers, compareVersionId } = input;
+  const { versionId, answers, compareVersionId } = input;
 
   // Load primary version
-  const matrix = await loadMatrixByVersionId(workspaceId, versionId);
+  const matrix = await loadMatrixByVersionId(versionId);
   if (!matrix) {
     throw new Error(`Matrix version ${versionId} not found`);
   }
@@ -104,7 +103,7 @@ export async function runSimulation(
   let diff: SimulationDiff | undefined;
 
   if (compareVersionId) {
-    const compareMatrix = await loadMatrixByVersionId(workspaceId, compareVersionId);
+    const compareMatrix = await loadMatrixByVersionId(compareVersionId);
     if (!compareMatrix) {
       throw new Error(`Compare version ${compareVersionId} not found`);
     }
@@ -118,7 +117,6 @@ export async function runSimulation(
 
   // Persist simulation record
   const simRecord = await repo.createMatrixSimulation({
-    workspaceId,
     versionId,
     compareVersionId: compareVersionId ?? null,
     answersJson: answers,
@@ -192,8 +190,8 @@ function computeDiff(
 
 // ── List Simulations ────────────────────────────────────────────────
 
-export async function listSimulations(workspaceId: number) {
-  return repo.listMatrixSimulations(workspaceId);
+export async function listSimulations() {
+  return repo.listMatrixSimulations();
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────

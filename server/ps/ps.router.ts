@@ -127,13 +127,13 @@ const systemsRouter = router({
   get: protectedProcedure
     .input(getSystemSchema)
     .query(async ({ input }) => {
-      return service.getSystem(input.workspaceId, input.id);
+      return service.getSystem(input.id);
     }),
 
   list: protectedProcedure
     .input(listSystemsSchema)
     .query(async ({ input }) => {
-      return service.listSystems(input.workspaceId, input.status);
+      return service.listSystems(input.status);
     }),
 });
 
@@ -153,13 +153,13 @@ const wizardRunsRouter = router({
   get: protectedProcedure
     .input(getWizardRunSchema)
     .query(async ({ input }) => {
-      return service.getWizardRun(input.workspaceId, input.id);
+      return service.getWizardRun(input.id);
     }),
 
   list: protectedProcedure
     .input(listWizardRunsSchema)
     .query(async ({ input }) => {
-      return service.listWizardRuns(input.workspaceId);
+      return service.listWizardRuns();
     }),
 });
 
@@ -167,7 +167,7 @@ const templatesRouter = router({
   list: protectedProcedure
     .input(listScopeTemplateMappingsSchema)
     .query(async ({ input }) => {
-      return service.listScopeTemplateMappings(input.workspaceId);
+      return service.listScopeTemplateMappings();
     }),
 
   create: governedProcedure
@@ -187,20 +187,19 @@ const demandRouter = router({
   list: protectedProcedure
     .input(listResourceRequestsSchema)
     .query(async ({ input }) => {
-      return service.listResourceRequests(input.workspaceId, input.status);
+      return service.listResourceRequests(input.status);
     }),
 
   listBySystem: protectedProcedure
     .input(listResourceRequestsBySystemSchema)
     .query(async ({ input }) => {
-      return service.listResourceRequestsBySystem(input.workspaceId, input.psSystemId);
+      return service.listResourceRequestsBySystem(input.psSystemId);
     }),
 
   updateStatus: governedProcedure
     .input(updateResourceRequestStatusSchema)
     .mutation(async ({ ctx, input }) => {
       return service.updateResourceRequestStatus(
-        input.workspaceId,
         input.id,
         input.status,
         ctx.user.id,
@@ -210,15 +209,14 @@ const demandRouter = router({
   summary: protectedProcedure
     .input(getDemandSummarySchema)
     .query(async ({ input }) => {
-      return service.getDemandSummary(input.workspaceId, input.psSystemId);
+      return service.getDemandSummary(input.psSystemId);
     }),
 
   generateForSystem: governedProcedure
     .input(getDemandSummarySchema)
     .mutation(async ({ ctx, input }) => {
-      const system = await service.getSystem(input.workspaceId, input.psSystemId);
+      const system = await service.getSystem(input.psSystemId);
       return service.generateDemandForSystem(
-        input.workspaceId,
         input.psSystemId,
         system.systemType,
         ctx.user.id,
@@ -236,19 +234,19 @@ const assignmentsRouter = router({
   list: protectedProcedure
     .input(listResourceAssignmentsSchema)
     .query(async ({ input }) => {
-      return service.listResourceAssignments(input.workspaceId, input.status);
+      return service.listResourceAssignments(input.status);
     }),
 
   listByRequest: protectedProcedure
     .input(listResourceAssignmentsByRequestSchema)
     .query(async ({ input }) => {
-      return service.listResourceAssignmentsByRequest(input.workspaceId, input.resourceRequestId);
+      return service.listResourceAssignmentsByRequest(input.resourceRequestId);
     }),
 
   listBySystem: protectedProcedure
     .input(listResourceAssignmentsBySystemSchema)
     .query(async ({ input }) => {
-      return service.listResourceAssignmentsBySystem(input.workspaceId, input.psSystemId);
+      return service.listResourceAssignmentsBySystem(input.psSystemId);
     }),
 
   update: governedProcedure
@@ -261,7 +259,6 @@ const assignmentsRouter = router({
     .input(updateResourceAssignmentStatusSchema)
     .mutation(async ({ ctx, input }) => {
       return service.updateResourceAssignmentStatus(
-        input.workspaceId,
         input.id,
         input.status,
         ctx.user.id,
@@ -271,13 +268,13 @@ const assignmentsRouter = router({
   delete: governedProcedure
     .input(deleteResourceAssignmentSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.deleteResourceAssignment(input.workspaceId, input.id, ctx.user.id);
+      return service.deleteResourceAssignment(input.id, ctx.user.id);
     }),
 
   summary: protectedProcedure
     .input(getAssignmentSummarySchema)
     .query(async ({ input }) => {
-      return service.getAssignmentSummary(input.workspaceId, input.psSystemId);
+      return service.getAssignmentSummary(input.psSystemId);
     }),
 });
 
@@ -289,20 +286,19 @@ const matrixRouter = router({
   getActiveVersion: protectedProcedure
     .input(hasActiveMatrixSchema)
     .query(async ({ input }) => {
-      return service.getActiveMatrixVersion(input.workspaceId);
+      return service.getActiveMatrixVersion();
     }),
 
   listVersions: protectedProcedure
     .input(hasActiveMatrixSchema)
     .query(async ({ input }) => {
-      return service.listMatrixVersions(input.workspaceId);
+      return service.listMatrixVersions();
     }),
 
   createVersion: governedProcedure
     .input(createMatrixVersionSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createMatrixVersion(
-        input.workspaceId,
         input.version,
         input.label,
         ctx.user.id,
@@ -312,20 +308,19 @@ const matrixRouter = router({
   activateVersion: governedProcedure
     .input(activateMatrixVersionSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.activateMatrixVersionValidated(input.workspaceId, input.id, ctx.user.id);
+      return service.activateMatrixVersionValidated(input.id, ctx.user.id);
     }),
 
   getScopes: protectedProcedure
     .input(matrixVersionIdSchema)
     .query(async ({ input }) => {
-      return service.listMatrixScopes(input.workspaceId, input.versionId);
+      return service.listMatrixScopes(input.versionId);
     }),
 
   createScope: governedProcedure
     .input(createMatrixScopeSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createMatrixScope(
-        input.workspaceId,
         input.versionId,
         input.code,
         input.label,
@@ -339,7 +334,6 @@ const matrixRouter = router({
     .input(createMatrixScopesBatchSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createMatrixScopesBatch(
-        input.workspaceId,
         input.versionId,
         input.items,
         ctx.user.id,
@@ -349,14 +343,13 @@ const matrixRouter = router({
   getQuestions: protectedProcedure
     .input(matrixVersionIdSchema)
     .query(async ({ input }) => {
-      return service.listMatrixQuestions(input.workspaceId, input.versionId);
+      return service.listMatrixQuestions(input.versionId);
     }),
 
   createQuestion: governedProcedure
     .input(createMatrixQuestionSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createMatrixQuestion(
-        input.workspaceId,
         input.versionId,
         input.code,
         input.label,
@@ -370,7 +363,6 @@ const matrixRouter = router({
     .input(createMatrixQuestionsBatchSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createMatrixQuestionsBatch(
-        input.workspaceId,
         input.versionId,
         input.items,
         ctx.user.id,
@@ -380,14 +372,13 @@ const matrixRouter = router({
   getCells: protectedProcedure
     .input(matrixVersionIdSchema)
     .query(async ({ input }) => {
-      return service.listMatrixCells(input.workspaceId, input.versionId);
+      return service.listMatrixCells(input.versionId);
     }),
 
   createCellsBatch: governedProcedure
     .input(createMatrixCellsBatchSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createMatrixCellsBatch(
-        input.workspaceId,
         input.versionId,
         input.items,
         ctx.user.id,
@@ -409,13 +400,13 @@ const matrixRouter = router({
   hasActive: protectedProcedure
     .input(hasActiveMatrixSchema)
     .query(async ({ input }) => {
-      return { available: await service.hasActiveMatrix(input.workspaceId) };
+      return { available: await service.hasActiveMatrix() };
     }),
 
   getActiveQuestions: protectedProcedure
     .input(getActiveMatrixQuestionsSchema)
     .query(async ({ input }) => {
-      const matrix = await loadActiveMatrix(input.workspaceId);
+      const matrix = await loadActiveMatrix();
       if (!matrix) return { available: false as const, questions: [], scopes: [], dimensions: [], version: null };
       return {
         available: true as const,
@@ -431,7 +422,7 @@ const matrixRouter = router({
   getVersion: protectedProcedure
     .input(getMatrixVersionByIdSchema)
     .query(async ({ input }) => {
-      return service.getMatrixVersionById(input.workspaceId, input.id);
+      return service.getMatrixVersionById(input.id);
     }),
 
   // ── Scope Matrix Profile endpoints ─────────────────────────────────
@@ -439,13 +430,13 @@ const matrixRouter = router({
   getScopeProfile: protectedProcedure
     .input(getScopeProfileSchema)
     .query(async ({ input }) => {
-      return service.getScopeProfile(input.workspaceId, input.scopeId);
+      return service.getScopeProfile(input.scopeId);
     }),
 
   listScopeProfiles: protectedProcedure
     .input(listScopeProfilesSchema)
     .query(async ({ input }) => {
-      return service.listScopeProfiles(input.workspaceId, input.versionId);
+      return service.listScopeProfiles(input.versionId);
     }),
 
   // ── Import record creation ─────────────────────────────────────────
@@ -461,20 +452,19 @@ const matrixRouter = router({
   listHeaders: protectedProcedure
     .input(listMatrixHeadersSchema)
     .query(async ({ input }) => {
-      return service.listMatrixHeaders(input.workspaceId, input.versionId);
+      return service.listMatrixHeaders(input.versionId);
     }),
 
   listHeadersByType: protectedProcedure
     .input(listMatrixHeadersByTypeSchema)
     .query(async ({ input }) => {
-      return service.listMatrixHeadersByType(input.workspaceId, input.versionId, input.headerType);
+      return service.listMatrixHeadersByType(input.versionId, input.headerType);
     }),
 
   parseHeaders: governedProcedure
     .input(parseMatrixHeadersSchema)
     .mutation(async ({ ctx, input }) => {
       return service.parseAndStoreHeaders(
-        input.workspaceId,
         input.versionId,
         input.rawHeaders,
         ctx.user.id,
@@ -486,7 +476,7 @@ const matrixRouter = router({
   seedScopeMatrix: governedProcedure
     .input(seedScopeMatrixSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.seedScopeMatrix(input.workspaceId, ctx.user.id);
+      return service.seedScopeMatrix(ctx.user.id);
     }),
 
   // ── Control Panel Admin endpoints ─────────────────────────────────
@@ -494,14 +484,13 @@ const matrixRouter = router({
   getOverview: protectedProcedure
     .input(getMatrixOverviewSchema)
     .query(async ({ input }) => {
-      return service.getMatrixOverview(input.workspaceId);
+      return service.getMatrixOverview();
     }),
 
   duplicateVersion: governedProcedure
     .input(duplicateMatrixVersionSchema)
     .mutation(async ({ ctx, input }) => {
       return service.duplicateMatrixVersion(
-        input.workspaceId,
         input.sourceVersionId,
         input.newVersion,
         input.newLabel,
@@ -512,13 +501,13 @@ const matrixRouter = router({
   archiveVersion: governedProcedure
     .input(archiveMatrixVersionSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.archiveMatrixVersion(input.workspaceId, input.id, ctx.user.id);
+      return service.archiveMatrixVersion(input.id, ctx.user.id);
     }),
 
   getValidationReport: protectedProcedure
     .input(getMatrixValidationReportSchema)
     .query(async ({ input }) => {
-      return service.getMatrixValidationReport(input.workspaceId, input.versionId);
+      return service.getMatrixValidationReport(input.versionId);
     }),
 
   // ── Safe Matrix Versioning ──────────────────────────────────────────
@@ -526,26 +515,25 @@ const matrixRouter = router({
   deepValidate: protectedProcedure
     .input(deepValidateMatrixSchema)
     .query(async ({ input }) => {
-      return service.deepValidateMatrix(input.workspaceId, input.versionId);
+      return service.deepValidateMatrix(input.versionId);
     }),
 
   safeActivate: governedProcedure
     .input(safeActivateMatrixSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.safeActivateMatrix(input.workspaceId, input.versionId, ctx.user.id);
+      return service.safeActivateMatrix(input.versionId, ctx.user.id);
     }),
 
   rollback: governedProcedure
     .input(rollbackMatrixSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.rollbackMatrixVersion(input.workspaceId, ctx.user.id);
+      return service.rollbackMatrixVersion(ctx.user.id);
     }),
 
   compareVersions: protectedProcedure
     .input(compareMatrixVersionsSchema)
     .query(async ({ input }) => {
       return service.compareMatrixVersions(
-        input.workspaceId,
         input.baseVersionId,
         input.targetVersionId,
       );
@@ -555,35 +543,34 @@ const matrixRouter = router({
   getAllScopes: protectedProcedure
     .input(matrixVersionIdSchema)
     .query(async ({ input }) => {
-      return service.listAllMatrixScopes(input.workspaceId, input.versionId);
+      return service.listAllMatrixScopes(input.versionId);
     }),
 
   updateScope: governedProcedure
     .input(updateMatrixScopeSchema)
     .mutation(async ({ ctx, input }) => {
-      const { workspaceId, versionId, id, ...data } = input;
-      return service.updateMatrixScope(workspaceId, versionId, id, data, ctx.user.id);
+      const { versionId, id, ...data } = input;
+      return service.updateMatrixScope(versionId, id, data, ctx.user.id);
     }),
 
   // Admin question operations (include inactive)
   getAllQuestions: protectedProcedure
     .input(matrixVersionIdSchema)
     .query(async ({ input }) => {
-      return service.listAllMatrixQuestions(input.workspaceId, input.versionId);
+      return service.listAllMatrixQuestions(input.versionId);
     }),
 
   updateQuestion: governedProcedure
     .input(updateMatrixQuestionSchema)
     .mutation(async ({ ctx, input }) => {
-      const { workspaceId, versionId, id, ...data } = input;
-      return service.updateMatrixQuestion(workspaceId, versionId, id, data, ctx.user.id);
+      const { versionId, id, ...data } = input;
+      return service.updateMatrixQuestion(versionId, id, data, ctx.user.id);
     }),
 
   reorderQuestions: governedProcedure
     .input(reorderMatrixQuestionsSchema)
     .mutation(async ({ ctx, input }) => {
       return service.reorderMatrixQuestions(
-        input.workspaceId,
         input.versionId,
         input.orderedIds,
         ctx.user.id,
@@ -594,14 +581,13 @@ const matrixRouter = router({
   getGrid: protectedProcedure
     .input(matrixVersionIdSchema)
     .query(async ({ input }) => {
-      return service.getMatrixGrid(input.workspaceId, input.versionId);
+      return service.getMatrixGrid(input.versionId);
     }),
 
   upsertCell: governedProcedure
     .input(upsertMatrixCellSchema)
     .mutation(async ({ ctx, input }) => {
       return service.upsertMatrixCell(
-        input.workspaceId,
         input.versionId,
         input.questionId,
         input.scopeId,
@@ -614,7 +600,6 @@ const matrixRouter = router({
     .input(bulkUpsertMatrixCellsSchema)
     .mutation(async ({ ctx, input }) => {
       return service.bulkUpsertMatrixCells(
-        input.workspaceId,
         input.versionId,
         input.items,
         ctx.user.id,
@@ -626,7 +611,6 @@ const matrixRouter = router({
     .input(previewMatrixImportSchema)
     .mutation(async ({ ctx, input }) => {
       return service.previewMatrixImport(
-        input.workspaceId,
         input.sourceType,
         input.sourceName,
         input.payload,
@@ -638,7 +622,6 @@ const matrixRouter = router({
     .input(commitMatrixImportSchema)
     .mutation(async ({ ctx, input }) => {
       return service.commitMatrixImport(
-        input.workspaceId,
         input.importId,
         input.targetVersionId,
         input.newVersion,
@@ -650,7 +633,7 @@ const matrixRouter = router({
   listImports: protectedProcedure
     .input(listMatrixImportsSchema)
     .query(async ({ input }) => {
-      return service.listMatrixImports(input.workspaceId);
+      return service.listMatrixImports();
     }),
 
   // ── Dimensions ─────────────────────────────────────────────────────
@@ -658,26 +641,25 @@ const matrixRouter = router({
   listDimensions: protectedProcedure
     .input(listDimensionsSchema)
     .query(async ({ input }) => {
-      return service.listDimensions(input.workspaceId, input.versionId);
+      return service.listDimensions(input.versionId);
     }),
 
   listAllDimensions: protectedProcedure
     .input(listDimensionsSchema)
     .query(async ({ input }) => {
-      return service.listAllDimensions(input.workspaceId, input.versionId);
+      return service.listAllDimensions(input.versionId);
     }),
 
   listDimensionsWithValues: protectedProcedure
     .input(listDimensionsSchema)
     .query(async ({ input }) => {
-      return service.listDimensionsWithValues(input.workspaceId, input.versionId);
+      return service.listDimensionsWithValues(input.versionId);
     }),
 
   createDimension: governedProcedure
     .input(createDimensionSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createDimension(
-        input.workspaceId,
         input.versionId,
         input.dimensionKey,
         input.dimensionLabel,
@@ -691,7 +673,6 @@ const matrixRouter = router({
     .input(createDimensionsBatchSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createDimensionsBatch(
-        input.workspaceId,
         input.versionId,
         input.items,
         ctx.user.id,
@@ -701,8 +682,8 @@ const matrixRouter = router({
   updateDimension: governedProcedure
     .input(updateDimensionSchema)
     .mutation(async ({ ctx, input }) => {
-      const { workspaceId, versionId, id, ...data } = input;
-      return service.updateDimension(workspaceId, versionId, id, data, ctx.user.id);
+      const { versionId, id, ...data } = input;
+      return service.updateDimension(versionId, id, data, ctx.user.id);
     }),
 
   // ── Dimension Values ───────────────────────────────────────────────
@@ -710,20 +691,19 @@ const matrixRouter = router({
   listDimensionValues: protectedProcedure
     .input(listDimensionValuesSchema)
     .query(async ({ input }) => {
-      return service.listDimensionValues(input.workspaceId, input.dimensionId);
+      return service.listDimensionValues(input.dimensionId);
     }),
 
   listAllDimensionValues: protectedProcedure
     .input(listDimensionValuesSchema)
     .query(async ({ input }) => {
-      return service.listAllDimensionValues(input.workspaceId, input.dimensionId);
+      return service.listAllDimensionValues(input.dimensionId);
     }),
 
   createDimensionValue: governedProcedure
     .input(createDimensionValueSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createDimensionValue(
-        input.workspaceId,
         input.dimensionId,
         input.valueKey,
         input.valueLabel,
@@ -737,7 +717,6 @@ const matrixRouter = router({
     .input(createDimensionValuesBatchSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createDimensionValuesBatch(
-        input.workspaceId,
         input.dimensionId,
         input.items,
         ctx.user.id,
@@ -747,8 +726,8 @@ const matrixRouter = router({
   updateDimensionValue: governedProcedure
     .input(updateDimensionValueSchema)
     .mutation(async ({ ctx, input }) => {
-      const { workspaceId, dimensionId, id, ...data } = input;
-      return service.updateDimensionValue(workspaceId, dimensionId, id, data, ctx.user.id);
+      const { dimensionId, id, ...data } = input;
+      return service.updateDimensionValue(dimensionId, id, data, ctx.user.id);
     }),
 
   // ── Question Presentations ─────────────────────────────────────────
@@ -756,20 +735,19 @@ const matrixRouter = router({
   getQuestionPresentation: protectedProcedure
     .input(getQuestionPresentationSchema)
     .query(async ({ input }) => {
-      return service.getQuestionPresentation(input.workspaceId, input.questionId);
+      return service.getQuestionPresentation(input.questionId);
     }),
 
   listQuestionPresentations: protectedProcedure
     .input(listQuestionPresentationsSchema)
     .query(async ({ input }) => {
-      return service.listQuestionPresentations(input.workspaceId, input.versionId);
+      return service.listQuestionPresentations(input.versionId);
     }),
 
   createQuestionPresentation: governedProcedure
     .input(createQuestionPresentationSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createQuestionPresentation(
-        input.workspaceId,
         input.questionId,
         input.presentationType,
         input.dimensionId ?? null,
@@ -782,7 +760,6 @@ const matrixRouter = router({
     .input(createQuestionPresentationsBatchSchema)
     .mutation(async ({ ctx, input }) => {
       return service.createQuestionPresentationsBatch(
-        input.workspaceId,
         input.versionId,
         input.items,
         ctx.user.id,
@@ -792,8 +769,8 @@ const matrixRouter = router({
   updateQuestionPresentation: governedProcedure
     .input(updateQuestionPresentationSchema)
     .mutation(async ({ ctx, input }) => {
-      const { workspaceId, questionId, ...data } = input;
-      return service.updateQuestionPresentation(workspaceId, questionId, data, ctx.user.id);
+      const { questionId, ...data } = input;
+      return service.updateQuestionPresentation(questionId, data, ctx.user.id);
     }),
 
   // ── Delete Operations (draft-only) ──────────────────────────────────
@@ -801,31 +778,31 @@ const matrixRouter = router({
   deleteScope: governedProcedure
     .input(deleteScopeSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.deleteMatrixScope(input.workspaceId, input.versionId, input.id, ctx.user.id);
+      return service.deleteMatrixScope(input.versionId, input.id, ctx.user.id);
     }),
 
   deleteQuestion: governedProcedure
     .input(deleteQuestionSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.deleteMatrixQuestion(input.workspaceId, input.versionId, input.id, ctx.user.id);
+      return service.deleteMatrixQuestion(input.versionId, input.id, ctx.user.id);
     }),
 
   deleteDimension: governedProcedure
     .input(deleteDimensionSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.deleteMatrixDimension(input.workspaceId, input.versionId, input.id, ctx.user.id);
+      return service.deleteMatrixDimension(input.versionId, input.id, ctx.user.id);
     }),
 
   deleteDimensionValue: governedProcedure
     .input(deleteDimensionValueSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.deleteMatrixDimensionValue(input.workspaceId, input.dimensionId, input.id, ctx.user.id);
+      return service.deleteMatrixDimensionValue(input.dimensionId, input.id, ctx.user.id);
     }),
 
   deleteCell: governedProcedure
     .input(deleteCellSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.deleteMatrixCell(input.workspaceId, input.versionId, input.id, ctx.user.id);
+      return service.deleteMatrixCell(input.versionId, input.id, ctx.user.id);
     }),
 });
 
@@ -841,7 +818,7 @@ const simulationRouter = router({
   list: protectedProcedure
     .input(listSimulationsSchema)
     .query(async ({ input }) => {
-      return service.listMatrixSimulations(input.workspaceId);
+      return service.listMatrixSimulations();
     }),
 });
 
@@ -857,26 +834,26 @@ const evaluationRouter = router({
   getCase: protectedProcedure
     .input(getEvalCaseSchema)
     .query(async ({ input }) => {
-      return service.getEvalCase(input.workspaceId, input.id);
+      return service.getEvalCase(input.id);
     }),
 
   listCases: protectedProcedure
     .input(listEvalCasesSchema)
     .query(async ({ input }) => {
-      return service.listEvalCases(input.workspaceId);
+      return service.listEvalCases();
     }),
 
   updateCase: governedProcedure
     .input(updateEvalCaseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { workspaceId, id, ...data } = input;
-      return service.updateEvalCase(workspaceId, id, data, ctx.user.id);
+      const { id, ...data } = input;
+      return service.updateEvalCase(id, data, ctx.user.id);
     }),
 
   deleteCase: governedProcedure
     .input(deleteEvalCaseSchema)
     .mutation(async ({ ctx, input }) => {
-      return service.deleteEvalCase(input.workspaceId, input.id, ctx.user.id);
+      return service.deleteEvalCase(input.id, ctx.user.id);
     }),
 
   runSuite: governedProcedure
@@ -888,13 +865,13 @@ const evaluationRouter = router({
   listRuns: protectedProcedure
     .input(listEvalRunsSchema)
     .query(async ({ input }) => {
-      return service.listEvalRuns(input.workspaceId);
+      return service.listEvalRuns();
     }),
 
   getRun: protectedProcedure
     .input(getEvalRunSchema)
     .query(async ({ input }) => {
-      return service.getEvalRun(input.workspaceId, input.id);
+      return service.getEvalRun(input.id);
     }),
 });
 
@@ -910,13 +887,13 @@ const overridesRouter = router({
   list: protectedProcedure
     .input(listOverridesSchema)
     .query(async ({ input }) => {
-      return service.listOverrides(input.workspaceId);
+      return service.listOverrides();
     }),
 
   patterns: protectedProcedure
     .input(getOverridePatternsSchema)
     .query(async ({ input }) => {
-      return service.getOverridePatterns(input.workspaceId);
+      return service.getOverridePatterns();
     }),
 });
 
@@ -948,6 +925,6 @@ export const psRouter = router({
   getMonitoringSummary: protectedProcedure
     .input(getMonitoringSummarySchema)
     .query(async ({ input }) => {
-      return service.getMonitoringSummary(input.workspaceId);
+      return service.getMonitoringSummary();
     }),
 });

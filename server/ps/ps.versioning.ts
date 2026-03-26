@@ -10,7 +10,6 @@ import { eq, and, desc } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import * as repo from "./ps.repository";
 import { logPsAudit } from "./ps.audit";
-import { logActivity } from "../modules/registry";
 import {
   psScopeTemplateMappings,
   psMatrixVersions,
@@ -32,10 +31,9 @@ import type {
  * - Weight range sanity checks
  */
 export async function deepValidateMatrix(
-  workspaceId: number,
   versionId: number,
 ): Promise<MatrixValidationReport> {
-  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  const version = await repo.getMatrixVersionById(versionId);
   if (!version) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
@@ -140,7 +138,6 @@ export async function deepValidateMatrix(
   if (db) {
     const templates = await db.select().from(psScopeTemplateMappings)
       .where(and(
-        eq(psScopeTemplateMappings.workspaceId, workspaceId),
         eq(psScopeTemplateMappings.isActive, 1),
       ));
     const activeScopeCodes = new Set(activeScopes.map((s) => s.code));
@@ -215,11 +212,10 @@ export async function deepValidateMatrix(
  * or throws with full validation report.
  */
 export async function safeActivateMatrix(
-  workspaceId: number,
   versionId: number,
   actorId: number,
 ) {
-  const report = await deepValidateMatrix(workspaceId, versionId);
+  const report = await deepValidateMatrix(versionId);
   if (!report.isValid) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -227,13 +223,12 @@ export async function safeActivateMatrix(
     });
   }
 
-  const activated = await repo.activateMatrixVersion(workspaceId, versionId);
+  const activated = await repo.activateMatrixVersion(versionId);
   if (!activated) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_version.safe_activate",
     entityType: "ps_matrix_version",
@@ -243,14 +238,6 @@ export async function safeActivateMatrix(
       validationStats: report.stats,
       warningCount: report.warnings.length,
     },
-  });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "matrix_version.safe_activate",
-    targetType: "ps_matrix_version",
-    targetId: versionId,
   });
 
   return { version: activated, validation: report };
@@ -263,14 +250,13 @@ export async function safeActivateMatrix(
  * most recently archived version that was previously active.
  */
 export async function rollbackMatrixVersion(
-  workspaceId: number,
   actorId: number,
 ): Promise<RollbackResult> {
   const db = getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
   // Find current active version
-  const currentActive = await repo.getActiveMatrixVersion(workspaceId);
+  const currentActive = await repo.getActiveMatrixVersion();
   if (!currentActive) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -281,7 +267,6 @@ export async function rollbackMatrixVersion(
   // Find the most recently activated archived version (the one that was active before)
   const [previousVersion] = await db.select().from(psMatrixVersions)
     .where(and(
-      eq(psMatrixVersions.workspaceId, workspaceId),
       eq(psMatrixVersions.status, "archived"),
     ))
     .orderBy(desc(psMatrixVersions.activatedAt))
@@ -295,7 +280,7 @@ export async function rollbackMatrixVersion(
   }
 
   // Validate the target version before rollback
-  const report = await deepValidateMatrix(workspaceId, previousVersion.id);
+  const report = await deepValidateMatrix(previousVersion.id);
   if (!report.isValid) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -304,30 +289,21 @@ export async function rollbackMatrixVersion(
   }
 
   // Archive current active
-  await repo.archiveMatrixVersion(workspaceId, currentActive.id);
+  await repo.archiveMatrixVersion(currentActive.id);
 
   // Re-activate previous version
-  const reactivated = await repo.activateMatrixVersion(workspaceId, previousVersion.id);
+  const reactivated = await repo.activateMatrixVersion(previousVersion.id);
   if (!reactivated) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to reactivate previous version" });
   }
 
   await logPsAudit({
-    workspaceId,
     actorId,
     action: "matrix_version.rollback",
     entityType: "ps_matrix_version",
     entityId: previousVersion.id,
     previousValue: { activeVersionId: currentActive.id, activeVersion: currentActive.version },
     newValue: { restoredVersionId: previousVersion.id, restoredVersion: previousVersion.version },
-  });
-  await logActivity({
-    workspaceId,
-    moduleKey: "ps",
-    actorId,
-    action: "matrix_version.rollback",
-    targetType: "ps_matrix_version",
-    targetId: previousVersion.id,
   });
 
   return {
@@ -344,15 +320,14 @@ export async function rollbackMatrixVersion(
  * Compare two matrix versions and produce a structured diff.
  */
 export async function compareMatrixVersions(
-  workspaceId: number,
   baseVersionId: number,
   targetVersionId: number,
 ): Promise<VersionComparison> {
-  const baseVersion = await repo.getMatrixVersionById(workspaceId, baseVersionId);
+  const baseVersion = await repo.getMatrixVersionById(baseVersionId);
   if (!baseVersion) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Base matrix version not found" });
   }
-  const targetVersion = await repo.getMatrixVersionById(workspaceId, targetVersionId);
+  const targetVersion = await repo.getMatrixVersionById(targetVersionId);
   if (!targetVersion) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Target matrix version not found" });
   }

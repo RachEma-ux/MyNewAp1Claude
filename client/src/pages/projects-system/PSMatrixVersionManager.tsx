@@ -39,16 +39,14 @@ function formatDate(ts: string | Date | null | undefined): string {
 }
 
 export function PSMatrixVersionManager({
-  workspaceId,
   selectedVersionId,
   onSelectVersion,
 }: {
-  workspaceId: number;
   selectedVersionId: number | null;
   onSelectVersion: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
-  const { data: versions, isLoading } = trpc.ps.matrix.listVersions.useQuery({ workspaceId });
+  const { data: versions, isLoading } = trpc.ps.matrix.listVersions.useQuery();
   const [showCreate, setShowCreate] = useState(false);
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [newVersion, setNewVersion] = useState("");
@@ -101,10 +99,10 @@ export function PSMatrixVersionManager({
                 <div className="flex items-center gap-1">
                   <Button size="sm" variant="ghost" onClick={() => { setDupSourceId(v.id); setShowDuplicate(true); }} title="Duplicate"><Copy className="w-3.5 h-3.5" /></Button>
                   {v.status === "draft" && (
-                    <Button size="sm" variant="ghost" className="text-green-600" onClick={() => activateMut.mutate({ workspaceId, id: v.id })} disabled={activateMut.isPending} title="Activate"><CheckCircle2 className="w-3.5 h-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="text-green-600" onClick={() => activateMut.mutate({ id: v.id })} disabled={activateMut.isPending} title="Activate"><CheckCircle2 className="w-3.5 h-3.5" /></Button>
                   )}
                   {v.status !== "active" && v.status !== "archived" && (
-                    <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => archiveMut.mutate({ workspaceId, id: v.id })} disabled={archiveMut.isPending} title="Archive"><Archive className="w-3.5 h-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => archiveMut.mutate({ id: v.id })} disabled={archiveMut.isPending} title="Archive"><Archive className="w-3.5 h-3.5" /></Button>
                   )}
                 </div>
               </CardContent>
@@ -122,7 +120,7 @@ export function PSMatrixVersionManager({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={() => createMut.mutate({ workspaceId, version: newVersion, label: newLabel })} disabled={!newVersion.trim() || !newLabel.trim() || createMut.isPending}>Create</Button>
+            <Button onClick={() => createMut.mutate({ version: newVersion, label: newLabel })} disabled={!newVersion.trim() || !newLabel.trim() || createMut.isPending}>Create</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -137,7 +135,7 @@ export function PSMatrixVersionManager({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDuplicate(false)}>Cancel</Button>
-            <Button onClick={() => dupSourceId && dupMut.mutate({ workspaceId, sourceVersionId: dupSourceId, newVersion, newLabel })} disabled={!newVersion.trim() || !newLabel.trim() || dupMut.isPending}>Duplicate</Button>
+            <Button onClick={() => dupSourceId && dupMut.mutate({ sourceVersionId: dupSourceId, newVersion, newLabel })} disabled={!newVersion.trim() || !newLabel.trim() || dupMut.isPending}>Duplicate</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -248,7 +248,7 @@ function DimensionSelector({
 
 // ── Component ─────────────────────────────────────────────────────────
 
-export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
+export function PSWizardPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [scenarioText, setScenarioText] = useState("");
   const [systemName, setSystemName] = useState("");
@@ -282,7 +282,7 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
 
   // ── Check if matrix mode is available ─────────────────────────────
   const activeQuestionsQuery = trpc.ps.matrix.getActiveQuestions.useQuery(
-    { workspaceId },
+    undefined,
     { staleTime: 60_000 },
   );
 
@@ -323,12 +323,12 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
 
   // ── Queries ───────────────────────────────────────────────────────
   const classifyQuery = trpc.ps.classifyScenario.useQuery(
-    { workspaceId, scenarioText, dimensions: dimensions as any },
+    { scenarioText, dimensions: dimensions as any },
     { enabled: false, retry: false },
   );
 
   const matrixEvalQuery = trpc.ps.matrix.evaluateEnriched.useQuery(
-    { workspaceId, answers: matrixAnswers },
+    { answers: matrixAnswers },
     { enabled: false, retry: false },
   );
 
@@ -444,7 +444,6 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
       if (isMatrixMode && enrichedResult) {
         // Canonical atomic flow: template resolution → wizard run → system → demand → assignments → override → audit
         const result = await acceptMut.mutateAsync({
-          workspaceId,
           scenarioText: scenarioText.trim(),
           projectName: systemName.trim(),
           selectedScopeCode: effectiveScope,
@@ -470,7 +469,6 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
         // Legacy fallback (no active matrix): 3-step manual flow
         const systemType = effectiveSystemType;
         const system = await createSystemMut.mutateAsync({
-          workspaceId,
           name: systemName.trim(),
           description: scenarioText.trim(),
           systemType,
@@ -478,13 +476,12 @@ export function PSWizardPage({ workspaceId }: { workspaceId: number }) {
           governanceProfile: dimensions.criticality || undefined,
         });
 
-        const demand = await generateDemandMut.mutateAsync({ workspaceId, psSystemId: system.id });
+        const demand = await generateDemandMut.mutateAsync({ psSystemId: system.id });
         if (Array.isArray(demand) && demand.length > 0) {
           setGeneratedDemand(demand.map((d: any) => ({ role: d.role, quantity: d.quantity ?? 1 })));
         }
 
         await createRunMut.mutateAsync({
-          workspaceId,
           scenarioText: scenarioText.trim(),
           inputPayload: { dimensions, mode: "legacy" },
           resultPayload: legacyClassification as any,

@@ -28,17 +28,15 @@ import { toast } from "sonner";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 
 export function PSDimensionValueEditor({
-  workspaceId,
   dimensionId,
   isDraft,
 }: {
-  workspaceId: number;
   dimensionId: number;
   isDraft: boolean;
 }) {
   const utils = trpc.useUtils();
   const { data: values, isLoading } = trpc.ps.matrix.listAllDimensionValues.useQuery(
-    { workspaceId, dimensionId },
+    { dimensionId },
   );
 
   const [showCreate, setShowCreate] = useState(false);
@@ -99,7 +97,7 @@ export function PSDimensionValueEditor({
                     <TableCell><Input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="h-6 text-xs" /></TableCell>
                     <TableCell>{v.isActive === 1 ? "Yes" : "No"}</TableCell>
                     <TableCell className="flex gap-1">
-                      <Button size="sm" variant="ghost" className="h-6" onClick={() => updateMut.mutate({ workspaceId, dimensionId, id: v.id, valueKey: editKey, valueLabel: editLabel, description: editDesc })} disabled={updateMut.isPending}><Save className="w-3 h-3" /></Button>
+                      <Button size="sm" variant="ghost" className="h-6" onClick={() => updateMut.mutate({ dimensionId, id: v.id, valueKey: editKey, valueLabel: editLabel, description: editDesc })} disabled={updateMut.isPending}><Save className="w-3 h-3" /></Button>
                       <Button size="sm" variant="ghost" className="h-6" onClick={() => setEditId(null)}>X</Button>
                     </TableCell>
                   </>
@@ -108,14 +106,14 @@ export function PSDimensionValueEditor({
                     <TableCell className="font-mono text-xs">{v.valueKey}</TableCell>
                     <TableCell className="text-xs">{v.valueLabel}</TableCell>
                     <TableCell>
-                      <Button size="sm" variant="ghost" className="h-6" onClick={() => toggleMut.mutate({ workspaceId, dimensionId, id: v.id, isActive: v.isActive === 1 ? 0 : 1 })} disabled={!isDraft}>
+                      <Button size="sm" variant="ghost" className="h-6" onClick={() => toggleMut.mutate({ dimensionId, id: v.id, isActive: v.isActive === 1 ? 0 : 1 })} disabled={!isDraft}>
                         <Badge variant="outline" className={`text-[10px] ${v.isActive === 1 ? "text-green-600" : "text-red-600"}`}>{v.isActive === 1 ? "Yes" : "No"}</Badge>
                       </Button>
                     </TableCell>
                     <TableCell className="flex gap-1">
                       <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setEditId(v.id); setEditKey(v.valueKey); setEditLabel(v.valueLabel); setEditDesc(v.description || ""); }} disabled={!isDraft}>Edit</Button>
                       {isDraft && (
-                        <Button size="sm" variant="ghost" className="h-6 text-red-600" onClick={() => { if (confirm(`Delete value "${v.valueKey}"?`)) deleteMut.mutate({ workspaceId, dimensionId, id: v.id }); }} disabled={deleteMut.isPending}><Trash2 className="w-3 h-3" /></Button>
+                        <Button size="sm" variant="ghost" className="h-6 text-red-600" onClick={() => { if (confirm(`Delete value "${v.valueKey}"?`)) deleteMut.mutate({ dimensionId, id: v.id }); }} disabled={deleteMut.isPending}><Trash2 className="w-3 h-3" /></Button>
                       )}
                     </TableCell>
                   </>
@@ -140,7 +138,7 @@ export function PSDimensionValueEditor({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={() => createMut.mutate({ workspaceId, dimensionId, valueKey: newKey, valueLabel: newLabel, description: newDesc || undefined })} disabled={!newKey.trim() || !newLabel.trim() || createMut.isPending}>Add</Button>
+            <Button onClick={() => createMut.mutate({ dimensionId, valueKey: newKey, valueLabel: newLabel, description: newDesc || undefined })} disabled={!newKey.trim() || !newLabel.trim() || createMut.isPending}>Add</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

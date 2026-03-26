@@ -20,9 +20,9 @@ const SYSTEM_TYPE_LABELS: Record<string, string> = {
   OPERATIONS_IMPROVEMENT: "Operations Improvement",
 };
 
-function DemandBadge({ workspaceId, psSystemId }: { workspaceId: number; psSystemId: number }) {
+function DemandBadge({ psSystemId }: { psSystemId: number }) {
   const { data: summary } = trpc.ps.demand.summary.useQuery(
-    { workspaceId, psSystemId },
+    { psSystemId },
     { staleTime: 30_000 },
   );
 
@@ -38,9 +38,9 @@ function DemandBadge({ workspaceId, psSystemId }: { workspaceId: number; psSyste
   );
 }
 
-function AssignmentBadge({ workspaceId, psSystemId }: { workspaceId: number; psSystemId: number }) {
+function AssignmentBadge({ psSystemId }: { psSystemId: number }) {
   const { data: summary } = trpc.ps.assignments.summary.useQuery(
-    { workspaceId, psSystemId },
+    { psSystemId },
     { staleTime: 30_000 },
   );
 
@@ -73,8 +73,8 @@ function AssignmentBadge({ workspaceId, psSystemId }: { workspaceId: number; psS
   );
 }
 
-export function PSListPage({ workspaceId }: { workspaceId: number }) {
-  const { data: systems, isLoading } = trpc.ps.systems.list.useQuery({ workspaceId });
+export function PSListPage() {
+  const { data: systems, isLoading } = trpc.ps.systems.list.useQuery();
 
   return (
     <div className="space-y-6 p-4">
@@ -127,10 +127,10 @@ export function PSListPage({ workspaceId }: { workspaceId: number }) {
                         </Badge>
                       </td>
                       <td className="py-2.5">
-                        <DemandBadge workspaceId={workspaceId} psSystemId={s.id} />
+                        <DemandBadge psSystemId={s.id} />
                       </td>
                       <td className="py-2.5">
-                        <AssignmentBadge workspaceId={workspaceId} psSystemId={s.id} />
+                        <AssignmentBadge psSystemId={s.id} />
                       </td>
                     </tr>
                   ))}

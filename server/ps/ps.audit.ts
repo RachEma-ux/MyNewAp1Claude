@@ -22,7 +22,6 @@ export const PS_AUDIT_ACTIONS = [
 export type PsAuditAction = (typeof PS_AUDIT_ACTIONS)[number];
 
 export async function logPsAudit(params: {
-  workspaceId: number;
   actorId?: number;
   action: string;
   entityType: string;
@@ -36,7 +35,6 @@ export async function logPsAudit(params: {
   if (!db) return;
   try {
     await db.insert(psAuditLog).values({
-      workspaceId: params.workspaceId,
       actorId: params.actorId,
       action: params.action,
       entityType: params.entityType,

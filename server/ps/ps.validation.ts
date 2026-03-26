@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 export const createSystemSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   name: z.string().min(1, "System name is required").max(255),
   description: z.string().max(2000).optional(),
   systemType: z.string().min(1, "System type is required").max(100),
@@ -14,17 +14,17 @@ export const createSystemSchema = z.object({
 });
 
 export const getSystemSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
 });
 
 export const listSystemsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   status: z.enum(["draft", "active", "archived"]).optional(),
 });
 
 export const createWizardRunSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   scenarioText: z.string().min(1, "Scenario text is required").max(5000),
   inputPayload: z.record(z.unknown()).optional(),
   resultPayload: z.record(z.unknown()).optional(),
@@ -34,18 +34,18 @@ export const createWizardRunSchema = z.object({
 });
 
 export const getWizardRunSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
 });
 
 export const listWizardRunsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 // ── Resource Requests (Demand) ──────────────────────────────────────
 
 export const createResourceRequestSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   psSystemId: z.number().int().positive(),
   role: z.string().min(1, "Role is required").max(200),
   capabilityTags: z.array(z.string().max(100)).max(20).optional(),
@@ -57,23 +57,23 @@ export const createResourceRequestSchema = z.object({
 });
 
 export const listResourceRequestsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   status: z.enum(["draft", "open", "partially_filled", "filled", "closed"]).optional(),
 });
 
 export const listResourceRequestsBySystemSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   psSystemId: z.number().int().positive(),
 });
 
 export const updateResourceRequestStatusSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
   status: z.enum(["draft", "open", "partially_filled", "filled", "closed"]),
 });
 
 export const getDemandSummarySchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   psSystemId: z.number().int().positive(),
 });
 
@@ -92,7 +92,7 @@ const assignmentSourceEnum = z.enum([
 ]);
 
 export const createResourceAssignmentSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   resourceRequestId: z.number().int().positive(),
   psSystemId: z.number().int().positive(),
   assignmentRole: z.string().min(1, "Assignment role is required").max(200),
@@ -108,7 +108,7 @@ export const createResourceAssignmentSchema = z.object({
 });
 
 export const updateResourceAssignmentSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
   assignmentRole: z.string().min(1).max(200).optional(),
   assigneeRefType: assigneeRefTypeEnum.optional(),
@@ -121,62 +121,62 @@ export const updateResourceAssignmentSchema = z.object({
 });
 
 export const updateResourceAssignmentStatusSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
   status: assignmentStatusEnum,
 });
 
 export const listResourceAssignmentsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   status: assignmentStatusEnum.optional(),
 });
 
 export const listResourceAssignmentsByRequestSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   resourceRequestId: z.number().int().positive(),
 });
 
 export const listResourceAssignmentsBySystemSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   psSystemId: z.number().int().positive(),
 });
 
 export const deleteResourceAssignmentSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
 });
 
 export const getAssignmentSummarySchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   psSystemId: z.number().int().positive(),
 });
 
 // ── Monitoring ──────────────────────────────────────────────────────
 
 export const getMonitoringSummarySchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 // ── Matrix Engine ──────────────────────────────────────────────────
 
 export const matrixVersionIdSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
 });
 
 export const createMatrixVersionSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   version: z.string().min(1).max(50),
   label: z.string().min(1).max(255),
 });
 
 export const activateMatrixVersionSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
 });
 
 export const createMatrixScopeSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   code: z.string().min(1).max(100),
   label: z.string().min(1).max(255),
@@ -185,7 +185,7 @@ export const createMatrixScopeSchema = z.object({
 });
 
 export const createMatrixScopesBatchSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   items: z.array(z.object({
     code: z.string().min(1).max(100),
@@ -196,7 +196,7 @@ export const createMatrixScopesBatchSchema = z.object({
 });
 
 export const createMatrixQuestionSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   code: z.string().min(1).max(100),
   label: z.string().min(1).max(500),
@@ -205,7 +205,7 @@ export const createMatrixQuestionSchema = z.object({
 });
 
 export const createMatrixQuestionsBatchSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   items: z.array(z.object({
     code: z.string().min(1).max(100),
@@ -216,7 +216,7 @@ export const createMatrixQuestionsBatchSchema = z.object({
 });
 
 export const createMatrixCellsBatchSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   items: z.array(z.object({
     questionId: z.number().int().positive(),
@@ -226,38 +226,38 @@ export const createMatrixCellsBatchSchema = z.object({
 });
 
 export const evaluateMatrixSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   answers: z.record(z.union([z.boolean(), z.string(), z.number()])),
 });
 
 export const hasActiveMatrixSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 export const getActiveMatrixQuestionsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 // ── Matrix Admin ──────────────────────────────────────────────────
 
 export const getMatrixOverviewSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 export const duplicateMatrixVersionSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   sourceVersionId: z.number().int().positive(),
   newVersion: z.string().min(1).max(50),
   newLabel: z.string().min(1).max(255),
 });
 
 export const archiveMatrixVersionSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
 });
 
 export const updateMatrixScopeSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   id: z.number().int().positive(),
   code: z.string().min(1).max(100).optional(),
@@ -268,7 +268,7 @@ export const updateMatrixScopeSchema = z.object({
 });
 
 export const updateMatrixQuestionSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   id: z.number().int().positive(),
   code: z.string().min(1).max(100).optional(),
@@ -279,13 +279,13 @@ export const updateMatrixQuestionSchema = z.object({
 });
 
 export const reorderMatrixQuestionsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   orderedIds: z.array(z.number().int().positive()).min(1).max(500),
 });
 
 export const upsertMatrixCellSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   questionId: z.number().int().positive(),
   scopeId: z.number().int().positive(),
@@ -293,7 +293,7 @@ export const upsertMatrixCellSchema = z.object({
 });
 
 export const bulkUpsertMatrixCellsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   items: z.array(z.object({
     questionId: z.number().int().positive(),
@@ -303,12 +303,12 @@ export const bulkUpsertMatrixCellsSchema = z.object({
 });
 
 export const getMatrixValidationReportSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
 });
 
 export const previewMatrixImportSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   sourceType: z.enum(["json", "excel", "manual"]).default("json"),
   sourceName: z.string().max(255).optional(),
   payload: z.object({
@@ -351,7 +351,7 @@ export const previewMatrixImportSchema = z.object({
 });
 
 export const commitMatrixImportSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   importId: z.number().int().positive(),
   targetVersionId: z.number().int().positive().optional(),
   newVersion: z.string().min(1).max(50).optional(),
@@ -359,28 +359,28 @@ export const commitMatrixImportSchema = z.object({
 });
 
 export const listMatrixImportsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 // ── Scope Matrix Profile ──────────────────────────────────────────
 
 export const getMatrixVersionByIdSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
 });
 
 export const getScopeProfileSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   scopeId: z.number().int().positive(),
 });
 
 export const listScopeProfilesSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
 });
 
 export const createMatrixImportRecordSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive().optional(),
   importType: z.enum(["scope_matrix", "scoring_matrix"]),
   sourceType: z.enum(["json", "excel", "manual"]).default("excel"),
@@ -396,18 +396,18 @@ export const createMatrixImportRecordSchema = z.object({
 // ── Matrix Headers ──────────────────────────────────────────────────
 
 export const listMatrixHeadersSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
 });
 
 export const listMatrixHeadersByTypeSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   headerType: z.enum(["Standard", "Method", "Framework", "Standards", "Methods", "Frameworks"]),
 });
 
 export const parseMatrixHeadersSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   rawHeaders: z.array(z.string()).min(1).max(50),
 });
@@ -415,18 +415,18 @@ export const parseMatrixHeadersSchema = z.object({
 // ── Seed ──────────────────────────────────────────────────────────────
 
 export const seedScopeMatrixSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 // ── Dimensions ──────────────────────────────────────────────────────
 
 export const listDimensionsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
 });
 
 export const createDimensionSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   dimensionKey: z.string().min(1).max(100),
   dimensionLabel: z.string().min(1).max(255),
@@ -435,7 +435,7 @@ export const createDimensionSchema = z.object({
 });
 
 export const createDimensionsBatchSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   items: z.array(z.object({
     dimensionKey: z.string().min(1).max(100),
@@ -452,7 +452,7 @@ export const createDimensionsBatchSchema = z.object({
 });
 
 export const updateDimensionSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   id: z.number().int().positive(),
   dimensionKey: z.string().min(1).max(100).optional(),
@@ -465,12 +465,12 @@ export const updateDimensionSchema = z.object({
 // ── Dimension Values ────────────────────────────────────────────────
 
 export const listDimensionValuesSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   dimensionId: z.number().int().positive(),
 });
 
 export const createDimensionValueSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   dimensionId: z.number().int().positive(),
   valueKey: z.string().min(1).max(100),
   valueLabel: z.string().min(1).max(255),
@@ -479,7 +479,7 @@ export const createDimensionValueSchema = z.object({
 });
 
 export const createDimensionValuesBatchSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   dimensionId: z.number().int().positive(),
   items: z.array(z.object({
     valueKey: z.string().min(1).max(100),
@@ -490,7 +490,7 @@ export const createDimensionValuesBatchSchema = z.object({
 });
 
 export const updateDimensionValueSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   dimensionId: z.number().int().positive(),
   id: z.number().int().positive(),
   valueKey: z.string().min(1).max(100).optional(),
@@ -503,17 +503,17 @@ export const updateDimensionValueSchema = z.object({
 // ── Question Presentations ──────────────────────────────────────────
 
 export const getQuestionPresentationSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   questionId: z.number().int().positive(),
 });
 
 export const listQuestionPresentationsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
 });
 
 export const createQuestionPresentationSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   questionId: z.number().int().positive(),
   presentationType: z.enum(["boolean", "select", "slider", "multi_select", "text"]),
   dimensionId: z.number().int().positive().optional(),
@@ -521,7 +521,7 @@ export const createQuestionPresentationSchema = z.object({
 });
 
 export const createQuestionPresentationsBatchSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   items: z.array(z.object({
     questionId: z.number().int().positive(),
@@ -532,7 +532,7 @@ export const createQuestionPresentationsBatchSchema = z.object({
 });
 
 export const updateQuestionPresentationSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   questionId: z.number().int().positive(),
   presentationType: z.enum(["boolean", "select", "slider", "multi_select", "text"]).optional(),
   dimensionId: z.number().int().positive().nullable().optional(),
@@ -543,31 +543,31 @@ export const updateQuestionPresentationSchema = z.object({
 // ── Delete Operations ──────────────────────────────────────────────
 
 export const deleteScopeSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   id: z.number().int().positive(),
 });
 
 export const deleteQuestionSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   id: z.number().int().positive(),
 });
 
 export const deleteDimensionSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   id: z.number().int().positive(),
 });
 
 export const deleteDimensionValueSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   dimensionId: z.number().int().positive(),
   id: z.number().int().positive(),
 });
 
 export const deleteCellSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   id: z.number().int().positive(),
 });
@@ -575,21 +575,21 @@ export const deleteCellSchema = z.object({
 // ── Matrix Versioning ──────────────────────────────────────────────
 
 export const deepValidateMatrixSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
 });
 
 export const safeActivateMatrixSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
 });
 
 export const rollbackMatrixSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 export const compareMatrixVersionsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   baseVersionId: z.number().int().positive(),
   targetVersionId: z.number().int().positive(),
 });
@@ -597,7 +597,7 @@ export const compareMatrixVersionsSchema = z.object({
 // ── Wizard Accept ──────────────────────────────────────────────────
 
 export const acceptWizardResultSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   scenarioText: z.string().min(1).max(5000),
   projectName: z.string().min(1).max(255),
   selectedScopeCode: z.string().min(1).max(120),
@@ -616,7 +616,7 @@ export const acceptWizardResultSchema = z.object({
 // ── Scope Template Mappings ──────────────────────────────────────────
 
 export const createScopeTemplateMappingSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   scopeCode: z.string().min(1).max(120),
   systemType: z.string().min(1).max(100),
   lifecycleType: z.string().max(100).optional(),
@@ -630,26 +630,26 @@ export const createScopeTemplateMappingSchema = z.object({
 });
 
 export const listScopeTemplateMappingsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 // ── Simulation ──────────────────────────────────────────────────────
 
 export const runSimulationSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   compareVersionId: z.number().int().positive().optional(),
   answers: z.record(z.union([z.boolean(), z.string(), z.number()])),
 });
 
 export const listSimulationsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 // ── Evaluation Cases ────────────────────────────────────────────────
 
 export const createEvalCaseSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   name: z.string().min(1).max(255),
   description: z.string().max(2000).optional(),
   answersJson: z.record(z.union([z.boolean(), z.string(), z.number()])),
@@ -658,16 +658,16 @@ export const createEvalCaseSchema = z.object({
 });
 
 export const getEvalCaseSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
 });
 
 export const listEvalCasesSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 export const updateEvalCaseSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
   name: z.string().min(1).max(255).optional(),
   description: z.string().max(2000).optional(),
@@ -678,32 +678,32 @@ export const updateEvalCaseSchema = z.object({
 });
 
 export const deleteEvalCaseSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
 });
 
 // ── Evaluation Suite ────────────────────────────────────────────────
 
 export const runEvaluationSuiteSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   versionId: z.number().int().positive(),
   caseIds: z.array(z.number().int().positive()).max(500).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
 });
 
 export const listEvalRunsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 export const getEvalRunSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   id: z.number().int().positive(),
 });
 
 // ── Overrides ───────────────────────────────────────────────────────
 
 export const overrideRecommendationSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   wizardRunId: z.number().int().positive().optional(),
   recommendedScopeCode: z.string().min(1).max(120),
   overriddenScopeCode: z.string().min(1).max(120),
@@ -714,17 +714,17 @@ export const overrideRecommendationSchema = z.object({
 });
 
 export const listOverridesSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 export const getOverridePatternsSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
 });
 
 // ── Classification ──────────────────────────────────────────────────
 
 export const classifyScenarioSchema = z.object({
-  workspaceId: z.number().int().positive(),
+
   scenarioText: z.string().min(1, "Scenario text is required").max(5000),
   dimensions: z.object({
     domain: z.enum(["software", "infrastructure", "business_process", "organizational_change", "construction", "research"]),

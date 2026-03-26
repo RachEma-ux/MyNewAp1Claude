@@ -33,21 +33,19 @@ import { PSDimensionValueEditor } from "./PSDimensionValueEditor";
 import { PSVersionSelector } from "./PSControlPanelPage";
 
 export function PSDimensionEditor({
-  workspaceId,
   selectedVersionId,
   onSelectVersion,
 }: {
-  workspaceId: number;
   selectedVersionId: number | null;
   onSelectVersion: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
   const { data: dimensions, isLoading } = trpc.ps.matrix.listAllDimensions.useQuery(
-    { workspaceId, versionId: selectedVersionId! },
+    { versionId: selectedVersionId! },
     { enabled: !!selectedVersionId },
   );
   const { data: version } = trpc.ps.matrix.getVersion.useQuery(
-    { workspaceId, id: selectedVersionId! },
+    { id: selectedVersionId! },
     { enabled: !!selectedVersionId },
   );
 
@@ -89,7 +87,7 @@ export function PSDimensionEditor({
 
   return (
     <div className="space-y-4">
-      <PSVersionSelector workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} />
+      <PSVersionSelector selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} />
       {!selectedVersionId ? null : isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
         <>
           <div className="flex items-center justify-between">
@@ -107,7 +105,7 @@ export function PSDimensionEditor({
                       <Input value={editKey} onChange={(e) => setEditKey(e.target.value)} className="h-7 text-xs max-w-[150px]" placeholder="Key" />
                       <Input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="h-7 text-xs max-w-[200px]" placeholder="Label" />
                       <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="h-7 text-xs max-w-[250px]" placeholder="Description" />
-                      <Button size="sm" variant="ghost" onClick={() => updateMut.mutate({ workspaceId, versionId: selectedVersionId!, id: dim.id, dimensionKey: editKey, dimensionLabel: editLabel, description: editDesc })} disabled={updateMut.isPending}><Save className="w-3.5 h-3.5" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => updateMut.mutate({ versionId: selectedVersionId!, id: dim.id, dimensionKey: editKey, dimensionLabel: editLabel, description: editDesc })} disabled={updateMut.isPending}><Save className="w-3.5 h-3.5" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => setEditId(null)}>X</Button>
                     </div>
                   ) : (
@@ -120,12 +118,12 @@ export function PSDimensionEditor({
                         {dim.description && <span className="text-xs text-muted-foreground">{dim.description}</span>}
                       </div>
                       <div className="flex items-center gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => toggleMut.mutate({ workspaceId, versionId: selectedVersionId!, id: dim.id, isActive: dim.isActive === 1 ? 0 : 1 })} disabled={!isDraft}>
+                        <Button size="sm" variant="ghost" onClick={() => toggleMut.mutate({ versionId: selectedVersionId!, id: dim.id, isActive: dim.isActive === 1 ? 0 : 1 })} disabled={!isDraft}>
                           Toggle
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => { setEditId(dim.id); setEditKey(dim.dimensionKey); setEditLabel(dim.dimensionLabel); setEditDesc(dim.description || ""); }} disabled={!isDraft}>Edit</Button>
                         {isDraft && (
-                          <Button size="sm" variant="ghost" className="text-red-600" onClick={() => { if (confirm(`Delete dimension "${dim.dimensionKey}" and all its values?`)) deleteMut.mutate({ workspaceId, versionId: selectedVersionId!, id: dim.id }); }} disabled={deleteMut.isPending}><Trash2 className="w-3.5 h-3.5" /></Button>
+                          <Button size="sm" variant="ghost" className="text-red-600" onClick={() => { if (confirm(`Delete dimension "${dim.dimensionKey}" and all its values?`)) deleteMut.mutate({ versionId: selectedVersionId!, id: dim.id }); }} disabled={deleteMut.isPending}><Trash2 className="w-3.5 h-3.5" /></Button>
                         )}
                       </div>
                     </div>
@@ -133,7 +131,6 @@ export function PSDimensionEditor({
 
                   {expandedId === dim.id && (
                     <PSDimensionValueEditor
-                      workspaceId={workspaceId}
                       dimensionId={dim.id}
                       isDraft={isDraft}
                     />
@@ -157,7 +154,7 @@ export function PSDimensionEditor({
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-                <Button onClick={() => createMut.mutate({ workspaceId, versionId: selectedVersionId!, dimensionKey: newKey, dimensionLabel: newLabel, description: newDesc || undefined })} disabled={!newKey.trim() || !newLabel.trim() || createMut.isPending}>Add</Button>
+                <Button onClick={() => createMut.mutate({ versionId: selectedVersionId!, dimensionKey: newKey, dimensionLabel: newLabel, description: newDesc || undefined })} disabled={!newKey.trim() || !newLabel.trim() || createMut.isPending}>Add</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

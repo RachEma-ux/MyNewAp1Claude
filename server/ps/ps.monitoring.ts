@@ -116,7 +116,7 @@ export interface MonitoringSummary {
 
 // ── System Metrics ──────────────────────────────────────────────────────
 
-export async function getSystemMetrics(workspaceId: number): Promise<SystemMetrics> {
+export async function getSystemMetrics(): Promise<SystemMetrics> {
   const db = getDb();
   if (!db) return { total: 0, active: 0, draft: 0, archived: 0 };
 
@@ -126,7 +126,7 @@ export async function getSystemMetrics(workspaceId: number): Promise<SystemMetri
       cnt: count(),
     })
     .from(psSystems)
-    .where(eq(psSystems.workspaceId, workspaceId))
+    
     .groupBy(psSystems.status);
 
   const result: SystemMetrics = { total: 0, active: 0, draft: 0, archived: 0 };
@@ -142,7 +142,7 @@ export async function getSystemMetrics(workspaceId: number): Promise<SystemMetri
 
 // ── Wizard Metrics ──────────────────────────────────────────────────────
 
-export async function getWizardMetrics(workspaceId: number): Promise<WizardMetrics> {
+export async function getWizardMetrics(): Promise<WizardMetrics> {
   const db = getDb();
   if (!db) return { total: 0, last24h: 0, last7d: 0, averageConfidence: null, lastRunAt: null };
 
@@ -160,7 +160,7 @@ export async function getWizardMetrics(workspaceId: number): Promise<WizardMetri
       lastRunAt: sql<string | null>`max(${psWizardRuns.createdAt})`,
     })
     .from(psWizardRuns)
-    .where(eq(psWizardRuns.workspaceId, workspaceId));
+    ;
 
   return {
     total: Number(row?.total ?? 0),
@@ -173,7 +173,7 @@ export async function getWizardMetrics(workspaceId: number): Promise<WizardMetri
 
 // ── Demand Metrics ──────────────────────────────────────────────────────
 
-export async function getDemandMetrics(workspaceId: number): Promise<DemandMetrics> {
+export async function getDemandMetrics(): Promise<DemandMetrics> {
   const db = getDb();
   if (!db) return { total: 0, draft: 0, open: 0, partiallyFilled: 0, filled: 0, closed: 0 };
 
@@ -183,7 +183,7 @@ export async function getDemandMetrics(workspaceId: number): Promise<DemandMetri
       cnt: count(),
     })
     .from(psResourceRequests)
-    .where(eq(psResourceRequests.workspaceId, workspaceId))
+    
     .groupBy(psResourceRequests.status);
 
   const result: DemandMetrics = { total: 0, draft: 0, open: 0, partiallyFilled: 0, filled: 0, closed: 0 };
@@ -201,7 +201,7 @@ export async function getDemandMetrics(workspaceId: number): Promise<DemandMetri
 
 // ── Assignment Metrics ──────────────────────────────────────────────────
 
-export async function getAssignmentMetrics(workspaceId: number): Promise<AssignmentMetrics> {
+export async function getAssignmentMetrics(): Promise<AssignmentMetrics> {
   const db = getDb();
   if (!db) return { total: 0, active: 0, completed: 0, rejected: 0, cancelled: 0 };
 
@@ -211,7 +211,7 @@ export async function getAssignmentMetrics(workspaceId: number): Promise<Assignm
       cnt: count(),
     })
     .from(psResourceAssignments)
-    .where(eq(psResourceAssignments.workspaceId, workspaceId))
+    
     .groupBy(psResourceAssignments.status);
 
   const result: AssignmentMetrics = { total: 0, active: 0, completed: 0, rejected: 0, cancelled: 0 };
@@ -229,7 +229,7 @@ export async function getAssignmentMetrics(workspaceId: number): Promise<Assignm
 
 // ── Fulfillment Metrics ─────────────────────────────────────────────────
 
-export async function getFulfillmentMetrics(workspaceId: number): Promise<FulfillmentMetrics> {
+export async function getFulfillmentMetrics(): Promise<FulfillmentMetrics> {
   const db = getDb();
   if (!db) return { totalRequests: 0, filledPercent: 0, partialPercent: 0, unfilledPercent: 0 };
 
@@ -239,7 +239,7 @@ export async function getFulfillmentMetrics(workspaceId: number): Promise<Fulfil
       cnt: count(),
     })
     .from(psResourceRequests)
-    .where(eq(psResourceRequests.workspaceId, workspaceId))
+    
     .groupBy(psResourceRequests.status);
 
   let total = 0;
@@ -268,7 +268,7 @@ export async function getFulfillmentMetrics(workspaceId: number): Promise<Fulfil
 
 // ── Recent Activity ─────────────────────────────────────────────────────
 
-export async function getRecentActivity(workspaceId: number): Promise<ActivityEntry[]> {
+export async function getRecentActivity(): Promise<ActivityEntry[]> {
   const db = getDb();
   if (!db) return [];
 
@@ -277,25 +277,25 @@ export async function getRecentActivity(workspaceId: number): Promise<ActivityEn
     db
       .select({ ts: psSystems.createdAt, name: psSystems.name })
       .from(psSystems)
-      .where(eq(psSystems.workspaceId, workspaceId))
+      
       .orderBy(desc(psSystems.createdAt))
       .limit(1),
     db
       .select({ ts: psWizardRuns.createdAt })
       .from(psWizardRuns)
-      .where(eq(psWizardRuns.workspaceId, workspaceId))
+      
       .orderBy(desc(psWizardRuns.createdAt))
       .limit(1),
     db
       .select({ ts: psResourceRequests.createdAt, role: psResourceRequests.role })
       .from(psResourceRequests)
-      .where(eq(psResourceRequests.workspaceId, workspaceId))
+      
       .orderBy(desc(psResourceRequests.createdAt))
       .limit(1),
     db
       .select({ ts: psResourceAssignments.updatedAt, role: psResourceAssignments.assignmentRole })
       .from(psResourceAssignments)
-      .where(eq(psResourceAssignments.workspaceId, workspaceId))
+      
       .orderBy(desc(psResourceAssignments.updatedAt))
       .limit(1),
   ]);
@@ -346,14 +346,14 @@ export async function getRecentActivity(workspaceId: number): Promise<ActivityEn
 
 // ── Override Rate Metrics ─────────────────────────────────────────────
 
-export async function getOverrideRateMetrics(workspaceId: number): Promise<OverrideRateMetrics> {
+export async function getOverrideRateMetrics(): Promise<OverrideRateMetrics> {
   const { getOverrideRate } = await import("./ps.override");
-  return getOverrideRate(workspaceId);
+  return getOverrideRate();
 }
 
 // ── Confidence Trends ─────────────────────────────────────────────────
 
-export async function getConfidenceTrends(workspaceId: number): Promise<ConfidenceTrend[]> {
+export async function getConfidenceTrends(): Promise<ConfidenceTrend[]> {
   const db = getDb();
   if (!db) return [];
 
@@ -366,8 +366,7 @@ export async function getConfidenceTrends(workspaceId: number): Promise<Confiden
     runCount: count(),
   })
   .from(psWizardRuns)
-  .where(and(
-    eq(psWizardRuns.workspaceId, workspaceId),
+  .where(
     gte(psWizardRuns.createdAt, twelveWeeksAgo),
   ))
   .groupBy(sql`to_char(${psWizardRuns.createdAt}, 'IYYY-"W"IW')`)
@@ -382,7 +381,7 @@ export async function getConfidenceTrends(workspaceId: number): Promise<Confiden
 
 // ── Scope Distribution ────────────────────────────────────────────────
 
-export async function getScopeDistribution(workspaceId: number): Promise<ScopeDistributionEntry[]> {
+export async function getScopeDistribution(): Promise<ScopeDistributionEntry[]> {
   const db = getDb();
   if (!db) return [];
 
@@ -391,7 +390,7 @@ export async function getScopeDistribution(workspaceId: number): Promise<ScopeDi
     cnt: count(),
   })
   .from(psWizardRuns)
-  .where(eq(psWizardRuns.workspaceId, workspaceId))
+  
   .groupBy(psWizardRuns.selectedSystemType)
   .orderBy(desc(count()));
 
@@ -410,7 +409,7 @@ export async function getScopeDistribution(workspaceId: number): Promise<ScopeDi
 
 // ── Dead Scopes ──────────────────────────────────────────────────────
 
-export async function getDeadScopes(workspaceId: number): Promise<DeadScopeEntry[]> {
+export async function getDeadScopes(): Promise<DeadScopeEntry[]> {
   const db = getDb();
   if (!db) return [];
 
@@ -418,7 +417,6 @@ export async function getDeadScopes(workspaceId: number): Promise<DeadScopeEntry
   const [activeVersion] = await db.select()
     .from(psMatrixVersions)
     .where(and(
-      eq(psMatrixVersions.workspaceId, workspaceId),
       eq(psMatrixVersions.status, "active"),
     ))
     .limit(1);
@@ -438,7 +436,7 @@ export async function getDeadScopes(workspaceId: number): Promise<DeadScopeEntry
   // Get all wizard runs with selected system types
   const wizardRuns = await db.select({ scopeCode: psWizardRuns.selectedSystemType })
     .from(psWizardRuns)
-    .where(eq(psWizardRuns.workspaceId, workspaceId));
+    ;
 
   const selectedScopes = new Set(wizardRuns.map((r) => r.scopeCode).filter(Boolean));
 
@@ -473,7 +471,7 @@ export async function getDeadScopes(workspaceId: number): Promise<DeadScopeEntry
 
 // ── Dead Questions ───────────────────────────────────────────────────
 
-export async function getDeadQuestions(workspaceId: number): Promise<DeadQuestionEntry[]> {
+export async function getDeadQuestions(): Promise<DeadQuestionEntry[]> {
   const db = getDb();
   if (!db) return [];
 
@@ -481,7 +479,6 @@ export async function getDeadQuestions(workspaceId: number): Promise<DeadQuestio
   const [activeVersion] = await db.select()
     .from(psMatrixVersions)
     .where(and(
-      eq(psMatrixVersions.workspaceId, workspaceId),
       eq(psMatrixVersions.status, "active"),
     ))
     .limit(1);

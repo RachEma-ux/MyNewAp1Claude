@@ -30,21 +30,19 @@ import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { PSVersionSelector } from "./PSControlPanelPage";
 
 export function PSQuestionEditor({
-  workspaceId,
   selectedVersionId,
   onSelectVersion,
 }: {
-  workspaceId: number;
   selectedVersionId: number | null;
   onSelectVersion: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
   const { data: questions, isLoading } = trpc.ps.matrix.getAllQuestions.useQuery(
-    { workspaceId, versionId: selectedVersionId! },
+    { versionId: selectedVersionId! },
     { enabled: !!selectedVersionId },
   );
   const { data: version } = trpc.ps.matrix.getVersion.useQuery(
-    { workspaceId, id: selectedVersionId! },
+    { id: selectedVersionId! },
     { enabled: !!selectedVersionId },
   );
 
@@ -84,7 +82,7 @@ export function PSQuestionEditor({
 
   return (
     <div className="space-y-4">
-      <PSVersionSelector workspaceId={workspaceId} selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} />
+      <PSVersionSelector selectedVersionId={selectedVersionId} onSelectVersion={onSelectVersion} />
       {!selectedVersionId ? null : isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
         <>
           <div className="flex items-center justify-between">
@@ -109,7 +107,7 @@ export function PSQuestionEditor({
                         <TableCell><Input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="h-7 text-xs" /></TableCell>
                         <TableCell>{q.isActive === 1 ? "Yes" : "No"}</TableCell>
                         <TableCell className="flex gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => updateMut.mutate({ workspaceId, versionId: selectedVersionId!, id: q.id, code: editCode, label: editLabel, description: editDesc })} disabled={updateMut.isPending}><Save className="w-3.5 h-3.5" /></Button>
+                          <Button size="sm" variant="ghost" onClick={() => updateMut.mutate({ versionId: selectedVersionId!, id: q.id, code: editCode, label: editLabel, description: editDesc })} disabled={updateMut.isPending}><Save className="w-3.5 h-3.5" /></Button>
                           <Button size="sm" variant="ghost" onClick={() => setEditId(null)}>X</Button>
                         </TableCell>
                       </>
@@ -119,14 +117,14 @@ export function PSQuestionEditor({
                         <TableCell className="font-mono text-xs">{q.code}</TableCell>
                         <TableCell>{q.label}</TableCell>
                         <TableCell>
-                          <Button size="sm" variant="ghost" onClick={() => toggleMut.mutate({ workspaceId, versionId: selectedVersionId!, id: q.id, isActive: q.isActive === 1 ? 0 : 1 })} disabled={!isDraft}>
+                          <Button size="sm" variant="ghost" onClick={() => toggleMut.mutate({ versionId: selectedVersionId!, id: q.id, isActive: q.isActive === 1 ? 0 : 1 })} disabled={!isDraft}>
                             <Badge variant="outline" className={q.isActive === 1 ? "text-green-600" : "text-red-600"}>{q.isActive === 1 ? "Yes" : "No"}</Badge>
                           </Button>
                         </TableCell>
                         <TableCell className="flex gap-1">
                           <Button size="sm" variant="ghost" onClick={() => { setEditId(q.id); setEditCode(q.code); setEditLabel(q.label); setEditDesc(q.description || ""); }} disabled={!isDraft}>Edit</Button>
                           {isDraft && (
-                            <Button size="sm" variant="ghost" className="text-red-600" onClick={() => { if (confirm(`Delete question "${q.code}"?`)) deleteMut.mutate({ workspaceId, versionId: selectedVersionId!, id: q.id }); }} disabled={deleteMut.isPending}><Trash2 className="w-3.5 h-3.5" /></Button>
+                            <Button size="sm" variant="ghost" className="text-red-600" onClick={() => { if (confirm(`Delete question "${q.code}"?`)) deleteMut.mutate({ versionId: selectedVersionId!, id: q.id }); }} disabled={deleteMut.isPending}><Trash2 className="w-3.5 h-3.5" /></Button>
                           )}
                         </TableCell>
                       </>
@@ -147,7 +145,7 @@ export function PSQuestionEditor({
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-                <Button onClick={() => createMut.mutate({ workspaceId, versionId: selectedVersionId!, code: newCode, label: newLabel, description: newDesc || undefined })} disabled={!newCode.trim() || !newLabel.trim() || createMut.isPending}>Add</Button>
+                <Button onClick={() => createMut.mutate({ versionId: selectedVersionId!, code: newCode, label: newLabel, description: newDesc || undefined })} disabled={!newCode.trim() || !newLabel.trim() || createMut.isPending}>Add</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
