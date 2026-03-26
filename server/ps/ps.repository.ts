@@ -12,6 +12,10 @@ import {
   psCatalogSystemTypes,
   psResourceRequests,
   psResourceAssignments,
+  psMatrixVersions,
+  psScopeRegistry,
+  psMatrixQuestions,
+  psMatrixCells,
   type PsSystem,
   type InsertPsSystem,
   type PsWizardRun,
@@ -21,6 +25,14 @@ import {
   type InsertPsResourceRequest,
   type PsResourceAssignment,
   type InsertPsResourceAssignment,
+  type PsMatrixVersion,
+  type InsertPsMatrixVersion,
+  type PsScopeRegistry,
+  type InsertPsScopeRegistry,
+  type PsMatrixQuestion,
+  type InsertPsMatrixQuestion,
+  type PsMatrixCell,
+  type InsertPsMatrixCell,
 } from "../../drizzle/tables/ps";
 
 // ── Systems ──────────────────────────────────────────────────────────────
@@ -304,4 +316,145 @@ export async function deleteResourceAssignment(
     ))
     .returning();
   return result.length > 0;
+}
+
+// ── Matrix Versions ──────────────────────────────────────────────────
+
+export async function getActiveMatrixVersion(workspaceId: number): Promise<PsMatrixVersion | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [version] = await db.select().from(psMatrixVersions)
+    .where(and(
+      eq(psMatrixVersions.workspaceId, workspaceId),
+      eq(psMatrixVersions.status, "active"),
+    ))
+    .limit(1);
+  return version ?? null;
+}
+
+export async function getMatrixVersionById(workspaceId: number, id: number): Promise<PsMatrixVersion | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [version] = await db.select().from(psMatrixVersions)
+    .where(and(
+      eq(psMatrixVersions.id, id),
+      eq(psMatrixVersions.workspaceId, workspaceId),
+    ))
+    .limit(1);
+  return version ?? null;
+}
+
+export async function listMatrixVersions(workspaceId: number): Promise<PsMatrixVersion[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psMatrixVersions)
+    .where(eq(psMatrixVersions.workspaceId, workspaceId))
+    .orderBy(desc(psMatrixVersions.createdAt));
+}
+
+export async function createMatrixVersion(data: InsertPsMatrixVersion): Promise<PsMatrixVersion> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psMatrixVersions).values({
+    ...data,
+    createdAt: new Date(),
+  }).returning();
+  return created;
+}
+
+export async function activateMatrixVersion(workspaceId: number, id: number): Promise<PsMatrixVersion | null> {
+  const db = getDb();
+  if (!db) return null;
+  // Deactivate all existing active versions for this workspace
+  await db.update(psMatrixVersions)
+    .set({ status: "archived" })
+    .where(and(
+      eq(psMatrixVersions.workspaceId, workspaceId),
+      eq(psMatrixVersions.status, "active"),
+    ));
+  // Activate the target version
+  const [updated] = await db.update(psMatrixVersions)
+    .set({ status: "active", activatedAt: new Date() })
+    .where(and(
+      eq(psMatrixVersions.id, id),
+      eq(psMatrixVersions.workspaceId, workspaceId),
+    ))
+    .returning();
+  return updated ?? null;
+}
+
+// ── Scope Registry ──────────────────────────────────────────────────
+
+export async function listScopesByVersion(versionId: number): Promise<PsScopeRegistry[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psScopeRegistry)
+    .where(and(
+      eq(psScopeRegistry.versionId, versionId),
+      eq(psScopeRegistry.isActive, 1),
+    ));
+}
+
+export async function createScope(data: InsertPsScopeRegistry): Promise<PsScopeRegistry> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psScopeRegistry).values(data).returning();
+  return created;
+}
+
+export async function createScopesBatch(items: InsertPsScopeRegistry[]): Promise<PsScopeRegistry[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  if (items.length === 0) return [];
+  return db.insert(psScopeRegistry).values(items).returning();
+}
+
+// ── Matrix Questions ────────────────────────────────────────────────
+
+export async function listQuestionsByVersion(versionId: number): Promise<PsMatrixQuestion[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psMatrixQuestions)
+    .where(and(
+      eq(psMatrixQuestions.versionId, versionId),
+      eq(psMatrixQuestions.isActive, 1),
+    ))
+    .orderBy(psMatrixQuestions.sortOrder);
+}
+
+export async function createQuestion(data: InsertPsMatrixQuestion): Promise<PsMatrixQuestion> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psMatrixQuestions).values(data).returning();
+  return created;
+}
+
+export async function createQuestionsBatch(items: InsertPsMatrixQuestion[]): Promise<PsMatrixQuestion[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  if (items.length === 0) return [];
+  return db.insert(psMatrixQuestions).values(items).returning();
+}
+
+// ── Matrix Cells ────────────────────────────────────────────────────
+
+export async function listCellsByVersion(versionId: number): Promise<PsMatrixCell[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psMatrixCells)
+    .where(eq(psMatrixCells.versionId, versionId));
+}
+
+export async function createCell(data: InsertPsMatrixCell): Promise<PsMatrixCell> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psMatrixCells).values(data).returning();
+  return created;
+}
+
+export async function createCellsBatch(items: InsertPsMatrixCell[]): Promise<PsMatrixCell[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  if (items.length === 0) return [];
+  return db.insert(psMatrixCells).values(items).returning();
 }

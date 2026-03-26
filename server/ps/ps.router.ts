@@ -2,7 +2,7 @@
  * PS Module — tRPC Router
  *
  * Exposes PS systems CRUD, wizard runs, catalog, classification,
- * demand, and assignment-facing flows.
+ * demand, assignment-facing flows, and matrix classification engine.
  */
 
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
@@ -28,8 +28,21 @@ import {
   listResourceAssignmentsBySystemSchema,
   deleteResourceAssignmentSchema,
   getAssignmentSummarySchema,
+  // Matrix schemas
+  matrixVersionIdSchema,
+  createMatrixVersionSchema,
+  activateMatrixVersionSchema,
+  createMatrixScopeSchema,
+  createMatrixScopesBatchSchema,
+  createMatrixQuestionSchema,
+  createMatrixQuestionsBatchSchema,
+  createMatrixCellsBatchSchema,
+  evaluateMatrixSchema,
+  hasActiveMatrixSchema,
+  getActiveMatrixQuestionsSchema,
 } from "./ps.validation";
 import * as service from "./ps.service";
+import { loadActiveMatrix } from "./ps.matrix-engine";
 
 const systemsRouter = router({
   create: governedProcedure
@@ -175,11 +188,156 @@ const assignmentsRouter = router({
     }),
 });
 
+// ── Matrix Classification Engine Router ──────────────────────────────
+
+const matrixRouter = router({
+  // Version management
+  getActiveVersion: protectedProcedure
+    .input(hasActiveMatrixSchema)
+    .query(async ({ input }) => {
+      return service.getActiveMatrixVersion(input.workspaceId);
+    }),
+
+  listVersions: protectedProcedure
+    .input(hasActiveMatrixSchema)
+    .query(async ({ input }) => {
+      return service.listMatrixVersions(input.workspaceId);
+    }),
+
+  createVersion: governedProcedure
+    .input(createMatrixVersionSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createMatrixVersion(
+        input.workspaceId,
+        input.version,
+        input.label,
+        ctx.user.id,
+      );
+    }),
+
+  activateVersion: governedProcedure
+    .input(activateMatrixVersionSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.activateMatrixVersion(input.workspaceId, input.id, ctx.user.id);
+    }),
+
+  // Scopes
+  getScopes: protectedProcedure
+    .input(matrixVersionIdSchema)
+    .query(async ({ input }) => {
+      return service.listMatrixScopes(input.workspaceId, input.versionId);
+    }),
+
+  createScope: governedProcedure
+    .input(createMatrixScopeSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createMatrixScope(
+        input.workspaceId,
+        input.versionId,
+        input.code,
+        input.label,
+        input.description || null,
+        input.family || null,
+        ctx.user.id,
+      );
+    }),
+
+  createScopesBatch: governedProcedure
+    .input(createMatrixScopesBatchSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createMatrixScopesBatch(
+        input.workspaceId,
+        input.versionId,
+        input.items,
+        ctx.user.id,
+      );
+    }),
+
+  // Questions
+  getQuestions: protectedProcedure
+    .input(matrixVersionIdSchema)
+    .query(async ({ input }) => {
+      return service.listMatrixQuestions(input.workspaceId, input.versionId);
+    }),
+
+  createQuestion: governedProcedure
+    .input(createMatrixQuestionSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createMatrixQuestion(
+        input.workspaceId,
+        input.versionId,
+        input.code,
+        input.label,
+        input.description || null,
+        input.sortOrder ?? 0,
+        ctx.user.id,
+      );
+    }),
+
+  createQuestionsBatch: governedProcedure
+    .input(createMatrixQuestionsBatchSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createMatrixQuestionsBatch(
+        input.workspaceId,
+        input.versionId,
+        input.items,
+        ctx.user.id,
+      );
+    }),
+
+  // Cells
+  getCells: protectedProcedure
+    .input(matrixVersionIdSchema)
+    .query(async ({ input }) => {
+      return service.listMatrixCells(input.workspaceId, input.versionId);
+    }),
+
+  createCellsBatch: governedProcedure
+    .input(createMatrixCellsBatchSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createMatrixCellsBatch(
+        input.workspaceId,
+        input.versionId,
+        input.items,
+        ctx.user.id,
+      );
+    }),
+
+  // Evaluation
+  evaluate: protectedProcedure
+    .input(evaluateMatrixSchema)
+    .query(async ({ input }) => {
+      return service.evaluateMatrixClassification(input);
+    }),
+
+  // Check if matrix mode is available
+  hasActive: protectedProcedure
+    .input(hasActiveMatrixSchema)
+    .query(async ({ input }) => {
+      return { available: await service.hasActiveMatrix(input.workspaceId) };
+    }),
+
+  // Get active matrix questions (for wizard dynamic loading)
+  getActiveQuestions: protectedProcedure
+    .input(getActiveMatrixQuestionsSchema)
+    .query(async ({ input }) => {
+      const matrix = await loadActiveMatrix(input.workspaceId);
+      if (!matrix) return { available: false as const, questions: [], scopes: [], version: null };
+      return {
+        available: true as const,
+        questions: matrix.questions,
+        scopes: matrix.scopes,
+        version: matrix.version,
+      };
+    }),
+});
+
 export const psRouter = router({
   systems: systemsRouter,
   wizardRuns: wizardRunsRouter,
   demand: demandRouter,
   assignments: assignmentsRouter,
+  matrix: matrixRouter,
 
   classifyScenario: protectedProcedure
     .input(classifyScenarioSchema)

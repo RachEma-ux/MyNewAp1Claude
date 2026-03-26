@@ -30,6 +30,7 @@ export const createWizardRunSchema = z.object({
   resultPayload: z.record(z.unknown()).optional(),
   confidence: z.number().min(0).max(100).optional(),
   selectedSystemType: z.string().max(100).optional(),
+  matrixVersion: z.string().max(50).optional(),
 });
 
 export const getWizardRunSchema = z.object({
@@ -153,6 +154,87 @@ export const getAssignmentSummarySchema = z.object({
 // ── Monitoring ──────────────────────────────────────────────────────
 
 export const getMonitoringSummarySchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
+// ── Matrix Engine ──────────────────────────────────────────────────
+
+export const matrixVersionIdSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+});
+
+export const createMatrixVersionSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  version: z.string().min(1).max(50),
+  label: z.string().min(1).max(255),
+});
+
+export const activateMatrixVersionSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
+export const createMatrixScopeSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  code: z.string().min(1).max(100),
+  label: z.string().min(1).max(255),
+  description: z.string().max(2000).optional(),
+  family: z.string().max(100).optional(),
+});
+
+export const createMatrixScopesBatchSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  items: z.array(z.object({
+    code: z.string().min(1).max(100),
+    label: z.string().min(1).max(255),
+    description: z.string().max(2000).optional(),
+    family: z.string().max(100).optional(),
+  })).min(1).max(100),
+});
+
+export const createMatrixQuestionSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  code: z.string().min(1).max(100),
+  label: z.string().min(1).max(500),
+  description: z.string().max(2000).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export const createMatrixQuestionsBatchSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  items: z.array(z.object({
+    code: z.string().min(1).max(100),
+    label: z.string().min(1).max(500),
+    description: z.string().max(2000).optional(),
+    sortOrder: z.number().int().min(0).optional(),
+  })).min(1).max(200),
+});
+
+export const createMatrixCellsBatchSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  items: z.array(z.object({
+    questionId: z.number().int().positive(),
+    scopeId: z.number().int().positive(),
+    weight: z.number().int(),
+  })).min(1).max(5000),
+});
+
+export const evaluateMatrixSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  answers: z.record(z.union([z.boolean(), z.string(), z.number()])),
+});
+
+export const hasActiveMatrixSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
+export const getActiveMatrixQuestionsSchema = z.object({
   workspaceId: z.number().int().positive(),
 });
 

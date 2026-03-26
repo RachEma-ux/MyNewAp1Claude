@@ -20,6 +20,7 @@ export interface CreateWizardRunInput {
   resultPayload?: Record<string, unknown>;
   confidence?: number;
   selectedSystemType?: string;
+  matrixVersion?: string;
 }
 
 // ── Classification Dimensions ─────────────────────────────────────────
@@ -231,4 +232,29 @@ export interface AssignmentSummary {
   filledRequests: number;
   byAssignmentStatus: Record<PsAssignmentStatus, number>;
   lastAssignmentDate: string | null;
+}
+
+// ── Matrix Classification Engine ─────────────────────────────────────
+
+export const PS_MATRIX_VERSION_STATUSES = ["draft", "active", "archived"] as const;
+export type PsMatrixVersionStatus = (typeof PS_MATRIX_VERSION_STATUSES)[number];
+
+export interface MatrixEvaluationInput {
+  workspaceId: number;
+  answers: Record<string, boolean | string | number>;
+}
+
+export interface MatrixEvaluationResult {
+  selectedScope: string;
+  scores: Record<string, number>;
+  matchedQuestions: string[];
+  matrixVersion: string;
+}
+
+export interface LoadedMatrix {
+  versionId: number;
+  version: string;
+  scopes: Array<{ id: number; code: string; label: string; family: string | null }>;
+  questions: Array<{ id: number; code: string; label: string; description: string | null }>;
+  cells: Array<{ questionId: number; scopeId: number; weight: number }>;
 }

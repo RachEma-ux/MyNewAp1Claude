@@ -8,7 +8,8 @@ import { TRPCError } from "@trpc/server";
 import * as repo from "./ps.repository";
 import { logPsAudit } from "./ps.audit";
 import { logActivity } from "../modules/registry";
-import { classifyScenario as runClassifier } from "./ps.classifier";
+import { classifyScenario as runLegacyClassifier } from "./ps.classifier";
+import { loadActiveMatrix, evaluateMatrix } from "./ps.matrix-engine";
 import type {
   CreateSystemInput,
   CreateWizardRunInput,
@@ -20,6 +21,9 @@ import type {
   PsAssignmentStatus,
   DemandSummary,
   AssignmentSummary,
+  MatrixEvaluationInput,
+  MatrixEvaluationResult,
+  PsMatrixVersionStatus,
 } from "./ps.types";
 import { generateDemandSpecs, resolveQuantity } from "./ps.demand";
 import {
@@ -102,11 +106,17 @@ export async function createWizardRun(input: CreateWizardRunInput, actorId: numb
     throw new TRPCError({ code: "BAD_REQUEST", message: "Scenario text is required" });
   }
 
+  // Merge matrixVersion into resultPayload if provided
+  const resultPayload = input.resultPayload || {};
+  if (input.matrixVersion) {
+    (resultPayload as any).matrixVersion = input.matrixVersion;
+  }
+
   const run = await repo.createWizardRun({
     workspaceId: input.workspaceId,
     scenarioText: input.scenarioText.trim(),
     inputPayload: input.inputPayload,
-    resultPayload: input.resultPayload,
+    resultPayload,
     confidence: input.confidence != null ? String(input.confidence) : null,
     selectedSystemType: input.selectedSystemType || null,
     createdBy: actorId,
@@ -144,10 +154,292 @@ export async function listWizardRuns(workspaceId: number) {
   return repo.listWizardRuns(workspaceId);
 }
 
-// ── Classification ────────────────────────────────────────────────────
+// ── Classification (legacy fallback) ──────────────────────────────────
 
 export function classifyScenario(input: ClassificationInput) {
-  return runClassifier(input);
+  return runLegacyClassifier(input);
+}
+
+// ── Matrix Classification Engine ─────────────────────────────────────
+
+export async function evaluateMatrixClassification(
+  input: MatrixEvaluationInput,
+): Promise<MatrixEvaluationResult> {
+  const matrix = await loadActiveMatrix(input.workspaceId);
+
+  if (!matrix) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "No active matrix version found. Falling back to legacy classifier is required.",
+    });
+  }
+
+  if (matrix.questions.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Active matrix has no questions defined",
+    });
+  }
+
+  if (matrix.scopes.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Active matrix has no scopes defined",
+    });
+  }
+
+  return evaluateMatrix(matrix, input.answers);
+}
+
+/**
+ * Check if a matrix-based classification is available.
+ * Used by the wizard to decide between matrix mode and legacy mode.
+ */
+export async function hasActiveMatrix(workspaceId: number): Promise<boolean> {
+  const version = await repo.getActiveMatrixVersion(workspaceId);
+  return version !== null;
+}
+
+// ── Matrix Version Management ────────────────────────────────────────
+
+export async function getActiveMatrixVersion(workspaceId: number) {
+  return repo.getActiveMatrixVersion(workspaceId);
+}
+
+export async function listMatrixVersions(workspaceId: number) {
+  return repo.listMatrixVersions(workspaceId);
+}
+
+export async function createMatrixVersion(
+  workspaceId: number,
+  version: string,
+  label: string,
+  actorId: number,
+) {
+  const created = await repo.createMatrixVersion({
+    workspaceId,
+    version,
+    label,
+    status: "draft",
+    createdBy: actorId,
+  });
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_version.create",
+    entityType: "ps_matrix_version",
+    entityId: created.id,
+    newValue: { version: created.version, label: created.label },
+  });
+  await logActivity({
+    workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "matrix_version.create",
+    targetType: "ps_matrix_version",
+    targetId: created.id,
+  });
+
+  return created;
+}
+
+export async function activateMatrixVersion(
+  workspaceId: number,
+  id: number,
+  actorId: number,
+) {
+  const activated = await repo.activateMatrixVersion(workspaceId, id);
+  if (!activated) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_version.activate",
+    entityType: "ps_matrix_version",
+    entityId: id,
+    newValue: { status: "active" },
+  });
+  await logActivity({
+    workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "matrix_version.activate",
+    targetType: "ps_matrix_version",
+    targetId: id,
+  });
+
+  return activated;
+}
+
+// ── Scope Management ─────────────────────────────────────────────────
+
+export async function listMatrixScopes(workspaceId: number, versionId: number) {
+  // Verify version exists and belongs to workspace
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.listScopesByVersion(versionId);
+}
+
+export async function createMatrixScope(
+  workspaceId: number,
+  versionId: number,
+  code: string,
+  label: string,
+  description: string | null,
+  family: string | null,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const scope = await repo.createScope({
+    versionId,
+    code,
+    label,
+    description,
+    family,
+    isActive: 1,
+  });
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_scope.create",
+    entityType: "ps_scope_registry",
+    entityId: scope.id,
+    newValue: { code, label, versionId },
+  });
+
+  return scope;
+}
+
+export async function createMatrixScopesBatch(
+  workspaceId: number,
+  versionId: number,
+  items: Array<{ code: string; label: string; description?: string; family?: string }>,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const rows = items.map((item) => ({
+    versionId,
+    code: item.code,
+    label: item.label,
+    description: item.description || null,
+    family: item.family || null,
+    isActive: 1,
+  }));
+
+  return repo.createScopesBatch(rows);
+}
+
+// ── Question Management ──────────────────────────────────────────────
+
+export async function listMatrixQuestions(workspaceId: number, versionId: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.listQuestionsByVersion(versionId);
+}
+
+export async function createMatrixQuestion(
+  workspaceId: number,
+  versionId: number,
+  code: string,
+  label: string,
+  description: string | null,
+  sortOrder: number,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const question = await repo.createQuestion({
+    versionId,
+    code,
+    label,
+    description,
+    sortOrder,
+    isActive: 1,
+  });
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_question.create",
+    entityType: "ps_matrix_question",
+    entityId: question.id,
+    newValue: { code, label, versionId },
+  });
+
+  return question;
+}
+
+export async function createMatrixQuestionsBatch(
+  workspaceId: number,
+  versionId: number,
+  items: Array<{ code: string; label: string; description?: string; sortOrder?: number }>,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const rows = items.map((item, i) => ({
+    versionId,
+    code: item.code,
+    label: item.label,
+    description: item.description || null,
+    sortOrder: item.sortOrder ?? i,
+    isActive: 1,
+  }));
+
+  return repo.createQuestionsBatch(rows);
+}
+
+// ── Cell Management ──────────────────────────────────────────────────
+
+export async function listMatrixCells(workspaceId: number, versionId: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.listCellsByVersion(versionId);
+}
+
+export async function createMatrixCellsBatch(
+  workspaceId: number,
+  versionId: number,
+  items: Array<{ questionId: number; scopeId: number; weight: number }>,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const rows = items.map((item) => ({
+    versionId,
+    questionId: item.questionId,
+    scopeId: item.scopeId,
+    weight: item.weight,
+  }));
+
+  return repo.createCellsBatch(rows);
 }
 
 // ── Catalog ──────────────────────────────────────────────────────────────

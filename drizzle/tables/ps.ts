@@ -172,3 +172,86 @@ export const psResourceAssignments = pgTable("ps_resource_assignments", {
 
 export type PsResourceAssignment = typeof psResourceAssignments.$inferSelect;
 export type InsertPsResourceAssignment = typeof psResourceAssignments.$inferInsert;
+
+// ============================================================================
+// 7. PS Matrix Versions — Versioned classification matrices
+// ============================================================================
+
+export const psMatrixVersions = pgTable("ps_matrix_versions", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  version: varchar("version", { length: 50 }).notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  status: varchar("status", { length: 30 }).default("draft").notNull(), // draft | active | archived
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  activatedAt: timestamp("activated_at"),
+}, (table) => ({
+  wsIdx: index("ps_matrix_versions_ws_idx").on(table.workspaceId),
+  statusIdx: index("ps_matrix_versions_status_idx").on(table.status),
+  versionUniq: unique("ps_matrix_versions_uniq").on(table.workspaceId, table.version),
+}));
+
+export type PsMatrixVersion = typeof psMatrixVersions.$inferSelect;
+export type InsertPsMatrixVersion = typeof psMatrixVersions.$inferInsert;
+
+// ============================================================================
+// 8. PS Scope Registry — Scope targets per matrix version
+// ============================================================================
+
+export const psScopeRegistry = pgTable("ps_scope_registry", {
+  id: serial("id").primaryKey(),
+  versionId: integer("version_id").notNull(),
+  code: varchar("code", { length: 100 }).notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  description: text("description"),
+  family: varchar("family", { length: 100 }),
+  isActive: integer("is_active").default(1).notNull(), // 1=active, 0=inactive
+}, (table) => ({
+  versionIdx: index("ps_scope_registry_version_idx").on(table.versionId),
+  codeUniq: unique("ps_scope_registry_code_uniq").on(table.versionId, table.code),
+}));
+
+export type PsScopeRegistry = typeof psScopeRegistry.$inferSelect;
+export type InsertPsScopeRegistry = typeof psScopeRegistry.$inferInsert;
+
+// ============================================================================
+// 9. PS Matrix Questions — Decision inputs per matrix version
+// ============================================================================
+
+export const psMatrixQuestions = pgTable("ps_matrix_questions", {
+  id: serial("id").primaryKey(),
+  versionId: integer("version_id").notNull(),
+  code: varchar("code", { length: 100 }).notNull(),
+  label: varchar("label", { length: 500 }).notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: integer("is_active").default(1).notNull(),
+}, (table) => ({
+  versionIdx: index("ps_matrix_questions_version_idx").on(table.versionId),
+  codeUniq: unique("ps_matrix_questions_code_uniq").on(table.versionId, table.code),
+  sortIdx: index("ps_matrix_questions_sort_idx").on(table.versionId, table.sortOrder),
+}));
+
+export type PsMatrixQuestion = typeof psMatrixQuestions.$inferSelect;
+export type InsertPsMatrixQuestion = typeof psMatrixQuestions.$inferInsert;
+
+// ============================================================================
+// 10. PS Matrix Cells — Weight matrix (question × scope)
+// ============================================================================
+
+export const psMatrixCells = pgTable("ps_matrix_cells", {
+  id: serial("id").primaryKey(),
+  versionId: integer("version_id").notNull(),
+  questionId: integer("question_id").notNull(),
+  scopeId: integer("scope_id").notNull(),
+  weight: integer("weight").notNull().default(0),
+}, (table) => ({
+  versionIdx: index("ps_matrix_cells_version_idx").on(table.versionId),
+  questionIdx: index("ps_matrix_cells_question_idx").on(table.questionId),
+  scopeIdx: index("ps_matrix_cells_scope_idx").on(table.scopeId),
+  cellUniq: unique("ps_matrix_cells_uniq").on(table.versionId, table.questionId, table.scopeId),
+}));
+
+export type PsMatrixCell = typeof psMatrixCells.$inferSelect;
+export type InsertPsMatrixCell = typeof psMatrixCells.$inferInsert;
