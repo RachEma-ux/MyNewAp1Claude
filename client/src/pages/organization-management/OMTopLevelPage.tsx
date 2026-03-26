@@ -1,9 +1,9 @@
 /**
  * OM Top-Level Page — Standalone OM page accessible from the main hamburger menu
  *
- * Since OM is workspace-scoped, this page uses a default workspace or lets the
- * user pick one. It re-uses the workspace-scoped OM components.
+ * Auto-provisions a default workspace if none exists so that OM is never gated.
  */
+import { useEffect, useRef } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { OMPortfolioPage } from "./OMPortfolioPage";
@@ -12,27 +12,34 @@ import { OMWizardPage } from "./OMWizardPage";
 import { OMListPage } from "./OMListPage";
 import { OMSettingsPage } from "./OMSettingsPage";
 import { OMTemplatesPage } from "./OMTemplatesPage";
-import { Card, CardContent } from "@/components/ui/card";
-import { Link } from "wouter";
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
-function useDefaultWorkspace() {
-  const { data: workspaces } = trpc.workspaces.list.useQuery();
-  return workspaces?.[0]?.id ?? null;
+function useAutoProvisionedWorkspace() {
+  const utils = trpc.useUtils();
+  const { data: workspaces, isLoading } = trpc.workspaces.list.useQuery();
+  const createWs = trpc.workspaces.create.useMutation({
+    onSuccess: () => utils.workspaces.list.invalidate(),
+  });
+  const attempted = useRef(false);
+
+  useEffect(() => {
+    if (!isLoading && workspaces && workspaces.length === 0 && !attempted.current && !createWs.isPending) {
+      attempted.current = true;
+      createWs.mutate({ name: "Default", description: "Auto-created for Organization Management" });
+    }
+  }, [isLoading, workspaces, createWs]);
+
+  return { workspaceId: workspaces?.[0]?.id ?? null, isLoading: isLoading || createWs.isPending };
 }
 
 export function OMTopLevelPage() {
   const { item } = useParams<{ item?: string }>();
-  const workspaceId = useDefaultWorkspace();
+  const { workspaceId, isLoading } = useAutoProvisionedWorkspace();
 
-  if (!workspaceId) {
+  if (isLoading || !workspaceId) {
     return (
-      <div className="p-6 space-y-4">
-        <h1 className="text-2xl font-bold">Organization Management</h1>
-        <Card><CardContent className="pt-4">
-          <p className="text-sm text-muted-foreground mb-3">Create or select a workspace to access Organization Management.</p>
-          <Link href="/ws/list"><Button variant="outline" size="sm">Go to Workspaces</Button></Link>
-        </CardContent></Card>
+      <div className="flex items-center justify-center h-64 gap-2 text-muted-foreground">
+        <Loader2 className="w-5 h-5 animate-spin" /> Loading Organization Management...
       </div>
     );
   }
