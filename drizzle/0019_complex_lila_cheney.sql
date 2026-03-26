@@ -3,7 +3,7 @@ CREATE TYPE "public"."discovery_attempt_status" AS ENUM('ok', 'partial', 'failed
 CREATE TYPE "public"."discovery_failure_reason" AS ENUM('INVALID_URL', 'SSRF_BLOCKED', 'DNS_FAILED', 'FETCH_TIMEOUT', 'FETCH_TOO_LARGE', 'FETCH_HTTP_ERROR', 'PARSE_FAILED', 'NO_METADATA_FOUND', 'NO_CANDIDATES', 'PROBE_ALL_FAILED');--> statement-breakpoint
 CREATE TYPE "public"."patch_artifact_status" AS ENUM('PROPOSED', 'MERGED', 'ABANDONED');--> statement-breakpoint
 CREATE TYPE "public"."reject_category" AS ENUM('NOT_A_PROVIDER', 'TOO_NICHE', 'DUPLICATE_OF_EXISTING', 'TEMPORARY_OUTAGE', 'NEEDS_MANUAL_CONNECT_ONLY', 'SECURITY_POLICY_BLOCK', 'OTHER');--> statement-breakpoint
-CREATE TABLE "governance_audit_logs" (
+CREATE TABLE IF NOT EXISTS "governance_audit_logs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"code" varchar(100) NOT NULL,
 	"agentId" integer,
@@ -15,7 +15,7 @@ CREATE TABLE "governance_audit_logs" (
 	"createdAt" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "provider_audit_log" (
+CREATE TABLE IF NOT EXISTS "provider_audit_log" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"connectionId" integer NOT NULL,
 	"action" varchar(50) NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE "provider_audit_log" (
 	"createdAt" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "provider_connections" (
+CREATE TABLE IF NOT EXISTS "provider_connections" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"providerId" integer NOT NULL,
 	"workspaceId" integer NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE "provider_connections" (
 	"updatedAt" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "provider_discovery_events" (
+CREATE TABLE IF NOT EXISTS "provider_discovery_events" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"createdAt" timestamp DEFAULT now() NOT NULL,
 	"actorId" integer,
@@ -55,7 +55,7 @@ CREATE TABLE "provider_discovery_events" (
 	"debug" json
 );
 --> statement-breakpoint
-CREATE TABLE "provider_secrets" (
+CREATE TABLE IF NOT EXISTS "provider_secrets" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"connectionId" integer NOT NULL,
 	"encryptedPat" text NOT NULL,
@@ -64,7 +64,7 @@ CREATE TABLE "provider_secrets" (
 	"createdAt" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "registry_patch_artifacts" (
+CREATE TABLE IF NOT EXISTS "registry_patch_artifacts" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"createdAt" timestamp DEFAULT now() NOT NULL,
 	"createdBy" integer NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE "registry_patch_artifacts" (
 	"linkedPrUrl" text
 );
 --> statement-breakpoint
-CREATE TABLE "registry_promotion_candidates" (
+CREATE TABLE IF NOT EXISTS "registry_promotion_candidates" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"domain" text NOT NULL,
 	"status" varchar(20) DEFAULT 'OPEN' NOT NULL,
@@ -104,7 +104,7 @@ CREATE TABLE "registry_promotion_candidates" (
 	CONSTRAINT "registry_promotion_candidates_domain_unique" UNIQUE("domain")
 );
 --> statement-breakpoint
-CREATE TABLE "import_audit_logs" (
+CREATE TABLE IF NOT EXISTS "import_audit_logs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"sessionId" text,
 	"userId" integer,
@@ -121,7 +121,7 @@ CREATE TABLE "import_audit_logs" (
 	"userAgent" text
 );
 --> statement-breakpoint
-CREATE TABLE "import_preview_rows" (
+CREATE TABLE IF NOT EXISTS "import_preview_rows" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"sessionId" text NOT NULL,
 	"tempId" text NOT NULL,
@@ -135,7 +135,7 @@ CREATE TABLE "import_preview_rows" (
 	"validationIssues" json
 );
 --> statement-breakpoint
-CREATE TABLE "import_sessions" (
+CREATE TABLE IF NOT EXISTS "import_sessions" (
 	"id" text PRIMARY KEY NOT NULL,
 	"userId" integer NOT NULL,
 	"method" varchar(50) NOT NULL,
@@ -149,7 +149,7 @@ CREATE TABLE "import_sessions" (
 	"updatedAt" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "governance_scorecards" (
+CREATE TABLE IF NOT EXISTS "governance_scorecards" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"subject_id" integer,
 	"subject_name" varchar(255),
@@ -182,7 +182,7 @@ CREATE TABLE "governance_scorecards" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "drift_events" (
+CREATE TABLE IF NOT EXISTS "drift_events" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"drift_detected" boolean NOT NULL,
 	"score_delta" integer NOT NULL,
@@ -197,7 +197,7 @@ CREATE TABLE "drift_events" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "evidence_bundles" (
+CREATE TABLE IF NOT EXISTS "evidence_bundles" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"bundle_id" varchar(100) NOT NULL,
 	"version" varchar(10) NOT NULL,
@@ -212,7 +212,7 @@ CREATE TABLE "evidence_bundles" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "subject_freezes" (
+CREATE TABLE IF NOT EXISTS "subject_freezes" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"subject_id" integer NOT NULL,
 	"subject_name" varchar(255) NOT NULL,
@@ -222,7 +222,7 @@ CREATE TABLE "subject_freezes" (
 	"frozen_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "capabilities" (
+CREATE TABLE IF NOT EXISTS "capabilities" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"key" text NOT NULL,
 	"description" text,
@@ -230,7 +230,7 @@ CREATE TABLE "capabilities" (
 	CONSTRAINT "capabilities_key_unique" UNIQUE("key")
 );
 --> statement-breakpoint
-CREATE TABLE "workspace_principal_capabilities" (
+CREATE TABLE IF NOT EXISTS "workspace_principal_capabilities" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"workspaceId" integer NOT NULL,
 	"userId" integer NOT NULL,
@@ -240,7 +240,7 @@ CREATE TABLE "workspace_principal_capabilities" (
 	CONSTRAINT "workspace_principal_capabilities_workspaceId_userId_capabilityId_unique" UNIQUE("workspaceId","userId","capabilityId")
 );
 --> statement-breakpoint
-CREATE TABLE "workspace_role_capabilities" (
+CREATE TABLE IF NOT EXISTS "workspace_role_capabilities" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"roleId" integer NOT NULL,
 	"capabilityId" integer NOT NULL,
@@ -249,7 +249,7 @@ CREATE TABLE "workspace_role_capabilities" (
 	CONSTRAINT "workspace_role_capabilities_roleId_capabilityId_unique" UNIQUE("roleId","capabilityId")
 );
 --> statement-breakpoint
-CREATE TABLE "workspace_roles" (
+CREATE TABLE IF NOT EXISTS "workspace_roles" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"workspaceId" integer NOT NULL,
 	"name" varchar(100) NOT NULL,
@@ -259,7 +259,7 @@ CREATE TABLE "workspace_roles" (
 	CONSTRAINT "workspace_roles_workspaceId_name_unique" UNIQUE("workspaceId","name")
 );
 --> statement-breakpoint
-CREATE TABLE "workspace_activity_log" (
+CREATE TABLE IF NOT EXISTS "workspace_activity_log" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"workspaceId" integer NOT NULL,
 	"moduleKey" varchar(50),
@@ -271,7 +271,7 @@ CREATE TABLE "workspace_activity_log" (
 	"createdAt" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "workspace_modules" (
+CREATE TABLE IF NOT EXISTS "workspace_modules" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"workspaceId" integer NOT NULL,
 	"moduleKey" varchar(50) NOT NULL,
@@ -283,7 +283,7 @@ CREATE TABLE "workspace_modules" (
 	CONSTRAINT "workspace_modules_workspaceId_moduleKey_unique" UNIQUE("workspaceId","moduleKey")
 );
 --> statement-breakpoint
-CREATE TABLE "governance_audit_preferences" (
+CREATE TABLE IF NOT EXISTS "governance_audit_preferences" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"principal_id" varchar(255) NOT NULL,
 	"default_format" varchar(10) NOT NULL,
@@ -293,7 +293,7 @@ CREATE TABLE "governance_audit_preferences" (
 	CONSTRAINT "governance_audit_preferences_principal_id_unique" UNIQUE("principal_id")
 );
 --> statement-breakpoint
-CREATE TABLE "governance_audit_runs" (
+CREATE TABLE IF NOT EXISTS "governance_audit_runs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"status" varchar(20) NOT NULL,
 	"format" varchar(10) NOT NULL,
@@ -312,7 +312,7 @@ CREATE TABLE "governance_audit_runs" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "execution_results" (
+CREATE TABLE IF NOT EXISTS "execution_results" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"job_id" varchar(64) NOT NULL,
 	"operator" varchar(32) NOT NULL,
@@ -327,7 +327,7 @@ CREATE TABLE "execution_results" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "operator_audit_log" (
+CREATE TABLE IF NOT EXISTS "operator_audit_log" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"trace_id" varchar(64) NOT NULL,
 	"job_id" varchar(64) NOT NULL,
@@ -344,7 +344,7 @@ CREATE TABLE "operator_audit_log" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "operator_jobs" (
+CREATE TABLE IF NOT EXISTS "operator_jobs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"job_id" varchar(64) NOT NULL,
 	"operator" varchar(32) NOT NULL,
@@ -363,7 +363,7 @@ CREATE TABLE "operator_jobs" (
 	CONSTRAINT "operator_jobs_job_id_unique" UNIQUE("job_id")
 );
 --> statement-breakpoint
-CREATE TABLE "syscall_batches" (
+CREATE TABLE IF NOT EXISTS "syscall_batches" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"job_id" varchar(64) NOT NULL,
 	"operator" varchar(32) NOT NULL,
