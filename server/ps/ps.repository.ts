@@ -461,3 +461,256 @@ export async function createCellsBatch(items: InsertPsMatrixCell[]): Promise<PsM
   if (items.length === 0) return [];
   return db.insert(psMatrixCells).values(items).returning();
 }
+
+// ── Matrix Admin — Extended Operations ─────────────────────────────
+
+export async function archiveMatrixVersion(workspaceId: number, id: number): Promise<PsMatrixVersion | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psMatrixVersions)
+    .set({ status: "archived" })
+    .where(and(
+      eq(psMatrixVersions.id, id),
+      eq(psMatrixVersions.workspaceId, workspaceId),
+    ))
+    .returning();
+  return updated ?? null;
+}
+
+export async function updateMatrixVersionStatus(
+  workspaceId: number,
+  id: number,
+  status: string,
+): Promise<PsMatrixVersion | null> {
+  const db = getDb();
+  if (!db) return null;
+  const setData: Record<string, unknown> = { status };
+  if (status === "active") setData.activatedAt = new Date();
+  const [updated] = await db.update(psMatrixVersions)
+    .set(setData)
+    .where(and(
+      eq(psMatrixVersions.id, id),
+      eq(psMatrixVersions.workspaceId, workspaceId),
+    ))
+    .returning();
+  return updated ?? null;
+}
+
+export async function getAllScopesByVersion(versionId: number): Promise<PsScopeRegistry[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psScopeRegistry)
+    .where(eq(psScopeRegistry.versionId, versionId));
+}
+
+export async function getAllQuestionsByVersion(versionId: number): Promise<PsMatrixQuestion[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psMatrixQuestions)
+    .where(eq(psMatrixQuestions.versionId, versionId))
+    .orderBy(psMatrixQuestions.sortOrder);
+}
+
+export async function updateScope(
+  id: number,
+  versionId: number,
+  data: Partial<InsertPsScopeRegistry>,
+): Promise<PsScopeRegistry | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psScopeRegistry)
+    .set(data)
+    .where(and(
+      eq(psScopeRegistry.id, id),
+      eq(psScopeRegistry.versionId, versionId),
+    ))
+    .returning();
+  return updated ?? null;
+}
+
+export async function updateQuestion(
+  id: number,
+  versionId: number,
+  data: Partial<InsertPsMatrixQuestion>,
+): Promise<PsMatrixQuestion | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psMatrixQuestions)
+    .set(data)
+    .where(and(
+      eq(psMatrixQuestions.id, id),
+      eq(psMatrixQuestions.versionId, versionId),
+    ))
+    .returning();
+  return updated ?? null;
+}
+
+export async function updateQuestionSortOrders(
+  versionId: number,
+  orderedIds: number[],
+): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.update(psMatrixQuestions)
+      .set({ sortOrder: i })
+      .where(and(
+        eq(psMatrixQuestions.id, orderedIds[i]),
+        eq(psMatrixQuestions.versionId, versionId),
+      ));
+  }
+}
+
+export async function upsertCell(
+  versionId: number,
+  questionId: number,
+  scopeId: number,
+  weight: number,
+): Promise<PsMatrixCell> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  // Try to find existing cell
+  const [existing] = await db.select().from(psMatrixCells)
+    .where(and(
+      eq(psMatrixCells.versionId, versionId),
+      eq(psMatrixCells.questionId, questionId),
+      eq(psMatrixCells.scopeId, scopeId),
+    ))
+    .limit(1);
+  if (existing) {
+    const [updated] = await db.update(psMatrixCells)
+      .set({ weight })
+      .where(eq(psMatrixCells.id, existing.id))
+      .returning();
+    return updated;
+  }
+  const [created] = await db.insert(psMatrixCells)
+    .values({ versionId, questionId, scopeId, weight })
+    .returning();
+  return created;
+}
+
+export async function upsertCellsBatch(
+  versionId: number,
+  items: Array<{ questionId: number; scopeId: number; weight: number }>,
+): Promise<PsMatrixCell[]> {
+  const results: PsMatrixCell[] = [];
+  for (const item of items) {
+    const cell = await upsertCell(versionId, item.questionId, item.scopeId, item.weight);
+    results.push(cell);
+  }
+  return results;
+}
+
+export async function countScopesByVersion(versionId: number): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const [result] = await db.select({ cnt: count() }).from(psScopeRegistry)
+    .where(eq(psScopeRegistry.versionId, versionId));
+  return result?.cnt ?? 0;
+}
+
+export async function countActiveScopesByVersion(versionId: number): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const [result] = await db.select({ cnt: count() }).from(psScopeRegistry)
+    .where(and(eq(psScopeRegistry.versionId, versionId), eq(psScopeRegistry.isActive, 1)));
+  return result?.cnt ?? 0;
+}
+
+export async function countQuestionsByVersion(versionId: number): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const [result] = await db.select({ cnt: count() }).from(psMatrixQuestions)
+    .where(eq(psMatrixQuestions.versionId, versionId));
+  return result?.cnt ?? 0;
+}
+
+export async function countActiveQuestionsByVersion(versionId: number): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const [result] = await db.select({ cnt: count() }).from(psMatrixQuestions)
+    .where(and(eq(psMatrixQuestions.versionId, versionId), eq(psMatrixQuestions.isActive, 1)));
+  return result?.cnt ?? 0;
+}
+
+export async function countCellsByVersion(versionId: number): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const [result] = await db.select({ cnt: count() }).from(psMatrixCells)
+    .where(eq(psMatrixCells.versionId, versionId));
+  return result?.cnt ?? 0;
+}
+
+export async function deleteCellsByVersion(versionId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  await db.delete(psMatrixCells).where(eq(psMatrixCells.versionId, versionId));
+}
+
+export async function deleteScopesByVersion(versionId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  await db.delete(psScopeRegistry).where(eq(psScopeRegistry.versionId, versionId));
+}
+
+export async function deleteQuestionsByVersion(versionId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  await db.delete(psMatrixQuestions).where(eq(psMatrixQuestions.versionId, versionId));
+}
+
+// ── Matrix Imports ────────────────────────────────────────────────────
+
+export async function createMatrixImport(data: InsertPsMatrixImport): Promise<PsMatrixImport> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psMatrixImports).values({
+    ...data,
+    createdAt: new Date(),
+  }).returning();
+  return created;
+}
+
+export async function getMatrixImportById(id: number): Promise<PsMatrixImport | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [imp] = await db.select().from(psMatrixImports)
+    .where(eq(psMatrixImports.id, id))
+    .limit(1);
+  return imp ?? null;
+}
+
+export async function updateMatrixImport(
+  id: number,
+  data: Partial<InsertPsMatrixImport>,
+): Promise<PsMatrixImport | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psMatrixImports)
+    .set(data)
+    .where(eq(psMatrixImports.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+export async function listMatrixImports(workspaceId: number): Promise<PsMatrixImport[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psMatrixImports)
+    .where(eq(psMatrixImports.workspaceId, workspaceId))
+    .orderBy(desc(psMatrixImports.createdAt));
+}
+
+export async function getLastImportDate(workspaceId: number): Promise<string | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [imp] = await db.select().from(psMatrixImports)
+    .where(and(
+      eq(psMatrixImports.workspaceId, workspaceId),
+      eq(psMatrixImports.importStatus, "committed"),
+    ))
+    .orderBy(desc(psMatrixImports.committedAt))
+    .limit(1);
+  return imp?.committedAt?.toISOString() ?? null;
+}
