@@ -929,6 +929,25 @@ export const psRouter = router({
       return service.classifyWizardScenario(input);
     }),
 
+  createPSProject: governedProcedure
+    .input(z.object({
+      name: z.string().min(1),
+      scope: z.string().min(1),
+      matrixVersion: z.string().min(1),
+      scenario: z.string().min(1),
+      context: z.object({
+        businessUnit: z.string().optional().default(""),
+        region: z.string().optional().default(""),
+        strategicImportance: z.string().optional().default(""),
+        existingSituation: z.string().optional().default(""),
+      }),
+      answers: z.record(z.string(), z.string()),
+      recommendation: z.any(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return service.createPSProject(input, ctx.user.id);
+    }),
+
   catalog: protectedProcedure
     .query(async () => {
       return service.getCatalog();

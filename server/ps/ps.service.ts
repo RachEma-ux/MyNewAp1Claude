@@ -245,6 +245,55 @@ export async function classifyWizardScenario(input: WizardClassifyInput) {
   };
 }
 
+// ── Wizard → Create PS Project ───────────────────────────────────────
+
+export async function createPSProject(input: {
+  name: string;
+  scope: string;
+  matrixVersion: string;
+  scenario: string;
+  context: Record<string, string>;
+  answers: Record<string, string>;
+  recommendation: any;
+}, actorId: number) {
+  // 1. Store wizard run for full traceability
+  const wizardRun = await repo.createWizardRun({
+    scenarioText: input.scenario,
+    inputPayload: {
+      context: input.context,
+      answers: input.answers,
+      matrixVersion: input.matrixVersion,
+    },
+    resultPayload: input.recommendation ?? {},
+    confidence: null,
+    selectedSystemType: input.recommendation?.selectedScopeCode ?? input.scope,
+    createdBy: actorId,
+  });
+
+  // 2. Create PS system record (shows up in PS List)
+  const system = await repo.createSystem({
+    name: input.name.trim() || "Untitled Project",
+    description: `Scope: ${input.scope} | Matrix: ${input.matrixVersion} | Wizard Run #${wizardRun.id}`,
+    systemType: input.recommendation?.selectedScopeCode ?? "CUSTOM",
+    status: "draft",
+    createdBy: actorId,
+  });
+
+  await logPsAudit({
+    actorId,
+    action: "wizard.create_project",
+    entityType: "ps_system",
+    entityId: system.id,
+    newValue: {
+      wizardRunId: wizardRun.id,
+      scope: input.scope,
+      matrixVersion: input.matrixVersion,
+    },
+  });
+
+  return system;
+}
+
 // ── Matrix Classification Engine ─────────────────────────────────────
 
 export async function evaluateMatrixClassification(

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -58,6 +59,10 @@ export default function PSWizardPage() {
   // Real API: classify scenario mutation
   const classifyMutation = trpc.ps.classifyScenario.useMutation();
 
+  // Real API: create PS project
+  const createPSProject = trpc.ps.createPSProject.useMutation();
+  const [, navigate] = useLocation();
+
   const stepLabels = ["Scenario", "Context", "Questions", "Recommendation", "Create"];
 
   const canGoNext =
@@ -108,6 +113,24 @@ export default function PSWizardPage() {
       setStep(4);
     } catch (err) {
       console.error("Classification failed:", err);
+    }
+  }
+
+  async function handleCreateAndList() {
+    if (!recommendation) return;
+    try {
+      await createPSProject.mutateAsync({
+        name: generatedName || "Untitled Project",
+        scope: recommendation.selectedScope ?? "",
+        matrixVersion: recommendation.matrixVersion ?? "v1.0.0",
+        scenario,
+        context,
+        answers,
+        recommendation,
+      });
+      navigate("/ps/list");
+    } catch (err) {
+      console.error("Failed to create PS project:", err);
     }
   }
 
@@ -360,9 +383,11 @@ export default function PSWizardPage() {
 
                 <button
                   type="button"
-                  className="rounded-xl bg-green-600 px-4 py-2 font-medium"
+                  onClick={handleCreateAndList}
+                  disabled={createPSProject.isPending}
+                  className="rounded-xl bg-green-600 px-4 py-2 font-medium disabled:opacity-40"
                 >
-                  Create PS System
+                  {createPSProject.isPending ? "Creating..." : "List PS Project"}
                 </button>
               </div>
             </div>

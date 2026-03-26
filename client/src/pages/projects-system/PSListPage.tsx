@@ -15,8 +15,10 @@ const STATUS_COLORS: Record<string, string> = {
 const SYSTEM_TYPE_LABELS: Record<string, string> = {
   PROJECT_GOVERNANCE: "Project Governance",
   SOFTWARE_DELIVERY: "Software Delivery",
+  SOFTWARE_LIFECYCLE: "Software Lifecycle",
   PROGRAM_MANAGEMENT: "Program Management",
   AGILE_PRODUCT: "Agile Product",
+  AGILE_TEAM_DELIVERY: "Agile Team Delivery",
   OPERATIONS_IMPROVEMENT: "Operations Improvement",
 };
 

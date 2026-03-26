@@ -365,6 +365,8 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   // ── Projects System (PS) ───────────────────────────────────────────────
   "ps.systems.create": "ps.system.create",
   "ps.wizardRuns.create": "ps.wizardRun.create",
+  "ps.wizardRuns.accept": "ps.wizardRun.create",
+  "ps.createPSProject": "ps.system.create",
   "ps.demand.create": "ps.demand.create",
   "ps.demand.updateStatus": "ps.demand.updateStatus",
   "ps.demand.generateForSystem": "ps.demand.generate",
