@@ -87,9 +87,20 @@ export default function PSWizardPage() {
     if (step > 1) setStep((s) => (s - 1) as Step);
   }
 
+  function deriveProjectName(text: string): string {
+    // Take first sentence or first 60 chars of the scenario as project name
+    const trimmed = text.trim();
+    const firstSentence = trimmed.split(/[.!?\n]/)[0]?.trim() || trimmed;
+    if (firstSentence.length <= 80) return firstSentence;
+    // Truncate at last word boundary before 80 chars
+    const cut = firstSentence.slice(0, 80);
+    const lastSpace = cut.lastIndexOf(" ");
+    return lastSpace > 20 ? cut.slice(0, lastSpace) : cut;
+  }
+
   function runAutomaticProcessing() {
     setParsingDone(true);
-    setGeneratedName("Customer Support Platform Modernization");
+    setGeneratedName(deriveProjectName(scenario));
     setNormalizedDimensions({
       DOMAIN: "SOFTWARE_IT_ENGINEERING",
       ORGANIZATIONAL_LEVEL: "PROGRAM",
