@@ -112,3 +112,42 @@ export interface ClassificationResult {
   matchedDimensions: string[];
   reasoning: string[];
 }
+
+// ── Resource Request (Demand) ────────────────────────────────────────
+
+export const PS_RESOURCE_REQUEST_STATUSES = [
+  "draft",
+  "open",
+  "partially_filled",
+  "filled",
+  "closed",
+] as const;
+export type PsResourceRequestStatus = (typeof PS_RESOURCE_REQUEST_STATUSES)[number];
+
+export interface CreateResourceRequestInput {
+  workspaceId: number;
+  psSystemId: number;
+  role: string;
+  capabilityTags?: string[];
+  quantity?: number;
+  seniorityLevel?: string;
+  startDate?: Date;
+  endDate?: Date;
+  allocationPercentage?: number;
+}
+
+export interface DemandRoleSpec {
+  role: string;
+  capabilityTags: string[];
+  quantityMin: number;
+  quantityMax: number;
+  seniorityLevel: string;
+}
+
+export interface DemandSummary {
+  psSystemId: number;
+  totalRequests: number;
+  totalQuantity: number;
+  byStatus: Record<PsResourceRequestStatus, number>;
+  roles: Array<{ role: string; quantity: number; status: string }>;
+}

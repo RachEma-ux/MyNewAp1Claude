@@ -41,6 +41,41 @@ export const listWizardRunsSchema = z.object({
   workspaceId: z.number().int().positive(),
 });
 
+// ── Resource Requests (Demand) ──────────────────────────────────────
+
+export const createResourceRequestSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  psSystemId: z.number().int().positive(),
+  role: z.string().min(1, "Role is required").max(200),
+  capabilityTags: z.array(z.string().max(100)).max(20).optional(),
+  quantity: z.number().int().min(1).max(100).optional(),
+  seniorityLevel: z.string().max(50).optional(),
+  startDate: z.date().optional(),
+  endDate: z.date().optional(),
+  allocationPercentage: z.number().int().min(1).max(100).optional(),
+});
+
+export const listResourceRequestsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  status: z.enum(["draft", "open", "partially_filled", "filled", "closed"]).optional(),
+});
+
+export const listResourceRequestsBySystemSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  psSystemId: z.number().int().positive(),
+});
+
+export const updateResourceRequestStatusSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+  status: z.enum(["draft", "open", "partially_filled", "filled", "closed"]),
+});
+
+export const getDemandSummarySchema = z.object({
+  workspaceId: z.number().int().positive(),
+  psSystemId: z.number().int().positive(),
+});
+
 export const classifyScenarioSchema = z.object({
   workspaceId: z.number().int().positive(),
   scenarioText: z.string().min(1, "Scenario text is required").max(5000),

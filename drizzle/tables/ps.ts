@@ -109,3 +109,31 @@ export const psAuditLog = pgTable("ps_audit_log", {
 
 export type PsAuditEntry = typeof psAuditLog.$inferSelect;
 export type InsertPsAuditEntry = typeof psAuditLog.$inferInsert;
+
+// ============================================================================
+// 5. PS Resource Requests — Demand owned by PS
+// ============================================================================
+
+export const psResourceRequests = pgTable("ps_resource_requests", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  psSystemId: integer("ps_system_id").notNull(),
+  role: varchar("role", { length: 200 }).notNull(),
+  capabilityTags: json("capability_tags").$type<string[]>().default([]),
+  quantity: integer("quantity").notNull().default(1),
+  seniorityLevel: varchar("seniority_level", { length: 50 }).default("mid"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  allocationPercentage: integer("allocation_percentage").default(100),
+  status: varchar("status", { length: 30 }).default("draft").notNull(),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  wsIdx: index("ps_resource_requests_ws_idx").on(table.workspaceId),
+  systemIdx: index("ps_resource_requests_system_idx").on(table.psSystemId),
+  statusIdx: index("ps_resource_requests_status_idx").on(table.status),
+}));
+
+export type PsResourceRequest = typeof psResourceRequests.$inferSelect;
+export type InsertPsResourceRequest = typeof psResourceRequests.$inferInsert;

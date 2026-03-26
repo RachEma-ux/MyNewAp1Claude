@@ -9,7 +9,15 @@ import * as repo from "./ps.repository";
 import { logPsAudit } from "./ps.audit";
 import { logActivity } from "../modules/registry";
 import { classifyScenario as runClassifier } from "./ps.classifier";
-import type { CreateSystemInput, CreateWizardRunInput, ClassificationInput } from "./ps.types";
+import type {
+  CreateSystemInput,
+  CreateWizardRunInput,
+  ClassificationInput,
+  CreateResourceRequestInput,
+  PsResourceRequestStatus,
+  DemandSummary,
+} from "./ps.types";
+import { generateDemandSpecs, resolveQuantity } from "./ps.demand";
 
 // ── Systems ──────────────────────────────────────────────────────────────
 

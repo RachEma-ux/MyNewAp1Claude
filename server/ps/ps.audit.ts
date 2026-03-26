@@ -10,6 +10,9 @@ export const PS_AUDIT_ACTIONS = [
   "system.update",
   "system.status_change",
   "wizard_run.create",
+  "resource_request.create",
+  "resource_request.status_change",
+  "demand.generate",
 ] as const;
 
 export type PsAuditAction = (typeof PS_AUDIT_ACTIONS)[number];
