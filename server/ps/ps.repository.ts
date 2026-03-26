@@ -4,7 +4,7 @@
  * All DB access for PS domain. No business logic.
  */
 
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import {
   psSystems,

@@ -10,6 +10,8 @@ import { logPsAudit } from "./ps.audit";
 import { logActivity } from "../modules/registry";
 import { classifyScenario as runLegacyClassifier } from "./ps.classifier";
 import { loadActiveMatrix, evaluateMatrix } from "./ps.matrix-engine";
+import * as matrixAdmin from "./ps.matrix-admin";
+import * as matrixImport from "./ps.matrix-import";
 import type {
   CreateSystemInput,
   CreateWizardRunInput,
@@ -24,6 +26,8 @@ import type {
   MatrixEvaluationInput,
   MatrixEvaluationResult,
   PsMatrixVersionStatus,
+  MatrixImportSourceType,
+  MatrixImportPayload,
 } from "./ps.types";
 import { generateDemandSpecs, resolveQuantity } from "./ps.demand";
 import {
@@ -836,6 +840,264 @@ export async function getAssignmentSummary(
     requests.map((r) => ({ id: r.id, role: r.role, quantity: r.quantity })),
     assignments,
   );
+}
+
+// ── Matrix Admin — Extended Operations ──────────────────────────────
+
+export async function getMatrixOverview(workspaceId: number) {
+  return matrixAdmin.getMatrixOverview(workspaceId);
+}
+
+export async function duplicateMatrixVersion(
+  workspaceId: number,
+  sourceVersionId: number,
+  newVersion: string,
+  newLabel: string,
+  actorId: number,
+) {
+  return matrixAdmin.duplicateMatrixVersion(workspaceId, sourceVersionId, newVersion, newLabel, actorId);
+}
+
+export async function archiveMatrixVersion(
+  workspaceId: number,
+  id: number,
+  actorId: number,
+) {
+  return matrixAdmin.archiveMatrixVersion(workspaceId, id, actorId);
+}
+
+export async function activateMatrixVersionValidated(
+  workspaceId: number,
+  id: number,
+  actorId: number,
+) {
+  const result = await matrixAdmin.activateMatrixVersionWithValidation(workspaceId, id, actorId);
+  if (!result) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_version.activate",
+    entityType: "ps_matrix_version",
+    entityId: id,
+    newValue: { status: "active" },
+  });
+  await logActivity({
+    workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "matrix_version.activate",
+    targetType: "ps_matrix_version",
+    targetId: id,
+  });
+
+  return result;
+}
+
+export async function getMatrixValidationReport(workspaceId: number, versionId: number) {
+  return matrixAdmin.validateMatrixVersion(workspaceId, versionId);
+}
+
+// ── Scope Editing ─────────────────────────────────────────────────────
+
+export async function updateMatrixScope(
+  workspaceId: number,
+  versionId: number,
+  id: number,
+  data: { code?: string; label?: string; description?: string; family?: string; isActive?: number },
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const updated = await repo.updateScope(id, versionId, data);
+  if (!updated) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Scope not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_scope.update",
+    entityType: "ps_scope_registry",
+    entityId: id,
+    newValue: data,
+  });
+
+  return updated;
+}
+
+export async function listAllMatrixScopes(workspaceId: number, versionId: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.getAllScopesByVersion(versionId);
+}
+
+// ── Question Editing ──────────────────────────────────────────────────
+
+export async function updateMatrixQuestion(
+  workspaceId: number,
+  versionId: number,
+  id: number,
+  data: { code?: string; label?: string; description?: string; sortOrder?: number; isActive?: number },
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const updated = await repo.updateQuestion(id, versionId, data);
+  if (!updated) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Question not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_question.update",
+    entityType: "ps_matrix_question",
+    entityId: id,
+    newValue: data,
+  });
+
+  return updated;
+}
+
+export async function listAllMatrixQuestions(workspaceId: number, versionId: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.getAllQuestionsByVersion(versionId);
+}
+
+export async function reorderMatrixQuestions(
+  workspaceId: number,
+  versionId: number,
+  orderedIds: number[],
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  await repo.updateQuestionSortOrders(versionId, orderedIds);
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_question.reorder",
+    entityType: "ps_matrix_question",
+    entityId: versionId,
+    newValue: { orderedIds },
+  });
+
+  return { success: true };
+}
+
+// ── Cell Editing ──────────────────────────────────────────────────────
+
+export async function upsertMatrixCell(
+  workspaceId: number,
+  versionId: number,
+  questionId: number,
+  scopeId: number,
+  weight: number,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const cell = await repo.upsertCell(versionId, questionId, scopeId, weight);
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_cell.upsert",
+    entityType: "ps_matrix_cell",
+    entityId: cell.id,
+    newValue: { questionId, scopeId, weight },
+  });
+
+  return cell;
+}
+
+export async function bulkUpsertMatrixCells(
+  workspaceId: number,
+  versionId: number,
+  items: Array<{ questionId: number; scopeId: number; weight: number }>,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const results = await repo.upsertCellsBatch(versionId, items);
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "matrix_cell.bulk_upsert",
+    entityType: "ps_matrix_cell",
+    entityId: versionId,
+    newValue: { cellCount: results.length },
+  });
+
+  return results;
+}
+
+// ── Matrix Grid (for grid editor UI) ──────────────────────────────────
+
+export async function getMatrixGrid(workspaceId: number, versionId: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const [scopes, questions, cells] = await Promise.all([
+    repo.getAllScopesByVersion(versionId),
+    repo.getAllQuestionsByVersion(versionId),
+    repo.listCellsByVersion(versionId),
+  ]);
+
+  return { version, scopes, questions, cells };
+}
+
+// ── Import Operations ─────────────────────────────────────────────────
+
+export async function previewMatrixImport(
+  workspaceId: number,
+  sourceType: MatrixImportSourceType,
+  sourceName: string | undefined,
+  payload: MatrixImportPayload,
+  actorId: number,
+) {
+  return matrixImport.previewMatrixImport(workspaceId, sourceType, sourceName, payload, actorId);
+}
+
+export async function commitMatrixImport(
+  workspaceId: number,
+  importId: number,
+  targetVersionId: number | undefined,
+  newVersion: string | undefined,
+  newLabel: string | undefined,
+  actorId: number,
+) {
+  return matrixImport.commitMatrixImport(workspaceId, importId, targetVersionId, newVersion, newLabel, actorId);
+}
+
+export async function listMatrixImports(workspaceId: number) {
+  return repo.listMatrixImports(workspaceId);
 }
 
 // ── Monitoring ────────────────────────────────────────────────────────
