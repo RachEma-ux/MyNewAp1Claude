@@ -1,51 +1,82 @@
 Session Summary — 2026-03-26 23:30
 ====================================
 
-## Focus: PS Wizard → List Pipeline Fixes
+## Focus: PS Wizard → List Pipeline — Full Fix Chain
+
+### Problem
+User reported "List PS Project" button in PS Wizard does not create entries visible in the PS List page. Multiple root causes found and fixed incrementally.
 
 ### Commits (all pushed to main)
 
-1. ed1492f — feat: enforce PS naming policy — auto-create, admin-rename, transactional
-   - Transactional createPSProject (wizard run + system in one tx)
-   - resolveUniqueName: auto-suffix 2, 3... for duplicates
+1. **ed1492f** — feat: enforce PS naming policy — auto-create, admin-rename, transactional
+   - Transactional createPSProject (wizard run + system in one DB transaction)
+   - resolveUniqueName: auto-suffix " 2", " 3"... for duplicate names
    - Admin rename mutation (ps.systems.updateName) with CONFLICT check
    - InlineRename component in PSListPage (hover pencil, Enter/Escape)
-   - Governance registration (action-key-map + platform_action_registry.yaml)
-   - Wizard Step 5 name field made read-only
+   - Governance registration (action-key-map.ts + platform_action_registry.yaml)
+   - Wizard Step 5 name field made read-only (admin edits via list page)
+   - Files: ps.service.ts, ps.repository.ts, ps.router.ts, action-key-map.ts, platform_action_registry.yaml, PSWizardPage.tsx, PSListPage.tsx
 
-2. 119608e — fix: wizard create — use scopeCode not label, add error visibility
-   - scope field was sending label string (could be null → "" → validation fail)
-   - Now sends selectedScopeCode first
-   - Missing recommendation shows visible error instead of silent return
+2. **119608e** — fix: wizard create — use scopeCode not label, add error visibility
+   - scope field was sending recommendation.selectedScope (label like "Software Lifecycle")
+   - Could be null → "" → fails z.string().min(1) validation silently
+   - Now sends selectedScopeCode first ("SOFTWARE_LIFECYCLE")
+   - Missing recommendation now shows visible error instead of silent return
+   - File: PSWizardPage.tsx
 
-3. 8931d4a — fix: derive project name from scenario text instead of hardcoded mock
-   - runAutomaticProcessing always set "Customer Support Platform Modernization"
-   - Now extracts first sentence of user's scenario (max 80 chars)
+3. **8931d4a** — fix: derive project name from scenario text instead of hardcoded mock
+   - runAutomaticProcessing() always hardcoded "Customer Support Platform Modernization"
+   - Now extracts first sentence of user's scenario text (max 80 chars, word-boundary truncation)
+   - File: PSWizardPage.tsx
 
-4. 9dd19fb — fix: list endpoint rejected undefined input — systems never displayed
-   - ROOT CAUSE: PSListPage called useQuery() with no args → undefined input
-   - listSystemsSchema was z.object({...}) which rejects undefined
-   - Added .optional().default({}) so undefined is accepted
-   - This was why "no new entry in list" — list query always silently failed
+4. **9dd19fb** — fix: list endpoint rejected undefined input — systems never displayed
+   - **THE ROOT CAUSE**: PSListPage called trpc.ps.systems.list.useQuery() with NO arguments
+   - tRPC sends undefined as input when useQuery() has no args
+   - listSystemsSchema was z.object({ status: z.enum(...).optional() }) — rejects undefined
+   - Added .optional().default({}) to schema so undefined is accepted
+   - This is why "no new entry in list" — the list query ALWAYS silently failed
+   - Systems were being created in DB successfully but list page showed "No systems yet"
+   - Files: ps.validation.ts, ps.router.ts, PSWizardPage.tsx (debug cleanup)
 
-### Files Changed (across all commits)
-- server/ps/ps.validation.ts — listSystemsSchema accepts undefined
-- server/ps/ps.service.ts — transactional createPSProject, updatePSProjectName
-- server/ps/ps.repository.ts — getSystemByName, updateSystemName
-- server/ps/ps.router.ts — systems.updateName endpoint, optional input handling
-- server/governance/action-key-map.ts — ps.systems.updateName mapping
-- config/governance/platform_action_registry.yaml — ps.system.update action
-- client/src/pages/projects-system/PSWizardPage.tsx — read-only name, scenario-derived name, scopeCode fix
-- client/src/pages/projects-system/PSListPage.tsx — InlineRename component
+5. **b0d00fc** — docs: session summary
 
-### Key Debugging Insights
-- Backend API worked perfectly via curl — all creates succeeded
-- The list endpoint silently failed due to Zod validation mismatch (undefined vs object)
-- tRPC useQuery() with no args sends undefined, not {}
-- Fix pattern: add .optional().default({}) to any schema used by a no-arg useQuery()
+### Debugging Journey
+1. Tested backend via curl — all API calls (classify, create, list) worked perfectly
+2. Confirmed systems existed in DB after wizard flow
+3. Realized the list page query itself was broken — not a create problem but a READ problem
+4. Verified: `curl /api/trpc/ps.systems.list` with no input → "invalid_type: expected object, received undefined"
+5. Fix: `.optional().default({})` on the Zod schema
+
+### Key Lessons Learned
+- tRPC useQuery() with no args sends `undefined`, NOT `{}`
+- Zod z.object({...}) rejects undefined even if all fields are optional
+- Fix pattern: add .optional().default({}) to schemas used by no-arg useQuery()
+- tRPC errors in React Query are swallowed by default (show loading → empty state)
+- Always test the exact same call path the frontend uses (no input, not {})
 - Governance requires BOTH action-key-map.ts AND platform_action_registry.yaml entries
+- runAutomaticProcessing was a static mock — never derived from actual user input
 
-### Repo State
-- Branch: main, fully pushed, working tree clean
-- Dev server running on localhost:3000
-- DB has test entries (can be cleaned with DELETE FROM ps_wizard_runs; DELETE FROM ps_systems;)
+### Architecture Notes (for future reference)
+- PS Wizard flow: Step 1 (scenario) → Step 2 (context + auto-parse) → Step 3 (questions from DB) → Step 4 (classification/recommendation) → Step 5 (create + navigate to list)
+- createPSProject (service): resolveUniqueName → db.transaction(wizard_run + system) → audit log
+- PSListPage: useQuery() → table with InlineRename per row
+- Governance: governedProcedure → action-key-map.ts maps "ps.createPSProject" → "ps.system.create" → checked against platform_action_registry.yaml
+- Dev mode: auth bypass active, user.id = 1
+
+### Files Changed This Session
+| File | Changes |
+|------|---------|
+| server/ps/ps.validation.ts | listSystemsSchema accepts undefined input |
+| server/ps/ps.service.ts | Transactional createPSProject, resolveUniqueName, updatePSProjectName |
+| server/ps/ps.repository.ts | getSystemByName, updateSystemName |
+| server/ps/ps.router.ts | systems.updateName endpoint, optional input on list |
+| server/governance/action-key-map.ts | ps.systems.updateName → ps.system.update |
+| config/governance/platform_action_registry.yaml | ps.system.update action (R2, ps.manage) |
+| client/src/pages/projects-system/PSWizardPage.tsx | Read-only name, scenario-derived name, scopeCode fix |
+| client/src/pages/projects-system/PSListPage.tsx | InlineRename component (hover pencil, edit, save/cancel) |
+
+### Repo State at End
+- Branch: main, fully pushed to origin, working tree clean
+- Latest commit: b0d00fc
+- Dev server was running on localhost:3000
+- DB has test entries (clean with: DELETE FROM ps_wizard_runs; DELETE FROM ps_systems;)
