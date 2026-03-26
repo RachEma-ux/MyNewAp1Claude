@@ -1,10 +1,11 @@
 /**
  * PS List — Systems list with demand and assignment-facing visibility (real data from tRPC)
  */
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { ClipboardList, Loader2, Users, FolderOpen, UserCheck } from "lucide-react";
+import { ClipboardList, Loader2, Users, FolderOpen, UserCheck, Pencil, Check, X } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-green-500/10 text-green-600 border-green-500/30",
@@ -75,6 +76,77 @@ function AssignmentBadge({ psSystemId }: { psSystemId: number }) {
   );
 }
 
+function InlineRename({ systemId, currentName }: { systemId: number; currentName: string }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(currentName);
+  const [error, setError] = useState("");
+  const utils = trpc.useUtils();
+
+  const renameMutation = trpc.ps.systems.updateName.useMutation({
+    onSuccess: () => {
+      utils.ps.systems.list.invalidate();
+      setEditing(false);
+      setError("");
+    },
+    onError: (err) => {
+      setError(err.message);
+    },
+  });
+
+  function handleSave() {
+    const trimmed = value.trim();
+    if (!trimmed) { setError("Name cannot be empty"); return; }
+    if (trimmed === currentName) { setEditing(false); return; }
+    renameMutation.mutate({ id: systemId, name: trimmed });
+  }
+
+  function handleCancel() {
+    setValue(currentName);
+    setEditing(false);
+    setError("");
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1.5 group">
+        <span className="font-medium">{currentName}</span>
+        <button
+          type="button"
+          onClick={() => { setValue(currentName); setEditing(true); setError(""); }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted"
+          title="Rename project"
+        >
+          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancel(); }}
+          className="h-7 rounded border border-border bg-background px-2 text-sm w-48"
+          autoFocus
+          disabled={renameMutation.isPending}
+        />
+        <button type="button" onClick={handleSave} disabled={renameMutation.isPending}
+          className="p-0.5 rounded hover:bg-green-500/10" title="Save">
+          <Check className="w-4 h-4 text-green-600" />
+        </button>
+        <button type="button" onClick={handleCancel} disabled={renameMutation.isPending}
+          className="p-0.5 rounded hover:bg-red-500/10" title="Cancel">
+          <X className="w-4 h-4 text-red-500" />
+        </button>
+      </div>
+      {error && <div className="text-xs text-red-500">{error}</div>}
+    </div>
+  );
+}
+
 export function PSListPage() {
   const { data: systems, isLoading } = trpc.ps.systems.list.useQuery();
 
@@ -117,7 +189,9 @@ export function PSListPage() {
                 <tbody>
                   {systems.map((s) => (
                     <tr key={s.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                      <td className="py-2.5 font-medium">{s.name}</td>
+                      <td className="py-2.5">
+                        <InlineRename systemId={s.id} currentName={s.name} />
+                      </td>
                       <td className="py-2.5">
                         <Badge variant="outline" className="text-xs">
                           {SYSTEM_TYPE_LABELS[s.systemType] || s.systemType}

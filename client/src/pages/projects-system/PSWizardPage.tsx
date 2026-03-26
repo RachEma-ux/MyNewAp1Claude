@@ -361,13 +361,8 @@ export default function PSWizardPage() {
 
               <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
                 <div>
-                  <div className="text-sm text-white/50 mb-1">Project Name</div>
-                  <input
-                    value={generatedName}
-                    onChange={(e) => setGeneratedName(e.target.value)}
-                    placeholder="Enter project name"
-                    className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
-                  />
+                  <div className="text-sm text-white/50">Project Name</div>
+                  <div className="font-semibold">{generatedName || "Auto-generated on create"}</div>
                 </div>
 
                 <div>

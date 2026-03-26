@@ -2358,6 +2358,14 @@ actions:
     approval: none
     evidence: { required: false }
 
+  ps.system.update:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   ps.wizardRun.create:
     domain: ps
     risk: R1

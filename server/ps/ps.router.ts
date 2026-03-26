@@ -135,6 +135,15 @@ const systemsRouter = router({
     .query(async ({ input }) => {
       return service.listSystems(input.status);
     }),
+
+  updateName: governedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      name: z.string().min(1).max(255),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return service.updatePSProjectName(input.id, input.name, ctx.user.id);
+    }),
 });
 
 const wizardRunsRouter = router({

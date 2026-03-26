@@ -6,6 +6,8 @@
 
 import { TRPCError } from "@trpc/server";
 import * as repo from "./ps.repository";
+import { getDb } from "../db/connection";
+import { psSystems, psWizardRuns } from "../../drizzle/tables/ps";
 import { logPsAudit } from "./ps.audit";
 import { classifyScenario as runLegacyClassifier } from "./ps.classifier";
 import { loadActiveMatrix, evaluateMatrix, evaluateMatrixEnriched } from "./ps.matrix-engine";
@@ -245,7 +247,23 @@ export async function classifyWizardScenario(input: WizardClassifyInput) {
   };
 }
 
-// ── Wizard → Create PS Project ───────────────────────────────────────
+// ── Wizard → Create PS Project (transactional) ──────────────────────
+
+/**
+ * Resolve a unique system name. If baseName already exists, tries
+ * "baseName 2", "baseName 3", etc. up to 10 attempts.
+ */
+async function resolveUniqueName(baseName: string): Promise<string> {
+  const existing = await repo.getSystemByName(baseName);
+  if (!existing) return baseName;
+  for (let i = 2; i <= 10; i++) {
+    const candidate = `${baseName} ${i}`;
+    const found = await repo.getSystemByName(candidate);
+    if (!found) return candidate;
+  }
+  // Fallback: append timestamp
+  return `${baseName} ${Date.now()}`;
+}
 
 export async function createPSProject(input: {
   name: string;
@@ -256,57 +274,101 @@ export async function createPSProject(input: {
   answers: Record<string, string>;
   recommendation: any;
 }, actorId: number) {
-  const baseName = input.name.trim() || "Untitled Project";
+  const db = getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-  // 1. Store wizard run for full traceability
-  const wizardRun = await repo.createWizardRun({
-    scenarioText: input.scenario,
-    inputPayload: {
-      context: input.context,
-      answers: input.answers,
-      matrixVersion: input.matrixVersion,
-    },
-    resultPayload: input.recommendation ?? {},
-    confidence: null,
-    selectedSystemType: input.recommendation?.selectedScopeCode ?? input.scope,
-    createdBy: actorId,
+  const baseName = input.name.trim() || "Untitled Project";
+  const finalName = await resolveUniqueName(baseName);
+
+  // Transactional: wizard run + system creation are atomic
+  const result = await db.transaction(async (tx) => {
+    // 1. Store wizard run
+    const [wizardRun] = await tx.insert(psWizardRuns).values({
+      scenarioText: input.scenario,
+      inputPayload: {
+        context: input.context,
+        answers: input.answers,
+        matrixVersion: input.matrixVersion,
+      },
+      resultPayload: input.recommendation ?? {},
+      confidence: null,
+      selectedSystemType: input.recommendation?.selectedScopeCode ?? input.scope,
+      createdBy: actorId,
+      createdAt: new Date(),
+    }).returning();
+
+    // 2. Create PS system
+    const desc = `Scope: ${input.scope} | Matrix: ${input.matrixVersion} | Wizard Run #${wizardRun.id}`;
+    const [system] = await tx.insert(psSystems).values({
+      name: finalName,
+      description: desc,
+      systemType: input.recommendation?.selectedScopeCode ?? "CUSTOM",
+      status: "draft",
+      createdBy: actorId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    return { wizardRun, system };
   });
 
-  // 2. Create PS system record — handle unique name constraint
-  const desc = `Scope: ${input.scope} | Matrix: ${input.matrixVersion} | Wizard Run #${wizardRun.id}`;
-  const sysData = {
-    systemType: input.recommendation?.selectedScopeCode ?? "CUSTOM",
-    status: "draft" as const,
-    createdBy: actorId,
-  };
-
-  let system;
-  try {
-    system = await repo.createSystem({ name: baseName, description: desc, ...sysData });
-  } catch (firstErr: any) {
-    // Likely unique constraint on name — retry with suffix
-    const suffixedName = `${baseName} (#${wizardRun.id})`;
-    try {
-      system = await repo.createSystem({ name: suffixedName, description: desc, ...sysData });
-    } catch (secondErr: any) {
-      // Both failed — throw the original error
-      throw firstErr;
-    }
-  }
-
+  // Audit outside transaction (non-critical)
   await logPsAudit({
     actorId,
     action: "wizard.create_project",
     entityType: "ps_system",
-    entityId: system.id,
+    entityId: result.system.id,
     newValue: {
-      wizardRunId: wizardRun.id,
+      wizardRunId: result.wizardRun.id,
       scope: input.scope,
       matrixVersion: input.matrixVersion,
     },
   });
 
-  return system;
+  return result.system;
+}
+
+// ── Admin: Rename PS Project ──────────────────────────────────────────
+
+export async function updatePSProjectName(
+  id: number,
+  newName: string,
+  actorId: number,
+) {
+  const trimmed = newName.trim();
+  if (!trimmed) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Project name cannot be empty" });
+  }
+
+  const system = await repo.getSystemById(id);
+  if (!system) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "PS system not found" });
+  }
+
+  // Check uniqueness — exact match with different ID
+  const existing = await repo.getSystemByName(trimmed);
+  if (existing && existing.id !== id) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `A project named "${trimmed}" already exists`,
+    });
+  }
+
+  const updated = await repo.updateSystemName(id, trimmed);
+  if (!updated) {
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update name" });
+  }
+
+  await logPsAudit({
+    actorId,
+    action: "system.rename",
+    entityType: "ps_system",
+    entityId: id,
+    previousValue: { name: system.name },
+    newValue: { name: trimmed },
+  });
+
+  return updated;
 }
 
 // ── Matrix Classification Engine ─────────────────────────────────────

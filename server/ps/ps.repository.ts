@@ -96,6 +96,25 @@ export async function listSystems(status?: string): Promise<PsSystem[]> {
     .orderBy(desc(psSystems.createdAt));
 }
 
+export async function getSystemByName(name: string): Promise<PsSystem | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [system] = await db.select().from(psSystems)
+    .where(eq(psSystems.name, name))
+    .limit(1);
+  return system ?? null;
+}
+
+export async function updateSystemName(id: number, name: string): Promise<PsSystem | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psSystems)
+    .set({ name, updatedAt: new Date() })
+    .where(eq(psSystems.id, id))
+    .returning();
+  return updated ?? null;
+}
+
 // ── Wizard Runs ──────────────────────────────────────────────────────────
 
 export async function createWizardRun(data: InsertPsWizardRun): Promise<PsWizardRun> {
