@@ -125,6 +125,33 @@ const ORIGIN_COLORS: Record<string, string> = {
   api: "bg-cyan-600/20 text-cyan-400 border-cyan-600/30",
 };
 
+/**
+ * Determine the current lifecycle stage from entry tags.
+ * Mirrors server logic in lifecycle-guard.ts getStageFromTags.
+ */
+function getLifecycleStage(tags: string[]): string {
+  if (tags.includes("published")) return "publish";
+  if (tags.includes("validated")) return "validate";
+  if (tags.includes("registered")) return "register";
+  if (tags.includes("candidate")) return "submit";
+  if (tags.includes("ingested")) return "ingest";
+  return "submit";
+}
+
+const STAGE_ORDER = ["ingest", "submit", "register", "validate", "publish", "catalog", "mutate"];
+
+/** Check if the entry's lifecycle stage is before the given stage */
+function isBeforeStage(tags: string[], stage: string): boolean {
+  const current = getLifecycleStage(tags);
+  return STAGE_ORDER.indexOf(current) < STAGE_ORDER.indexOf(stage);
+}
+
+/** Check if the entry's lifecycle stage is at or past the given stage */
+function isAtOrPastStage(tags: string[], stage: string): boolean {
+  const current = getLifecycleStage(tags);
+  return STAGE_ORDER.indexOf(current) >= STAGE_ORDER.indexOf(stage);
+}
+
 /** Get per-stage review state from entry's stageReviews JSON — each stage tracked independently */
 function getStageReviewState(entry: any, stage: string): string {
   const stageReviews = entry.stageReviews || {};
@@ -915,8 +942,7 @@ export default function CandidatePage() {
                           {entry.displayName || entry.name}
                         </CardTitle>
                         <div className="flex gap-1 shrink-0">
-                          {(entry.tags || []).includes("candidate") &&
-                          !(entry.tags || []).includes("registered") ? (
+                          {isBeforeStage(entry.tags || [], "register") ? (
                             <Button
                               size="sm"
                               onClick={() =>
@@ -1176,8 +1202,8 @@ export default function CandidatePage() {
                             {entry.displayName || entry.name}
                           </CardTitle>
                           <div className="flex gap-1 shrink-0">
-                            {(entry.tags || []).includes("registered") &&
-                            !(entry.tags || []).includes("validated") ? (
+                            {isAtOrPastStage(entry.tags || [], "register") &&
+                            isBeforeStage(entry.tags || [], "validate") ? (
                               <Button
                                 size="sm"
                                 onClick={() =>
@@ -1535,8 +1561,8 @@ export default function CandidatePage() {
                               {entry.displayName || entry.name}
                             </CardTitle>
                             <div className="flex gap-1 shrink-0">
-                              {(entry.tags || []).includes("validated") &&
-                              !(entry.tags || []).includes("published") ? (
+                              {isAtOrPastStage(entry.tags || [], "validate") &&
+                              isBeforeStage(entry.tags || [], "publish") ? (
                                 <Button
                                   size="sm"
                                   onClick={() =>
