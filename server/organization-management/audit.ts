@@ -17,12 +17,7 @@ export type OmEntityType =
   | "position"
   | "reporting_relationship"
   | "cost_center"
-  | "structure_version"
-  | "alignment_matrix_version"
-  | "alignment_type"
-  | "alignment_attribute"
-  | "alignment_cell"
-  | "alignment_selection";
+  | "structure_version";
 
 export const OM_AUDIT_ACTIONS = [
   // Legal entities
@@ -60,23 +55,6 @@ export const OM_AUDIT_ACTIONS = [
   // Authority
   "authority.resolve",
   "authority.chain_query",
-  // Alignment Matrix
-  "alignment_matrix_version.create",
-  "alignment_matrix_version.publish",
-  "alignment_matrix_version.archive",
-  "alignment_type.create",
-  "alignment_type.update",
-  "alignment_type.reorder",
-  "alignment_type.archive",
-  "alignment_attribute.create",
-  "alignment_attribute.update",
-  "alignment_attribute.reorder",
-  "alignment_attribute.archive",
-  "alignment_cell.upsert",
-  "alignment_cell.bulk_upsert",
-  "alignment_selection.apply_defaults",
-  "alignment_selection.override",
-  "alignment_selection.clear_override",
 ] as const;
 
 export type OmAuditAction = typeof OM_AUDIT_ACTIONS[number];

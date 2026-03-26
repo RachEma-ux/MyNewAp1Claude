@@ -235,19 +235,6 @@ async function startServer() {
     console.warn(`[OMTemplateSeed] Skipped — ${error.message}`);
   }
 
-  // Seed OM Alignment Matrix (canonical v1)
-  try {
-    const { seedAlignmentMatrix } = await import("../organization-management/alignment-matrix-seed");
-    const amResult = await seedAlignmentMatrix(0);
-    if (amResult.created) {
-      console.log(`[OMAlignmentSeed] Seeded alignment matrix v1`);
-    } else {
-      console.log(`[OMAlignmentSeed] Alignment matrix already present`);
-    }
-  } catch (error: any) {
-    console.warn(`[OMAlignmentSeed] Skipped — ${error.message}`);
-  }
-
   // Initialize Governance Engine (CGT v2)
   initializeGovernance();
 

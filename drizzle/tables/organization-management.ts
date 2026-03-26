@@ -42,9 +42,6 @@ export const omLegalEntities = pgTable("om_legal_entities", {
   parentEntityId: integer("parent_entity_id"), // self-ref for holding structures
   country: varchar("country", { length: 100 }),
   registrationNumber: varchar("registration_number", { length: 100 }),
-  legalStructure: varchar("legal_structure", { length: 50 }), // sole_proprietorship | partnership | llc | corporation
-  taxElection: varchar("tax_election", { length: 50 }), // none | s_corp
-  incorporationState: varchar("incorporation_state", { length: 100 }),
   status: varchar("status", { length: 30 }).default("active").notNull(), // active | inactive | dissolved
   metadata: json("metadata").$type<Record<string, unknown>>(),
   createdBy: integer("created_by"),
@@ -225,8 +222,6 @@ export const omStructureVersions = pgTable("om_structure_versions", {
   description: text("description"),
   status: varchar("status", { length: 30 }).default("draft").notNull(), // draft | published | archived | superseded
   snapshot: json("snapshot").$type<Record<string, unknown>>(), // frozen structural snapshot at publish time
-  alignmentMatrixVersionId: integer("alignment_matrix_version_id"),
-  selectedStructureTypeId: integer("selected_structure_type_id"),
   publishedAt: timestamp("published_at"),
   publishedBy: integer("published_by"),
   createdBy: integer("created_by"),
@@ -298,130 +293,3 @@ export const omOrgTemplates = pgTable("om_org_templates", {
 
 export type OmOrgTemplate = typeof omOrgTemplates.$inferSelect;
 export type InsertOmOrgTemplate = typeof omOrgTemplates.$inferInsert;
-
-// ============================================================================
-// 10. Alignment Matrix Versions — Version the matrix master dataset
-// ============================================================================
-
-export const omAlignmentMatrixVersions = pgTable("om_alignment_matrix_versions", {
-  id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
-  name: varchar("name", { length: 200 }).notNull(),
-  status: varchar("status", { length: 30 }).default("draft").notNull(), // draft | active | archived | superseded
-  description: text("description"),
-  createdBy: integer("created_by"),
-  publishedAt: timestamp("published_at"),
-  publishedBy: integer("published_by"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => ({
-  wsIdx: index("om_alignment_matrix_version_ws_idx").on(table.workspaceId),
-  statusIdx: index("om_alignment_matrix_version_status_idx").on(table.status),
-}));
-
-export type OmAlignmentMatrixVersion = typeof omAlignmentMatrixVersions.$inferSelect;
-export type InsertOmAlignmentMatrixVersion = typeof omAlignmentMatrixVersions.$inferInsert;
-
-// ============================================================================
-// 11. Alignment Types — Matrix column definitions (structure types)
-// ============================================================================
-
-export const omAlignmentTypes = pgTable("om_alignment_types", {
-  id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
-  matrixVersionId: integer("matrix_version_id").notNull(),
-  code: varchar("code", { length: 50 }).notNull(),
-  label: varchar("label", { length: 200 }).notNull(),
-  description: text("description"),
-  sortOrder: integer("sort_order").default(0).notNull(),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdBy: integer("created_by"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => ({
-  wsIdx: index("om_alignment_type_ws_idx").on(table.workspaceId),
-  matrixIdx: index("om_alignment_type_matrix_idx").on(table.matrixVersionId),
-  uniqCode: unique("om_alignment_type_code_uniq").on(table.matrixVersionId, table.code),
-}));
-
-export type OmAlignmentType = typeof omAlignmentTypes.$inferSelect;
-export type InsertOmAlignmentType = typeof omAlignmentTypes.$inferInsert;
-
-// ============================================================================
-// 12. Alignment Attributes — Matrix row definitions
-// ============================================================================
-
-export const omAlignmentAttributes = pgTable("om_alignment_attributes", {
-  id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
-  matrixVersionId: integer("matrix_version_id").notNull(),
-  code: varchar("code", { length: 100 }).notNull(),
-  label: varchar("label", { length: 200 }).notNull(),
-  description: text("description"),
-  sortOrder: integer("sort_order").default(0).notNull(),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdBy: integer("created_by"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => ({
-  wsIdx: index("om_alignment_attr_ws_idx").on(table.workspaceId),
-  matrixIdx: index("om_alignment_attr_matrix_idx").on(table.matrixVersionId),
-  uniqCode: unique("om_alignment_attr_code_uniq").on(table.matrixVersionId, table.code),
-}));
-
-export type OmAlignmentAttribute = typeof omAlignmentAttributes.$inferSelect;
-export type InsertOmAlignmentAttribute = typeof omAlignmentAttributes.$inferInsert;
-
-// ============================================================================
-// 13. Alignment Cells — Type × Attribute intersection values
-// ============================================================================
-
-export const omAlignmentCells = pgTable("om_alignment_cells", {
-  id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
-  matrixVersionId: integer("matrix_version_id").notNull(),
-  typeId: integer("type_id").notNull(),
-  attributeId: integer("attribute_id").notNull(),
-  valueText: text("value_text").notNull(),
-  valueCode: varchar("value_code", { length: 100 }),
-  createdBy: integer("created_by"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => ({
-  wsIdx: index("om_alignment_cell_ws_idx").on(table.workspaceId),
-  matrixIdx: index("om_alignment_cell_matrix_idx").on(table.matrixVersionId),
-  typeIdx: index("om_alignment_cell_type_idx").on(table.typeId),
-  attrIdx: index("om_alignment_cell_attr_idx").on(table.attributeId),
-  uniqCell: unique("om_alignment_cell_uniq").on(table.matrixVersionId, table.typeId, table.attributeId),
-}));
-
-export type OmAlignmentCell = typeof omAlignmentCells.$inferSelect;
-export type InsertOmAlignmentCell = typeof omAlignmentCells.$inferInsert;
-
-// ============================================================================
-// 14. Structure Alignment Selections — Wizard draft row selections
-// ============================================================================
-
-export const omStructureAlignmentSelections = pgTable("om_structure_alignment_selections", {
-  id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
-  structureVersionId: integer("structure_version_id").notNull(),
-  matrixVersionId: integer("matrix_version_id").notNull(),
-  selectedTypeId: integer("selected_type_id").notNull(),
-  attributeId: integer("attribute_id").notNull(),
-  selectedValueText: text("selected_value_text").notNull(),
-  source: varchar("source", { length: 30 }).default("matrix_default").notNull(), // matrix_default | manual_override
-  createdBy: integer("created_by"),
-  updatedBy: integer("updated_by"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => ({
-  wsIdx: index("om_structure_alignment_sel_ws_idx").on(table.workspaceId),
-  structureIdx: index("om_structure_alignment_sel_structure_idx").on(table.structureVersionId),
-  matrixIdx: index("om_structure_alignment_sel_matrix_idx").on(table.matrixVersionId),
-  attributeIdx: index("om_structure_alignment_sel_attr_idx").on(table.attributeId),
-  uniqSelection: unique("om_structure_alignment_sel_uniq").on(table.structureVersionId, table.attributeId),
-}));
-
-export type OmStructureAlignmentSelection = typeof omStructureAlignmentSelections.$inferSelect;
-export type InsertOmStructureAlignmentSelection = typeof omStructureAlignmentSelections.$inferInsert;

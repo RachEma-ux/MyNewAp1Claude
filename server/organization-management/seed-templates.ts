@@ -20,18 +20,6 @@ const TEMPLATES = [
       "Classic hierarchy organized by business function. Each department (Engineering, Marketing, Finance, HR, Operations) reports to a C-suite executive. Best for companies with stable, specialized functions and clear expertise domains.",
     isSystem: true,
     snapshot: {
-      // ── Matrix metadata ──
-      operationalCategory: "Administration / Specialized Functions",
-      commonLegalStructure: "LLC, Corp, Inc — standard single-entity structure",
-      growthIntent: "Organic Efficiency",
-      keyFocus: "Internal Efficiency & Specialization",
-      reportingLineSummary: "One boss per person, straight up the chain",
-      pros: "Deep specialization, clear career paths, strong expertise domains, efficient within each function",
-      cons: "Silos between departments, slow cross-functional decisions, poor lateral communication",
-      bestFor: "Stable industries, regulated sectors, mature companies with well-defined functions",
-      theVibe: "The well-oiled machine",
-      biggestRisk: "Innovation stalls in silos — departments optimize locally at the expense of the whole",
-      // ── Structural snapshot ──
       legalEntity: { code: "FUNC-CORP", name: "Functional Corp", type: "company" },
       orgUnits: [
         { code: "EXEC", name: "Executive Office", type: "department" },
@@ -95,18 +83,6 @@ const TEMPLATES = [
       "Organized by product line or geography. Each division operates semi-autonomously with its own functional teams. Best for diversified companies with distinct product lines or geographic markets.",
     isSystem: true,
     snapshot: {
-      // ── Matrix metadata ──
-      operationalCategory: "Revenue / Market-Facing",
-      commonLegalStructure: "Holding company + subsidiaries (one legal entity per division or region)",
-      growthIntent: "Market Expansion & Diversification",
-      keyFocus: "External Market Fit & P&L Ownership per Division",
-      reportingLineSummary: "Division heads report to CEO; teams within each division report to their division president",
-      pros: "Market responsiveness, clear P&L ownership, division autonomy, localized decision-making",
-      cons: "Duplication of functions across divisions, internal competition, higher overhead costs",
-      bestFor: "Multi-product companies, global businesses, diversified conglomerates",
-      theVibe: "Mini-companies under one roof",
-      biggestRisk: "Costly duplication and destructive internal competition between divisions",
-      // ── Structural snapshot ──
       legalEntity: { code: "DIV-CORP", name: "Divisional Holdings Inc", type: "holding" },
       orgUnits: [
         { code: "HQ", name: "Corporate Headquarters", type: "department" },
@@ -176,18 +152,6 @@ const TEMPLATES = [
       "Dual reporting structure combining functional expertise with project/product focus. Employees report to both a functional manager and a project/product manager. Best for complex organizations that need deep specialization AND cross-functional delivery.",
     isSystem: true,
     snapshot: {
-      // ── Matrix metadata ──
-      operationalCategory: "Project / Cross-Functional Delivery",
-      commonLegalStructure: "Corp or Ltd — single entity with complex internal reporting structures",
-      growthIntent: "Innovation Through Collaboration",
-      keyFocus: "Balancing Deep Specialization with Cross-Functional Delivery",
-      reportingLineSummary: "Dual reporting — functional manager for skills/career + product/project manager for delivery",
-      pros: "Resource sharing across projects, flexible expertise allocation, cross-pollination of ideas",
-      cons: "Confusion from dual reporting, power struggles between managers, slow consensus-based decisions",
-      bestFor: "Complex organizations needing both deep functional expertise and cross-functional product delivery",
-      theVibe: "Two bosses, twice the meetings",
-      biggestRisk: "Authority conflicts and decision paralysis when functional and product priorities clash",
-      // ── Structural snapshot ──
       legalEntity: { code: "MTX-CORP", name: "Matrix Technologies Corp", type: "company" },
       orgUnits: [
         { code: "EXEC", name: "Executive Leadership", type: "department" },
@@ -255,18 +219,6 @@ const TEMPLATES = [
       "Minimal management layers with wide spans of control. Decision-making is decentralized, and teams self-organize around outcomes. Best for startups, innovation labs, and organizations that value agility and autonomy.",
     isSystem: true,
     snapshot: {
-      // ── Matrix metadata ──
-      operationalCategory: "Innovation / Agility",
-      commonLegalStructure: "LLC or Inc — lean startup structure with minimal corporate overhead",
-      growthIntent: "Rapid Experimentation & Agility",
-      keyFocus: "Speed, Autonomy & Self-Organization",
-      reportingLineSummary: "Minimal layers — everyone is 1-2 hops from the founder/CEO",
-      pros: "Fast decisions, high autonomy, low overhead, strong culture, rapid iteration",
-      cons: "Chaos at scale, unclear accountability, founder bottleneck, hard to specialize",
-      bestFor: "Startups, innovation labs, small creative teams, early-stage companies (<50 people)",
-      theVibe: "The startup garage",
-      biggestRisk: "Breaks down as headcount grows past ~50 — lack of structure becomes a liability",
-      // ── Structural snapshot ──
       legalEntity: { code: "FLAT-INC", name: "Flat Ventures Inc", type: "company" },
       orgUnits: [
         { code: "CORE", name: "Core Team", type: "group" },
@@ -321,18 +273,6 @@ const TEMPLATES = [
       "Small core team coordinates a network of external partners, contractors, and service providers. Best for asset-light businesses, consultancies, platform companies, or organizations that scale through partnerships rather than headcount.",
     isSystem: true,
     snapshot: {
-      // ── Matrix metadata ──
-      operationalCategory: "Coordination / Partnership & Outsourcing",
-      commonLegalStructure: "LLC or LLP — asset-light hub structure; partners are separate legal entities",
-      growthIntent: "Scale Through Partnerships & External Leverage",
-      keyFocus: "Orchestration, Quality Gates & SLA Management",
-      reportingLineSummary: "Small hub core with contractual/SLA relationships to external partners and contractors",
-      pros: "Asset-light, infinitely scalable, access to specialized external talent, flexible capacity",
-      cons: "Less direct control, quality variance across partners, dependency on external parties",
-      bestFor: "Consultancies, platform companies, outsourcing-heavy firms, asset-light businesses",
-      theVibe: "The conductor's orchestra",
-      biggestRisk: "Quality and brand risk from partner failures — you're only as good as your weakest partner",
-      // ── Structural snapshot ──
       legalEntity: { code: "NET-HUB", name: "Network Hub LLC", type: "company" },
       orgUnits: [
         { code: "HUB", name: "Hub (Core Team)", type: "department" },
