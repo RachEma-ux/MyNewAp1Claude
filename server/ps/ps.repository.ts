@@ -22,6 +22,9 @@ import {
   psDimensions,
   psDimensionValues,
   psMatrixQuestionPresentations,
+  psEvalCases,
+  psEvalRuns,
+  psMatrixSimulations,
   type PsSystem,
   type InsertPsSystem,
   type PsWizardRun,
@@ -51,6 +54,12 @@ import {
   type InsertPsDimensionValue,
   type PsMatrixQuestionPresentation,
   type InsertPsMatrixQuestionPresentation,
+  type PsEvalCase,
+  type InsertPsEvalCase,
+  type PsEvalRun,
+  type InsertPsEvalRun,
+  type PsMatrixSimulation,
+  type InsertPsMatrixSimulation,
 } from "../../drizzle/tables/ps";
 
 // ── Systems ──────────────────────────────────────────────────────────────
@@ -1088,4 +1097,107 @@ export async function deleteQuestionPresentationsByVersion(versionId: number): P
     await db.delete(psMatrixQuestionPresentations)
       .where(eq(psMatrixQuestionPresentations.questionId, q.id));
   }
+}
+
+// ── Eval Cases ─────────────────────────────────────────────────────────
+
+export async function createEvalCase(data: InsertPsEvalCase): Promise<PsEvalCase> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psEvalCases).values({
+    ...data,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }).returning();
+  return created;
+}
+
+export async function listEvalCases(workspaceId: number): Promise<PsEvalCase[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psEvalCases)
+    .where(and(eq(psEvalCases.workspaceId, workspaceId), eq(psEvalCases.isActive, 1)))
+    .orderBy(psEvalCases.name);
+}
+
+export async function getEvalCaseById(workspaceId: number, id: number): Promise<PsEvalCase | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [found] = await db.select().from(psEvalCases)
+    .where(and(eq(psEvalCases.id, id), eq(psEvalCases.workspaceId, workspaceId)))
+    .limit(1);
+  return found ?? null;
+}
+
+export async function updateEvalCase(
+  workspaceId: number,
+  id: number,
+  data: Partial<InsertPsEvalCase>,
+): Promise<PsEvalCase | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psEvalCases)
+    .set({ ...data, updatedAt: new Date() })
+    .where(and(eq(psEvalCases.id, id), eq(psEvalCases.workspaceId, workspaceId)))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteEvalCase(workspaceId: number, id: number): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const [deleted] = await db.update(psEvalCases)
+    .set({ isActive: 0, updatedAt: new Date() })
+    .where(and(eq(psEvalCases.id, id), eq(psEvalCases.workspaceId, workspaceId)))
+    .returning();
+  return !!deleted;
+}
+
+// ── Eval Runs ──────────────────────────────────────────────────────────
+
+export async function createEvalRun(data: InsertPsEvalRun): Promise<PsEvalRun> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psEvalRuns).values({
+    ...data,
+    createdAt: new Date(),
+  }).returning();
+  return created;
+}
+
+export async function listEvalRuns(workspaceId: number): Promise<PsEvalRun[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psEvalRuns)
+    .where(eq(psEvalRuns.workspaceId, workspaceId))
+    .orderBy(desc(psEvalRuns.createdAt));
+}
+
+export async function getEvalRunById(workspaceId: number, id: number): Promise<PsEvalRun | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [found] = await db.select().from(psEvalRuns)
+    .where(and(eq(psEvalRuns.id, id), eq(psEvalRuns.workspaceId, workspaceId)))
+    .limit(1);
+  return found ?? null;
+}
+
+// ── Matrix Simulations ─────────────────────────────────────────────────
+
+export async function createMatrixSimulation(data: InsertPsMatrixSimulation): Promise<PsMatrixSimulation> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psMatrixSimulations).values({
+    ...data,
+    createdAt: new Date(),
+  }).returning();
+  return created;
+}
+
+export async function listMatrixSimulations(workspaceId: number): Promise<PsMatrixSimulation[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psMatrixSimulations)
+    .where(eq(psMatrixSimulations.workspaceId, workspaceId))
+    .orderBy(desc(psMatrixSimulations.createdAt));
 }

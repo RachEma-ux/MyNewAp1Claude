@@ -446,3 +446,74 @@ export const psScopeTemplateMappings = pgTable("ps_scope_template_mappings", {
 
 export type PsScopeTemplateMapping = typeof psScopeTemplateMappings.$inferSelect;
 export type InsertPsScopeTemplateMapping = typeof psScopeTemplateMappings.$inferInsert;
+
+// ============================================================================
+// 18. PS Eval Cases — Benchmark test cases for matrix evaluation
+// ============================================================================
+
+export const psEvalCases = pgTable("ps_eval_cases", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  answersJson: json("answers_json").$type<Record<string, boolean | string | number>>().notNull(),
+  expectedScopeCode: varchar("expected_scope_code", { length: 120 }).notNull(),
+  tags: json("tags").$type<string[]>().default([]),
+  isActive: integer("is_active").default(1).notNull(),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  wsIdx: index("ps_eval_cases_ws_idx").on(table.workspaceId),
+  nameUniq: unique("ps_eval_cases_name_uniq").on(table.workspaceId, table.name),
+}));
+
+export type PsEvalCase = typeof psEvalCases.$inferSelect;
+export type InsertPsEvalCase = typeof psEvalCases.$inferInsert;
+
+// ============================================================================
+// 19. PS Eval Runs — Evaluation suite execution records
+// ============================================================================
+
+export const psEvalRuns = pgTable("ps_eval_runs", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  versionId: integer("version_id").notNull(),
+  totalCases: integer("total_cases").notNull().default(0),
+  passedCases: integer("passed_cases").notNull().default(0),
+  failedCases: integer("failed_cases").notNull().default(0),
+  passRate: numeric("pass_rate", { precision: 5, scale: 2 }),
+  resultsJson: json("results_json").$type<Array<Record<string, unknown>>>(),
+  status: varchar("status", { length: 30 }).default("completed").notNull(),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  wsIdx: index("ps_eval_runs_ws_idx").on(table.workspaceId),
+  versionIdx: index("ps_eval_runs_version_idx").on(table.versionId),
+}));
+
+export type PsEvalRun = typeof psEvalRuns.$inferSelect;
+export type InsertPsEvalRun = typeof psEvalRuns.$inferInsert;
+
+// ============================================================================
+// 20. PS Matrix Simulations — Simulation run records
+// ============================================================================
+
+export const psMatrixSimulations = pgTable("ps_matrix_simulations", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  versionId: integer("version_id").notNull(),
+  compareVersionId: integer("compare_version_id"),
+  answersJson: json("answers_json").$type<Record<string, boolean | string | number>>().notNull(),
+  resultJson: json("result_json").$type<Record<string, unknown>>(),
+  compareResultJson: json("compare_result_json").$type<Record<string, unknown>>(),
+  diffSummary: text("diff_summary"),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  wsIdx: index("ps_matrix_simulations_ws_idx").on(table.workspaceId),
+  versionIdx: index("ps_matrix_simulations_version_idx").on(table.versionId),
+}));
+
+export type PsMatrixSimulation = typeof psMatrixSimulations.$inferSelect;
+export type InsertPsMatrixSimulation = typeof psMatrixSimulations.$inferInsert;

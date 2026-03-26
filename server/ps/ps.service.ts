@@ -2032,6 +2032,188 @@ export async function createScopeTemplateMapping(
   return created;
 }
 
+// ── Simulation ────────────────────────────────────────────────────────
+
+export async function runMatrixSimulation(
+  input: import("./ps.types").SimulationInput,
+  actorId: number,
+) {
+  const { runSimulation } = await import("./ps.simulation");
+  const result = await runSimulation(input, actorId);
+
+  await logPsAudit({
+    workspaceId: input.workspaceId,
+    actorId,
+    action: "simulation.run",
+    entityType: "ps_matrix_simulation",
+    entityId: result.simulationId,
+    newValue: {
+      versionId: input.versionId,
+      compareVersionId: input.compareVersionId,
+      selectedScope: result.result.selectedScope,
+      scopeChanged: result.diff?.selectedScopeChanged,
+    },
+  });
+  await logActivity({
+    workspaceId: input.workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "simulation.run",
+    targetType: "ps_matrix_simulation",
+    targetId: result.simulationId,
+  });
+
+  return result;
+}
+
+export async function listMatrixSimulations(workspaceId: number) {
+  const { listSimulations } = await import("./ps.simulation");
+  return listSimulations(workspaceId);
+}
+
+// ── Evaluation ────────────────────────────────────────────────────────
+
+export async function createEvalCase(
+  input: import("./ps.types").EvalCaseInput,
+  actorId: number,
+) {
+  const evaluation = await import("./ps.evaluation");
+  const created = await evaluation.createEvalCase(input, actorId);
+
+  await logPsAudit({
+    workspaceId: input.workspaceId,
+    actorId,
+    action: "eval_case.create",
+    entityType: "ps_eval_case",
+    entityId: created.id,
+    newValue: { name: input.name, expectedScopeCode: input.expectedScopeCode },
+  });
+  await logActivity({
+    workspaceId: input.workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "eval_case.create",
+    targetType: "ps_eval_case",
+    targetId: created.id,
+  });
+
+  return created;
+}
+
+export async function listEvalCases(workspaceId: number) {
+  const evaluation = await import("./ps.evaluation");
+  return evaluation.listEvalCases(workspaceId);
+}
+
+export async function getEvalCase(workspaceId: number, id: number) {
+  const evaluation = await import("./ps.evaluation");
+  const found = await evaluation.getEvalCase(workspaceId, id);
+  if (!found) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Eval case not found" });
+  }
+  return found;
+}
+
+export async function updateEvalCase(
+  workspaceId: number,
+  id: number,
+  data: {
+    name?: string;
+    description?: string;
+    answersJson?: Record<string, boolean | string | number>;
+    expectedScopeCode?: string;
+    tags?: string[];
+    isActive?: number;
+  },
+  actorId: number,
+) {
+  const evaluation = await import("./ps.evaluation");
+  const updated = await evaluation.updateEvalCase(workspaceId, id, data);
+  if (!updated) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Eval case not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "eval_case.update",
+    entityType: "ps_eval_case",
+    entityId: id,
+    newValue: data,
+  });
+
+  return updated;
+}
+
+export async function deleteEvalCase(
+  workspaceId: number,
+  id: number,
+  actorId: number,
+) {
+  const evaluation = await import("./ps.evaluation");
+  const deleted = await evaluation.deleteEvalCase(workspaceId, id);
+  if (!deleted) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Eval case not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "eval_case.delete",
+    entityType: "ps_eval_case",
+    entityId: id,
+  });
+
+  return { success: true };
+}
+
+export async function runEvaluationSuite(
+  input: import("./ps.types").EvalSuiteInput,
+  actorId: number,
+) {
+  const evaluation = await import("./ps.evaluation");
+  const result = await evaluation.runEvaluationSuite(input, actorId);
+
+  await logPsAudit({
+    workspaceId: input.workspaceId,
+    actorId,
+    action: "eval_suite.run",
+    entityType: "ps_eval_run",
+    entityId: result.evalRunId,
+    newValue: {
+      versionId: input.versionId,
+      totalCases: result.totalCases,
+      passedCases: result.passedCases,
+      failedCases: result.failedCases,
+      passRate: result.passRate,
+    },
+  });
+  await logActivity({
+    workspaceId: input.workspaceId,
+    moduleKey: "ps",
+    actorId,
+    action: "eval_suite.run",
+    targetType: "ps_eval_run",
+    targetId: result.evalRunId,
+  });
+
+  return result;
+}
+
+export async function listEvalRuns(workspaceId: number) {
+  const evaluation = await import("./ps.evaluation");
+  return evaluation.listEvalRuns(workspaceId);
+}
+
+export async function getEvalRun(workspaceId: number, id: number) {
+  const evaluation = await import("./ps.evaluation");
+  const found = await evaluation.getEvalRun(workspaceId, id);
+  if (!found) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Eval run not found" });
+  }
+  return found;
+}
+
 // ── Monitoring ────────────────────────────────────────────────────────
 
 export async function getMonitoringSummary(workspaceId: number): Promise<MonitoringSummary> {

@@ -75,6 +75,18 @@ import {
   // Scope template mapping schemas
   createScopeTemplateMappingSchema,
   listScopeTemplateMappingsSchema,
+  // Simulation schemas
+  runSimulationSchema,
+  listSimulationsSchema,
+  // Evaluation schemas
+  createEvalCaseSchema,
+  getEvalCaseSchema,
+  listEvalCasesSchema,
+  updateEvalCaseSchema,
+  deleteEvalCaseSchema,
+  runEvaluationSuiteSchema,
+  listEvalRunsSchema,
+  getEvalRunSchema,
   // Dimension schemas
   listDimensionsSchema,
   createDimensionSchema,
@@ -813,6 +825,75 @@ const matrixRouter = router({
     }),
 });
 
+// ── Simulation Router ──────────────────────────────────────────────────
+
+const simulationRouter = router({
+  run: governedProcedure
+    .input(runSimulationSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.runMatrixSimulation(input, ctx.user.id);
+    }),
+
+  list: protectedProcedure
+    .input(listSimulationsSchema)
+    .query(async ({ input }) => {
+      return service.listMatrixSimulations(input.workspaceId);
+    }),
+});
+
+// ── Evaluation Router ─────────────────────────────────────────────────
+
+const evaluationRouter = router({
+  createCase: governedProcedure
+    .input(createEvalCaseSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createEvalCase(input, ctx.user.id);
+    }),
+
+  getCase: protectedProcedure
+    .input(getEvalCaseSchema)
+    .query(async ({ input }) => {
+      return service.getEvalCase(input.workspaceId, input.id);
+    }),
+
+  listCases: protectedProcedure
+    .input(listEvalCasesSchema)
+    .query(async ({ input }) => {
+      return service.listEvalCases(input.workspaceId);
+    }),
+
+  updateCase: governedProcedure
+    .input(updateEvalCaseSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { workspaceId, id, ...data } = input;
+      return service.updateEvalCase(workspaceId, id, data, ctx.user.id);
+    }),
+
+  deleteCase: governedProcedure
+    .input(deleteEvalCaseSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.deleteEvalCase(input.workspaceId, input.id, ctx.user.id);
+    }),
+
+  runSuite: governedProcedure
+    .input(runEvaluationSuiteSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.runEvaluationSuite(input, ctx.user.id);
+    }),
+
+  listRuns: protectedProcedure
+    .input(listEvalRunsSchema)
+    .query(async ({ input }) => {
+      return service.listEvalRuns(input.workspaceId);
+    }),
+
+  getRun: protectedProcedure
+    .input(getEvalRunSchema)
+    .query(async ({ input }) => {
+      return service.getEvalRun(input.workspaceId, input.id);
+    }),
+});
+
 export const psRouter = router({
   systems: systemsRouter,
   wizardRuns: wizardRunsRouter,
@@ -820,6 +901,8 @@ export const psRouter = router({
   assignments: assignmentsRouter,
   templates: templatesRouter,
   matrix: matrixRouter,
+  simulation: simulationRouter,
+  evaluation: evaluationRouter,
 
   classifyScenario: protectedProcedure
     .input(classifyScenarioSchema)

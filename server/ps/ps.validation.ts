@@ -633,6 +633,73 @@ export const listScopeTemplateMappingsSchema = z.object({
   workspaceId: z.number().int().positive(),
 });
 
+// ── Simulation ──────────────────────────────────────────────────────
+
+export const runSimulationSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  compareVersionId: z.number().int().positive().optional(),
+  answers: z.record(z.union([z.boolean(), z.string(), z.number()])),
+});
+
+export const listSimulationsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
+// ── Evaluation Cases ────────────────────────────────────────────────
+
+export const createEvalCaseSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  name: z.string().min(1).max(255),
+  description: z.string().max(2000).optional(),
+  answersJson: z.record(z.union([z.boolean(), z.string(), z.number()])),
+  expectedScopeCode: z.string().min(1).max(120),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+});
+
+export const getEvalCaseSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
+export const listEvalCasesSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
+export const updateEvalCaseSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).optional(),
+  answersJson: z.record(z.union([z.boolean(), z.string(), z.number()])).optional(),
+  expectedScopeCode: z.string().min(1).max(120).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+  isActive: z.number().int().min(0).max(1).optional(),
+});
+
+export const deleteEvalCaseSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
+// ── Evaluation Suite ────────────────────────────────────────────────
+
+export const runEvaluationSuiteSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  caseIds: z.array(z.number().int().positive()).max(500).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+});
+
+export const listEvalRunsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+});
+
+export const getEvalRunSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  id: z.number().int().positive(),
+});
+
 // ── Classification ──────────────────────────────────────────────────
 
 export const classifyScenarioSchema = z.object({

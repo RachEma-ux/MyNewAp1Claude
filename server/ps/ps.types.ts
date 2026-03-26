@@ -617,6 +617,86 @@ export interface AcceptWizardResult {
   };
 }
 
+// ── Simulation Types ──────────────────────────────────────────────────
+
+export interface SimulationInput {
+  workspaceId: number;
+  versionId: number;
+  compareVersionId?: number;
+  answers: Record<string, boolean | string | number>;
+}
+
+export interface SimulationResult {
+  simulationId: number;
+  versionId: number;
+  versionLabel: string;
+  result: EnrichedMatrixResult;
+  compareVersionId?: number;
+  compareVersionLabel?: string;
+  compareResult?: EnrichedMatrixResult;
+  diff?: SimulationDiff;
+}
+
+export interface SimulationDiff {
+  selectedScopeChanged: boolean;
+  previousScope: string;
+  newScope: string;
+  rankingChanges: Array<{
+    scopeCode: string;
+    oldRank: number;
+    newRank: number;
+    oldScore: number;
+    newScore: number;
+  }>;
+  summary: string;
+}
+
+// ── Evaluation Types ──────────────────────────────────────────────────
+
+export interface EvalCaseInput {
+  workspaceId: number;
+  name: string;
+  description?: string;
+  answersJson: Record<string, boolean | string | number>;
+  expectedScopeCode: string;
+  tags?: string[];
+}
+
+export interface EvalCaseResult {
+  caseId: number;
+  caseName: string;
+  expectedScope: string;
+  actualScope: string;
+  passed: boolean;
+  confidence: number;
+  scores: Record<string, number>;
+  ranking: ScopeScore[];
+}
+
+export interface EvalSuiteInput {
+  workspaceId: number;
+  versionId: number;
+  caseIds?: number[];
+  tags?: string[];
+}
+
+export interface EvalSuiteResult {
+  evalRunId: number;
+  versionId: number;
+  versionLabel: string;
+  totalCases: number;
+  passedCases: number;
+  failedCases: number;
+  passRate: number;
+  results: EvalCaseResult[];
+  failedDetails: Array<{
+    caseName: string;
+    expectedScope: string;
+    actualScope: string;
+    scoreDelta: number;
+  }>;
+}
+
 export interface CreateMatrixImportRecordInput {
   workspaceId: number;
   versionId?: number;
