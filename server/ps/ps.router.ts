@@ -65,6 +65,22 @@ import {
   parseMatrixHeadersSchema,
   // Seed schema
   seedScopeMatrixSchema,
+  // Dimension schemas
+  listDimensionsSchema,
+  createDimensionSchema,
+  createDimensionsBatchSchema,
+  updateDimensionSchema,
+  // Dimension value schemas
+  listDimensionValuesSchema,
+  createDimensionValueSchema,
+  createDimensionValuesBatchSchema,
+  updateDimensionValueSchema,
+  // Question presentation schemas
+  getQuestionPresentationSchema,
+  listQuestionPresentationsSchema,
+  createQuestionPresentationSchema,
+  createQuestionPresentationsBatchSchema,
+  updateQuestionPresentationSchema,
 } from "./ps.validation";
 import * as service from "./ps.service";
 import { loadActiveMatrix } from "./ps.matrix-engine";
@@ -546,6 +562,149 @@ const matrixRouter = router({
     .input(listMatrixImportsSchema)
     .query(async ({ input }) => {
       return service.listMatrixImports(input.workspaceId);
+    }),
+
+  // ── Dimensions ─────────────────────────────────────────────────────
+
+  listDimensions: protectedProcedure
+    .input(listDimensionsSchema)
+    .query(async ({ input }) => {
+      return service.listDimensions(input.workspaceId, input.versionId);
+    }),
+
+  listAllDimensions: protectedProcedure
+    .input(listDimensionsSchema)
+    .query(async ({ input }) => {
+      return service.listAllDimensions(input.workspaceId, input.versionId);
+    }),
+
+  listDimensionsWithValues: protectedProcedure
+    .input(listDimensionsSchema)
+    .query(async ({ input }) => {
+      return service.listDimensionsWithValues(input.workspaceId, input.versionId);
+    }),
+
+  createDimension: governedProcedure
+    .input(createDimensionSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createDimension(
+        input.workspaceId,
+        input.versionId,
+        input.dimensionKey,
+        input.dimensionLabel,
+        input.description || null,
+        input.sortOrder ?? 0,
+        ctx.user.id,
+      );
+    }),
+
+  createDimensionsBatch: governedProcedure
+    .input(createDimensionsBatchSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createDimensionsBatch(
+        input.workspaceId,
+        input.versionId,
+        input.items,
+        ctx.user.id,
+      );
+    }),
+
+  updateDimension: governedProcedure
+    .input(updateDimensionSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { workspaceId, versionId, id, ...data } = input;
+      return service.updateDimension(workspaceId, versionId, id, data, ctx.user.id);
+    }),
+
+  // ── Dimension Values ───────────────────────────────────────────────
+
+  listDimensionValues: protectedProcedure
+    .input(listDimensionValuesSchema)
+    .query(async ({ input }) => {
+      return service.listDimensionValues(input.workspaceId, input.dimensionId);
+    }),
+
+  listAllDimensionValues: protectedProcedure
+    .input(listDimensionValuesSchema)
+    .query(async ({ input }) => {
+      return service.listAllDimensionValues(input.workspaceId, input.dimensionId);
+    }),
+
+  createDimensionValue: governedProcedure
+    .input(createDimensionValueSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createDimensionValue(
+        input.workspaceId,
+        input.dimensionId,
+        input.valueKey,
+        input.valueLabel,
+        input.description || null,
+        input.sortOrder ?? 0,
+        ctx.user.id,
+      );
+    }),
+
+  createDimensionValuesBatch: governedProcedure
+    .input(createDimensionValuesBatchSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createDimensionValuesBatch(
+        input.workspaceId,
+        input.dimensionId,
+        input.items,
+        ctx.user.id,
+      );
+    }),
+
+  updateDimensionValue: governedProcedure
+    .input(updateDimensionValueSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { workspaceId, dimensionId, id, ...data } = input;
+      return service.updateDimensionValue(workspaceId, dimensionId, id, data, ctx.user.id);
+    }),
+
+  // ── Question Presentations ─────────────────────────────────────────
+
+  getQuestionPresentation: protectedProcedure
+    .input(getQuestionPresentationSchema)
+    .query(async ({ input }) => {
+      return service.getQuestionPresentation(input.workspaceId, input.questionId);
+    }),
+
+  listQuestionPresentations: protectedProcedure
+    .input(listQuestionPresentationsSchema)
+    .query(async ({ input }) => {
+      return service.listQuestionPresentations(input.workspaceId, input.versionId);
+    }),
+
+  createQuestionPresentation: governedProcedure
+    .input(createQuestionPresentationSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createQuestionPresentation(
+        input.workspaceId,
+        input.questionId,
+        input.presentationType,
+        input.dimensionId ?? null,
+        input.configJson ?? null,
+        ctx.user.id,
+      );
+    }),
+
+  createQuestionPresentationsBatch: governedProcedure
+    .input(createQuestionPresentationsBatchSchema)
+    .mutation(async ({ ctx, input }) => {
+      return service.createQuestionPresentationsBatch(
+        input.workspaceId,
+        input.versionId,
+        input.items,
+        ctx.user.id,
+      );
+    }),
+
+  updateQuestionPresentation: governedProcedure
+    .input(updateQuestionPresentationSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { workspaceId, questionId, ...data } = input;
+      return service.updateQuestionPresentation(workspaceId, questionId, data, ctx.user.id);
     }),
 });
 

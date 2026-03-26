@@ -29,6 +29,8 @@ import type {
   MatrixImportSourceType,
   MatrixImportPayload,
   CreateMatrixImportRecordInput,
+  DimensionDefinition,
+  PresentationType,
 } from "./ps.types";
 import { generateDemandSpecs, resolveQuantity } from "./ps.demand";
 import {
@@ -1065,13 +1067,14 @@ export async function getMatrixGrid(workspaceId: number, versionId: number) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
   }
 
-  const [scopes, questions, cells] = await Promise.all([
+  const [scopes, questions, cells, dimensions] = await Promise.all([
     repo.getAllScopesByVersion(versionId),
     repo.getAllQuestionsByVersion(versionId),
     repo.listCellsByVersion(versionId),
+    repo.getAllDimensionsByVersion(versionId),
   ]);
 
-  return { version, scopes, questions, cells };
+  return { version, scopes, questions, cells, dimensions };
 }
 
 // ── Import Operations ─────────────────────────────────────────────────
@@ -1291,6 +1294,391 @@ export async function seedScopeMatrix(workspaceId: number, actorId: number) {
   });
 
   return result;
+}
+
+// ── Dimensions ────────────────────────────────────────────────────────
+
+export async function listDimensions(workspaceId: number, versionId: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.listDimensionsByVersion(versionId);
+}
+
+export async function listAllDimensions(workspaceId: number, versionId: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.getAllDimensionsByVersion(versionId);
+}
+
+export async function listDimensionsWithValues(
+  workspaceId: number,
+  versionId: number,
+): Promise<DimensionDefinition[]> {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const dims = await repo.listDimensionsByVersion(versionId);
+  const result: DimensionDefinition[] = [];
+
+  for (const dim of dims) {
+    const values = await repo.listDimensionValues(dim.id);
+    result.push({
+      id: dim.id,
+      dimensionKey: dim.dimensionKey,
+      dimensionLabel: dim.dimensionLabel,
+      description: dim.description,
+      sortOrder: dim.sortOrder,
+      isActive: dim.isActive,
+      values: values.map((v) => ({
+        id: v.id,
+        dimensionId: v.dimensionId,
+        valueKey: v.valueKey,
+        valueLabel: v.valueLabel,
+        description: v.description,
+        sortOrder: v.sortOrder,
+        isActive: v.isActive,
+      })),
+    });
+  }
+
+  return result;
+}
+
+export async function createDimension(
+  workspaceId: number,
+  versionId: number,
+  dimensionKey: string,
+  dimensionLabel: string,
+  description: string | null,
+  sortOrder: number,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const dim = await repo.createDimension({
+    versionId,
+    dimensionKey,
+    dimensionLabel,
+    description,
+    sortOrder,
+    isActive: 1,
+  });
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "dimension.create",
+    entityType: "ps_dimension",
+    entityId: dim.id,
+    newValue: { dimensionKey, dimensionLabel, versionId },
+  });
+
+  return dim;
+}
+
+export async function createDimensionsBatch(
+  workspaceId: number,
+  versionId: number,
+  items: Array<{
+    dimensionKey: string;
+    dimensionLabel: string;
+    description?: string;
+    sortOrder?: number;
+    values?: Array<{
+      valueKey: string;
+      valueLabel: string;
+      description?: string;
+      sortOrder?: number;
+    }>;
+  }>,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const dimRows = items.map((item, i) => ({
+    versionId,
+    dimensionKey: item.dimensionKey,
+    dimensionLabel: item.dimensionLabel,
+    description: item.description || null,
+    sortOrder: item.sortOrder ?? i,
+    isActive: 1,
+  }));
+
+  const createdDims = await repo.createDimensionsBatch(dimRows);
+
+  // Insert values for each dimension
+  for (let i = 0; i < items.length; i++) {
+    const itemValues = items[i].values;
+    if (!itemValues || itemValues.length === 0) continue;
+    const dimId = createdDims[i].id;
+
+    const valRows = itemValues.map((v, j) => ({
+      dimensionId: dimId,
+      valueKey: v.valueKey,
+      valueLabel: v.valueLabel,
+      description: v.description || null,
+      sortOrder: v.sortOrder ?? j,
+      isActive: 1,
+    }));
+    await repo.createDimensionValuesBatch(valRows);
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "dimension.batch_create",
+    entityType: "ps_dimension",
+    entityId: versionId,
+    newValue: { count: createdDims.length },
+  });
+
+  return createdDims;
+}
+
+export async function updateDimension(
+  workspaceId: number,
+  versionId: number,
+  id: number,
+  data: { dimensionKey?: string; dimensionLabel?: string; description?: string; sortOrder?: number; isActive?: number },
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const updated = await repo.updateDimension(id, versionId, data);
+  if (!updated) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Dimension not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "dimension.update",
+    entityType: "ps_dimension",
+    entityId: id,
+    newValue: data,
+  });
+
+  return updated;
+}
+
+// ── Dimension Values ──────────────────────────────────────────────────
+
+export async function listDimensionValues(workspaceId: number, dimensionId: number) {
+  return repo.listDimensionValues(dimensionId);
+}
+
+export async function listAllDimensionValues(workspaceId: number, dimensionId: number) {
+  return repo.getAllDimensionValues(dimensionId);
+}
+
+export async function createDimensionValue(
+  workspaceId: number,
+  dimensionId: number,
+  valueKey: string,
+  valueLabel: string,
+  description: string | null,
+  sortOrder: number,
+  actorId: number,
+) {
+  const val = await repo.createDimensionValue({
+    dimensionId,
+    valueKey,
+    valueLabel,
+    description,
+    sortOrder,
+    isActive: 1,
+  });
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "dimension_value.create",
+    entityType: "ps_dimension_value",
+    entityId: val.id,
+    newValue: { valueKey, valueLabel, dimensionId },
+  });
+
+  return val;
+}
+
+export async function createDimensionValuesBatch(
+  workspaceId: number,
+  dimensionId: number,
+  items: Array<{ valueKey: string; valueLabel: string; description?: string; sortOrder?: number }>,
+  actorId: number,
+) {
+  const valRows = items.map((v, i) => ({
+    dimensionId,
+    valueKey: v.valueKey,
+    valueLabel: v.valueLabel,
+    description: v.description || null,
+    sortOrder: v.sortOrder ?? i,
+    isActive: 1,
+  }));
+
+  const created = await repo.createDimensionValuesBatch(valRows);
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "dimension_value.batch_create",
+    entityType: "ps_dimension_value",
+    entityId: dimensionId,
+    newValue: { count: created.length },
+  });
+
+  return created;
+}
+
+export async function updateDimensionValue(
+  workspaceId: number,
+  dimensionId: number,
+  id: number,
+  data: { valueKey?: string; valueLabel?: string; description?: string; sortOrder?: number; isActive?: number },
+  actorId: number,
+) {
+  const updated = await repo.updateDimensionValue(id, dimensionId, data);
+  if (!updated) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Dimension value not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "dimension_value.update",
+    entityType: "ps_dimension_value",
+    entityId: id,
+    newValue: data,
+  });
+
+  return updated;
+}
+
+// ── Question Presentations ────────────────────────────────────────────
+
+export async function getQuestionPresentation(workspaceId: number, questionId: number) {
+  const pres = await repo.getQuestionPresentation(questionId);
+  if (!pres) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Question presentation not found" });
+  }
+  return pres;
+}
+
+export async function listQuestionPresentations(workspaceId: number, versionId: number) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+  return repo.listQuestionPresentationsByVersion(versionId);
+}
+
+export async function createQuestionPresentation(
+  workspaceId: number,
+  questionId: number,
+  presentationType: PresentationType,
+  dimensionId: number | null,
+  configJson: Record<string, unknown> | null,
+  actorId: number,
+) {
+  const pres = await repo.createQuestionPresentation({
+    questionId,
+    presentationType,
+    dimensionId,
+    configJson,
+    isActive: 1,
+  });
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "question_presentation.create",
+    entityType: "ps_matrix_question_presentation",
+    entityId: pres.id,
+    newValue: { questionId, presentationType, dimensionId },
+  });
+
+  return pres;
+}
+
+export async function createQuestionPresentationsBatch(
+  workspaceId: number,
+  versionId: number,
+  items: Array<{
+    questionId: number;
+    presentationType: PresentationType;
+    dimensionId?: number | null;
+    configJson?: Record<string, unknown> | null;
+  }>,
+  actorId: number,
+) {
+  const version = await repo.getMatrixVersionById(workspaceId, versionId);
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Matrix version not found" });
+  }
+
+  const presRows = items.map((p) => ({
+    questionId: p.questionId,
+    presentationType: p.presentationType,
+    dimensionId: p.dimensionId ?? null,
+    configJson: p.configJson ?? null,
+    isActive: 1,
+  }));
+
+  const created = await repo.createQuestionPresentationsBatch(presRows);
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "question_presentation.batch_create",
+    entityType: "ps_matrix_question_presentation",
+    entityId: versionId,
+    newValue: { count: created.length },
+  });
+
+  return created;
+}
+
+export async function updateQuestionPresentation(
+  workspaceId: number,
+  questionId: number,
+  data: {
+    presentationType?: PresentationType;
+    dimensionId?: number | null;
+    configJson?: Record<string, unknown> | null;
+    isActive?: number;
+  },
+  actorId: number,
+) {
+  const updated = await repo.updateQuestionPresentation(questionId, data);
+  if (!updated) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Question presentation not found" });
+  }
+
+  await logPsAudit({
+    workspaceId,
+    actorId,
+    action: "question_presentation.update",
+    entityType: "ps_matrix_question_presentation",
+    entityId: questionId,
+    newValue: data,
+  });
+
+  return updated;
 }
 
 // ── Monitoring ────────────────────────────────────────────────────────

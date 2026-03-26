@@ -23,11 +23,13 @@ export async function getMatrixOverview(workspaceId: number): Promise<MatrixOver
   let totalScopes = 0;
   let totalQuestions = 0;
   let totalCells = 0;
+  let totalDimensions = 0;
 
   if (activeVersion) {
     totalScopes = await repo.countActiveScopesByVersion(activeVersion.id);
     totalQuestions = await repo.countActiveQuestionsByVersion(activeVersion.id);
     totalCells = await repo.countCellsByVersion(activeVersion.id);
+    totalDimensions = await repo.countDimensionsByVersion(activeVersion.id);
   }
 
   const lastImportAt = await repo.getLastImportDate(workspaceId);
@@ -60,6 +62,7 @@ export async function getMatrixOverview(workspaceId: number): Promise<MatrixOver
     totalScopes,
     totalQuestions,
     totalCells,
+    totalDimensions,
     lastImportAt,
     lastActivationAt,
   };
@@ -140,6 +143,59 @@ export async function duplicateMatrixVersion(
     }
   }
 
+  // Copy dimensions and dimension values
+  const dimensions = await repo.getAllDimensionsByVersion(sourceVersionId);
+  const dimensionIdMap = new Map<number, number>();
+  if (dimensions.length > 0) {
+    const dimRows = dimensions.map((d) => ({
+      versionId: created.id,
+      dimensionKey: d.dimensionKey,
+      dimensionLabel: d.dimensionLabel,
+      description: d.description,
+      sortOrder: d.sortOrder,
+      isActive: d.isActive,
+    }));
+    const newDimensions = await repo.createDimensionsBatch(dimRows);
+    for (let i = 0; i < dimensions.length; i++) {
+      dimensionIdMap.set(dimensions[i].id, newDimensions[i].id);
+    }
+
+    // Copy values for each dimension
+    for (const oldDim of dimensions) {
+      const newDimId = dimensionIdMap.get(oldDim.id);
+      if (!newDimId) continue;
+      const values = await repo.getAllDimensionValues(oldDim.id);
+      if (values.length > 0) {
+        const valRows = values.map((v) => ({
+          dimensionId: newDimId,
+          valueKey: v.valueKey,
+          valueLabel: v.valueLabel,
+          description: v.description,
+          sortOrder: v.sortOrder,
+          isActive: v.isActive,
+        }));
+        await repo.createDimensionValuesBatch(valRows);
+      }
+    }
+  }
+
+  // Copy question presentations with remapped IDs
+  const presentations = await repo.listQuestionPresentationsByVersion(sourceVersionId);
+  if (presentations.length > 0) {
+    const presRows = presentations
+      .filter((p) => questionIdMap.has(p.questionId))
+      .map((p) => ({
+        questionId: questionIdMap.get(p.questionId)!,
+        presentationType: p.presentationType,
+        dimensionId: p.dimensionId ? (dimensionIdMap.get(p.dimensionId) ?? null) : null,
+        configJson: p.configJson,
+        isActive: p.isActive,
+      }));
+    if (presRows.length > 0) {
+      await repo.createQuestionPresentationsBatch(presRows);
+    }
+  }
+
   await logPsAudit({
     workspaceId,
     actorId,
@@ -152,6 +208,8 @@ export async function duplicateMatrixVersion(
       scopesCopied: scopes.length,
       questionsCopied: questions.length,
       cellsCopied: cells.length,
+      dimensionsCopied: dimensions.length,
+      presentationsCopied: presentations.length,
     },
   });
   await logActivity({
@@ -224,6 +282,7 @@ export async function validateMatrixVersion(
   const allScopes = await repo.getAllScopesByVersion(versionId);
   const allQuestions = await repo.getAllQuestionsByVersion(versionId);
   const cells = await repo.listCellsByVersion(versionId);
+  const dimensionCount = await repo.countDimensionsByVersion(versionId);
 
   const activeScopes = allScopes.filter((s) => s.isActive === 1);
   const activeQuestions = allQuestions.filter((q) => q.isActive === 1);

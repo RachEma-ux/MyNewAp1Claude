@@ -354,3 +354,67 @@ export const psScopeMatrixHeaders = pgTable("ps_scope_matrix_headers", {
 
 export type PsScopeMatrixHeader = typeof psScopeMatrixHeaders.$inferSelect;
 export type InsertPsScopeMatrixHeader = typeof psScopeMatrixHeaders.$inferInsert;
+
+// ============================================================================
+// 14. PS Dimensions — DB-driven classification dimensions (replaces hard-coded enums)
+// ============================================================================
+
+export const psDimensions = pgTable("ps_dimensions", {
+  id: serial("id").primaryKey(),
+  versionId: integer("version_id").notNull(),
+  dimensionKey: varchar("dimension_key", { length: 100 }).notNull(),
+  dimensionLabel: varchar("dimension_label", { length: 255 }).notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: integer("is_active").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  versionIdx: index("ps_dimensions_version_idx").on(table.versionId),
+  keyUniq: unique("ps_dimensions_key_uniq").on(table.versionId, table.dimensionKey),
+  sortIdx: index("ps_dimensions_sort_idx").on(table.versionId, table.sortOrder),
+}));
+
+export type PsDimension = typeof psDimensions.$inferSelect;
+export type InsertPsDimension = typeof psDimensions.$inferInsert;
+
+// ============================================================================
+// 15. PS Dimension Values — Enumerated values per dimension
+// ============================================================================
+
+export const psDimensionValues = pgTable("ps_dimension_values", {
+  id: serial("id").primaryKey(),
+  dimensionId: integer("dimension_id").notNull(),
+  valueKey: varchar("value_key", { length: 100 }).notNull(),
+  valueLabel: varchar("value_label", { length: 255 }).notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: integer("is_active").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  dimensionIdx: index("ps_dimension_values_dim_idx").on(table.dimensionId),
+  keyUniq: unique("ps_dimension_values_key_uniq").on(table.dimensionId, table.valueKey),
+  sortIdx: index("ps_dimension_values_sort_idx").on(table.dimensionId, table.sortOrder),
+}));
+
+export type PsDimensionValue = typeof psDimensionValues.$inferSelect;
+export type InsertPsDimensionValue = typeof psDimensionValues.$inferInsert;
+
+// ============================================================================
+// 16. PS Matrix Question Presentations — UI metadata per question
+// ============================================================================
+
+export const psMatrixQuestionPresentations = pgTable("ps_matrix_question_presentations", {
+  id: serial("id").primaryKey(),
+  questionId: integer("question_id").notNull(),
+  presentationType: varchar("presentation_type", { length: 50 }).notNull(), // boolean | select | slider | multi_select
+  dimensionId: integer("dimension_id"), // optional link to a dimension for select-type
+  configJson: json("config_json").$type<Record<string, unknown>>(),
+  isActive: integer("is_active").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  questionIdx: index("ps_matrix_qp_question_idx").on(table.questionId),
+  questionUniq: unique("ps_matrix_qp_question_uniq").on(table.questionId),
+}));
+
+export type PsMatrixQuestionPresentation = typeof psMatrixQuestionPresentations.$inferSelect;
+export type InsertPsMatrixQuestionPresentation = typeof psMatrixQuestionPresentations.$inferInsert;

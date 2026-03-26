@@ -59,6 +59,47 @@ export async function previewMatrixImport(
     }
   }
 
+  // Validate dimensions if provided
+  if (payload.dimensions && payload.dimensions.length > 0) {
+    const dimKeys = new Set<string>();
+    for (const dim of payload.dimensions) {
+      if (dimKeys.has(dim.dimensionKey)) {
+        errors.push(`Duplicate dimension key in import: "${dim.dimensionKey}"`);
+      }
+      dimKeys.add(dim.dimensionKey);
+
+      // Validate value keys unique within dimension
+      const valKeys = new Set<string>();
+      for (const val of dim.values) {
+        if (valKeys.has(val.valueKey)) {
+          errors.push(`Duplicate value key "${val.valueKey}" in dimension "${dim.dimensionKey}"`);
+        }
+        valKeys.add(val.valueKey);
+      }
+      if (dim.values.length === 0) {
+        warnings.push(`Dimension "${dim.dimensionKey}" has no values defined`);
+      }
+    }
+  }
+
+  // Validate question presentations if provided
+  if (payload.questionPresentations && payload.questionPresentations.length > 0) {
+    const validPresentationTypes = new Set(["boolean", "select", "slider", "multi_select", "text"]);
+    const dimKeys = payload.dimensions ? new Set(payload.dimensions.map((d) => d.dimensionKey)) : new Set<string>();
+
+    for (const pres of payload.questionPresentations) {
+      if (!questionCodes.has(pres.questionCode)) {
+        errors.push(`Question presentation references unknown question code: "${pres.questionCode}"`);
+      }
+      if (!validPresentationTypes.has(pres.presentationType)) {
+        errors.push(`Invalid presentation type "${pres.presentationType}" for question "${pres.questionCode}"`);
+      }
+      if (pres.dimensionKey && !dimKeys.has(pres.dimensionKey)) {
+        warnings.push(`Question presentation for "${pres.questionCode}" references dimension "${pres.dimensionKey}" not in this import`);
+      }
+    }
+  }
+
   // Coverage warning
   const expectedCells = payload.scopes.length * payload.questions.length;
   if (payload.cells.length < expectedCells) {
@@ -92,6 +133,8 @@ export async function previewMatrixImport(
     scopesCount: payload.scopes.length,
     questionsCount: payload.questions.length,
     cellsCount: payload.cells.length,
+    dimensionsCount: payload.dimensions?.length ?? 0,
+    questionPresentationsCount: payload.questionPresentations?.length ?? 0,
     warnings: uniqueWarnings,
     errors: uniqueErrors,
     isValid: uniqueErrors.length === 0,
@@ -145,9 +188,11 @@ export async function commitMatrixImport(
     versionId = targetVersionId;
 
     // Clear existing data in target version before importing
+    await repo.deleteQuestionPresentationsByVersion(versionId);
     await repo.deleteCellsByVersion(versionId);
     await repo.deleteQuestionsByVersion(versionId);
     await repo.deleteScopesByVersion(versionId);
+    await repo.deleteDimensionsByVersion(versionId);
   } else if (newVersion && newLabel) {
     // Create new draft version
     const created = await repo.createMatrixVersion({
@@ -208,6 +253,63 @@ export async function commitMatrixImport(
     await repo.createCellsBatch(cellRows);
   }
 
+  // Insert dimensions + values if provided
+  let dimensionsCreated = 0;
+  let dimensionValuesCreated = 0;
+  const dimensionKeyToId = new Map<string, number>();
+
+  if (payload.dimensions && payload.dimensions.length > 0) {
+    const dimRows = payload.dimensions.map((d, i) => ({
+      versionId,
+      dimensionKey: d.dimensionKey,
+      dimensionLabel: d.dimensionLabel,
+      description: d.description || null,
+      sortOrder: d.sortOrder ?? i,
+      isActive: 1,
+    }));
+    const createdDims = await repo.createDimensionsBatch(dimRows);
+    dimensionsCreated = createdDims.length;
+
+    for (const dim of createdDims) {
+      dimensionKeyToId.set(dim.dimensionKey, dim.id);
+    }
+
+    // Insert values for each dimension
+    for (const dimDef of payload.dimensions) {
+      const dimId = dimensionKeyToId.get(dimDef.dimensionKey);
+      if (!dimId || !dimDef.values || dimDef.values.length === 0) continue;
+
+      const valRows = dimDef.values.map((v, i) => ({
+        dimensionId: dimId,
+        valueKey: v.valueKey,
+        valueLabel: v.valueLabel,
+        description: v.description || null,
+        sortOrder: v.sortOrder ?? i,
+        isActive: 1,
+      }));
+      const createdVals = await repo.createDimensionValuesBatch(valRows);
+      dimensionValuesCreated += createdVals.length;
+    }
+  }
+
+  // Insert question presentations if provided
+  let presentationsCreated = 0;
+  if (payload.questionPresentations && payload.questionPresentations.length > 0) {
+    const presRows = payload.questionPresentations
+      .filter((p) => questionCodeToId.has(p.questionCode))
+      .map((p) => ({
+        questionId: questionCodeToId.get(p.questionCode)!,
+        presentationType: p.presentationType,
+        dimensionId: p.dimensionKey ? (dimensionKeyToId.get(p.dimensionKey) ?? null) : null,
+        configJson: p.configJson || null,
+        isActive: 1,
+      }));
+    if (presRows.length > 0) {
+      const createdPres = await repo.createQuestionPresentationsBatch(presRows);
+      presentationsCreated = createdPres.length;
+    }
+  }
+
   // Update import record
   await repo.updateMatrixImport(importId, {
     versionId,
@@ -227,6 +329,9 @@ export async function commitMatrixImport(
       scopesCreated: createdScopes.length,
       questionsCreated: createdQuestions.length,
       cellsCreated: cellRows.length,
+      dimensionsCreated,
+      dimensionValuesCreated,
+      presentationsCreated,
     },
   });
   await logActivity({
@@ -244,5 +349,8 @@ export async function commitMatrixImport(
     scopesCreated: createdScopes.length,
     questionsCreated: createdQuestions.length,
     cellsCreated: cellRows.length,
+    dimensionsCreated,
+    dimensionValuesCreated,
+    presentationsCreated,
   };
 }

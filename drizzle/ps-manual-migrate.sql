@@ -239,4 +239,47 @@ CREATE TABLE IF NOT EXISTS ps_scope_matrix_headers (
 CREATE INDEX IF NOT EXISTS ps_scope_matrix_headers_version_idx ON ps_scope_matrix_headers(version_id);
 CREATE INDEX IF NOT EXISTS ps_scope_matrix_headers_sort_idx ON ps_scope_matrix_headers(version_id, sort_order);
 
+-- 14. ps_dimensions — DB-driven classification dimensions
+CREATE TABLE IF NOT EXISTS ps_dimensions (
+  id serial PRIMARY KEY,
+  version_id integer NOT NULL,
+  dimension_key varchar(100) NOT NULL,
+  dimension_label varchar(255) NOT NULL,
+  description text,
+  sort_order integer NOT NULL DEFAULT 0,
+  is_active integer NOT NULL DEFAULT 1,
+  created_at timestamp NOT NULL DEFAULT now(),
+  CONSTRAINT ps_dimensions_key_uniq UNIQUE(version_id, dimension_key)
+);
+CREATE INDEX IF NOT EXISTS ps_dimensions_version_idx ON ps_dimensions(version_id);
+CREATE INDEX IF NOT EXISTS ps_dimensions_sort_idx ON ps_dimensions(version_id, sort_order);
+
+-- 15. ps_dimension_values — Enumerated values per dimension
+CREATE TABLE IF NOT EXISTS ps_dimension_values (
+  id serial PRIMARY KEY,
+  dimension_id integer NOT NULL,
+  value_key varchar(100) NOT NULL,
+  value_label varchar(255) NOT NULL,
+  description text,
+  sort_order integer NOT NULL DEFAULT 0,
+  is_active integer NOT NULL DEFAULT 1,
+  created_at timestamp NOT NULL DEFAULT now(),
+  CONSTRAINT ps_dimension_values_key_uniq UNIQUE(dimension_id, value_key)
+);
+CREATE INDEX IF NOT EXISTS ps_dimension_values_dim_idx ON ps_dimension_values(dimension_id);
+CREATE INDEX IF NOT EXISTS ps_dimension_values_sort_idx ON ps_dimension_values(dimension_id, sort_order);
+
+-- 16. ps_matrix_question_presentations — UI metadata per question
+CREATE TABLE IF NOT EXISTS ps_matrix_question_presentations (
+  id serial PRIMARY KEY,
+  question_id integer NOT NULL,
+  presentation_type varchar(50) NOT NULL,
+  dimension_id integer,
+  config_json json,
+  is_active integer NOT NULL DEFAULT 1,
+  created_at timestamp NOT NULL DEFAULT now(),
+  CONSTRAINT ps_matrix_qp_question_uniq UNIQUE(question_id)
+);
+CREATE INDEX IF NOT EXISTS ps_matrix_qp_question_idx ON ps_matrix_question_presentations(question_id);
+
 COMMIT;

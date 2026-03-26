@@ -267,6 +267,7 @@ export interface MatrixOverview {
   totalScopes: number;
   totalQuestions: number;
   totalCells: number;
+  totalDimensions: number;
   lastImportAt: string | null;
   lastActivationAt: string | null;
 }
@@ -322,6 +323,8 @@ export interface MatrixImportPayload {
   scopes: MatrixImportScopeRow[];
   questions: MatrixImportQuestionRow[];
   cells: MatrixImportCellRow[];
+  dimensions?: MatrixImportDimensionRow[];
+  questionPresentations?: MatrixImportQuestionPresentationRow[];
 }
 
 export interface MatrixImportPreview {
@@ -330,6 +333,8 @@ export interface MatrixImportPreview {
   scopesCount: number;
   questionsCount: number;
   cellsCount: number;
+  dimensionsCount: number;
+  questionPresentationsCount: number;
   warnings: string[];
   errors: string[];
   isValid: boolean;
@@ -341,6 +346,9 @@ export interface MatrixImportCommitResult {
   scopesCreated: number;
   questionsCreated: number;
   cellsCreated: number;
+  dimensionsCreated: number;
+  dimensionValuesCreated: number;
+  presentationsCreated: number;
 }
 
 // ── Scope Matrix Profile Types ──────────────────────────────────────────
@@ -385,6 +393,86 @@ export interface MatrixHeaderDefinition {
   headerLabel: string;
   headerType: MatrixHeaderType | null;
   sortOrder: number;
+}
+
+// ── Dimension Types (DB-driven, replaces hard-coded enums) ─────────────
+
+export interface DimensionDefinition {
+  id: number;
+  dimensionKey: string;
+  dimensionLabel: string;
+  description: string | null;
+  sortOrder: number;
+  isActive: number;
+  values: DimensionValueDefinition[];
+}
+
+export interface DimensionValueDefinition {
+  id: number;
+  dimensionId: number;
+  valueKey: string;
+  valueLabel: string;
+  description: string | null;
+  sortOrder: number;
+  isActive: number;
+}
+
+export interface CreateDimensionInput {
+  versionId: number;
+  dimensionKey: string;
+  dimensionLabel: string;
+  description?: string;
+  sortOrder?: number;
+}
+
+export interface CreateDimensionValueInput {
+  dimensionId: number;
+  valueKey: string;
+  valueLabel: string;
+  description?: string;
+  sortOrder?: number;
+}
+
+// ── Question Presentation Types ─────────────────────────────────────
+
+export const PRESENTATION_TYPES = [
+  "boolean",
+  "select",
+  "slider",
+  "multi_select",
+  "text",
+] as const;
+export type PresentationType = (typeof PRESENTATION_TYPES)[number];
+
+export interface QuestionPresentationData {
+  questionId: number;
+  presentationType: PresentationType;
+  dimensionId?: number | null;
+  configJson?: Record<string, unknown> | null;
+}
+
+// ── Import Dimension/Presentation Rows ──────────────────────────────
+
+export interface MatrixImportDimensionRow {
+  dimensionKey: string;
+  dimensionLabel: string;
+  description?: string;
+  sortOrder?: number;
+  values: MatrixImportDimensionValueRow[];
+}
+
+export interface MatrixImportDimensionValueRow {
+  valueKey: string;
+  valueLabel: string;
+  description?: string;
+  sortOrder?: number;
+}
+
+export interface MatrixImportQuestionPresentationRow {
+  questionCode: string;
+  presentationType: PresentationType;
+  dimensionKey?: string;
+  configJson?: Record<string, unknown>;
 }
 
 export type MatrixImportType = "scope_matrix" | "scoring_matrix";

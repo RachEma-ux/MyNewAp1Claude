@@ -329,6 +329,24 @@ export const previewMatrixImportSchema = z.object({
       scopeCode: z.string().min(1).max(100),
       weight: z.number().int(),
     })).min(1).max(10000),
+    dimensions: z.array(z.object({
+      dimensionKey: z.string().min(1).max(100),
+      dimensionLabel: z.string().min(1).max(255),
+      description: z.string().max(2000).optional(),
+      sortOrder: z.number().int().min(0).optional(),
+      values: z.array(z.object({
+        valueKey: z.string().min(1).max(100),
+        valueLabel: z.string().min(1).max(255),
+        description: z.string().max(2000).optional(),
+        sortOrder: z.number().int().min(0).optional(),
+      })).min(1).max(100),
+    })).optional(),
+    questionPresentations: z.array(z.object({
+      questionCode: z.string().min(1).max(100),
+      presentationType: z.enum(["boolean", "select", "slider", "multi_select", "text"]),
+      dimensionKey: z.string().max(100).optional(),
+      configJson: z.record(z.unknown()).optional(),
+    })).optional(),
   }),
 });
 
@@ -398,6 +416,128 @@ export const parseMatrixHeadersSchema = z.object({
 
 export const seedScopeMatrixSchema = z.object({
   workspaceId: z.number().int().positive(),
+});
+
+// ── Dimensions ──────────────────────────────────────────────────────
+
+export const listDimensionsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+});
+
+export const createDimensionSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  dimensionKey: z.string().min(1).max(100),
+  dimensionLabel: z.string().min(1).max(255),
+  description: z.string().max(2000).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export const createDimensionsBatchSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  items: z.array(z.object({
+    dimensionKey: z.string().min(1).max(100),
+    dimensionLabel: z.string().min(1).max(255),
+    description: z.string().max(2000).optional(),
+    sortOrder: z.number().int().min(0).optional(),
+    values: z.array(z.object({
+      valueKey: z.string().min(1).max(100),
+      valueLabel: z.string().min(1).max(255),
+      description: z.string().max(2000).optional(),
+      sortOrder: z.number().int().min(0).optional(),
+    })).optional(),
+  })).min(1).max(50),
+});
+
+export const updateDimensionSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  id: z.number().int().positive(),
+  dimensionKey: z.string().min(1).max(100).optional(),
+  dimensionLabel: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+  isActive: z.number().int().min(0).max(1).optional(),
+});
+
+// ── Dimension Values ────────────────────────────────────────────────
+
+export const listDimensionValuesSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  dimensionId: z.number().int().positive(),
+});
+
+export const createDimensionValueSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  dimensionId: z.number().int().positive(),
+  valueKey: z.string().min(1).max(100),
+  valueLabel: z.string().min(1).max(255),
+  description: z.string().max(2000).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export const createDimensionValuesBatchSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  dimensionId: z.number().int().positive(),
+  items: z.array(z.object({
+    valueKey: z.string().min(1).max(100),
+    valueLabel: z.string().min(1).max(255),
+    description: z.string().max(2000).optional(),
+    sortOrder: z.number().int().min(0).optional(),
+  })).min(1).max(100),
+});
+
+export const updateDimensionValueSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  dimensionId: z.number().int().positive(),
+  id: z.number().int().positive(),
+  valueKey: z.string().min(1).max(100).optional(),
+  valueLabel: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+  isActive: z.number().int().min(0).max(1).optional(),
+});
+
+// ── Question Presentations ──────────────────────────────────────────
+
+export const getQuestionPresentationSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  questionId: z.number().int().positive(),
+});
+
+export const listQuestionPresentationsSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+});
+
+export const createQuestionPresentationSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  questionId: z.number().int().positive(),
+  presentationType: z.enum(["boolean", "select", "slider", "multi_select", "text"]),
+  dimensionId: z.number().int().positive().optional(),
+  configJson: z.record(z.unknown()).optional(),
+});
+
+export const createQuestionPresentationsBatchSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  items: z.array(z.object({
+    questionId: z.number().int().positive(),
+    presentationType: z.enum(["boolean", "select", "slider", "multi_select", "text"]),
+    dimensionId: z.number().int().positive().optional(),
+    configJson: z.record(z.unknown()).optional(),
+  })).min(1).max(500),
+});
+
+export const updateQuestionPresentationSchema = z.object({
+  workspaceId: z.number().int().positive(),
+  questionId: z.number().int().positive(),
+  presentationType: z.enum(["boolean", "select", "slider", "multi_select", "text"]).optional(),
+  dimensionId: z.number().int().positive().nullable().optional(),
+  configJson: z.record(z.unknown()).nullable().optional(),
+  isActive: z.number().int().min(0).max(1).optional(),
 });
 
 // ── Classification ──────────────────────────────────────────────────

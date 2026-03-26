@@ -19,6 +19,9 @@ import {
   psMatrixImports,
   psScopeMatrixProfile,
   psScopeMatrixHeaders,
+  psDimensions,
+  psDimensionValues,
+  psMatrixQuestionPresentations,
   type PsSystem,
   type InsertPsSystem,
   type PsWizardRun,
@@ -42,6 +45,12 @@ import {
   type InsertPsScopeMatrixProfile,
   type PsScopeMatrixHeader,
   type InsertPsScopeMatrixHeader,
+  type PsDimension,
+  type InsertPsDimension,
+  type PsDimensionValue,
+  type InsertPsDimensionValue,
+  type PsMatrixQuestionPresentation,
+  type InsertPsMatrixQuestionPresentation,
 } from "../../drizzle/tables/ps";
 
 // ── Systems ──────────────────────────────────────────────────────────────
@@ -834,4 +843,199 @@ export async function deleteHeadersByVersion(versionId: number): Promise<void> {
   const db = getDb();
   if (!db) return;
   await db.delete(psScopeMatrixHeaders).where(eq(psScopeMatrixHeaders.versionId, versionId));
+}
+
+// ── Dimensions ──────────────────────────────────────────────────────
+
+export async function listDimensionsByVersion(versionId: number): Promise<PsDimension[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psDimensions)
+    .where(and(
+      eq(psDimensions.versionId, versionId),
+      eq(psDimensions.isActive, 1),
+    ))
+    .orderBy(psDimensions.sortOrder);
+}
+
+export async function getAllDimensionsByVersion(versionId: number): Promise<PsDimension[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psDimensions)
+    .where(eq(psDimensions.versionId, versionId))
+    .orderBy(psDimensions.sortOrder);
+}
+
+export async function createDimension(data: InsertPsDimension): Promise<PsDimension> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psDimensions).values(data).returning();
+  return created;
+}
+
+export async function createDimensionsBatch(items: InsertPsDimension[]): Promise<PsDimension[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  if (items.length === 0) return [];
+  return db.insert(psDimensions).values(items).returning();
+}
+
+export async function updateDimension(
+  id: number,
+  versionId: number,
+  data: Partial<InsertPsDimension>,
+): Promise<PsDimension | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psDimensions)
+    .set(data)
+    .where(and(eq(psDimensions.id, id), eq(psDimensions.versionId, versionId)))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteDimensionsByVersion(versionId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  // First delete all values for dimensions in this version
+  const dims = await db.select({ id: psDimensions.id }).from(psDimensions)
+    .where(eq(psDimensions.versionId, versionId));
+  for (const d of dims) {
+    await db.delete(psDimensionValues).where(eq(psDimensionValues.dimensionId, d.id));
+  }
+  await db.delete(psDimensions).where(eq(psDimensions.versionId, versionId));
+}
+
+export async function countDimensionsByVersion(versionId: number): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const [result] = await db.select({ cnt: count() }).from(psDimensions)
+    .where(eq(psDimensions.versionId, versionId));
+  return result?.cnt ?? 0;
+}
+
+// ── Dimension Values ────────────────────────────────────────────────
+
+export async function listDimensionValues(dimensionId: number): Promise<PsDimensionValue[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psDimensionValues)
+    .where(and(
+      eq(psDimensionValues.dimensionId, dimensionId),
+      eq(psDimensionValues.isActive, 1),
+    ))
+    .orderBy(psDimensionValues.sortOrder);
+}
+
+export async function getAllDimensionValues(dimensionId: number): Promise<PsDimensionValue[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(psDimensionValues)
+    .where(eq(psDimensionValues.dimensionId, dimensionId))
+    .orderBy(psDimensionValues.sortOrder);
+}
+
+export async function createDimensionValue(data: InsertPsDimensionValue): Promise<PsDimensionValue> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psDimensionValues).values(data).returning();
+  return created;
+}
+
+export async function createDimensionValuesBatch(items: InsertPsDimensionValue[]): Promise<PsDimensionValue[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  if (items.length === 0) return [];
+  return db.insert(psDimensionValues).values(items).returning();
+}
+
+export async function updateDimensionValue(
+  id: number,
+  dimensionId: number,
+  data: Partial<InsertPsDimensionValue>,
+): Promise<PsDimensionValue | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psDimensionValues)
+    .set(data)
+    .where(and(eq(psDimensionValues.id, id), eq(psDimensionValues.dimensionId, dimensionId)))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteDimensionValues(dimensionId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  await db.delete(psDimensionValues).where(eq(psDimensionValues.dimensionId, dimensionId));
+}
+
+// ── Question Presentations ──────────────────────────────────────────
+
+export async function getQuestionPresentation(questionId: number): Promise<PsMatrixQuestionPresentation | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [pres] = await db.select().from(psMatrixQuestionPresentations)
+    .where(eq(psMatrixQuestionPresentations.questionId, questionId))
+    .limit(1);
+  return pres ?? null;
+}
+
+export async function listQuestionPresentationsByVersion(versionId: number): Promise<PsMatrixQuestionPresentation[]> {
+  const db = getDb();
+  if (!db) return [];
+  // Join through questions to get presentations for a specific version
+  const questions = await db.select().from(psMatrixQuestions)
+    .where(eq(psMatrixQuestions.versionId, versionId));
+  if (questions.length === 0) return [];
+
+  const results: PsMatrixQuestionPresentation[] = [];
+  for (const q of questions) {
+    const [p] = await db.select().from(psMatrixQuestionPresentations)
+      .where(eq(psMatrixQuestionPresentations.questionId, q.id))
+      .limit(1);
+    if (p) results.push(p);
+  }
+  return results;
+}
+
+export async function createQuestionPresentation(
+  data: InsertPsMatrixQuestionPresentation,
+): Promise<PsMatrixQuestionPresentation> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(psMatrixQuestionPresentations).values(data).returning();
+  return created;
+}
+
+export async function createQuestionPresentationsBatch(
+  items: InsertPsMatrixQuestionPresentation[],
+): Promise<PsMatrixQuestionPresentation[]> {
+  const db = getDb();
+  if (!db) throw new Error("Database unavailable");
+  if (items.length === 0) return [];
+  return db.insert(psMatrixQuestionPresentations).values(items).returning();
+}
+
+export async function updateQuestionPresentation(
+  questionId: number,
+  data: Partial<InsertPsMatrixQuestionPresentation>,
+): Promise<PsMatrixQuestionPresentation | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [updated] = await db.update(psMatrixQuestionPresentations)
+    .set(data)
+    .where(eq(psMatrixQuestionPresentations.questionId, questionId))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteQuestionPresentationsByVersion(versionId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  const questions = await db.select({ id: psMatrixQuestions.id }).from(psMatrixQuestions)
+    .where(eq(psMatrixQuestions.versionId, versionId));
+  for (const q of questions) {
+    await db.delete(psMatrixQuestionPresentations)
+      .where(eq(psMatrixQuestionPresentations.questionId, q.id));
+  }
 }
