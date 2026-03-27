@@ -27,14 +27,14 @@ import {
 import { Loader2, ClipboardList, Plus, Copy, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-export function PMTWorkItemTemplatesPage({ workspaceId }: { workspaceId: number }) {
+export function PMTWorkItemTemplatesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", description: "", templateData: "{}", projectId: "" });
 
   const utils = trpc.useUtils();
-  const { data: templates, isLoading } = trpc.modules.pmt.templates.workItemTemplates.list.useQuery({ workspaceId });
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: templates, isLoading } = trpc.modules.pmt.templates.workItemTemplates.list.useQuery();
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
 
   const createMut = trpc.modules.pmt.templates.workItemTemplates.create.useMutation({
     onSuccess: () => { utils.modules.pmt.templates.workItemTemplates.list.invalidate(); setDialogOpen(false); toast.success("Template created"); },
@@ -78,7 +78,6 @@ export function PMTWorkItemTemplatesPage({ workspaceId }: { workspaceId: number 
     let parsed: any;
     try { parsed = JSON.parse(form.templateData); } catch { toast.error("Invalid JSON"); return; }
     const payload = {
-      workspaceId,
       name: form.name,
       description: form.description || undefined,
       templateData: parsed,
@@ -128,7 +127,7 @@ export function PMTWorkItemTemplatesPage({ workspaceId }: { workspaceId: number 
                     onClick={() => {
                       const pid = projects?.[0]?.id;
                       if (!pid) { toast.error("No project available"); return; }
-                      applyMut.mutate({ id: t.id, workspaceId, projectId: pid });
+                      applyMut.mutate({ id: t.id, projectId: pid });
                     }}
                     disabled={applyMut.isPending}
                   >
@@ -138,7 +137,7 @@ export function PMTWorkItemTemplatesPage({ workspaceId }: { workspaceId: number 
                   <Button variant="ghost" size="sm" onClick={() => openEdit(t)}>
                     <Pencil className="h-3 w-3" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm("Delete?")) deleteMut.mutate({ id: t.id, workspaceId }); }}>
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm("Delete?")) deleteMut.mutate({ id: t.id }); }}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>

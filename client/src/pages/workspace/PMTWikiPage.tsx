@@ -18,16 +18,16 @@ import { toast } from "sonner";
 
 const STORAGE_PREFIX = "pmt-wiki-";
 
-export function PMTWikiPage({ workspaceId }: { workspaceId: number }) {
+export function PMTWikiPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
-  const storageKey = `${STORAGE_PREFIX}${workspaceId}-${projectId || "none"}`;
+  const storageKey = `${STORAGE_PREFIX}${}-${projectId || "none"}`;
 
   // Load from localStorage when project changes
   useEffect(() => {

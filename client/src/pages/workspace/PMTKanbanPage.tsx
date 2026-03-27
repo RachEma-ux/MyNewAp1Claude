@@ -71,7 +71,7 @@ const typeColors: Record<string, string> = {
 
 type GroupByField = "status" | "priority" | "type" | "assignee";
 
-export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
+export function PMTKanbanPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [groupBy, setGroupBy] = useState<GroupByField>("status");
   const [createOpen, setCreateOpen] = useState(false);
@@ -83,17 +83,17 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   const utils = trpc.useUtils();
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: tasks } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
   // Check governance freeze from the project
   const { data: project } = trpc.modules.pmt.projects.get.useQuery(
-    { id: projectId!, workspaceId },
+    { id: projectId! },
     { enabled: !!projectId }
   );
   const isFrozen = project?.governanceStage === "frozen";
@@ -191,7 +191,7 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
     if (!taskId || fromKey === targetKey) return;
 
     // Update the corresponding field
-    const updatePayload: any = { id: taskId, workspaceId };
+    const updatePayload: any = { id: taskId };
     if (groupBy === "status") updatePayload.status = targetKey;
     else if (groupBy === "priority") updatePayload.priority = targetKey;
     else if (groupBy === "type") updatePayload.type = targetKey;
@@ -325,7 +325,7 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
                                 key={c.key}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  updateMut.mutate({ id: task.id, workspaceId, status: c.key });
+                                  updateMut.mutate({ id: task.id, status: c.key });
                                 }}
                                 className="text-[9px] text-muted-foreground hover:text-foreground transition-colors"
                               >
@@ -387,7 +387,6 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
               onClick={() => {
                 if (!projectId) return;
                 createMut.mutate({
-                  workspaceId,
                   projectId,
                   title: newTitle,
                   description: newDesc || undefined,
@@ -404,7 +403,6 @@ export function PMTKanbanPage({ workspaceId }: { workspaceId: number }) {
 
       {/* Task Detail Drawer */}
       <PMTTaskDetailDrawer
-        workspaceId={workspaceId}
         taskId={selectedTaskId}
         open={!!selectedTaskId}
         onOpenChange={(open) => { if (!open) setSelectedTaskId(null); }}

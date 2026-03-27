@@ -29,14 +29,14 @@ interface TypeForm {
 
 const emptyForm: TypeForm = { name: "", color: "#3b82f6", icon: "circle", isMilestone: false };
 
-export function PMTTypesConfigPage({ workspaceId }: { workspaceId: number }) {
+export function PMTTypesConfigPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<TypeForm>(emptyForm);
 
   const utils = trpc.useUtils();
 
-  const { data: types, isLoading } = trpc.modules.pmt.config.types.list.useQuery({ workspaceId });
+  const { data: types, isLoading } = trpc.modules.pmt.config.types.list.useQuery();
 
   const createMut = trpc.modules.pmt.config.types.create.useMutation({
     onSuccess: () => {
@@ -90,15 +90,15 @@ export function PMTTypesConfigPage({ workspaceId }: { workspaceId: number }) {
       return;
     }
     if (editingId) {
-      updateMut.mutate({ id: editingId, workspaceId, ...form });
+      updateMut.mutate({ id: editingId, ...form });
     } else {
-      createMut.mutate({ workspaceId, ...form });
+      createMut.mutate({ ...form });
     }
   };
 
   const handleDelete = (id: number) => {
     if (confirm("Delete this type?")) {
-      deleteMut.mutate({ id, workspaceId });
+      deleteMut.mutate({ id });
     }
   };
 

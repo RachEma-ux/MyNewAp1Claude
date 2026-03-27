@@ -53,7 +53,7 @@ function sumHours(phases: any[]): number {
   return total;
 }
 
-export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }) {
+export function PMTProjectTemplatesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", description: "", templateData: "{}" });
@@ -62,7 +62,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
   const [applyProjectName, setApplyProjectName] = useState("");
 
   const utils = trpc.useUtils();
-  const { data: templates, isLoading } = trpc.modules.pmt.templates.projectTemplates.list.useQuery({ workspaceId });
+  const { data: templates, isLoading } = trpc.modules.pmt.templates.projectTemplates.list.useQuery();
 
   const createMut = trpc.modules.pmt.templates.projectTemplates.create.useMutation({
     onSuccess: () => { utils.modules.pmt.templates.projectTemplates.list.invalidate(); setDialogOpen(false); toast.success("Template created"); },
@@ -121,7 +121,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
 
   const handleApply = () => {
     if (!applyTemplateId || !applyProjectName.trim()) return;
-    applyMut.mutate({ id: applyTemplateId, workspaceId, name: applyProjectName.trim() });
+    applyMut.mutate({ id: applyTemplateId, name: applyProjectName.trim() });
   };
 
   const handleSubmit = () => {
@@ -129,7 +129,6 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
     let parsed: any;
     try { parsed = JSON.parse(form.templateData); } catch { toast.error("Invalid JSON"); return; }
     const payload = {
-      workspaceId,
       name: form.name,
       description: form.description || undefined,
       templateData: parsed,
@@ -149,7 +148,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
           Project Templates
         </h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => seedMut.mutate({ workspaceId })} disabled={seedMut.isPending}>
+          <Button variant="outline" onClick={() => seedMut.mutate()} disabled={seedMut.isPending}>
             <Sparkles className="h-4 w-4 mr-1" />
             {seedMut.isPending ? "Seeding..." : "Seed PM Templates"}
           </Button>
@@ -225,7 +224,7 @@ export function PMTProjectTemplatesPage({ workspaceId }: { workspaceId: number }
                     <Button variant="ghost" size="sm" onClick={() => openEdit(t)}>
                       <Pencil className="h-3 w-3" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm("Delete?")) deleteMut.mutate({ id: t.id, workspaceId }); }}>
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm("Delete?")) deleteMut.mutate({ id: t.id }); }}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>

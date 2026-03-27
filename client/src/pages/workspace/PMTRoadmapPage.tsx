@@ -25,19 +25,19 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
 
 const CLOSED_STATUSES = ["done", "closed", "resolved"];
 
-export function PMTRoadmapPage({ workspaceId }: { workspaceId: number }) {
+export function PMTRoadmapPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: versions, isLoading: versionsLoading } = trpc.modules.pmt.versions.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
   const { data: tasks, isLoading: tasksLoading } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 

@@ -32,7 +32,7 @@ const stateColors: Record<string, string> = {
   closed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
 
-export function PMTGitReferencesPage({ workspaceId }: { workspaceId: number }) {
+export function PMTGitReferencesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({
     workItemId: "",
@@ -45,8 +45,8 @@ export function PMTGitReferencesPage({ workspaceId }: { workspaceId: number }) {
   });
 
   const utils = trpc.useUtils();
-  const { data: refs, isLoading } = trpc.modules.pmt.git.list.useQuery({ workspaceId });
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: refs, isLoading } = trpc.modules.pmt.git.list.useQuery();
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
 
   const createMut = trpc.modules.pmt.git.create.useMutation({
     onSuccess: () => {
@@ -71,7 +71,6 @@ export function PMTGitReferencesPage({ workspaceId }: { workspaceId: number }) {
       return;
     }
     createMut.mutate({
-      workspaceId,
       workItemId: parseInt(form.workItemId),
       provider: form.provider,
       refType: form.refType,
@@ -137,7 +136,7 @@ export function PMTGitReferencesPage({ workspaceId }: { workspaceId: number }) {
                     className="text-destructive"
                     onClick={() => {
                       if (confirm("Remove this reference?"))
-                        deleteMut.mutate({ id: r.id, workspaceId });
+                        deleteMut.mutate({ id: r.id });
                     }}
                   >
                     <Trash2 className="h-3 w-3" />

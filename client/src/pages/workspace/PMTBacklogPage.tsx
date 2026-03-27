@@ -37,7 +37,7 @@ const typeColors: Record<string, string> = {
   feature: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
 };
 
-export function PMTBacklogPage({ workspaceId }: { workspaceId: number }) {
+export function PMTBacklogPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
   const [createSprintOpen, setCreateSprintOpen] = useState(false);
@@ -47,16 +47,16 @@ export function PMTBacklogPage({ workspaceId }: { workspaceId: number }) {
   const [sprintEnd, setSprintEnd] = useState("");
 
   const utils = trpc.useUtils();
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: tasks } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
   const { data: sprints } = trpc.modules.pmt.sprints.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
@@ -200,7 +200,6 @@ export function PMTBacklogPage({ workspaceId }: { workspaceId: number }) {
                           title="Move to sprint"
                           onClick={() =>
                             addItemsMut.mutate({
-                              workspaceId,
                               sprintId: activeSprint.id,
                               taskIds: [task.id],
                             })
@@ -251,7 +250,6 @@ export function PMTBacklogPage({ workspaceId }: { workspaceId: number }) {
                         title="Remove from sprint"
                         onClick={() =>
                           removeItemsMut.mutate({
-                            workspaceId,
                             sprintId: activeSprint.id,
                             taskIds: [task.id],
                           })
@@ -334,7 +332,6 @@ export function PMTBacklogPage({ workspaceId }: { workspaceId: number }) {
               onClick={() => {
                 if (!projectId) return;
                 createSprintMut.mutate({
-                  workspaceId,
                   projectId,
                   name: sprintName,
                   goal: sprintGoal || undefined,

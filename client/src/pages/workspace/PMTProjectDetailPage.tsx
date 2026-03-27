@@ -37,7 +37,7 @@ import { Plus, ArrowLeft, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 
-export function PMTProjectDetailPage({ workspaceId }: { workspaceId: number }) {
+export function PMTProjectDetailPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = parseInt(params.projectId || "0", 10);
 
@@ -49,17 +49,17 @@ export function PMTProjectDetailPage({ workspaceId }: { workspaceId: number }) {
 
   const utils = trpc.useUtils();
   const { data: project } = trpc.modules.pmt.projects.get.useQuery(
-    { id: projectId, workspaceId },
+    { id: projectId },
     { enabled: projectId > 0 }
   );
 
   const { data: tasks } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId },
+    { projectId },
     { enabled: projectId > 0 }
   );
 
   const { data: drawerTask } = trpc.modules.pmt.tasks.get.useQuery(
-    { id: drawerTaskId!, workspaceId },
+    { id: drawerTaskId! },
     { enabled: !!drawerTaskId }
   );
 
@@ -95,7 +95,7 @@ export function PMTProjectDetailPage({ workspaceId }: { workspaceId: number }) {
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-3">
-        <Link href={`/w/${workspaceId}/projects`}>
+        <Link href={`/w/${}/projects`}>
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -130,7 +130,6 @@ export function PMTProjectDetailPage({ workspaceId }: { workspaceId: number }) {
                     e.stopPropagation();
                     updateMut.mutate({
                       id: task.id,
-                      workspaceId,
                       status: task.status === "done" ? "todo" : "done",
                     });
                   }}
@@ -177,7 +176,7 @@ export function PMTProjectDetailPage({ workspaceId }: { workspaceId: number }) {
                 <Select
                   value={drawerTask.status || "backlog"}
                   onValueChange={(v) =>
-                    updateMut.mutate({ id: drawerTask.id, workspaceId, status: v })
+                    updateMut.mutate({ id: drawerTask.id, status: v })
                   }
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -196,7 +195,7 @@ export function PMTProjectDetailPage({ workspaceId }: { workspaceId: number }) {
                 <Select
                   value={drawerTask.priority || "medium"}
                   onValueChange={(v) =>
-                    updateMut.mutate({ id: drawerTask.id, workspaceId, priority: v })
+                    updateMut.mutate({ id: drawerTask.id, priority: v })
                   }
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -223,7 +222,7 @@ export function PMTProjectDetailPage({ workspaceId }: { workspaceId: number }) {
                 size="sm"
                 onClick={() => {
                   if (confirm("Delete this task?")) {
-                    deleteMut.mutate({ id: drawerTask.id, workspaceId });
+                    deleteMut.mutate({ id: drawerTask.id });
                   }
                 }}
               >
@@ -277,7 +276,6 @@ export function PMTProjectDetailPage({ workspaceId }: { workspaceId: number }) {
             <Button
               onClick={() =>
                 createMut.mutate({
-                  workspaceId,
                   projectId,
                   title: newTitle,
                   description: newDesc || undefined,

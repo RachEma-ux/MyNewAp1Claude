@@ -27,7 +27,7 @@ import {
 import { Loader2, Plus, Newspaper, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-export function PMTNewsPage({ workspaceId }: { workspaceId: number }) {
+export function PMTNewsPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
@@ -37,11 +37,11 @@ export function PMTNewsPage({ workspaceId }: { workspaceId: number }) {
   const [content, setContent] = useState("");
 
   const utils = trpc.useUtils();
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: news, isLoading } = trpc.modules.pmt.news.list.useQuery(
-    { workspaceId, projectId: projectId || undefined },
+    { projectId: projectId || undefined },
     { enabled: true }
   );
 
@@ -156,7 +156,7 @@ export function PMTNewsPage({ workspaceId }: { workspaceId: number }) {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteMut.mutate({ id: item.id, workspaceId })}
+                      onClick={() => deleteMut.mutate({ id: item.id })}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -217,14 +217,12 @@ export function PMTNewsPage({ workspaceId }: { workspaceId: number }) {
                 if (editItem) {
                   updateMut.mutate({
                     id: editItem.id,
-                    workspaceId,
                     title,
                     summary: summary || undefined,
                     content: content || undefined,
                   });
                 } else {
                   createMut.mutate({
-                    workspaceId,
                     projectId: projectId || undefined,
                     title,
                     summary: summary || undefined,

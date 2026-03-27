@@ -24,14 +24,14 @@ import {
 } from "@/components/ui/table";
 import { Loader2, Clock } from "lucide-react";
 
-export function PMTTimeReportPage({ workspaceId }: { workspaceId: number }) {
+export function PMTTimeReportPage() {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
 
-  const queryInput: any = { workspaceId };
+  const queryInput: any = {};
   if (projectFilter !== "all") queryInput.projectId = parseInt(projectFilter);
   if (startDate) queryInput.startDate = startDate;
   if (endDate) queryInput.endDate = endDate;

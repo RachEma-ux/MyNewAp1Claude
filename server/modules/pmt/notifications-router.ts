@@ -7,17 +7,16 @@ import { eq, and, desc, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
-import { requireModule } from "../registry";
 import { pmNotifications } from "./integrations-schema";
+import { getShellWorkspaceId } from "./pm-shell";
 
 export const notificationsRouter = router({
   list: protectedProcedure
-    .input(z.object({ workspaceId: z.number(), unreadOnly: z.boolean().optional() }))
+    .input(z.object({ unreadOnly: z.boolean().optional() }))
     .query(async ({ input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmNotifications.workspaceId, input.workspaceId)];
+      const conditions = [eq(pmNotifications.wsId)];
       if (input.unreadOnly) conditions.push(isNull(pmNotifications.readAt));
       return db.select().from(pmNotifications)
         .where(and(...conditions))
@@ -25,24 +24,22 @@ export const notificationsRouter = router({
     }),
 
   markRead: protectedProcedure
-    .input(z.object({ id: z.number(), workspaceId: z.number() }))
+    .input(z.object({ id: z.number(): z.number() }))
     .mutation(async ({ input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.update(pmNotifications).set({ readAt: new Date() })
-        .where(and(eq(pmNotifications.id, input.id), eq(pmNotifications.workspaceId, input.workspaceId)));
+        .where(and(eq(pmNotifications.id, input.id), eq(pmNotifications.wsId)));
       return { success: true };
     }),
 
   markAllRead: protectedProcedure
-    .input(z.object({ workspaceId: z.number() }))
+    
     .mutation(async ({ input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.update(pmNotifications).set({ readAt: new Date() })
-        .where(and(eq(pmNotifications.workspaceId, input.workspaceId), isNull(pmNotifications.readAt)));
+        .where(and(eq(pmNotifications.wsId), isNull(pmNotifications.readAt)));
       return { success: true };
     }),
 });

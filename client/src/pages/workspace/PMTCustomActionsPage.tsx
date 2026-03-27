@@ -20,7 +20,7 @@ import {
 import { Loader2, Zap, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-export function PMTCustomActionsPage({ workspaceId }: { workspaceId: number }) {
+export function PMTCustomActionsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({
@@ -32,7 +32,7 @@ export function PMTCustomActionsPage({ workspaceId }: { workspaceId: number }) {
   });
 
   const utils = trpc.useUtils();
-  const { data: actions, isLoading } = trpc.modules.pmt.customActions.list.useQuery({ workspaceId });
+  const { data: actions, isLoading } = trpc.modules.pmt.customActions.list.useQuery();
 
   const createMut = trpc.modules.pmt.customActions.create.useMutation({
     onSuccess: () => { utils.modules.pmt.customActions.list.invalidate(); setDialogOpen(false); toast.success("Action created"); },
@@ -73,7 +73,6 @@ export function PMTCustomActionsPage({ workspaceId }: { workspaceId: number }) {
     try { conditions = JSON.parse(form.conditions); } catch { toast.error("Invalid conditions JSON"); return; }
     try { changes = JSON.parse(form.changes); } catch { toast.error("Invalid changes JSON"); return; }
     const payload = {
-      workspaceId,
       name: form.name,
       description: form.description || undefined,
       conditions,
@@ -127,7 +126,7 @@ export function PMTCustomActionsPage({ workspaceId }: { workspaceId: number }) {
                   <Button variant="ghost" size="sm" onClick={() => openEdit(a)}>
                     <Pencil className="h-3 w-3" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm("Delete?")) deleteMut.mutate({ id: a.id, workspaceId }); }}>
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm("Delete?")) deleteMut.mutate({ id: a.id }); }}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>

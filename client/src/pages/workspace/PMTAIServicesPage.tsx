@@ -20,7 +20,7 @@ import {
 import { Loader2, Brain, Sparkles, BarChart3, Users, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
-export function PMTAIServicesPage({ workspaceId }: { workspaceId: number }) {
+export function PMTAIServicesPage() {
   const [taskDesc, setTaskDesc] = useState("");
   const [triageTitle, setTriageTitle] = useState("");
   const [triageDesc, setTriageDesc] = useState("");
@@ -31,7 +31,7 @@ export function PMTAIServicesPage({ workspaceId }: { workspaceId: number }) {
   const [statusReport, setStatusReport] = useState<string | null>(null);
   const [workloadResult, setWorkloadResult] = useState<any | null>(null);
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
 
   const suggestMut = trpc.modules.pmt.ai.suggestTasks.useMutation({
     onSuccess: (data) => {
@@ -42,17 +42,17 @@ export function PMTAIServicesPage({ workspaceId }: { workspaceId: number }) {
   });
 
   const { refetch: fetchTriage, isFetching: triageFetching } = trpc.modules.pmt.ai.triageWorkItem.useQuery(
-    { workspaceId, title: triageTitle, description: triageDesc },
+    { title: triageTitle, description: triageDesc },
     { enabled: false }
   );
 
   const { refetch: fetchReport, isFetching: reportFetching } = trpc.modules.pmt.ai.generateStatusReport.useQuery(
-    { workspaceId, sprintId: parseInt(selectedSprint) || 0 },
+    { sprintId: parseInt(selectedSprint) || 0 },
     { enabled: false }
   );
 
   const { refetch: fetchWorkload, isFetching: workloadFetching } = trpc.modules.pmt.ai.suggestWorkloadBalance.useQuery(
-    { workspaceId },
+    {},
     { enabled: false }
   );
 
@@ -61,7 +61,7 @@ export function PMTAIServicesPage({ workspaceId }: { workspaceId: number }) {
       toast.error("Enter a description and select a project");
       return;
     }
-    suggestMut.mutate({ workspaceId, projectId: parseInt(selectedProject), description: taskDesc });
+    suggestMut.mutate({ projectId: parseInt(selectedProject), description: taskDesc });
   };
 
   const handleTriage = async () => {

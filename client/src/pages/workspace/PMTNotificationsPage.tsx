@@ -9,11 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Bell, CheckCheck, Check } from "lucide-react";
 import { toast } from "sonner";
 
-export function PMTNotificationsPage({ workspaceId }: { workspaceId: number }) {
+export function PMTNotificationsPage() {
   const utils = trpc.useUtils();
-  const { data: notifications, isLoading } = trpc.modules.pmt.notifications.list.useQuery({
-    workspaceId,
-  });
+  const { data: notifications, isLoading } = trpc.modules.pmt.notifications.list.useQuery();
 
   const markReadMut = trpc.modules.pmt.notifications.markRead.useMutation({
     onSuccess: () => utils.modules.pmt.notifications.list.invalidate(),
@@ -48,7 +46,7 @@ export function PMTNotificationsPage({ workspaceId }: { workspaceId: number }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => markAllMut.mutate({ workspaceId })}
+            onClick={() => markAllMut.mutate()}
             disabled={markAllMut.isPending}
           >
             <CheckCheck className="h-4 w-4 mr-1" />
@@ -93,7 +91,7 @@ export function PMTNotificationsPage({ workspaceId }: { workspaceId: number }) {
                     variant="ghost"
                     size="sm"
                     onClick={() =>
-                      markReadMut.mutate({ id: n.id, workspaceId })
+                      markReadMut.mutate({ id: n.id })
                     }
                     disabled={markReadMut.isPending}
                     className="shrink-0"

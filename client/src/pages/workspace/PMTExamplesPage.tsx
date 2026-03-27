@@ -149,7 +149,7 @@ const EXAMPLES: ExampleProject[] = [
   },
 ];
 
-export function PMTExamplesPage({ workspaceId }: { workspaceId: number }) {
+export function PMTExamplesPage() {
   const [applyDialog, setApplyDialog] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
 
@@ -168,7 +168,6 @@ export function PMTExamplesPage({ workspaceId }: { workspaceId: number }) {
   const handleApply = (exampleId: string) => {
     if (!projectName.trim()) return;
     applyMut.mutate({
-      workspaceId,
       exampleId,
       name: projectName.trim(),
     });

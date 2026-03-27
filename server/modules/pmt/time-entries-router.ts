@@ -7,14 +7,13 @@ import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
-import { requireModule, logActivity } from "../registry";
 import { pmTimeEntries } from "./time-cost-schema";
 import { projects } from "./schema";
+import { getShellWorkspaceId } from "./pm-shell";
 
 export const timeEntriesRouter = router({
   list: protectedProcedure
     .input(z.object({
-      workspaceId: z.number(),
       projectId: z.number().optional(),
       workItemId: z.number().optional(),
       userId: z.number().optional(),
@@ -22,10 +21,9 @@ export const timeEntriesRouter = router({
       endDate: z.string().optional(),
     }))
     .query(async ({ input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmTimeEntries.workspaceId, input.workspaceId)];
+      const conditions = [eq(pmTimeEntries.wsId)];
       if (input.projectId) conditions.push(eq(pmTimeEntries.projectId, input.projectId));
       if (input.workItemId) conditions.push(eq(pmTimeEntries.workItemId, input.workItemId));
       if (input.userId) conditions.push(eq(pmTimeEntries.userId, input.userId));
@@ -38,7 +36,6 @@ export const timeEntriesRouter = router({
 
   create: governedProcedure
     .input(z.object({
-      workspaceId: z.number(),
       projectId: z.number(),
       workItemId: z.number().optional(),
       activityTypeId: z.number().optional(),
@@ -47,11 +44,11 @@ export const timeEntriesRouter = router({
       spentOn: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(pmTimeEntries).values({
-        workspaceId: input.workspaceId,
+        workspaceId: wsId,
         projectId: input.projectId,
         workItemId: input.workItemId,
         userId: ctx.user.id,
@@ -60,55 +57,48 @@ export const timeEntriesRouter = router({
         comment: input.comment,
         spentOn: new Date(input.spentOn),
       }).returning();
-      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "timeEntry.create", targetType: "time_entry", targetId: created.id });
       return created;
     }),
 
   update: governedProcedure
     .input(z.object({
       id: z.number(),
-      workspaceId: z.number(),
       hours: z.number().positive().optional(),
       comment: z.string().optional(),
       activityTypeId: z.number().optional(),
       spentOn: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const { id, workspaceId, spentOn, ...updates } = input;
+      const { id, spentOn, ...updates } = input;
       const setValues: Record<string, unknown> = { ...updates, updatedAt: new Date() };
       if (spentOn) setValues.spentOn = new Date(spentOn);
       await db.update(pmTimeEntries).set(setValues)
-        .where(and(eq(pmTimeEntries.id, id), eq(pmTimeEntries.workspaceId, workspaceId)));
-      await logActivity({ workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "timeEntry.update", targetType: "time_entry", targetId: id });
+        .where(and(eq(pmTimeEntries.id, id), eq(pmTimeEntries.workspaceId)));
       return { success: true };
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(), workspaceId: z.number() }))
+    .input(z.object({ id: z.number(): z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmTimeEntries)
-        .where(and(eq(pmTimeEntries.id, input.id), eq(pmTimeEntries.workspaceId, input.workspaceId)));
-      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "timeEntry.delete", targetType: "time_entry", targetId: input.id });
+        .where(and(eq(pmTimeEntries.id, input.id), eq(pmTimeEntries.wsId)));
       return { success: true };
     }),
 
   report: protectedProcedure
     .input(z.object({
-      workspaceId: z.number(),
       startDate: z.string().optional(),
       endDate: z.string().optional(),
     }))
     .query(async ({ input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmTimeEntries.workspaceId, input.workspaceId)];
+      const conditions = [eq(pmTimeEntries.wsId)];
       if (input.startDate) conditions.push(gte(pmTimeEntries.spentOn, new Date(input.startDate)));
       if (input.endDate) conditions.push(lte(pmTimeEntries.spentOn, new Date(input.endDate)));
       return db.select({

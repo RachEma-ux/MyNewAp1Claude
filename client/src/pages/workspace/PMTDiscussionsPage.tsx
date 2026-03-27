@@ -34,17 +34,17 @@ import { Loader2, Plus, MessageSquare, Pin, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
-export function PMTDiscussionsPage({ workspaceId }: { workspaceId: number }) {
+export function PMTDiscussionsPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
 
   const utils = trpc.useUtils();
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: discussions, isLoading } = trpc.modules.pmt.discussions.list.useQuery(
-    { workspaceId, projectId: projectId || undefined },
+    { projectId: projectId || undefined },
     { enabled: true }
   );
 
@@ -116,7 +116,7 @@ export function PMTDiscussionsPage({ workspaceId }: { workspaceId: number }) {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/workspaces/${workspaceId}/projects/discussions/${d.id}`}
+                        href={`/workspaces/${}/projects/discussions/${d.id}`}
                         className="font-medium hover:underline"
                       >
                         {d.title}
@@ -171,7 +171,6 @@ export function PMTDiscussionsPage({ workspaceId }: { workspaceId: number }) {
             <Button
               onClick={() => {
                 createMut.mutate({
-                  workspaceId,
                   projectId: projectId || undefined,
                   title,
                 });

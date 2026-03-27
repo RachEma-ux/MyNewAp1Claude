@@ -50,15 +50,15 @@ function isDateInRange(date: Date, start: Date | null, end: Date | null): boolea
   return false;
 }
 
-export function PMTTeamPlannerPage({ workspaceId }: { workspaceId: number }) {
+export function PMTTeamPlannerPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: tasks, isLoading } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 

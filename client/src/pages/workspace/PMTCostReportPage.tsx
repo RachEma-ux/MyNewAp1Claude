@@ -24,14 +24,14 @@ import {
 } from "@/components/ui/table";
 import { Loader2, DollarSign } from "lucide-react";
 
-export function PMTCostReportPage({ workspaceId }: { workspaceId: number }) {
+export function PMTCostReportPage() {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
 
-  const queryInput: any = { workspaceId };
+  const queryInput: any = {};
   if (projectFilter !== "all") queryInput.projectId = parseInt(projectFilter);
 
   const { data: entries, isLoading } = trpc.modules.pmt.costEntries.list.useQuery(queryInput);

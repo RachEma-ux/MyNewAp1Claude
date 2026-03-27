@@ -7,10 +7,10 @@ import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
-import { requireModule, logActivity } from "../registry";
 import { pmProjectTemplates, pmWorkItemTemplates } from "./integrations-schema";
 import { projects, tasks } from "./schema";
 import { pmStatuses, pmTypes } from "./config-schema";
+import { getShellWorkspaceId } from "./pm-shell";
 
 // ============================================================================
 // Shared OpenProject-aligned constants
@@ -595,24 +595,22 @@ const EXAMPLE_DATA_MAP: Record<string, object> = {
 
 const projectTemplatesRouter = router({
   list: protectedProcedure
-    .input(z.object({ workspaceId: z.number() }))
+    
     .query(async ({ input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmProjectTemplates)
-        .where(eq(pmProjectTemplates.workspaceId, input.workspaceId))
+        .where(eq(pmProjectTemplates.wsId))
         .orderBy(desc(pmProjectTemplates.createdAt));
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(), workspaceId: z.number() }))
+    .input(z.object({ id: z.number(): z.number() }))
     .query(async ({ input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmProjectTemplates)
-        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.workspaceId, input.workspaceId)))
+        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project template not found" });
       return rows[0];
@@ -620,90 +618,83 @@ const projectTemplatesRouter = router({
 
   create: governedProcedure
     .input(z.object({
-      workspaceId: z.number(),
       name: z.string().min(1).max(255),
       description: z.string().optional(),
       templateData: z.record(z.string(), z.unknown()),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(pmProjectTemplates).values({
-        workspaceId: input.workspaceId,
+        workspaceId: wsId,
         name: input.name,
         description: input.description,
         templateData: input.templateData,
         createdBy: ctx.user.id,
       }).returning();
-      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "projectTemplate.create", targetType: "project_template", targetId: created.id });
       return created;
     }),
 
   update: governedProcedure
     .input(z.object({
       id: z.number(),
-      workspaceId: z.number(),
       name: z.string().min(1).max(255).optional(),
       description: z.string().optional(),
       templateData: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const { id, workspaceId, ...updates } = input;
+      const { id, ...updates } = input;
       await db.update(pmProjectTemplates).set(updates)
-        .where(and(eq(pmProjectTemplates.id, id), eq(pmProjectTemplates.workspaceId, workspaceId)));
-      await logActivity({ workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "projectTemplate.update", targetType: "project_template", targetId: id });
+        .where(and(eq(pmProjectTemplates.id, id), eq(pmProjectTemplates.workspaceId)));
       return { success: true };
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(), workspaceId: z.number() }))
+    .input(z.object({ id: z.number(): z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmProjectTemplates)
-        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.workspaceId, input.workspaceId)));
-      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "projectTemplate.delete", targetType: "project_template", targetId: input.id });
+        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.wsId)));
       return { success: true };
     }),
 
   /** Apply a DB-stored template to create a project */
   useTemplate: governedProcedure
-    .input(z.object({ id: z.number(), workspaceId: z.number(), name: z.string().min(1).max(255) }))
+    .input(z.object({ id: z.number(): z.number(), name: z.string().min(1).max(255) }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmProjectTemplates)
-        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.workspaceId, input.workspaceId)))
+        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project template not found" });
-      return applyTemplateData(db, ctx.user.id, input.workspaceId, input.name, rows[0].templateData as Record<string, unknown>);
+      return applyTemplateData(db, ctx.user.id, wsId, input.name, rows[0].templateData as Record<string, unknown>);
     }),
 
   /** Apply a built-in example by ID (no DB template needed) */
   applyExample: governedProcedure
-    .input(z.object({ workspaceId: z.number(), exampleId: z.string(), name: z.string().min(1).max(255) }))
+    .input(z.object({ exampleId: z.string(), name: z.string().min(1).max(255) }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const tplData = EXAMPLE_DATA_MAP[input.exampleId];
       if (!tplData) throw new TRPCError({ code: "NOT_FOUND", message: `Example '${input.exampleId}' not found` });
-      const project = await applyTemplateData(db, ctx.user.id, input.workspaceId, input.name, tplData as Record<string, unknown>);
-      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "projectTemplate.apply", targetType: "project", targetId: project.id, metadata: { exampleId: input.exampleId } });
+      const project = await applyTemplateData(db, ctx.user.id, wsId, input.name, tplData as Record<string, unknown>);
       return project;
     }),
 
   /** Seed abstract reusable templates (PM Lifecycle, Scrum, Kanban, Product Launch, SDLC) */
   seed: governedProcedure
-    .input(z.object({ workspaceId: z.number() }))
+    
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -718,7 +709,7 @@ const projectTemplatesRouter = router({
       const created = [];
       for (const def of templateDefs) {
         const [row] = await db.insert(pmProjectTemplates).values({
-          workspaceId: input.workspaceId,
+          workspaceId: wsId,
           name: def.name,
           description: def.description,
           templateData: def.data,
@@ -727,16 +718,15 @@ const projectTemplatesRouter = router({
         created.push(row);
       }
 
-      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "projectTemplate.seed", targetType: "project_template", targetId: created[0].id, metadata: { templateIds: created.map(c => c.id) } });
       return { templates: created };
     }),
 });
 
 /** Shared helper: apply template data to create a project with statuses, types, and tasks */
-async function applyTemplateData(db: any, userId: number, workspaceId: number, projectName: string, tpl: Record<string, unknown>) {
+async function applyTemplateData(db: any, userId: number: number, projectName: string, tpl: Record<string, unknown>) {
   // 1. Create the project
   const [created] = await db.insert(projects).values({
-    workspaceId,
+    
     name: projectName,
     description: (tpl.description as string) || undefined,
     status: "draft",
@@ -748,7 +738,7 @@ async function applyTemplateData(db: any, userId: number, workspaceId: number, p
   if (statusArr && statusArr.length > 0) {
     await db.insert(pmStatuses).values(
       statusArr.map((s) => ({
-        workspaceId,
+        
         name: s.name,
         color: s.color,
         isClosed: s.isClosed ?? false,
@@ -763,7 +753,7 @@ async function applyTemplateData(db: any, userId: number, workspaceId: number, p
   if (typeArr && typeArr.length > 0) {
     await db.insert(pmTypes).values(
       typeArr.map((t) => ({
-        workspaceId,
+        
         name: t.name,
         color: t.color,
         icon: t.icon,
@@ -782,7 +772,7 @@ async function applyTemplateData(db: any, userId: number, workspaceId: number, p
 
     const insertTask = async (t: TemplateTask, parentId: number | null): Promise<void> => {
       const [row] = await db.insert(tasks).values({
-        workspaceId,
+        
         projectId: created.id,
         title: t.title,
         description: t.description || undefined,
@@ -803,7 +793,7 @@ async function applyTemplateData(db: any, userId: number, workspaceId: number, p
 
     for (const phase of phasesArr) {
       const [parentTask] = await db.insert(tasks).values({
-        workspaceId,
+        
         projectId: created.id,
         title: phase.name,
         description: phase.description || undefined,
@@ -821,30 +811,27 @@ async function applyTemplateData(db: any, userId: number, workspaceId: number, p
     }
   }
 
-  await logActivity({ workspaceId, moduleKey: "pmt", actorId: userId, action: "projectTemplate.apply", targetType: "project", targetId: created.id });
   return created;
 }
 
 const workItemTemplatesRouter = router({
   list: protectedProcedure
-    .input(z.object({ workspaceId: z.number() }))
+    
     .query(async ({ input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmWorkItemTemplates)
-        .where(eq(pmWorkItemTemplates.workspaceId, input.workspaceId))
+        .where(eq(pmWorkItemTemplates.wsId))
         .orderBy(desc(pmWorkItemTemplates.createdAt));
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(), workspaceId: z.number() }))
+    .input(z.object({ id: z.number(): z.number() }))
     .query(async ({ input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmWorkItemTemplates)
-        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.workspaceId, input.workspaceId)))
+        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Work item template not found" });
       return rows[0];
@@ -852,73 +839,67 @@ const workItemTemplatesRouter = router({
 
   create: governedProcedure
     .input(z.object({
-      workspaceId: z.number(),
       name: z.string().min(1).max(255),
       description: z.string().optional(),
       templateData: z.record(z.string(), z.unknown()),
       typeId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [created] = await db.insert(pmWorkItemTemplates).values({
-        workspaceId: input.workspaceId,
+        workspaceId: wsId,
         name: input.name,
         description: input.description,
         templateData: input.templateData,
         typeId: input.typeId,
         createdBy: ctx.user.id,
       }).returning();
-      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "workItemTemplate.create", targetType: "work_item_template", targetId: created.id });
       return created;
     }),
 
   update: governedProcedure
     .input(z.object({
       id: z.number(),
-      workspaceId: z.number(),
       name: z.string().min(1).max(255).optional(),
       description: z.string().optional(),
       templateData: z.record(z.string(), z.unknown()).optional(),
       typeId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const { id, workspaceId, ...updates } = input;
+      const { id, ...updates } = input;
       await db.update(pmWorkItemTemplates).set(updates)
-        .where(and(eq(pmWorkItemTemplates.id, id), eq(pmWorkItemTemplates.workspaceId, workspaceId)));
-      await logActivity({ workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "workItemTemplate.update", targetType: "work_item_template", targetId: id });
+        .where(and(eq(pmWorkItemTemplates.id, id), eq(pmWorkItemTemplates.workspaceId)));
       return { success: true };
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(), workspaceId: z.number() }))
+    .input(z.object({ id: z.number(): z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmWorkItemTemplates)
-        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.workspaceId, input.workspaceId)));
-      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "workItemTemplate.delete", targetType: "work_item_template", targetId: input.id });
+        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.wsId)));
       return { success: true };
     }),
 
   useTemplate: governedProcedure
-    .input(z.object({ id: z.number(), workspaceId: z.number(), projectId: z.number() }))
+    .input(z.object({ id: z.number(): z.number(), projectId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await requireModule(input.workspaceId, "pmt");
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmWorkItemTemplates)
-        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.workspaceId, input.workspaceId)))
+        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Work item template not found" });
       const tpl = rows[0].templateData as Record<string, unknown>;
       const [created] = await db.insert(tasks).values({
-        workspaceId: input.workspaceId,
+        workspaceId: wsId,
         projectId: input.projectId,
         title: (tpl.title as string) || rows[0].name,
         description: (tpl.description as string) || undefined,
@@ -926,7 +907,6 @@ const workItemTemplatesRouter = router({
         type: (tpl.type as string) || "task",
         status: "todo",
       }).returning();
-      await logActivity({ workspaceId: input.workspaceId, moduleKey: "pmt", actorId: ctx.user.id, action: "workItemTemplate.apply", targetType: "task", targetId: created.id, metadata: { templateId: input.id } });
       return created;
     }),
 });

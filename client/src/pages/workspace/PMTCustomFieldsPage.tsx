@@ -55,14 +55,14 @@ const emptyForm: FieldForm = {
   helpText: "",
 };
 
-export function PMTCustomFieldsPage({ workspaceId }: { workspaceId: number }) {
+export function PMTCustomFieldsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FieldForm>(emptyForm);
 
   const utils = trpc.useUtils();
 
-  const { data: fields, isLoading } = trpc.modules.pmt.customFields.fields.list.useQuery({ workspaceId });
+  const { data: fields, isLoading } = trpc.modules.pmt.customFields.fields.list.useQuery();
 
   const sortedFields = fields ? [...fields].sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0)) : [];
 
@@ -123,7 +123,6 @@ export function PMTCustomFieldsPage({ workspaceId }: { workspaceId: number }) {
       return;
     }
     const payload: any = {
-      workspaceId,
       name: form.name,
       fieldType: form.fieldType,
       required: form.required,
@@ -142,7 +141,7 @@ export function PMTCustomFieldsPage({ workspaceId }: { workspaceId: number }) {
 
   const handleDelete = (id: number) => {
     if (confirm("Delete this field?")) {
-      deleteMut.mutate({ id, workspaceId });
+      deleteMut.mutate({ id });
     }
   };
 

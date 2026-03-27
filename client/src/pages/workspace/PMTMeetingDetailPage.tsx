@@ -20,14 +20,14 @@ const ITEM_TYPES = [
   { key: "decision", label: "Decisions" },
 ];
 
-export function PMTMeetingDetailPage({ workspaceId }: { workspaceId: number }) {
+export function PMTMeetingDetailPage() {
   const params = useParams<{ meetingId: string }>();
   const meetingId = parseInt(params.meetingId || "0", 10);
 
   const utils = trpc.useUtils();
 
   const { data: meeting, isLoading: meetingLoading } = trpc.modules.pmt.meetings.get.useQuery(
-    { id: meetingId, workspaceId },
+    { id: meetingId },
     { enabled: !!meetingId }
   );
 
@@ -59,7 +59,6 @@ export function PMTMeetingDetailPage({ workspaceId }: { workspaceId: number }) {
     onError: (e: any) => toast.error(e.message),
   });
 
-
   if (!meeting) {
     return (
       <div className="p-6 text-center text-muted-foreground">
@@ -72,7 +71,7 @@ export function PMTMeetingDetailPage({ workspaceId }: { workspaceId: number }) {
     <div className="p-6 space-y-4">
       {/* Back link + header */}
       <div className="flex items-center gap-3">
-        <Link href={`/workspaces/${workspaceId}/projects/meetings`}>
+        <Link href={`/workspaces/${}/projects/meetings`}>
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -111,22 +110,20 @@ export function PMTMeetingDetailPage({ workspaceId }: { workspaceId: number }) {
         {ITEM_TYPES.map((it) => (
           <TabsContent key={it.key} value={it.key} className="mt-3">
             <ItemList
-              workspaceId={workspaceId}
               meetingId={meetingId}
               itemType={it.key}
               items={(items || []).filter((i: any) => i.itemType === it.key)}
               showDone={it.key === "action_item"}
               onToggleDone={(item: any) =>
-                updateItemMut.mutate({ id: item.id, workspaceId, done: !item.done })
+                updateItemMut.mutate({ id: item.id, done: !item.done })
               }
               onDelete={(id: number) =>
-                deleteItemMut.mutate({ id, workspaceId })
+                deleteItemMut.mutate({ id })
               }
               onCreate={(content: string) => {
                 const position = (items || []).filter((i: any) => i.itemType === it.key).length;
                 createItemMut.mutate({
                   meetingId,
-                  workspaceId,
                   itemType: it.key,
                   content,
                   position,
@@ -142,7 +139,6 @@ export function PMTMeetingDetailPage({ workspaceId }: { workspaceId: number }) {
 }
 
 function ItemList({
-  workspaceId,
   meetingId,
   itemType,
   items,
@@ -152,7 +148,6 @@ function ItemList({
   onCreate,
   isCreating,
 }: {
-  workspaceId: number;
   meetingId: number;
   itemType: string;
   items: any[];

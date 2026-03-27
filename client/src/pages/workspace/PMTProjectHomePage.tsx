@@ -23,19 +23,19 @@ const statusLabels: Record<string, string> = {
   done: "Done",
 };
 
-export function PMTProjectHomePage({ workspaceId }: { workspaceId: number }) {
+export function PMTProjectHomePage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: tasks, isLoading } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
   const { data: sprints } = trpc.modules.pmt.sprints.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 

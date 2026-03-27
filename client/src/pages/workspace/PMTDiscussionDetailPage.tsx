@@ -12,7 +12,7 @@ import { Loader2, ArrowLeft, Pin, Lock, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useParams } from "wouter";
 
-export function PMTDiscussionDetailPage({ workspaceId }: { workspaceId: number }) {
+export function PMTDiscussionDetailPage() {
   const params = useParams<{ discussionId: string }>();
   const discussionId = parseInt(params.discussionId || "0", 10);
   const [draft, setDraft] = useState("");
@@ -20,7 +20,7 @@ export function PMTDiscussionDetailPage({ workspaceId }: { workspaceId: number }
   const utils = trpc.useUtils();
 
   const { data: discussion, isLoading: discLoading } = trpc.modules.pmt.discussions.get.useQuery(
-    { id: discussionId, workspaceId },
+    { id: discussionId },
     { enabled: !!discussionId }
   );
 
@@ -38,7 +38,6 @@ export function PMTDiscussionDetailPage({ workspaceId }: { workspaceId: number }
     onError: (e: any) => toast.error(e.message),
   });
 
-
   if (!discussion) {
     return (
       <div className="p-6 text-center text-muted-foreground">
@@ -51,7 +50,7 @@ export function PMTDiscussionDetailPage({ workspaceId }: { workspaceId: number }
     <div className="p-6 space-y-4 h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href={`/workspaces/${workspaceId}/projects/discussions`}>
+        <Link href={`/workspaces/${}/projects/discussions`}>
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -116,7 +115,6 @@ export function PMTDiscussionDetailPage({ workspaceId }: { workspaceId: number }
             onClick={() =>
               createPostMut.mutate({
                 discussionId,
-                workspaceId,
                 content: draft.trim(),
               })
             }

@@ -24,7 +24,7 @@ function formatElapsed(seconds: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export function PMTTimeTracker({ workspaceId }: { workspaceId: number }) {
+export function PMTTimeTracker() {
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [showLog, setShowLog] = useState(false);
@@ -32,7 +32,7 @@ export function PMTTimeTracker({ workspaceId }: { workspaceId: number }) {
   const [comment, setComment] = useState("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const utils = trpc.useUtils();
 
   const createMut = trpc.modules.pmt.timeEntries.create.useMutation({
@@ -70,7 +70,6 @@ export function PMTTimeTracker({ workspaceId }: { workspaceId: number }) {
     const hours = Math.round((elapsed / 3600) * 100) / 100;
     if (hours <= 0) { toast.error("No time to log"); return; }
     createMut.mutate({
-      workspaceId,
       projectId: parseInt(projectId),
       userId: 1,
       hours,

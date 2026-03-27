@@ -27,14 +27,14 @@ import {
 import { Loader2, Wallet, Plus } from "lucide-react";
 import { toast } from "sonner";
 
-export function PMTBudgetPage({ workspaceId }: { workspaceId: number }) {
+export function PMTBudgetPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", description: "", plannedLabor: 0, plannedUnits: 0, projectId: "" });
 
   const utils = trpc.useUtils();
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
-  const { data: budgets, isLoading } = trpc.modules.pmt.budgets.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
+  const { data: budgets, isLoading } = trpc.modules.pmt.budgets.list.useQuery();
 
   const createMut = trpc.modules.pmt.budgets.create.useMutation({
     onSuccess: () => { utils.modules.pmt.budgets.list.invalidate(); setDialogOpen(false); toast.success("Budget created"); },
@@ -72,7 +72,6 @@ export function PMTBudgetPage({ workspaceId }: { workspaceId: number }) {
   const handleSubmit = () => {
     if (!form.name.trim() || !form.projectId) return;
     const payload = {
-      workspaceId,
       projectId: parseInt(form.projectId),
       name: form.name,
       description: form.description || undefined,
@@ -112,7 +111,7 @@ export function PMTBudgetPage({ workspaceId }: { workspaceId: number }) {
                   <CardTitle className="text-base">{b.name}</CardTitle>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="sm" onClick={() => openEdit(b)}>Edit</Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm("Delete?")) deleteMut.mutate({ id: b.id, workspaceId }); }}>Delete</Button>
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm("Delete?")) deleteMut.mutate({ id: b.id }); }}>Delete</Button>
                   </div>
                 </div>
               </CardHeader>

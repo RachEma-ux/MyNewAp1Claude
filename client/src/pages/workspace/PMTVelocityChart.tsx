@@ -23,19 +23,19 @@ const PLOT_W = CHART_W - PAD_L - PAD_R;
 const PLOT_H = CHART_H - PAD_T - PAD_B;
 const BAR_GAP = 0.3; // fraction of slot width used as gap
 
-export function PMTVelocityChart({ workspaceId }: { workspaceId: number }) {
+export function PMTVelocityChart() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: sprints, isLoading } = trpc.modules.pmt.sprints.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
   const { data: tasks } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 

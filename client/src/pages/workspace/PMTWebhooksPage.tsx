@@ -31,13 +31,13 @@ const EVENTS = [
   "comment.created",
 ];
 
-export function PMTWebhooksPage({ workspaceId }: { workspaceId: number }) {
+export function PMTWebhooksPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", url: "", secret: "", events: [] as string[] });
 
   const utils = trpc.useUtils();
-  const { data: webhooks, isLoading } = trpc.modules.pmt.webhooks.list.useQuery({ workspaceId });
+  const { data: webhooks, isLoading } = trpc.modules.pmt.webhooks.list.useQuery();
 
   const createMut = trpc.modules.pmt.webhooks.create.useMutation({
     onSuccess: () => { utils.modules.pmt.webhooks.list.invalidate(); setDialogOpen(false); toast.success("Webhook created"); },
@@ -88,7 +88,6 @@ export function PMTWebhooksPage({ workspaceId }: { workspaceId: number }) {
   const handleSubmit = () => {
     if (!form.name.trim() || !form.url.trim()) { toast.error("Name and URL required"); return; }
     const payload = {
-      workspaceId,
       name: form.name,
       url: form.url,
       secret: form.secret || undefined,
@@ -138,13 +137,13 @@ export function PMTWebhooksPage({ workspaceId }: { workspaceId: number }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <Button variant="ghost" size="sm" onClick={() => testMut.mutate({ id: w.id, workspaceId })} disabled={testMut.isPending}>
+                  <Button variant="ghost" size="sm" onClick={() => testMut.mutate({ id: w.id })} disabled={testMut.isPending}>
                     <Zap className="h-3 w-3" />
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => openEdit(w)}>
                     <Pencil className="h-3 w-3" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm("Delete?")) deleteMut.mutate({ id: w.id, workspaceId }); }}>
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm("Delete?")) deleteMut.mutate({ id: w.id }); }}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>

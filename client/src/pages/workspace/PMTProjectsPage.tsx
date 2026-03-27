@@ -35,18 +35,18 @@ const riskBadge: Record<string, string> = {
   critical: "bg-red-500/10 text-red-600 border-red-500/20",
 };
 
-export function PMTProjectsPage({ workspaceId }: { workspaceId: number }) {
+export function PMTProjectsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [riskLevel, setRiskLevel] = useState<string>("low");
 
   const utils = trpc.useUtils();
-  const { data: projects, isLoading } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects, isLoading } = trpc.modules.pmt.projects.list.useQuery();
 
   const createMut = trpc.modules.pmt.projects.create.useMutation({
     onSuccess: () => {
-      utils.modules.pmt.projects.list.invalidate({ workspaceId });
+      utils.modules.pmt.projects.list.invalidate();
       setCreateOpen(false);
       setName("");
       setDescription("");
@@ -57,7 +57,7 @@ export function PMTProjectsPage({ workspaceId }: { workspaceId: number }) {
 
   const deleteMut = trpc.modules.pmt.projects.delete.useMutation({
     onSuccess: () => {
-      utils.modules.pmt.projects.list.invalidate({ workspaceId });
+      utils.modules.pmt.projects.list.invalidate();
       toast.success("Project deleted");
     },
     onError: (e) => toast.error(e.message),
@@ -84,7 +84,7 @@ export function PMTProjectsPage({ workspaceId }: { workspaceId: number }) {
       {projects && projects.length > 0 ? (
         <div className="grid gap-3">
           {projects.map((p) => (
-            <Link key={p.id} href={`/w/${workspaceId}/projects/${p.id}`}>
+            <Link key={p.id} href={`/w/${}/projects/${p.id}`}>
               <Card className="cursor-pointer hover:border-primary/50 transition-colors">
                 <CardContent className="flex items-center gap-3 py-4 overflow-hidden">
                   <div className="min-w-0 flex-1">
@@ -113,7 +113,7 @@ export function PMTProjectsPage({ workspaceId }: { workspaceId: number }) {
                       e.preventDefault();
                       e.stopPropagation();
                       if (confirm("Delete this project?")) {
-                        deleteMut.mutate({ id: p.id, workspaceId });
+                        deleteMut.mutate({ id: p.id });
                       }
                     }}
                   >
@@ -177,7 +177,6 @@ export function PMTProjectsPage({ workspaceId }: { workspaceId: number }) {
             <Button
               onClick={() =>
                 createMut.mutate({
-                  workspaceId,
                   name,
                   description: description || undefined,
                   riskLevel: riskLevel as "low" | "medium" | "high" | "critical",

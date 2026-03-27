@@ -36,14 +36,14 @@ interface StatusForm {
 
 const emptyForm: StatusForm = { name: "", color: "#3b82f6", isClosed: false, position: 0 };
 
-export function PMTStatusConfigPage({ workspaceId }: { workspaceId: number }) {
+export function PMTStatusConfigPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<StatusForm>(emptyForm);
 
   const utils = trpc.useUtils();
 
-  const { data: statuses, isLoading } = trpc.modules.pmt.config.statuses.list.useQuery({ workspaceId });
+  const { data: statuses, isLoading } = trpc.modules.pmt.config.statuses.list.useQuery();
 
   const sortedStatuses = statuses ? [...statuses].sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0)) : [];
 
@@ -102,30 +102,30 @@ export function PMTStatusConfigPage({ workspaceId }: { workspaceId: number }) {
       return;
     }
     if (editingId) {
-      updateMut.mutate({ id: editingId, workspaceId, ...form });
+      updateMut.mutate({ id: editingId, ...form });
     } else {
-      createMut.mutate({ workspaceId, ...form });
+      createMut.mutate({ ...form });
     }
   };
 
   const handleDelete = (id: number) => {
     if (confirm("Delete this status?")) {
-      deleteMut.mutate({ id, workspaceId });
+      deleteMut.mutate({ id });
     }
   };
 
   const moveUp = (s: any, idx: number) => {
     if (idx === 0) return;
     const prev = sortedStatuses[idx - 1];
-    updateMut.mutate({ id: s.id, workspaceId, position: prev.position ?? idx - 1 });
-    updateMut.mutate({ id: prev.id, workspaceId, position: s.position ?? idx });
+    updateMut.mutate({ id: s.id, position: prev.position ?? idx - 1 });
+    updateMut.mutate({ id: prev.id, position: s.position ?? idx });
   };
 
   const moveDown = (s: any, idx: number) => {
     if (idx >= sortedStatuses.length - 1) return;
     const next = sortedStatuses[idx + 1];
-    updateMut.mutate({ id: s.id, workspaceId, position: next.position ?? idx + 1 });
-    updateMut.mutate({ id: next.id, workspaceId, position: s.position ?? idx });
+    updateMut.mutate({ id: s.id, position: next.position ?? idx + 1 });
+    updateMut.mutate({ id: next.id, position: s.position ?? idx });
   };
 
   return (

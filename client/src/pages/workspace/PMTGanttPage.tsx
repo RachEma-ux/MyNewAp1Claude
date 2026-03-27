@@ -42,21 +42,21 @@ function formatMonthYear(d: Date) {
   return `${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-export function PMTGanttPage({ workspaceId }: { workspaceId: number }) {
+export function PMTGanttPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [pxPerDay, setPxPerDay] = useState(14);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: tasks, isLoading } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
   const { data: dependencies } = trpc.modules.pmt.dependencies.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 

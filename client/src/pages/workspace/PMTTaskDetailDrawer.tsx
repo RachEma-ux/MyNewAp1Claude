@@ -48,14 +48,12 @@ const STATUSES = [
 ];
 
 interface PMTTaskDetailDrawerProps {
-  workspaceId: number;
   taskId: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function PMTTaskDetailDrawer({
-  workspaceId,
   taskId,
   open,
   onOpenChange,
@@ -63,7 +61,7 @@ export function PMTTaskDetailDrawer({
   const utils = trpc.useUtils();
 
   const { data: task, isLoading } = trpc.modules.pmt.tasks.get.useQuery(
-    { id: taskId!, workspaceId },
+    { id: taskId! },
     { enabled: !!taskId }
   );
 
@@ -86,14 +84,14 @@ export function PMTTaskDetailDrawer({
 
   const handleTitleSave = () => {
     if (task && titleDraft.trim() && titleDraft !== task.title) {
-      updateMut.mutate({ id: task.id, workspaceId, title: titleDraft.trim() });
+      updateMut.mutate({ id: task.id, title: titleDraft.trim() });
     }
     setEditingTitle(false);
   };
 
   const handleDescSave = () => {
     if (task) {
-      updateMut.mutate({ id: task.id, workspaceId, description: descDraft });
+      updateMut.mutate({ id: task.id, description: descDraft });
     }
     setEditingDesc(false);
   };
@@ -119,7 +117,7 @@ export function PMTTaskDetailDrawer({
                 <Select
                   value={task.status}
                   onValueChange={(v) =>
-                    updateMut.mutate({ id: task.id, workspaceId, status: v })
+                    updateMut.mutate({ id: task.id, status: v })
                   }
                 >
                   <SelectTrigger className="h-7 w-auto text-xs">
@@ -170,7 +168,7 @@ export function PMTTaskDetailDrawer({
                 <Select
                   value={task.priority}
                   onValueChange={(v) =>
-                    updateMut.mutate({ id: task.id, workspaceId, priority: v })
+                    updateMut.mutate({ id: task.id, priority: v })
                   }
                 >
                   <SelectTrigger className="h-7 mt-0.5 text-xs">
@@ -259,15 +257,15 @@ export function PMTTaskDetailDrawer({
                 </TabsContent>
 
                 <TabsContent value="comments" className="mt-3">
-                  <CommentThread workspaceId={workspaceId} workItemId={task.id} />
+                  <CommentThread workItemId={task.id} />
                 </TabsContent>
 
                 <TabsContent value="attachments" className="mt-3">
-                  <AttachmentList workspaceId={workspaceId} workItemId={task.id} />
+                  <AttachmentList workItemId={task.id} />
                 </TabsContent>
 
                 <TabsContent value="dependencies" className="mt-3">
-                  <DependencyList workspaceId={workspaceId} taskId={task.id} />
+                  <DependencyList taskId={task.id} />
                 </TabsContent>
               </Tabs>
             </ScrollArea>
@@ -280,10 +278,9 @@ export function PMTTaskDetailDrawer({
 
 /* ── Comment Thread ── */
 
-function CommentThread({ workspaceId, workItemId }: { workspaceId: number; workItemId: number }) {
+function CommentThread({ workItemId }: { workItemId: number }) {
   const utils = trpc.useUtils();
   const { data: comments, isLoading } = trpc.modules.pmt.comments.list.useQuery({
-    workspaceId,
     workItemId,
   });
 
@@ -297,7 +294,6 @@ function CommentThread({ workspaceId, workItemId }: { workspaceId: number; workI
   });
 
   const [draft, setDraft] = useState("");
-
 
   // Group comments: top-level vs replies
   const topLevel = (comments || []).filter((c) => !c.parentId);
@@ -349,7 +345,7 @@ function CommentThread({ workspaceId, workItemId }: { workspaceId: number; workI
           size="icon"
           disabled={!draft.trim() || createMut.isPending}
           onClick={() =>
-            createMut.mutate({ workspaceId, workItemId, content: draft.trim() })
+            createMut.mutate({ workItemId, content: draft.trim() })
           }
         >
           <Send className="h-4 w-4" />
@@ -361,12 +357,10 @@ function CommentThread({ workspaceId, workItemId }: { workspaceId: number; workI
 
 /* ── Attachment List ── */
 
-function AttachmentList({ workspaceId, workItemId }: { workspaceId: number; workItemId: number }) {
+function AttachmentList({ workItemId }: { workItemId: number }) {
   const { data: attachments, isLoading } = trpc.modules.pmt.attachments.list.useQuery({
-    workspaceId,
     workItemId,
   });
-
 
   return (
     <div className="space-y-2">
@@ -396,12 +390,10 @@ function AttachmentList({ workspaceId, workItemId }: { workspaceId: number; work
 
 /* ── Dependency List ── */
 
-function DependencyList({ workspaceId, taskId }: { workspaceId: number; taskId: number }) {
+function DependencyList({ taskId }: { taskId: number }) {
   const { data: deps, isLoading } = trpc.modules.pmt.dependencies.list.useQuery({
-    workspaceId,
     taskId,
   });
-
 
   return (
     <div className="space-y-2">

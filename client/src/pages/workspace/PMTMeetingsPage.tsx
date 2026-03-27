@@ -34,7 +34,7 @@ import { Loader2, Plus, CalendarDays, MapPin, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
-export function PMTMeetingsPage({ workspaceId }: { workspaceId: number }) {
+export function PMTMeetingsPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -43,11 +43,11 @@ export function PMTMeetingsPage({ workspaceId }: { workspaceId: number }) {
   const [endTime, setEndTime] = useState("");
 
   const utils = trpc.useUtils();
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: meetings, isLoading } = trpc.modules.pmt.meetings.list.useQuery(
-    { workspaceId, projectId: projectId || undefined },
+    { projectId: projectId || undefined },
     { enabled: true }
   );
 
@@ -119,7 +119,7 @@ export function PMTMeetingsPage({ workspaceId }: { workspaceId: number }) {
                 <TableRow key={m.id} className="cursor-pointer hover:bg-muted/50">
                   <TableCell>
                     <Link
-                      href={`/workspaces/${workspaceId}/projects/meetings/${m.id}`}
+                      href={`/workspaces/${}/projects/meetings/${m.id}`}
                       className="font-medium hover:underline"
                     >
                       {m.title}
@@ -182,7 +182,6 @@ export function PMTMeetingsPage({ workspaceId }: { workspaceId: number }) {
             <Button
               onClick={() => {
                 createMut.mutate({
-                  workspaceId,
                   projectId: projectId || undefined,
                   title,
                   location: location || undefined,

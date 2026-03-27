@@ -15,14 +15,14 @@ import {
 import { CalendarDays, Clock } from "lucide-react";
 import { useState } from "react";
 
-export function PMTTimelinePage({ workspaceId }: { workspaceId: number }) {
+export function PMTTimelinePage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: tasks } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 

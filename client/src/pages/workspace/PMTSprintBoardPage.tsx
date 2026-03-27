@@ -41,17 +41,17 @@ const typeColors: Record<string, string> = {
   feature: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
 };
 
-export function PMTSprintBoardPage({ workspaceId }: { workspaceId: number }) {
+export function PMTSprintBoardPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   const utils = trpc.useUtils();
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: sprints } = trpc.modules.pmt.sprints.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
@@ -60,7 +60,7 @@ export function PMTSprintBoardPage({ workspaceId }: { workspaceId: number }) {
     : sprints?.find((s: any) => s.status === "active");
 
   const { data: tasks, isLoading } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
@@ -104,7 +104,7 @@ export function PMTSprintBoardPage({ workspaceId }: { workspaceId: number }) {
     setDragOverColumn(null);
     const taskId = parseInt(e.dataTransfer.getData("taskId"), 10);
     if (!taskId) return;
-    updateMut.mutate({ id: taskId, workspaceId, status: targetStatus });
+    updateMut.mutate({ id: taskId, status: targetStatus });
     toast.success(`Moved to ${COLUMNS.find((c) => c.key === targetStatus)?.label}`);
   };
 

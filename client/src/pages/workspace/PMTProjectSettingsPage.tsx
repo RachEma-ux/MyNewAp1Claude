@@ -24,7 +24,7 @@ import { toast } from "sonner";
 const LIFECYCLE_OPTIONS = ["initiating", "planning", "executing", "monitoring", "closing"];
 const RISK_LEVELS = ["low", "medium", "high", "critical"];
 
-export function PMTProjectSettingsPage({ workspaceId }: { workspaceId: number }) {
+export function PMTProjectSettingsPage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -35,11 +35,11 @@ export function PMTProjectSettingsPage({ workspaceId }: { workspaceId: number })
 
   const utils = trpc.useUtils();
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: project, isLoading } = trpc.modules.pmt.projects.get.useQuery(
-    { id: projectId!, workspaceId },
+    { id: projectId! },
     { enabled: !!projectId }
   );
 
@@ -67,14 +67,13 @@ export function PMTProjectSettingsPage({ workspaceId }: { workspaceId: number })
     if (!projectId) return;
     updateMut.mutate({
       id: projectId,
-      workspaceId,
       description: form.description || undefined,
       lifecycle: form.lifecycle || undefined,
       riskLevel: form.riskLevel || undefined,
     });
   };
 
-  const basePath = `/w/${workspaceId}/projects/config`;
+  const basePath = `/w/${}/projects/config`;
   const configLinks = [
     { label: "Work Item Types", icon: Tags, description: "Configure task types, colors, and icons", path: `${basePath}/types` },
     { label: "Statuses", icon: CircleDot, description: "Manage workflow statuses and ordering", path: `${basePath}/statuses` },

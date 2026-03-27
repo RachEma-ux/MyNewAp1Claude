@@ -14,8 +14,8 @@ const riskColors: Record<string, string> = {
   critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
 
-export function PMTPortfolioPage({ workspaceId }: { workspaceId: number }) {
-  const { data: projects, isLoading } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+export function PMTPortfolioPage() {
+  const { data: projects, isLoading } = trpc.modules.pmt.projects.list.useQuery();
 
   return (
     <div className="p-6 space-y-4">
@@ -33,7 +33,7 @@ export function PMTPortfolioPage({ workspaceId }: { workspaceId: number }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map((p: any) => (
-            <ProjectCard key={p.id} project={p} workspaceId={workspaceId} />
+            <ProjectCard key={p.id} project={p} />
           ))}
         </div>
       )}
@@ -41,9 +41,9 @@ export function PMTPortfolioPage({ workspaceId }: { workspaceId: number }) {
   );
 }
 
-function ProjectCard({ project, workspaceId }: { project: any; workspaceId: number }) {
+function ProjectCard({ project }: { project: any }) {
   const { data: tasks } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: project.id },
+    { projectId: project.id },
     { retry: false }
   );
 

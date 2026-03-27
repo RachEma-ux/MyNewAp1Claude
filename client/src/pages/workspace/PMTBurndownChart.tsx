@@ -26,15 +26,15 @@ function daysBetween(a: Date, b: Date) {
   return Math.ceil((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function PMTBurndownChart({ workspaceId }: { workspaceId: number }) {
+export function PMTBurndownChart() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
 
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: sprints } = trpc.modules.pmt.sprints.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
@@ -43,7 +43,7 @@ export function PMTBurndownChart({ workspaceId }: { workspaceId: number }) {
     : sprints?.find((s: any) => s.status === "active") || sprints?.[0];
 
   const { data: burndown, isLoading } = trpc.modules.pmt.sprints.burndown.useQuery(
-    { workspaceId, sprintId: activeSprint?.id! },
+    { sprintId: activeSprint?.id! },
     { enabled: !!activeSprint?.id }
   );
 

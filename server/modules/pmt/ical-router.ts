@@ -6,8 +6,8 @@ import { z } from "zod";
 import { eq, and, isNotNull } from "drizzle-orm";
 import { router, protectedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
-import { requireModule } from "../registry";
 import { tasks } from "./schema";
+import { getShellWorkspaceId } from "./pm-shell";
 
 function formatICalDate(d: Date): string {
   return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
@@ -15,13 +15,12 @@ function formatICalDate(d: Date): string {
 
 export const icalRouter = router({
   export: protectedProcedure
-    .input(z.object({ workspaceId: z.number(), projectId: z.number().optional() }))
+    .input(z.object({ projectId: z.number().optional() }))
     .query(async ({ input }) => {
-      await requireModule(input.workspaceId, "pmt");
       const db = getDb();
       if (!db) return "";
       const conditions = [
-        eq(tasks.workspaceId, input.workspaceId),
+        eq(tasks.wsId),
         isNotNull(tasks.dueDate),
       ];
       if (input.projectId) conditions.push(eq(tasks.projectId, input.projectId));

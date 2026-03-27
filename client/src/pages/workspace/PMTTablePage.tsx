@@ -55,7 +55,7 @@ const PRIORITIES = ["low", "medium", "high", "critical"];
 
 type SortKey = "title" | "type" | "status" | "priority" | "dueDate" | "percentComplete";
 
-export function PMTTablePage({ workspaceId }: { workspaceId: number }) {
+export function PMTTablePage() {
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -66,11 +66,11 @@ export function PMTTablePage({ workspaceId }: { workspaceId: number }) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
 
   const utils = trpc.useUtils();
-  const { data: projects } = trpc.modules.pmt.projects.list.useQuery({ workspaceId });
+  const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
   const { data: allTasks, isLoading } = trpc.modules.pmt.tasks.list.useQuery(
-    { workspaceId, projectId: projectId! },
+    { projectId: projectId! },
     { enabled: !!projectId }
   );
 
@@ -149,13 +149,13 @@ export function PMTTablePage({ workspaceId }: { workspaceId: number }) {
   const hasFilters = statusFilter !== "all" || typeFilter !== "all" || priorityFilter !== "all";
 
   const bulkChangeStatus = (status: string) => {
-    selected.forEach((id) => updateMut.mutate({ id, workspaceId, status }));
+    selected.forEach((id) => updateMut.mutate({ id, status }));
     setSelected(new Set());
     toast.success("Status updated");
   };
 
   const bulkDelete = () => {
-    selected.forEach((id) => deleteMut.mutate({ id, workspaceId }));
+    selected.forEach((id) => deleteMut.mutate({ id }));
   };
 
   const SortHeader = ({ label, k }: { label: string; k: SortKey }) => (
@@ -320,7 +320,7 @@ export function PMTTablePage({ workspaceId }: { workspaceId: number }) {
                     <Select
                       value={task.status}
                       onValueChange={(v) =>
-                        updateMut.mutate({ id: task.id, workspaceId, status: v })
+                        updateMut.mutate({ id: task.id, status: v })
                       }
                     >
                       <SelectTrigger className="h-7 w-28 text-xs">
@@ -337,7 +337,7 @@ export function PMTTablePage({ workspaceId }: { workspaceId: number }) {
                     <Select
                       value={task.priority}
                       onValueChange={(v) =>
-                        updateMut.mutate({ id: task.id, workspaceId, priority: v })
+                        updateMut.mutate({ id: task.id, priority: v })
                       }
                     >
                       <SelectTrigger className={`h-7 w-24 text-xs ${priorityColors[task.priority] || ""}`}>
@@ -366,7 +366,6 @@ export function PMTTablePage({ workspaceId }: { workspaceId: number }) {
 
       {/* Task Detail Drawer */}
       <PMTTaskDetailDrawer
-        workspaceId={workspaceId}
         taskId={selectedTaskId}
         open={!!selectedTaskId}
         onOpenChange={(open) => { if (!open) setSelectedTaskId(null); }}

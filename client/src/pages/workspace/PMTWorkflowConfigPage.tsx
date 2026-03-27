@@ -23,7 +23,7 @@ import {
 import { Loader2, Workflow, Plus, Trash2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
-export function PMTWorkflowConfigPage({ workspaceId }: { workspaceId: number }) {
+export function PMTWorkflowConfigPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [newTypeId, setNewTypeId] = useState<string>("");
   const [newFromId, setNewFromId] = useState<string>("");
@@ -31,9 +31,9 @@ export function PMTWorkflowConfigPage({ workspaceId }: { workspaceId: number }) 
 
   const utils = trpc.useUtils();
 
-  const { data: types } = trpc.modules.pmt.config.types.list.useQuery({ workspaceId });
-  const { data: statuses } = trpc.modules.pmt.config.statuses.list.useQuery({ workspaceId });
-  const { data: workflows, isLoading } = trpc.modules.pmt.config.workflows.list.useQuery({ workspaceId });
+  const { data: types } = trpc.modules.pmt.config.types.list.useQuery();
+  const { data: statuses } = trpc.modules.pmt.config.statuses.list.useQuery();
+  const { data: workflows, isLoading } = trpc.modules.pmt.config.workflows.list.useQuery();
 
   const createMut = trpc.modules.pmt.config.workflows.create.useMutation({
     onSuccess: () => {
@@ -73,7 +73,6 @@ export function PMTWorkflowConfigPage({ workspaceId }: { workspaceId: number }) 
       return;
     }
     createMut.mutate({
-      workspaceId,
       typeId: parseInt(newTypeId),
       fromStatusId: parseInt(newFromId),
       toStatusId: parseInt(newToId),
@@ -82,7 +81,7 @@ export function PMTWorkflowConfigPage({ workspaceId }: { workspaceId: number }) 
 
   const handleDelete = (id: number) => {
     if (confirm("Delete this transition?")) {
-      deleteMut.mutate({ id, workspaceId });
+      deleteMut.mutate({ id });
     }
   };
 
