@@ -14,7 +14,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const commentsRouter = router({
   list: protectedProcedure
     .input(z.object({ workItemId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmComments)

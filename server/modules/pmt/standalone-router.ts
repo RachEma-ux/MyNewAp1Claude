@@ -35,7 +35,6 @@ import {
   type ProjectState, type LifecycleEvent,
 } from "./project-lifecycle";
 import { getMethodPack } from "@shared/pm-method-packs";
-
 // ── Auto-managed PM Shell workspace ──
 
 let cachedWsId: number | null = null;

@@ -14,7 +14,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const discussionsRouter = router({
   list: protectedProcedure
     .input(z.object({ projectId: z.number().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       const conditions = [eq(pmDiscussions.workspaceId, wsId)];
@@ -26,7 +27,8 @@ export const discussionsRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmDiscussions)
@@ -62,11 +64,12 @@ export const discussionsRouter = router({
       locked: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmDiscussions).set(updates)
-        .where(and(eq(pmDiscussions.id, id), eq(pmDiscussions.workspaceId)));
+        .where(and(eq(pmDiscussions.id, id), eq(pmDiscussions.workspaceId, wsId)));
       return { success: true };
     }),
 

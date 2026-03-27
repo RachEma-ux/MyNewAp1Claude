@@ -13,7 +13,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const notificationsRouter = router({
   list: protectedProcedure
     .input(z.object({ unreadOnly: z.boolean().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       const conditions = [eq(pmNotifications.workspaceId, wsId)];
@@ -25,7 +26,8 @@ export const notificationsRouter = router({
 
   markRead: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.update(pmNotifications).set({ readAt: new Date() })
@@ -35,7 +37,8 @@ export const notificationsRouter = router({
 
   markAllRead: protectedProcedure
     
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.update(pmNotifications).set({ readAt: new Date() })

@@ -14,7 +14,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const meetingsRouter = router({
   list: protectedProcedure
     .input(z.object({ projectId: z.number().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       const conditions = [eq(pmMeetings.workspaceId, wsId)];
@@ -26,7 +27,8 @@ export const meetingsRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmMeetings)
@@ -69,6 +71,7 @@ export const meetingsRouter = router({
       endTime: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, startTime, endTime, ...updates } = input;
@@ -76,7 +79,7 @@ export const meetingsRouter = router({
       if (startTime) setValues.startTime = new Date(startTime);
       if (endTime) setValues.endTime = new Date(endTime);
       await db.update(pmMeetings).set(setValues)
-        .where(and(eq(pmMeetings.id, id), eq(pmMeetings.workspaceId)));
+        .where(and(eq(pmMeetings.id, id), eq(pmMeetings.workspaceId, wsId)));
       return { success: true };
     }),
 

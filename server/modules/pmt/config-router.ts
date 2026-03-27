@@ -14,7 +14,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 const statusesRouter = router({
   list: protectedProcedure
     
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmStatuses)
@@ -55,11 +56,12 @@ const statusesRouter = router({
       position: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmStatuses).set(updates)
-        .where(and(eq(pmStatuses.id, id), eq(pmStatuses.workspaceId)));
+        .where(and(eq(pmStatuses.id, id), eq(pmStatuses.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -78,7 +80,8 @@ const statusesRouter = router({
 const typesRouter = router({
   list: protectedProcedure
     
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmTypes)
@@ -122,11 +125,12 @@ const typesRouter = router({
       position: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmTypes).set(updates)
-        .where(and(eq(pmTypes.id, id), eq(pmTypes.workspaceId)));
+        .where(and(eq(pmTypes.id, id), eq(pmTypes.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -145,7 +149,8 @@ const typesRouter = router({
 const workflowsRouter = router({
   list: protectedProcedure
     .input(z.object({ typeId: z.number().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       const conditions = [eq(pmWorkflows.workspaceId, wsId)];

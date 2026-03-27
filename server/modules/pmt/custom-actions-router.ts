@@ -14,7 +14,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const customActionsRouter = router({
   list: protectedProcedure
     
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmCustomActions)
@@ -55,11 +56,12 @@ export const customActionsRouter = router({
       position: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmCustomActions).set(updates)
-        .where(and(eq(pmCustomActions.id, id), eq(pmCustomActions.workspaceId)));
+        .where(and(eq(pmCustomActions.id, id), eq(pmCustomActions.workspaceId, wsId)));
       return { success: true };
     }),
 

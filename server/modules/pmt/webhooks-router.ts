@@ -13,7 +13,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const webhooksRouter = router({
   list: protectedProcedure
     
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmWebhooks)
@@ -52,11 +53,12 @@ export const webhooksRouter = router({
       active: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmWebhooks).set(updates)
-        .where(and(eq(pmWebhooks.id, id), eq(pmWebhooks.workspaceId)));
+        .where(and(eq(pmWebhooks.id, id), eq(pmWebhooks.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -101,7 +103,7 @@ export async function fireWebhook(workspaceId: number, event: string, payload: R
   const db = getDb();
   if (!db) return;
   const hooks = await db.select().from(pmWebhooks)
-    .where(and(eq(pmWebhooks.workspaceId), eq(pmWebhooks.active, true)));
+    .where(and(eq(pmWebhooks.workspaceId, workspaceId), eq(pmWebhooks.active, true)));
   for (const hook of hooks) {
     const events = hook.events as string[];
     if (!events.includes(event) && !events.includes("*")) continue;

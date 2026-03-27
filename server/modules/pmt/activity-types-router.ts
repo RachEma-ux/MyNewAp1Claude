@@ -13,7 +13,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const activityTypesRouter = router({
   list: protectedProcedure
     
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmActivityTypes)
@@ -48,11 +49,12 @@ export const activityTypesRouter = router({
       position: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmActivityTypes).set(updates)
-        .where(and(eq(pmActivityTypes.id, id), eq(pmActivityTypes.workspaceId)));
+        .where(and(eq(pmActivityTypes.id, id), eq(pmActivityTypes.workspaceId, wsId)));
       return { success: true };
     }),
 

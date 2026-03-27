@@ -20,7 +20,8 @@ export const costEntriesRouter = router({
       startDate: z.string().optional(),
       endDate: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       const conditions = [eq(pmCostEntries.workspaceId, wsId)];
@@ -69,13 +70,14 @@ export const costEntriesRouter = router({
       spentOn: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, spentOn, ...updates } = input;
       const setValues: Record<string, unknown> = { ...updates };
       if (spentOn) setValues.spentOn = new Date(spentOn);
       await db.update(pmCostEntries).set(setValues)
-        .where(and(eq(pmCostEntries.id, id), eq(pmCostEntries.workspaceId)));
+        .where(and(eq(pmCostEntries.id, id), eq(pmCostEntries.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -95,7 +97,8 @@ export const costEntriesRouter = router({
       startDate: z.string().optional(),
       endDate: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       const conditions = [eq(pmCostEntries.workspaceId, wsId)];

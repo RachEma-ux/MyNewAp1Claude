@@ -14,7 +14,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 const fieldsRouter = router({
   list: protectedProcedure
     
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmCustomFields)
@@ -58,11 +59,12 @@ const fieldsRouter = router({
       helpText: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmCustomFields).set(updates)
-        .where(and(eq(pmCustomFields.id, id), eq(pmCustomFields.workspaceId)));
+        .where(and(eq(pmCustomFields.id, id), eq(pmCustomFields.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -82,7 +84,8 @@ const fieldsRouter = router({
 const valuesRouter = router({
   list: protectedProcedure
     .input(z.object({ workItemId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmCustomValues)

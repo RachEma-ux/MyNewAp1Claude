@@ -596,7 +596,8 @@ const EXAMPLE_DATA_MAP: Record<string, object> = {
 const projectTemplatesRouter = router({
   list: protectedProcedure
     
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmProjectTemplates)
@@ -606,7 +607,8 @@ const projectTemplatesRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmProjectTemplates)
@@ -644,11 +646,12 @@ const projectTemplatesRouter = router({
       templateData: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmProjectTemplates).set(updates)
-        .where(and(eq(pmProjectTemplates.id, id), eq(pmProjectTemplates.workspaceId)));
+        .where(and(eq(pmProjectTemplates.id, id), eq(pmProjectTemplates.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -817,7 +820,8 @@ async function applyTemplateData(db: any, userId: number, projectName: string, t
 const workItemTemplatesRouter = router({
   list: protectedProcedure
     
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmWorkItemTemplates)
@@ -827,7 +831,8 @@ const workItemTemplatesRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmWorkItemTemplates)
@@ -868,11 +873,12 @@ const workItemTemplatesRouter = router({
       typeId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmWorkItemTemplates).set(updates)
-        .where(and(eq(pmWorkItemTemplates.id, id), eq(pmWorkItemTemplates.workspaceId)));
+        .where(and(eq(pmWorkItemTemplates.id, id), eq(pmWorkItemTemplates.workspaceId, wsId)));
       return { success: true };
     }),
 

@@ -13,7 +13,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const budgetsRouter = router({
   list: protectedProcedure
     .input(z.object({ projectId: z.number().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       const conditions = [eq(pmBudgets.workspaceId, wsId)];
@@ -25,7 +26,8 @@ export const budgetsRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmBudgets)
@@ -67,11 +69,12 @@ export const budgetsRouter = router({
       plannedUnits: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmBudgets).set({ ...updates, updatedAt: new Date() })
-        .where(and(eq(pmBudgets.id, id), eq(pmBudgets.workspaceId)));
+        .where(and(eq(pmBudgets.id, id), eq(pmBudgets.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -88,7 +91,8 @@ export const budgetsRouter = router({
 
   variance: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       // Get budget

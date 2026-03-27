@@ -16,7 +16,8 @@ function formatICalDate(d: Date): string {
 export const icalRouter = router({
   export: protectedProcedure
     .input(z.object({ projectId: z.number().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return "";
       const conditions = [

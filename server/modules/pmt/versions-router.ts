@@ -14,7 +14,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const versionsRouter = router({
   list: protectedProcedure
     .input(z.object({ projectId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmVersions)
@@ -27,7 +28,8 @@ export const versionsRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmVersions)
@@ -72,6 +74,7 @@ export const versionsRouter = router({
       dueDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, startDate, dueDate, ...updates } = input;
@@ -79,7 +82,7 @@ export const versionsRouter = router({
       if (startDate) setValues.startDate = new Date(startDate);
       if (dueDate) setValues.dueDate = new Date(dueDate);
       await db.update(pmVersions).set(setValues)
-        .where(and(eq(pmVersions.id, id), eq(pmVersions.workspaceId)));
+        .where(and(eq(pmVersions.id, id), eq(pmVersions.workspaceId, wsId)));
       return { success: true };
     }),
 

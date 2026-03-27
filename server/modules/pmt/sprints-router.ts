@@ -15,7 +15,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const sprintsRouter = router({
   list: protectedProcedure
     .input(z.object({ projectId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmSprints)
@@ -28,7 +29,8 @@ export const sprintsRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmSprints)
@@ -70,6 +72,7 @@ export const sprintsRouter = router({
       endDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, startDate, endDate, ...updates } = input;
@@ -77,7 +80,7 @@ export const sprintsRouter = router({
       if (startDate) setValues.startDate = new Date(startDate);
       if (endDate) setValues.endDate = new Date(endDate);
       await db.update(pmSprints).set(setValues)
-        .where(and(eq(pmSprints.id, id), eq(pmSprints.workspaceId)));
+        .where(and(eq(pmSprints.id, id), eq(pmSprints.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -162,7 +165,8 @@ export const sprintsRouter = router({
 
   burndown: protectedProcedure
     .input(z.object({ sprintId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const sprintRows = await db.select().from(pmSprints)

@@ -13,7 +13,8 @@ import { getShellWorkspaceId } from "./pm-shell";
 export const gitRouter = router({
   list: protectedProcedure
     .input(z.object({ workItemId: z.number().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       const conditions = [eq(pmGitReferences.workspaceId, wsId)];

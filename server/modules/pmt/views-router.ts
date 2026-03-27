@@ -17,7 +17,8 @@ export const viewsRouter = router({
       projectId: z.number().optional(),
       viewType: z.enum(["table", "kanban", "gantt", "calendar", "timeline"]).optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) return [];
       const conditions = [eq(pmSavedViews.workspaceId, wsId)];
@@ -30,7 +31,8 @@ export const viewsRouter = router({
 
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmSavedViews)
@@ -75,11 +77,12 @@ export const viewsRouter = router({
       isPublic: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, ...updates } = input;
       await db.update(pmSavedViews).set({ ...updates, updatedAt: new Date() })
-        .where(and(eq(pmSavedViews.id, id), eq(pmSavedViews.workspaceId)));
+        .where(and(eq(pmSavedViews.id, id), eq(pmSavedViews.workspaceId, wsId)));
       return { success: true };
     }),
 
