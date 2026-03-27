@@ -8,7 +8,8 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { PSIdeationHeader } from "./PSIdeationHeader";
 import { PSIdeationWorkflowRail } from "./PSIdeationWorkflowRail";
 import { PSIdeationWorkspace } from "./PSIdeationWorkspace";
@@ -157,6 +158,8 @@ export function PSIdeationShell({ ideationId }: Props) {
   // Local state
   const currentStepKey = (ideation?.currentStepKey as IdeationStepKey) || "context";
   const isConverted = ideation?.lifecycleStatus === "converted";
+  const [railOpen, setRailOpen] = useState(true);
+  const [insightOpen, setInsightOpen] = useState(true);
 
   const handleStepClick = (stepKey: IdeationStepKey) => {
     setCurrentStepMut.mutate({ id: ideationId, stepKey });
@@ -232,12 +235,23 @@ export function PSIdeationShell({ ideationId }: Props) {
         deleting={deleteMut.isPending}
       />
       <div className="flex flex-1 min-h-0">
-        <PSIdeationWorkflowRail
-          steps={(steps as any[]) || []}
-          currentStep={currentStepKey}
-          onStepClick={handleStepClick}
-          isConverted={isConverted}
-        />
+        {/* Left rail toggle */}
+        {!railOpen && (
+          <div className="border-r border-border flex flex-col items-center py-2 px-1">
+            <Button variant="ghost" size="sm" onClick={() => setRailOpen(true)} title="Show workflow steps">
+              <PanelLeftOpen className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+        {railOpen && (
+          <PSIdeationWorkflowRail
+            steps={(steps as any[]) || []}
+            currentStep={currentStepKey}
+            onStepClick={handleStepClick}
+            isConverted={isConverted}
+            onCollapse={() => setRailOpen(false)}
+          />
+        )}
         <PSIdeationWorkspace
           currentStep={currentStepKey}
           steps={(steps as any[]) || []}
@@ -258,10 +272,20 @@ export function PSIdeationShell({ ideationId }: Props) {
           onUpsertScenario={handleUpsertScenario}
           onUpsertFeasibility={handleUpsertFeasibility}
         />
-        <PSIdeationInsightPanel
-          readiness={readiness as any}
-          activity={(activity as any[]) || []}
-        />
+        {/* Right insight panel toggle */}
+        {insightOpen ? (
+          <PSIdeationInsightPanel
+            readiness={readiness as any}
+            activity={(activity as any[]) || []}
+            onCollapse={() => setInsightOpen(false)}
+          />
+        ) : (
+          <div className="border-l border-border flex flex-col items-center py-2 px-1">
+            <Button variant="ghost" size="sm" onClick={() => setInsightOpen(true)} title="Show insights">
+              <PanelLeftClose className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

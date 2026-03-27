@@ -4,8 +4,8 @@
  * Shows readiness status, blockers, warnings, and activity log.
  */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle2, XCircle, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, CheckCircle2, XCircle, Activity, PanelLeftClose } from "lucide-react";
 
 interface ReadinessResult {
   ready: boolean;
@@ -24,11 +24,19 @@ interface Props {
   readiness: ReadinessResult | null | undefined;
   activity: ActivityEntry[];
   isLoading?: boolean;
+  onCollapse?: () => void;
 }
 
-export function PSIdeationInsightPanel({ readiness, activity, isLoading }: Props) {
+export function PSIdeationInsightPanel({ readiness, activity, isLoading, onCollapse }: Props) {
   return (
     <aside className="w-64 shrink-0 border-l border-border overflow-y-auto p-3 space-y-4">
+      {onCollapse && (
+        <div className="flex justify-start">
+          <Button variant="ghost" size="sm" onClick={onCollapse} title="Collapse panel" className="h-6 w-6 p-0">
+            <PanelLeftClose className="w-3.5 h-3.5 rotate-180" />
+          </Button>
+        </div>
+      )}
       {/* Readiness */}
       <Card>
         <CardHeader className="pb-2">
