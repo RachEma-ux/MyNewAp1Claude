@@ -726,10 +726,10 @@ const projectTemplatesRouter = router({
 });
 
 /** Shared helper: apply template data to create a project with statuses, types, and tasks */
-async function applyTemplateData(db: any, userId: number, projectName: string, tpl: Record<string, unknown>) {
+async function applyTemplateData(db: any, userId: number, wsId: number, projectName: string, tpl: Record<string, unknown>) {
   // 1. Create the project
   const [created] = await db.insert(projects).values({
-    
+    workspaceId: wsId,
     name: projectName,
     description: (tpl.description as string) || undefined,
     status: "draft",
@@ -741,7 +741,7 @@ async function applyTemplateData(db: any, userId: number, projectName: string, t
   if (statusArr && statusArr.length > 0) {
     await db.insert(pmStatuses).values(
       statusArr.map((s) => ({
-        
+        workspaceId: wsId,
         name: s.name,
         color: s.color,
         isClosed: s.isClosed ?? false,
@@ -756,7 +756,7 @@ async function applyTemplateData(db: any, userId: number, projectName: string, t
   if (typeArr && typeArr.length > 0) {
     await db.insert(pmTypes).values(
       typeArr.map((t) => ({
-        
+        workspaceId: wsId,
         name: t.name,
         color: t.color,
         icon: t.icon,
@@ -775,7 +775,7 @@ async function applyTemplateData(db: any, userId: number, projectName: string, t
 
     const insertTask = async (t: TemplateTask, parentId: number | null): Promise<void> => {
       const [row] = await db.insert(tasks).values({
-        
+        workspaceId: wsId,
         projectId: created.id,
         title: t.title,
         description: t.description || undefined,
@@ -796,7 +796,7 @@ async function applyTemplateData(db: any, userId: number, projectName: string, t
 
     for (const phase of phasesArr) {
       const [parentTask] = await db.insert(tasks).values({
-        
+        workspaceId: wsId,
         projectId: created.id,
         title: phase.name,
         description: phase.description || undefined,
