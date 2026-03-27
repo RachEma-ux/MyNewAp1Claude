@@ -235,6 +235,14 @@ async function startServer() {
     console.warn(`[OMTemplateSeed] Skipped — ${error.message}`);
   }
 
+  // Initialize GraphRAG pilot adapters (registers Documents source in DB)
+  try {
+    const { initializeAdapters } = await import("../data-analysis/graphrag/service");
+    await initializeAdapters();
+  } catch (error: any) {
+    console.warn(`[GraphRAG] Adapter init skipped — ${error.message}`);
+  }
+
   // Initialize Governance Engine (CGT v2)
   initializeGovernance();
 

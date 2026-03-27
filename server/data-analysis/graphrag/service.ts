@@ -277,11 +277,11 @@ export async function getWorkerStatus() {
 
 // ── Initialize pilot adapters ────────────────────────────────────────────────
 
-export function initializeAdapters() {
+export async function initializeAdapters() {
   try {
     const { documentsGraphRagAdapter } = require("./adapters/documents-adapter");
-    registerSourceAdapter(documentsGraphRagAdapter);
-    console.log("[GraphRAG] Documents pilot adapter initialized");
+    await registerSource(documentsGraphRagAdapter);
+    console.log("[GraphRAG] Documents pilot adapter initialized and registered");
   } catch (err: any) {
     console.warn("[GraphRAG] Failed to init documents adapter:", err.message);
   }
