@@ -723,7 +723,7 @@ const projectTemplatesRouter = router({
 });
 
 /** Shared helper: apply template data to create a project with statuses, types, and tasks */
-async function applyTemplateData(db: any, userId: number: number, projectName: string, tpl: Record<string, unknown>) {
+async function applyTemplateData(db: any, userId: number, projectName: string, tpl: Record<string, unknown>) {
   // 1. Create the project
   const [created] = await db.insert(projects).values({
     

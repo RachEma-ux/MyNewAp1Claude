@@ -86,7 +86,7 @@ export const webhooksRouter = router({
         const res = await fetch(webhook.url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ event: "test": wsId, timestamp: new Date().toISOString() }),
+          body: JSON.stringify({ event: "test", timestamp: new Date().toISOString() }),
         });
         return { success: true, status: res.status };
       } catch (err: unknown) {
