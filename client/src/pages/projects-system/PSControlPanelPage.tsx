@@ -26,6 +26,12 @@ import {
   FileQuestion,
   Target,
   Layers,
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  FolderKanban,
+  GitCompareArrows,
+  PieChart,
 } from "lucide-react";
 
 // ── Tab Components ────────────────────────────────────────────────────
@@ -35,6 +41,7 @@ import { PSScopeRegistryEditor } from "./PSScopeRegistryEditor";
 import { PSQuestionEditor } from "./PSQuestionEditor";
 import { PSDimensionEditor } from "./PSDimensionEditor";
 import { PSMatrixGridEditor } from "./PSMatrixGridEditor";
+import { PSValidationQueueTab } from "./PSValidationQueueTab";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -108,6 +115,8 @@ export function PSControlPanelPage() {
           <TabsTrigger value="dimensions"><Layers className="w-3.5 h-3.5 mr-1" />Dimensions</TabsTrigger>
           <TabsTrigger value="grid"><Grid3X3 className="w-3.5 h-3.5 mr-1" />Grid</TabsTrigger>
           <TabsTrigger value="validation"><Shield className="w-3.5 h-3.5 mr-1" />Validation</TabsTrigger>
+          <TabsTrigger value="monitoring"><BarChart3 className="w-3.5 h-3.5 mr-1" />Monitoring</TabsTrigger>
+          <TabsTrigger value="queue"><CheckCircle2 className="w-3.5 h-3.5 mr-1" />Queue</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -133,6 +142,12 @@ export function PSControlPanelPage() {
         </TabsContent>
         <TabsContent value="validation">
           <ValidationTab selectedVersionId={selectedVersionId} onSelectVersion={setSelectedVersionId} />
+        </TabsContent>
+        <TabsContent value="monitoring">
+          <MonitoringTab />
+        </TabsContent>
+        <TabsContent value="queue">
+          <PSValidationQueueTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -291,6 +306,277 @@ function ValidationTab({
         </>
       )}
     </div>
+  );
+}
+
+// ── H. Monitoring Tab ────────────────────────────────────────────────
+
+function MonitoringTab() {
+  const { data, isLoading } = trpc.ps.getMonitoringSummary.useQuery();
+
+  if (isLoading) return <Loader2 className="w-5 h-5 animate-spin mx-auto mt-8" />;
+  if (!data) return <p className="text-sm text-muted-foreground">Unable to load monitoring data.</p>;
+
+  return (
+    <div className="space-y-6">
+      {/* ── Row 1: Key Metrics ───────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <MetricCard
+          icon={<FolderKanban className="w-4 h-4 text-blue-500" />}
+          label="PS Projects"
+          value={data.projects.total}
+          sub={`${data.projects.draft} draft / ${data.projects.validated} validated`}
+        />
+        <MetricCard
+          icon={<CheckCircle2 className="w-4 h-4 text-green-500" />}
+          label="Validation Rate"
+          value={`${data.projects.validationRate}%`}
+          sub={`${data.projects.validated} of ${data.projects.validated + data.projects.rejected} decided`}
+        />
+        <MetricCard
+          icon={<AlertTriangle className="w-4 h-4 text-red-500" />}
+          label="Rejection Rate"
+          value={`${data.projects.rejectionRate}%`}
+          sub={`${data.projects.rejected} rejected`}
+        />
+        <MetricCard
+          icon={<GitCompareArrows className="w-4 h-4 text-orange-500" />}
+          label="Override Rate"
+          value={`${data.overrideRate.overrideRate}%`}
+          sub={`${data.overrideRate.totalOverrides} of ${data.overrideRate.totalWizardRuns} runs`}
+        />
+      </div>
+
+      {/* ── Row 2: Drift + Confidence Dist ────────────────────────── */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Drift Rate */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-amber-500" />
+              Drift Rate
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.drift.totalFeedback === 0 ? (
+              <p className="text-sm text-muted-foreground">No feedback submitted yet.</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl font-bold">{data.drift.driftRate}%</span>
+                  <span className="text-sm text-muted-foreground">
+                    {data.drift.driftCount} of {data.drift.totalFeedback} feedback entries flagged drift
+                  </span>
+                </div>
+                {data.drift.byOutcome.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase">By Outcome</p>
+                    {data.drift.byOutcome.map((o) => (
+                      <div key={o.outcome} className="flex justify-between text-sm">
+                        <span className="capitalize">{o.outcome}</span>
+                        <span>
+                          {o.driftCount}/{o.count}
+                          <span className="text-muted-foreground ml-1">
+                            ({o.count > 0 ? Math.round((o.driftCount / o.count) * 100) : 0}%)
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Confidence Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <PieChart className="w-4 h-4 text-indigo-500" />
+              Confidence Distribution
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.confidenceDistribution.every((b) => b.count === 0) ? (
+              <p className="text-sm text-muted-foreground">No projects with confidence scores yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {data.confidenceDistribution.map((b) => (
+                  <div key={b.bucket} className="flex items-center gap-3">
+                    <span className="text-xs w-12 text-right text-muted-foreground">{b.bucket}</span>
+                    <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-500 rounded-full transition-all"
+                        style={{ width: `${Math.max(b.percent, b.count > 0 ? 2 : 0)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs w-16 text-muted-foreground">{b.count} ({b.percent}%)</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Row 3: Scope Distribution ────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Target className="w-4 h-4 text-purple-500" />
+            Scope Distribution
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {data.scopeDistribution.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No wizard runs recorded yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {data.scopeDistribution.map((s) => (
+                <div key={s.scopeCode} className="flex items-center gap-3">
+                  <span className="text-xs w-40 truncate font-mono" title={s.scopeCode}>{s.scopeCode}</span>
+                  <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                    <div
+                      className="h-full bg-purple-500 rounded-full transition-all"
+                      style={{ width: `${Math.max(s.percent, s.count > 0 ? 2 : 0)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs w-20 text-muted-foreground">{s.count} ({s.percent}%)</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Row 4: Confidence Trends + Project Breakdown ─────────── */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Confidence Trends */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-green-500" />
+              Confidence Trends (12 weeks)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.confidenceTrends.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No wizard runs in the last 12 weeks.</p>
+            ) : (
+              <div className="space-y-1">
+                {data.confidenceTrends.map((t) => (
+                  <div key={t.period} className="flex items-center gap-3 text-sm">
+                    <span className="w-24 text-xs text-muted-foreground font-mono">{t.period}</span>
+                    <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 rounded-full transition-all"
+                        style={{ width: `${t.avgConfidence}%` }}
+                      />
+                    </div>
+                    <span className="text-xs w-24 text-muted-foreground">
+                      {t.avgConfidence}% ({t.runCount} runs)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Project Status Breakdown */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <FolderKanban className="w-4 h-4 text-blue-500" />
+              Project Status Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.projects.total === 0 ? (
+              <p className="text-sm text-muted-foreground">No projects created yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {[
+                  { label: "Draft", count: data.projects.draft, color: "bg-gray-400" },
+                  { label: "Submitted", count: data.projects.submitted, color: "bg-yellow-500" },
+                  { label: "Validated", count: data.projects.validated, color: "bg-green-500" },
+                  { label: "Rejected", count: data.projects.rejected, color: "bg-red-500" },
+                  { label: "Sent to PM", count: data.projects.sentToPm, color: "bg-blue-500" },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center gap-3">
+                    <span className="text-xs w-20 text-muted-foreground">{row.label}</span>
+                    <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                      <div
+                        className={`h-full ${row.color} rounded-full transition-all`}
+                        style={{ width: `${data.projects.total > 0 ? Math.max((row.count / data.projects.total) * 100, row.count > 0 ? 3 : 0) : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-xs w-8 text-right font-medium">{row.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Row 5: Override Rate Detail (30d) ─────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <GitCompareArrows className="w-4 h-4 text-orange-500" />
+            Override Rate Detail
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <p className="text-muted-foreground text-xs">All-time</p>
+              <p className="text-2xl font-bold">{data.overrideRate.overrideRate}%</p>
+              <p className="text-xs text-muted-foreground">{data.overrideRate.totalOverrides} overrides / {data.overrideRate.totalWizardRuns} runs</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Last 30 days</p>
+              <p className="text-2xl font-bold">{data.overrideRate.last30dOverrideRate}%</p>
+              <p className="text-xs text-muted-foreground">{data.overrideRate.last30dOverrides} overrides / {data.overrideRate.last30dWizardRuns} runs</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Wizard Avg Confidence</p>
+              <p className="text-2xl font-bold">{data.wizard.averageConfidence ?? "\u2014"}</p>
+              <p className="text-xs text-muted-foreground">{data.wizard.total} total runs</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Metric Card (reusable) ───────────────────────────────────────────
+
+function MetricCard({
+  icon,
+  label,
+  value,
+  sub,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  sub: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+          {icon}
+          {label}
+        </div>
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+      </CardContent>
+    </Card>
   );
 }
 

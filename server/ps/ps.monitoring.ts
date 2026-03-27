@@ -544,3 +544,123 @@ export async function getDeadQuestions(): Promise<DeadQuestionEntry[]> {
 
   return deadQuestions;
 }
+
+// ── Project Metrics ──────────────────────────────────────────────────
+
+export async function getProjectMetrics(): Promise<ProjectMetrics> {
+  const db = getDb();
+  if (!db) return { total: 0, draft: 0, submitted: 0, validated: 0, rejected: 0, sentToPm: 0, validationRate: 0, rejectionRate: 0 };
+
+  const rows = await db
+    .select({
+      status: psProjects.status,
+      cnt: count(),
+    })
+    .from(psProjects)
+    .groupBy(psProjects.status);
+
+  const result: ProjectMetrics = { total: 0, draft: 0, submitted: 0, validated: 0, rejected: 0, sentToPm: 0, validationRate: 0, rejectionRate: 0 };
+
+  for (const r of rows) {
+    const n = Number(r.cnt);
+    result.total += n;
+    const s = (r.status ?? "").toUpperCase();
+    if (s === "DRAFT" || s === "draft") result.draft += n;
+    else if (s === "SUBMITTED" || s === "submitted") result.submitted += n;
+    else if (s === "VALIDATED" || s === "validated") result.validated += n;
+    else if (s === "REJECTED" || s === "rejected") result.rejected += n;
+    else if (s === "SENT_TO_PM" || s === "sent_to_pm") result.sentToPm += n;
+  }
+
+  const decided = result.validated + result.rejected;
+  result.validationRate = decided > 0 ? Math.round((result.validated / decided) * 10000) / 100 : 0;
+  result.rejectionRate = decided > 0 ? Math.round((result.rejected / decided) * 10000) / 100 : 0;
+
+  return result;
+}
+
+// ── Confidence Distribution ─────────────────────────────────────────
+
+export async function getConfidenceDistribution(): Promise<ConfidenceDistributionBucket[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      confidence: psProjects.confidence,
+    })
+    .from(psProjects);
+
+  const buckets = [
+    { bucket: "0-20", min: 0, max: 20, count: 0 },
+    { bucket: "20-40", min: 20, max: 40, count: 0 },
+    { bucket: "40-60", min: 40, max: 60, count: 0 },
+    { bucket: "60-80", min: 60, max: 80, count: 0 },
+    { bucket: "80-100", min: 80, max: 101, count: 0 },
+  ];
+
+  let total = 0;
+  for (const r of rows) {
+    if (!r.confidence) continue;
+    const val = Number(r.confidence);
+    if (isNaN(val)) continue;
+    total++;
+    for (const b of buckets) {
+      if (val >= b.min && val < b.max) {
+        b.count++;
+        break;
+      }
+    }
+  }
+
+  return buckets.map((b) => ({
+    bucket: b.bucket,
+    count: b.count,
+    percent: total > 0 ? Math.round((b.count / total) * 10000) / 100 : 0,
+  }));
+}
+
+// ── Drift Metrics ───────────────────────────────────────────────────
+
+export async function getDriftMetrics(): Promise<DriftMetrics> {
+  const db = getDb();
+  if (!db) return { totalFeedback: 0, driftCount: 0, noDriftCount: 0, driftRate: 0, byOutcome: [] };
+
+  const rows = await db
+    .select({
+      outcome: psFeedback.outcome,
+      driftFlag: psFeedback.driftFlag,
+      cnt: count(),
+    })
+    .from(psFeedback)
+    .groupBy(psFeedback.outcome, psFeedback.driftFlag);
+
+  let totalFeedback = 0;
+  let driftCount = 0;
+  const outcomeMap = new Map<string, { count: number; driftCount: number }>();
+
+  for (const r of rows) {
+    const n = Number(r.cnt);
+    totalFeedback += n;
+    if (r.driftFlag === 1) driftCount += n;
+
+    const existing = outcomeMap.get(r.outcome) ?? { count: 0, driftCount: 0 };
+    existing.count += n;
+    if (r.driftFlag === 1) existing.driftCount += n;
+    outcomeMap.set(r.outcome, existing);
+  }
+
+  const byOutcome = Array.from(outcomeMap.entries()).map(([outcome, data]) => ({
+    outcome,
+    count: data.count,
+    driftCount: data.driftCount,
+  }));
+
+  return {
+    totalFeedback,
+    driftCount,
+    noDriftCount: totalFeedback - driftCount,
+    driftRate: totalFeedback > 0 ? Math.round((driftCount / totalFeedback) * 10000) / 100 : 0,
+    byOutcome,
+  };
+}

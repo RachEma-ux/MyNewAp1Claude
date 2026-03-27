@@ -55,6 +55,9 @@ import {
   getScopeDistribution,
   getDeadScopes,
   getDeadQuestions,
+  getProjectMetrics,
+  getConfidenceDistribution,
+  getDriftMetrics,
   type MonitoringSummary,
 } from "./ps.monitoring";
 
@@ -2215,6 +2218,7 @@ export async function getMonitoringSummary(): Promise<MonitoringSummary> {
   const [
     systems, wizard, demand, assignments, fulfillment, activity,
     overrideRate, confidenceTrends, scopeDistribution, deadScopes, deadQuestions,
+    projects, confidenceDistribution, drift,
   ] = await Promise.all([
     getSystemMetrics(),
     getWizardMetrics(),
@@ -2227,11 +2231,15 @@ export async function getMonitoringSummary(): Promise<MonitoringSummary> {
     getScopeDistribution(),
     getDeadScopes(),
     getDeadQuestions(),
+    getProjectMetrics(),
+    getConfidenceDistribution(),
+    getDriftMetrics(),
   ]);
 
   return {
     systems, wizard, demand, assignments, fulfillment, activity,
     overrideRate, confidenceTrends, scopeDistribution, deadScopes, deadQuestions,
+    projects, confidenceDistribution, drift,
   };
 }
 
