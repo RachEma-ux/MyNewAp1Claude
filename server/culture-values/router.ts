@@ -54,7 +54,7 @@ const valueSetsRouter = router({
       workspaceId: z.number(),
       name: z.string().min(1).max(200),
       description: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -155,7 +155,7 @@ const valueDefsRouter = router({
       category: z.string().max(100).optional(),
       sortOrder: z.number().default(0),
       icon: z.string().max(50).optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -175,7 +175,7 @@ const valueDefsRouter = router({
       category: z.string().max(100).nullable().optional(),
       sortOrder: z.number().optional(),
       icon: z.string().max(50).nullable().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -219,7 +219,7 @@ const behaviorsRouter = router({
       workspaceId: z.number(), valueDefinitionId: z.number(),
       behavior: z.string().min(1), level: z.enum(["standard", "exemplary", "minimum"]).default("standard"),
       context: z.string().max(100).optional(), sortOrder: z.number().default(0),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -261,7 +261,7 @@ const nonNegotiablesRouter = router({
       workspaceId: z.number(), valueDefinitionId: z.number(),
       description: z.string().min(1), severity: z.enum(["critical", "high", "medium"]).default("critical"),
       category: z.enum(["red_flag", "anti_pattern", "violation"]).default("red_flag"),
-      sortOrder: z.number().default(0), metadata: z.record(z.unknown()).optional(),
+      sortOrder: z.number().default(0), metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -291,7 +291,7 @@ const translationsRouter = router({
       workspaceId: z.number(), valueDefinitionId: z.number(),
       unitType: z.string().min(1).max(50), unitIdentifier: z.string().min(1).max(200),
       translation: z.string().min(1), examples: z.array(z.string()).optional(),
-      sortOrder: z.number().default(0), metadata: z.record(z.unknown()).optional(),
+      sortOrder: z.number().default(0), metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -322,8 +322,8 @@ const operationalizationRouter = router({
       workspaceId: z.number(), valueDefinitionId: z.number().optional(), valueSetId: z.number().optional(),
       type: z.enum(["review_criteria", "onboarding_checklist", "bars_scale", "survey_question", "recognition_criteria"]),
       name: z.string().min(1).max(200), description: z.string().optional(),
-      content: z.record(z.unknown()).optional(), sortOrder: z.number().default(0),
-      metadata: z.record(z.unknown()).optional(),
+      content: z.record(z.string(), z.unknown()).optional(), sortOrder: z.number().default(0),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();

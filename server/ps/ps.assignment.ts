@@ -63,7 +63,7 @@ export function validateSystemMatch(
 // ── Fulfillment States ─────────────────────────────────────────────
 
 /** Statuses that count toward fulfillment (not rejected/cancelled) */
-const FULFILLMENT_STATUSES: Set<PsAssignmentStatus> = new Set([
+const FULFILLMENT_STATUSES = new Set<PsAssignmentStatus>([
   "proposed",
   "requested",
   "confirmed",

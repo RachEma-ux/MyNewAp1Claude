@@ -97,7 +97,7 @@ const legalEntitiesRouter = router({
       parentEntityId: z.number().optional(),
       country: z.string().max(100).optional(),
       registrationNumber: z.string().max(100).optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -148,7 +148,7 @@ const legalEntitiesRouter = router({
       parentEntityId: z.number().nullable().optional(),
       country: z.string().max(100).nullable().optional(),
       registrationNumber: z.string().max(100).nullable().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -291,7 +291,7 @@ const orgUnitsRouter = router({
       level: z.number().default(0),
       effectiveFrom: z.string().optional(),
       effectiveTo: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -351,7 +351,7 @@ const orgUnitsRouter = router({
       level: z.number().optional(),
       effectiveFrom: z.string().nullable().optional(),
       effectiveTo: z.string().nullable().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -494,7 +494,7 @@ const jobsRouter = router({
       level: z.string().max(50).optional(),
       levelRank: z.number().default(0),
       description: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -541,7 +541,7 @@ const jobsRouter = router({
       level: z.string().max(50).nullable().optional(),
       levelRank: z.number().optional(),
       description: z.string().nullable().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -681,7 +681,7 @@ const positionsRouter = router({
       status: z.enum(["vacant", "filled", "frozen", "temporary"]).default("vacant"),
       effectiveFrom: z.string().optional(),
       effectiveTo: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -748,7 +748,7 @@ const positionsRouter = router({
       headcountLimit: z.number().optional(),
       effectiveFrom: z.string().nullable().optional(),
       effectiveTo: z.string().nullable().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -893,7 +893,7 @@ const reportingRouter = router({
       isPrimary: z.boolean().default(true),
       effectiveFrom: z.string().optional(),
       effectiveTo: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -1003,7 +1003,7 @@ const costCentersRouter = router({
       name: z.string().min(1).max(200),
       legalEntityId: z.number().optional(),
       parentCostCenterId: z.number().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -1049,7 +1049,7 @@ const costCentersRouter = router({
       name: z.string().min(1).max(200).optional(),
       legalEntityId: z.number().nullable().optional(),
       parentCostCenterId: z.number().nullable().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();

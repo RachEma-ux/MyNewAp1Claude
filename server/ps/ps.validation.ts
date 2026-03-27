@@ -25,8 +25,8 @@ export const listSystemsSchema = z.object({
 export const createWizardRunSchema = z.object({
 
   scenarioText: z.string().min(1, "Scenario text is required").max(5000),
-  inputPayload: z.record(z.unknown()).optional(),
-  resultPayload: z.record(z.unknown()).optional(),
+  inputPayload: z.record(z.string(), z.unknown()).optional(),
+  resultPayload: z.record(z.string(), z.unknown()).optional(),
   confidence: z.number().min(0).max(100).optional(),
   selectedSystemType: z.string().max(100).optional(),
   matrixVersion: z.string().max(50).optional(),
@@ -222,7 +222,7 @@ export const createMatrixCellsBatchSchema = z.object({
 
 export const evaluateMatrixSchema = z.object({
 
-  answers: z.record(z.union([z.boolean(), z.string(), z.number()])),
+  answers: z.record(z.string(), z.union([z.boolean(), z.string(), z.number()])),
 });
 
 export const hasActiveMatrixSchema = z.void();
@@ -334,7 +334,7 @@ export const previewMatrixImportSchema = z.object({
       questionCode: z.string().min(1).max(100),
       presentationType: z.enum(["boolean", "select", "slider", "multi_select", "text"]),
       dimensionKey: z.string().max(100).optional(),
-      configJson: z.record(z.unknown()).optional(),
+      configJson: z.record(z.string(), z.unknown()).optional(),
     })).optional(),
   }),
 });
@@ -377,7 +377,7 @@ export const createMatrixImportRecordSchema = z.object({
   importedRows: z.number().int().min(0),
   skippedRows: z.number().int().min(0),
   warningsJson: z.array(z.string()).optional(),
-  rawPayloadJson: z.record(z.unknown()).optional(),
+  rawPayloadJson: z.record(z.string(), z.unknown()).optional(),
 });
 
 // ── Matrix Headers ──────────────────────────────────────────────────
@@ -502,7 +502,7 @@ export const createQuestionPresentationSchema = z.object({
   questionId: z.number().int().positive(),
   presentationType: z.enum(["boolean", "select", "slider", "multi_select", "text"]),
   dimensionId: z.number().int().positive().optional(),
-  configJson: z.record(z.unknown()).optional(),
+  configJson: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const createQuestionPresentationsBatchSchema = z.object({
@@ -512,7 +512,7 @@ export const createQuestionPresentationsBatchSchema = z.object({
     questionId: z.number().int().positive(),
     presentationType: z.enum(["boolean", "select", "slider", "multi_select", "text"]),
     dimensionId: z.number().int().positive().optional(),
-    configJson: z.record(z.unknown()).optional(),
+    configJson: z.record(z.string(), z.unknown()).optional(),
   })).min(1).max(500),
 });
 
@@ -521,7 +521,7 @@ export const updateQuestionPresentationSchema = z.object({
   questionId: z.number().int().positive(),
   presentationType: z.enum(["boolean", "select", "slider", "multi_select", "text"]).optional(),
   dimensionId: z.number().int().positive().nullable().optional(),
-  configJson: z.record(z.unknown()).nullable().optional(),
+  configJson: z.record(z.string(), z.unknown()).nullable().optional(),
   isActive: z.number().int().min(0).max(1).optional(),
 });
 
@@ -586,14 +586,14 @@ export const acceptWizardResultSchema = z.object({
   selectedScopeCode: z.string().min(1).max(120),
   selectedScopeLabel: z.string().min(1).max(255),
   matrixVersion: z.string().min(1).max(50),
-  answers: z.record(z.union([z.boolean(), z.string(), z.number()])),
+  answers: z.record(z.string(), z.union([z.boolean(), z.string(), z.number()])),
   confidence: z.number().min(0).max(100),
   overrideInfo: z.object({
     scopeCode: z.string().min(1).max(120),
     reason: z.string().min(1).max(500),
   }).nullable().optional(),
-  inputPayload: z.record(z.unknown()).optional(),
-  resultPayload: z.record(z.unknown()).optional(),
+  inputPayload: z.record(z.string(), z.unknown()).optional(),
+  resultPayload: z.record(z.string(), z.unknown()).optional(),
 });
 
 // ── Scope Template Mappings ──────────────────────────────────────────
@@ -630,7 +630,7 @@ export const runSimulationSchema = z.object({
 
   versionId: z.number().int().positive(),
   compareVersionId: z.number().int().positive().optional(),
-  answers: z.record(z.union([z.boolean(), z.string(), z.number()])),
+  answers: z.record(z.string(), z.union([z.boolean(), z.string(), z.number()])),
 });
 
 export const listSimulationsSchema = z.void();
@@ -641,7 +641,7 @@ export const createEvalCaseSchema = z.object({
 
   name: z.string().min(1).max(255),
   description: z.string().max(2000).optional(),
-  answersJson: z.record(z.union([z.boolean(), z.string(), z.number()])),
+  answersJson: z.record(z.string(), z.union([z.boolean(), z.string(), z.number()])),
   expectedScopeCode: z.string().min(1).max(120),
   tags: z.array(z.string().max(50)).max(20).optional(),
 });
@@ -658,7 +658,7 @@ export const updateEvalCaseSchema = z.object({
   id: z.number().int().positive(),
   name: z.string().min(1).max(255).optional(),
   description: z.string().max(2000).optional(),
-  answersJson: z.record(z.union([z.boolean(), z.string(), z.number()])).optional(),
+  answersJson: z.record(z.string(), z.union([z.boolean(), z.string(), z.number()])).optional(),
   expectedScopeCode: z.string().min(1).max(120).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
   isActive: z.number().int().min(0).max(1).optional(),
@@ -695,7 +695,7 @@ export const overrideRecommendationSchema = z.object({
   reason: z.string().min(1).max(2000),
   recommendedConfidence: z.number().min(0).max(100).optional(),
   matrixVersion: z.string().max(50).optional(),
-  answersJson: z.record(z.union([z.boolean(), z.string(), z.number()])).optional(),
+  answersJson: z.record(z.string(), z.union([z.boolean(), z.string(), z.number()])).optional(),
 });
 
 export const listOverridesSchema = z.void();
