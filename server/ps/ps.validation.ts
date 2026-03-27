@@ -604,6 +604,16 @@ export const createScopeTemplateMappingSchema = z.object({
   systemType: z.string().min(1).max(100),
   lifecycleType: z.string().max(100).optional(),
   governanceProfile: z.string().max(100).optional(),
+  methodsJson: z.array(z.string().max(120)).max(20).optional(),
+  frameworksJson: z.array(z.string().max(120)).max(20).optional(),
+  workflowJson: z.object({
+    phases: z.array(z.object({
+      name: z.string().min(1).max(120),
+      gateType: z.string().max(50).optional(),
+      deliverables: z.array(z.string().max(200)).max(20).optional(),
+    })).min(1).max(20),
+    reviewCadence: z.string().max(50).optional(),
+  }).optional(),
   demandTemplateJson: z.array(z.object({
     role: z.string().min(1).max(200),
     capabilityTags: z.array(z.string().max(100)).max(20),

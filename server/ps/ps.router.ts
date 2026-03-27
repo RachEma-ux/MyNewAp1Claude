@@ -115,6 +115,11 @@ import {
   updateQuestionPresentationSchema,
 } from "./ps.validation";
 import * as service from "./ps.service";
+import * as projectService from "./ps.project";
+import * as feedbackService from "./ps.feedback";
+import * as lifecycle from "./ps.lifecycle";
+import * as governance from "./ps.governance";
+import * as pmBridge from "./ps.pm-bridge";
 import { loadActiveMatrix } from "./ps.matrix-engine";
 
 const systemsRouter = router({
@@ -906,9 +911,170 @@ const overridesRouter = router({
     }),
 });
 
+// ── PS Projects Router ──────────────────────────────────────────────────
+
+const projectsRouter = router({
+  create: governedProcedure
+    .input(z.object({
+      name: z.string().min(1),
+      scenario: z.string().min(1),
+      context: z.object({
+        businessUnit: z.string().optional().default(""),
+        region: z.string().optional().default(""),
+        strategicImportance: z.string().optional().default(""),
+        existingSituation: z.string().optional().default(""),
+      }),
+      answers: z.record(z.string(), z.string()),
+      selectedScopeCode: z.string().min(1),
+      selectedScopeLabel: z.string().min(1),
+      topScopes: z.array(z.object({
+        scopeCode: z.string(),
+        scopeLabel: z.string(),
+        score: z.number(),
+      })),
+      confidence: z.string(),
+      explainability: z.object({
+        positiveContributors: z.array(z.string()),
+        negativeContributors: z.array(z.string()),
+      }),
+      matrixVersionId: z.number().int().positive(),
+      matrixVersion: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return projectService.createPSProjectFromWizard(input, ctx.user.id);
+    }),
+
+  get: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return projectService.getPSProject(input.id);
+    }),
+
+  list: protectedProcedure
+    .input(z.object({
+      status: z.string().optional(),
+    }).optional().default({}))
+    .query(async ({ input }) => {
+      return projectService.listPSProjects(input?.status);
+    }),
+});
+
+// ── Feedback Router ────────────────────────────────────────────────────
+
+const feedbackRouter = router({
+  create: governedProcedure
+    .input(feedbackService.createFeedbackSchema)
+    .mutation(async ({ input }) => {
+      return feedbackService.submitFeedback(input);
+    }),
+
+  get: protectedProcedure
+    .input(feedbackService.getFeedbackSchema)
+    .query(async ({ input }) => {
+      return feedbackService.getFeedbackById(input.id);
+    }),
+
+  list: protectedProcedure
+    .input(feedbackService.listFeedbackSchema)
+    .query(async ({ input }) => {
+      return feedbackService.listFeedbackByProject(input?.psProjectId);
+    }),
+});
+
+// ── Lifecycle Router ──────────────────────────────────────────────────
+
+const lifecycleIdInput = z.object({ projectId: z.number().int().positive() });
+
+const lifecycleRouter = router({
+  submit: governedProcedure
+    .input(lifecycleIdInput)
+    .mutation(async ({ ctx, input }) => {
+      return lifecycle.submitPSProject(input.projectId, ctx.user.id);
+    }),
+
+  validate: governedProcedure
+    .input(lifecycleIdInput)
+    .mutation(async ({ ctx, input }) => {
+      return lifecycle.validatePSProject(input.projectId, ctx.user.id);
+    }),
+
+  reject: governedProcedure
+    .input(lifecycleIdInput)
+    .mutation(async ({ ctx, input }) => {
+      return lifecycle.rejectPSProject(input.projectId, ctx.user.id);
+    }),
+
+  sendToPM: governedProcedure
+    .input(lifecycleIdInput)
+    .mutation(async ({ ctx, input }) => {
+      return lifecycle.sendToPMCentral(input.projectId, ctx.user.id);
+    }),
+});
+
+// ── Governance Router (Admin Validation Queue) ──────────────────────
+
+const governanceRouter = router({
+  queue: protectedProcedure
+    .input(z.object({ status: z.string().optional() }).optional().default({}))
+    .query(async ({ input }) => {
+      return governance.listValidationQueue(input?.status);
+    }),
+
+  approve: governedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      note: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return governance.approvePSProject(input.id, input.note ?? null, ctx.user.id);
+    }),
+
+  reject: governedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      note: z.string().min(1, "Rejection reason is required"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return governance.rejectPSProjectWithNote(input.id, input.note, ctx.user.id);
+    }),
+
+  overrideScope: governedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      newScopeCode: z.string().min(1),
+      reason: z.string().min(1, "Override reason is required"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return governance.overridePSProjectScope(
+        input.id,
+        input.newScopeCode,
+        input.reason,
+        ctx.user.id,
+      );
+    }),
+});
+
+// ── PM Bridge Router ────────────────────────────────────────────────
+
+const pmBridgeRouter = router({
+  sendToPM: governedProcedure
+    .input(z.object({
+      psProjectId: z.number().int().positive(),
+      workspaceId: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return pmBridge.createPMProjectFromPS(
+        input.psProjectId,
+        input.workspaceId,
+        ctx.user.id,
+      );
+    }),
+});
+
 export const psRouter = router({
   systems: systemsRouter,
   wizardRuns: wizardRunsRouter,
+  projects: projectsRouter,
   demand: demandRouter,
   assignments: assignmentsRouter,
   templates: templatesRouter,
@@ -916,6 +1082,10 @@ export const psRouter = router({
   simulation: simulationRouter,
   evaluation: evaluationRouter,
   overrides: overridesRouter,
+  feedback: feedbackRouter,
+  lifecycle: lifecycleRouter,
+  governance: governanceRouter,
+  pmBridge: pmBridgeRouter,
 
   getActiveQuestions: protectedProcedure
     .input(z.void())

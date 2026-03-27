@@ -60,9 +60,9 @@ export default function PSWizardPage() {
   // Real API: classify scenario mutation
   const classifyMutation = trpc.ps.classifyScenario.useMutation();
 
-  // Real API: create PS project
+  // Real API: create PS project (formal artifact — not legacy ps_systems)
   const utils = trpc.useUtils();
-  const createPSProject = trpc.ps.createPSProject.useMutation();
+  const createProjectMut = trpc.ps.projects.create.useMutation();
   const [, navigate] = useLocation();
 
   const stepLabels = ["Scenario", "Context", "Questions", "Recommendation", "Create"];
@@ -88,11 +88,9 @@ export default function PSWizardPage() {
   }
 
   function deriveProjectName(text: string): string {
-    // Take first sentence or first 60 chars of the scenario as project name
     const trimmed = text.trim();
     const firstSentence = trimmed.split(/[.!?\n]/)[0]?.trim() || trimmed;
     if (firstSentence.length <= 80) return firstSentence;
-    // Truncate at last word boundary before 80 chars
     const cut = firstSentence.slice(0, 80);
     const lastSpace = cut.lastIndexOf(" ");
     return lastSpace > 20 ? cut.slice(0, lastSpace) : cut;
@@ -129,24 +127,32 @@ export default function PSWizardPage() {
     }
   }
 
-  async function handleCreateAndList() {
+  async function handleCreateProject() {
     if (!recommendation) {
-      setCreateError("No recommendation available — please go back to Step 3 and classify first.");
+      setCreateError("No recommendation available — go back to Step 3 and classify first.");
       return;
     }
     setCreateError("");
     try {
       const projectName = generatedName.trim() || recommendation.selectedScope || "Untitled Project";
-      await createPSProject.mutateAsync({
+      await createProjectMut.mutateAsync({
         name: projectName,
-        scope: recommendation.selectedScopeCode ?? recommendation.selectedScope ?? "CUSTOM",
-        matrixVersion: recommendation.matrixVersion ?? "v1.0.0",
         scenario,
         context,
         answers,
-        recommendation,
+        selectedScopeCode: recommendation.selectedScopeCode ?? "CUSTOM",
+        selectedScopeLabel: recommendation.selectedScope ?? "Custom",
+        topScopes: recommendation.top3.map((t) => ({
+          scopeCode: t.scopeCode,
+          scopeLabel: t.scopeLabel,
+          score: t.score,
+        })),
+        confidence: recommendation.confidence,
+        explainability: recommendation.explainability,
+        matrixVersionId: recommendation.matrixVersionId,
+        matrixVersion: recommendation.matrixVersion,
       });
-      await utils.ps.systems.list.invalidate();
+      await utils.ps.projects.list.invalidate();
       navigate("/ps/list");
     } catch (err: any) {
       const msg = err?.message || "Failed to create PS project";
@@ -182,7 +188,7 @@ export default function PSWizardPage() {
           {step === 1 && (
             <div className="space-y-4">
               <h2 className="text-2xl font-semibold">Scenario</h2>
-              <p className="text-white/70">2.1 Enter Scenario</p>
+              <p className="text-white/70">Describe the project scenario</p>
 
               <textarea
                 value={scenario}
@@ -199,7 +205,7 @@ export default function PSWizardPage() {
           {step === 2 && (
             <div className="space-y-4">
               <h2 className="text-2xl font-semibold">Context</h2>
-              <p className="text-white/70">2.2 Set Context</p>
+              <p className="text-white/70">Set organizational context</p>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <input
@@ -243,7 +249,7 @@ export default function PSWizardPage() {
               {parsingDone && (
                 <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4">
                   <div className="text-sm font-semibold text-indigo-300">
-                    3.1 Automatic NLP parsing complete
+                    Automatic NLP parsing complete
                   </div>
                   <ul className="mt-2 space-y-1 text-sm text-white/80">
                     <li>software / IT domain</li>
@@ -254,7 +260,7 @@ export default function PSWizardPage() {
                   </ul>
 
                   <div className="mt-4 text-sm font-semibold text-indigo-300">
-                    3.2 Auto-generated project name
+                    Auto-generated project name
                   </div>
                   <div className="mt-1 text-lg font-semibold">{generatedName}</div>
 
@@ -372,33 +378,40 @@ export default function PSWizardPage() {
 
           {step === 5 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">Create</h2>
+              <h2 className="text-2xl font-semibold">Accept & Create PS Project</h2>
 
               <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
                 <div>
                   <div className="text-sm text-white/50">Project Name</div>
-                  <div className="font-semibold">{generatedName || "Auto-generated on create"}</div>
+                  <div className="font-semibold">{generatedName || recommendation?.selectedScope || "Auto-generated"}</div>
                 </div>
 
                 <div>
-                  <div className="text-sm text-white/50">Scope</div>
-                  <div className="font-semibold">{recommendation?.selectedScope ?? "—"}</div>
+                  <div className="text-sm text-white/50">Selected Scope</div>
+                  <div className="font-semibold text-indigo-300">{recommendation?.selectedScope ?? "—"}</div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <div className="text-sm text-white/50">Confidence</div>
+                    <div className="font-semibold">{recommendation?.confidence ?? "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-white/50">Matrix Version</div>
+                    <div className="font-semibold">{recommendation?.matrixVersion ?? "—"}</div>
+                  </div>
                 </div>
 
                 <div>
-                  <div className="text-sm text-white/50">Matrix Version</div>
-                  <div className="font-semibold">{recommendation?.matrixVersion ?? "—"}</div>
+                  <div className="text-sm text-white/50">Decision Trace</div>
+                  <div className="mt-1 rounded-lg bg-black/40 px-3 py-2 text-xs text-white/60 font-mono">
+                    scope={recommendation?.selectedScopeCode} | confidence={recommendation?.confidence} | matrix_v={recommendation?.matrixVersion} | top3=[{recommendation?.top3.map(t => t.scopeCode).join(", ")}]
+                  </div>
                 </div>
 
                 <div>
-                  <div className="text-sm text-white/50">Demand Preview</div>
-                  <ul className="mt-2 list-disc pl-5">
-                    <li>Product Owner × 1</li>
-                    <li>Scrum Master × 1</li>
-                    <li>Backend Developer × 2</li>
-                    <li>Frontend Developer × 2</li>
-                    <li>QA × 1</li>
-                  </ul>
+                  <div className="text-sm text-white/50">Status</div>
+                  <div className="inline-block mt-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 px-3 py-1 text-sm text-yellow-400 font-medium">DRAFT</div>
                 </div>
 
                 {createError && (
@@ -409,13 +422,12 @@ export default function PSWizardPage() {
 
                 <button
                   type="button"
-                  onClick={handleCreateAndList}
-                  disabled={createPSProject.isPending}
-                  className="rounded-xl bg-green-600 px-4 py-2 font-medium disabled:opacity-40"
+                  onClick={handleCreateProject}
+                  disabled={createProjectMut.isPending}
+                  className="rounded-xl bg-green-600 px-6 py-2.5 font-medium disabled:opacity-40"
                 >
-                  {createPSProject.isPending ? "Creating..." : "List PS Project"}
+                  {createProjectMut.isPending ? "Creating..." : "Accept & Create Project"}
                 </button>
-
               </div>
             </div>
           )}

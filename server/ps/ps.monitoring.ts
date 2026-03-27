@@ -16,6 +16,8 @@ import {
   psScopeRegistry,
   psMatrixQuestions,
   psMatrixCells,
+  psProjects,
+  psFeedback,
 } from "../../drizzle/tables/ps";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -100,6 +102,31 @@ export interface DeadQuestionEntry {
   reason: string;  // "all_zero_weights" | "never_answered" | "inactive"
 }
 
+export interface ProjectMetrics {
+  total: number;
+  draft: number;
+  submitted: number;
+  validated: number;
+  rejected: number;
+  sentToPm: number;
+  validationRate: number;   // 0..100 — validated / (validated + rejected)
+  rejectionRate: number;    // 0..100 — rejected / (validated + rejected)
+}
+
+export interface ConfidenceDistributionBucket {
+  bucket: string;       // e.g. "0-20", "20-40", ...
+  count: number;
+  percent: number;
+}
+
+export interface DriftMetrics {
+  totalFeedback: number;
+  driftCount: number;
+  noDriftCount: number;
+  driftRate: number;    // 0..100
+  byOutcome: { outcome: string; count: number; driftCount: number }[];
+}
+
 export interface MonitoringSummary {
   systems: SystemMetrics;
   wizard: WizardMetrics;
@@ -112,6 +139,9 @@ export interface MonitoringSummary {
   scopeDistribution: ScopeDistributionEntry[];
   deadScopes: DeadScopeEntry[];
   deadQuestions: DeadQuestionEntry[];
+  projects: ProjectMetrics;
+  confidenceDistribution: ConfidenceDistributionBucket[];
+  drift: DriftMetrics;
 }
 
 // ── System Metrics ──────────────────────────────────────────────────────

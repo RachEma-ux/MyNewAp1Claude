@@ -1891,6 +1891,9 @@ export async function acceptWizardResult(
         templateUsed: template.systemType,
         lifecycleType: template.lifecycleType,
         governanceProfile: template.governanceProfile,
+        methods: template.methods,
+        frameworks: template.frameworks,
+        workflow: template.workflow,
         demandSpecCount: template.demandSpecs.length,
         ...(input.resultPayload || {}),
       },
@@ -2017,6 +2020,12 @@ export async function createScopeTemplateMapping(
     systemType: string;
     lifecycleType?: string;
     governanceProfile?: string;
+    methodsJson?: string[];
+    frameworksJson?: string[];
+    workflowJson?: {
+      phases: Array<{ name: string; gateType?: string; deliverables?: string[] }>;
+      reviewCadence?: string;
+    };
     demandTemplateJson?: Array<{
       role: string;
       capabilityTags: string[];
@@ -2031,6 +2040,9 @@ export async function createScopeTemplateMapping(
     systemType: input.systemType,
     lifecycleType: input.lifecycleType || null,
     governanceProfile: input.governanceProfile || null,
+    methodsJson: input.methodsJson || null,
+    frameworksJson: input.frameworksJson || null,
+    workflowJson: input.workflowJson || null,
     demandTemplateJson: input.demandTemplateJson || null,
     isActive: 1,
   });

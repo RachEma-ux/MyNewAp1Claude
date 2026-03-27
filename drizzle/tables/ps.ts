@@ -415,6 +415,12 @@ export const psScopeTemplateMappings = pgTable("ps_scope_template_mappings", {
   systemType: varchar("system_type", { length: 100 }).notNull(),
   lifecycleType: varchar("lifecycle_type", { length: 100 }),
   governanceProfile: varchar("governance_profile", { length: 100 }),
+  methodsJson: json("methods_json").$type<string[]>(),
+  frameworksJson: json("frameworks_json").$type<string[]>(),
+  workflowJson: json("workflow_json").$type<{
+    phases: Array<{ name: string; gateType?: string; deliverables?: string[] }>;
+    reviewCadence?: string;
+  }>(),
   demandTemplateJson: json("demand_template_json").$type<Array<{
     role: string;
     capabilityTags: string[];
@@ -519,3 +525,61 @@ export const psWizardOverrides = pgTable("ps_wizard_overrides", {
 
 export type PsWizardOverride = typeof psWizardOverrides.$inferSelect;
 export type InsertPsWizardOverride = typeof psWizardOverrides.$inferInsert;
+
+// ============================================================================
+// 22. PS Projects — Formal project artifacts produced by the PS Wizard
+// ============================================================================
+
+export const psProjects = pgTable("ps_projects", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  scenario: text("scenario").notNull(),
+  contextJson: json("context_json").$type<Record<string, string>>().default({}),
+  selectedScopeCode: varchar("selected_scope_code", { length: 120 }).notNull(),
+  topScopesJson: json("top_scopes_json").$type<Array<{ scopeCode: string; scopeLabel: string; score: number }>>().default([]),
+  confidence: varchar("confidence", { length: 30 }),
+  explainabilityJson: json("explainability_json").$type<{ positiveContributors: string[]; negativeContributors: string[] }>(),
+  matrixVersionId: integer("matrix_version_id"),
+  templateBundleJson: json("template_bundle_json").$type<Record<string, unknown>>(),
+  wizardRunId: integer("wizard_run_id"),
+  status: varchar("status", { length: 30 }).default("DRAFT").notNull(), // DRAFT | SUBMITTED | VALIDATED | REJECTED | SENT_TO_PM
+  /** Admin validation note (approve/reject reason) */
+  validationNote: text("validation_note"),
+  /** Who validated (approved/rejected) this project */
+  validatedBy: integer("validated_by"),
+  /** When the validation decision was made */
+  validatedAt: timestamp("validated_at"),
+  /** PM Central project ID after handoff */
+  pmProjectId: integer("pm_project_id"),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index("ps_projects_status_idx").on(table.status),
+  scopeIdx: index("ps_projects_scope_idx").on(table.selectedScopeCode),
+  nameUniq: unique("ps_projects_name_uniq").on(table.name),
+}));
+
+export type PsProject = typeof psProjects.$inferSelect;
+export type InsertPsProject = typeof psProjects.$inferInsert;
+
+// ============================================================================
+// 23. PS Feedback — Execution feedback linked to PS + PM projects
+// ============================================================================
+
+export const psFeedback = pgTable("ps_feedback", {
+  id: serial("id").primaryKey(),
+  psProjectId: integer("ps_project_id").notNull(),
+  pmProjectId: integer("pm_project_id"),
+  outcome: varchar("outcome", { length: 100 }).notNull(), // success | partial | failed | cancelled
+  driftFlag: integer("drift_flag").default(0).notNull(), // 0=no drift, 1=drift detected
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  psProjectIdx: index("ps_feedback_ps_project_idx").on(table.psProjectId),
+  pmProjectIdx: index("ps_feedback_pm_project_idx").on(table.pmProjectId),
+  outcomeIdx: index("ps_feedback_outcome_idx").on(table.outcome),
+}));
+
+export type PsFeedback = typeof psFeedback.$inferSelect;
+export type InsertPsFeedback = typeof psFeedback.$inferInsert;

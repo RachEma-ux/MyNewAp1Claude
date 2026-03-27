@@ -4,6 +4,25 @@
 
 export type PsSystemStatus = "draft" | "active" | "archived";
 
+// ── PS Project Lifecycle ─────────────────────────────────────────────
+
+export const PS_PROJECT_STATUSES = [
+  "DRAFT",
+  "SUBMITTED",
+  "VALIDATED",
+  "REJECTED",
+  "SENT_TO_PM",
+] as const;
+export type PsProjectStatus = (typeof PS_PROJECT_STATUSES)[number];
+
+export const PS_PROJECT_TRANSITIONS: Record<PsProjectStatus, PsProjectStatus[]> = {
+  DRAFT:      ["SUBMITTED"],
+  SUBMITTED:  ["VALIDATED", "REJECTED"],
+  VALIDATED:  ["SENT_TO_PM"],
+  REJECTED:   [],
+  SENT_TO_PM: [],
+};
+
 export interface CreateSystemInput {
 
   name: string;
