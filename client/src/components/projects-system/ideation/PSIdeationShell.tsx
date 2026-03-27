@@ -1,29 +1,35 @@
 /**
  * PS Ideation — Shell
  *
- * Composes: Header + WorkflowRail + Workspace + InsightPanel + MobileBar
- * This is the main layout for the PS Ideation detail view.
+ * Composes: Header + WorkflowRail (left sidebar) + Center Canvas
+ *
+ * Single-sidebar architecture:
+ *   Left sidebar = workflow steps + Concept + Wizard Handoff + Activity
+ *   Center canvas = active content (step tool panel or support view)
+ *   Step navigation = in-card footer (Previous | Save | Next)
  *
  * Responsive:
- *   mobile  → drawers (Sheet) + sticky bottom bar
- *   tablet  → collapsible side panels
- *   desktop → persistent rails/panels when space allows
+ *   mobile  → left drawer (Sheet) + in-card footer navigation
+ *   tablet  → collapsible left sidebar
+ *   desktop → persistent left sidebar
  */
 import { useState, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2, PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { Loader2, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PSIdeationHeader } from "./PSIdeationHeader";
-import { PSIdeationWorkflowRail } from "./PSIdeationWorkflowRail";
+import { PSIdeationWorkflowRail, isStepView, type ActiveView } from "./PSIdeationWorkflowRail";
 import { PSIdeationWorkspace } from "./PSIdeationWorkspace";
-import { PSIdeationInsightPanel } from "./PSIdeationInsightPanel";
-import { PSIdeationMobileBar, type SaveStatus } from "./PSIdeationMobileBar";
+import { PSIdeationConceptView } from "./PSIdeationConceptView";
+import { PSIdeationWizardHandoffView } from "./PSIdeationWizardHandoffView";
+import { PSIdeationActivityView } from "./PSIdeationActivityView";
+import type { SaveStatus } from "./PSIdeationMobileBar";
 import {
   IDEATION_STEP_KEYS,
   IDEATION_STEP_LABELS,
@@ -107,7 +113,6 @@ export function PSIdeationShell({ ideationId }: Props) {
       invalidateAll();
       setSaveStatus("saved");
       toast.success("Step saved");
-      // Reset to idle after 2s
       setTimeout(() => setSaveStatus((s) => s === "saved" ? "idle" : s), 2000);
     },
     onError: (e) => {
@@ -163,6 +168,14 @@ export function PSIdeationShell({ ideationId }: Props) {
     onError: (e) => toast.error(e.message),
   });
 
+  const duplicateMut = trpc.ps.ideation.duplicate.useMutation({
+    onSuccess: (data) => {
+      toast.success("Ideation duplicated");
+      navigate(`/ps/ideation/${data.id}`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const deleteMut = trpc.ps.ideation.deleteDraft.useMutation({
     onSuccess: () => { toast.success("Ideation deleted"); navigate("/ps/ideation"); },
     onError: (e) => toast.error(e.message),
@@ -190,21 +203,30 @@ export function PSIdeationShell({ ideationId }: Props) {
   ).length;
   const selectedConcept = ((ideas as any[]) || []).find((i: any) => i.isSelected === 1) || null;
 
-  // ── Panel state ───────────────────────────────────────────────────────
-  // Desktop: default expanded for wide screens
+  // ── View state (local — support views are not persisted) ──────────────
+  const [activeView, setActiveView] = useState<ActiveView>(currentStepKey);
   const [railOpen, setRailOpen] = useState(!isMobile);
-  const [insightOpen, setInsightOpen] = useState(!isMobile);
-  // Mobile drawer state
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
-  const [mobileInsightOpen, setMobileInsightOpen] = useState(false);
+
+  // Sync activeView when server step changes (e.g. on initial load)
+  useEffect(() => {
+    if (currentStepKey && isStepView(activeView)) {
+      setActiveView(currentStepKey);
+    }
+  }, [currentStepKey]);
+
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean; title: string; description: string; action: () => void; destructive?: boolean;
   }>({ open: false, title: "", description: "", action: () => {} });
 
   // ── Handlers ──────────────────────────────────────────────────────────
-  const handleStepClick = useCallback((stepKey: IdeationStepKey) => {
-    setCurrentStepMut.mutate({ id: ideationId, stepKey });
+  const handleViewSelect = useCallback((view: ActiveView) => {
+    setActiveView(view);
+    // Only persist to server when selecting a workflow step
+    if (isStepView(view)) {
+      setCurrentStepMut.mutate({ id: ideationId, stepKey: view });
+    }
   }, [ideationId]);
 
   const handleSaveStep = useCallback(async (stepKey: string, payload: Record<string, unknown>) => {
@@ -243,6 +265,10 @@ export function PSIdeationShell({ ideationId }: Props) {
     navigate(`/ps/ideation/${ideationId}/convert`);
   }, [ideationId]);
 
+  const handleDuplicate = useCallback(() => {
+    duplicateMut.mutate({ id: ideationId, carryPayloads: true });
+  }, [ideationId]);
+
   const handleDelete = useCallback(() => {
     setConfirmDialog({
       open: true,
@@ -274,15 +300,15 @@ export function PSIdeationShell({ ideationId }: Props) {
 
   const handlePrev = useCallback(() => {
     if (stepIndex > 0) {
-      handleStepClick(IDEATION_STEP_KEYS[stepIndex - 1]);
+      handleViewSelect(IDEATION_STEP_KEYS[stepIndex - 1]);
     }
-  }, [stepIndex, handleStepClick]);
+  }, [stepIndex, handleViewSelect]);
 
   const handleNext = useCallback(() => {
     if (stepIndex < IDEATION_STEP_KEYS.length - 1) {
-      handleStepClick(IDEATION_STEP_KEYS[stepIndex + 1]);
+      handleViewSelect(IDEATION_STEP_KEYS[stepIndex + 1]);
     }
-  }, [stepIndex, handleStepClick]);
+  }, [stepIndex, handleViewSelect]);
 
   // ── Loading / Not found ───────────────────────────────────────────────
   if (isLoading) {
@@ -301,70 +327,12 @@ export function PSIdeationShell({ ideationId }: Props) {
     );
   }
 
-  // ── Render ────────────────────────────────────────────────────────────
-  return (
-    <div className="flex flex-col h-full">
-      <PSIdeationHeader
-        title={ideation.title}
-        lifecycleStatus={ideation.lifecycleStatus as any}
-        isConverted={isConverted}
-        readiness={readiness as any}
-        saveStatus={saveStatus}
-        stepIndex={stepIndex}
-        stepCount={IDEATION_STEP_KEYS.length}
-        stepLabel={stepLabel}
-        completedCount={completedCount}
-        onConvert={handleConvert}
-        onDelete={handleDelete}
-        onDefer={handleDefer}
-        onReject={handleReject}
-        deleting={deleteMut.isPending}
-      />
-
-      <div className="flex flex-1 min-h-0">
-        {/* ── Left rail ────────────────────────────────────────── */}
-        {isMobile ? (
-          <>
-            {/* Mobile: rail icon + sheet drawer */}
-            <div className="border-r border-border flex flex-col items-center py-2 px-1">
-              <Button variant="ghost" size="sm" onClick={() => setMobileRailOpen(true)} title="Workflow steps" className="h-7 w-7 p-0">
-                <PanelLeftOpen className="w-4 h-4" />
-              </Button>
-            </div>
-            <PSIdeationWorkflowRail
-              steps={(steps as any[]) || []}
-              currentStep={currentStepKey}
-              onStepClick={handleStepClick}
-              isConverted={isConverted}
-              mobileSheet
-              mobileOpen={mobileRailOpen}
-              onMobileClose={() => setMobileRailOpen(false)}
-            />
-          </>
-        ) : (
-          <>
-            {/* Desktop/tablet: collapsible inline rail */}
-            {!railOpen ? (
-              <div className="border-r border-border flex flex-col items-center py-2 px-1">
-                <Button variant="ghost" size="sm" onClick={() => setRailOpen(true)} title="Show workflow steps" className="h-7 w-7 p-0">
-                  <PanelLeftOpen className="w-4 h-4" />
-                </Button>
-              </div>
-            ) : (
-              <PSIdeationWorkflowRail
-                steps={(steps as any[]) || []}
-                currentStep={currentStepKey}
-                onStepClick={handleStepClick}
-                isConverted={isConverted}
-                onCollapse={() => setRailOpen(false)}
-              />
-            )}
-          </>
-        )}
-
-        {/* ── Center canvas ────────────────────────────────────── */}
+  // ── Center canvas content resolver ────────────────────────────────────
+  function renderCenterCanvas() {
+    if (isStepView(activeView)) {
+      return (
         <PSIdeationWorkspace
-          currentStep={currentStepKey}
+          currentStep={activeView}
           steps={(steps as any[]) || []}
           ideas={(ideas as any[]) || []}
           themes={(themes as any[]) || []}
@@ -382,67 +350,118 @@ export function PSIdeationShell({ ideationId }: Props) {
           onSaveScore={handleSaveScore}
           onUpsertScenario={handleUpsertScenario}
           onUpsertFeasibility={handleUpsertFeasibility}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          saveStatus={saveStatus}
+          stepIndex={stepIndex}
+          stepCount={IDEATION_STEP_KEYS.length}
         />
+      );
+    }
 
-        {/* ── Right insight panel ──────────────────────────────── */}
+    if (activeView === "concept") {
+      return (
+        <div className="flex-1 overflow-y-auto p-4">
+          <PSIdeationConceptView
+            selectedConcept={selectedConcept}
+            lifecycleStatus={ideation.lifecycleStatus as any}
+            rationaleSummary={ideation.rationaleSummary || null}
+            problemSnapshot={ideation.problemStatementSnapshot || null}
+            opportunitySnapshot={ideation.opportunityStatementSnapshot || null}
+            guidingQuestionSnapshot={ideation.guidingQuestionSnapshot || null}
+          />
+        </div>
+      );
+    }
+
+    if (activeView === "wizard_handoff") {
+      return (
+        <div className="flex-1 overflow-y-auto p-4">
+          <PSIdeationWizardHandoffView
+            readiness={readiness as any}
+            isConverted={isConverted}
+            onConvert={handleConvert}
+          />
+        </div>
+      );
+    }
+
+    if (activeView === "activity") {
+      return (
+        <div className="flex-1 overflow-y-auto p-4">
+          <PSIdeationActivityView activity={(activity as any[]) || []} />
+        </div>
+      );
+    }
+
+    return null;
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────
+  return (
+    <div className="flex flex-col h-full">
+      <PSIdeationHeader
+        title={ideation.title}
+        sourceType={ideation.sourceType}
+        lifecycleStatus={ideation.lifecycleStatus as any}
+        isConverted={isConverted}
+        readiness={readiness as any}
+        saveStatus={saveStatus}
+        stepIndex={stepIndex}
+        stepCount={IDEATION_STEP_KEYS.length}
+        stepLabel={stepLabel}
+        completedCount={completedCount}
+        onConvert={handleConvert}
+        onDuplicate={handleDuplicate}
+        onDelete={handleDelete}
+        onDefer={handleDefer}
+        onReject={handleReject}
+        deleting={deleteMut.isPending}
+        duplicating={duplicateMut.isPending}
+      />
+
+      <div className="flex flex-1 min-h-0">
+        {/* ── Left rail (single sidebar) ────────────────────────── */}
         {isMobile ? (
           <>
-            {/* Mobile: insight icon + sheet drawer */}
-            <div className="border-l border-border flex flex-col items-center py-2 px-1">
-              <Button variant="ghost" size="sm" onClick={() => setMobileInsightOpen(true)} title="Insights" className="h-7 w-7 p-0">
-                <PanelRightOpen className="w-4 h-4" />
+            <div className="border-r border-border flex flex-col items-center py-2 px-1">
+              <Button variant="ghost" size="sm" onClick={() => setMobileRailOpen(true)} title="Navigation" className="h-7 w-7 p-0">
+                <PanelLeftOpen className="w-4 h-4" />
               </Button>
             </div>
-            <PSIdeationInsightPanel
-              readiness={readiness as any}
-              activity={(activity as any[]) || []}
+            <PSIdeationWorkflowRail
               steps={(steps as any[]) || []}
-              lifecycleStatus={ideation.lifecycleStatus as any}
-              selectedConcept={selectedConcept}
+              activeView={activeView}
+              onViewSelect={handleViewSelect}
               isConverted={isConverted}
-              onConvert={handleConvert}
               mobileSheet
-              mobileOpen={mobileInsightOpen}
-              onMobileClose={() => setMobileInsightOpen(false)}
+              mobileOpen={mobileRailOpen}
+              onMobileClose={() => setMobileRailOpen(false)}
             />
           </>
         ) : (
           <>
-            {insightOpen ? (
-              <PSIdeationInsightPanel
-                readiness={readiness as any}
-                activity={(activity as any[]) || []}
-                steps={(steps as any[]) || []}
-                lifecycleStatus={ideation.lifecycleStatus as any}
-                selectedConcept={selectedConcept}
-                isConverted={isConverted}
-                onConvert={handleConvert}
-                onCollapse={() => setInsightOpen(false)}
-              />
-            ) : (
-              <div className="border-l border-border flex flex-col items-center py-2 px-1">
-                <Button variant="ghost" size="sm" onClick={() => setInsightOpen(true)} title="Show insights" className="h-7 w-7 p-0">
-                  <PanelRightOpen className="w-4 h-4" />
+            {!railOpen ? (
+              <div className="border-r border-border flex flex-col items-center py-2 px-1">
+                <Button variant="ghost" size="sm" onClick={() => setRailOpen(true)} title="Show navigation" className="h-7 w-7 p-0">
+                  <PanelLeftOpen className="w-4 h-4" />
                 </Button>
               </div>
+            ) : (
+              <PSIdeationWorkflowRail
+                steps={(steps as any[]) || []}
+                activeView={activeView}
+                onViewSelect={handleViewSelect}
+                isConverted={isConverted}
+                onCollapse={() => setRailOpen(false)}
+              />
             )}
           </>
         )}
-      </div>
 
-      {/* ── Mobile sticky action bar ─────────────────────────── */}
-      {isMobile && (
-        <PSIdeationMobileBar
-          currentStep={currentStepKey}
-          saveStatus={saveStatus}
-          readinessReady={!!(readiness as any)?.ready}
-          isConverted={isConverted}
-          onPrev={handlePrev}
-          onNext={handleNext}
-          onSave={() => {}} // Steps save via their own Save buttons
-          onWizard={handleConvert}
-        />
-      )}
+        {/* ── Center canvas (full width) ────────────────────────── */}
+        {renderCenterCanvas()}
+      </div>
 
       {/* ── Confirmation dialog ─────────────────────────────── */}
       <AlertDialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog((d) => ({ ...d, open: false }))}>

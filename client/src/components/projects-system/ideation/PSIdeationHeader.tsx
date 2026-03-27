@@ -1,9 +1,9 @@
 /**
  * PS Ideation — Header
  *
- * Shows: Back + Title + Lifecycle badge + Save state + Step progress
- * Actions: Workflow/Insight toggles, Wizard handoff, Overflow (defer/reject/delete)
- * Action hierarchy: identity → lifecycle → save → progress → wizard → destructive (overflow)
+ * Shows: Back + Title + Source badge + Lifecycle badge + Save state + Step progress
+ * Actions: Wizard handoff, Overflow (duplicate / defer / reject / delete)
+ * Action hierarchy: identity → source → lifecycle → save → progress → wizard → duplicate → destructive (overflow)
  */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,13 +26,16 @@ import {
   Trash2,
   PauseCircle,
   XCircle,
+  Copy,
 } from "lucide-react";
 import { Link } from "wouter";
 import type { IdeationLifecycleStatus } from "../../../../../server/ps/ps.ideation-types";
 import type { SaveStatus } from "./PSIdeationMobileBar";
+import { IDEATION_SOURCE_CONFIGS } from "@/config/psNavConfig";
 
 interface Props {
   title: string;
+  sourceType?: string;
   lifecycleStatus: IdeationLifecycleStatus;
   isConverted: boolean;
   readiness?: { ready: boolean; blockers: string[]; warnings: string[] } | null;
@@ -42,10 +45,12 @@ interface Props {
   stepLabel: string;
   completedCount: number;
   onConvert?: () => void;
+  onDuplicate?: () => void;
   onDelete?: () => void;
   onDefer?: () => void;
   onReject?: () => void;
   deleting?: boolean;
+  duplicating?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -86,9 +91,9 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
 }
 
 export function PSIdeationHeader({
-  title, lifecycleStatus, isConverted, readiness, saveStatus,
+  title, sourceType, lifecycleStatus, isConverted, readiness, saveStatus,
   stepIndex, stepCount, stepLabel, completedCount,
-  onConvert, onDelete, onDefer, onReject, deleting,
+  onConvert, onDuplicate, onDelete, onDefer, onReject, deleting, duplicating,
 }: Props) {
   const progressPct = stepCount > 0 ? Math.round((completedCount / stepCount) * 100) : 0;
 
@@ -107,6 +112,12 @@ export function PSIdeationHeader({
           <Badge variant="outline" className={`shrink-0 text-[10px] ${STATUS_COLORS[lifecycleStatus] || ""}`}>
             {STATUS_LABELS[lifecycleStatus] || lifecycleStatus}
           </Badge>
+          {/* Source badge — hidden on mobile for space */}
+          {sourceType && IDEATION_SOURCE_CONFIGS[sourceType] && (
+            <Badge variant="outline" className={`shrink-0 text-[10px] hidden sm:inline-flex ${IDEATION_SOURCE_CONFIGS[sourceType].badgeClass}`}>
+              {IDEATION_SOURCE_CONFIGS[sourceType].label}
+            </Badge>
+          )}
           {/* Save indicator — hidden on mobile (shown in bottom bar instead) */}
           <div className="hidden sm:block shrink-0">
             <SaveIndicator status={saveStatus} />
@@ -138,6 +149,13 @@ export function PSIdeationHeader({
                     Open in Wizard
                   </DropdownMenuItem>
                 )}
+                {onDuplicate && (
+                  <DropdownMenuItem onClick={onDuplicate} disabled={duplicating}>
+                    {duplicating ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Copy className="w-3.5 h-3.5 mr-2" />}
+                    Duplicate
+                  </DropdownMenuItem>
+                )}
+                {onDuplicate && (onDefer || onReject || onDelete) && <DropdownMenuSeparator />}
                 {onDefer && (
                   <DropdownMenuItem onClick={onDefer}>
                     <PauseCircle className="w-3.5 h-3.5 mr-2" />

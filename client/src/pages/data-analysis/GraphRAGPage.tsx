@@ -53,12 +53,12 @@ export default function GraphRAGPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex flex-wrap gap-1 h-auto p-1">
+        <TabsList className="flex flex-wrap gap-1 h-auto p-1.5 w-full md:w-auto md:flex-nowrap md:overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab.id}
               value={tab.id}
-              className="flex items-center gap-1.5 text-xs"
+              className="flex items-center gap-1.5 text-xs shrink-0 flex-none whitespace-nowrap min-h-[2.25rem]"
             >
               <tab.icon className="w-3.5 h-3.5" />
               {tab.label}

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollableTabsList } from "@/components/ui/scrollable-tabs-list";
 import { trpc } from "@/lib/trpc";
 import { Package, Download, Loader2, CheckCircle2, AlertCircle, Cpu, History, Clock, XCircle, RotateCw, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -96,24 +97,24 @@ export default function Models() {
 
       {/* Tabs */}
       <Tabs defaultValue="all" className="space-y-4">
-        <TabsList className="flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="all" onClick={() => setSelectedType(undefined)}>
+        <ScrollableTabsList>
+          <TabsTrigger value="all" onClick={() => setSelectedType(undefined)} className="shrink-0 flex-none">
             All Models
           </TabsTrigger>
-          <TabsTrigger value="llm" onClick={() => setSelectedType("llm")}>
+          <TabsTrigger value="llm" onClick={() => setSelectedType("llm")} className="shrink-0 flex-none">
             LLM Models
           </TabsTrigger>
-          <TabsTrigger value="embedding" onClick={() => setSelectedType("embedding")}>
+          <TabsTrigger value="embedding" onClick={() => setSelectedType("embedding")} className="shrink-0 flex-none">
             Embedding Models
           </TabsTrigger>
-          <TabsTrigger value="reranker" onClick={() => setSelectedType("reranker")}>
+          <TabsTrigger value="reranker" onClick={() => setSelectedType("reranker")} className="shrink-0 flex-none">
             Reranker Models
           </TabsTrigger>
-          <TabsTrigger value="history">
+          <TabsTrigger value="history" className="shrink-0 flex-none">
             <History className="mr-2 h-4 w-4" />
             Download History
           </TabsTrigger>
-        </TabsList>
+        </ScrollableTabsList>
 
         <TabsContent value="all" className="space-y-4">
           {!models || models.length === 0 ? (

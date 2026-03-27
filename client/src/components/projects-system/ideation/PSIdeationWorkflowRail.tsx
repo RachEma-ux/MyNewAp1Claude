@@ -1,21 +1,44 @@
 /**
- * PS Ideation — Workflow Rail
+ * PS Ideation — Workflow Rail (left sidebar)
  *
- * Left sidebar showing the exact 11-step workflow as numbered steps.
- * Each step shows its completion status and can be clicked to navigate.
+ * Shows the exact 11-step workflow plus 3 support views:
+ *   Workflow Steps (grouped): 11 items
+ *   Supporting Views: Concept, Wizard Handoff, Activity
+ *
  * On mobile: renders inside a Sheet drawer.
  * On desktop/tablet: renders as a persistent sidebar panel.
  */
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { CheckCircle2, Circle, Loader2, AlertCircle, Lock, PanelLeftClose } from "lucide-react";
+import {
+  CheckCircle2,
+  Circle,
+  Loader2,
+  AlertCircle,
+  Lock,
+  PanelLeftClose,
+  Target,
+  Wand2,
+  Activity,
+} from "lucide-react";
 import {
   IDEATION_STEP_LABELS,
   IDEATION_STEP_GROUPS,
+  IDEATION_STEP_KEYS,
   type IdeationStepKey,
   type IdeationStepStatus,
 } from "../../../../../server/ps/ps.ideation-types";
+
+/** All possible views: workflow steps + 3 support views */
+export type ActiveView = IdeationStepKey | "concept" | "wizard_handoff" | "activity";
+
+export const SUPPORT_VIEW_KEYS = ["concept", "wizard_handoff", "activity"] as const;
+export type SupportViewKey = (typeof SUPPORT_VIEW_KEYS)[number];
+
+export function isStepView(view: ActiveView): view is IdeationStepKey {
+  return (IDEATION_STEP_KEYS as readonly string[]).includes(view);
+}
 
 interface StepState {
   stepKey: string;
@@ -24,11 +47,11 @@ interface StepState {
 
 interface Props {
   steps: StepState[];
-  currentStep: IdeationStepKey;
-  onStepClick: (stepKey: IdeationStepKey) => void;
+  activeView: ActiveView;
+  onViewSelect: (view: ActiveView) => void;
   isConverted?: boolean;
   onCollapse?: () => void;
-  /** Mobile sheet mode — when true, renders inside a Sheet */
+  /** Mobile sheet mode */
   mobileSheet?: boolean;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
@@ -41,20 +64,27 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
   not_started: <Circle className="w-4 h-4 text-muted-foreground shrink-0" />,
 };
 
+const SUPPORT_ITEMS: { key: SupportViewKey; label: string; icon: React.ReactNode }[] = [
+  { key: "concept", label: "Concept", icon: <Target className="w-4 h-4 shrink-0" /> },
+  { key: "wizard_handoff", label: "Wizard Handoff", icon: <Wand2 className="w-4 h-4 shrink-0" /> },
+  { key: "activity", label: "Activity", icon: <Activity className="w-4 h-4 shrink-0" /> },
+];
+
 function getStepStatus(steps: StepState[], key: string): IdeationStepStatus {
   const s = steps.find((st) => st.stepKey === key);
   return (s?.stepStatus as IdeationStepStatus) || "not_started";
 }
 
 /** The rail content — shared between inline and sheet modes */
-function RailContent({ steps, currentStep, onStepClick, isConverted }: {
+function RailContent({ steps, activeView, onViewSelect, isConverted }: {
   steps: StepState[];
-  currentStep: IdeationStepKey;
-  onStepClick: (stepKey: IdeationStepKey) => void;
+  activeView: ActiveView;
+  onViewSelect: (view: ActiveView) => void;
   isConverted?: boolean;
 }) {
   return (
     <div className="flex-1 overflow-y-auto">
+      {/* Workflow Steps */}
       {Object.entries(IDEATION_STEP_GROUPS).map(([group, keys]) => (
         <div key={group} className="mb-3">
           <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -62,11 +92,11 @@ function RailContent({ steps, currentStep, onStepClick, isConverted }: {
           </div>
           {keys.map((key) => {
             const status = getStepStatus(steps, key);
-            const isActive = currentStep === key;
+            const isActive = activeView === key;
             return (
               <button
                 key={key}
-                onClick={() => !isConverted && onStepClick(key)}
+                onClick={() => !isConverted && onViewSelect(key)}
                 disabled={isConverted}
                 className={cn(
                   "flex items-center gap-2 w-full px-3 py-2 text-left text-xs transition-colors",
@@ -83,12 +113,37 @@ function RailContent({ steps, currentStep, onStepClick, isConverted }: {
           })}
         </div>
       ))}
+
+      {/* Supporting Views separator + items */}
+      <div className="mb-3 mt-1 border-t border-border/50 pt-1">
+        <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Supporting Views
+        </div>
+        {SUPPORT_ITEMS.map(({ key, label, icon }) => {
+          const isActive = activeView === key;
+          return (
+            <button
+              key={key}
+              onClick={() => onViewSelect(key)}
+              className={cn(
+                "flex items-center gap-2 w-full px-3 py-2 text-left text-xs transition-colors",
+                isActive
+                  ? "bg-accent text-accent-foreground font-medium"
+                  : "hover:bg-accent/50 text-muted-foreground",
+              )}
+            >
+              {icon}
+              <span className="truncate leading-tight">{label}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 export function PSIdeationWorkflowRail({
-  steps, currentStep, onStepClick, isConverted, onCollapse,
+  steps, activeView, onViewSelect, isConverted, onCollapse,
   mobileSheet, mobileOpen, onMobileClose,
 }: Props) {
   // Mobile: render as Sheet drawer
@@ -97,9 +152,9 @@ export function PSIdeationWorkflowRail({
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onMobileClose?.()}>
         <SheetContent side="left" className="w-64 p-0 pt-2">
           <SheetHeader className="px-3 pb-2">
-            <SheetTitle className="text-sm">Workflow Steps</SheetTitle>
+            <SheetTitle className="text-sm">Navigation</SheetTitle>
           </SheetHeader>
-          <RailContent steps={steps} currentStep={currentStep} onStepClick={(key) => { onStepClick(key); onMobileClose?.(); }} isConverted={isConverted} />
+          <RailContent steps={steps} activeView={activeView} onViewSelect={(view) => { onViewSelect(view); onMobileClose?.(); }} isConverted={isConverted} />
         </SheetContent>
       </Sheet>
     );
@@ -115,7 +170,7 @@ export function PSIdeationWorkflowRail({
           </Button>
         </div>
       )}
-      <RailContent steps={steps} currentStep={currentStep} onStepClick={onStepClick} isConverted={isConverted} />
+      <RailContent steps={steps} activeView={activeView} onViewSelect={onViewSelect} isConverted={isConverted} />
     </nav>
   );
 }

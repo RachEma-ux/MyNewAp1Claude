@@ -113,6 +113,85 @@ export async function updateIdeationMeta(id: number, data: {
   return updated;
 }
 
+export async function duplicateIdeation(
+  id: number,
+  actorId: number,
+  options?: { carryPayloads?: boolean; preserveLifecycle?: boolean },
+) {
+  const db = requireDb();
+  const source = await getIdeationById(id);
+  const carry = options?.carryPayloads ?? false;
+  const preserve = options?.preserveLifecycle ?? false;
+
+  // Read source steps for payload carry-over
+  const sourceSteps = carry
+    ? await db.select().from(psIdeationSteps)
+        .where(eq(psIdeationSteps.ideationId, id))
+        .orderBy(psIdeationSteps.stepOrder)
+    : [];
+  const sourceStepMap = new Map(sourceSteps.map((s) => [s.stepKey, s]));
+
+  // Lifecycle: preserve source's state or reset to draft
+  const lifecycleStatus = preserve ? source.lifecycleStatus : "draft";
+  const currentStepKey = preserve ? source.currentStepKey : "context";
+
+  const [copy] = await db.insert(psIdeations).values({
+    workspaceId: source.workspaceId,
+    title: `${source.title} (Copy)`,
+    sourceType: source.sourceType,
+    lifecycleStatus,
+    currentStepKey,
+    // Carry over snapshots when preserving
+    ...(preserve ? {
+      problemStatementSnapshot: source.problemStatementSnapshot,
+      opportunityStatementSnapshot: source.opportunityStatementSnapshot,
+      guidingQuestionSnapshot: source.guidingQuestionSnapshot,
+      rationaleSummary: source.rationaleSummary,
+    } : {}),
+    createdBy: actorId,
+    updatedBy: actorId,
+  }).returning();
+
+  // Build steps — carry payloads/status from source when requested
+  const stepRows = IDEATION_STEP_KEYS.map((key, i) => {
+    const srcStep = sourceStepMap.get(key);
+    const hasPayload = carry && srcStep?.payloadJson;
+    return {
+      ideationId: copy.id,
+      stepKey: key,
+      stepOrder: i + 1,
+      stepStatus: hasPayload && srcStep.stepStatus === "complete"
+        ? "complete"
+        : i === 0 ? "in_progress" : "not_started",
+      ...(hasPayload ? { payloadJson: srcStep.payloadJson } : {}),
+    };
+  });
+  await db.insert(psIdeationSteps).values(stepRows);
+
+  await emitIdeationEvent({
+    ideationId: copy.id,
+    eventType: "ideation.duplicated",
+    payload: {
+      sourceIdeationId: id,
+      title: copy.title,
+      carryPayloads: carry,
+      preserveLifecycle: preserve,
+    },
+    actorId,
+  });
+
+  await logPsAudit({
+    actorId,
+    action: "ideation.duplicate",
+    entityType: "ps_ideation",
+    entityId: copy.id,
+    previousValue: { sourceId: id },
+    newValue: { title: copy.title, workspaceId: source.workspaceId },
+  });
+
+  return copy;
+}
+
 export async function deleteIdeationDraft(id: number, actorId: number) {
   const db = requireDb();
   const ideation = await getIdeationById(id);

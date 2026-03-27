@@ -5,8 +5,16 @@
  * Includes step-level error boundary and empty/loading states.
  */
 import React from "react";
-import { AlertCircle } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Save,
+  Loader2,
+  CheckCircle2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { SaveStatus } from "./PSIdeationMobileBar";
 import type { IdeationStepKey } from "../../../../../server/ps/ps.ideation-types";
 import { IDEATION_STEP_LABELS } from "../../../../../server/ps/ps.ideation-types";
 import { ContextDefinitionToolPanel } from "./ContextDefinitionToolPanel";
@@ -77,6 +85,14 @@ interface Theme {
   sortOrder: number;
 }
 
+const SAVE_DISPLAY: Record<SaveStatus, { label: string; icon: React.ReactNode; className: string }> = {
+  idle: { label: "Saved", icon: <CheckCircle2 className="w-3.5 h-3.5" />, className: "text-muted-foreground" },
+  saving: { label: "Saving…", icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />, className: "text-blue-500" },
+  saved: { label: "Saved", icon: <CheckCircle2 className="w-3.5 h-3.5" />, className: "text-green-500" },
+  unsaved: { label: "Unsaved", icon: <Save className="w-3.5 h-3.5" />, className: "text-amber-500" },
+  error: { label: "Save failed", icon: <AlertCircle className="w-3.5 h-3.5" />, className: "text-red-500" },
+};
+
 interface Props {
   currentStep: IdeationStepKey;
   steps: StepData[];
@@ -96,6 +112,11 @@ interface Props {
   onSaveScore: (ideaId: number, criterionKey: string, score: number) => Promise<void>;
   onUpsertScenario: (scenario: any) => Promise<void>;
   onUpsertFeasibility: (check: any) => Promise<void>;
+  onPrev: () => void;
+  onNext: () => void;
+  saveStatus: SaveStatus;
+  stepIndex: number;
+  stepCount: number;
 }
 
 function getStepPayload(steps: StepData[], key: string): Record<string, unknown> | null {
@@ -108,9 +129,13 @@ export function PSIdeationWorkspace({
   autoSummary, ideationId, isConverted,
   onSaveStep, onAddIdea, onSelectIdea, onUpsertTheme, onAssignIdea,
   onSaveScore, onUpsertScenario, onUpsertFeasibility,
+  onPrev, onNext, saveStatus, stepIndex, stepCount,
 }: Props) {
   const payload = getStepPayload(steps, currentStep);
   const disabled = isConverted;
+  const hasPrev = stepIndex > 0;
+  const hasNext = stepIndex < stepCount - 1;
+  const saveDisplay = SAVE_DISPLAY[saveStatus];
 
   const saveHandler = (stepKey: string) => async (p: Record<string, unknown>) => {
     await onSaveStep(stepKey, p);
@@ -119,7 +144,7 @@ export function PSIdeationWorkspace({
   const stepTitle = IDEATION_STEP_LABELS[currentStep] || currentStep;
 
   return (
-    <div className="flex-1 overflow-y-auto p-3 pb-20 md:pb-4">
+    <div className="flex-1 overflow-y-auto p-3 pb-4">
       {/* Step title visible on mobile (header shows it on desktop) */}
       <div className="mb-3 md:hidden">
         <h2 className="text-sm font-medium text-muted-foreground">{stepTitle}</h2>
@@ -208,6 +233,36 @@ export function PSIdeationWorkspace({
           />
         )}
       </StepErrorBoundary>
+
+      {/* ── Step card footer: Previous | Save | Next ─────────────── */}
+      <div className="flex items-center justify-between border-t border-border bg-muted/30 rounded-b-lg px-4 py-3 mt-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onPrev}
+          disabled={!hasPrev || disabled}
+          className="h-9 px-3 gap-1"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          <span className="text-sm">Previous</span>
+        </Button>
+
+        <div className={`flex items-center gap-1.5 text-xs ${saveDisplay.className}`}>
+          {saveDisplay.icon}
+          <span>{saveDisplay.label}</span>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onNext}
+          disabled={!hasNext || disabled}
+          className="h-9 px-3 gap-1"
+        >
+          <span className="text-sm">Next</span>
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
     </div>
   );
 }

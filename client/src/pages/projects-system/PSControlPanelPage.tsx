@@ -9,7 +9,8 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollableTabsList } from "@/components/ui/scrollable-tabs-list";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -106,19 +107,19 @@ export function PSControlPanelPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="overview"><LayoutGrid className="w-3.5 h-3.5 mr-1" />Overview</TabsTrigger>
-          <TabsTrigger value="versions"><List className="w-3.5 h-3.5 mr-1" />Versions</TabsTrigger>
-          <TabsTrigger value="import"><Upload className="w-3.5 h-3.5 mr-1" />Import</TabsTrigger>
-          <TabsTrigger value="scopes"><Target className="w-3.5 h-3.5 mr-1" />Scopes</TabsTrigger>
-          <TabsTrigger value="questions"><FileQuestion className="w-3.5 h-3.5 mr-1" />Questions</TabsTrigger>
-          <TabsTrigger value="dimensions"><Layers className="w-3.5 h-3.5 mr-1" />Dimensions</TabsTrigger>
-          <TabsTrigger value="grid"><Grid3X3 className="w-3.5 h-3.5 mr-1" />Grid</TabsTrigger>
-          <TabsTrigger value="validation"><Shield className="w-3.5 h-3.5 mr-1" />Validation</TabsTrigger>
-          <TabsTrigger value="monitoring"><BarChart3 className="w-3.5 h-3.5 mr-1" />Monitoring</TabsTrigger>
-          <TabsTrigger value="queue"><CheckCircle2 className="w-3.5 h-3.5 mr-1" />Queue</TabsTrigger>
-          <TabsTrigger value="ideation"><TrendingUp className="w-3.5 h-3.5 mr-1" />Ideation</TabsTrigger>
-        </TabsList>
+        <ScrollableTabsList>
+          <TabsTrigger value="overview" className="shrink-0 flex-none"><LayoutGrid className="w-3.5 h-3.5 mr-1" />Overview</TabsTrigger>
+          <TabsTrigger value="versions" className="shrink-0 flex-none"><List className="w-3.5 h-3.5 mr-1" />Versions</TabsTrigger>
+          <TabsTrigger value="import" className="shrink-0 flex-none"><Upload className="w-3.5 h-3.5 mr-1" />Import</TabsTrigger>
+          <TabsTrigger value="scopes" className="shrink-0 flex-none"><Target className="w-3.5 h-3.5 mr-1" />Scopes</TabsTrigger>
+          <TabsTrigger value="questions" className="shrink-0 flex-none"><FileQuestion className="w-3.5 h-3.5 mr-1" />Questions</TabsTrigger>
+          <TabsTrigger value="dimensions" className="shrink-0 flex-none"><Layers className="w-3.5 h-3.5 mr-1" />Dimensions</TabsTrigger>
+          <TabsTrigger value="grid" className="shrink-0 flex-none"><Grid3X3 className="w-3.5 h-3.5 mr-1" />Grid</TabsTrigger>
+          <TabsTrigger value="validation" className="shrink-0 flex-none"><Shield className="w-3.5 h-3.5 mr-1" />Validation</TabsTrigger>
+          <TabsTrigger value="monitoring" className="shrink-0 flex-none"><BarChart3 className="w-3.5 h-3.5 mr-1" />Monitoring</TabsTrigger>
+          <TabsTrigger value="queue" className="shrink-0 flex-none"><CheckCircle2 className="w-3.5 h-3.5 mr-1" />Queue</TabsTrigger>
+          <TabsTrigger value="ideation" className="shrink-0 flex-none"><TrendingUp className="w-3.5 h-3.5 mr-1" />Ideation</TabsTrigger>
+        </ScrollableTabsList>
 
         <TabsContent value="overview">
           <OverviewTab onSelectVersion={setSelectedVersionId} onChangeTab={setActiveTab} />

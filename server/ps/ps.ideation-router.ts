@@ -234,6 +234,19 @@ export const ideationRouter = router({
       return service.updateIdeationMeta(input.id, input, ctx.user.id);
     }),
 
+  duplicate: governedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      carryPayloads: z.boolean().optional(),
+      preserveLifecycle: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return service.duplicateIdeation(input.id, ctx.user.id, {
+        carryPayloads: input.carryPayloads,
+        preserveLifecycle: input.preserveLifecycle,
+      });
+    }),
+
   deleteDraft: governedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
