@@ -8,6 +8,12 @@ import { trpc } from "@/lib/trpc";
 import { ClipboardList, Loader2, FolderOpen, Pencil, Check, X } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
+  DRAFT: "bg-yellow-500/10 text-yellow-600 border-yellow-500/30",
+  SUBMITTED: "bg-blue-500/10 text-blue-600 border-blue-500/30",
+  VALIDATED: "bg-green-500/10 text-green-600 border-green-500/30",
+  REJECTED: "bg-red-500/10 text-red-600 border-red-500/30",
+  SENT_TO_PM: "bg-purple-500/10 text-purple-600 border-purple-500/30",
+  // Legacy lowercase fallbacks
   active: "bg-green-500/10 text-green-600 border-green-500/30",
   draft: "bg-yellow-500/10 text-yellow-600 border-yellow-500/30",
   archived: "bg-gray-500/10 text-gray-500 border-gray-500/30",

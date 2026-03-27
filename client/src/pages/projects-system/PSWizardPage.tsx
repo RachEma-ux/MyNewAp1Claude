@@ -7,7 +7,7 @@
  *
  * All steps DB-driven, no hardcoded logic.
  */
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 
@@ -694,11 +694,11 @@ export default function PSWizardPage() {
                   <div className="text-sm text-white/50">Current Status</div>
                   <div className="mt-1">
                     <span className={`inline-block rounded-full px-3 py-1 text-sm font-medium ${
-                      createdProject?.status === "draft"
+                      createdProject?.status === "DRAFT"
                         ? "bg-yellow-500/10 border border-yellow-500/30 text-yellow-400"
                         : "bg-blue-500/10 border border-blue-500/30 text-blue-400"
                     }`}>
-                      {(createdProject?.status ?? "draft").toUpperCase()}
+                      {createdProject?.status ?? "DRAFT"}
                     </span>
                   </div>
                 </div>
@@ -710,7 +710,7 @@ export default function PSWizardPage() {
                   </div>
                 )}
 
-                {createdProject?.status === "draft" && (
+                {createdProject?.status === "DRAFT" && (
                   <button
                     type="button"
                     onClick={handleSubmitForValidation}
@@ -749,13 +749,13 @@ export default function PSWizardPage() {
                   </div>
                 )}
 
-                {createdProject?.status === "draft" && (
+                {createdProject?.status === "DRAFT" && (
                   <div className="text-sm text-white/50">
                     Project must be validated before PM handoff.
                   </div>
                 )}
 
-                {!createdProject?.pmProjectId && createdProject?.status !== "draft" && (
+                {!createdProject?.pmProjectId && createdProject?.status !== "DRAFT" && (
                   <button
                     type="button"
                     onClick={handleSendToPM}
