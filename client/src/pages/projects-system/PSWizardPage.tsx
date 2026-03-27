@@ -167,6 +167,7 @@ export default function PSWizardPage() {
   // ── Classification ───────────────────────────────────────────────────
 
   async function handleRunClassification() {
+    setCreateError("");
     try {
       const result = await classifyMutation.mutateAsync({
         scenario,
@@ -175,8 +176,9 @@ export default function PSWizardPage() {
       });
       setRecommendation(result);
       setStep(6);
-    } catch (err) {
-      console.error("Classification failed:", err);
+    } catch (err: any) {
+      const msg = err?.message || "Classification failed";
+      setCreateError(msg);
     }
   }
 
@@ -429,7 +431,9 @@ export default function PSWizardPage() {
               <p className="text-white/70">DB-driven classification questions from active matrix</p>
 
               {questions.length === 0 ? (
-                <div className="text-white/50">No questions loaded. Ensure an active matrix version exists.</div>
+                <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
+                  No questions loaded. Ensure an active matrix version exists in PS Control Panel.
+                </div>
               ) : (
                 <div className="space-y-3">
                   {questions.map((q) => (
@@ -453,6 +457,18 @@ export default function PSWizardPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {isClassifying && (
+                <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-400">
+                  Running classification...
+                </div>
+              )}
+
+              {createError && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                  {createError}
                 </div>
               )}
             </div>
