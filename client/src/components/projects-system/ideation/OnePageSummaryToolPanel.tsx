@@ -69,7 +69,7 @@ export function OnePageSummaryToolPanel({ payload, autoSummary, onSave, disabled
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <FileText className="w-4 h-4" />
-          11. One-Page Summary
+          11. One-Page Summary (Optional)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

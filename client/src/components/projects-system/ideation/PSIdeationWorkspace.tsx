@@ -2,8 +2,13 @@
  * PS Ideation — Workspace (center panel)
  *
  * Renders the correct tool panel for the current step.
+ * Includes step-level error boundary and empty/loading states.
  */
+import React from "react";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { IdeationStepKey } from "../../../../../server/ps/ps.ideation-types";
+import { IDEATION_STEP_LABELS } from "../../../../../server/ps/ps.ideation-types";
 import { ContextDefinitionToolPanel } from "./ContextDefinitionToolPanel";
 import { ProblemDefinitionToolPanel } from "./ProblemDefinitionToolPanel";
 import { OpportunityDefinitionToolPanel } from "./OpportunityDefinitionToolPanel";
@@ -15,6 +20,40 @@ import { ScenarioExplorationToolPanel } from "./ScenarioExplorationToolPanel";
 import { FeasibilityCheckToolPanel } from "./FeasibilityCheckToolPanel";
 import { ConceptSelectionToolPanel } from "./ConceptSelectionToolPanel";
 import { OnePageSummaryToolPanel } from "./OnePageSummaryToolPanel";
+
+/** Error boundary for individual tool panels — catches render errors gracefully */
+class StepErrorBoundary extends React.Component<
+  { stepKey: string; children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { stepKey: string; children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidUpdate(prevProps: { stepKey: string }) {
+    if (prevProps.stepKey !== this.props.stepKey && this.state.hasError) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+          <p className="text-sm font-medium">Failed to load step panel</p>
+          <p className="text-xs text-muted-foreground max-w-md">{this.state.error?.message}</p>
+          <Button size="sm" variant="outline" onClick={() => this.setState({ hasError: false, error: null })}>
+            Retry
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface StepData {
   stepKey: string;
@@ -77,90 +116,98 @@ export function PSIdeationWorkspace({
     await onSaveStep(stepKey, p);
   };
 
+  const stepTitle = IDEATION_STEP_LABELS[currentStep] || currentStep;
+
   return (
-    <div className="flex-1 overflow-y-auto p-4">
-      {currentStep === "context" && (
-        <ContextDefinitionToolPanel payload={payload} onSave={saveHandler("context")} disabled={disabled} />
-      )}
-      {currentStep === "problem" && (
-        <ProblemDefinitionToolPanel payload={payload} onSave={saveHandler("problem")} disabled={disabled} />
-      )}
-      {currentStep === "opportunity" && (
-        <OpportunityDefinitionToolPanel payload={payload} onSave={saveHandler("opportunity")} disabled={disabled} />
-      )}
-      {currentStep === "guiding_question" && (
-        <GuidingWhatIfToolPanel payload={payload} onSave={saveHandler("guiding_question")} disabled={disabled} />
-      )}
-      {currentStep === "idea_generation" && (
-        <IdeaGenerationToolPanel
-          payload={payload}
-          ideas={ideas}
-          onSave={saveHandler("idea_generation")}
-          onAddIdea={onAddIdea}
-          disabled={disabled}
-        />
-      )}
-      {currentStep === "clustering" && (
-        <ClusteringAndThemingToolPanel
-          payload={payload}
-          themes={themes}
-          ideas={ideas}
-          onSave={saveHandler("clustering")}
-          onUpsertTheme={onUpsertTheme}
-          onAssignIdea={onAssignIdea}
-          ideationId={ideationId}
-          disabled={disabled}
-        />
-      )}
-      {currentStep === "screening" && (
-        <InitialScreeningToolPanel
-          payload={payload}
-          ideas={ideas}
-          scores={scores}
-          onSave={saveHandler("screening")}
-          onSaveScore={onSaveScore}
-          disabled={disabled}
-        />
-      )}
-      {currentStep === "scenario_exploration" && (
-        <ScenarioExplorationToolPanel
-          payload={payload}
-          ideas={ideas}
-          scenarios={scenarios}
-          onSave={saveHandler("scenario_exploration")}
-          onUpsertScenario={onUpsertScenario}
-          ideationId={ideationId}
-          disabled={disabled}
-        />
-      )}
-      {currentStep === "feasibility" && (
-        <FeasibilityCheckToolPanel
-          payload={payload}
-          ideas={ideas}
-          checks={checks}
-          onSave={saveHandler("feasibility")}
-          onUpsertCheck={onUpsertFeasibility}
-          ideationId={ideationId}
-          disabled={disabled}
-        />
-      )}
-      {currentStep === "concept_selection" && (
-        <ConceptSelectionToolPanel
-          payload={payload}
-          ideas={ideas}
-          onSave={saveHandler("concept_selection")}
-          onSelectIdea={onSelectIdea}
-          disabled={disabled}
-        />
-      )}
-      {currentStep === "one_page_summary" && (
-        <OnePageSummaryToolPanel
-          payload={payload}
-          autoSummary={autoSummary}
-          onSave={saveHandler("one_page_summary")}
-          disabled={disabled}
-        />
-      )}
+    <div className="flex-1 overflow-y-auto p-3 pb-20 md:pb-4">
+      {/* Step title visible on mobile (header shows it on desktop) */}
+      <div className="mb-3 md:hidden">
+        <h2 className="text-sm font-medium text-muted-foreground">{stepTitle}</h2>
+      </div>
+      <StepErrorBoundary stepKey={currentStep}>
+        {currentStep === "context" && (
+          <ContextDefinitionToolPanel payload={payload} onSave={saveHandler("context")} disabled={disabled} />
+        )}
+        {currentStep === "problem" && (
+          <ProblemDefinitionToolPanel payload={payload} onSave={saveHandler("problem")} disabled={disabled} />
+        )}
+        {currentStep === "opportunity" && (
+          <OpportunityDefinitionToolPanel payload={payload} onSave={saveHandler("opportunity")} disabled={disabled} />
+        )}
+        {currentStep === "guiding_question" && (
+          <GuidingWhatIfToolPanel payload={payload} onSave={saveHandler("guiding_question")} disabled={disabled} />
+        )}
+        {currentStep === "idea_generation" && (
+          <IdeaGenerationToolPanel
+            payload={payload}
+            ideas={ideas}
+            onSave={saveHandler("idea_generation")}
+            onAddIdea={onAddIdea}
+            disabled={disabled}
+          />
+        )}
+        {currentStep === "clustering" && (
+          <ClusteringAndThemingToolPanel
+            payload={payload}
+            themes={themes}
+            ideas={ideas}
+            onSave={saveHandler("clustering")}
+            onUpsertTheme={onUpsertTheme}
+            onAssignIdea={onAssignIdea}
+            ideationId={ideationId}
+            disabled={disabled}
+          />
+        )}
+        {currentStep === "screening" && (
+          <InitialScreeningToolPanel
+            payload={payload}
+            ideas={ideas}
+            scores={scores}
+            onSave={saveHandler("screening")}
+            onSaveScore={onSaveScore}
+            disabled={disabled}
+          />
+        )}
+        {currentStep === "scenario_exploration" && (
+          <ScenarioExplorationToolPanel
+            payload={payload}
+            ideas={ideas}
+            scenarios={scenarios}
+            onSave={saveHandler("scenario_exploration")}
+            onUpsertScenario={onUpsertScenario}
+            ideationId={ideationId}
+            disabled={disabled}
+          />
+        )}
+        {currentStep === "feasibility" && (
+          <FeasibilityCheckToolPanel
+            payload={payload}
+            ideas={ideas}
+            checks={checks}
+            onSave={saveHandler("feasibility")}
+            onUpsertCheck={onUpsertFeasibility}
+            ideationId={ideationId}
+            disabled={disabled}
+          />
+        )}
+        {currentStep === "concept_selection" && (
+          <ConceptSelectionToolPanel
+            payload={payload}
+            ideas={ideas}
+            onSave={saveHandler("concept_selection")}
+            onSelectIdea={onSelectIdea}
+            disabled={disabled}
+          />
+        )}
+        {currentStep === "one_page_summary" && (
+          <OnePageSummaryToolPanel
+            payload={payload}
+            autoSummary={autoSummary}
+            onSave={saveHandler("one_page_summary")}
+            disabled={disabled}
+          />
+        )}
+      </StepErrorBoundary>
     </div>
   );
 }

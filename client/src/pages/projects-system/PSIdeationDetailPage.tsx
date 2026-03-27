@@ -2,6 +2,7 @@
  * PS Ideation — Detail Page
  *
  * Wraps the PSIdeationShell with route parameter extraction.
+ * Applies safe-area-inset for mobile devices with notches.
  */
 import { useParams } from "wouter";
 import { PSIdeationShell } from "@/components/projects-system/ideation/PSIdeationShell";
@@ -19,7 +20,10 @@ export function PSIdeationDetailPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-64px)]">
+    <div
+      className="h-[calc(100vh-64px)] overflow-hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+    >
       <PSIdeationShell ideationId={ideationId} />
     </div>
   );

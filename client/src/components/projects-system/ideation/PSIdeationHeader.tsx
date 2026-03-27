@@ -1,21 +1,50 @@
 /**
  * PS Ideation — Header
  *
- * Shows ideation title, lifecycle badge, and action buttons.
+ * Shows: Back + Title + Lifecycle badge + Save state + Step progress
+ * Actions: Workflow/Insight toggles, Wizard handoff, Overflow (defer/reject/delete)
+ * Action hierarchy: identity → lifecycle → save → progress → wizard → destructive (overflow)
  */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Wand2, Trash2, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  ArrowLeft,
+  Wand2,
+  Loader2,
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  MoreVertical,
+  Trash2,
+  PauseCircle,
+  XCircle,
+} from "lucide-react";
 import { Link } from "wouter";
 import type { IdeationLifecycleStatus } from "../../../../../server/ps/ps.ideation-types";
+import type { SaveStatus } from "./PSIdeationMobileBar";
 
 interface Props {
   title: string;
   lifecycleStatus: IdeationLifecycleStatus;
   isConverted: boolean;
   readiness?: { ready: boolean; blockers: string[]; warnings: string[] } | null;
+  saveStatus: SaveStatus;
+  stepIndex: number;
+  stepCount: number;
+  stepLabel: string;
+  completedCount: number;
   onConvert?: () => void;
   onDelete?: () => void;
+  onDefer?: () => void;
+  onReject?: () => void;
   deleting?: boolean;
 }
 
@@ -41,34 +70,111 @@ const STATUS_LABELS: Record<string, string> = {
   converted: "Converted",
 };
 
+function SaveIndicator({ status }: { status: SaveStatus }) {
+  switch (status) {
+    case "saving":
+      return <span className="flex items-center gap-1 text-xs text-blue-500"><Loader2 className="w-3 h-3 animate-spin" />Saving…</span>;
+    case "saved":
+      return <span className="flex items-center gap-1 text-xs text-green-500"><CheckCircle2 className="w-3 h-3" />Saved</span>;
+    case "unsaved":
+      return <span className="flex items-center gap-1 text-xs text-amber-500"><Save className="w-3 h-3" />Unsaved</span>;
+    case "error":
+      return <span className="flex items-center gap-1 text-xs text-red-500"><AlertCircle className="w-3 h-3" />Save failed</span>;
+    default:
+      return null;
+  }
+}
+
 export function PSIdeationHeader({
-  title, lifecycleStatus, isConverted, readiness, onConvert, onDelete, deleting,
+  title, lifecycleStatus, isConverted, readiness, saveStatus,
+  stepIndex, stepCount, stepLabel, completedCount,
+  onConvert, onDelete, onDefer, onReject, deleting,
 }: Props) {
+  const progressPct = stepCount > 0 ? Math.round((completedCount / stepCount) * 100) : 0;
+
   return (
-    <div className="flex items-center justify-between border-b border-border px-4 py-2">
-      <div className="flex items-center gap-3 min-w-0">
-        <Link href="/ps/ideation">
-          <Button variant="ghost" size="sm" className="shrink-0">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </Link>
-        <h1 className="text-lg font-semibold truncate">{title}</h1>
-        <Badge variant="outline" className={STATUS_COLORS[lifecycleStatus] || ""}>
-          {STATUS_LABELS[lifecycleStatus] || lifecycleStatus}
-        </Badge>
+    <div className="border-b border-border">
+      {/* Main row */}
+      <div className="flex items-center justify-between px-3 py-1.5 gap-2">
+        {/* Left: Back + Title + Badges */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Link href="/ps/ideation">
+            <Button variant="ghost" size="sm" className="shrink-0 h-7 w-7 p-0">
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+          </Link>
+          <h1 className="text-sm font-semibold truncate">{title}</h1>
+          <Badge variant="outline" className={`shrink-0 text-[10px] ${STATUS_COLORS[lifecycleStatus] || ""}`}>
+            {STATUS_LABELS[lifecycleStatus] || lifecycleStatus}
+          </Badge>
+          {/* Save indicator — hidden on mobile (shown in bottom bar instead) */}
+          <div className="hidden sm:block shrink-0">
+            <SaveIndicator status={saveStatus} />
+          </div>
+        </div>
+
+        {/* Right: Wizard + Overflow */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Wizard handoff — primary action when ready */}
+          {readiness?.ready && !isConverted && onConvert && (
+            <Button onClick={onConvert} size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700 hidden sm:flex">
+              <Wand2 className="w-3.5 h-3.5 mr-1" />
+              Open in Wizard
+            </Button>
+          )}
+
+          {/* Overflow menu — destructive and secondary actions */}
+          {!isConverted && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                {readiness?.ready && onConvert && (
+                  <DropdownMenuItem onClick={onConvert} className="sm:hidden">
+                    <Wand2 className="w-3.5 h-3.5 mr-2" />
+                    Open in Wizard
+                  </DropdownMenuItem>
+                )}
+                {onDefer && (
+                  <DropdownMenuItem onClick={onDefer}>
+                    <PauseCircle className="w-3.5 h-3.5 mr-2" />
+                    Defer
+                  </DropdownMenuItem>
+                )}
+                {onReject && (
+                  <DropdownMenuItem onClick={onReject}>
+                    <XCircle className="w-3.5 h-3.5 mr-2" />
+                    Reject
+                  </DropdownMenuItem>
+                )}
+                {(onDefer || onReject) && onDelete && <DropdownMenuSeparator />}
+                {onDelete && (
+                  <DropdownMenuItem onClick={onDelete} disabled={deleting} className="text-red-500 focus:text-red-500">
+                    {deleting ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-2" />}
+                    Delete Draft
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {readiness?.ready && !isConverted && onConvert && (
-          <Button onClick={onConvert} size="sm" className="bg-green-600 hover:bg-green-700">
-            <Wand2 className="w-4 h-4 mr-1" />
-            Convert to Wizard
-          </Button>
-        )}
-        {!isConverted && onDelete && (
-          <Button onClick={onDelete} variant="ghost" size="sm" className="text-red-500" disabled={deleting}>
-            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-          </Button>
-        )}
+
+      {/* Progress row — step indicator + bar */}
+      <div className="flex items-center gap-2 px-3 pb-1.5">
+        <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
+          Step {stepIndex + 1}/{stepCount}
+        </span>
+        <Progress value={progressPct} className="h-1.5 flex-1" />
+        <span className="text-[10px] text-muted-foreground shrink-0 truncate max-w-[140px] hidden sm:inline">
+          {stepLabel}
+        </span>
+        <span className="text-[10px] text-muted-foreground shrink-0">
+          {completedCount}/{stepCount}
+        </span>
       </div>
     </div>
   );

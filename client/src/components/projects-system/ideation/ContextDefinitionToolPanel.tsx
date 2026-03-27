@@ -1,7 +1,11 @@
 /**
  * Step 1: Context of the Project — Tool Panel
  *
- * Fields: externalDriver, internalDriver, triggerEvent, shapesNeed
+ * Fields match source-of-truth template wording:
+ *   - External driver
+ *   - Internal driver
+ *   - Trigger event (Why now?)
+ *   - How this shapes the need for a project
  */
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,40 +55,44 @@ export function ContextDefinitionToolPanel({ payload, onSave, disabled }: Props)
       <CardContent className="space-y-4">
         <div>
           <Label>External Driver</Label>
+          <p className="text-[10px] text-muted-foreground mb-1">What external factor is driving the need for this project?</p>
           <Textarea
             value={externalDriver}
             onChange={(e) => setExternalDriver(e.target.value)}
-            placeholder="What external factor is pushing this project?"
+            placeholder="Market shifts, regulatory changes, competitive pressure..."
             disabled={disabled}
             rows={2}
           />
         </div>
         <div>
           <Label>Internal Driver</Label>
+          <p className="text-[10px] text-muted-foreground mb-1">What internal factor is driving the need for this project?</p>
           <Textarea
             value={internalDriver}
             onChange={(e) => setInternalDriver(e.target.value)}
-            placeholder="What internal need does this address?"
+            placeholder="Process inefficiency, strategic pivot, capability gap..."
             disabled={disabled}
             rows={2}
           />
         </div>
         <div>
-          <Label>Trigger Event</Label>
+          <Label>Trigger Event (Why now?)</Label>
+          <p className="text-[10px] text-muted-foreground mb-1">What specific event or deadline triggered this initiative right now?</p>
           <Textarea
             value={triggerEvent}
             onChange={(e) => setTriggerEvent(e.target.value)}
-            placeholder="What specific event triggered this initiative?"
+            placeholder="Executive mandate, budget cycle, incident, opportunity window..."
             disabled={disabled}
             rows={2}
           />
         </div>
         <div>
-          <Label>What Shapes the Need?</Label>
+          <Label>How This Shapes the Need for a Project</Label>
+          <p className="text-[10px] text-muted-foreground mb-1">How do these drivers and trigger combine to justify initiating a project?</p>
           <Textarea
             value={shapesNeed}
             onChange={(e) => setShapesNeed(e.target.value)}
-            placeholder="What broader conditions shape this need?"
+            placeholder="The convergence of these factors means that without a structured project..."
             disabled={disabled}
             rows={2}
           />

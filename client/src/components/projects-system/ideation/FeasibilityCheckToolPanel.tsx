@@ -78,7 +78,7 @@ export function FeasibilityCheckToolPanel({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <FlaskConical className="w-4 h-4" />
-          9. Quick Feasibility Checks
+          9. Quick Feasibility Checks (Mini-POCs)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
