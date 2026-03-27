@@ -2382,6 +2382,54 @@ actions:
     approval: none
     evidence: { required: false }
 
+  ps.project.submit:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.project.validate:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.project.reject:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.project.sendToPM:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.project.override:
+    domain: ps
+    risk: R3
+    capability: ps.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  ps.feedback.create:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   ps.demand.create:
     domain: ps
     risk: R2
