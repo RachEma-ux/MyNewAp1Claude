@@ -121,6 +121,7 @@ import * as lifecycle from "./ps.lifecycle";
 import * as governance from "./ps.governance";
 import * as pmBridge from "./ps.pm-bridge";
 import { loadActiveMatrix } from "./ps.matrix-engine";
+import { ideationRouter } from "./ps.ideation-router";
 
 const systemsRouter = router({
   create: governedProcedure
@@ -1092,6 +1093,7 @@ export const psRouter = router({
   lifecycle: lifecycleRouter,
   governance: governanceRouter,
   pmBridge: pmBridgeRouter,
+  ideation: ideationRouter,
 
   getActiveQuestions: protectedProcedure
     .input(z.void())

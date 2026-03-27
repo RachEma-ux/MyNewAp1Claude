@@ -117,6 +117,7 @@ export function PSControlPanelPage() {
           <TabsTrigger value="validation"><Shield className="w-3.5 h-3.5 mr-1" />Validation</TabsTrigger>
           <TabsTrigger value="monitoring"><BarChart3 className="w-3.5 h-3.5 mr-1" />Monitoring</TabsTrigger>
           <TabsTrigger value="queue"><CheckCircle2 className="w-3.5 h-3.5 mr-1" />Queue</TabsTrigger>
+          <TabsTrigger value="ideation"><TrendingUp className="w-3.5 h-3.5 mr-1" />Ideation</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -148,6 +149,9 @@ export function PSControlPanelPage() {
         </TabsContent>
         <TabsContent value="queue">
           <PSValidationQueueTab />
+        </TabsContent>
+        <TabsContent value="ideation">
+          <IdeationKPIsTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -577,6 +581,56 @@ function MetricCard({
         <p className="text-xs text-muted-foreground mt-1">{sub}</p>
       </CardContent>
     </Card>
+  );
+}
+
+// ── Ideation KPIs Tab ─────────────────────────────────────────────────
+
+function IdeationKPIsTab() {
+  const { data: kpis, isLoading } = trpc.ps.ideation.kpis.useQuery();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <Loader2 className="w-5 h-5 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!kpis) {
+    return <p className="text-sm text-muted-foreground p-4">No ideation data available.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold">PS Ideation KPIs</h3>
+      <div className="grid md:grid-cols-4 gap-4">
+        <KpiCard
+          icon={<FolderKanban className="w-4 h-4 text-blue-500" />}
+          label="Total Ideations"
+          value={kpis.total ?? 0}
+          sub="All ideation records"
+        />
+        <KpiCard
+          icon={<TrendingUp className="w-4 h-4 text-green-500" />}
+          label="Active"
+          value={kpis.active ?? 0}
+          sub="In exploration / screening"
+        />
+        <KpiCard
+          icon={<GitCompareArrows className="w-4 h-4 text-purple-500" />}
+          label="Converted"
+          value={kpis.converted ?? 0}
+          sub="Sent to PS Wizard"
+        />
+        <KpiCard
+          icon={<PieChart className="w-4 h-4 text-amber-500" />}
+          label="Conversion Rate"
+          value={kpis.total ? `${Math.round(((kpis.converted ?? 0) / kpis.total) * 100)}%` : "—"}
+          sub="Converted / Total"
+        />
+      </div>
+    </div>
   );
 }
 

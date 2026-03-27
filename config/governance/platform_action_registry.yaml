@@ -2462,6 +2462,119 @@ actions:
     approval: none
     evidence: { required: false }
 
+  # ── PS Ideation ─────────────────────────────────────────────────────────
+  ps.ideation.create:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.update:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.delete:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.step.save:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.idea.create:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.idea.update:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.idea.delete:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.idea.select:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.theme.upsert:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.theme.delete:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.screening.save:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.scenario.upsert:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.feasibility.upsert:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.convert.commit:
+    domain: ps
+    risk: R3
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: true, types: [reason] }
+
   # ═══════════════════════════════════════════════════════════════════════════
   # MODULES (ENGINE BINDING)
   # ═══════════════════════════════════════════════════════════════════════════

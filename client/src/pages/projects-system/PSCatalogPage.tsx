@@ -17,6 +17,7 @@ import {
   List,
   Loader2,
   FolderOpen,
+  Lightbulb,
 } from "lucide-react";
 
 const CONFIDENCE_COLORS: Record<string, string> = {
@@ -64,6 +65,11 @@ export function PSCatalogPage() {
             <Link href="/ps/list">
               <Button variant="outline" size="sm">
                 <List className="w-4 h-4 mr-1.5" /> PS List
+              </Button>
+            </Link>
+            <Link href="/ps/ideation">
+              <Button variant="outline" size="sm">
+                <Lightbulb className="w-4 h-4 mr-1.5" /> PS Ideation
               </Button>
             </Link>
           </div>

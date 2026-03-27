@@ -8,6 +8,7 @@ import { PSCatalogPage } from "./PSCatalogPage";
 import { PSControlPanelPage } from "./PSControlPanelPage";
 import PSWizardPage from "./PSWizardPage";
 import { PSListPage } from "./PSListPage";
+import { PSIdeationPage } from "./PSIdeationPage";
 
 
 export function PSTopLevelPage() {
@@ -16,6 +17,7 @@ export function PSTopLevelPage() {
     case "control-panel": return <PSControlPanelPage />;
     case "wizard": return <PSWizardPage />;
     case "list": return <PSListPage />;
+    case "ideation": return <PSIdeationPage />;
     case "catalog":
     default: return <PSCatalogPage />;
   }

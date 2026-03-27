@@ -583,3 +583,199 @@ export const psFeedback = pgTable("ps_feedback", {
 
 export type PsFeedback = typeof psFeedback.$inferSelect;
 export type InsertPsFeedback = typeof psFeedback.$inferInsert;
+
+// ============================================================================
+// 24. PS Ideations — Pre-project intake & concept lab records
+// ============================================================================
+
+export const psIdeations = pgTable("ps_ideations", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  sourceType: varchar("source_type", { length: 50 }).default("manual").notNull(), // manual | import | template | ai
+  workflowVersion: varchar("workflow_version", { length: 20 }).default("1.0").notNull(),
+  lifecycleStatus: varchar("lifecycle_status", { length: 50 }).default("draft").notNull(), // draft | in_exploration | screening | concept_selected | ready_for_wizard | deferred | rejected | converted
+  currentStepKey: varchar("current_step_key", { length: 50 }).default("context").notNull(),
+  selectedIdeaId: integer("selected_idea_id"),
+  problemStatementSnapshot: text("problem_statement_snapshot"),
+  opportunityStatementSnapshot: text("opportunity_statement_snapshot"),
+  guidingQuestionSnapshot: text("guiding_question_snapshot"),
+  selectedConceptSummary: text("selected_concept_summary"),
+  rationaleSummary: text("rationale_summary"),
+  feasibilityScore: varchar("feasibility_score", { length: 20 }), // High | Medium | Low
+  riskLevel: varchar("risk_level", { length: 20 }), // low | medium | high | critical
+  summaryGeneratedText: text("summary_generated_text"),
+  summaryOverrideText: text("summary_override_text"),
+  readinessSnapshotJson: json("readiness_snapshot_json").$type<Record<string, unknown>>(),
+  conversionProjectId: integer("conversion_project_id"),
+  createdBy: integer("created_by").notNull(),
+  updatedBy: integer("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  readyAt: timestamp("ready_at"),
+  convertedAt: timestamp("converted_at"),
+}, (table) => ({
+  wsStatusIdx: index("ps_ideations_ws_status_idx").on(table.workspaceId, table.lifecycleStatus),
+  wsCreatedIdx: index("ps_ideations_ws_created_idx").on(table.workspaceId, table.createdAt),
+  conversionIdx: index("ps_ideations_conversion_idx").on(table.conversionProjectId),
+}));
+
+export type PsIdeation = typeof psIdeations.$inferSelect;
+export type InsertPsIdeation = typeof psIdeations.$inferInsert;
+
+// ============================================================================
+// 25. PS Ideation Steps — Step state tracking for the 11-step workflow
+// ============================================================================
+
+export const psIdeationSteps = pgTable("ps_ideation_steps", {
+  id: serial("id").primaryKey(),
+  ideationId: integer("ideation_id").notNull(),
+  stepKey: varchar("step_key", { length: 50 }).notNull(),
+  stepOrder: integer("step_order").notNull(),
+  stepStatus: varchar("step_status", { length: 30 }).default("not_started").notNull(), // not_started | in_progress | complete | blocked
+  payloadJson: json("payload_json").$type<Record<string, unknown>>(),
+  lastSavedAt: timestamp("last_saved_at"),
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  ideationIdx: index("ps_ideation_steps_ideation_idx").on(table.ideationId),
+  stepUniq: unique("ps_ideation_steps_uniq").on(table.ideationId, table.stepKey),
+}));
+
+export type PsIdeationStep = typeof psIdeationSteps.$inferSelect;
+export type InsertPsIdeationStep = typeof psIdeationSteps.$inferInsert;
+
+// ============================================================================
+// 26. PS Ideation Ideas — Raw idea pool
+// ============================================================================
+
+export const psIdeationIdeas = pgTable("ps_ideation_ideas", {
+  id: serial("id").primaryKey(),
+  ideationId: integer("ideation_id").notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  sourceType: varchar("source_type", { length: 50 }).default("brainstorm"), // brainstorm | ai | import | reference
+  themeId: integer("theme_id"),
+  rankOrder: integer("rank_order").default(0),
+  isShortlisted: integer("is_shortlisted").default(0).notNull(), // 0=no, 1=yes
+  isSelected: integer("is_selected").default(0).notNull(), // 0=no, 1=yes (exactly one)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  ideationIdx: index("ps_ideation_ideas_ideation_idx").on(table.ideationId),
+  themeIdx: index("ps_ideation_ideas_theme_idx").on(table.themeId),
+}));
+
+export type PsIdeationIdea = typeof psIdeationIdeas.$inferSelect;
+export type InsertPsIdeationIdea = typeof psIdeationIdeas.$inferInsert;
+
+// ============================================================================
+// 27. PS Ideation Themes — Idea clustering groups
+// ============================================================================
+
+export const psIdeationThemes = pgTable("ps_ideation_themes", {
+  id: serial("id").primaryKey(),
+  ideationId: integer("ideation_id").notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  patternNotes: text("pattern_notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  ideationIdx: index("ps_ideation_themes_ideation_idx").on(table.ideationId),
+}));
+
+export type PsIdeationTheme = typeof psIdeationThemes.$inferSelect;
+export type InsertPsIdeationTheme = typeof psIdeationThemes.$inferInsert;
+
+// ============================================================================
+// 28. PS Ideation Screening Scores — Per-idea scoring
+// ============================================================================
+
+export const psIdeationScreeningScores = pgTable("ps_ideation_screening_scores", {
+  id: serial("id").primaryKey(),
+  ideationId: integer("ideation_id").notNull(),
+  ideaId: integer("idea_id").notNull(),
+  criterionKey: varchar("criterion_key", { length: 100 }).notNull(),
+  score: integer("score").notNull(),
+  note: text("note"),
+  scoredBy: integer("scored_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  ideationIdx: index("ps_ideation_screening_ideation_idx").on(table.ideationId),
+  criterionUniq: unique("ps_ideation_screening_uniq").on(table.ideationId, table.ideaId, table.criterionKey),
+}));
+
+export type PsIdeationScreeningScore = typeof psIdeationScreeningScores.$inferSelect;
+export type InsertPsIdeationScreeningScore = typeof psIdeationScreeningScores.$inferInsert;
+
+// ============================================================================
+// 29. PS Ideation Scenarios — What-if scenario exploration
+// ============================================================================
+
+export const psIdeationScenarios = pgTable("ps_ideation_scenarios", {
+  id: serial("id").primaryKey(),
+  ideationId: integer("ideation_id").notNull(),
+  ideaId: integer("idea_id").notNull(),
+  adoptionHighText: text("adoption_high_text"),
+  adoptionLowText: text("adoption_low_text"),
+  costIncreaseText: text("cost_increase_text"),
+  competitorReactionText: text("competitor_reaction_text"),
+  technologyLimitText: text("technology_limit_text"),
+  insightsText: text("insights_text"),
+  createdBy: integer("created_by"),
+  updatedBy: integer("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  ideationIdx: index("ps_ideation_scenarios_ideation_idx").on(table.ideationId),
+  ideaIdx: index("ps_ideation_scenarios_idea_idx").on(table.ideaId),
+}));
+
+export type PsIdeationScenario = typeof psIdeationScenarios.$inferSelect;
+export type InsertPsIdeationScenario = typeof psIdeationScenarios.$inferInsert;
+
+// ============================================================================
+// 30. PS Ideation Feasibility Checks — Quick feasibility validation
+// ============================================================================
+
+export const psIdeationFeasibilityChecks = pgTable("ps_ideation_feasibility_checks", {
+  id: serial("id").primaryKey(),
+  ideationId: integer("ideation_id").notNull(),
+  ideaId: integer("idea_id").notNull(),
+  testPerformed: text("test_performed").notNull(),
+  finding1: text("finding_1"),
+  finding2: text("finding_2"),
+  feasibilityRating: varchar("feasibility_rating", { length: 20 }).notNull(), // High | Medium | Low
+  confidence: varchar("confidence", { length: 20 }),
+  evidenceRef: text("evidence_ref"),
+  notes: text("notes"),
+  createdBy: integer("created_by"),
+  updatedBy: integer("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  ideationIdx: index("ps_ideation_feasibility_ideation_idx").on(table.ideationId),
+  ideaIdx: index("ps_ideation_feasibility_idea_idx").on(table.ideaId),
+}));
+
+export type PsIdeationFeasibilityCheck = typeof psIdeationFeasibilityChecks.$inferSelect;
+export type InsertPsIdeationFeasibilityCheck = typeof psIdeationFeasibilityChecks.$inferInsert;
+
+// ============================================================================
+// 31. PS Ideation Activity — Structured audit events
+// ============================================================================
+
+export const psIdeationActivity = pgTable("ps_ideation_activity", {
+  id: serial("id").primaryKey(),
+  ideationId: integer("ideation_id").notNull(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  payloadJson: json("payload_json").$type<Record<string, unknown>>(),
+  actorId: integer("actor_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  ideationIdx: index("ps_ideation_activity_ideation_idx").on(table.ideationId),
+  eventIdx: index("ps_ideation_activity_event_idx").on(table.eventType),
+}));
+
+export type PsIdeationActivity = typeof psIdeationActivity.$inferSelect;
+export type InsertPsIdeationActivity = typeof psIdeationActivity.$inferInsert;

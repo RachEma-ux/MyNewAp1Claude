@@ -142,6 +142,8 @@ const HRRoleDefinitionComparePage = lazy(() => import("@/pages/hr/HRRoleDefiniti
 const OMTopLevelPage = lazy(() => import("@/pages/organization-management/OMTopLevelPage"));
 const CVTopLevelPage = lazy(() => import("@/pages/culture-values/CVTopLevelPage"));
 const PSTopLevelPage = lazy(() => import("@/pages/projects-system/PSTopLevelPage"));
+const PSIdeationDetailPage = lazy(() => import("@/pages/projects-system/PSIdeationDetailPage"));
+const PSIdeationConvertPage = lazy(() => import("@/pages/projects-system/PSIdeationConvertPage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
@@ -374,6 +376,9 @@ function Router() {
       {/* Culture Values — top-level (auto-selects default workspace) */}
       <Route path="/cv/:item" component={() => <ProtectedRoute component={CVTopLevelPage} />} />
       <Route path="/cv" component={() => <ProtectedRoute component={CVTopLevelPage} />} />
+      {/* Projects System — Ideation detail routes (must precede generic /ps/:item) */}
+      <Route path="/ps/ideation/:id/convert" component={() => <ProtectedRoute component={PSIdeationConvertPage} />} />
+      <Route path="/ps/ideation/:id" component={() => <ProtectedRoute component={PSIdeationDetailPage} />} />
       {/* Projects System — top-level (auto-selects default workspace) */}
       <Route path="/ps/:item" component={() => <ProtectedRoute component={PSTopLevelPage} />} />
       <Route path="/ps" component={() => <ProtectedRoute component={PSTopLevelPage} />} />

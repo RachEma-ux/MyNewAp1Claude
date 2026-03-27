@@ -384,6 +384,24 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "ps.demand.updateStatus": "ps.demand.updateStatus",
   "ps.demand.generateForSystem": "ps.demand.generate",
 
+  // ── PS Ideation ──────────────────────────────────────────────────────
+  "ps.ideation.create": "ps.ideation.create",
+  "ps.ideation.updateMeta": "ps.ideation.update",
+  "ps.ideation.deleteDraft": "ps.ideation.delete",
+  "ps.ideation.setCurrentStep": "ps.ideation.update",
+  "ps.ideation.setLifecycleStatus": "ps.ideation.update",
+  "ps.ideation.steps.save": "ps.ideation.step.save",
+  "ps.ideation.ideas.add": "ps.ideation.idea.create",
+  "ps.ideation.ideas.update": "ps.ideation.idea.update",
+  "ps.ideation.ideas.remove": "ps.ideation.idea.delete",
+  "ps.ideation.ideas.select": "ps.ideation.idea.select",
+  "ps.ideation.themes.upsert": "ps.ideation.theme.upsert",
+  "ps.ideation.themes.remove": "ps.ideation.theme.delete",
+  "ps.ideation.screening.save": "ps.ideation.screening.save",
+  "ps.ideation.scenarios.upsert": "ps.ideation.scenario.upsert",
+  "ps.ideation.feasibility.upsert": "ps.ideation.feasibility.upsert",
+  "ps.ideation.convert.commit": "ps.ideation.convert.commit",
+
   // ── Modules (Engine Binding) ─────────────────────────────────────────────
   "modules.manage.setEnabled": "module.setEnabled",
   "modules.manage.seed": "module.seed",
