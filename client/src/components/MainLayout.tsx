@@ -76,6 +76,7 @@ import {
   UserMinus,
   Award,
   ClipboardList,
+  Lightbulb,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -274,6 +275,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       icon: <ClipboardList className="w-5 h-5" />,
       children: [
         { label: "PS Catalog", icon: <ClipboardList className="w-4 h-4" />, href: "/ps/catalog" },
+        { label: "PS Ideation", icon: <Lightbulb className="w-4 h-4" />, href: "/ps/ideation" },
         { label: "PS Control Panel", icon: <Settings className="w-4 h-4" />, href: "/ps/control-panel" },
         { label: "PS Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/ps/wizard" },
         { label: "PS List", icon: <List className="w-4 h-4" />, href: "/ps/list" },
