@@ -18,7 +18,7 @@ const statusesRouter = router({
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmStatuses)
-        .where(eq(pmStatuses.wsId))
+        .where(eq(pmStatuses.workspaceId, wsId))
         .orderBy(asc(pmStatuses.position));
     }),
 
@@ -64,13 +64,13 @@ const statusesRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmStatuses)
-        .where(and(eq(pmStatuses.id, input.id), eq(pmStatuses.wsId)));
+        .where(and(eq(pmStatuses.id, input.id), eq(pmStatuses.workspaceId, wsId)));
       return { success: true };
     }),
 });
@@ -82,7 +82,7 @@ const typesRouter = router({
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmTypes)
-        .where(eq(pmTypes.wsId))
+        .where(eq(pmTypes.workspaceId, wsId))
         .orderBy(asc(pmTypes.position));
     }),
 
@@ -131,13 +131,13 @@ const typesRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmTypes)
-        .where(and(eq(pmTypes.id, input.id), eq(pmTypes.wsId)));
+        .where(and(eq(pmTypes.id, input.id), eq(pmTypes.workspaceId, wsId)));
       return { success: true };
     }),
 });
@@ -148,7 +148,7 @@ const workflowsRouter = router({
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmWorkflows.wsId)];
+      const conditions = [eq(pmWorkflows.workspaceId, wsId)];
       if (input.typeId) conditions.push(eq(pmWorkflows.typeId, input.typeId));
       return db.select().from(pmWorkflows).where(and(...conditions));
     }),
@@ -175,13 +175,13 @@ const workflowsRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmWorkflows)
-        .where(and(eq(pmWorkflows.id, input.id), eq(pmWorkflows.wsId)));
+        .where(and(eq(pmWorkflows.id, input.id), eq(pmWorkflows.workspaceId, wsId)));
       return { success: true };
     }),
 });

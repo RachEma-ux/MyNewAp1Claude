@@ -23,7 +23,7 @@ export const timeEntriesRouter = router({
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmTimeEntries.wsId)];
+      const conditions = [eq(pmTimeEntries.workspaceId, wsId)];
       if (input.projectId) conditions.push(eq(pmTimeEntries.projectId, input.projectId));
       if (input.workItemId) conditions.push(eq(pmTimeEntries.workItemId, input.workItemId));
       if (input.userId) conditions.push(eq(pmTimeEntries.userId, input.userId));
@@ -80,13 +80,13 @@ export const timeEntriesRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmTimeEntries)
-        .where(and(eq(pmTimeEntries.id, input.id), eq(pmTimeEntries.wsId)));
+        .where(and(eq(pmTimeEntries.id, input.id), eq(pmTimeEntries.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -98,7 +98,7 @@ export const timeEntriesRouter = router({
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmTimeEntries.wsId)];
+      const conditions = [eq(pmTimeEntries.workspaceId, wsId)];
       if (input.startDate) conditions.push(gte(pmTimeEntries.spentOn, new Date(input.startDate)));
       if (input.endDate) conditions.push(lte(pmTimeEntries.spentOn, new Date(input.endDate)));
       return db.select({

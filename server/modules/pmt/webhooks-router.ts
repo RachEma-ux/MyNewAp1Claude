@@ -17,7 +17,7 @@ export const webhooksRouter = router({
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmWebhooks)
-        .where(eq(pmWebhooks.wsId))
+        .where(eq(pmWebhooks.workspaceId, wsId))
         .orderBy(desc(pmWebhooks.createdAt));
     }),
 
@@ -61,24 +61,24 @@ export const webhooksRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmWebhooks)
-        .where(and(eq(pmWebhooks.id, input.id), eq(pmWebhooks.wsId)));
+        .where(and(eq(pmWebhooks.id, input.id), eq(pmWebhooks.workspaceId, wsId)));
       return { success: true };
     }),
 
   test: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmWebhooks)
-        .where(and(eq(pmWebhooks.id, input.id), eq(pmWebhooks.wsId)))
+        .where(and(eq(pmWebhooks.id, input.id), eq(pmWebhooks.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Webhook not found" });
       const webhook = rows[0];

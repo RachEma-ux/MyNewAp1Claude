@@ -73,7 +73,7 @@ export function PMTProjectSettingsPage() {
     });
   };
 
-  const basePath = `/w/${}/projects/config`;
+  const basePath = `/pm/projects/config`;
   const configLinks = [
     { label: "Work Item Types", icon: Tags, description: "Configure task types, colors, and icons", path: `${basePath}/types` },
     { label: "Statuses", icon: CircleDot, description: "Manage workflow statuses and ordering", path: `${basePath}/statuses` },

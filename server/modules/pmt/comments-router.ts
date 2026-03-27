@@ -20,7 +20,7 @@ export const commentsRouter = router({
       return db.select().from(pmComments)
         .where(and(
           eq(pmComments.workItemId, input.workItemId),
-          eq(pmComments.wsId),
+          eq(pmComments.workspaceId, wsId),
         ))
         .orderBy(asc(pmComments.createdAt));
     }),
@@ -75,20 +75,20 @@ export const commentsRouter = router({
         content: input.content,
         mentions: mentions.length > 0 ? mentions : null,
         updatedAt: new Date(),
-      }).where(and(eq(pmComments.id, input.id), eq(pmComments.wsId)));
+      }).where(and(eq(pmComments.id, input.id), eq(pmComments.workspaceId, wsId)));
 
       return { success: true };
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       await db.delete(pmComments)
-        .where(and(eq(pmComments.id, input.id), eq(pmComments.wsId)));
+        .where(and(eq(pmComments.id, input.id), eq(pmComments.workspaceId, wsId)));
 
       return { success: true };
     }),

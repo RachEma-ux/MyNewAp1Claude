@@ -95,7 +95,7 @@ export function PMTProjectDetailPage() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-3">
-        <Link href={`/w/${}/projects`}>
+        <Link href={`/pm/projects`}>
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />
           </Button>

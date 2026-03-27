@@ -18,7 +18,7 @@ const fieldsRouter = router({
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmCustomFields)
-        .where(eq(pmCustomFields.wsId))
+        .where(eq(pmCustomFields.workspaceId, wsId))
         .orderBy(asc(pmCustomFields.position));
     }),
 
@@ -67,14 +67,14 @@ const fieldsRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmCustomValues).where(eq(pmCustomValues.fieldId, input.id));
       await db.delete(pmCustomFields)
-        .where(and(eq(pmCustomFields.id, input.id), eq(pmCustomFields.wsId)));
+        .where(and(eq(pmCustomFields.id, input.id), eq(pmCustomFields.workspaceId, wsId)));
       return { success: true };
     }),
 });
@@ -88,7 +88,7 @@ const valuesRouter = router({
       return db.select().from(pmCustomValues)
         .where(and(
           eq(pmCustomValues.workItemId, input.workItemId),
-          eq(pmCustomValues.wsId),
+          eq(pmCustomValues.workspaceId, wsId),
         ));
     }),
 

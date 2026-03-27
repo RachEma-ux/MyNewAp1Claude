@@ -20,7 +20,7 @@ export const baselinesRouter = router({
       if (!db) return [];
       return db.select().from(pmBaselines)
         .where(and(
-          eq(pmBaselines.wsId),
+          eq(pmBaselines.workspaceId, wsId),
           eq(pmBaselines.projectId, input.projectId),
         ))
         .orderBy(desc(pmBaselines.createdAt));
@@ -38,7 +38,7 @@ export const baselinesRouter = router({
       // Capture snapshot of all tasks in the project
       const items = await db.select().from(tasks).where(and(
         eq(tasks.projectId, input.projectId),
-        eq(tasks.wsId),
+        eq(tasks.workspaceId, wsId),
       ));
       const [created] = await db.insert(pmBaselines).values({
         workspaceId: wsId,
@@ -51,12 +51,12 @@ export const baselinesRouter = router({
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmBaselines)
-        .where(and(eq(pmBaselines.id, input.id), eq(pmBaselines.wsId)))
+        .where(and(eq(pmBaselines.id, input.id), eq(pmBaselines.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Baseline not found" });
       return rows[0];

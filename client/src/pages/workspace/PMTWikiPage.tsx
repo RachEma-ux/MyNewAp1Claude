@@ -27,7 +27,7 @@ export function PMTWikiPage() {
   const { data: projects } = trpc.modules.pmt.projects.list.useQuery();
   const projectId = selectedProject || projects?.[0]?.id;
 
-  const storageKey = `${STORAGE_PREFIX}${}-${projectId || "none"}`;
+  const storageKey = `${STORAGE_PREFIX}pm-${projectId || "none"}`;
 
   // Load from localStorage when project changes
   useEffect(() => {

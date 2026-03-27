@@ -17,7 +17,7 @@ export const discussionsRouter = router({
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmDiscussions.wsId)];
+      const conditions = [eq(pmDiscussions.workspaceId, wsId)];
       if (input.projectId) conditions.push(eq(pmDiscussions.projectId, input.projectId));
       return db.select().from(pmDiscussions)
         .where(and(...conditions))
@@ -25,12 +25,12 @@ export const discussionsRouter = router({
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmDiscussions)
-        .where(and(eq(pmDiscussions.id, input.id), eq(pmDiscussions.wsId)))
+        .where(and(eq(pmDiscussions.id, input.id), eq(pmDiscussions.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Discussion not found" });
       return rows[0];
@@ -71,7 +71,7 @@ export const discussionsRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
@@ -84,13 +84,13 @@ export const discussionsRouter = router({
         await db.delete(pmDiscussionPosts).where(inArray(pmDiscussionPosts.id, posts.map(p => p.id)));
       }
       await db.delete(pmDiscussions)
-        .where(and(eq(pmDiscussions.id, input.id), eq(pmDiscussions.wsId)));
+        .where(and(eq(pmDiscussions.id, input.id), eq(pmDiscussions.workspaceId, wsId)));
       return { success: true };
     }),
 
   posts: router({
     list: protectedProcedure
-      .input(z.object({ discussionId: z.number(): z.number().optional() }))
+      .input(z.object({ discussionId: z.number().optional() }))
       .query(async ({ input }) => {
         const db = getDb();
         if (!db) return [];
@@ -131,7 +131,7 @@ export const discussionsRouter = router({
       }),
 
     delete: governedProcedure
-      .input(z.object({ id: z.number(): z.number() }))
+      .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });

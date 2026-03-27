@@ -17,7 +17,7 @@ export const newsRouter = router({
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmNews.wsId)];
+      const conditions = [eq(pmNews.workspaceId, wsId)];
       if (input.projectId) conditions.push(eq(pmNews.projectId, input.projectId));
       return db.select().from(pmNews)
         .where(and(...conditions))
@@ -25,12 +25,12 @@ export const newsRouter = router({
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmNews)
-        .where(and(eq(pmNews.id, input.id), eq(pmNews.wsId)))
+        .where(and(eq(pmNews.id, input.id), eq(pmNews.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "News item not found" });
       return rows[0];
@@ -75,13 +75,13 @@ export const newsRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmNews)
-        .where(and(eq(pmNews.id, input.id), eq(pmNews.wsId)));
+        .where(and(eq(pmNews.id, input.id), eq(pmNews.workspaceId, wsId)));
       return { success: true };
     }),
 });

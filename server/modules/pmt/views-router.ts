@@ -20,7 +20,7 @@ export const viewsRouter = router({
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmSavedViews.wsId)];
+      const conditions = [eq(pmSavedViews.workspaceId, wsId)];
       if (input.projectId) conditions.push(eq(pmSavedViews.projectId, input.projectId));
       if (input.viewType) conditions.push(eq(pmSavedViews.viewType, input.viewType));
       return db.select().from(pmSavedViews)
@@ -29,12 +29,12 @@ export const viewsRouter = router({
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmSavedViews)
-        .where(and(eq(pmSavedViews.id, input.id), eq(pmSavedViews.wsId)))
+        .where(and(eq(pmSavedViews.id, input.id), eq(pmSavedViews.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "View not found" });
       return rows[0];
@@ -84,13 +84,13 @@ export const viewsRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmSavedViews)
-        .where(and(eq(pmSavedViews.id, input.id), eq(pmSavedViews.wsId)));
+        .where(and(eq(pmSavedViews.id, input.id), eq(pmSavedViews.workspaceId, wsId)));
       return { success: true };
     }),
 });

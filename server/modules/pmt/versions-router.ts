@@ -19,19 +19,19 @@ export const versionsRouter = router({
       if (!db) return [];
       return db.select().from(pmVersions)
         .where(and(
-          eq(pmVersions.wsId),
+          eq(pmVersions.workspaceId, wsId),
           eq(pmVersions.projectId, input.projectId),
         ))
         .orderBy(desc(pmVersions.createdAt));
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmVersions)
-        .where(and(eq(pmVersions.id, input.id), eq(pmVersions.wsId)))
+        .where(and(eq(pmVersions.id, input.id), eq(pmVersions.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" });
       return rows[0];
@@ -84,13 +84,13 @@ export const versionsRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmVersions)
-        .where(and(eq(pmVersions.id, input.id), eq(pmVersions.wsId)));
+        .where(and(eq(pmVersions.id, input.id), eq(pmVersions.workspaceId, wsId)));
       return { success: true };
     }),
 });

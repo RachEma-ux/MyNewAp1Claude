@@ -119,7 +119,7 @@ export function PMTMeetingsPage() {
                 <TableRow key={m.id} className="cursor-pointer hover:bg-muted/50">
                   <TableCell>
                     <Link
-                      href={`/workspaces/${}/projects/meetings/${m.id}`}
+                      href={`/pm/projects/meetings/${m.id}`}
                       className="font-medium hover:underline"
                     >
                       {m.title}

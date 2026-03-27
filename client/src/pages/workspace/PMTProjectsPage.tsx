@@ -84,7 +84,7 @@ export function PMTProjectsPage() {
       {projects && projects.length > 0 ? (
         <div className="grid gap-3">
           {projects.map((p) => (
-            <Link key={p.id} href={`/w/${}/projects/${p.id}`}>
+            <Link key={p.id} href={`/pm/projects/${p.id}`}>
               <Card className="cursor-pointer hover:border-primary/50 transition-colors">
                 <CardContent className="flex items-center gap-3 py-4 overflow-hidden">
                   <div className="min-w-0 flex-1">

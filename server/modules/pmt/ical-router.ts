@@ -20,7 +20,7 @@ export const icalRouter = router({
       const db = getDb();
       if (!db) return "";
       const conditions = [
-        eq(tasks.wsId),
+        eq(tasks.workspaceId, wsId),
         isNotNull(tasks.dueDate),
       ];
       if (input.projectId) conditions.push(eq(tasks.projectId, input.projectId));

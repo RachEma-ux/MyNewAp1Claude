@@ -20,19 +20,19 @@ export const sprintsRouter = router({
       if (!db) return [];
       return db.select().from(pmSprints)
         .where(and(
-          eq(pmSprints.wsId),
+          eq(pmSprints.workspaceId, wsId),
           eq(pmSprints.projectId, input.projectId),
         ))
         .orderBy(desc(pmSprints.startDate));
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmSprints)
-        .where(and(eq(pmSprints.id, input.id), eq(pmSprints.wsId)))
+        .where(and(eq(pmSprints.id, input.id), eq(pmSprints.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Sprint not found" });
       return rows[0];
@@ -82,32 +82,32 @@ export const sprintsRouter = router({
     }),
 
   start: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       // Get the sprint to find its project
       const rows = await db.select().from(pmSprints)
-        .where(and(eq(pmSprints.id, input.id), eq(pmSprints.wsId)))
+        .where(and(eq(pmSprints.id, input.id), eq(pmSprints.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Sprint not found" });
       // Validate no other active sprint in same project
       const active = await db.select().from(pmSprints)
         .where(and(
           eq(pmSprints.projectId, rows[0].projectId),
-          eq(pmSprints.wsId),
+          eq(pmSprints.workspaceId, wsId),
           eq(pmSprints.status, "active"),
         ))
         .limit(1);
       if (active.length > 0) throw new TRPCError({ code: "CONFLICT", message: "Another sprint is already active in this project" });
       await db.update(pmSprints).set({ status: "active" })
-        .where(and(eq(pmSprints.id, input.id), eq(pmSprints.wsId)));
+        .where(and(eq(pmSprints.id, input.id), eq(pmSprints.workspaceId, wsId)));
       return { success: true };
     }),
 
   close: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
@@ -122,7 +122,7 @@ export const sprintsRouter = router({
         ));
       const velocity = result[0]?.totalPoints ?? 0;
       await db.update(pmSprints).set({ status: "closed", velocity })
-        .where(and(eq(pmSprints.id, input.id), eq(pmSprints.wsId)));
+        .where(and(eq(pmSprints.id, input.id), eq(pmSprints.workspaceId, wsId)));
       return { success: true, velocity };
     }),
 
@@ -137,7 +137,7 @@ export const sprintsRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { inArray } = await import("drizzle-orm");
       await db.update(tasks).set({ sprintId: input.sprintId, updatedAt: new Date() })
-        .where(and(inArray(tasks.id, input.taskIds), eq(tasks.wsId)));
+        .where(and(inArray(tasks.id, input.taskIds), eq(tasks.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -155,7 +155,7 @@ export const sprintsRouter = router({
         .where(and(
           inArray(tasks.id, input.taskIds),
           eq(tasks.sprintId, input.sprintId),
-          eq(tasks.wsId),
+          eq(tasks.workspaceId, wsId),
         ));
       return { success: true };
     }),
@@ -166,7 +166,7 @@ export const sprintsRouter = router({
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const sprintRows = await db.select().from(pmSprints)
-        .where(and(eq(pmSprints.id, input.sprintId), eq(pmSprints.wsId)))
+        .where(and(eq(pmSprints.id, input.sprintId), eq(pmSprints.workspaceId, wsId)))
         .limit(1);
       if (!sprintRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Sprint not found" });
       const sprintTasks = await db.select().from(tasks)

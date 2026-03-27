@@ -20,7 +20,7 @@ export const watchersRouter = router({
       return db.select().from(pmWatchers)
         .where(and(
           eq(pmWatchers.workItemId, input.workItemId),
-          eq(pmWatchers.wsId),
+          eq(pmWatchers.workspaceId, wsId),
         ));
     }),
 
@@ -57,7 +57,7 @@ export const watchersRouter = router({
         .where(and(
           eq(pmWatchers.workItemId, input.workItemId),
           eq(pmWatchers.userId, input.userId),
-          eq(pmWatchers.wsId),
+          eq(pmWatchers.workspaceId, wsId),
         ));
 
       return { success: true };

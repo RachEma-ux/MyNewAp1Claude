@@ -17,7 +17,7 @@ export const activityTypesRouter = router({
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmActivityTypes)
-        .where(eq(pmActivityTypes.wsId))
+        .where(eq(pmActivityTypes.workspaceId, wsId))
         .orderBy(asc(pmActivityTypes.position));
     }),
 
@@ -57,13 +57,13 @@ export const activityTypesRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmActivityTypes)
-        .where(and(eq(pmActivityTypes.id, input.id), eq(pmActivityTypes.wsId)));
+        .where(and(eq(pmActivityTypes.id, input.id), eq(pmActivityTypes.workspaceId, wsId)));
       return { success: true };
     }),
 });

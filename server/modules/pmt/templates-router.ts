@@ -600,17 +600,17 @@ const projectTemplatesRouter = router({
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmProjectTemplates)
-        .where(eq(pmProjectTemplates.wsId))
+        .where(eq(pmProjectTemplates.workspaceId, wsId))
         .orderBy(desc(pmProjectTemplates.createdAt));
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmProjectTemplates)
-        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.wsId)))
+        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project template not found" });
       return rows[0];
@@ -653,25 +653,25 @@ const projectTemplatesRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmProjectTemplates)
-        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.wsId)));
+        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.workspaceId, wsId)));
       return { success: true };
     }),
 
   /** Apply a DB-stored template to create a project */
   useTemplate: governedProcedure
-    .input(z.object({ id: z.number(): z.number(), name: z.string().min(1).max(255) }))
+    .input(z.object({ id: z.number(), name: z.string().min(1).max(255) }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmProjectTemplates)
-        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.wsId)))
+        .where(and(eq(pmProjectTemplates.id, input.id), eq(pmProjectTemplates.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Project template not found" });
       return applyTemplateData(db, ctx.user.id, wsId, input.name, rows[0].templateData as Record<string, unknown>);
@@ -821,17 +821,17 @@ const workItemTemplatesRouter = router({
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmWorkItemTemplates)
-        .where(eq(pmWorkItemTemplates.wsId))
+        .where(eq(pmWorkItemTemplates.workspaceId, wsId))
         .orderBy(desc(pmWorkItemTemplates.createdAt));
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmWorkItemTemplates)
-        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.wsId)))
+        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Work item template not found" });
       return rows[0];
@@ -877,24 +877,24 @@ const workItemTemplatesRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmWorkItemTemplates)
-        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.wsId)));
+        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.workspaceId, wsId)));
       return { success: true };
     }),
 
   useTemplate: governedProcedure
-    .input(z.object({ id: z.number(): z.number(), projectId: z.number() }))
+    .input(z.object({ id: z.number(), projectId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmWorkItemTemplates)
-        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.wsId)))
+        .where(and(eq(pmWorkItemTemplates.id, input.id), eq(pmWorkItemTemplates.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Work item template not found" });
       const tpl = rows[0].templateData as Record<string, unknown>;

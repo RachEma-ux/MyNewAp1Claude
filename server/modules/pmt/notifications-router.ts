@@ -16,7 +16,7 @@ export const notificationsRouter = router({
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmNotifications.wsId)];
+      const conditions = [eq(pmNotifications.workspaceId, wsId)];
       if (input.unreadOnly) conditions.push(isNull(pmNotifications.readAt));
       return db.select().from(pmNotifications)
         .where(and(...conditions))
@@ -24,12 +24,12 @@ export const notificationsRouter = router({
     }),
 
   markRead: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.update(pmNotifications).set({ readAt: new Date() })
-        .where(and(eq(pmNotifications.id, input.id), eq(pmNotifications.wsId)));
+        .where(and(eq(pmNotifications.id, input.id), eq(pmNotifications.workspaceId, wsId)));
       return { success: true };
     }),
 
@@ -39,7 +39,7 @@ export const notificationsRouter = router({
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.update(pmNotifications).set({ readAt: new Date() })
-        .where(and(eq(pmNotifications.wsId), isNull(pmNotifications.readAt)));
+        .where(and(eq(pmNotifications.workspaceId, wsId), isNull(pmNotifications.readAt)));
       return { success: true };
     }),
 });

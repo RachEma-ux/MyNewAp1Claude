@@ -16,7 +16,7 @@ export const gitRouter = router({
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmGitReferences.wsId)];
+      const conditions = [eq(pmGitReferences.workspaceId, wsId)];
       if (input.workItemId) conditions.push(eq(pmGitReferences.workItemId, input.workItemId));
       return db.select().from(pmGitReferences)
         .where(and(...conditions))
@@ -51,13 +51,13 @@ export const gitRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmGitReferences)
-        .where(and(eq(pmGitReferences.id, input.id), eq(pmGitReferences.wsId)));
+        .where(and(eq(pmGitReferences.id, input.id), eq(pmGitReferences.workspaceId, wsId)));
       return { success: true };
     }),
 });

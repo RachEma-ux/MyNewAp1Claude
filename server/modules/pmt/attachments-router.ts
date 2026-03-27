@@ -20,7 +20,7 @@ export const attachmentsRouter = router({
       return db.select().from(pmAttachments)
         .where(and(
           eq(pmAttachments.workItemId, input.workItemId),
-          eq(pmAttachments.wsId),
+          eq(pmAttachments.workspaceId, wsId),
         ))
         .orderBy(desc(pmAttachments.createdAt));
     }),
@@ -52,14 +52,14 @@ export const attachmentsRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       await db.delete(pmAttachments)
-        .where(and(eq(pmAttachments.id, input.id), eq(pmAttachments.wsId)));
+        .where(and(eq(pmAttachments.id, input.id), eq(pmAttachments.workspaceId, wsId)));
 
       return { success: true };
     }),

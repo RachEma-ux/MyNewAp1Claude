@@ -116,7 +116,7 @@ export function PMTDiscussionsPage() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/workspaces/${}/projects/discussions/${d.id}`}
+                        href={`/pm/projects/discussions/${d.id}`}
                         className="font-medium hover:underline"
                       >
                         {d.title}

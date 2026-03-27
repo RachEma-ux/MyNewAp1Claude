@@ -16,7 +16,7 @@ export const budgetsRouter = router({
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) return [];
-      const conditions = [eq(pmBudgets.wsId)];
+      const conditions = [eq(pmBudgets.workspaceId, wsId)];
       if (input.projectId) conditions.push(eq(pmBudgets.projectId, input.projectId));
       return db.select().from(pmBudgets)
         .where(and(...conditions))
@@ -24,12 +24,12 @@ export const budgetsRouter = router({
     }),
 
   get: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmBudgets)
-        .where(and(eq(pmBudgets.id, input.id), eq(pmBudgets.wsId)))
+        .where(and(eq(pmBudgets.id, input.id), eq(pmBudgets.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Budget not found" });
       return rows[0];
@@ -76,24 +76,24 @@ export const budgetsRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmBudgets)
-        .where(and(eq(pmBudgets.id, input.id), eq(pmBudgets.wsId)));
+        .where(and(eq(pmBudgets.id, input.id), eq(pmBudgets.workspaceId, wsId)));
       return { success: true };
     }),
 
   variance: protectedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       // Get budget
       const budgetRows = await db.select().from(pmBudgets)
-        .where(and(eq(pmBudgets.id, input.id), eq(pmBudgets.wsId)))
+        .where(and(eq(pmBudgets.id, input.id), eq(pmBudgets.workspaceId, wsId)))
         .limit(1);
       if (!budgetRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Budget not found" });
       const budget = budgetRows[0];
@@ -103,7 +103,7 @@ export const budgetsRouter = router({
       }).from(pmTimeEntries)
         .where(and(
           eq(pmTimeEntries.projectId, budget.projectId),
-          eq(pmTimeEntries.wsId),
+          eq(pmTimeEntries.workspaceId, wsId),
         ));
       // Actual cost units for this project
       const costResult = await db.select({
@@ -112,7 +112,7 @@ export const budgetsRouter = router({
       }).from(pmCostEntries)
         .where(and(
           eq(pmCostEntries.projectId, budget.projectId),
-          eq(pmCostEntries.wsId),
+          eq(pmCostEntries.workspaceId, wsId),
         ));
       const actualHours = laborResult[0]?.actualHours ?? 0;
       const actualUnits = costResult[0]?.actualUnits ?? 0;

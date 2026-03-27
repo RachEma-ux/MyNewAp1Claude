@@ -18,7 +18,7 @@ export const customActionsRouter = router({
       const db = getDb();
       if (!db) return [];
       return db.select().from(pmCustomActions)
-        .where(eq(pmCustomActions.wsId))
+        .where(eq(pmCustomActions.workspaceId, wsId))
         .orderBy(pmCustomActions.position);
     }),
 
@@ -64,31 +64,31 @@ export const customActionsRouter = router({
     }),
 
   delete: governedProcedure
-    .input(z.object({ id: z.number(): z.number() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(pmCustomActions)
-        .where(and(eq(pmCustomActions.id, input.id), eq(pmCustomActions.wsId)));
+        .where(and(eq(pmCustomActions.id, input.id), eq(pmCustomActions.workspaceId, wsId)));
       return { success: true };
     }),
 
   execute: governedProcedure
-    .input(z.object({ id: z.number(): z.number(), taskId: z.number() }))
+    .input(z.object({ id: z.number(), taskId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const wsId = await getShellWorkspaceId(ctx.user.id);
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(pmCustomActions)
-        .where(and(eq(pmCustomActions.id, input.id), eq(pmCustomActions.wsId)))
+        .where(and(eq(pmCustomActions.id, input.id), eq(pmCustomActions.workspaceId, wsId)))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Custom action not found" });
       const changes = rows[0].changes as Record<string, unknown>;
       const setValues: Record<string, unknown> = { ...changes, updatedAt: new Date() };
       if (changes.status === "done") setValues.completedAt = new Date();
       await db.update(tasks).set(setValues)
-        .where(and(eq(tasks.id, input.taskId), eq(tasks.wsId)));
+        .where(and(eq(tasks.id, input.taskId), eq(tasks.workspaceId, wsId)));
       return { success: true };
     }),
 });
