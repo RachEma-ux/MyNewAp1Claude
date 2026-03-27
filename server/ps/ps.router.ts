@@ -1004,6 +1004,12 @@ const lifecycleRouter = router({
       return lifecycle.rejectPSProject(input.projectId, ctx.user.id);
     }),
 
+  publish: governedProcedure
+    .input(lifecycleIdInput)
+    .mutation(async ({ ctx, input }) => {
+      return lifecycle.publishPSProject(input.projectId, ctx.user.id);
+    }),
+
   sendToPM: governedProcedure
     .input(lifecycleIdInput)
     .mutation(async ({ ctx, input }) => {

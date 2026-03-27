@@ -4,7 +4,7 @@
  * Admin actions for the PS validation queue. Builds on the existing
  * lifecycle state machine (ps.lifecycle.ts):
  *
- *   DRAFT → SUBMITTED → VALIDATED → SENT_TO_PM
+ *   DRAFT → SUBMITTED → VALIDATED → PUBLISHED | SENT_TO_PM
  *                      → REJECTED
  *
  * This module adds:
@@ -180,11 +180,11 @@ export async function overridePSProjectScope(
     throw new TRPCError({ code: "NOT_FOUND", message: "PS project not found" });
   }
 
-  // Cannot override after handoff to PM
-  if (project.status === "SENT_TO_PM") {
+  // Cannot override after publish or handoff to PM
+  if (project.status === "PUBLISHED" || project.status === "SENT_TO_PM") {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: "Cannot override scope after project has been sent to PM Central.",
+      message: "Cannot override scope after project has been published or sent to PM Central.",
     });
   }
 

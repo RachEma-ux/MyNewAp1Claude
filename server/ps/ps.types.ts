@@ -11,6 +11,7 @@ export const PS_PROJECT_STATUSES = [
   "SUBMITTED",
   "VALIDATED",
   "REJECTED",
+  "PUBLISHED",
   "SENT_TO_PM",
 ] as const;
 export type PsProjectStatus = (typeof PS_PROJECT_STATUSES)[number];
@@ -18,8 +19,9 @@ export type PsProjectStatus = (typeof PS_PROJECT_STATUSES)[number];
 export const PS_PROJECT_TRANSITIONS: Record<PsProjectStatus, PsProjectStatus[]> = {
   DRAFT:      ["SUBMITTED"],
   SUBMITTED:  ["VALIDATED", "REJECTED"],
-  VALIDATED:  ["SENT_TO_PM"],
+  VALIDATED:  ["PUBLISHED", "SENT_TO_PM"],
   REJECTED:   [],
+  PUBLISHED:  [],
   SENT_TO_PM: [],
 };
 

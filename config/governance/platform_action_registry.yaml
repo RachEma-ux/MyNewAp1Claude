@@ -2406,6 +2406,14 @@ actions:
     approval: none
     evidence: { required: false }
 
+  ps.project.publish:
+    domain: ps
+    risk: R2
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   ps.project.sendToPM:
     domain: ps
     risk: R2

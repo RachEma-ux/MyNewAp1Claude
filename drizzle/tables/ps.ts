@@ -542,7 +542,7 @@ export const psProjects = pgTable("ps_projects", {
   matrixVersionId: integer("matrix_version_id"),
   templateBundleJson: json("template_bundle_json").$type<Record<string, unknown>>(),
   wizardRunId: integer("wizard_run_id"),
-  status: varchar("status", { length: 30 }).default("DRAFT").notNull(), // DRAFT | SUBMITTED | VALIDATED | REJECTED | SENT_TO_PM
+  status: varchar("status", { length: 30 }).default("DRAFT").notNull(), // DRAFT | SUBMITTED | VALIDATED | REJECTED | PUBLISHED | SENT_TO_PM
   /** Admin validation note (approve/reject reason) */
   validationNote: text("validation_note"),
   /** Who validated (approved/rejected) this project */

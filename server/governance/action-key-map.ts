@@ -373,6 +373,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "ps.lifecycle.submit": "ps.project.submit",
   "ps.lifecycle.validate": "ps.project.validate",
   "ps.lifecycle.reject": "ps.project.reject",
+  "ps.lifecycle.publish": "ps.project.publish",
   "ps.lifecycle.sendToPM": "ps.project.sendToPM",
   "ps.governance.approve": "ps.project.validate",
   "ps.governance.reject": "ps.project.reject",

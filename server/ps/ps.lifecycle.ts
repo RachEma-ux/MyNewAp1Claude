@@ -1,14 +1,15 @@
 /**
  * PS Project Lifecycle — Strict state machine for PS projects.
  *
- * States: DRAFT → SUBMITTED → VALIDATED → SENT_TO_PM
- *                            → REJECTED
+ * States: DRAFT → SUBMITTED → VALIDATED → PUBLISHED
+ *                            → REJECTED   → SENT_TO_PM
  *
  * Rules:
  *   DRAFT      → SUBMITTED
  *   SUBMITTED  → VALIDATED | REJECTED
- *   VALIDATED  → SENT_TO_PM
+ *   VALIDATED  → PUBLISHED | SENT_TO_PM
  *   REJECTED   → (terminal)
+ *   PUBLISHED  → (terminal)
  *   SENT_TO_PM → (terminal)
  */
 
@@ -91,6 +92,10 @@ export async function validatePSProject(projectId: number, actorId: number) {
 
 export async function rejectPSProject(projectId: number, actorId: number) {
   return transitionProject(projectId, "REJECTED", actorId);
+}
+
+export async function publishPSProject(projectId: number, actorId: number) {
+  return transitionProject(projectId, "PUBLISHED", actorId);
 }
 
 export async function sendToPMCentral(projectId: number, actorId: number) {
