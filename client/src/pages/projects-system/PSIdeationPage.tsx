@@ -1,13 +1,21 @@
 /**
  * PS Ideation — List Page
  *
- * Shows all ideation records for the current workspace, with create button.
+ * Shows all ideation records for the current workspace, with create dialog.
  */
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -49,6 +57,8 @@ export function PSIdeationPage() {
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
 
   const { data: ideations, isLoading } = trpc.ps.ideation.list.useQuery(
     { workspaceId: DEFAULT_WORKSPACE_ID },
@@ -57,15 +67,16 @@ export function PSIdeationPage() {
   const createMut = trpc.ps.ideation.create.useMutation({
     onSuccess: (data) => {
       toast.success("Ideation created");
+      setDialogOpen(false);
+      setNewTitle("");
       navigate(`/ps/ideation/${data.id}`);
     },
     onError: (e) => toast.error(e.message),
   });
 
   const handleCreate = () => {
-    const title = prompt("Ideation title:");
-    if (!title?.trim()) return;
-    createMut.mutate({ workspaceId: DEFAULT_WORKSPACE_ID, title: title.trim() });
+    if (!newTitle.trim()) return;
+    createMut.mutate({ workspaceId: DEFAULT_WORKSPACE_ID, title: newTitle.trim() });
   };
 
   const filtered = (ideations || []).filter((i: any) => {
@@ -90,14 +101,14 @@ export function PSIdeationPage() {
             PS Ideation
           </h1>
         </div>
-        <Button onClick={handleCreate} disabled={createMut.isPending} size="sm">
-          {createMut.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+        <Button onClick={() => setDialogOpen(true)} size="sm">
+          <Plus className="w-4 h-4 mr-1" />
           New Ideation
         </Button>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -155,6 +166,39 @@ export function PSIdeationPage() {
           ))}
         </div>
       )}
+
+      {/* Create Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Ideation</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label htmlFor="ideation-title">Title</Label>
+              <Input
+                id="ideation-title"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="Enter ideation title..."
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newTitle.trim()) handleCreate();
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={createMut.isPending || !newTitle.trim()}>
+              {createMut.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
