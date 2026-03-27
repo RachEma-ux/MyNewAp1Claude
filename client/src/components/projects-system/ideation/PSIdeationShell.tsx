@@ -158,8 +158,8 @@ export function PSIdeationShell({ ideationId }: Props) {
   // Local state
   const currentStepKey = (ideation?.currentStepKey as IdeationStepKey) || "context";
   const isConverted = ideation?.lifecycleStatus === "converted";
-  const [railOpen, setRailOpen] = useState(true);
-  const [insightOpen, setInsightOpen] = useState(true);
+  const [railOpen, setRailOpen] = useState(false);
+  const [insightOpen, setInsightOpen] = useState(false);
 
   const handleStepClick = (stepKey: IdeationStepKey) => {
     setCurrentStepMut.mutate({ id: ideationId, stepKey });

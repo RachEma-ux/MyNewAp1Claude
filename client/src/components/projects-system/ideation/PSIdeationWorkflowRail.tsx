@@ -42,7 +42,7 @@ function getStepStatus(steps: StepState[], key: string): IdeationStepStatus {
 
 export function PSIdeationWorkflowRail({ steps, currentStep, onStepClick, isConverted, onCollapse }: Props) {
   return (
-    <nav className="w-56 shrink-0 border-r border-border overflow-y-auto py-2 flex flex-col">
+    <nav className="w-44 shrink-0 border-r border-border overflow-y-auto py-2 flex flex-col">
       {/* Collapse button */}
       {onCollapse && (
         <div className="flex justify-end px-2 mb-1">

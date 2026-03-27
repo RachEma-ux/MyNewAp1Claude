@@ -29,7 +29,7 @@ interface Props {
 
 export function PSIdeationInsightPanel({ readiness, activity, isLoading, onCollapse }: Props) {
   return (
-    <aside className="w-64 shrink-0 border-l border-border overflow-y-auto p-3 space-y-4">
+    <aside className="w-48 shrink-0 border-l border-border overflow-y-auto p-2 space-y-3">
       {onCollapse && (
         <div className="flex justify-start">
           <Button variant="ghost" size="sm" onClick={onCollapse} title="Collapse panel" className="h-6 w-6 p-0">
