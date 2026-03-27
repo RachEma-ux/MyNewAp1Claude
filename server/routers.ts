@@ -48,6 +48,7 @@ import { workforceAssignmentRouter } from "./workforce-assignment/router";
 import { organizationManagementRouter } from "./organization-management/router";
 import { cultureValuesRouter } from "./culture-values/router";
 import { psRouter } from "./ps/ps.router";
+import { dataAnalysisRouter } from "./data-analysis/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -95,6 +96,7 @@ export const appRouter = router({
   orchestrator: orchestratorRouter, // Multi-Operator Autonomous Runtime
   models: modelsRouter, // Model Registry (governed)
   bots: botsRouter, // Bot Domain (governed lifecycle)
+  dataAnalysis: dataAnalysisRouter, // Data Analysis — GraphRAG engine + future analytical tools
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

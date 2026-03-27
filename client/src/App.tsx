@@ -177,6 +177,8 @@ const MethodesPage = lazy(() => import("@/pages/pm-central/MethodesPage"));
 const ShellClonePage = lazy(() => import("@/pages/pm-central/ShellClonePage"));
 const AgentRunDetailPanel = lazy(() => import("@/pages/pm-central/AgentRunDetailPanel"));
 const IdeaBuilderWizard = lazy(() => import("@/pages/pm-central/IdeaBuilderWizard"));
+// Data Analysis — GraphRAG
+const GraphRAGPage = lazy(() => import("@/pages/data-analysis/GraphRAGPage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -538,6 +540,9 @@ function Router() {
       {/* PM Central — Top-level views */}
       <Route path="/pm-central/:item" component={() => <ProtectedRoute component={PMCentralPage} />} />
       <Route path="/pm-central" component={() => <ProtectedRoute component={PMCentralPage} />} />
+      {/* Data Analysis — GraphRAG */}
+      <Route path="/data-analysis/graphrag" component={() => <ProtectedRoute component={GraphRAGPage} />} />
+      <Route path="/data-analysis" component={() => <Redirect to="/data-analysis/graphrag" />} />
       {/* UI Showcase — living documentation for shared components */}
       <Route path="/ui-showcase" component={() => <ProtectedRoute component={UIShowcasePage} />} />
       <Route path="/404" component={NotFound} />

@@ -77,6 +77,7 @@ import {
   Award,
   ClipboardList,
   Lightbulb,
+  BrainCircuit,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -111,6 +112,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [omMenuOpen, setOmMenuOpen] = useState(false);
   const [cvMenuOpen, setCvMenuOpen] = useState(false);
   const [psMenuOpen, setPsMenuOpen] = useState(false);
+  const [dataAnalysisMenuOpen, setDataAnalysisMenuOpen] = useState(false);
   const [aiTypesSubMenus, setAiTypesSubMenus] = useState<Record<string, boolean>>({});
   const hrRole = useHrRole();
   const logoutMutation = trpc.auth.logout.useMutation();
@@ -282,6 +284,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
       ],
     },
     {
+      label: "Data Analysis",
+      icon: <BrainCircuit className="w-5 h-5" />,
+      children: [
+        { label: "GraphRAG", icon: <BrainCircuit className="w-4 h-4" />, href: "/data-analysis/graphrag" },
+      ],
+    },
+    {
       label: "Human Resources",
       icon: <Users className="w-5 h-5" />,
       children: HR_NAV_CONFIG.sections.map((section) => ({
@@ -406,6 +415,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setCvMenuOpen(!cvMenuOpen);
                       } else if (item.label === "Projects System") {
                         setPsMenuOpen(!psMenuOpen);
+                      } else if (item.label === "Data Analysis") {
+                        setDataAnalysisMenuOpen(!dataAnalysisMenuOpen);
                       }
                     }}
                     className="flex w-full items-center justify-between space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -414,10 +425,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Human Resources" && hrMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Human Resources" && hrMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) || (item.label === "Data Analysis" && dataAnalysisMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* Automation / Digital HQ menus (2-level) */}
-                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen)) && (
+                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) || (item.label === "Data Analysis" && dataAnalysisMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>

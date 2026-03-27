@@ -40,3 +40,4 @@ export * from './tables/workforce-assignment';
 export * from './tables/organization-management';
 export * from './tables/culture-values';
 export * from './tables/ps';
+export * from './tables/graphrag';

@@ -196,6 +196,10 @@ export default function DocumentsDashboard() {
               Delete {selectedIds.size} Selected
             </Button>
           )}
+          <Button variant="outline" onClick={() => setLocation("/data-analysis/graphrag")} className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Analyze with GraphRAG
+          </Button>
           <Button onClick={() => setLocation("/documents/upload")} className="gap-2">
             <Upload className="h-4 w-4" />
             Upload Document
