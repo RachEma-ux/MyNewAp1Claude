@@ -96,8 +96,12 @@ export default function PSWizardPage() {
   // Project CRUD
   const utils = trpc.useUtils();
   const createProjectMut = trpc.ps.projects.create.useMutation();
-  const validateMut = trpc.ps.projects.validate.useMutation();
-  const sendToPMMut = trpc.ps.projects.sendToPM.useMutation();
+
+  // Lifecycle transitions (existing server endpoints)
+  const submitMut = trpc.ps.lifecycle.submit.useMutation();
+  const sendToPMMut = trpc.ps.lifecycle.sendToPM.useMutation();
+
+  // Feedback
   const feedbackMut = trpc.ps.feedback.create.useMutation();
 
   // Fetch created project for post-creation steps
@@ -216,7 +220,7 @@ export default function PSWizardPage() {
   async function handleSubmitForValidation() {
     if (!createdProjectId) return;
     try {
-      await validateMut.mutateAsync({ id: createdProjectId, action: "submit" });
+      await submitMut.mutateAsync({ projectId: createdProjectId });
       await refetchProject();
     } catch (err: any) {
       setCreateError(err?.message || "Validation transition failed");
@@ -228,7 +232,7 @@ export default function PSWizardPage() {
   async function handleSendToPM() {
     if (!createdProjectId) return;
     try {
-      await sendToPMMut.mutateAsync({ id: createdProjectId });
+      await sendToPMMut.mutateAsync({ projectId: createdProjectId });
       await refetchProject();
     } catch (err: any) {
       setCreateError(err?.message || "PM handoff failed");
@@ -710,10 +714,10 @@ export default function PSWizardPage() {
                   <button
                     type="button"
                     onClick={handleSubmitForValidation}
-                    disabled={validateMut.isPending}
+                    disabled={submitMut.isPending}
                     className="rounded-xl bg-blue-600 px-4 py-2 font-medium disabled:opacity-40"
                   >
-                    {validateMut.isPending ? "Submitting..." : "Submit for Validation"}
+                    {submitMut.isPending ? "Submitting..." : "Submit for Validation"}
                   </button>
                 )}
 
