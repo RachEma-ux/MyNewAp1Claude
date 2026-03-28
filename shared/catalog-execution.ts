@@ -106,3 +106,50 @@ export function getDefaultReasoningLlmRef(
   const ref = agent.defaultReasoningLlmRef;
   return typeof ref === "string" && ref.length > 0 ? ref : null;
 }
+
+// ── Agent Reasoning Provider Reference ──────────────────────────────
+
+/**
+ * Extract the Default Reasoning Provider catalog entry reference from an
+ * agent's config. Returns the catalog entry ID as a string, or null.
+ *
+ * Stored at config.agent.defaultReasoningProviderRef.
+ */
+export function getDefaultReasoningProviderRef(
+  config: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!config) return null;
+  const agent = config.agent as Record<string, unknown> | undefined;
+  if (!agent) return null;
+  const ref = agent.defaultReasoningProviderRef;
+  return typeof ref === "string" && ref.length > 0 ? ref : null;
+}
+
+// ── Agent Reasoning Model Reference ─────────────────────────────────
+
+/**
+ * Extract the Default Reasoning Model identifier from an agent's config.
+ * This is a direct provider-model string (e.g. "gpt-4o"), used as
+ * fallback when no catalog LLM entry is selected.
+ *
+ * Stored at config.agent.defaultReasoningModel.
+ */
+export function getDefaultReasoningModel(
+  config: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!config) return null;
+  const agent = config.agent as Record<string, unknown> | undefined;
+  if (!agent) return null;
+  const ref = agent.defaultReasoningModel;
+  return typeof ref === "string" && ref.length > 0 ? ref : null;
+}
+
+// ── Entry Type Runtime Detection ────────────────────────────────────
+
+/** Entry types that are executable and may need runtime defaults */
+export const EXECUTABLE_ENTRY_TYPES = ["agent", "bot"] as const;
+
+/** Check if an entryType is executable (needs runtime provider/LLM/model) */
+export function isExecutableEntryType(entryType: string): boolean {
+  return (EXECUTABLE_ENTRY_TYPES as readonly string[]).includes(entryType);
+}

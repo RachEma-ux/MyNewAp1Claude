@@ -17,6 +17,7 @@ import { createCatalogEntry, createCatalogAuditEvent, getDb, getCatalogEntryById
 import { getProvidersByType, updateProvider } from "../providers/db";
 import { importAuditLogs } from "../../drizzle/schema";
 import type { BulkCreateResult, BulkCreateResultEntry } from "@shared/catalog-import-types";
+import { isExecutableEntryType } from "@shared/catalog-execution";
 
 export const catalogImportRouter = router({
   /**
@@ -218,6 +219,12 @@ export const catalogImportRouter = router({
         sessionId: z.string(),
         selectedTempIds: z.array(z.string()),
         forceConflicts: z.boolean().optional(),
+        /** Reviewed runtime defaults from the import wizard */
+        runtimeDefaults: z.object({
+          providerId: z.string().optional(),
+          llmId: z.string().optional(),
+          modelId: z.string().optional(),
+        }).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -283,6 +290,17 @@ export const catalogImportRouter = router({
           const fileTags = Array.isArray(meta.tags) ? meta.tags : [];
           const origin = row.source === "file_import" ? "import" : "discovery";
 
+          // Merge reviewed runtime defaults into executable entries' config
+          let finalConfig: Record<string, any> = { ...meta };
+          if (isExecutableEntryType(row.type) && input.runtimeDefaults) {
+            const rd = input.runtimeDefaults;
+            const agentBlock = (finalConfig.agent as Record<string, any>) || {};
+            if (rd.llmId) agentBlock.defaultReasoningLlmRef = rd.llmId;
+            if (rd.providerId) agentBlock.defaultReasoningProviderRef = rd.providerId;
+            if (rd.modelId) agentBlock.defaultReasoningModel = rd.modelId;
+            if (Object.keys(agentBlock).length > 0) finalConfig.agent = agentBlock;
+          }
+
           const catalogEntry = await createCatalogEntry({
             name: row.name,
             displayName,
@@ -293,7 +311,7 @@ export const catalogImportRouter = router({
             origin,
             reviewState: "needs_review",
             providerId: null,
-            config: row.metadata,
+            config: finalConfig,
             tags: [row.source, ...fileTags],
             category,
             subCategory,

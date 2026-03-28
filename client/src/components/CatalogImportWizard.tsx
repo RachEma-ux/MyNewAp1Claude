@@ -109,6 +109,12 @@ import type {
   PreviewEntry,
   BulkCreateResult,
 } from "../../../shared/catalog-import-types";
+import {
+  isExecutableEntryType,
+  getDefaultReasoningLlmRef,
+  getDefaultReasoningProviderRef,
+  getDefaultReasoningModel,
+} from "../../../shared/catalog-execution";
 
 interface CatalogImportWizardProps {
   open: boolean;
@@ -189,6 +195,14 @@ export function CatalogImportWizard({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileParseErrors, setFileParseErrors] = useState<string[]>([]);
   const [detectedFormat, setDetectedFormat] = useState<string | null>(null);
+  // Runtime defaults (post-parse) — Provider / LLM / Model
+  const [runtimeProviderId, setRuntimeProviderId] = useState("");
+  const [runtimeLlmId, setRuntimeLlmId] = useState("");
+  const [runtimeModelId, setRuntimeModelId] = useState("");
+  const [runtimeProviderSource, setRuntimeProviderSource] = useState<"" | "auto-selected" | "imported" | "platform-default" | "admin-override">("");
+  const [runtimeLlmSource, setRuntimeLlmSource] = useState<"" | "auto-selected" | "imported" | "platform-default" | "admin-override">("");
+  const [runtimeModelSource, setRuntimeModelSource] = useState<"" | "auto-selected" | "imported" | "platform-default" | "admin-override">("");
+  const [runtimeSectionVisible, setRuntimeSectionVisible] = useState(false);
   const normalizeUrl = (u: string) => {
     const v = u.trim();
     if (!v) return v;
@@ -201,6 +215,54 @@ export function CatalogImportWizard({
     setFileParseErrors([]);
     setDetectedFormat(null);
     setError(null);
+  };
+
+  /**
+   * Auto-compute runtime defaults after file parse.
+   * Scans parsed entries for executable types and extracts any imported
+   * runtime config values, then shows the runtime defaults section.
+   */
+  const computeRuntimeDefaults = (rows: (PreviewEntry & { selected: boolean })[]) => {
+    const hasExecutable = rows.some((r) => isExecutableEntryType(r.type));
+    if (!hasExecutable) {
+      setRuntimeSectionVisible(false);
+      return;
+    }
+    setRuntimeSectionVisible(true);
+
+    // Scan for the first executable entry with runtime config hints
+    let importedLlmRef: string | null = null;
+    let importedProviderRef: string | null = null;
+    let importedModel: string | null = null;
+
+    for (const row of rows) {
+      if (!isExecutableEntryType(row.type)) continue;
+      const meta = (row.metadata || {}) as Record<string, unknown>;
+      // Check config.agent.* or top-level config fields
+      if (!importedLlmRef) {
+        importedLlmRef = getDefaultReasoningLlmRef(meta) || (meta.defaultReasoningLlmRef as string) || null;
+      }
+      if (!importedProviderRef) {
+        importedProviderRef = getDefaultReasoningProviderRef(meta) || (meta.defaultReasoningProviderRef as string) || (meta.providerId as string) || null;
+      }
+      if (!importedModel) {
+        importedModel = getDefaultReasoningModel(meta) || (meta.defaultReasoningModel as string) || (meta.modelId as string) || null;
+      }
+    }
+
+    // Apply imported values as defaults (only if admin hasn't overridden)
+    if (importedProviderRef && runtimeProviderSource !== "admin-override") {
+      setRuntimeProviderId(importedProviderRef);
+      setRuntimeProviderSource("imported");
+    }
+    if (importedLlmRef && runtimeLlmSource !== "admin-override") {
+      setRuntimeLlmId(importedLlmRef);
+      setRuntimeLlmSource("imported");
+    }
+    if (importedModel && runtimeModelSource !== "admin-override") {
+      setRuntimeModelId(importedModel);
+      setRuntimeModelSource("imported");
+    }
   };
 
   // File Import: read file, send to backend, advance to preview
@@ -256,15 +318,18 @@ export function CatalogImportWizard({
         { sessionId: result.sessionId }
       );
       if (preview && preview.rows.length > 0) {
-        setPreviewRows(
-          preview.rows.map((r: PreviewEntry) => {
-            const hasErrors = r.validationIssues?.some((i) => i.severity === "error");
-            return {
-              ...r,
-              selected: !hasErrors && (r.duplicateStatus === "new" || r.duplicateStatus === "fuzzy_match"),
-            };
-          })
-        );
+        const rows = preview.rows.map((r: PreviewEntry) => {
+          const hasErrors = r.validationIssues?.some((i) => i.severity === "error");
+          return {
+            ...r,
+            selected: !hasErrors && (r.duplicateStatus === "new" || r.duplicateStatus === "fuzzy_match"),
+          };
+        });
+        setPreviewRows(rows);
+
+        // Auto-compute runtime defaults from parsed entries
+        computeRuntimeDefaults(rows);
+
         setStep(3);
       } else {
         setError("File parsed but no valid entries were found");
@@ -405,6 +470,13 @@ export function CatalogImportWizard({
       setSelectedFile(null);
       setFileParseErrors([]);
       setDetectedFormat(null);
+      setRuntimeProviderId("");
+      setRuntimeLlmId("");
+      setRuntimeModelId("");
+      setRuntimeProviderSource("");
+      setRuntimeLlmSource("");
+      setRuntimeModelSource("");
+      setRuntimeSectionVisible(false);
     }
     onOpenChange(isOpen);
   };
@@ -539,10 +611,18 @@ export function CatalogImportWizard({
     }
 
     try {
+      // Build runtime defaults payload for executable entries
+      const runtimeDefaults = (runtimeProviderId || runtimeLlmId || runtimeModelId) ? {
+        providerId: runtimeProviderId || undefined,
+        llmId: runtimeLlmId || undefined,
+        modelId: runtimeModelId || undefined,
+      } : undefined;
+
       const result = await bulkCreateMutation.mutateAsync({
         sessionId,
         selectedTempIds: selectedIds,
         forceConflicts,
+        runtimeDefaults,
       });
       setImportResult(result);
       setStep(4);
@@ -974,6 +1054,100 @@ export function CatalogImportWizard({
         {/* Step 3: Preview Table */}
         {step === 3 && (
           <div className="py-4 space-y-4">
+            {/* Runtime Defaults / Override Section (post-parse, for executable entries) */}
+            {runtimeSectionVisible && method === "file_upload" && (
+              <div className="border border-blue-600/30 rounded-lg p-4 space-y-3 bg-blue-950/10">
+                <div className="flex items-center gap-2 font-medium text-sm">
+                  <Brain className="h-4 w-4 text-blue-400" />
+                  Runtime Defaults
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Parsed entries include executable types. Review and override the runtime provider, LLM, and model before import.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Provider */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs">Provider</Label>
+                      {runtimeProviderSource && (
+                        <Badge variant="outline" className={`text-[9px] px-1 py-0 ${runtimeProviderSource === "admin-override" ? "text-amber-400 border-amber-600/30" : "text-blue-400 border-blue-600/30"}`}>
+                          {runtimeProviderSource === "admin-override" ? "Overridden" : runtimeProviderSource === "imported" ? "Imported" : runtimeProviderSource === "auto-selected" ? "Auto" : runtimeProviderSource === "platform-default" ? "Default" : ""}
+                        </Badge>
+                      )}
+                    </div>
+                    <CatalogSelect
+                      entryType="provider"
+                      value={runtimeProviderId}
+                      onValueChange={(v) => {
+                        setRuntimeProviderId(v);
+                        setRuntimeProviderSource(v ? "admin-override" : "");
+                      }}
+                      placeholder="Select provider..."
+                    />
+                  </div>
+                  {/* LLM (primary) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs">LLM</Label>
+                      {runtimeLlmSource && (
+                        <Badge variant="outline" className={`text-[9px] px-1 py-0 ${runtimeLlmSource === "admin-override" ? "text-amber-400 border-amber-600/30" : "text-blue-400 border-blue-600/30"}`}>
+                          {runtimeLlmSource === "admin-override" ? "Overridden" : runtimeLlmSource === "imported" ? "Imported" : runtimeLlmSource === "auto-selected" ? "Auto" : runtimeLlmSource === "platform-default" ? "Default" : ""}
+                        </Badge>
+                      )}
+                    </div>
+                    <CatalogSelect
+                      entryType="llm"
+                      value={runtimeLlmId}
+                      onValueChange={(v) => {
+                        setRuntimeLlmId(v);
+                        setRuntimeLlmSource(v ? "admin-override" : "");
+                      }}
+                      placeholder="Select LLM..."
+                    />
+                    {runtimeLlmId && (
+                      <p className="text-[10px] text-green-400">Primary reasoning source</p>
+                    )}
+                  </div>
+                  {/* Model (fallback) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs">Model</Label>
+                      {runtimeModelSource && (
+                        <Badge variant="outline" className={`text-[9px] px-1 py-0 ${runtimeModelSource === "admin-override" ? "text-amber-400 border-amber-600/30" : "text-blue-400 border-blue-600/30"}`}>
+                          {runtimeModelSource === "admin-override" ? "Overridden" : runtimeModelSource === "imported" ? "Imported" : runtimeModelSource === "auto-selected" ? "Auto" : runtimeModelSource === "platform-default" ? "Default" : ""}
+                        </Badge>
+                      )}
+                    </div>
+                    <CatalogSelect
+                      entryType="model"
+                      value={runtimeModelId}
+                      onValueChange={(v) => {
+                        setRuntimeModelId(v);
+                        setRuntimeModelSource(v ? "admin-override" : "");
+                      }}
+                      placeholder="Select model..."
+                    />
+                    {!runtimeLlmId && runtimeProviderId && runtimeModelId && (
+                      <p className="text-[10px] text-yellow-400">Fallback: Provider + Model (no LLM selected)</p>
+                    )}
+                  </div>
+                </div>
+                {/* Validation: no runtime at all */}
+                {!runtimeLlmId && !runtimeModelId && !runtimeProviderId && (
+                  <div className="flex items-center gap-2 p-2 rounded bg-yellow-900/20 border border-yellow-800/30 text-yellow-400 text-xs">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    No runtime defaults configured. Imported entries will use their own config or platform fallback.
+                  </div>
+                )}
+                {/* Validation: LLM+Model both set — LLM is primary */}
+                {runtimeLlmId && runtimeModelId && (
+                  <p className="text-[10px] text-muted-foreground">
+                    LLM is the primary reasoning source. Model is retained for compatibility reference.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Summary bar */}
             <div className="flex gap-2 flex-wrap">
               <Badge variant="outline">{previewRows.length} {method === "file_upload" ? "parsed" : "discovered"}</Badge>
