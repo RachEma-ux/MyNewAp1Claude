@@ -290,10 +290,35 @@ export const catalogImportRouter = router({
           const fileTags = Array.isArray(meta.tags) ? meta.tags : [];
           const origin = row.source === "file_import" ? "import" : "discovery";
 
-          // Merge reviewed runtime defaults into executable entries' config
+          // ── Resolve runtime defaults into real platform fields ──────
           let finalConfig: Record<string, any> = { ...meta };
-          if (isExecutableEntryType(row.type) && input.runtimeDefaults) {
-            const rd = input.runtimeDefaults;
+          const rd = input.runtimeDefaults;
+
+          // 1. Resolve providerId — the real relational field validation reads
+          //    Priority: explicit admin selection > config.providerId from file > null
+          let resolvedProviderId: number | null = null;
+          if (rd?.providerId) {
+            const parsed = parseInt(rd.providerId, 10);
+            if (!isNaN(parsed)) resolvedProviderId = parsed;
+          }
+          if (!resolvedProviderId && finalConfig.providerId) {
+            const parsed = typeof finalConfig.providerId === "number"
+              ? finalConfig.providerId
+              : parseInt(String(finalConfig.providerId), 10);
+            if (!isNaN(parsed)) resolvedProviderId = parsed;
+          }
+
+          // 2. For model/llm/provider entries: persist providerId in config too
+          //    (validation fallback reads config.providerId)
+          if (resolvedProviderId) {
+            finalConfig.providerId = resolvedProviderId;
+          }
+          if (rd?.modelId) {
+            finalConfig.model = rd.modelId;
+          }
+
+          // 3. For executable entries (agent/bot): write agent config block
+          if (isExecutableEntryType(row.type) && rd) {
             const agentBlock = (finalConfig.agent as Record<string, any>) || {};
             if (rd.llmId) agentBlock.defaultReasoningLlmRef = rd.llmId;
             if (rd.providerId) agentBlock.defaultReasoningProviderRef = rd.providerId;
@@ -310,7 +335,7 @@ export const catalogImportRouter = router({
             status: "draft",
             origin,
             reviewState: "needs_review",
-            providerId: null,
+            providerId: resolvedProviderId,
             config: finalConfig,
             tags: [row.source, ...fileTags],
             category,
@@ -357,5 +382,97 @@ export const catalogImportRouter = router({
       }
 
       return result;
+    }),
+
+  /**
+   * Repair imported entries that are missing runtime linkage (providerId).
+   * Scans entries with import-origin tags and attempts to resolve providerId
+   * from config.providerId or config.providerType + config.baseUrl.
+   */
+  repairProviderLinks: protectedProcedure
+    .input(z.object({
+      entryIds: z.array(z.number().int().positive()).optional(),
+      dryRun: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      if (!db) throw new Error("Database not available");
+
+      const { catalogEntries } = await import("../../drizzle/schema");
+      const { isNull } = await import("drizzle-orm");
+
+      // Find entries missing providerId
+      let query = db.select().from(catalogEntries).where(isNull(catalogEntries.providerId));
+      const candidates = await query;
+
+      // Filter to specified IDs if provided
+      const entries = input.entryIds
+        ? candidates.filter((e) => input.entryIds!.includes(e.id))
+        : candidates;
+
+      const allProviders = await import("../providers/db").then((m) => m.getAllProviders());
+      const repaired: { id: number; name: string; providerId: number }[] = [];
+      const unresolved: { id: number; name: string; reason: string }[] = [];
+
+      for (const entry of entries) {
+        const config = (entry.config as Record<string, any>) || {};
+
+        // Try config.providerId first
+        let matchedProviderId: number | null = null;
+        if (config.providerId) {
+          const pid = typeof config.providerId === "number"
+            ? config.providerId
+            : parseInt(String(config.providerId), 10);
+          const exists = allProviders.find((p: any) => p.id === pid);
+          if (exists) matchedProviderId = pid;
+        }
+
+        // Try matching by providerType + baseUrl
+        if (!matchedProviderId && config.providerType) {
+          const typeMap: Record<string, string> = { ollama: "local-ollama", openai: "openai", anthropic: "anthropic" };
+          const dbType = typeMap[config.providerType] || config.providerType;
+          const match = allProviders.find((p: any) => {
+            if (p.type !== dbType) return false;
+            if (config.baseUrl) {
+              const pConfig = (p.config as Record<string, any>) || {};
+              return pConfig.baseUrl === config.baseUrl;
+            }
+            return true;
+          });
+          if (match) matchedProviderId = match.id;
+        }
+
+        // Try name match
+        if (!matchedProviderId) {
+          const match = allProviders.find((p: any) =>
+            p.name === entry.name || p.name === entry.displayName
+          );
+          if (match) matchedProviderId = match.id;
+        }
+
+        if (matchedProviderId) {
+          if (!input.dryRun) {
+            await updateCatalogEntry(entry.id, { providerId: matchedProviderId }, 1);
+            // Also persist in config for fallback
+            if (!config.providerId) {
+              await updateCatalogEntry(entry.id, {
+                config: { ...config, providerId: matchedProviderId },
+              }, 1);
+            }
+          }
+          repaired.push({ id: entry.id, name: entry.name, providerId: matchedProviderId });
+        } else {
+          unresolved.push({ id: entry.id, name: entry.name, reason: "No matching provider found" });
+        }
+      }
+
+      return {
+        dryRun: !!input.dryRun,
+        scanned: entries.length,
+        repaired: repaired.length,
+        unresolved: unresolved.length,
+        repairedEntries: repaired,
+        unresolvedEntries: unresolved,
+      };
     }),
 });
