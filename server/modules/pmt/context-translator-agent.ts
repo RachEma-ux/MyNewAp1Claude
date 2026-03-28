@@ -150,12 +150,29 @@ Return a JSON object conforming to the TranslateResponse schema. No markdown wra
 
 // ── Analysis Functions ──────────────────────────────────────────────────────
 
-/** Analyze raw user input and produce a structured context translation */
-export async function analyzeRawInput(rawText: string): Promise<TranslateResponse> {
+/** Optional LLM override — resolved from catalog agent's defaultReasoningLlmRef */
+export interface LlmOverrideHint {
+  provider?: string;
+  model?: string;
+  apiBaseUrl?: string;
+}
+
+/**
+ * Analyze raw user input and produce a structured context translation.
+ *
+ * @param rawText - The unstructured project text to analyze
+ * @param llmHint - Optional LLM override from the catalog agent's defaultReasoningLlmRef.
+ *   When provided, the model field is passed to the LLM provider for routing.
+ *   This ensures the admin-selected reasoning LLM is used even in built-in mode.
+ */
+export async function analyzeRawInput(
+  rawText: string,
+  llmHint?: LlmOverrideHint,
+): Promise<TranslateResponse> {
   const provider = getAvailableProvider();
 
   if (!provider) {
-    // Fallback: return a template response when no LLM is available
+    // No LLM provider at all — return clearly-labeled template fallback
     return createFallbackResponse(rawText);
   }
 
@@ -167,7 +184,12 @@ export async function analyzeRawInput(rawText: string): Promise<TranslateRespons
     },
   ];
 
-  const raw = await callLLM(provider, messages, { temperature: 0.3, maxTokens: 8000 });
+  // Use the catalog-resolved model if provided, otherwise let the provider choose
+  const raw = await callLLM(provider, messages, {
+    temperature: 0.3,
+    maxTokens: 8000,
+    model: llmHint?.model || undefined,
+  });
   return parseLLMJson<TranslateResponse>(raw);
 }
 

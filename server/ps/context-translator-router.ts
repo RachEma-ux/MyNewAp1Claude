@@ -1,8 +1,14 @@
 /**
  * PS Ideation — Context Translator tRPC Sub-Router
  *
- * Exposes the Project Context Translator Python service
- * through the existing tRPC API layer at trpc.ps.ideation.contextTranslator.*
+ * Execution precedence (non-negotiable):
+ *
+ *   1. Imported catalog agent → Python service (with resolved LLM override)
+ *   2. Imported catalog agent → built-in LLM fallback (with resolved catalog LLM)
+ *   3. Degraded template fallback (clearly labeled, never masquerades as primary)
+ *
+ * The selected defaultReasoningLlmRef from the catalog agent entry is always
+ * resolved and passed to whichever execution path handles the request.
  */
 
 import { z } from "zod";
@@ -19,12 +25,112 @@ import {
   type ServiceRuntimeTarget,
   type ServiceHealthResult,
 } from "../catalog/service-runtime";
+import { getCatalogEntryById, getCatalogEntries } from "../db/catalog";
+import {
+  getDefaultReasoningLlmRef,
+  getDefaultReasoningProviderRef,
+  getDefaultReasoningModel,
+} from "@shared/catalog-execution";
 import { AGENT_CATALOG_ID, analyzeRawInput } from "../modules/pmt/context-translator-agent";
+
+// ── LLM Resolution ─────────────────────────────────────────────────────────
+
+interface ResolvedLlm {
+  provider?: string;
+  model?: string;
+  apiBaseUrl?: string;
+  catalogRef?: string;
+  catalogEntryId?: number;
+  displayName?: string;
+}
+
+/**
+ * Resolve the Default Reasoning LLM from the catalog agent entry.
+ * Checks config.agent.defaultReasoningLlmRef → catalog LLM entry → provider/model.
+ * Falls back to config.agent.defaultReasoningProviderRef + defaultReasoningModel.
+ */
+async function resolveAgentLlm(): Promise<ResolvedLlm | null> {
+  // Find the catalog agent entry
+  const entries = await getCatalogEntries({ entryType: "agent" });
+  const agentEntry = entries.find(e => e.name === AGENT_CATALOG_ID);
+  if (!agentEntry) return null;
+
+  const config = agentEntry.config as Record<string, unknown> | null;
+  if (!config) return null;
+
+  // Try config.agent.defaultReasoningLlmRef (catalog LLM entry ID)
+  const llmRef = getDefaultReasoningLlmRef(config);
+  if (llmRef) {
+    const llmEntryId = parseInt(llmRef, 10);
+    if (!isNaN(llmEntryId) && llmEntryId > 0) {
+      const llmEntry = await getCatalogEntryById(llmEntryId);
+      if (llmEntry && (llmEntry.entryType === "llm" || llmEntry.entryType === "model")) {
+        const llmConfig = llmEntry.config as Record<string, unknown> | null;
+        return {
+          provider: (llmConfig?.provider as string) || (llmConfig?.llmProvider as string) || undefined,
+          model: (llmConfig?.model as string) || (llmConfig?.modelId as string) || (llmConfig?.llmModel as string) || undefined,
+          apiBaseUrl: (llmConfig?.baseUrl as string) || (llmConfig?.apiBaseUrl as string) || undefined,
+          catalogRef: llmEntry.name,
+          catalogEntryId: llmEntry.id,
+          displayName: llmEntry.displayName || llmEntry.name,
+        };
+      }
+    }
+  }
+
+  // Fallback: try config.agent.defaultReasoningProviderRef + defaultReasoningModel
+  const providerRef = getDefaultReasoningProviderRef(config);
+  const modelRef = getDefaultReasoningModel(config);
+
+  if (providerRef || modelRef) {
+    let provider: string | undefined;
+    let apiBaseUrl: string | undefined;
+
+    if (providerRef) {
+      const providerEntryId = parseInt(providerRef, 10);
+      if (!isNaN(providerEntryId) && providerEntryId > 0) {
+        const providerEntry = await getCatalogEntryById(providerEntryId);
+        if (providerEntry) {
+          const pConfig = providerEntry.config as Record<string, unknown> | null;
+          provider = (pConfig?.provider as string) || providerEntry.name;
+          apiBaseUrl = (pConfig?.baseUrl as string) || (pConfig?.apiBaseUrl as string) || undefined;
+        }
+      }
+    }
+
+    if (provider || modelRef) {
+      return {
+        provider,
+        model: modelRef || undefined,
+        apiBaseUrl,
+        catalogRef: providerRef || undefined,
+      };
+    }
+  }
+
+  return null;
+}
+
+// ── Execution Source Types ──────────────────────────────────────────────────
+
+/**
+ * Execution source tells the UI exactly how the translation was performed.
+ *
+ * - "service":  Python service executed with resolved LLM
+ * - "built-in-llm": Built-in agent executed with provider-registry LLM
+ * - "built-in-catalog-llm": Built-in agent executed with catalog-resolved LLM
+ * - "fallback-template": No LLM available, template output only
+ */
+type ExecutionSource = "service" | "built-in-llm" | "built-in-catalog-llm" | "fallback-template";
 
 export const contextTranslatorRouter = router({
   /**
    * POST /translate — Run the Project Context Translator on raw text.
-   * Calls the Python service, persists the result, and returns it.
+   *
+   * Precedence:
+   *   1. Python service (with resolved LLM override from catalog)
+   *   2. Built-in LLM agent (with resolved catalog LLM or provider registry)
+   *   3. Template fallback (clearly labeled degraded output)
    */
   translate: governedProcedure
     .input(z.object({
@@ -33,19 +139,46 @@ export const contextTranslatorRouter = router({
       metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Try the Python service first, fall back to built-in LLM agent
+      // Step 1: Resolve the agent's selected Default Reasoning LLM
+      const resolvedLlm = await resolveAgentLlm();
+
+      // Step 2: Build the llmOverride payload for the Python service
+      const llmOverride: client.LlmOverride | undefined = resolvedLlm
+        ? {
+            provider: resolvedLlm.provider,
+            model: resolvedLlm.model,
+            apiBaseUrl: resolvedLlm.apiBaseUrl,
+            catalogRef: resolvedLlm.catalogRef,
+          }
+        : undefined;
+
+      // Step 3: Try the Python service (primary path)
       let result: client.TranslateResponse;
-      let source: "service" | "built-in" = "service";
+      let source: ExecutionSource = "service";
+
       try {
         result = await client.translate({
           rawText: input.rawText,
           metadata: input.metadata,
+          llmOverride,
         });
-      } catch {
+      } catch (serviceErr) {
         // Python service unavailable — fall back to built-in agent
         try {
-          result = await analyzeRawInput(input.rawText);
-          source = "built-in";
+          result = await analyzeRawInput(input.rawText, {
+            provider: resolvedLlm?.provider,
+            model: resolvedLlm?.model,
+            apiBaseUrl: resolvedLlm?.apiBaseUrl,
+          });
+
+          // Determine which built-in path was actually used
+          if (result.decisionGate.reason?.includes("without LLM")) {
+            source = "fallback-template";
+          } else if (resolvedLlm) {
+            source = "built-in-catalog-llm";
+          } else {
+            source = "built-in-llm";
+          }
         } catch (fallbackErr: any) {
           throw new TRPCError({
             code: "BAD_GATEWAY",
@@ -54,7 +187,7 @@ export const contextTranslatorRouter = router({
         }
       }
 
-      // Persist the translator run
+      // Step 4: Persist the translator run
       const db = getDb();
       if (db) {
         try {
@@ -66,12 +199,17 @@ export const contextTranslatorRouter = router({
             createdBy: ctx.user.id,
           });
         } catch (persistErr: any) {
-          // Log but don't fail the request — translator result is still valid
           console.error("Failed to persist translator run:", persistErr.message);
         }
       }
 
-      return { ...result, _source: source };
+      return {
+        ...result,
+        _source: source,
+        _resolvedLlm: resolvedLlm
+          ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
+          : null,
+      };
     }),
 
   /**
@@ -241,56 +379,81 @@ export const contextTranslatorRouter = router({
 
   /**
    * Resolve the catalog agent entry into a runtime target.
-   * Returns service URL, health URL, capabilities, and current health status.
+   *
+   * Reports truthful states — never masks service-offline with built-in.
+   * Returns distinct fields for:
+   *   - serviceOnline: Python service reachable
+   *   - llmConfigured: Default Reasoning LLM is set in catalog
+   *   - builtInAvailable: built-in fallback can run
    */
   resolveRuntime: protectedProcedure
     .query(async (): Promise<{
       resolved: boolean;
       target: ServiceRuntimeTarget | null;
       health: ServiceHealthResult | null;
+      serviceOnline: boolean;
+      llmConfigured: boolean;
+      resolvedLlm: { displayName?: string; provider?: string; model?: string } | null;
       builtInAvailable: boolean;
       error: string | null;
     }> => {
-      // Built-in translator is always available (has LLM fallback + template fallback)
       const builtInAvailable = true;
+
+      // Resolve the catalog agent's Default Reasoning LLM
+      let resolvedLlm: ResolvedLlm | null = null;
+      try {
+        resolvedLlm = await resolveAgentLlm();
+      } catch {
+        // LLM resolution failure is non-fatal
+      }
+      const llmConfigured = resolvedLlm !== null;
 
       try {
         const target = await resolveServiceAgentByName(AGENT_CATALOG_ID);
         if (!target) {
+          // Agent not in catalog — no primary path available
           return {
             resolved: false,
             target: null,
-            health: builtInAvailable
-              ? { available: true, status: "built-in", service: "context-translator-agent", version: "1.0.0", latencyMs: 0 }
+            health: null,
+            serviceOnline: false,
+            llmConfigured,
+            resolvedLlm: resolvedLlm
+              ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
               : null,
             builtInAvailable,
-            error: builtInAvailable ? null : `Catalog entry '${AGENT_CATALOG_ID}' not found`,
+            error: `Catalog entry '${AGENT_CATALOG_ID}' not found`,
           };
         }
 
+        // Check actual Python service health — report truthfully
         const health = await checkServiceHealthByName(AGENT_CATALOG_ID);
+        const serviceOnline = health.available;
 
-        // If service is offline but built-in is available, override to available
-        if (!health.available && builtInAvailable) {
-          return {
-            resolved: true,
-            target,
-            health: { ...health, available: true, status: "built-in" },
-            builtInAvailable,
-            error: null,
-          };
-        }
-
-        return { resolved: true, target, health, builtInAvailable, error: null };
+        return {
+          resolved: true,
+          target,
+          health,
+          serviceOnline,
+          llmConfigured,
+          resolvedLlm: resolvedLlm
+            ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
+            : null,
+          builtInAvailable,
+          error: null,
+        };
       } catch (err: any) {
         return {
           resolved: false,
           target: null,
-          health: builtInAvailable
-            ? { available: true, status: "built-in", service: "context-translator-agent", version: "1.0.0", latencyMs: 0 }
+          health: null,
+          serviceOnline: false,
+          llmConfigured,
+          resolvedLlm: resolvedLlm
+            ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
             : null,
           builtInAvailable,
-          error: builtInAvailable ? null : (err.message || "Failed to resolve runtime"),
+          error: err.message || "Failed to resolve runtime",
         };
       }
     }),

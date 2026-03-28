@@ -7,6 +7,13 @@
  * Shows: The Problem, The Opportunity, External Drivers, Internal Drivers,
  * Trigger, Project Context Result, What If? Question, ideation workflow draft,
  * and clarification questions when needed.
+ *
+ * Execution states (truthful, distinct):
+ *   - "online"         → Python service reachable, primary path
+ *   - "llm-fallback"   → Service offline, using catalog LLM via built-in agent
+ *   - "degraded"       → Service offline, no catalog LLM, provider-registry LLM
+ *   - "no-llm"         → No LLM configured anywhere, template only
+ *   - "unavailable"    → Agent not in catalog
  */
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +38,7 @@ import {
   HelpCircle,
   ClipboardCheck,
   RefreshCw,
+  Info,
 } from "lucide-react";
 import type { TranslateResponse } from "@shared/ps-context-translator-types";
 
@@ -40,9 +48,11 @@ interface Props {
   onApplied?: () => void;
 }
 
+type ExecutionMode = "online" | "llm-fallback" | "degraded" | "no-llm" | "unavailable" | "checking";
+
 export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Props) {
   const [rawText, setRawText] = useState("");
-  const [result, setResult] = useState<TranslateResponse | null>(null);
+  const [result, setResult] = useState<(TranslateResponse & { _source?: string; _resolvedLlm?: { displayName?: string; provider?: string; model?: string } | null }) | null>(null);
   const [showResult, setShowResult] = useState(false);
   const utils = trpc.useUtils();
 
@@ -53,9 +63,17 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
       { staleTime: 30_000, refetchInterval: 60_000 },
     );
 
-  const serviceAvailable = runtime?.health?.available === true;
-  const serviceStatus = runtime?.health?.status ?? "unknown";
-  const isBuiltIn = serviceStatus === "built-in";
+  // Derive the execution mode from runtime state
+  const executionMode: ExecutionMode = (() => {
+    if (!runtime || isHealthChecking) return "checking";
+    if (!runtime.resolved && !runtime.builtInAvailable) return "unavailable";
+    if (runtime.serviceOnline) return "online";
+    if (runtime.llmConfigured) return "llm-fallback";
+    if (runtime.builtInAvailable) return "degraded";
+    return "unavailable";
+  })();
+
+  const canTranslate = executionMode !== "unavailable" && executionMode !== "checking";
 
   const handleRefreshHealth = useCallback(() => {
     utils.ps.ideation.contextTranslator.resolveRuntime.invalidate();
@@ -63,10 +81,15 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
 
   const translateMut = trpc.ps.ideation.contextTranslator.translate.useMutation({
     onSuccess: (data) => {
-      setResult(data as TranslateResponse);
+      setResult(data as any);
       setShowResult(true);
       if (data.decisionGate.status === "CONTINUE") {
-        toast.success("Analysis complete — review results below");
+        const src = (data as any)._source;
+        if (src === "fallback-template") {
+          toast.info("Template analysis only — configure LLM for full reasoning");
+        } else {
+          toast.success("Analysis complete — review results below");
+        }
       } else {
         toast.info("Clarification needed — see questions below");
       }
@@ -100,6 +123,9 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
   const isContinue = result?.decisionGate.status === "CONTINUE";
   const isClarification = result?.decisionGate.status === "CLARIFICATION_NEEDED";
 
+  // Status pill config
+  const statusConfig = getStatusPillConfig(executionMode, isHealthChecking);
+
   return (
     <div className="space-y-4">
       {/* Input Card */}
@@ -115,48 +141,28 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                   <button
                     type="button"
                     onClick={handleRefreshHealth}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer border ${
-                      isHealthChecking
-                        ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
-                        : serviceAvailable
-                          ? isBuiltIn
-                            ? "bg-blue-500/10 text-blue-600 border-blue-500/30"
-                            : "bg-green-500/10 text-green-600 border-green-500/30"
-                          : "bg-red-500/10 text-red-500 border-red-500/30"
-                    }`}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer border ${statusConfig.pillClass}`}
                   >
-                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${
-                      isHealthChecking
-                        ? "bg-amber-500 animate-pulse"
-                        : serviceAvailable
-                          ? isBuiltIn ? "bg-blue-500" : "bg-green-500"
-                          : "bg-red-500"
-                    }`} />
-                    {isHealthChecking
-                      ? "Checking..."
-                      : serviceAvailable
-                        ? isBuiltIn ? "Built-in" : "Online"
-                        : "Offline"}
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${statusConfig.dotClass}`} />
+                    {statusConfig.pillLabel}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-[240px]">
+                <TooltipContent side="bottom" className="max-w-[280px]">
                   <div className="space-y-1">
-                    <p className="font-medium">
-                      {isHealthChecking
-                        ? "Checking service status..."
-                        : serviceAvailable
-                          ? isBuiltIn
-                            ? "Built-in LLM Translator"
-                            : "Python Service Online"
-                          : "Service Offline"}
-                    </p>
+                    <p className="font-medium">{statusConfig.tooltipTitle}</p>
+                    <p className="text-[10px] opacity-70">{statusConfig.tooltipDetail}</p>
+                    {runtime?.resolvedLlm && (
+                      <p className="text-[10px] opacity-70">
+                        LLM: {runtime.resolvedLlm.displayName || `${runtime.resolvedLlm.provider}/${runtime.resolvedLlm.model}`}
+                      </p>
+                    )}
                     {runtime?.target && (
                       <p className="text-[10px] opacity-70">
                         Catalog: {runtime.target.catalogEntryName || runtime.target.displayName || "resolved"}
                       </p>
                     )}
                     {dataUpdatedAt > 0 && (
-                      <p className="text-[10px] opacity-70">
+                      <p className="text-[10px] opacity-50">
                         Checked: {new Date(dataUpdatedAt).toLocaleTimeString()}
                       </p>
                     )}
@@ -172,41 +178,81 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
             Paste raw project description, idea, or scenario text. The AI translator will analyze it,
             frame The Problem and The Opportunity, extract drivers, and generate a structured ideation package.
           </p>
-          {runtime && !serviceAvailable && (
+
+          {/* Status banners — truthful, distinct */}
+          {executionMode === "unavailable" && (
             <div className="flex items-start gap-2 p-2 rounded bg-red-500/5 border border-red-500/20">
               <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
               <div className="text-xs text-red-600">
-                <span className="font-medium">All translation backends unavailable</span>
-                {runtime.health?.error && <span className="block text-red-500/80 mt-0.5">{runtime.health.error}</span>}
-                <span className="block text-red-500/70 mt-0.5">Configure an LLM provider or start the Python service to enable translation.</span>
+                <span className="font-medium">Translator unavailable</span>
+                <span className="block text-red-500/80 mt-0.5">
+                  {runtime?.error || "Agent not found in catalog. Import the Project Context Translator agent first."}
+                </span>
               </div>
             </div>
           )}
-          {runtime && serviceAvailable && isBuiltIn && (
+
+          {executionMode === "no-llm" && (
+            <div className="flex items-start gap-2 p-2 rounded bg-amber-500/5 border border-amber-500/20">
+              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <div className="text-xs text-amber-600">
+                <span className="font-medium">No LLM configured</span>
+                <span className="block text-amber-500/80 mt-0.5">
+                  Python service offline and no Default Reasoning LLM selected.
+                  Select a reasoning LLM in the Catalog for the Context Translator agent.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {executionMode === "degraded" && (
+            <div className="flex items-start gap-2 p-2 rounded bg-amber-500/5 border border-amber-500/20">
+              <Info className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <div className="text-xs text-amber-600">
+                <span className="font-medium">Degraded mode — using provider registry LLM</span>
+                <span className="block text-amber-500/80 mt-0.5">
+                  Python service offline. No catalog LLM selected. Using first available provider.
+                  For best results, select a Default Reasoning LLM in the agent catalog entry.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {executionMode === "llm-fallback" && (
             <div className="flex items-center gap-2 p-2 rounded bg-blue-500/5 border border-blue-500/20">
-              <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+              <Info className="w-4 h-4 text-blue-500 shrink-0" />
               <span className="text-xs text-blue-600">
-                Using built-in translator — Python service offline
+                Python service offline — using {runtime?.resolvedLlm?.displayName || "catalog LLM"} via built-in agent
               </span>
             </div>
           )}
+
+          {executionMode === "online" && runtime?.resolvedLlm && (
+            <div className="flex items-center gap-2 p-2 rounded bg-green-500/5 border border-green-500/20">
+              <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+              <span className="text-xs text-green-600">
+                Service online — using {runtime.resolvedLlm.displayName || `${runtime.resolvedLlm.provider}/${runtime.resolvedLlm.model}`}
+              </span>
+            </div>
+          )}
+
           <Textarea
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
             placeholder={
-              runtime && !serviceAvailable
-                ? "Translation is currently unavailable — configure an LLM provider or start the Python service first."
+              !canTranslate
+                ? "Translation is currently unavailable — see status above."
                 : "Describe your project idea, situation, or scenario in detail. Include any context about what's driving the need, what problems exist, what opportunities you see..."
             }
             rows={6}
-            disabled={disabled || translateMut.isPending || (runtime != null && !serviceAvailable)}
-            className={`text-sm ${runtime && !serviceAvailable ? "opacity-50" : ""}`}
+            disabled={disabled || translateMut.isPending || !canTranslate}
+            className={`text-sm ${!canTranslate ? "opacity-50" : ""}`}
           />
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{rawText.length}/10000</span>
             <Button
               onClick={handleTranslate}
-              disabled={disabled || translateMut.isPending || rawText.trim().length < 10 || (runtime != null && !serviceAvailable)}
+              disabled={disabled || translateMut.isPending || rawText.trim().length < 10 || !canTranslate}
               size="sm"
             >
               {translateMut.isPending ? (
@@ -216,11 +262,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
               )}
               {translateMut.isPending
                 ? "Analyzing..."
-                : runtime && !serviceAvailable
-                  ? "Service Unavailable"
-                  : isBuiltIn
-                    ? "Translate (Built-in)"
-                    : "Translate Context"}
+                : getButtonLabel(executionMode)}
             </Button>
           </div>
         </CardContent>
@@ -229,6 +271,23 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
       {/* Results */}
       {showResult && result && (
         <>
+          {/* Execution source badge */}
+          {result._source && result._source !== "service" && (
+            <Card>
+              <CardContent className="py-2">
+                <div className="flex items-center gap-2">
+                  <Info className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-xs text-muted-foreground">
+                    Executed via: <span className="font-medium">{getSourceLabel(result._source)}</span>
+                    {result._resolvedLlm?.displayName && (
+                      <> using <span className="font-medium">{result._resolvedLlm.displayName}</span></>
+                    )}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Decision Gate */}
           <Card>
             <CardContent className="py-3">
@@ -236,9 +295,15 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                 {isContinue ? (
                   <>
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
-                    <span className="text-sm font-medium text-green-600">Analysis Complete</span>
-                    <Badge variant="outline" className="ml-auto text-xs bg-green-500/10 text-green-600 border-green-500/30">
-                      CONTINUE
+                    <span className="text-sm font-medium text-green-600">
+                      {result._source === "fallback-template" ? "Template Analysis" : "Analysis Complete"}
+                    </span>
+                    <Badge variant="outline" className={`ml-auto text-xs ${
+                      result._source === "fallback-template"
+                        ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                        : "bg-green-500/10 text-green-600 border-green-500/30"
+                    }`}>
+                      {result._source === "fallback-template" ? "LOW CONFIDENCE" : "CONTINUE"}
                     </Badge>
                   </>
                 ) : (
@@ -488,9 +553,86 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
   );
 }
 
-/**
- * Collapsible Ideation Workflow Draft section.
- */
+// ── Status Pill Helpers ─────────────────────────────────────────────────────
+
+function getStatusPillConfig(mode: ExecutionMode, isChecking: boolean) {
+  if (isChecking || mode === "checking") {
+    return {
+      pillClass: "bg-amber-500/10 text-amber-600 border-amber-500/30",
+      dotClass: "bg-amber-500 animate-pulse",
+      pillLabel: "Checking...",
+      tooltipTitle: "Checking service status...",
+      tooltipDetail: "Resolving catalog agent and service health",
+    };
+  }
+  switch (mode) {
+    case "online":
+      return {
+        pillClass: "bg-green-500/10 text-green-600 border-green-500/30",
+        dotClass: "bg-green-500",
+        pillLabel: "Online",
+        tooltipTitle: "Python Service Online",
+        tooltipDetail: "Primary execution path active. Requests go to the dedicated Python translator service.",
+      };
+    case "llm-fallback":
+      return {
+        pillClass: "bg-blue-500/10 text-blue-600 border-blue-500/30",
+        dotClass: "bg-blue-500",
+        pillLabel: "LLM Fallback",
+        tooltipTitle: "Service Offline — Using Catalog LLM",
+        tooltipDetail: "Python service unreachable. Using the selected Default Reasoning LLM via built-in agent.",
+      };
+    case "degraded":
+      return {
+        pillClass: "bg-amber-500/10 text-amber-600 border-amber-500/30",
+        dotClass: "bg-amber-500",
+        pillLabel: "Degraded",
+        tooltipTitle: "Degraded Mode",
+        tooltipDetail: "Python service offline and no catalog LLM selected. Using provider-registry fallback. Select a Default Reasoning LLM for better results.",
+      };
+    case "no-llm":
+      return {
+        pillClass: "bg-red-500/10 text-red-500 border-red-500/30",
+        dotClass: "bg-red-500",
+        pillLabel: "No LLM",
+        tooltipTitle: "No LLM Available",
+        tooltipDetail: "No Python service, no catalog LLM, no provider-registry LLM. Template output only.",
+      };
+    case "unavailable":
+    default:
+      return {
+        pillClass: "bg-red-500/10 text-red-500 border-red-500/30",
+        dotClass: "bg-red-500",
+        pillLabel: "Unavailable",
+        tooltipTitle: "Translator Unavailable",
+        tooltipDetail: "Agent not found in catalog or resolution failed.",
+      };
+  }
+}
+
+function getButtonLabel(mode: ExecutionMode): string {
+  switch (mode) {
+    case "online": return "Translate Context";
+    case "llm-fallback": return "Translate (LLM Fallback)";
+    case "degraded": return "Translate (Degraded)";
+    case "no-llm": return "Unavailable";
+    case "unavailable": return "Unavailable";
+    default: return "Translate Context";
+  }
+}
+
+function getSourceLabel(source: string): string {
+  switch (source) {
+    case "service": return "Python Service";
+    case "built-in-catalog-llm": return "Built-in Agent (Catalog LLM)";
+    case "built-in-llm": return "Built-in Agent (Provider Registry)";
+    case "fallback-template": return "Template Fallback (No LLM)";
+    default: return source;
+  }
+}
+
+// ── Collapsible Sections ────────────────────────────────────────────────────
+
 function IdeationWorkflowDraftSection({ draft }: { draft: TranslateResponse["ideationWorkflowDraft"] }) {
   const [expanded, setExpanded] = useState(false);
 
