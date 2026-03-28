@@ -2567,6 +2567,22 @@ actions:
     approval: none
     evidence: { required: false }
 
+  ps.ideation.contextTranslator.translate:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  ps.ideation.contextTranslator.apply:
+    domain: ps
+    risk: R1
+    capability: ps.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   ps.ideation.convert.commit:
     domain: ps
     risk: R3

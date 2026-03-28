@@ -402,6 +402,10 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "ps.ideation.feasibility.upsert": "ps.ideation.feasibility.upsert",
   "ps.ideation.convert.commit": "ps.ideation.convert.commit",
 
+  // ── PS Ideation — Context Translator ───────────────────────────────
+  "ps.ideation.contextTranslator.translate": "ps.ideation.contextTranslator.translate",
+  "ps.ideation.contextTranslator.applyToIdeation": "ps.ideation.contextTranslator.apply",
+
   // ── Modules (Engine Binding) ─────────────────────────────────────────────
   "modules.manage.setEnabled": "module.setEnabled",
   "modules.manage.seed": "module.seed",
