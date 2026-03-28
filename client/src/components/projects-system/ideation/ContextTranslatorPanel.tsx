@@ -8,11 +8,12 @@
  * Trigger, Project Context Result, What If? Question, ideation workflow draft,
  * and clarification questions when needed.
  */
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -30,7 +31,6 @@ import {
   HelpCircle,
   ClipboardCheck,
   RefreshCw,
-  Activity,
 } from "lucide-react";
 import type { TranslateResponse } from "@shared/ps-context-translator-types";
 
@@ -47,14 +47,19 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
   const utils = trpc.useUtils();
 
   // Service runtime health (catalog → service resolution)
-  const { data: runtime } = trpc.ps.ideation.contextTranslator.resolveRuntime.useQuery(
-    undefined,
-    { staleTime: 30_000, refetchInterval: 60_000 },
-  );
+  const { data: runtime, isFetching: isHealthChecking, dataUpdatedAt } =
+    trpc.ps.ideation.contextTranslator.resolveRuntime.useQuery(
+      undefined,
+      { staleTime: 30_000, refetchInterval: 60_000 },
+    );
 
   const serviceAvailable = runtime?.health?.available === true;
   const serviceStatus = runtime?.health?.status ?? "unknown";
   const isBuiltIn = serviceStatus === "built-in";
+
+  const handleRefreshHealth = useCallback(() => {
+    utils.ps.ideation.contextTranslator.resolveRuntime.invalidate();
+  }, [utils]);
 
   const translateMut = trpc.ps.ideation.contextTranslator.translate.useMutation({
     onSuccess: (data) => {
@@ -103,24 +108,63 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
           <CardTitle className="flex items-center gap-2 text-sm">
             <Sparkles className="w-4 h-4 text-purple-500" />
             Project Context Translator
-            {/* Service health badge */}
-            {runtime && (
-              <Badge
-                variant="outline"
-                className={`ml-auto text-[10px] flex items-center gap-1 ${
-                  serviceAvailable
-                    ? isBuiltIn
-                      ? "bg-blue-500/10 text-blue-600 border-blue-500/30"
-                      : "bg-green-500/10 text-green-600 border-green-500/30"
-                    : "bg-red-500/10 text-red-500 border-red-500/30"
-                }`}
-              >
-                <Activity className="w-3 h-3" />
-                {serviceAvailable
-                  ? isBuiltIn ? "Built-in Mode" : "Service Online"
-                  : "Service Offline"}
-              </Badge>
-            )}
+            {/* Service status pill with tooltip */}
+            <div className="ml-auto flex items-center gap-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleRefreshHealth}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer border ${
+                      isHealthChecking
+                        ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                        : serviceAvailable
+                          ? isBuiltIn
+                            ? "bg-blue-500/10 text-blue-600 border-blue-500/30"
+                            : "bg-green-500/10 text-green-600 border-green-500/30"
+                          : "bg-red-500/10 text-red-500 border-red-500/30"
+                    }`}
+                  >
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${
+                      isHealthChecking
+                        ? "bg-amber-500 animate-pulse"
+                        : serviceAvailable
+                          ? isBuiltIn ? "bg-blue-500" : "bg-green-500"
+                          : "bg-red-500"
+                    }`} />
+                    {isHealthChecking
+                      ? "Checking..."
+                      : serviceAvailable
+                        ? isBuiltIn ? "Built-in" : "Online"
+                        : "Offline"}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[240px]">
+                  <div className="space-y-1">
+                    <p className="font-medium">
+                      {isHealthChecking
+                        ? "Checking service status..."
+                        : serviceAvailable
+                          ? isBuiltIn
+                            ? "Built-in LLM Translator"
+                            : "Python Service Online"
+                          : "Service Offline"}
+                    </p>
+                    {runtime?.target && (
+                      <p className="text-[10px] opacity-70">
+                        Catalog: {runtime.target.catalogEntryName || runtime.target.displayName || "resolved"}
+                      </p>
+                    )}
+                    {dataUpdatedAt > 0 && (
+                      <p className="text-[10px] opacity-70">
+                        Checked: {new Date(dataUpdatedAt).toLocaleTimeString()}
+                      </p>
+                    )}
+                    <p className="text-[10px] opacity-50">Click to refresh</p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -132,33 +176,37 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
             <div className="flex items-start gap-2 p-2 rounded bg-red-500/5 border border-red-500/20">
               <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
               <div className="text-xs text-red-600">
-                <span className="font-medium">Service unavailable</span>
+                <span className="font-medium">All translation backends unavailable</span>
                 {runtime.health?.error && <span className="block text-red-500/80 mt-0.5">{runtime.health.error}</span>}
+                <span className="block text-red-500/70 mt-0.5">Configure an LLM provider or start the Python service to enable translation.</span>
               </div>
             </div>
           )}
           {runtime && serviceAvailable && isBuiltIn && (
-            <div className="flex items-start gap-2 p-2 rounded bg-blue-500/5 border border-blue-500/20">
-              <Sparkles className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-              <div className="text-xs text-blue-600">
-                <span className="font-medium">Using built-in LLM translator</span>
-                <span className="block text-blue-500/80 mt-0.5">Python service offline — analysis runs via platform LLM providers</span>
-              </div>
+            <div className="flex items-center gap-2 p-2 rounded bg-blue-500/5 border border-blue-500/20">
+              <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+              <span className="text-xs text-blue-600">
+                Using built-in translator — Python service offline
+              </span>
             </div>
           )}
           <Textarea
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
-            placeholder="Describe your project idea, situation, or scenario in detail. Include any context about what's driving the need, what problems exist, what opportunities you see..."
+            placeholder={
+              runtime && !serviceAvailable
+                ? "Translation is currently unavailable — configure an LLM provider or start the Python service first."
+                : "Describe your project idea, situation, or scenario in detail. Include any context about what's driving the need, what problems exist, what opportunities you see..."
+            }
             rows={6}
-            disabled={disabled || translateMut.isPending}
-            className="text-sm"
+            disabled={disabled || translateMut.isPending || (runtime != null && !serviceAvailable)}
+            className={`text-sm ${runtime && !serviceAvailable ? "opacity-50" : ""}`}
           />
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{rawText.length}/10000</span>
             <Button
               onClick={handleTranslate}
-              disabled={disabled || translateMut.isPending || rawText.trim().length < 10}
+              disabled={disabled || translateMut.isPending || rawText.trim().length < 10 || (runtime != null && !serviceAvailable)}
               size="sm"
             >
               {translateMut.isPending ? (
@@ -166,7 +214,13 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
               ) : (
                 <Sparkles className="w-4 h-4 mr-1" />
               )}
-              {translateMut.isPending ? "Analyzing..." : "Translate Context"}
+              {translateMut.isPending
+                ? "Analyzing..."
+                : runtime && !serviceAvailable
+                  ? "Service Unavailable"
+                  : isBuiltIn
+                    ? "Translate (Built-in)"
+                    : "Translate Context"}
             </Button>
           </div>
         </CardContent>
