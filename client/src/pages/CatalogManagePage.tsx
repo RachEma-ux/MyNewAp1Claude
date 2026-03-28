@@ -87,6 +87,7 @@ import {
   getLifecycleSteps,
   getLifecycleProgress,
   getAvailableActions,
+  isExecutionEligible,
 } from "@shared/catalog-lifecycle";
 import type { LifecycleEntry } from "@shared/catalog-lifecycle";
 import { CatalogSelect } from "@/components/CatalogSelect";
@@ -3658,6 +3659,28 @@ function LifecyclePanel({
         </CardContent>
       </Card>
 
+      {/* Execution Eligibility */}
+      {(() => {
+        const elig = isExecutionEligible(lifecycleEntry);
+        return !elig.eligible ? (
+          <Card className="border-amber-600/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-amber-400 flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                Not Runnable
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ul className="text-xs text-muted-foreground space-y-1">
+                {elig.reasons.map((r, i) => (
+                  <li key={i}>• {r}</li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ) : null;
+      })()}
+
       <ExecutionObservabilityPanel
         entryId={entry.id}
         entryName={entry.displayName || entry.name}
@@ -4391,6 +4414,9 @@ function ExecutionObservabilityPanel({
                         {run.blockerCode === "service_execution_error" && (
                           <span className="font-medium">Service Offline — </span>
                         )}
+                        {run.blockerCode === "catalog_entry_inactive" && (
+                          <span className="font-medium text-amber-400">Not Active — </span>
+                        )}
                         {run.blockerSummary}
                       </div>
                     )}
@@ -4462,6 +4488,14 @@ function ExecutionObservabilityPanel({
                         <div className="text-xs">{selectedRun.blockerSummary}</div>
                         <div className="text-[10px] text-red-400/70 mt-1">
                           Blocker: {selectedRun.blockerCode} / {selectedRun.blockerCategory || "technical_error"}
+                        </div>
+                      </>
+                    ) : selectedRun.blockerCode === "catalog_entry_inactive" ? (
+                      <>
+                        <div className="font-medium text-amber-300">Lifecycle: Not Active</div>
+                        <div className="text-xs">{selectedRun.blockerSummary}</div>
+                        <div className="text-[10px] text-amber-400/70 mt-1">
+                          The entry must be activated through the Catalog lifecycle before it can run.
                         </div>
                       </>
                     ) : (

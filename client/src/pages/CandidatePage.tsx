@@ -8,6 +8,7 @@ import {
   ENTRY_TYPE_DEFS,
 } from "@shared/catalog-taxonomy";
 import type { EntryType } from "@shared/catalog-taxonomy";
+import { getExecutionStatus } from "@shared/catalog-lifecycle";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -1588,12 +1589,29 @@ export default function CandidatePage() {
                                   )}
                                   Publish
                                 </Button>
-                              ) : (
-                                <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
-                                  <Rocket className="h-3 w-3 mr-1" />
-                                  Published
-                                </Badge>
-                              )}
+                              ) : (() => {
+                                const execStatus = getExecutionStatus({
+                                  status: entry.status,
+                                  reviewState: entry.reviewState || "",
+                                  stageReviews: entry.stageReviews,
+                                  validationStatus: entry.validationStatus,
+                                  tags: entry.tags,
+                                });
+                                return execStatus.runnable ? (
+                                  <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                                    <Rocket className="h-3 w-3 mr-1" />
+                                    Published
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    className="text-xs bg-amber-600/20 text-amber-400 border-amber-600/30"
+                                    title={execStatus.reasons.join("; ")}
+                                  >
+                                    <Rocket className="h-3 w-3 mr-1" />
+                                    {execStatus.label}
+                                  </Badge>
+                                );
+                              })()}
                             </div>
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5">

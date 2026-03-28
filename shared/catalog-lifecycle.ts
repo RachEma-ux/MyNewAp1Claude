@@ -109,12 +109,18 @@ export function getLifecycleSteps(entry: LifecycleEntry): LifecycleStep[] {
   });
 
   // Step 3: Activated
-  const isActive = entry.status === "active";
+  // Tags past activation (validated/published) imply activation happened,
+  // even if entry.status drifted from "active" (e.g. after import or re-draft).
+  const tags = entry.tags || [];
+  const impliedActive = tags.includes("validated") || tags.includes("published");
+  const isActive = entry.status === "active" || impliedActive;
   steps.push({
     key: "activate",
     label: "Activated",
     status: isActive ? "done" : regStatus === "approved" ? "current" : "pending",
-    detail: isActive ? "active" : entry.status,
+    detail: isActive
+      ? (entry.status === "active" ? "active" : `active (via ${tags.includes("published") ? "published" : "validated"} tag)`)
+      : entry.status,
   });
 
   // Step 4: Validation (4-step handshake)
@@ -189,5 +195,86 @@ export function getStageReviewSummary(stageReviews?: Record<string, string> | nu
     register: map("register"),
     validate: map("validate"),
     publish: map("publish"),
+  };
+}
+
+/**
+ * Check if a catalog entry is eligible for execution.
+ * Both the "published" tag AND active status are required for service-backed entries.
+ * Returns { eligible, reasons } so callers can display specific blockers.
+ */
+export function isExecutionEligible(entry: LifecycleEntry): { eligible: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  const tags = entry.tags || [];
+
+  if (entry.status !== "active") {
+    reasons.push(`Status is "${entry.status}" — must be "active"`);
+  }
+  if (!tags.includes("published")) {
+    reasons.push("Missing \"published\" tag — entry has not completed the publish stage");
+  }
+  const sr = entry.stageReviews || {};
+  if (sr.validate !== "approved") {
+    reasons.push("Validation review not approved");
+  }
+
+  return { eligible: reasons.length === 0, reasons };
+}
+
+/**
+ * Execution status tiers for consistent badge rendering across all surfaces.
+ *
+ * Lifecycle truth model:
+ *   - "Published" = publish stage tag present (does NOT imply runnable)
+ *   - "Active"    = entry.status === "active" (requires activation after register approval)
+ *   - "Runnable"  = derived: active + published tag + validation approved
+ *
+ * Tiers:
+ *   "published"       — fully runnable (green badge: "Published")
+ *   "published_not_active" — publish tag present but status !== active (amber: "Publish Approved (Not Active)")
+ *   "published_not_runnable" — published + active but missing validation (amber: "Published (Not Runnable)")
+ *   "not_published"   — no published tag (no badge)
+ */
+export type ExecutionStatusTier =
+  | "published"
+  | "published_not_active"
+  | "published_not_runnable"
+  | "not_published";
+
+export interface ExecutionStatus {
+  tier: ExecutionStatusTier;
+  label: string;
+  runnable: boolean;
+  reasons: string[];
+}
+
+export function getExecutionStatus(entry: LifecycleEntry): ExecutionStatus {
+  const tags = entry.tags || [];
+  const hasPublishedTag = tags.includes("published");
+
+  if (!hasPublishedTag) {
+    return { tier: "not_published", label: "", runnable: false, reasons: ["Not yet published"] };
+  }
+
+  const elig = isExecutionEligible(entry);
+
+  if (elig.eligible) {
+    return { tier: "published", label: "Published", runnable: true, reasons: [] };
+  }
+
+  if (entry.status !== "active") {
+    return {
+      tier: "published_not_active",
+      label: "Publish Approved (Not Active)",
+      runnable: false,
+      reasons: elig.reasons,
+    };
+  }
+
+  return {
+    tier: "published_not_runnable",
+    label: "Published (Not Runnable)",
+    runnable: false,
+    reasons: elig.reasons,
   };
 }

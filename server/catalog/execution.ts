@@ -67,14 +67,26 @@ export async function resolveServiceAgentExecutionTarget(
 
   // Service agents must be active
   if (entry.status !== "active") {
+    const tags = Array.isArray(entry.tags) ? entry.tags : [];
+    const hasPublishedTag = tags.includes("published");
+    const details = [`Current status: ${entry.status}`];
+    const actions: string[] = [];
+    if (hasPublishedTag && entry.status === "draft") {
+      details.push("Entry has the \"published\" tag but status is still \"draft\" — activation was never completed.");
+      actions.push("Complete the activation step in the Catalog lifecycle (Register Review → Activate), then try again.");
+    } else {
+      actions.push("Activate the Catalog entry, then try again.");
+    }
     throw createAppBlockerError({
       code: "catalog_entry_inactive",
       category: "lifecycle_rule",
       title: "This service agent is not active",
-      summary: "This service-backed Catalog entry cannot run because it is not currently active.",
-      details: [`Current status: ${entry.status}`],
-      recommendedActions: ["Activate the Catalog entry, then try again."],
-      context: { catalogEntryId, status: entry.status },
+      summary: hasPublishedTag
+        ? `This entry has publish approval but is not active (status: ${entry.status}). Activation is required before execution.`
+        : "This service-backed Catalog entry cannot run because it is not currently active.",
+      details,
+      recommendedActions: actions,
+      context: { catalogEntryId, status: entry.status, tags },
     }, "CONFLICT");
   }
 
@@ -171,14 +183,21 @@ export async function resolveCatalogAgentExecutionTarget(catalogEntryId: number)
       code: "catalog_entry_inactive",
       category: "lifecycle_rule",
       title: "This agent is not active",
-      summary: "This Catalog entry cannot run because it is not currently active.",
+      summary: hasPublishedCatalogTag(tags)
+        ? `This entry has publish approval but is not active (status: ${entry.status}). Activation is required before execution.`
+        : "This Catalog entry cannot run because it is not currently active.",
       details: [
         `Current status: ${entry.status}`,
+        ...(hasPublishedCatalogTag(tags) && entry.status === "draft"
+          ? ["Entry has the \"published\" tag but status is still \"draft\" — activation was never completed."]
+          : []),
       ],
       recommendedActions: [
-        "Activate the published Catalog entry, then try again.",
+        hasPublishedCatalogTag(tags) && entry.status === "draft"
+          ? "Complete the activation step in the Catalog lifecycle (Register Review → Activate), then try again."
+          : "Activate the published Catalog entry, then try again.",
       ],
-      context: { catalogEntryId, status: entry.status },
+      context: { catalogEntryId, status: entry.status, tags },
     }, "CONFLICT");
   }
 
