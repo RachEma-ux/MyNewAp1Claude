@@ -280,7 +280,7 @@ export async function getWorkerStatus() {
 export async function initializeAdapters() {
   // 1. Documents pilot adapter (always registered)
   try {
-    const { documentsGraphRagAdapter } = require("./adapters/documents-adapter");
+    const { documentsGraphRagAdapter } = await import("./adapters/documents-adapter");
     await registerSource(documentsGraphRagAdapter);
     console.log("[GraphRAG] Documents pilot adapter initialized and registered");
   } catch (err: any) {
@@ -290,7 +290,7 @@ export async function initializeAdapters() {
   // 2. Sample datasets (dev/test only — never in production)
   if (process.env.NODE_ENV !== "production") {
     try {
-      const { sampleDatasetAdapters } = require("./adapters/sample-datasets-adapter");
+      const { sampleDatasetAdapters } = await import("./adapters/sample-datasets-adapter");
       let registered = 0;
       for (const adapter of sampleDatasetAdapters) {
         try {
