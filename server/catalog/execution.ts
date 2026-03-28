@@ -129,8 +129,8 @@ export async function resolveCatalogAgentExecutionTarget(catalogEntryId: number)
 
   // Service-backed agents have their own execution path — they should not
   // reach this LLM-chat resolver. If they do, give a clear error.
-  const config = entry.config as Record<string, unknown> | null;
-  if (isServiceBasedAgent(config)) {
+  const entryConfig = entry.config as Record<string, unknown> | null;
+  if (isServiceBasedAgent(entryConfig)) {
     throw createAppBlockerError({
       code: "service_agent_wrong_path",
       category: "validation_error",
