@@ -295,7 +295,7 @@ export const catalogImportRouter = router({
           const rd = input.runtimeDefaults;
 
           // 1. Resolve providerId — the real relational field validation reads
-          //    Priority: explicit admin selection > config.providerId from file > null
+          //    Priority: admin selection > numeric config.providerId > providerType match > null
           let resolvedProviderId: number | null = null;
           if (rd?.providerId) {
             const parsed = parseInt(rd.providerId, 10);
@@ -306,6 +306,24 @@ export const catalogImportRouter = router({
               ? finalConfig.providerId
               : parseInt(String(finalConfig.providerId), 10);
             if (!isNaN(parsed)) resolvedProviderId = parsed;
+          }
+          // Fallback: resolve providerType slug (e.g. "openai") to a registered provider
+          if (!resolvedProviderId && finalConfig.providerType) {
+            const typeMap: Record<string, string> = {
+              ollama: "local-ollama", openai: "openai", anthropic: "anthropic",
+              google: "google", groq: "groq",
+            };
+            const dbType = typeMap[finalConfig.providerType] || finalConfig.providerType;
+            const allProviders = await import("../providers/db").then((m) => m.getAllProviders());
+            const match = allProviders.find((p: any) => {
+              if (p.type !== dbType) return false;
+              if (finalConfig.baseUrl) {
+                const pConfig = (p.config as Record<string, any>) || {};
+                return pConfig.baseUrl === finalConfig.baseUrl;
+              }
+              return true;
+            });
+            if (match) resolvedProviderId = match.id;
           }
 
           // 2. For model/llm/provider entries: persist providerId in config too

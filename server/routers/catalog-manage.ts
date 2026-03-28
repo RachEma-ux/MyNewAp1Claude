@@ -439,12 +439,44 @@ export const catalogManageRouter = router({
 
       try {
         // Resolve the provider: use providerId from entry, or find by config
-        let providerId = entry.providerId;
-        if (!providerId) {
-          const config = entry.config as Record<string, any> | null;
-          if (config?.providerId) {
-            providerId = config.providerId;
-          }
+        let providerId: number | null = entry.providerId ?? null;
+        const config = entry.config as Record<string, any> | null;
+
+        // Try config.providerId — must be numeric (string slugs like "openai" are not valid IDs)
+        if (!providerId && config?.providerId) {
+          const parsed = typeof config.providerId === "number"
+            ? config.providerId
+            : parseInt(String(config.providerId), 10);
+          if (!isNaN(parsed)) providerId = parsed;
+        }
+
+        // Try matching by providerType from config (discovery sets this)
+        if (!providerId && config?.providerType) {
+          const typeMap: Record<string, string> = {
+            ollama: "local-ollama", openai: "openai", anthropic: "anthropic",
+            google: "google", groq: "groq",
+          };
+          const dbType = typeMap[config.providerType] || config.providerType;
+          const allProviders = await providerDb.getAllProviders();
+          const match = allProviders.find((p: any) => {
+            if (p.type !== dbType) return false;
+            if (config.baseUrl) {
+              const pConfig = (p.config as Record<string, any>) || {};
+              return pConfig.baseUrl === config.baseUrl;
+            }
+            return true;
+          });
+          if (match) providerId = match.id;
+        }
+
+        // Try matching by string slug in config.providerId (e.g. "openai" → provider named "openai")
+        if (!providerId && config?.providerId && typeof config.providerId === "string") {
+          const slug = config.providerId.toLowerCase();
+          const allProviders = await providerDb.getAllProviders();
+          const match = allProviders.find((p: any) =>
+            p.name?.toLowerCase() === slug || p.type?.toLowerCase() === slug
+          );
+          if (match) providerId = match.id;
         }
 
         if (!providerId) {
@@ -475,7 +507,12 @@ export const catalogManageRouter = router({
         const provider = registry.getProvider(providerId);
 
         if (!provider) {
-          errors.push(`Provider ID ${providerId} not found in runtime registry (may not be initialized).`);
+          // Check if provider exists in DB but failed to initialize (e.g. missing API key)
+          const dbProvider = await providerDb.getProviderById(providerId);
+          const hint = dbProvider
+            ? `Provider "${dbProvider.name}" (${dbProvider.type}) exists but failed to initialize — check that its API key is configured.`
+            : `Provider ID ${providerId} not found in the database or runtime registry.`;
+          errors.push(hint);
           await updateCatalogEntry(input.id, { status: previousStatus }, 1);
           const { getDb } = await import("../db");
           const db = getDb();
