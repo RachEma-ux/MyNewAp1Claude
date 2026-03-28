@@ -42,6 +42,9 @@ for (const f of IMPORT_CANONICAL_FIELDS) {
   FIELD_ALIASES[f.toLowerCase()] = f;
 }
 
+// Set of lowercase canonical field names — used to distinguish "alias used" vs "canonical name"
+const CANONICAL_LOWER = new Set([...IMPORT_CANONICAL_FIELDS].map((f) => f.toLowerCase()));
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -94,8 +97,8 @@ interface NormalizationResult {
 function normalizeFieldName(key: string): NormalizationResult {
   const lower = key.toLowerCase().trim();
   const canonical = FIELD_ALIASES[lower] ?? null;
-  // It's an alias if the lowercase doesn't exactly match a canonical name
-  const wasAlias = canonical !== null && !IMPORT_CANONICAL_FIELDS.has(lower);
+  // It's an alias if the lowercase key is NOT a canonical name (case-insensitive)
+  const wasAlias = canonical !== null && !CANONICAL_LOWER.has(lower);
   return { canonical, wasAlias, originalKey: key };
 }
 
