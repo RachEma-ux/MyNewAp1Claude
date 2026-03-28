@@ -747,6 +747,7 @@ export const catalogManageRouter = router({
       }
 
       // Governance gate: run Register stage review (activation requires register approval)
+      const classifications = await getEntryClassifications(input.id);
       const review = evaluateStageReview(
         {
           id: entry.id,
@@ -759,6 +760,7 @@ export const catalogManageRouter = router({
           status: entry.status,
           validationStatus: (entry as any).validationStatus || undefined,
           stageReviews: (entry as any).stageReviews || {},
+          classifications: classifications.map(c => c.label),
         },
         "register",
         { id: String(ctx.user.id), role: ctx.user.role || "admin" }
