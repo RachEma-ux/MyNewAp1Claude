@@ -55,10 +55,19 @@ app = FastAPI(
 # ── Pydantic Models ─────────────────────────────────────────────────────────
 
 
+class LlmOverride(BaseModel):
+    """Optional LLM override from the platform's Default Reasoning LLM selection."""
+    provider: Optional[str] = Field(default=None, description="LLM provider (openai | anthropic)")
+    model: Optional[str] = Field(default=None, description="Model identifier")
+    apiBaseUrl: Optional[str] = Field(default=None, description="API base URL")
+    catalogRef: Optional[str] = Field(default=None, description="Catalog entry name for audit trail")
+
+
 class TranslateRequest(BaseModel):
     """Input: raw user text and optional metadata."""
     rawText: str = Field(..., min_length=10, max_length=10000, description="Raw user input describing a project idea or scenario")
     metadata: Optional[dict] = Field(default=None, description="Optional metadata (workspaceId, sourceType, etc.)")
+    llmOverride: Optional[LlmOverride] = Field(default=None, description="Platform-provided LLM override from agent config")
 
 
 class DecisionGate(BaseModel):
@@ -267,18 +276,33 @@ Return a JSON object with this exact structure (no markdown fences, just raw JSO
 """
 
 
-async def _call_llm(user_content: str) -> dict:
+async def _call_llm(
+    user_content: str,
+    override: Optional["LlmOverride"] = None,
+) -> dict:
     """Call the configured LLM provider and parse structured JSON response.
 
     Args:
         user_content: Pre-built user message content (enriched with
                       spaCy preprocessing evidence when available).
+        override: Optional platform-provided LLM override from the agent's
+                  Default Reasoning LLM selection. When present, overrides
+                  the env-based provider/model/base_url config.
     """
-    if not LLM_API_KEY:
+    # Resolve effective LLM config — override wins over env
+    eff_provider = (override.provider if override and override.provider else None) or LLM_PROVIDER
+    eff_model = (override.model if override and override.model else None) or LLM_MODEL
+    eff_base_url = (override.apiBaseUrl if override and override.apiBaseUrl else None) or LLM_BASE_URL
+    eff_api_key = LLM_API_KEY  # API key always from env (never sent over the wire)
+
+    if not eff_api_key:
         raise HTTPException(
             status_code=503,
             detail="LLM API key not configured. Set PCT_LLM_API_KEY environment variable.",
         )
+
+    if override and (override.provider or override.model):
+        logger.info(f"LLM override active: provider={eff_provider} model={eff_model} catalogRef={override.catalogRef}")
 
     user_message = user_content
 
@@ -291,30 +315,30 @@ async def _call_llm(user_content: str) -> dict:
         "Content-Type": "application/json",
     }
 
-    if LLM_PROVIDER == "anthropic":
+    if eff_provider == "anthropic":
         # Anthropic API format
-        headers["x-api-key"] = LLM_API_KEY
+        headers["x-api-key"] = eff_api_key
         headers["anthropic-version"] = "2023-06-01"
         body = {
-            "model": LLM_MODEL,
+            "model": eff_model,
             "max_tokens": LLM_MAX_TOKENS,
             "system": _system_prompt + "\n\n" + RESPONSE_SCHEMA_HINT,
             "messages": [{"role": "user", "content": user_message}],
         }
-        url = LLM_BASE_URL.rstrip("/") + "/messages" if "anthropic" in LLM_BASE_URL else "https://api.anthropic.com/v1/messages"
+        url = eff_base_url.rstrip("/") + "/messages" if "anthropic" in eff_base_url else "https://api.anthropic.com/v1/messages"
     else:
         # OpenAI-compatible API format (default)
-        headers["Authorization"] = f"Bearer {LLM_API_KEY}"
+        headers["Authorization"] = f"Bearer {eff_api_key}"
         body = {
-            "model": LLM_MODEL,
+            "model": eff_model,
             "messages": messages,
             "max_tokens": LLM_MAX_TOKENS,
             "temperature": 0.3,
         }
-        url = LLM_BASE_URL.rstrip("/") + "/chat/completions"
+        url = eff_base_url.rstrip("/") + "/chat/completions"
 
     async with httpx.AsyncClient(timeout=120.0) as client:
-        logger.info(f"Calling LLM: provider={LLM_PROVIDER} model={LLM_MODEL} url={url}")
+        logger.info(f"Calling LLM: provider={eff_provider} model={eff_model} url={url}")
         resp = await client.post(url, json=body, headers=headers)
 
         if resp.status_code != 200:
@@ -432,7 +456,7 @@ async def translate(req: TranslateRequest):
 
     # ── Step 4: Call LLM reasoning layer ─────────────────────────────────
     try:
-        result = await _call_llm(user_content)
+        result = await _call_llm(user_content, override=req.llmOverride)
     except HTTPException:
         raise
     except Exception as e:

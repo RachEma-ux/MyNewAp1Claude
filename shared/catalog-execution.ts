@@ -87,3 +87,22 @@ export function resolveCatalogRuntimeKind(
   if (isCatalogServiceAgent(config)) return "service";
   return "llm-chat";
 }
+
+// ── Agent Reasoning LLM Reference ────────────────────────────────────
+
+/**
+ * Extract the Default Reasoning LLM catalog entry reference from an
+ * agent's config. Returns the catalog entry ID as a string, or null
+ * if not configured.
+ *
+ * Stored at config.agent.defaultReasoningLlmRef.
+ */
+export function getDefaultReasoningLlmRef(
+  config: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!config) return null;
+  const agent = config.agent as Record<string, unknown> | undefined;
+  if (!agent) return null;
+  const ref = agent.defaultReasoningLlmRef;
+  return typeof ref === "string" && ref.length > 0 ? ref : null;
+}

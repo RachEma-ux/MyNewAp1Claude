@@ -9,9 +9,17 @@ const SERVICE_URL = process.env.PROJECT_CONTEXT_TRANSLATOR_URL || "http://localh
 
 // ── Types (mirror Python Pydantic models) ─────────────────────────────────
 
+export interface LlmOverride {
+  provider?: string;
+  model?: string;
+  apiBaseUrl?: string;
+  catalogRef?: string;
+}
+
 export interface TranslateRequest {
   rawText: string;
   metadata?: Record<string, unknown>;
+  llmOverride?: LlmOverride;
 }
 
 export interface DecisionGate {

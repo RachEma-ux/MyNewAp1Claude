@@ -18,11 +18,16 @@
  */
 
 import { getCatalogEntryById } from "../db";
-import { resolveCatalogRuntimeKind, type CatalogRuntimeKind } from "@shared/catalog-execution";
+import {
+  resolveCatalogRuntimeKind,
+  getDefaultReasoningLlmRef,
+  type CatalogRuntimeKind,
+} from "@shared/catalog-execution";
 import {
   executeCatalogChatStream,
   executeServiceAgentStream,
   type CatalogExecutionEvent,
+  type ReasoningLlmContext,
 } from "./execution";
 
 export interface CatalogInvokeInput {
@@ -95,7 +100,27 @@ export async function* invokeCatalogEntry(
   const config = entry.config as Record<string, unknown> | null;
   const runtimeKind = resolveCatalogRuntimeKind(config);
 
-  // 2. Dispatch to the correct adapter
+  // 2a. Resolve Default Reasoning LLM if configured
+  let reasoningLlm: ReasoningLlmContext | undefined;
+  const llmRef = getDefaultReasoningLlmRef(config);
+  if (llmRef) {
+    const llmEntryId = parseInt(llmRef, 10);
+    if (!isNaN(llmEntryId) && llmEntryId > 0) {
+      const llmEntry = await getCatalogEntryById(llmEntryId);
+      if (llmEntry && llmEntry.entryType === "llm") {
+        const llmConfig = llmEntry.config as Record<string, unknown> | null;
+        reasoningLlm = {
+          catalogEntryId: llmEntry.id,
+          catalogEntryName: llmEntry.name,
+          provider: (llmConfig?.provider as string) || (llmConfig?.llmProvider as string) || undefined,
+          model: (llmConfig?.model as string) || (llmConfig?.modelId as string) || (llmConfig?.llmModel as string) || undefined,
+          apiBaseUrl: (llmConfig?.baseUrl as string) || (llmConfig?.apiBaseUrl as string) || undefined,
+        };
+      }
+    }
+  }
+
+  // 2b. Dispatch to the correct adapter
   const resolvedTrigger = triggerSource ?? `catalog_invoke`;
 
   switch (runtimeKind) {
@@ -105,6 +130,7 @@ export async function* invokeCatalogEntry(
         actorUserId,
         message,
         triggerSource: resolvedTrigger,
+        reasoningLlm,
       });
       break;
 

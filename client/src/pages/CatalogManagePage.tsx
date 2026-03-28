@@ -188,6 +188,7 @@ export default function CatalogManagePage() {
   const [formClassifications, setFormClassifications] = useState<number[]>([]);
   const [formCapabilities, setFormCapabilities] = useState<string[]>([]);
   const [formProviderId, setFormProviderId] = useState<string>("");
+  const [formDefaultReasoningLlm, setFormDefaultReasoningLlm] = useState<string>("");
   const [createStep, setCreateStep] = useState(0);
 
   // Discovery state
@@ -478,6 +479,7 @@ export default function CatalogManagePage() {
     setFormClassifications([]);
     setFormCapabilities([]);
     setFormProviderId("");
+    setFormDefaultReasoningLlm("");
     setCreateStep(0);
     setDialogOpen(true);
   }
@@ -493,6 +495,9 @@ export default function CatalogManagePage() {
     setFormClassifications([]);
     setFormCapabilities(entry.capabilities || []);
     setFormProviderId(entry.providerId ? String(entry.providerId) : "");
+    // Load existing default reasoning LLM from config
+    const agentConfig = (entry.config as Record<string, any>)?.agent;
+    setFormDefaultReasoningLlm(agentConfig?.defaultReasoningLlmRef ? String(agentConfig.defaultReasoningLlmRef) : "");
     setDialogOpen(true);
     // Load classifications from DB
     trpcUtils.catalogManage.getClassifications
@@ -532,6 +537,22 @@ export default function CatalogManagePage() {
       base = JSON.parse(formConfig);
     } catch {
       // Keep empty on parse error
+    }
+
+    // Merge Default Reasoning LLM ref for agent entries
+    if (formEntryType === "agent" && formDefaultReasoningLlm) {
+      const agentBlock = (base.agent as Record<string, unknown>) || {};
+      agentBlock.defaultReasoningLlmRef = formDefaultReasoningLlm;
+      base.agent = agentBlock;
+    } else if (formEntryType === "agent" && !formDefaultReasoningLlm) {
+      // Clear the ref if admin deselects
+      const agentBlock = (base.agent as Record<string, unknown>) || {};
+      delete agentBlock.defaultReasoningLlmRef;
+      if (Object.keys(agentBlock).length > 0) {
+        base.agent = agentBlock;
+      } else {
+        delete base.agent;
+      }
     }
 
     if (isEnterprise) {
@@ -1488,6 +1509,21 @@ export default function CatalogManagePage() {
                     placeholder="local, ollama, inference"
                   />
                 </div>
+                {/* Default Reasoning LLM — agent entries only */}
+                {(editingEntry ? editingEntry.entryType === "agent" : formEntryType === "agent") && (
+                  <div className="grid gap-2">
+                    <Label>Default Reasoning LLM</Label>
+                    <CatalogSelect
+                      entryType="llm"
+                      value={formDefaultReasoningLlm}
+                      onValueChange={v => setFormDefaultReasoningLlm(v || "")}
+                      placeholder="Select a catalog LLM for reasoning..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Which catalog LLM this agent should use for internal reasoning work. Leave empty to use the service default.
+                    </p>
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label className="flex items-center gap-2">
                     Configuration (JSON)

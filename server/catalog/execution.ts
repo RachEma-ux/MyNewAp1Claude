@@ -533,6 +533,18 @@ export async function getExecutionRunForUi(runId: number) {
 }
 
 /**
+ * Resolved reasoning LLM context from the agent's config.agent.defaultReasoningLlmRef.
+ * Passed to service adapters so they can use the admin-selected LLM.
+ */
+export interface ReasoningLlmContext {
+  catalogEntryId: number;
+  catalogEntryName: string;
+  provider?: string;
+  model?: string;
+  apiBaseUrl?: string;
+}
+
+/**
  * Execute a service-backed agent via HTTP dispatch.
  * This bypasses the LLM-chat pipeline entirely — dispatches the user message
  * to the service's translate endpoint and streams back the result.
@@ -542,6 +554,7 @@ export async function* executeServiceAgentStream(input: {
   actorUserId: number;
   message: string;
   triggerSource?: string;
+  reasoningLlm?: ReasoningLlmContext;
 }): AsyncGenerator<CatalogExecutionEvent> {
   const triggerSource = input.triggerSource ?? "catalog_service";
 
@@ -595,10 +608,20 @@ export async function* executeServiceAgentStream(input: {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
 
+    const requestBody: Record<string, unknown> = { rawText: input.message };
+    if (input.reasoningLlm) {
+      requestBody.llmOverride = {
+        provider: input.reasoningLlm.provider,
+        model: input.reasoningLlm.model,
+        apiBaseUrl: input.reasoningLlm.apiBaseUrl,
+        catalogRef: input.reasoningLlm.catalogEntryName,
+      };
+    }
+
     const resp = await fetch(serviceTarget.serviceTarget.translateUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rawText: input.message }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
 
