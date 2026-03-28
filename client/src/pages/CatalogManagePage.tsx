@@ -281,6 +281,7 @@ export default function CatalogManagePage() {
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingEntry, setDeletingEntry] = useState<any>(null);
+  const [deleteReason, setDeleteReason] = useState("");
 
   // Version history dialog state
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
@@ -345,9 +346,14 @@ export default function CatalogManagePage() {
   });
   const deleteMutation = trpc.catalogManage.delete.useMutation({
     onSuccess: () => {
+      toast.success("Catalog entry deleted");
       refetch();
       setDeleteDialogOpen(false);
       setDeletingEntry(null);
+      setDeleteReason("");
+    },
+    onError: (e) => {
+      toast.error(e.message);
     },
   });
   const validateMutation = trpc.catalogManage.validate.useMutation({
@@ -2946,7 +2952,10 @@ export default function CatalogManagePage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
+        setDeleteDialogOpen(open);
+        if (!open) { setDeleteReason(""); setDeletingEntry(null); }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Entry</DialogTitle>
@@ -2956,6 +2965,17 @@ export default function CatalogManagePage() {
               remove all version history and cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          <div className="py-2">
+            <Label htmlFor="delete-reason">Reason for deletion (required)</Label>
+            <Textarea
+              id="delete-reason"
+              placeholder="e.g. Duplicate entry, replaced by newer version, no longer needed..."
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              className="mt-1"
+              rows={3}
+            />
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -2966,9 +2986,15 @@ export default function CatalogManagePage() {
             <Button
               variant="destructive"
               onClick={() =>
-                deletingEntry && deleteMutation.mutate({ id: deletingEntry.id })
+                deletingEntry && deleteMutation.mutate({
+                  id: deletingEntry.id,
+                  _evidence: {
+                    types: ["reason"],
+                    refs: [{ type: "reason", value: deleteReason.trim() }],
+                  },
+                })
               }
-              disabled={deleteMutation.isPending}
+              disabled={deleteMutation.isPending || !deleteReason.trim()}
             >
               {deleteMutation.isPending && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

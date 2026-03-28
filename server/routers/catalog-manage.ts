@@ -386,7 +386,7 @@ export const catalogManageRouter = router({
    * Delete a catalog entry and all its versions
    */
   delete: governedProcedure
-    .input(z.object({ id: z.number().int().positive() }))
+    .input(z.object({ id: z.number().int().positive() }).passthrough())
     .mutation(async ({ input }) => {
       const entry = await getCatalogEntryById(input.id);
       await deleteCatalogEntry(input.id);

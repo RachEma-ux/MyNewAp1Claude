@@ -166,6 +166,9 @@ export async function deleteCatalogEntry(id: number): Promise<void> {
   const db = getDb();
   if (!db) throw new Error("Database not available");
 
+  // Clean up all referencing tables before deleting the entry
+  await db.delete(catalogEntryClassifications).where(eq(catalogEntryClassifications.catalogEntryId, id));
+  await db.delete(executionRuns).where(eq(executionRuns.catalogEntryId, id));
   await db.delete(catalogEntryVersions).where(eq(catalogEntryVersions.catalogEntryId, id));
   await db.delete(publishBundles).where(eq(publishBundles.catalogEntryId, id));
   await db.delete(catalogEntries).where(eq(catalogEntries.id, id));
