@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Send, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
+import { WorkerOfflineBanner } from "./GraphRAGWorkerBanner";
 
 const METHODS = [
   { value: "basic", label: "Basic", description: "Keyword-based search" },
@@ -22,7 +23,11 @@ const METHODS = [
   { value: "drift", label: "DRIFT", description: "Dynamic reasoning with iterative follow-up" },
 ] as const;
 
-export function GraphRAGQueryLab() {
+interface Props {
+  workerOnline?: boolean;
+}
+
+export function GraphRAGQueryLab({ workerOnline = false }: Props) {
   const [moduleSlug, setModuleSlug] = useState("");
   const [datasetKey, setDatasetKey] = useState("");
   const [method, setMethod] = useState<string>("local");
@@ -54,7 +59,6 @@ export function GraphRAGQueryLab() {
     },
   });
 
-  // When a source is selected, populate moduleSlug and datasetKey
   function handleSourceSelect(sourceId: string) {
     const src = sources?.find((s) => String(s.id) === sourceId);
     if (src) {
@@ -79,6 +83,10 @@ export function GraphRAGQueryLab() {
 
   return (
     <div className="space-y-4 mt-4">
+      {!workerOnline && (
+        <WorkerOfflineBanner context="Querying datasets" />
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm flex items-center gap-2">
@@ -136,15 +144,17 @@ export function GraphRAGQueryLab() {
           {/* Question Input */}
           <div className="flex gap-2">
             <Input
-              placeholder="Ask a question about this dataset..."
+              placeholder={workerOnline ? "Ask a question about this dataset..." : "Worker offline — queries disabled"}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              onKeyDown={(e) => e.key === "Enter" && workerOnline && handleSubmit()}
               className="flex-1"
+              disabled={!workerOnline}
             />
             <Button
               onClick={handleSubmit}
-              disabled={queryMut.isPending || !question.trim()}
+              disabled={!workerOnline || queryMut.isPending || !question.trim()}
+              title={!workerOnline ? "Python worker is offline" : undefined}
             >
               {queryMut.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

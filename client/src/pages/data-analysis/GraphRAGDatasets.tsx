@@ -13,7 +13,11 @@ import {
 import { Loader2, RefreshCw, Play } from "lucide-react";
 import { toast } from "sonner";
 
-export function GraphRAGDatasets() {
+interface Props {
+  workerOnline?: boolean;
+}
+
+export function GraphRAGDatasets({ workerOnline = false }: Props) {
   const utils = trpc.useUtils();
   const { data: sources, isLoading } =
     trpc.dataAnalysis.graphRag.listSources.useQuery();
@@ -117,7 +121,8 @@ export function GraphRAGDatasets() {
                     size="sm"
                     variant="outline"
                     onClick={() => buildMut.mutate({ sourceId: src.id })}
-                    disabled={buildMut.isPending}
+                    disabled={!workerOnline || buildMut.isPending}
+                    title={!workerOnline ? "Python worker offline — indexing unavailable" : undefined}
                   >
                     <Play className="w-3 h-3 mr-1" />
                     Build Index
@@ -127,6 +132,11 @@ export function GraphRAGDatasets() {
             ))}
           </TableBody>
         </Table>
+        {!workerOnline && (
+          <p className="text-xs text-amber-600 mt-3">
+            Build Index is disabled — Python worker is offline. Sync operations still work.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

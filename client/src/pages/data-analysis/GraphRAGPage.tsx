@@ -3,9 +3,11 @@
  *
  * Top-level page for Data Analysis > GraphRAG.
  * Renders a tab-based navigation across all GraphRAG sub-sections.
+ * Fetches worker status once and passes it to worker-dependent tabs.
  */
 
 import { useState } from "react";
+import { trpc } from "@/lib/trpc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   LayoutDashboard,
@@ -43,6 +45,13 @@ const tabs = [
 export default function GraphRAGPage() {
   const [activeTab, setActiveTab] = useState("overview");
 
+  const { data: workerStatus } =
+    trpc.dataAnalysis.graphRag.workerStatus.useQuery(undefined, {
+      refetchInterval: 30_000,
+    });
+
+  const workerOnline = workerStatus?.healthy ?? false;
+
   return (
     <div className="space-y-6">
       <div>
@@ -70,7 +79,7 @@ export default function GraphRAGPage() {
           <GraphRAGOverview />
         </TabsContent>
         <TabsContent value="datasets">
-          <GraphRAGDatasets />
+          <GraphRAGDatasets workerOnline={workerOnline} />
         </TabsContent>
         <TabsContent value="adapters">
           <GraphRAGSourceAdapters />
@@ -79,16 +88,16 @@ export default function GraphRAGPage() {
           <GraphRAGSyncRuns />
         </TabsContent>
         <TabsContent value="index-runs">
-          <GraphRAGIndexRuns />
+          <GraphRAGIndexRuns workerOnline={workerOnline} />
         </TabsContent>
         <TabsContent value="query-lab">
-          <GraphRAGQueryLab />
+          <GraphRAGQueryLab workerOnline={workerOnline} />
         </TabsContent>
         <TabsContent value="graph-explorer">
-          <GraphRAGGraphExplorer />
+          <GraphRAGGraphExplorer workerOnline={workerOnline} />
         </TabsContent>
         <TabsContent value="community-reports">
-          <GraphRAGCommunityReports />
+          <GraphRAGCommunityReports workerOnline={workerOnline} />
         </TabsContent>
         <TabsContent value="settings">
           <GraphRAGSettings />

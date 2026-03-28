@@ -12,8 +12,13 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, GitFork, CircleDot, ArrowRight, Users } from "lucide-react";
+import { WorkerOfflineBanner } from "./GraphRAGWorkerBanner";
 
-export function GraphRAGGraphExplorer() {
+interface Props {
+  workerOnline?: boolean;
+}
+
+export function GraphRAGGraphExplorer({ workerOnline = false }: Props) {
   const [moduleSlug, setModuleSlug] = useState("");
   const [datasetKey, setDatasetKey] = useState("");
 
@@ -49,6 +54,10 @@ export function GraphRAGGraphExplorer() {
 
   return (
     <div className="space-y-4 mt-4">
+      {!workerOnline && (
+        <WorkerOfflineBanner context="Graph exploration" />
+      )}
+
       {/* Source Selector */}
       <Card>
         <CardContent className="pt-4">

@@ -11,8 +11,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, FileText } from "lucide-react";
+import { WorkerOfflineBanner } from "./GraphRAGWorkerBanner";
 
-export function GraphRAGCommunityReports() {
+interface Props {
+  workerOnline?: boolean;
+}
+
+export function GraphRAGCommunityReports({ workerOnline = false }: Props) {
   const [moduleSlug, setModuleSlug] = useState("");
   const [datasetKey, setDatasetKey] = useState("");
 
@@ -34,6 +39,10 @@ export function GraphRAGCommunityReports() {
 
   return (
     <div className="space-y-4 mt-4">
+      {!workerOnline && (
+        <WorkerOfflineBanner context="Community reports" />
+      )}
+
       <Card>
         <CardContent className="pt-4">
           <div className="max-w-sm">
