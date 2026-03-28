@@ -2,18 +2,21 @@
  * PS Ideation — Wizard Handoff View (center canvas)
  *
  * Shows readiness checklist, blockers, warnings, handoff preview,
- * and the Open in PS Wizard CTA.
+ * translator-generated scenario package, and the Open in PS Wizard CTA.
  */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { trpc } from "@/lib/trpc";
 import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
   Wand2,
-  Shield,
   ClipboardCheck,
+  FileText,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 
 interface ReadinessResult {
@@ -23,12 +26,20 @@ interface ReadinessResult {
 }
 
 interface Props {
+  ideationId?: number;
   readiness: ReadinessResult | null | undefined;
   isConverted: boolean;
   onConvert?: () => void;
 }
 
-export function PSIdeationWizardHandoffView({ readiness, isConverted, onConvert }: Props) {
+export function PSIdeationWizardHandoffView({ ideationId, readiness, isConverted, onConvert }: Props) {
+  // Fetch translator-generated wizard handoff if ideationId is provided
+  const { data: wizardHandoff, isLoading: handoffLoading, refetch: refetchHandoff } =
+    trpc.ps.ideation.contextTranslator.generateWizardHandoff.useQuery(
+      { ideationId: ideationId! },
+      { enabled: !!ideationId },
+    );
+
   return (
     <div className="space-y-4 max-w-2xl">
       {/* Readiness Status */}
@@ -92,6 +103,54 @@ export function PSIdeationWizardHandoffView({ readiness, isConverted, onConvert 
                 <span>{w}</span>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Translator-Generated Wizard Scenario Package */}
+      {ideationId && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <FileText className="w-4 h-4 text-indigo-500" />
+              AI-Generated Scenario Package
+              <Button variant="ghost" size="sm" className="ml-auto h-6 w-6 p-0" onClick={() => refetchHandoff()}>
+                <RefreshCw className="w-3 h-3" />
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {handoffLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Loading scenario package...</span>
+              </div>
+            ) : wizardHandoff ? (
+              <div className="space-y-2 text-xs">
+                <div><span className="font-medium text-muted-foreground">Title:</span> {wizardHandoff.scenarioTitle}</div>
+                <div><span className="font-medium text-muted-foreground">Summary:</span> {wizardHandoff.scenarioSummary}</div>
+                <div><span className="font-medium text-muted-foreground">Business Need:</span> {wizardHandoff.businessNeed}</div>
+                <div><span className="font-medium text-muted-foreground">Primary Problem:</span> {wizardHandoff.primaryProblem}</div>
+                <div><span className="font-medium text-muted-foreground">Opportunity:</span> {wizardHandoff.opportunityStatement}</div>
+                <div><span className="font-medium text-muted-foreground">Urgency Driver:</span> {wizardHandoff.urgencyDriver}</div>
+                <div><span className="font-medium text-muted-foreground">Recommended Direction:</span> {wizardHandoff.recommendedDirection}</div>
+                {wizardHandoff.feasibilityNotes && (
+                  <div><span className="font-medium text-muted-foreground">Feasibility:</span> {wizardHandoff.feasibilityNotes}</div>
+                )}
+                {wizardHandoff.openQuestions?.length > 0 && (
+                  <div>
+                    <span className="font-medium text-muted-foreground">Open Questions:</span>
+                    <ul className="list-disc ml-4 mt-1">
+                      {wizardHandoff.openQuestions.map((q: string, i: number) => <li key={i}>{q}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No AI scenario package yet. Use the Context Translator on Step 1 to generate one.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

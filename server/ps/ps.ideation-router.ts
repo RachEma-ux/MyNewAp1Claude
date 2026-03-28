@@ -13,6 +13,7 @@ import { composeSummary } from "./summary-composer";
 import { getDb } from "../db/connection";
 import { eq } from "drizzle-orm";
 import { psIdeations } from "../../drizzle/tables/ps";
+import { contextTranslatorRouter } from "./context-translator-router";
 import {
   IDEATION_LIFECYCLE_STATUSES,
   IDEATION_STEP_KEYS,
@@ -293,4 +294,5 @@ export const ideationRouter = router({
   feasibility: feasibilityRouter,
   readiness: readinessRouter,
   convert: convertRouter,
+  contextTranslator: contextTranslatorRouter,
 });

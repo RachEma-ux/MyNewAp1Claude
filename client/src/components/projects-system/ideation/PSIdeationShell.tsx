@@ -378,6 +378,7 @@ export function PSIdeationShell({ ideationId }: Props) {
       return (
         <div className="flex-1 overflow-y-auto p-4">
           <PSIdeationWizardHandoffView
+            ideationId={ideationId}
             readiness={readiness as any}
             isConverted={isConverted}
             onConvert={handleConvert}

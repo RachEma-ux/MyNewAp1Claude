@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import type { SaveStatus } from "./PSIdeationMobileBar";
 import { IDEATION_STEP_LABELS, type IdeationStepKey } from "@shared/ps-ideation-constants";
 import { ContextDefinitionToolPanel } from "./ContextDefinitionToolPanel";
+import { ContextTranslatorPanel } from "./ContextTranslatorPanel";
 import { ProblemDefinitionToolPanel } from "./ProblemDefinitionToolPanel";
 import { OpportunityDefinitionToolPanel } from "./OpportunityDefinitionToolPanel";
 import { GuidingWhatIfToolPanel } from "./GuidingWhatIfToolPanel";
@@ -150,7 +151,11 @@ export function PSIdeationWorkspace({
       </div>
       <StepErrorBoundary stepKey={currentStep}>
         {currentStep === "context" && (
-          <ContextDefinitionToolPanel payload={payload} onSave={saveHandler("context")} disabled={disabled} />
+          <>
+            <ContextTranslatorPanel ideationId={ideationId} disabled={disabled} />
+            <div className="my-4 border-t border-border" />
+            <ContextDefinitionToolPanel payload={payload} onSave={saveHandler("context")} disabled={disabled} />
+          </>
         )}
         {currentStep === "problem" && (
           <ProblemDefinitionToolPanel payload={payload} onSave={saveHandler("problem")} disabled={disabled} />
