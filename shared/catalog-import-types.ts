@@ -63,8 +63,7 @@ export type ValidationIssueCode =
   | "DUPLICATE_KEY_IN_FILE"
   | "EXISTING_CATALOG_CONFLICT"
   | "UNSUPPORTED_FIELD"
-  | "ALIAS_USED"
-  | "AGENT_IMPORT_BLOCKED";
+  | "ALIAS_USED";
 
 export interface PreviewEntry {
   tempId: string;
@@ -112,7 +111,7 @@ export interface BulkCreateResult {
 // ============================================================================
 
 /** Valid catalog entry types for file import */
-export const VALID_IMPORT_ENTRY_TYPES = ["provider", "llm", "model", "bot"] as const;
+export const VALID_IMPORT_ENTRY_TYPES = ["provider", "llm", "model", "bot", "agent"] as const;
 export type ImportEntryType = (typeof VALID_IMPORT_ENTRY_TYPES)[number];
 
 /** Canonical normalized shape that all file formats map into */

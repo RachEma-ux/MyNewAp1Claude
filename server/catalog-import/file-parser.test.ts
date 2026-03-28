@@ -232,12 +232,14 @@ describe("parseFileContent — Validation", () => {
     expect(issues.some((i) => i.field === "entryType" && i.severity === "error")).toBe(true);
   });
 
-  it("flags agent entryType as error", () => {
+  it("accepts agent entryType without error", () => {
     const content = JSON.stringify([{ name: "my-agent", entryType: "agent" }]);
     const result = parseFileContent(content, "data.json");
 
-    const issues = result.entries[0].validationIssues;
-    expect(issues.some((i) => i.field === "entryType" && i.message.includes("Agent"))).toBe(true);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].type).toBe("agent");
+    expect(result.entries[0].validationIssues).toHaveLength(0);
+    expect(result.entries[0].riskLevel).toBe("low");
   });
 
   it("defaults entryType to model when missing but flags error", () => {
@@ -481,14 +483,12 @@ describe("parseFileContent — Issue Codes", () => {
     expect(issue).toBeDefined();
   });
 
-  it("assigns AGENT_IMPORT_BLOCKED code for agent type", () => {
+  it("accepts agent entryType with no validation error code", () => {
     const content = JSON.stringify([{ name: "my-agent", entryType: "agent" }]);
     const result = parseFileContent(content, "data.json");
 
-    const issue = result.entries[0].validationIssues.find(
-      (i) => i.code === "AGENT_IMPORT_BLOCKED",
-    );
-    expect(issue).toBeDefined();
+    expect(result.entries[0].type).toBe("agent");
+    expect(result.entries[0].validationIssues).toHaveLength(0);
   });
 
   it("assigns MAX_LENGTH_EXCEEDED code for long name", () => {
@@ -593,5 +593,93 @@ describe("parseFileContent — ParseResult Shape", () => {
 
     expect(result.globalIssues.length).toBeGreaterThan(0);
     expect(result.globalIssues[0]).toContain("size limit");
+  });
+});
+
+// ============================================================================
+// Agent Entry Import (project-context-translator style)
+// ============================================================================
+
+describe("parseFileContent — Agent Entry Import", () => {
+  it("parses a JSON agent entry with runtime config", () => {
+    const content = JSON.stringify([
+      {
+        name: "project-context-translator",
+        displayName: "Project Context Translator",
+        entryType: "agent",
+        description: "Transforms unstructured input into PS Ideation fields.",
+        category: "ps_ideation",
+        tags: ["agent", "pct"],
+        capabilities: ["translate", "ideation"],
+        scope: "app",
+        config: {
+          runtimeKind: "sidecar",
+          serviceKind: "fastapi",
+          port: 8585,
+          healthPath: "/health",
+          executePath: "/translate",
+        },
+      },
+    ]);
+    const result = parseFileContent(content, "pct.json");
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].type).toBe("agent");
+    expect(result.entries[0].name).toBe("project-context-translator");
+    expect(result.entries[0].validationIssues).toHaveLength(0);
+    expect(result.entries[0].riskLevel).toBe("low");
+
+    const meta = result.entries[0].metadata as Record<string, unknown>;
+    expect(meta.runtimeKind).toBe("sidecar");
+    expect(meta.port).toBe(8585);
+    expect(meta.healthPath).toBe("/health");
+    expect(meta.executePath).toBe("/translate");
+    expect(meta.tags).toEqual(["agent", "pct"]);
+    expect(meta.capabilities).toEqual(["translate", "ideation"]);
+  });
+
+  it("parses a YAML agent entry with runtime config", () => {
+    const content = `
+- name: project-context-translator
+  displayName: Project Context Translator
+  entryType: agent
+  description: Transforms unstructured input into PS Ideation fields.
+  category: ps_ideation
+  tags:
+    - agent
+    - pct
+  capabilities:
+    - translate
+    - ideation
+  scope: app
+  config:
+    runtimeKind: sidecar
+    serviceKind: fastapi
+    port: 8585
+    healthPath: /health
+    executePath: /translate
+`;
+    const result = parseFileContent(content, "pct.yaml");
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].type).toBe("agent");
+    expect(result.entries[0].validationIssues).toHaveLength(0);
+
+    const meta = result.entries[0].metadata as Record<string, unknown>;
+    expect(meta.runtimeKind).toBe("sidecar");
+    expect(meta.port).toBe(8585);
+  });
+
+  it("builds a valid preview for agent entries", () => {
+    const content = JSON.stringify([
+      { name: "agent-a", entryType: "agent", config: { port: 8585 } },
+      { name: "agent-b", entryType: "agent", config: { port: 9090 } },
+    ]);
+    const result = parseFileContent(content, "agents.json");
+    const preview = buildFileImportPreview(result, result.entries);
+
+    expect(preview.totalRecords).toBe(2);
+    expect(preview.validRecords).toBe(2);
+    expect(preview.invalidRecords).toBe(0);
   });
 });

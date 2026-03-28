@@ -33,8 +33,8 @@ import {
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const MAX_ENTRIES = 500;
 
-/** Entry types that include "agent" for validation messaging but block import */
-const ALL_ENTRY_TYPES = new Set([...VALID_IMPORT_ENTRY_TYPES, "agent"]);
+/** Set of valid entry types for fast lookup */
+const VALID_TYPES_SET = new Set<string>(VALID_IMPORT_ENTRY_TYPES);
 
 // Build a complete alias map that also includes canonical names mapping to themselves
 const FIELD_ALIASES: Record<string, string> = { ...IMPORT_FIELD_ALIASES };
@@ -244,7 +244,7 @@ function normalizeRecord(
       entryKey: name || undefined,
       code: "REQUIRED_FIELD_MISSING",
     });
-  } else if (!ALL_ENTRY_TYPES.has(entryType)) {
+  } else if (!VALID_TYPES_SET.has(entryType)) {
     issues.push({
       field: "entryType",
       message: `Invalid entryType "${entryType}". Must be: ${[...VALID_IMPORT_ENTRY_TYPES].join(", ")}`,
@@ -252,18 +252,6 @@ function normalizeRecord(
       rowIndex: index,
       entryKey: name || undefined,
       code: "INVALID_ENUM",
-    });
-  }
-
-  // Agent import blocked
-  if (entryType === "agent") {
-    issues.push({
-      field: "entryType",
-      message: "Agent entries must be imported through the Agents lifecycle, not file import",
-      severity: "error",
-      rowIndex: index,
-      entryKey: name || undefined,
-      code: "AGENT_IMPORT_BLOCKED",
     });
   }
 

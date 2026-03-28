@@ -1,0 +1,101 @@
+# Project Context Translator — Catalog Import File (YAML)
+# Upload via Import Catalog Entries → File Import
+#
+# This agent transforms unstructured user input into structured
+# PS Ideation fields and a PS Wizard-ready scenario package.
+#
+# Runtime metadata is embedded in the config field so the platform
+# knows how to health-check, invoke, and configure the service.
+
+- name: project-context-translator
+  displayName: Project Context Translator
+  entryType: agent
+  description: >-
+    Transforms unstructured user input into structured PS Ideation fields
+    and a PS Wizard-ready scenario package. Applies the formula:
+    Project Context = External Drivers + Internal Drivers + Trigger.
+  category: ps_ideation
+  tags:
+    - agent
+    - pct
+    - ps-ideation
+    - ps-wizard
+    - context-translation
+  capabilities:
+    - translate
+    - ideation
+    - scenario-generation
+  scope: app
+  config:
+    # ── Runtime ────────────────────────────────────────────────
+    runtimeKind: sidecar
+    serviceKind: fastapi
+    version: "1.0.0"
+    host: localhost
+    port: 8585
+    healthPath: /health
+    statusPath: /status
+    executePath: /translate
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port 8585"
+    servicePath: services/project-context-translator
+    promptPath: prompts/system-prompt.md
+
+    # ── Core Formula ───────────────────────────────────────────
+    formula: "Project Context = External Drivers + Internal Drivers + Trigger"
+    llmProviders:
+      - openai
+      - anthropic
+
+    # ── Environment Variables ──────────────────────────────────
+    envVars:
+      - PCT_LLM_PROVIDER
+      - PCT_LLM_API_KEY
+      - PCT_LLM_MODEL
+      - PCT_LLM_BASE_URL
+      - PCT_LLM_MAX_TOKENS
+    defaultEnv:
+      PCT_LLM_PROVIDER: openai
+      PCT_LLM_MODEL: gpt-4o-mini
+      PCT_LLM_BASE_URL: "https://api.openai.com/v1"
+      PCT_LLM_MAX_TOKENS: "4096"
+
+    # ── Input / Output Contracts ───────────────────────────────
+    inputContract:
+      endpoint: "POST /translate"
+      contentType: application/json
+      fields:
+        rawText:
+          type: string
+          required: true
+          minLength: 10
+          maxLength: 10000
+        metadata:
+          type: object
+          required: false
+          description: "Optional context (workspaceId, sourceType, etc.)"
+    outputContract:
+      decisionGate:
+        status: "CONTINUE | CLARIFICATION_NEEDED"
+        reason: string
+      extractedFacts: "string[]"
+      problem:
+        statement: string
+        status: "clear | unclear | missing"
+      opportunity:
+        statement: string
+        status: "clear | unclear | missing"
+      coreSignals:
+        externalDrivers: "string[]"
+        internalDrivers: "string[]"
+        trigger: string
+      projectContextResult: string
+      whatIfQuestion: string
+      ideationWorkflowDraft: IdeationWorkflowDraft
+      psWizardScenarioPackage: PSWizardScenarioPackage
+      missingInformation: "string[]"
+      clarificationQuestions: "string[]"
+      framingNotes:
+        extracted: "string[]"
+        inferred: "string[]"
+        proposed: "string[]"
+      renderedMarkdown: string
