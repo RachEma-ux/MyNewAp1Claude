@@ -5,27 +5,27 @@
 #   - Top-level sequence (this file)
 #   - Mapping with entries: [...] or data: [...]
 #
-# Required fields: name, entryType (provider | model | llm | bot)
+# Required fields: name, entryType (provider | model | llm | bot | agent)
 # Optional fields: displayName, description, category, subCategory,
 #                  tags, capabilities, scope, config
 
 - name: yaml-cloud-provider
-  displayName: YAML Cloud Provider
+  displayName: "YAML Cloud Provider"
   entryType: provider
-  description: A sample provider imported from YAML.
+  description: "A sample provider imported from YAML."
   category: cloud_api
   tags:
     - cloud
     - yaml-example
   scope: app
   config:
-    baseUrl: https://api.yaml-example.com/v1
+    baseUrl: "https://api.yaml-example.com/v1"
     authType: api_key
 
 - name: yaml-local-model
-  displayName: YAML Local Model 3B
+  displayName: "YAML Local Model 3B"
   entryType: model
-  description: A sample local model imported from YAML.
+  description: "A sample local model imported from YAML."
   category: local_runtime
   subCategory: quantized
   tags:
@@ -36,9 +36,32 @@
     - sandbox
 
 - name: yaml-llm-entry
-  displayName: YAML LLM Entry
+  displayName: "YAML LLM Entry"
   entryType: llm
-  description: A sample LLM catalog entry.
+  description: "A sample LLM catalog entry."
   tags:
     - llm
     - yaml-example
+
+- name: yaml-bot-entry
+  displayName: "YAML Bot"
+  entryType: bot
+  description: "A sample bot entry for import testing."
+  tags:
+    - bot
+    - yaml-example
+  capabilities:
+    - web_search
+    - summarization
+
+- name: yaml-agent-entry
+  displayName: "YAML Agent"
+  entryType: agent
+  description: "A sample agent entry for import testing."
+  category: specialist
+  tags:
+    - agent
+    - yaml-example
+  capabilities:
+    - translate
+    - summarization

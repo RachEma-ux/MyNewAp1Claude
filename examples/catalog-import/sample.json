@@ -48,5 +48,14 @@
     "description": "A sample bot entry for import testing.",
     "tags": ["bot", "example"],
     "capabilities": ["web_search", "summarization"]
+  },
+  {
+    "name": "example-agent-entry",
+    "displayName": "Example Agent",
+    "entryType": "agent",
+    "description": "A sample agent entry for import testing.",
+    "category": "specialist",
+    "tags": ["agent", "example"],
+    "capabilities": ["translate", "summarization"]
   }
 ]

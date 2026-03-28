@@ -8,12 +8,9 @@
 # catalog resolver can health-check, invoke, and configure the service.
 
 - name: ps.agent.context_translator
-  displayName: Project Context Translator
+  displayName: "Project Context Translator"
   entryType: agent
-  description: >-
-    Transforms unstructured user input into structured PS Ideation fields
-    and a PS Wizard-ready scenario package. Applies the formula:
-    Project Context = External Drivers + Internal Drivers + Trigger.
+  description: "Transforms unstructured user input into structured PS Ideation fields and a PS Wizard-ready scenario package. Applies the formula: Project Context = External Drivers + Internal Drivers + Trigger."
   category: specialist
   subCategory: ideation
   tags:
@@ -31,8 +28,6 @@
   config:
     version: "1.0.0"
     agentType: context_translator
-
-    # ── Runtime (ServiceRuntimeConfig) ──────────────────────────
     runtime:
       kind: service
       serviceKind: python
@@ -49,14 +44,10 @@
         - wizard-handoff
         - context-framing
       bounded: true
-
-    # ── Core Formula ───────────────────────────────────────────
     formula: "Project Context = External Drivers + Internal Drivers + Trigger"
     llmProviders:
       - openai
       - anthropic
-
-    # ── Environment Variables ──────────────────────────────────
     envVars:
       - PCT_LLM_PROVIDER
       - PCT_LLM_API_KEY

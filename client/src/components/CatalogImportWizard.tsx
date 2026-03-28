@@ -649,7 +649,7 @@ export function CatalogImportWizard({
   return (
     <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl w-[calc(100vw-2rem)] max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>
             Import Catalog Entries
@@ -667,7 +667,7 @@ export function CatalogImportWizard({
 
         {/* Step 1: Method Selection */}
         {step === 1 && (
-          <div className="grid grid-cols-2 gap-3 py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-4">
             {METHODS.map((m) => {
               const Icon = m.icon;
               return (
@@ -923,16 +923,16 @@ export function CatalogImportWizard({
             </div>
 
             {error && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm">
-                  <XCircle className="h-4 w-4 shrink-0" />
-                  {error}
+              <div className="space-y-2 min-w-0">
+                <div className="flex items-start gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm">
+                  <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span className="break-words min-w-0">{error}</span>
                 </div>
                 {(error.includes("fetch fail") || error.includes("ECONNREFUSED")) &&
                   (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1") || baseUrl.includes("0.0.0.0")) && (
-                  <div className="flex items-center gap-2 p-3 rounded-md bg-yellow-900/20 border border-yellow-800/30 text-yellow-400 text-xs">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    Local providers (Ollama, llama.cpp) can only be discovered when the server runs on the same machine. The cloud-deployed server cannot reach localhost on your device.
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-yellow-900/20 border border-yellow-800/30 text-yellow-400 text-xs">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span className="break-words">Local providers (Ollama, llama.cpp) can only be discovered when the server runs on the same machine. The cloud-deployed server cannot reach localhost on your device.</span>
                   </div>
                 )}
               </div>
@@ -967,10 +967,10 @@ export function CatalogImportWizard({
               >
                 {selectedFile ? (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-400" />
-                      <span className="font-medium text-sm">{selectedFile.name}</span>
-                      <Badge variant="outline" className="text-xs">
+                    <div className="flex items-center justify-center gap-2 min-w-0">
+                      <CheckCircle2 className="h-5 w-5 text-green-400 shrink-0" />
+                      <span className="font-medium text-sm truncate max-w-[200px]">{selectedFile.name}</span>
+                      <Badge variant="outline" className="text-xs shrink-0">
                         {(selectedFile.size / 1024).toFixed(1)} KB
                       </Badge>
                     </div>
@@ -1011,41 +1011,41 @@ export function CatalogImportWizard({
               </div>
 
               {/* Format info / help */}
-              <div className="border rounded-md p-3 bg-muted/20 text-xs space-y-1.5">
+              <div className="border rounded-md p-3 bg-muted/20 text-xs space-y-1.5 min-w-0 break-words">
                 <div className="font-medium text-sm">Supported file contract</div>
-                <div><strong>JSON / YAML:</strong> Array of objects, or <code>{`{ "entries": [...] }`}</code> / <code>{`{ "data": [...] }`}</code> wrapper</div>
-                <div><strong>CSV:</strong> Header row + data rows. Use <code>|</code> to separate array values (e.g. <code>tag1|tag2</code>)</div>
-                <div className="pt-1">
-                  Required: <Badge variant="outline" className="text-[10px] mx-0.5">name</Badge>
-                  <Badge variant="outline" className="text-[10px] mx-0.5">entryType</Badge>
-                  <span className="text-muted-foreground ml-1">(provider | model | llm | bot)</span>
+                <div className="break-words"><strong>JSON / YAML:</strong> Array of objects, or <code className="break-all">{`{ "entries": [...] }`}</code> / <code className="break-all">{`{ "data": [...] }`}</code> wrapper</div>
+                <div><strong>CSV:</strong> Header row + data rows. Use <code>|</code> for array values (e.g. <code>tag1|tag2</code>)</div>
+                <div className="pt-1 flex flex-wrap items-center gap-1">
+                  Required: <Badge variant="outline" className="text-[10px]">name</Badge>
+                  <Badge variant="outline" className="text-[10px]">entryType</Badge>
+                  <span className="text-muted-foreground">(provider | model | llm | bot | agent)</span>
                 </div>
-                <div>
+                <div className="break-words">
                   Optional: <span className="text-muted-foreground">displayName, description, category, subCategory, tags, capabilities, scope, config</span>
                 </div>
-                <div>
-                  Aliases accepted: <span className="text-muted-foreground">key/slug &rarr; name, label/title &rarr; displayName, type/kind &rarr; entryType</span>
+                <div className="break-words">
+                  Aliases: <span className="text-muted-foreground">key/slug &rarr; name, label/title &rarr; displayName, type/kind &rarr; entryType</span>
                 </div>
               </div>
             </div>
 
             {/* Parse errors */}
             {fileParseErrors.length > 0 && (
-              <div className="space-y-1 p-3 rounded-md bg-yellow-900/20 border border-yellow-800/30">
+              <div className="space-y-1 p-3 rounded-md bg-yellow-900/20 border border-yellow-800/30 min-w-0">
                 <div className="flex items-center gap-2 text-yellow-400 text-sm font-medium">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   Parse warnings
                 </div>
                 {fileParseErrors.map((err, i) => (
-                  <div key={i} className="text-xs text-yellow-400/80 ml-6">{err}</div>
+                  <div key={i} className="text-xs text-yellow-400/80 ml-6 break-words">{err}</div>
                 ))}
               </div>
             )}
 
             {error && (
-              <div className="flex items-center gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm">
-                <XCircle className="h-4 w-4 shrink-0" />
-                {error}
+              <div className="flex items-start gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm min-w-0">
+                <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span className="break-words min-w-0">{error}</span>
               </div>
             )}
           </div>
@@ -1056,7 +1056,7 @@ export function CatalogImportWizard({
           <div className="py-4 space-y-4">
             {/* Runtime Defaults / Override Section (post-parse, for executable entries) */}
             {runtimeSectionVisible && method === "file_upload" && (
-              <div className="border border-blue-600/30 rounded-lg p-4 space-y-3 bg-blue-950/10">
+              <div className="border border-blue-600/30 rounded-lg p-4 space-y-3 bg-blue-950/10 min-w-0">
                 <div className="flex items-center gap-2 font-medium text-sm">
                   <Brain className="h-4 w-4 text-blue-400" />
                   Runtime Defaults
@@ -1149,7 +1149,7 @@ export function CatalogImportWizard({
             )}
 
             {/* Summary bar */}
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-1.5 flex-wrap min-w-0">
               <Badge variant="outline">{previewRows.length} {method === "file_upload" ? "parsed" : "discovered"}</Badge>
               <Badge className="bg-green-600/20 text-green-400 border-green-600/30">
                 {previewRows.filter((r) => r.duplicateStatus === "new").length} new
@@ -1176,21 +1176,21 @@ export function CatalogImportWizard({
               )}
             </div>
 
-            <div className="max-h-[40vh] overflow-y-auto border rounded-md">
-              <Table>
+            <div className="max-h-[40vh] overflow-auto border rounded-md min-w-0">
+              <Table className="min-w-[480px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-10">
+                    <TableHead className="w-8 px-2">
                       <Checkbox
                         checked={selectedCount === previewRows.length}
                         onCheckedChange={(c) => toggleAll(!!c)}
                       />
                     </TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Risk</TableHead>
-                    {method === "file_upload" && <TableHead>Issues</TableHead>}
+                    <TableHead className="min-w-[120px]">Name</TableHead>
+                    <TableHead className="w-16">Type</TableHead>
+                    <TableHead className="w-20">Status</TableHead>
+                    <TableHead className="w-16">Risk</TableHead>
+                    {method === "file_upload" && <TableHead className="min-w-[100px]">Issues</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1200,17 +1200,17 @@ export function CatalogImportWizard({
                     const hasErrors = row.validationIssues?.some((i) => i.severity === "error");
                     return (
                       <TableRow key={row.tempId} className={row.selected ? "" : "opacity-50"}>
-                        <TableCell>
+                        <TableCell className="px-2">
                           <Checkbox
                             checked={row.selected}
                             disabled={hasErrors}
                             onCheckedChange={() => toggleRow(row.tempId)}
                           />
                         </TableCell>
-                        <TableCell>
-                          <div className="font-medium text-sm">{row.name}</div>
+                        <TableCell className="min-w-0">
+                          <div className="font-medium text-sm truncate max-w-[180px] sm:max-w-none">{row.name}</div>
                           {row.description && (
-                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            <div className="text-xs text-muted-foreground truncate max-w-[160px] sm:max-w-[200px]">
                               {row.description}
                             </div>
                           )}
@@ -1231,11 +1231,11 @@ export function CatalogImportWizard({
                           )}
                         </TableCell>
                         {method === "file_upload" && (
-                          <TableCell>
+                          <TableCell className="min-w-0">
                             {row.validationIssues && row.validationIssues.length > 0 ? (
-                              <div className="space-y-0.5">
+                              <div className="space-y-0.5 max-w-[150px] sm:max-w-none">
                                 {row.validationIssues.map((issue, i) => (
-                                  <div key={i} className={`text-[10px] ${issue.severity === "error" ? "text-red-400" : "text-yellow-400"}`}>
+                                  <div key={i} className={`text-[10px] break-words ${issue.severity === "error" ? "text-red-400" : "text-yellow-400"}`}>
                                     {issue.field}: {issue.message}
                                   </div>
                                 ))}
@@ -1266,9 +1266,9 @@ export function CatalogImportWizard({
             )}
 
             {error && (
-              <div className="flex items-center gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm">
-                <XCircle className="h-4 w-4 shrink-0" />
-                {error}
+              <div className="flex items-start gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm min-w-0">
+                <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span className="break-words min-w-0">{error}</span>
               </div>
             )}
           </div>
@@ -1295,19 +1295,21 @@ export function CatalogImportWizard({
               )}
             </div>
 
-            <div className="max-h-[40vh] overflow-y-auto border rounded-md">
-              <Table>
+            <div className="max-h-[40vh] overflow-auto border rounded-md min-w-0">
+              <Table className="min-w-[360px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Outcome</TableHead>
-                    <TableHead>Details</TableHead>
+                    <TableHead className="min-w-[120px]">Name</TableHead>
+                    <TableHead className="w-20">Outcome</TableHead>
+                    <TableHead className="min-w-[80px]">Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {importResult.entries.map((entry) => (
                     <TableRow key={entry.tempId}>
-                      <TableCell className="font-medium text-sm">{entry.name}</TableCell>
+                      <TableCell className="font-medium text-sm min-w-0">
+                        <span className="block truncate max-w-[180px] sm:max-w-none">{entry.name}</span>
+                      </TableCell>
                       <TableCell>
                         {entry.outcome === "created" && (
                           <Badge className="bg-green-600/20 text-green-400 border-green-600/30 text-xs">
@@ -1325,8 +1327,8 @@ export function CatalogImportWizard({
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {entry.error || (entry.catalogEntryId ? `Entry #${entry.catalogEntryId}` : "")}
+                      <TableCell className="text-xs text-muted-foreground break-words min-w-0">
+                        {entry.error || (entry.catalogEntryId ? `#${entry.catalogEntryId}` : "")}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1337,7 +1339,7 @@ export function CatalogImportWizard({
         )}
 
         {/* Footer / Navigation */}
-        <DialogFooter className="flex justify-between sm:justify-between">
+        <DialogFooter className="flex flex-wrap justify-between sm:justify-between gap-2">
           <div>
             {step > 1 && step < 4 && (
               <Button
