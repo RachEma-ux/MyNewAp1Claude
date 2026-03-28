@@ -19,6 +19,7 @@ import {
   type ServiceRuntimeTarget,
   type ServiceHealthResult,
 } from "../catalog/service-runtime";
+import { AGENT_CATALOG_ID } from "../modules/pmt/context-translator-agent";
 
 export const contextTranslatorRouter = router({
   /**
@@ -243,17 +244,17 @@ export const contextTranslatorRouter = router({
       error: string | null;
     }> => {
       try {
-        const target = await resolveServiceAgentByName("ps.agent.context_translator");
+        const target = await resolveServiceAgentByName(AGENT_CATALOG_ID);
         if (!target) {
           return {
             resolved: false,
             target: null,
             health: null,
-            error: "Catalog entry 'ps.agent.context_translator' not found or not a service-based agent",
+            error: `Catalog entry '${AGENT_CATALOG_ID}' not found or not a service-based agent`,
           };
         }
 
-        const health = await checkServiceHealthByName("ps.agent.context_translator");
+        const health = await checkServiceHealthByName(AGENT_CATALOG_ID);
         return { resolved: true, target, health, error: null };
       } catch (err: any) {
         return {

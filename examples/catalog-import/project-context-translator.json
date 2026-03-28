@@ -1,25 +1,31 @@
 [
   {
-    "name": "project-context-translator",
+    "name": "ps.agent.context_translator",
     "displayName": "Project Context Translator",
     "entryType": "agent",
     "description": "Transforms unstructured user input into structured PS Ideation fields and a PS Wizard-ready scenario package. Applies the formula: Project Context = External Drivers + Internal Drivers + Trigger.",
-    "category": "ps_ideation",
-    "tags": ["agent", "pct", "ps-ideation", "ps-wizard", "context-translation"],
+    "category": "specialist",
+    "subCategory": "ideation",
+    "tags": ["ps", "ideation", "context-translator", "wizard", "scenario", "llm-powered"],
     "capabilities": ["translate", "ideation", "scenario-generation"],
     "scope": "app",
     "config": {
-      "runtimeKind": "sidecar",
-      "serviceKind": "fastapi",
       "version": "1.0.0",
-      "host": "localhost",
-      "port": 8585,
-      "healthPath": "/health",
-      "statusPath": "/status",
-      "executePath": "/translate",
-      "startCommand": "uvicorn main:app --host 0.0.0.0 --port 8585",
-      "servicePath": "services/project-context-translator",
-      "promptPath": "prompts/system-prompt.md",
+      "agentType": "context_translator",
+      "runtime": {
+        "kind": "service",
+        "serviceKind": "python",
+        "serviceName": "project-context-translator",
+        "serviceUrlEnv": "PROJECT_CONTEXT_TRANSLATOR_URL",
+        "serviceUrlDefault": "http://localhost:8585",
+        "healthEndpoint": "/health",
+        "statusEndpoint": "/status",
+        "translateEndpoint": "/translate",
+        "inputSchemaRef": "shared/ps-context-translator-types#TranslateRequest",
+        "outputSchemaRef": "shared/ps-context-translator-types#TranslateResponse",
+        "capabilityTags": ["ps-ideation", "wizard-handoff", "context-framing"],
+        "bounded": true
+      },
       "formula": "Project Context = External Drivers + Internal Drivers + Trigger",
       "llmProviders": ["openai", "anthropic"],
       "envVars": [
@@ -34,29 +40,6 @@
         "PCT_LLM_MODEL": "gpt-4o-mini",
         "PCT_LLM_BASE_URL": "https://api.openai.com/v1",
         "PCT_LLM_MAX_TOKENS": "4096"
-      },
-      "inputContract": {
-        "endpoint": "POST /translate",
-        "contentType": "application/json",
-        "fields": {
-          "rawText": { "type": "string", "required": true, "minLength": 10, "maxLength": 10000 },
-          "metadata": { "type": "object", "required": false, "description": "Optional context (workspaceId, sourceType, etc.)" }
-        }
-      },
-      "outputContract": {
-        "decisionGate": { "status": "CONTINUE | CLARIFICATION_NEEDED", "reason": "string" },
-        "extractedFacts": "string[]",
-        "problem": { "statement": "string", "status": "clear | unclear | missing" },
-        "opportunity": { "statement": "string", "status": "clear | unclear | missing" },
-        "coreSignals": { "externalDrivers": "string[]", "internalDrivers": "string[]", "trigger": "string" },
-        "projectContextResult": "string",
-        "whatIfQuestion": "string",
-        "ideationWorkflowDraft": "IdeationWorkflowDraft",
-        "psWizardScenarioPackage": "PSWizardScenarioPackage",
-        "missingInformation": "string[]",
-        "clarificationQuestions": "string[]",
-        "framingNotes": { "extracted": "string[]", "inferred": "string[]", "proposed": "string[]" },
-        "renderedMarkdown": "string"
       }
     }
   }

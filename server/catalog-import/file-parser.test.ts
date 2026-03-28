@@ -601,23 +601,33 @@ describe("parseFileContent — ParseResult Shape", () => {
 // ============================================================================
 
 describe("parseFileContent — Agent Entry Import", () => {
-  it("parses a JSON agent entry with runtime config", () => {
+  it("parses a JSON agent entry with nested runtime config", () => {
     const content = JSON.stringify([
       {
-        name: "project-context-translator",
+        name: "ps.agent.context_translator",
         displayName: "Project Context Translator",
         entryType: "agent",
         description: "Transforms unstructured input into PS Ideation fields.",
-        category: "ps_ideation",
-        tags: ["agent", "pct"],
+        category: "specialist",
+        subCategory: "ideation",
+        tags: ["ps", "ideation", "context-translator"],
         capabilities: ["translate", "ideation"],
         scope: "app",
         config: {
-          runtimeKind: "sidecar",
-          serviceKind: "fastapi",
-          port: 8585,
-          healthPath: "/health",
-          executePath: "/translate",
+          version: "1.0.0",
+          agentType: "context_translator",
+          runtime: {
+            kind: "service",
+            serviceKind: "python",
+            serviceName: "project-context-translator",
+            serviceUrlEnv: "PROJECT_CONTEXT_TRANSLATOR_URL",
+            serviceUrlDefault: "http://localhost:8585",
+            healthEndpoint: "/health",
+            statusEndpoint: "/status",
+            translateEndpoint: "/translate",
+            capabilityTags: ["ps-ideation", "wizard-handoff"],
+            bounded: true,
+          },
         },
       },
     ]);
@@ -625,39 +635,51 @@ describe("parseFileContent — Agent Entry Import", () => {
 
     expect(result.entries).toHaveLength(1);
     expect(result.entries[0].type).toBe("agent");
-    expect(result.entries[0].name).toBe("project-context-translator");
+    expect(result.entries[0].name).toBe("ps.agent.context_translator");
     expect(result.entries[0].validationIssues).toHaveLength(0);
     expect(result.entries[0].riskLevel).toBe("low");
 
     const meta = result.entries[0].metadata as Record<string, unknown>;
-    expect(meta.runtimeKind).toBe("sidecar");
-    expect(meta.port).toBe(8585);
-    expect(meta.healthPath).toBe("/health");
-    expect(meta.executePath).toBe("/translate");
-    expect(meta.tags).toEqual(["agent", "pct"]);
+    expect(meta.tags).toEqual(["ps", "ideation", "context-translator"]);
     expect(meta.capabilities).toEqual(["translate", "ideation"]);
+    // Nested runtime config preserved
+    const runtime = (meta as any).runtime;
+    expect(runtime).toBeDefined();
+    expect(runtime.kind).toBe("service");
+    expect(runtime.serviceKind).toBe("python");
+    expect(runtime.healthEndpoint).toBe("/health");
+    expect(runtime.translateEndpoint).toBe("/translate");
+    expect(runtime.bounded).toBe(true);
   });
 
-  it("parses a YAML agent entry with runtime config", () => {
+  it("parses a YAML agent entry with nested runtime config", () => {
     const content = `
-- name: project-context-translator
+- name: ps.agent.context_translator
   displayName: Project Context Translator
   entryType: agent
   description: Transforms unstructured input into PS Ideation fields.
-  category: ps_ideation
+  category: specialist
+  subCategory: ideation
   tags:
-    - agent
-    - pct
+    - ps
+    - ideation
+    - context-translator
   capabilities:
     - translate
     - ideation
   scope: app
   config:
-    runtimeKind: sidecar
-    serviceKind: fastapi
-    port: 8585
-    healthPath: /health
-    executePath: /translate
+    version: "1.0.0"
+    agentType: context_translator
+    runtime:
+      kind: service
+      serviceKind: python
+      serviceName: project-context-translator
+      serviceUrlEnv: PROJECT_CONTEXT_TRANSLATOR_URL
+      serviceUrlDefault: "http://localhost:8585"
+      healthEndpoint: /health
+      translateEndpoint: /translate
+      bounded: true
 `;
     const result = parseFileContent(content, "pct.yaml");
 
@@ -666,8 +688,10 @@ describe("parseFileContent — Agent Entry Import", () => {
     expect(result.entries[0].validationIssues).toHaveLength(0);
 
     const meta = result.entries[0].metadata as Record<string, unknown>;
-    expect(meta.runtimeKind).toBe("sidecar");
-    expect(meta.port).toBe(8585);
+    const runtime = (meta as any).runtime;
+    expect(runtime).toBeDefined();
+    expect(runtime.kind).toBe("service");
+    expect(runtime.serviceKind).toBe("python");
   });
 
   it("builds a valid preview for agent entries", () => {
