@@ -11,7 +11,7 @@ import { serveStatic, setupVite } from "./vite";
 import { initializeProviders } from "../providers/init";
 import { handleChatStream } from "../chat/stream";
 import { handleAgentChatStream, handleCatalogAgentChatStream } from "../agents/stream";
-import { executeCatalogChatStream, catalogExecutionQuerySchema } from "../catalog/execution";
+import { executeCatalogChatStream, executeServiceAgentStream, resolveServiceAgentExecutionTarget, catalogExecutionQuerySchema } from "../catalog/execution";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
 import { getDb, ensureDefaultWorkspace } from "../db";
@@ -541,14 +541,28 @@ async function startServer() {
       res.setHeader("X-Accel-Buffering", "no");
       res.flushHeaders();
 
-      for await (const event of executeCatalogChatStream({
-        catalogEntryId,
-        actorUserId: user.id,
-        message: parsed.data.message,
-        conversationId: parsed.data.conversationId,
-        triggerSource: parsed.data.triggerSource,
-      })) {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      // Branch: service-backed agents use HTTP dispatch, LLM agents use provider streaming
+      const serviceTarget = await resolveServiceAgentExecutionTarget(catalogEntryId).catch(() => null);
+
+      if (serviceTarget) {
+        for await (const event of executeServiceAgentStream({
+          catalogEntryId,
+          actorUserId: user.id,
+          message: parsed.data.message,
+          triggerSource: parsed.data.triggerSource,
+        })) {
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        }
+      } else {
+        for await (const event of executeCatalogChatStream({
+          catalogEntryId,
+          actorUserId: user.id,
+          message: parsed.data.message,
+          conversationId: parsed.data.conversationId,
+          triggerSource: parsed.data.triggerSource,
+        })) {
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        }
       }
 
       res.end();

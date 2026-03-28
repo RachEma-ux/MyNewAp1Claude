@@ -30,6 +30,20 @@ export function isCatalogEntryCallable(config: Record<string, unknown> | null | 
   return config?.callable === true;
 }
 
+/**
+ * Check if a catalog entry config indicates a service-backed agent.
+ * Service agents have config.runtime.kind === "service".
+ */
+export function isCatalogServiceAgent(config: Record<string, unknown> | null | undefined): boolean {
+  if (!config) return false;
+  const runtime = config.runtime as Record<string, unknown> | undefined;
+  return runtime?.kind === "service";
+}
+
+/**
+ * Check if a catalog entry is eligible for LLM-chat execution.
+ * This is the traditional execution path requiring published bundles.
+ */
 export function isCatalogExecutionEligible(entry: CatalogExecutionEntryLike): boolean {
   return (
     entry.entryType === "agent" &&
@@ -37,5 +51,17 @@ export function isCatalogExecutionEligible(entry: CatalogExecutionEntryLike): bo
     entry.reviewState === "approved" &&
     hasPublishedCatalogTag(entry.tags) &&
     isCatalogEntryCallable(entry.config)
+  );
+}
+
+/**
+ * Check if a catalog entry is eligible for service-backed execution.
+ * Service agents only need to be active agents with runtime metadata.
+ */
+export function isCatalogServiceExecutionEligible(entry: CatalogExecutionEntryLike): boolean {
+  return (
+    entry.entryType === "agent" &&
+    entry.status === "active" &&
+    isCatalogServiceAgent(entry.config)
   );
 }

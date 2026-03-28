@@ -14,7 +14,7 @@ import {
   getCatalogAuditEvents,
   listExecutionRuns,
 } from "../db";
-import { resolveCatalogAgentExecutionTarget } from "../catalog/execution";
+import { resolveCatalogAgentExecutionTarget, resolveServiceAgentExecutionTarget } from "../catalog/execution";
 
 export const catalogRegistryRouter = router({
   /**
@@ -55,6 +55,30 @@ export const catalogRegistryRouter = router({
   getAgentExecutionTarget: protectedProcedure
     .input(z.object({ catalogEntryId: z.number().int().positive() }))
     .query(async ({ input }) => {
+      // Service-backed agents have a different execution target shape
+      const serviceTarget = await resolveServiceAgentExecutionTarget(input.catalogEntryId).catch(() => null);
+      if (serviceTarget) {
+        return {
+          catalogEntryId: serviceTarget.entry.id,
+          name: serviceTarget.entry.displayName || serviceTarget.entry.name,
+          entryType: serviceTarget.entry.entryType,
+          status: serviceTarget.entry.status,
+          reviewState: serviceTarget.entry.reviewState,
+          tags: serviceTarget.entry.tags,
+          executionKind: "service" as const,
+          serviceName: serviceTarget.serviceTarget.serviceName,
+          serviceUrl: serviceTarget.serviceTarget.serviceUrl,
+          bundleId: null,
+          bundleVersionLabel: null,
+          sourceAgentId: null,
+          sourceAgentName: null,
+          config: {
+            serviceKind: serviceTarget.serviceTarget.serviceKind,
+            capabilityTags: serviceTarget.serviceTarget.capabilityTags,
+          },
+        };
+      }
+
       const target = await resolveCatalogAgentExecutionTarget(input.catalogEntryId);
       return {
         catalogEntryId: target.entry.id,
@@ -63,6 +87,7 @@ export const catalogRegistryRouter = router({
         status: target.entry.status,
         reviewState: target.entry.reviewState,
         tags: target.entry.tags,
+        executionKind: "llm_chat" as const,
         bundleId: target.bundle.id,
         bundleVersionLabel: target.bundle.versionLabel,
         sourceAgentId: target.sourceAgent.id,

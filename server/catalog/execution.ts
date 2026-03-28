@@ -21,12 +21,79 @@ import {
   isCatalogEntryCallable,
   type CatalogAgentExecutionConfig,
 } from "@shared/catalog-execution";
+import {
+  isServiceBasedAgent,
+  resolveServiceAgent,
+  type ServiceRuntimeTarget,
+} from "./service-runtime";
 
 export interface CatalogAgentExecutionTarget {
   entry: Awaited<ReturnType<typeof getCatalogEntryById>> extends infer T ? Exclude<T, null> : never;
   bundle: NonNullable<Awaited<ReturnType<typeof getActiveBundleForEntry>>>;
   executionConfig: CatalogAgentExecutionConfig;
   sourceAgent: NonNullable<Awaited<ReturnType<typeof getAgent>>>;
+}
+
+/**
+ * Execution target for service-backed agents.
+ * These run directly via HTTP dispatch, not through LLM provider streaming.
+ */
+export interface ServiceAgentExecutionTarget {
+  kind: "service";
+  entry: Awaited<ReturnType<typeof getCatalogEntryById>> extends infer T ? Exclude<T, null> : never;
+  serviceTarget: ServiceRuntimeTarget;
+}
+
+/**
+ * Resolve a service-backed agent entry into an execution target.
+ * Service agents bypass the bundle/sourceAgent/provider gates — they dispatch
+ * directly to their HTTP service via config.runtime metadata.
+ *
+ * Gate sequence for service agents:
+ *   1. Entry must exist and be type "agent"
+ *   2. Entry must be active
+ *   3. config.runtime.kind === "service" must be present
+ *   4. Service runtime must resolve (URL, health endpoint, etc.)
+ */
+export async function resolveServiceAgentExecutionTarget(
+  catalogEntryId: number,
+): Promise<ServiceAgentExecutionTarget | null> {
+  const entry = await getCatalogEntryById(catalogEntryId);
+  if (!entry) return null;
+  if (entry.entryType !== "agent") return null;
+
+  const config = entry.config as Record<string, unknown> | null;
+  if (!isServiceBasedAgent(config)) return null;
+
+  // Service agents must be active
+  if (entry.status !== "active") {
+    throw createAppBlockerError({
+      code: "catalog_entry_inactive",
+      category: "lifecycle_rule",
+      title: "This service agent is not active",
+      summary: "This service-backed Catalog entry cannot run because it is not currently active.",
+      details: [`Current status: ${entry.status}`],
+      recommendedActions: ["Activate the Catalog entry, then try again."],
+      context: { catalogEntryId, status: entry.status },
+    }, "CONFLICT");
+  }
+
+  // Resolve service runtime target
+  const serviceTarget = await resolveServiceAgent(catalogEntryId);
+  if (!serviceTarget) {
+    throw createAppBlockerError({
+      code: "service_runtime_not_resolved",
+      category: "dependency_block",
+      title: "Service runtime could not be resolved",
+      summary: "This service-backed agent has runtime metadata but could not resolve to a concrete service target.",
+      recommendedActions: [
+        "Verify the config.runtime block has valid serviceUrlEnv, serviceUrlDefault, and endpoints.",
+      ],
+      context: { catalogEntryId },
+    }, "CONFLICT");
+  }
+
+  return { kind: "service", entry: entry as any, serviceTarget };
 }
 
 export async function resolveCatalogAgentExecutionTarget(catalogEntryId: number): Promise<CatalogAgentExecutionTarget> {
@@ -57,6 +124,22 @@ export async function resolveCatalogAgentExecutionTarget(catalogEntryId: number)
         "Open an agent entry instead, or use the workflow intended for this Catalog type.",
       ],
       context: { catalogEntryId, entryType: entry.entryType },
+    }, "BAD_REQUEST");
+  }
+
+  // Service-backed agents have their own execution path — they should not
+  // reach this LLM-chat resolver. If they do, give a clear error.
+  const config = entry.config as Record<string, unknown> | null;
+  if (isServiceBasedAgent(config)) {
+    throw createAppBlockerError({
+      code: "service_agent_wrong_path",
+      category: "validation_error",
+      title: "Service agent cannot use LLM execution path",
+      summary: "This is a service-backed agent. Use the service execution path instead of the LLM-chat path.",
+      recommendedActions: [
+        "This agent runs via its dedicated HTTP service, not through LLM streaming.",
+      ],
+      context: { catalogEntryId },
     }, "BAD_REQUEST");
   }
 
@@ -447,4 +530,112 @@ export async function* executeCatalogChatStream(input: {
 
 export async function getExecutionRunForUi(runId: number) {
   return await getExecutionRunById(runId);
+}
+
+/**
+ * Execute a service-backed agent via HTTP dispatch.
+ * This bypasses the LLM-chat pipeline entirely — dispatches the user message
+ * to the service's translate endpoint and streams back the result.
+ */
+export async function* executeServiceAgentStream(input: {
+  catalogEntryId: number;
+  actorUserId: number;
+  message: string;
+  triggerSource?: string;
+}): AsyncGenerator<CatalogExecutionEvent> {
+  const triggerSource = input.triggerSource ?? "catalog_service";
+
+  // Create execution run for observability
+  const run = await createExecutionRun({
+    catalogEntryId: input.catalogEntryId,
+    actorUserId: input.actorUserId,
+    triggerSource,
+    state: "created",
+  });
+
+  await updateExecutionRun(run.id, { state: "validating" });
+
+  // Resolve service target
+  let serviceTarget: ServiceAgentExecutionTarget;
+  try {
+    const result = await resolveServiceAgentExecutionTarget(input.catalogEntryId);
+    if (!result) {
+      throw new Error("Entry is not a service-backed agent");
+    }
+    serviceTarget = result;
+  } catch (error) {
+    const blocker = toExecutionRunBlocker(error, {
+      code: "service_resolution_failed",
+      category: "dependency_block",
+      summary: "Service agent runtime could not be resolved.",
+    });
+    await failExecutionRun(run.id, blocker);
+    yield { type: "error", runId: run.id, error: blocker.summary };
+    return;
+  }
+
+  await updateExecutionRun(run.id, {
+    state: "running",
+    provider: serviceTarget.serviceTarget.serviceName,
+    modelId: null,
+    metadata: {
+      executionKind: "service",
+      serviceName: serviceTarget.serviceTarget.serviceName,
+      serviceKind: serviceTarget.serviceTarget.serviceKind,
+      serviceUrl: serviceTarget.serviceTarget.serviceUrl,
+      entryType: serviceTarget.entry.entryType,
+      entryStatus: serviceTarget.entry.status,
+    },
+  });
+
+  yield { type: "run_started", runId: run.id };
+
+  // Dispatch to the service's translate endpoint
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    const resp = await fetch(serviceTarget.serviceTarget.translateUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rawText: input.message }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      throw new Error(`Service returned ${resp.status}: ${body.slice(0, 200)}`);
+    }
+
+    const result = await resp.json();
+    const content = typeof result.renderedMarkdown === "string"
+      ? result.renderedMarkdown
+      : JSON.stringify(result, null, 2);
+
+    await updateExecutionRun(run.id, { firstTokenAt: new Date() });
+    yield { type: "token", content };
+
+    await updateExecutionRun(run.id, {
+      state: "completed",
+      success: true,
+      completedAt: new Date(),
+    });
+
+    yield { type: "complete", runId: run.id, conversationId: 0, content };
+  } catch (error) {
+    const summary = error instanceof Error ? error.message : "Service agent execution failed.";
+
+    await updateExecutionRun(run.id, {
+      state: "failed",
+      success: false,
+      blockerCode: "service_execution_error",
+      blockerCategory: "technical_error",
+      blockerSummary: summary,
+      completedAt: new Date(),
+    });
+
+    yield { type: "error", runId: run.id, error: summary };
+  }
 }

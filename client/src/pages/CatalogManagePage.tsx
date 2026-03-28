@@ -3032,7 +3032,7 @@ export default function CatalogManagePage() {
           }
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {wizardStep === 3
@@ -3052,16 +3052,16 @@ export default function CatalogManagePage() {
 
           {/* Step 0: Review */}
           {wizardStep === 0 && publishEntry && (
-            <div className="space-y-3 py-2">
-              <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="space-y-3 py-2 min-w-0">
+              <div className="grid grid-cols-2 gap-2 text-sm min-w-0">
                 <div className="text-muted-foreground">Name</div>
-                <div className="font-medium">
+                <div className="font-medium min-w-0 break-words">
                   {publishEntry.displayName || publishEntry.name}
                 </div>
                 <div className="text-muted-foreground">Type</div>
-                <div>{publishEntry.entryType}</div>
+                <div className="min-w-0 break-words">{publishEntry.entryType}</div>
                 <div className="text-muted-foreground">Scope</div>
-                <div>{publishEntry.scope}</div>
+                <div className="min-w-0 break-words">{publishEntry.scope}</div>
                 <div className="text-muted-foreground">Validation</div>
                 <div>
                   <Badge
@@ -3073,11 +3073,11 @@ export default function CatalogManagePage() {
               </div>
               {publishEntry.config &&
                 Object.keys(publishEntry.config).length > 0 && (
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs text-muted-foreground mb-1">
                       Configuration:
                     </p>
-                    <pre className="text-xs font-mono bg-muted/50 rounded p-2 max-h-[150px] overflow-y-auto">
+                    <pre className="text-xs font-mono bg-muted/50 rounded p-2 max-h-[150px] overflow-auto whitespace-pre-wrap break-words">
                       {JSON.stringify(publishEntry.config, null, 2)}
                     </pre>
                   </div>
@@ -3113,20 +3113,20 @@ export default function CatalogManagePage() {
 
           {/* Step 2: Confirm */}
           {wizardStep === 2 && publishEntry && (
-            <div className="space-y-3 py-2">
-              <div className="p-3 border rounded-md bg-muted/30">
+            <div className="space-y-3 py-2 min-w-0">
+              <div className="p-3 border rounded-md bg-muted/30 min-w-0">
                 <p className="text-sm font-medium mb-2">
                   You are about to publish:
                 </p>
-                <div className="grid grid-cols-2 gap-1 text-xs">
+                <div className="grid grid-cols-2 gap-1 text-xs min-w-0">
                   <span className="text-muted-foreground">Entry:</span>
-                  <span>{publishEntry.displayName || publishEntry.name}</span>
+                  <span className="min-w-0 break-words">{publishEntry.displayName || publishEntry.name}</span>
                   <span className="text-muted-foreground">Version:</span>
-                  <span className="font-mono">{publishVersion}</span>
+                  <span className="font-mono min-w-0 break-all">{publishVersion}</span>
                   {publishNotes && (
                     <>
                       <span className="text-muted-foreground">Notes:</span>
-                      <span>{publishNotes}</span>
+                      <span className="min-w-0 break-words">{publishNotes}</span>
                     </>
                   )}
                 </div>

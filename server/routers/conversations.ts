@@ -4,7 +4,7 @@ import { getDb } from "../db";
 import { conversations, messages } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { resolveCatalogAgentExecutionTarget } from "../catalog/execution";
+import { resolveCatalogAgentExecutionTarget, resolveServiceAgentExecutionTarget } from "../catalog/execution";
 
 /**
  * Conversations Router
@@ -78,10 +78,16 @@ export const conversationsRouter = router({
       let resolvedWorkspaceId = input.workspaceId;
 
       if (input.catalogEntryId) {
-        const target = await resolveCatalogAgentExecutionTarget(input.catalogEntryId);
-        resolvedAgentId = target.sourceAgent.id;
-        resolvedWorkspaceId = resolvedWorkspaceId ?? target.sourceAgent.workspaceId;
-        derivedTitle = input.title || `${target.entry.displayName || target.entry.name} Run`;
+        // Service-backed agents don't have a sourceAgent — handle them separately
+        const serviceTarget = await resolveServiceAgentExecutionTarget(input.catalogEntryId).catch(() => null);
+        if (serviceTarget) {
+          derivedTitle = input.title || `${serviceTarget.entry.displayName || serviceTarget.entry.name} Run`;
+        } else {
+          const target = await resolveCatalogAgentExecutionTarget(input.catalogEntryId);
+          resolvedAgentId = target.sourceAgent.id;
+          resolvedWorkspaceId = resolvedWorkspaceId ?? target.sourceAgent.workspaceId;
+          derivedTitle = input.title || `${target.entry.displayName || target.entry.name} Run`;
+        }
       }
 
       // Use provided workspaceId, or fall back to user's first workspace
