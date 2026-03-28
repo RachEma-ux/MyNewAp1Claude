@@ -1,0 +1,42 @@
+Session Summary — 2026-03-28 23:00
+
+## Tasks Completed
+
+### 1. Import Runtime Linking Fix (commit 39e1105)
+- Fixed bulkCreate in server/catalog-import/router.ts hardcoding providerId: null
+- Now resolves providerId from: admin selection > config.providerId (numeric) > providerType match > null
+- Persists to both entry.providerId (relational FK) and config.providerId (validation fallback)
+- Sets config.model from runtimeDefaults.modelId
+- Agent config block still scoped to agent/bot types only
+- Added repairProviderLinks endpoint for fixing previously broken entries
+- Created docs/import-runtime-linking.md documentation
+- Completed full AGENTS.md pipeline: Planner → Builder → Reviewer → Tester → Governance
+
+### 2. Provider String Slug Resolution Fix (commit a6d3679)
+- Validation was passing string config.providerId ("openai") to registry.getProvider(number) → always failed
+- Fixed validation to: parse string to number, try providerType matching, try slug/name matching
+- Import bulkCreate also now falls back to providerType matching against registered providers
+- Improved error message when provider exists in DB but failed to initialize (e.g. missing API key)
+
+### 3. OpenAI Provider Setup (DB-only, no code)
+- Created OpenAI provider record (id=2, type='openai') in providers table
+- Copied API key from catalog entry 7 config to provider record
+- Linked all 6 GPT entries (ids 8-10, 13-14, 102) to provider id=2
+- Fixed old entries' config.providerId from string "openai" to numeric 2
+- Restarted server: OpenAI provider now initializes successfully (2 loaded, 0 skipped)
+- GPT validation passes all 4 steps: Health, Capabilities (9 models), Models, TestPrompt
+
+## Key Findings
+- discoverFromApi saves apiKey to catalog entry config (if input.providerId set) but NOT to the provider record
+- OpenAI provider requires apiKey in its config to initialize (RequiredConfigValue check in base.ts)
+- Old seed entries (ids 8-14) had minimal descriptive config with string slugs, not discovery metadata
+- New discovery entries (id 102) have full metadata (baseUrl, providerType, owned_by, created)
+
+## Files Changed
+- server/catalog-import/router.ts — bulkCreate providerType fallback + repairProviderLinks endpoint
+- server/routers/catalog-manage.ts — validation provider resolution handles strings + better error messages
+- docs/import-runtime-linking.md — new documentation
+
+## Commits
+- 39e1105 fix: resolve import runtime defaults into real catalog entry fields
+- a6d3679 fix: resolve string provider slugs and improve validation error messages
