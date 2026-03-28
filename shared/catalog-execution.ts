@@ -65,3 +65,25 @@ export function isCatalogServiceExecutionEligible(entry: CatalogExecutionEntryLi
     isCatalogServiceAgent(entry.config)
   );
 }
+
+// ── Universal Runtime Kind ──────────────────────────────────────────────
+
+/**
+ * The runtime kind determines which execution adapter handles a catalog entry.
+ *
+ * - "llm-chat": traditional LLM provider streaming (requires published bundle)
+ * - "service": HTTP service dispatch (requires config.runtime.kind === "service")
+ */
+export type CatalogRuntimeKind = "llm-chat" | "service";
+
+/**
+ * Resolve the runtime kind of a catalog entry from its config.
+ * Returns "service" if the entry has service runtime metadata,
+ * otherwise returns "llm-chat" (the default execution path).
+ */
+export function resolveCatalogRuntimeKind(
+  config: Record<string, unknown> | null | undefined,
+): CatalogRuntimeKind {
+  if (isCatalogServiceAgent(config)) return "service";
+  return "llm-chat";
+}

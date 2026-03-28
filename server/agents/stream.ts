@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { sdk } from '../_core/sdk';
 import { executeAgent } from './executor';
 import { AppBlockerError, createGenericTechnicalBlocker } from '../_core/blockers';
+import { invokeCatalogEntry } from '../catalog/invoke';
 
 function getDevOrAuthenticatedUser(req: Request) {
   if (process.env.DEV_MODE === "true") {
@@ -87,6 +88,10 @@ export async function handleAgentChatStream(req: Request, res: Response) {
   }
 }
 
+/**
+ * Catalog agent chat stream — now uses the universal invoke path.
+ * Runtime kind is resolved automatically (llm-chat or service).
+ */
 export async function handleCatalogAgentChatStream(req: Request, res: Response) {
   try {
     const user = await getDevOrAuthenticatedUser(req);
@@ -98,24 +103,31 @@ export async function handleCatalogAgentChatStream(req: Request, res: Response) 
     const { catalogEntryId } = req.params;
     const { conversationId, message } = req.query;
 
-    if (!catalogEntryId || !conversationId || !message) {
-      res.status(400).json({ error: 'Missing required parameters' });
+    if (!catalogEntryId || !message) {
+      res.status(400).json({ error: 'Missing required parameters: catalogEntryId and message are required' });
       return;
     }
 
     const sendEvent = setupSse(res);
 
     try {
-      const result = await executeAgent({
-        conversationId: parseInt(conversationId as string),
-        userMessage: message as string,
-        userId: user.id,
-        workspaceId: 1,
+      for await (const event of invokeCatalogEntry({
         catalogEntryId: parseInt(catalogEntryId),
-      });
-
-      sendEvent({ type: 'token', content: result.response });
-      sendEvent({ type: 'done' });
+        actorUserId: user.id,
+        message: message as string,
+        conversationId: conversationId ? parseInt(conversationId as string) : undefined,
+        triggerSource: "catalog_agent_chat",
+      })) {
+        // Map the universal event format to the legacy stream format
+        if (event.type === "token") {
+          sendEvent({ type: 'token', content: event.content });
+        } else if (event.type === "complete") {
+          sendEvent({ type: 'done' });
+        } else if (event.type === "error") {
+          sendEvent({ type: 'error', error: event.error });
+        }
+        // run_started events are informational — not sent in legacy format
+      }
     } catch (error: any) {
       console.error('[CatalogAgentChatStream] Error:', error);
       const blocker = toStreamBlocker(error);

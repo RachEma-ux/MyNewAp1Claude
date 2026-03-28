@@ -11,7 +11,8 @@ import { serveStatic, setupVite } from "./vite";
 import { initializeProviders } from "../providers/init";
 import { handleChatStream } from "../chat/stream";
 import { handleAgentChatStream, handleCatalogAgentChatStream } from "../agents/stream";
-import { executeCatalogChatStream, executeServiceAgentStream, resolveServiceAgentExecutionTarget, catalogExecutionQuerySchema } from "../catalog/execution";
+import { catalogExecutionQuerySchema } from "../catalog/execution";
+import { invokeCatalogEntry } from "../catalog/invoke";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
 import { getDb, ensureDefaultWorkspace } from "../db";
@@ -496,8 +497,10 @@ async function startServer() {
   app.get("/api/agents/:agentId/chat/stream", handleAgentChatStream);
   // Catalog-authoritative agent chat streaming endpoint
   app.get("/api/catalog/agents/:catalogEntryId/chat/stream", handleCatalogAgentChatStream);
-  // Catalog-first execution streaming endpoint
-  app.get("/api/catalog/:catalogEntryId/chat/stream", async (req, res) => {
+  // Universal catalog invoke streaming endpoint
+  // All catalog agent execution goes through invokeCatalogEntry() which
+  // resolves the runtime kind and dispatches to the correct adapter.
+  app.get("/api/catalog/:catalogEntryId/invoke/stream", async (req, res) => {
     try {
       let user;
       if (process.env.DEV_MODE === "true") {
@@ -541,33 +544,19 @@ async function startServer() {
       res.setHeader("X-Accel-Buffering", "no");
       res.flushHeaders();
 
-      // Branch: service-backed agents use HTTP dispatch, LLM agents use provider streaming
-      const serviceTarget = await resolveServiceAgentExecutionTarget(catalogEntryId).catch(() => null);
-
-      if (serviceTarget) {
-        for await (const event of executeServiceAgentStream({
-          catalogEntryId,
-          actorUserId: user.id,
-          message: parsed.data.message,
-          triggerSource: parsed.data.triggerSource,
-        })) {
-          res.write(`data: ${JSON.stringify(event)}\n\n`);
-        }
-      } else {
-        for await (const event of executeCatalogChatStream({
-          catalogEntryId,
-          actorUserId: user.id,
-          message: parsed.data.message,
-          conversationId: parsed.data.conversationId,
-          triggerSource: parsed.data.triggerSource,
-        })) {
-          res.write(`data: ${JSON.stringify(event)}\n\n`);
-        }
+      for await (const event of invokeCatalogEntry({
+        catalogEntryId,
+        actorUserId: user.id,
+        message: parsed.data.message,
+        conversationId: parsed.data.conversationId,
+        triggerSource: parsed.data.triggerSource,
+      })) {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
       }
 
       res.end();
     } catch (error) {
-      console.error("[CatalogChatStream] Request error:", error);
+      console.error("[CatalogInvokeStream] Request error:", error);
       if (!res.headersSent) {
         res.status(500).json({ error: "Internal server error" });
         return;
@@ -579,6 +568,13 @@ async function startServer() {
       })}\n\n`);
       res.end();
     }
+  });
+
+  // Legacy endpoint — redirects to the universal invoke path
+  app.get("/api/catalog/:catalogEntryId/chat/stream", (req, res) => {
+    const catalogEntryId = req.params.catalogEntryId;
+    const qs = new URLSearchParams(req.query as Record<string, string>).toString();
+    res.redirect(307, `/api/catalog/${catalogEntryId}/invoke/stream?${qs}`);
   });
 
   // Governance audit artifact download

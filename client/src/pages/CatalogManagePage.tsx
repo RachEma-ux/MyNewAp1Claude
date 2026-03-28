@@ -4190,14 +4190,14 @@ function ExecutionObservabilityPanel({
 
     const params = new URLSearchParams({
       message: trimmed,
-      triggerSource: "catalog_chat",
+      triggerSource: "catalog_invoke",
     });
     if (conversationId) {
       params.set("conversationId", String(conversationId));
     }
 
     const eventSource = new EventSource(
-      `/api/catalog/${entryId}/chat/stream?${params.toString()}`
+      `/api/catalog/${entryId}/invoke/stream?${params.toString()}`
     );
 
     eventSource.onmessage = event => {
