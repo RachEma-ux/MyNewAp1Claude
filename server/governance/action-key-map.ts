@@ -253,6 +253,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   // ── Catalog Import ───────────────────────────────────────────────────────
   "catalogImport.discoverFromApi": "catalogImport.discoverFromApi",
   "catalogImport.parseFile": "catalogImport.parseFile",
+  "catalogImport.parseFileUpload": "catalogImport.parseFile",
   "catalogImport.bulkCreate": "catalogImport.bulkCreate",
   "catalogImport.importUrl": "catalogImport.importUrl",
   "catalogImport.retryAll": "catalogImport.retryAll",
