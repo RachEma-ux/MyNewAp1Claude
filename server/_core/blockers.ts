@@ -375,8 +375,32 @@ function tryBuildGovernanceOrLifecycleBlocker(
     });
   }
 
+  // Gate FAIL with specific check names (e.g. "Registration gate FAIL: check1, check2")
+  const gateFailMatch = message.match(
+    /gate FAIL:\s*(.+)/i
+  );
+  if (gateFailMatch) {
+    const failedChecks = gateFailMatch[1]
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return createAppBlockerPayload({
+      code: "governance_gate_failed",
+      category: "governance_block",
+      title: "Governance checks failed",
+      summary: `${failedChecks.length} governance check(s) did not pass. Review the failed items and fix them.`,
+      details: failedChecks.map((check) => `Failed: ${check}`),
+      missingRequirements: failedChecks,
+      recommendedActions: [
+        "Fix the failed governance checks listed above, then try again.",
+      ],
+      context: { trpcCode, failedChecks },
+      technicalDetails: message,
+    });
+  }
+
   if (
-    /FREEZE|gate FAIL|risk finding|governance denied|policy|compliance/i.test(
+    /FREEZE|risk finding|governance denied|policy|compliance/i.test(
       message
     )
   ) {

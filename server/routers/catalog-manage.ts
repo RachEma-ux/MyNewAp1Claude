@@ -85,6 +85,7 @@ import * as providerDb from "../providers/db";
 import { discoverProvider, discoverDocsUrl, extractDocMetadata } from "./discover-provider";
 import { normalizeDiscovery, toArtifactSummary } from "../governance/discovery-artifact";
 import { TRPCError } from "@trpc/server";
+import { createAppBlockerError, appBlockerToTRPCError } from "../_core/blockers";
 import { evaluateStageReview } from "../governance/stage-review";
 
 // ── Rate Limiting & Caching ─────────────────────────────────────────
@@ -763,11 +764,31 @@ export const catalogManageRouter = router({
         { id: String(ctx.user.id), role: ctx.user.role || "admin" }
       );
       if (!review.passed) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: `Registration gate FAIL: ${review.blockers.map((b) => b.name).join(", ")}`,
-          cause: review,
-        });
+        throw appBlockerToTRPCError(
+          createAppBlockerError(
+            {
+              code: "activation_gate_failed",
+              category: "governance_block",
+              title: "Activation blocked by governance checks",
+              summary: `${review.blockers.length} governance check(s) failed. Fix the issues below, then try again.`,
+              details: review.blockers.map(
+                (b) => `${b.name}: ${b.details}${b.remediation ? ` — Fix: ${b.remediation}` : ""}`
+              ),
+              missingRequirements: review.blockers.map((b) => b.name),
+              recommendedActions: review.blockers
+                .filter((b) => b.remediation)
+                .map((b) => b.remediation!),
+              context: {
+                stage: review.stage,
+                score: review.score,
+                totalChecks: review.items.length,
+                failedChecks: review.blockers.length,
+              },
+              technicalDetails: `Registration gate FAIL: ${review.blockers.map((b) => b.name).join(", ")}`,
+            },
+            "CONFLICT"
+          )
+        );
       }
 
       await updateCatalogEntry(input.id, { status: "active" }, 1);

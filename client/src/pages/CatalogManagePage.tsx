@@ -96,7 +96,7 @@ import { CatalogImportWizard } from "@/components/CatalogImportWizard";
 import { ConnectProviderModal } from "@/components/ConnectProviderModal";
 import { DiscoveryHealthPanel } from "@/components/DiscoveryOpsPanel";
 import { toast } from "sonner";
-import { showBlockerToast } from "@/lib/appBlockers";
+import { showBlockerToast, getAppBlocker } from "@/lib/appBlockers";
 
 const TYPE_ICONS: Record<string, any> = {
   provider: Server,
@@ -290,6 +290,7 @@ export default function CatalogManagePage() {
   const [activatingEntry, setActivatingEntry] = useState<any>(null);
   const [activateReason, setActivateReason] = useState("");
   const [activateTestsPassed, setActivateTestsPassed] = useState(false);
+  const [activateError, setActivateError] = useState<import("@shared/blockers").AppBlockerPayload | null>(null);
 
   // Version history dialog state
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
@@ -398,10 +399,12 @@ export default function CatalogManagePage() {
       setActivatingEntry(null);
       setActivateReason("");
       setActivateTestsPassed(false);
+      setActivateError(null);
       toast.success("Entry activated — governance gate passed");
     },
     onError: error => {
-      showBlockerToast(error, "Activation blocked");
+      const blocker = getAppBlocker(error);
+      setActivateError(blocker);
     },
   });
 
@@ -409,6 +412,7 @@ export default function CatalogManagePage() {
     setActivatingEntry(entry);
     setActivateReason("");
     setActivateTestsPassed(false);
+    setActivateError(null);
     setActivateDialogOpen(true);
   }
 
@@ -3325,6 +3329,7 @@ export default function CatalogManagePage() {
           setActivatingEntry(null);
           setActivateReason("");
           setActivateTestsPassed(false);
+          setActivateError(null);
         }
       }}>
         <DialogContent className="max-w-md">
@@ -3357,6 +3362,53 @@ export default function CatalogManagePage() {
               </Label>
             </div>
           </div>
+
+          {/* Governance failure details */}
+          {activateError && (
+            <div className="rounded-md border border-red-500/30 bg-red-950/20 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <ShieldX className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-red-300">{activateError.title}</p>
+                  <p className="text-sm text-red-400/80 mt-1">{activateError.summary}</p>
+                </div>
+              </div>
+
+              {activateError.details.length > 0 && (
+                <div className="space-y-1 ml-7">
+                  <p className="text-xs font-medium text-red-300/70 uppercase tracking-wide">Failed checks</p>
+                  {activateError.details.map((detail, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm text-red-300/90">
+                      <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-red-400" />
+                      <span>{detail}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {activateError.missingRequirements.length > 0 && (
+                <div className="space-y-1 ml-7">
+                  <p className="text-xs font-medium text-red-300/70 uppercase tracking-wide">Missing requirements</p>
+                  {activateError.missingRequirements.map((req, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm text-red-300/90">
+                      <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-red-400" />
+                      <span>{req}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {activateError.recommendedActions.length > 0 && (
+                <div className="space-y-1 ml-7">
+                  <p className="text-xs font-medium text-amber-300/70 uppercase tracking-wide">What to do</p>
+                  {activateError.recommendedActions.map((action, i) => (
+                    <p key={i} className="text-sm text-amber-200/80">• {action}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <DialogFooter>
             <Button
               variant="outline"
