@@ -54,6 +54,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
 
   const serviceAvailable = runtime?.health?.available === true;
   const serviceStatus = runtime?.health?.status ?? "unknown";
+  const isBuiltIn = serviceStatus === "built-in";
 
   const translateMut = trpc.ps.ideation.contextTranslator.translate.useMutation({
     onSuccess: (data) => {
@@ -108,12 +109,16 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                 variant="outline"
                 className={`ml-auto text-[10px] flex items-center gap-1 ${
                   serviceAvailable
-                    ? "bg-green-500/10 text-green-600 border-green-500/30"
+                    ? isBuiltIn
+                      ? "bg-blue-500/10 text-blue-600 border-blue-500/30"
+                      : "bg-green-500/10 text-green-600 border-green-500/30"
                     : "bg-red-500/10 text-red-500 border-red-500/30"
                 }`}
               >
                 <Activity className="w-3 h-3" />
-                {serviceAvailable ? "Service Online" : "Service Offline"}
+                {serviceAvailable
+                  ? isBuiltIn ? "Built-in Mode" : "Service Online"
+                  : "Service Offline"}
               </Badge>
             )}
           </CardTitle>
@@ -129,6 +134,15 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
               <div className="text-xs text-red-600">
                 <span className="font-medium">Service unavailable</span>
                 {runtime.health?.error && <span className="block text-red-500/80 mt-0.5">{runtime.health.error}</span>}
+              </div>
+            </div>
+          )}
+          {runtime && serviceAvailable && isBuiltIn && (
+            <div className="flex items-start gap-2 p-2 rounded bg-blue-500/5 border border-blue-500/20">
+              <Sparkles className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+              <div className="text-xs text-blue-600">
+                <span className="font-medium">Using built-in LLM translator</span>
+                <span className="block text-blue-500/80 mt-0.5">Python service offline — analysis runs via platform LLM providers</span>
               </div>
             </div>
           )}

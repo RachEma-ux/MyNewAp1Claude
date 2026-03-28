@@ -19,7 +19,7 @@ import {
   type ServiceRuntimeTarget,
   type ServiceHealthResult,
 } from "../catalog/service-runtime";
-import { AGENT_CATALOG_ID } from "../modules/pmt/context-translator-agent";
+import { AGENT_CATALOG_ID, analyzeRawInput } from "../modules/pmt/context-translator-agent";
 
 export const contextTranslatorRouter = router({
   /**
@@ -33,18 +33,25 @@ export const contextTranslatorRouter = router({
       metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Call the Python service
+      // Try the Python service first, fall back to built-in LLM agent
       let result: client.TranslateResponse;
+      let source: "service" | "built-in" = "service";
       try {
         result = await client.translate({
           rawText: input.rawText,
           metadata: input.metadata,
         });
-      } catch (err: any) {
-        throw new TRPCError({
-          code: "BAD_GATEWAY",
-          message: err.message || "Project Context Translator service unavailable",
-        });
+      } catch {
+        // Python service unavailable — fall back to built-in agent
+        try {
+          result = await analyzeRawInput(input.rawText);
+          source = "built-in";
+        } catch (fallbackErr: any) {
+          throw new TRPCError({
+            code: "BAD_GATEWAY",
+            message: fallbackErr.message || "Both Python service and built-in translator failed",
+          });
+        }
       }
 
       // Persist the translator run
@@ -64,7 +71,7 @@ export const contextTranslatorRouter = router({
         }
       }
 
-      return result;
+      return { ...result, _source: source };
     }),
 
   /**
@@ -241,27 +248,49 @@ export const contextTranslatorRouter = router({
       resolved: boolean;
       target: ServiceRuntimeTarget | null;
       health: ServiceHealthResult | null;
+      builtInAvailable: boolean;
       error: string | null;
     }> => {
+      // Built-in translator is always available (has LLM fallback + template fallback)
+      const builtInAvailable = true;
+
       try {
         const target = await resolveServiceAgentByName(AGENT_CATALOG_ID);
         if (!target) {
           return {
             resolved: false,
             target: null,
-            health: null,
-            error: `Catalog entry '${AGENT_CATALOG_ID}' not found or not a service-based agent`,
+            health: builtInAvailable
+              ? { available: true, status: "built-in", service: "context-translator-agent", version: "1.0.0", latencyMs: 0 }
+              : null,
+            builtInAvailable,
+            error: builtInAvailable ? null : `Catalog entry '${AGENT_CATALOG_ID}' not found`,
           };
         }
 
         const health = await checkServiceHealthByName(AGENT_CATALOG_ID);
-        return { resolved: true, target, health, error: null };
+
+        // If service is offline but built-in is available, override to available
+        if (!health.available && builtInAvailable) {
+          return {
+            resolved: true,
+            target,
+            health: { ...health, available: true, status: "built-in" },
+            builtInAvailable,
+            error: null,
+          };
+        }
+
+        return { resolved: true, target, health, builtInAvailable, error: null };
       } catch (err: any) {
         return {
           resolved: false,
           target: null,
-          health: null,
-          error: err.message || "Failed to resolve runtime",
+          health: builtInAvailable
+            ? { available: true, status: "built-in", service: "context-translator-agent", version: "1.0.0", latencyMs: 0 }
+            : null,
+          builtInAvailable,
+          error: builtInAvailable ? null : (err.message || "Failed to resolve runtime"),
         };
       }
     }),

@@ -20,7 +20,7 @@
 
 import { getAvailableProvider, callLLM, parseLLMJson } from "./idea-builder-agent";
 import type { Message } from "../../providers/types";
-import { createCatalogEntry, getCatalogEntries, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../db/catalog";
+import { createCatalogEntry, updateCatalogEntry, getCatalogEntries, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../db/catalog";
 import type { TranslateResponse } from "@shared/ps-context-translator-types";
 
 // ── Agent Identity ──────────────────────────────────────────────────────────
@@ -308,6 +308,35 @@ export async function ensureContextTranslatorRegistered(): Promise<number | null
     const found = existing.find(e => e.name === AGENT_CATALOG_ID);
 
     if (found) {
+      // Ensure runtime config is present (fix config drift from older registrations)
+      const existingConfig = (found.config as Record<string, unknown>) || {};
+      if (!existingConfig.runtime || (existingConfig.runtime as any)?.kind !== "service") {
+        try {
+          await updateCatalogEntry(found.id, {
+            config: {
+              ...existingConfig,
+              runtime: {
+                kind: "service",
+                serviceKind: "python",
+                serviceName: "project-context-translator",
+                serviceUrlEnv: "PROJECT_CONTEXT_TRANSLATOR_URL",
+                serviceUrlDefault: "http://localhost:8585",
+                healthEndpoint: "/health",
+                statusEndpoint: "/status",
+                translateEndpoint: "/translate",
+                inputSchemaRef: "shared/ps-context-translator-types#TranslateRequest",
+                outputSchemaRef: "shared/ps-context-translator-types#TranslateResponse",
+                capabilityTags: ["ps-ideation", "wizard-handoff", "context-framing"],
+                bounded: true,
+              },
+            },
+          }, 0);
+          console.log(`[ContextTranslator] Patched missing runtime config on existing agent (id=${found.id})`);
+        } catch (patchErr: any) {
+          console.warn(`[ContextTranslator] Failed to patch runtime config:`, patchErr.message);
+        }
+      }
+
       // Ensure taxonomy classifications are assigned
       try {
         const existingClassifications = await getEntryClassifications(found.id);
