@@ -1520,7 +1520,7 @@ actions:
     capability: catalog.manage
     stage: validate
     approval: role_any
-    evidence: { required: true, types: [probe_results] }
+    evidence: { required: false }
 
   catalog.approve:
     domain: catalog

@@ -366,12 +366,22 @@ export default function CatalogManagePage() {
     },
   });
   const validateMutation = trpc.catalogManage.validate.useMutation({
-    onSuccess: (data, variables) => {
+    onSuccess: (data: any, variables) => {
       setValidationResults(prev => ({ ...prev, [variables.id]: data }));
       setValidatingId(null);
       refetch();
+      if (data?.success === false) {
+        toast.error("Validation completed with errors", {
+          description: data.errors?.join("; ") || "Check the validation results for details.",
+        });
+      } else {
+        toast.success("Validation complete");
+      }
     },
-    onError: () => setValidatingId(null),
+    onError: (error) => {
+      setValidatingId(null);
+      showBlockerToast(error, "Validation failed");
+    },
   });
   const publishMutation = trpc.catalogManage.publish.useMutation({
     onSuccess: () => {

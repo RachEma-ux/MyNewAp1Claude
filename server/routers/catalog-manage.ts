@@ -408,7 +408,7 @@ export const catalogManageRouter = router({
    * Validate a catalog entry via orchestrator handshake
    * Allowed on draft and active entries. Restores previous status on completion.
    */
-  validate: governedProcedure
+  validate: protectedProcedure
     .input(z.object({
       id: z.number().int().positive(),
       runTestPrompt: z.boolean().optional(),
