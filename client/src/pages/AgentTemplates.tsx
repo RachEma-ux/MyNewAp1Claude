@@ -3,9 +3,9 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  BarChart3, Code, FileText, Search, Database, Mail, 
-  Sparkles, Rocket, CheckCircle2 
+import {
+  BarChart3, Code, FileText, Search, Database, Mail, Lightbulb,
+  Sparkles, Rocket, CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -102,6 +102,22 @@ const templates: AgentTemplate[] = [
       "Schema migrations",
     ],
     deployCount: 421,
+  },
+  {
+    id: "context-translator",
+    name: "Project Context Translator",
+    description: "Transforms raw project ideas into structured context analysis and PS Wizard-ready scenarios",
+    icon: Lightbulb,
+    category: "Ideation",
+    tools: ["context_extraction", "scenario_framing", "feasibility_assessment"],
+    systemPrompt: "You are a Project Context Translator. Transform unstructured user input into structured project context using the formula: Project Context = External Drivers + Internal Drivers + Trigger. Produce decision gates, core signals, ideation workflow drafts, and PS Wizard scenario packages. All outputs are drafts requiring human approval.",
+    useCases: [
+      "Raw idea to structured scenario",
+      "PS Wizard step 1 prefilling",
+      "Ideation workflow draft generation",
+      "Project context signal extraction",
+    ],
+    deployCount: 0,
   },
   {
     id: "email-assistant",

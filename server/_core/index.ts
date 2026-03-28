@@ -222,6 +222,17 @@ async function startServer() {
     console.warn(`[AgentSeed] Skipped — ${error.message}`);
   }
 
+  // Register Project Context Translator Agent in AI Types Catalog
+  try {
+    const { ensureContextTranslatorRegistered } = await import("../modules/pmt/context-translator-agent");
+    const ctAgentId = await ensureContextTranslatorRegistered();
+    if (ctAgentId) {
+      console.log(`[AgentSeed] Project Context Translator Agent registered in catalog (id=${ctAgentId})`);
+    }
+  } catch (error: any) {
+    console.warn(`[AgentSeed] Context Translator skipped — ${error.message}`);
+  }
+
   // Seed OM organization templates (5 structure models)
   try {
     const { seedOmTemplates } = await import("../organization-management/seed-templates");

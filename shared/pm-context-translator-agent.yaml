@@ -1,0 +1,387 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Project Context Translator Agent — Full Enterprise Specification
+#
+# AI Types Agent Definition + Catalog Entry + PM Central Binding +
+# Enforcement Overlay + Wizard Specification
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: "1.0"
+schema: ai_types_agent_enterprise_definition
+
+# ─── 1. AI TYPES AGENT DEFINITION ────────────────────────────────────────────
+
+agent:
+  id: "ai.agent.ps.context_translator.v1"
+  name: "Project Context Translator"
+  domain: ps_ideation
+  version: "1.0.0"
+  status: active
+  description: >
+    Transforms unstructured user input into a structured project context
+    analysis and PS Wizard-ready scenario. Applies the formula:
+    Project Context = External Drivers + Internal Drivers + Trigger.
+    Produces decision gates, core signals, ideation workflow drafts,
+    and scenario packages. All outputs are draft-only and require
+    explicit human commit.
+
+  layer: agent  # Provider → LLM → Model → Agent → Bot
+
+  runtime:
+    provider_ref: "catalog.ai.provider.llm_or_template.v1"
+    execution_mode: sequential
+    timeout_seconds: 120
+    max_retries: 0
+    idempotent: true
+
+  capabilities:
+    allowed:
+      - draft_generation
+      - context_extraction
+      - scenario_framing
+      - feasibility_assessment
+      - evidence_emission
+      - audit_event_emission
+    forbidden:
+      - gate_submit
+      - gate_approve
+      - gate_reject
+      - gate_waive
+      - state_transition
+      - baseline_lock
+      - baseline_unlock
+      - freeze
+      - unfreeze
+      - artifact_write_canonical
+      - admin_override
+      - external_export
+      - user_impersonation
+      - secret_access
+      - database_direct_write
+
+  output_contracts:
+    translate_response:
+      format: json
+      schema_ref: "#/artifact_schemas/translate_response"
+      requires_human_review: true
+      sections:
+        - decisionGate
+        - extractedFacts
+        - problem
+        - opportunity
+        - coreSignals
+        - projectContextFormula
+        - projectContextResult
+        - whatIfQuestion
+        - ideationWorkflowDraft
+        - psWizardScenarioPackage
+        - missingInformation
+        - clarificationQuestions
+        - framingNotes
+        - renderedMarkdown
+
+  phase_restrictions:
+    allowed_phases:
+      - draft_shell
+      - initiating
+      - planning
+    forbidden_phases:
+      - executing
+      - monitoring
+      - closing
+
+  policy_profile: enterprise_hardened
+  data_tier: internal
+  risk_tier: medium
+
+# ─── 2. CATALOG PUBLICATION ENTRY ────────────────────────────────────────────
+
+catalog_entry:
+  catalog_id: "catalog.ai.agent.ps.context_translator"
+  entry_type: agent
+  name: "Project Context Translator"
+  version: "1.0.0"
+  pinned_digest: "sha256:context_translator_v1_2026032800"
+  status: active
+  allowed_modules:
+    - ps_ideation
+    - pm_central
+  publisher: "system"
+  immutable_after_publish: true
+  version_history:
+    - version: "1.0.0"
+      digest: "sha256:context_translator_v1_2026032800"
+      published_at: "2026-03-28T00:00:00Z"
+      changelog: "Initial release — LLM-powered context translation with fallback"
+
+# ─── 3. PM CENTRAL BINDING ───────────────────────────────────────────────────
+
+pm_central_binding:
+  alias: "context_translator"
+  catalog_id: "catalog.ai.agent.ps.context_translator"
+  pinned_digest: "sha256:context_translator_v1_2026032800"
+  display_name: "Project Context Translator"
+  description: "Transforms unstructured input into structured project context and PS Wizard scenarios"
+  phases_allowed:
+    - draft_shell
+    - initiating
+    - planning
+  enforcement_overlay:
+    deny:
+      - gate_submit
+      - gate_approve
+      - gate_reject
+      - gate_waive
+      - state_transition
+      - baseline_lock
+      - baseline_unlock
+      - freeze
+      - unfreeze
+      - artifact_write_canonical
+    require_human_review: true
+    max_execution_time_seconds: 120
+    data_tier_guard: internal
+    no_admin_override: true
+    no_external_export: true
+
+# ─── 4. AGENT PACK ───────────────────────────────────────────────────────────
+
+pack:
+  id: "context_translator_analysis"
+  name: "Context Translator Analysis"
+  description: "Full context translation from raw user input to PS Wizard scenario"
+  agents:
+    - context_translator
+  trigger: manual
+  policies:
+    require_human_commit: true
+    forbid_gate_actions: true
+    forbid_state_transitions: true
+    forbid_baseline_lock: true
+    strict_timeout: true
+    timeout_seconds: 120
+
+# ─── 5. CORE FORMULA ─────────────────────────────────────────────────────────
+
+core_formula:
+  name: "Project Context Formula"
+  expression: "Project Context = External Drivers + Internal Drivers + Trigger"
+  components:
+    external_drivers:
+      description: "Market forces, competitive pressure, regulatory changes, customer demands, technology shifts"
+      min_count: 1
+    internal_drivers:
+      description: "Process inefficiency, capability gaps, resource constraints, technical debt, cultural factors"
+      min_count: 1
+    trigger:
+      description: "Specific event or catalyst that makes this project necessary NOW"
+      required: true
+
+# ─── 6. PROCESSING STEPS ─────────────────────────────────────────────────────
+
+processing_steps:
+  - step: 1
+    id: decision_gate
+    name: "Decision Gate"
+    description: "Evaluate if input has at least one problem OR opportunity"
+    outputs: [decisionGate]
+
+  - step: 2
+    id: extract_facts
+    name: "Extract Facts"
+    description: "Pull out every concrete fact, metric, constraint from input"
+    outputs: [extractedFacts]
+
+  - step: 3
+    id: identify_problem
+    name: "Identify the Problem"
+    description: "Articulate the core problem — classify as clear/unclear/missing"
+    outputs: [problem]
+
+  - step: 4
+    id: identify_opportunity
+    name: "Identify the Opportunity"
+    description: "Articulate the opportunity — classify as clear/unclear/missing"
+    outputs: [opportunity]
+
+  - step: 5
+    id: core_signals
+    name: "Core Signals Extraction"
+    description: "Extract external drivers, internal drivers, and trigger"
+    outputs: [coreSignals]
+
+  - step: 6
+    id: apply_formula
+    name: "Apply Project Context Formula"
+    description: "Synthesize context result from drivers and trigger"
+    outputs: [projectContextFormula, projectContextResult]
+
+  - step: 7
+    id: guiding_question
+    name: "Frame Guiding Question"
+    description: "Generate a What-If question for transformative potential"
+    outputs: [whatIfQuestion]
+
+  - step: 8
+    id: ideation_draft
+    name: "Ideation Workflow Draft"
+    description: "Produce structured draft across 11 ideation sections"
+    outputs: [ideationWorkflowDraft]
+
+  - step: 9
+    id: wizard_package
+    name: "PS Wizard Scenario Package"
+    description: "Produce PS Wizard handoff payload"
+    outputs: [psWizardScenarioPackage]
+
+  - step: 10
+    id: missing_info
+    name: "Missing Information"
+    description: "List information gaps that would improve analysis"
+    outputs: [missingInformation]
+
+  - step: 11
+    id: confidence_notes
+    name: "Confidence Notes"
+    description: "Classify every claim as extracted/inferred/proposed"
+    outputs: [framingNotes]
+
+# ─── 7. SECURITY & GOVERNANCE ENFORCEMENT ────────────────────────────────────
+
+security:
+  authentication: required
+  authorization: protectedProcedure
+  data_classification: internal
+  encryption_at_rest: platform_default
+  encryption_in_transit: tls
+
+  enforcement_rules:
+    - rule: deny_lifecycle_transition
+      action: state_transition
+      effect: deny
+      severity: blocker
+    - rule: deny_gate_submission
+      action: gate_submit
+      effect: deny
+      severity: blocker
+    - rule: deny_gate_approval
+      action: gate_approve
+      effect: deny
+      severity: blocker
+    - rule: deny_baseline_lock
+      action: baseline_lock
+      effect: deny
+      severity: blocker
+    - rule: deny_canonical_write
+      action: artifact_write_canonical
+      effect: deny
+      severity: blocker
+    - rule: deny_admin_override
+      action: admin_override
+      effect: deny
+      severity: blocker
+    - rule: deny_external_export
+      action: external_export
+      effect: deny
+      severity: blocker
+    - rule: enforce_timeout
+      action: execution
+      max_duration_seconds: 120
+      effect: abort
+      severity: critical
+    - rule: enforce_data_tier
+      data_tier: internal
+      effect: deny_if_exceeds
+      severity: blocker
+
+# ─── 8. TESTING SPECIFICATION ─────────────────────────────────────────────────
+
+testing:
+  dry_run:
+    enabled: true
+    description: "Execute context translation without persisting to database"
+    validates:
+      - all_sections_populated
+      - decision_gate_valid
+      - core_signals_complete
+      - wizard_package_complete
+      - governance_overlay_enforced
+
+  governance_simulation:
+    enabled: true
+    test_cases:
+      - name: deny_gate_submit
+        action: gate_submit
+        expected: denied
+      - name: deny_state_transition
+        action: state_transition
+        expected: denied
+      - name: deny_baseline_lock
+        action: baseline_lock
+        expected: denied
+      - name: deny_canonical_write
+        action: artifact_write_canonical
+        expected: denied
+      - name: deny_admin_override
+        action: admin_override
+        expected: denied
+
+  schema_validation:
+    test_translate_response: true
+    test_required_fields: true
+    test_decision_gate_statuses: true
+    test_wizard_package_completeness: true
+
+  performance:
+    max_runtime_seconds: 120
+    max_memory_mb: 256
+
+# ─── 9. UI WIZARD SPECIFICATION ──────────────────────────────────────────────
+
+wizard:
+  id: "context_translator_wizard"
+  name: "Project Context Translator"
+  description: "Analyze raw input and produce a PS Wizard-ready scenario"
+  integration_point: "PSWizardPage Step 1 — scenario textarea prefill"
+  steps:
+    - step: 1
+      id: raw_input
+      label: "Describe Your Project"
+      fields:
+        - id: raw_text
+          type: textarea
+          label: "Raw Project Description"
+          placeholder: "Describe your project idea, business need, or organizational challenge in your own words..."
+          required: true
+          min_length: 10
+          max_length: 10000
+      validation: raw_text_not_empty
+
+    - step: 2
+      id: analyze
+      label: "Analyze Context"
+      type: action
+      action: run_context_translator
+      shows: analysis_progress
+
+    - step: 3
+      id: review_analysis
+      label: "Review Analysis"
+      type: review
+      shows:
+        - decision_gate_status
+        - extracted_facts
+        - core_signals
+        - project_context_result
+        - wizard_scenario_package
+      actions:
+        - accept_and_prefill_wizard
+        - request_clarification
+        - edit_manually
+        - re_analyze
+
+    - step: 4
+      id: handoff
+      label: "Launch PS Wizard"
+      type: action
+      action: prefill_ps_wizard_step1
+      description: "Injects the scenario package into PS Wizard Step 1"
