@@ -285,6 +285,12 @@ export default function CatalogManagePage() {
   const [deletingEntry, setDeletingEntry] = useState<any>(null);
   const [deleteReason, setDeleteReason] = useState("");
 
+  // Activation modal state
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false);
+  const [activatingEntry, setActivatingEntry] = useState<any>(null);
+  const [activateReason, setActivateReason] = useState("");
+  const [activateTestsPassed, setActivateTestsPassed] = useState(false);
+
   // Version history dialog state
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
   const [versionsEntryId, setVersionsEntryId] = useState<number | null>(null);
@@ -388,12 +394,39 @@ export default function CatalogManagePage() {
   const activateMutation = trpc.catalogManage.activate.useMutation({
     onSuccess: () => {
       refetch();
+      setActivateDialogOpen(false);
+      setActivatingEntry(null);
+      setActivateReason("");
+      setActivateTestsPassed(false);
       toast.success("Entry activated — governance gate passed");
     },
     onError: error => {
       showBlockerToast(error, "Activation blocked");
     },
   });
+
+  function openActivateDialog(entry: any) {
+    setActivatingEntry(entry);
+    setActivateReason("");
+    setActivateTestsPassed(false);
+    setActivateDialogOpen(true);
+  }
+
+  function submitActivation() {
+    if (!activatingEntry) return;
+    activateMutation.mutate({
+      id: activatingEntry.id,
+      reason: activateReason,
+      testsPassed: activateTestsPassed,
+      _evidence: {
+        types: ["reason", "tests_passed"],
+        refs: [
+          `reason:${activateReason}`,
+          `tests_passed:${activateTestsPassed}`,
+        ],
+      },
+    });
+  }
   const classifyMutation = trpc.catalogManage.classify.useMutation();
 
   // Discover provider from catalog table — runs discovery and updates entry config
@@ -991,9 +1024,7 @@ export default function CatalogManagePage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() =>
-                                  activateMutation.mutate({ id: entry.id })
-                                }
+                                onClick={() => openActivateDialog(entry)}
                                 disabled={activateMutation.isPending}
                                 title="Activate (governance-gated)"
                                 className="text-green-400 hover:text-green-300"
@@ -1132,7 +1163,10 @@ export default function CatalogManagePage() {
             onApprove={(id: number, stage?: string) =>
               approveMutation.mutate({ id, stage })
             }
-            onActivate={(id: number) => activateMutation.mutate({ id })}
+            onActivate={(id: number) => {
+              const entry = entries.find((e: any) => e.id === id);
+              if (entry) openActivateDialog(entry);
+            }}
             onPublish={(entry: any) => openPublishWizard(entry)}
             onRecall={(bundleId: number) => recallMutation.mutate({ bundleId })}
             approvePending={approveMutation.isPending}
@@ -3283,6 +3317,74 @@ export default function CatalogManagePage() {
         onOpenChange={setConnectModalOpen}
         onComplete={() => refetch()}
       />
+
+      {/* Activation Modal */}
+      <Dialog open={activateDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setActivateDialogOpen(false);
+          setActivatingEntry(null);
+          setActivateReason("");
+          setActivateTestsPassed(false);
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Activate Catalog Entry</DialogTitle>
+            <DialogDescription>
+              Provide the required governance evidence to activate{" "}
+              <strong>{activatingEntry?.displayName || activatingEntry?.name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="activate-reason">Reason for activation *</Label>
+              <Textarea
+                id="activate-reason"
+                placeholder="Why is this entry ready for activation? (e.g., reviewed configuration, validated provider connectivity)"
+                value={activateReason}
+                onChange={(e) => setActivateReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="activate-tests"
+                checked={activateTestsPassed}
+                onCheckedChange={setActivateTestsPassed}
+              />
+              <Label htmlFor="activate-tests" className="cursor-pointer">
+                Tests passed — I confirm that required tests/checks have been completed
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setActivateDialogOpen(false);
+                setActivatingEntry(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitActivation}
+              disabled={
+                !activateReason.trim() ||
+                !activateTestsPassed ||
+                activateMutation.isPending
+              }
+            >
+              {activateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Zap className="h-4 w-4 mr-2" />
+              )}
+              Confirm Activation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

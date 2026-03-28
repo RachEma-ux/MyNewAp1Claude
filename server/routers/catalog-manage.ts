@@ -730,6 +730,12 @@ export const catalogManageRouter = router({
   activate: governedAdminProcedure
     .input(z.object({
       id: z.number().int().positive(),
+      reason: z.string().optional(),
+      testsPassed: z.boolean().optional(),
+      _evidence: z.object({
+        types: z.array(z.string()),
+        refs: z.array(z.string()),
+      }).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const entry = await getCatalogEntryById(input.id);

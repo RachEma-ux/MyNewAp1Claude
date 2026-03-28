@@ -1561,33 +1561,20 @@ export default function CandidatePage() {
                             >
                               {entry.displayName || entry.name}
                             </CardTitle>
-                            {/* Primary badge = real current status */}
-                            <Badge
-                              className={`text-xs shrink-0 ${STATUS_COLORS[entry.status] || ""}`}
-                            >
-                              {entry.status}
-                            </Badge>
-                          </div>
-                          {/* Secondary chips: type, approvals, publish action, validation */}
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {(() => {
-                              const Icon =
-                                TYPE_ICONS[entry.entryType] || Package;
-                              return (
-                                <Badge variant="outline" className="text-xs">
-                                  <Icon className="h-3 w-3 mr-1" />
-                                  {ENTRY_TYPE_DEFS[entry.entryType as EntryType]
-                                    ?.label || entry.entryType}
-                                </Badge>
-                              );
-                            })()}
-                            {/* Publish action or publish-approved chip */}
-                            {isAtOrPastStage(entry.tags || [], "validate") &&
-                            isBeforeStage(entry.tags || [], "publish") ? (
+                            {/* Top-right badge: blue Published when published, otherwise Publish button or nothing */}
+                            {(entry.tags || []).includes("published") ? (
+                              <Badge
+                                className="text-xs shrink-0 bg-blue-600/20 text-blue-400 border-blue-600/30"
+                              >
+                                <Rocket className="h-3 w-3 mr-1" />
+                                Published
+                              </Badge>
+                            ) : isAtOrPastStage(entry.tags || [], "validate") &&
+                              isBeforeStage(entry.tags || [], "publish") ? (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-6 text-xs"
+                                className="h-6 text-xs shrink-0"
                                 onClick={() =>
                                   governedTransition(entry, "publish")
                                 }
@@ -1611,27 +1598,21 @@ export default function CandidatePage() {
                                 )}
                                 Publish
                               </Button>
-                            ) : (entry.tags || []).includes("published") ? (
-                              <Badge
-                                variant="outline"
-                                className="text-xs border-emerald-600/30 text-emerald-400"
-                                title={(() => {
-                                  const execStatus = getExecutionStatus({
-                                    status: entry.status,
-                                    reviewState: entry.reviewState || "",
-                                    stageReviews: entry.stageReviews,
-                                    validationStatus: entry.validationStatus,
-                                    tags: entry.tags,
-                                  });
-                                  return execStatus.runnable
-                                    ? "Runnable"
-                                    : `Not runnable: ${execStatus.reasons.join("; ")}`;
-                                })()}
-                              >
-                                <Rocket className="h-3 w-3 mr-1" />
-                                Publish approved
-                              </Badge>
                             ) : null}
+                          </div>
+                          {/* Secondary chips: type, review, validation, runnable */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {(() => {
+                              const Icon =
+                                TYPE_ICONS[entry.entryType] || Package;
+                              return (
+                                <Badge variant="outline" className="text-xs">
+                                  <Icon className="h-3 w-3 mr-1" />
+                                  {ENTRY_TYPE_DEFS[entry.entryType as EntryType]
+                                    ?.label || entry.entryType}
+                                </Badge>
+                              );
+                            })()}
                             <Badge
                               className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "publish")] || ""}`}
                               onClick={e => {
