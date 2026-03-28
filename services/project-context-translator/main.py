@@ -21,6 +21,10 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from spacy_preprocess import preprocess as spacy_preprocess
+from reasoning_request import build_reasoning_context
+from grounding import check_grounding, GroundingResult
+
 load_dotenv()
 
 # ── Logging ─────────────────────────────────────────────────────────────────
@@ -147,6 +151,14 @@ class FramingNotes(BaseModel):
     proposed: list[str] = []
 
 
+class GroundingMetadata(BaseModel):
+    """Post-LLM grounding check results — evidence tracing metadata."""
+    overallScore: str = "unknown"  # strong | moderate | weak | unknown
+    ungroundedClaims: list[str] = []
+    noteCount: int = 0
+    groundedCount: int = 0
+
+
 class TranslateResponse(BaseModel):
     """Full structured output from the Project Context Translator."""
     decisionGate: DecisionGate
@@ -163,6 +175,7 @@ class TranslateResponse(BaseModel):
     clarificationQuestions: list[str] = []
     framingNotes: FramingNotes = FramingNotes()
     renderedMarkdown: str = ""
+    grounding: Optional[GroundingMetadata] = None
 
 
 class HealthResponse(BaseModel):
@@ -254,17 +267,20 @@ Return a JSON object with this exact structure (no markdown fences, just raw JSO
 """
 
 
-async def _call_llm(raw_text: str, metadata: Optional[dict] = None) -> dict:
-    """Call the configured LLM provider and parse structured JSON response."""
+async def _call_llm(user_content: str) -> dict:
+    """Call the configured LLM provider and parse structured JSON response.
+
+    Args:
+        user_content: Pre-built user message content (enriched with
+                      spaCy preprocessing evidence when available).
+    """
     if not LLM_API_KEY:
         raise HTTPException(
             status_code=503,
             detail="LLM API key not configured. Set PCT_LLM_API_KEY environment variable.",
         )
 
-    user_message = f"Analyze the following raw project input and return the structured JSON response:\n\n---\n{raw_text}\n---"
-    if metadata:
-        user_message += f"\n\nAdditional metadata: {json.dumps(metadata)}"
+    user_message = user_content
 
     messages = [
         {"role": "system", "content": _system_prompt + "\n\n" + RESPONSE_SCHEMA_HINT},
@@ -377,20 +393,72 @@ async def translate(req: TranslateRequest):
 
     Applies: Project Context = External Drivers + Internal Drivers + Trigger
 
-    Returns structured output with clear problem/opportunity framing,
-    or clarification mode if neither is identifiable.
+    End-to-end flow:
+      1. Receive raw ideation text
+      2. Run spaCy preprocessing (sentences, entities, signals, validation)
+      3. Build model-agnostic reasoning context enriched with evidence
+      4. Call the LLM reasoning layer with enriched context
+      5. Run grounding check — validate LLM claims against source evidence
+      6. Return final structured response with grounding metadata
     """
     logger.info(f"Translate request: {len(req.rawText)} chars, metadata={req.metadata is not None}")
 
+    # ── Step 1-2: spaCy Preprocessing ────────────────────────────────────
     try:
-        result = await _call_llm(req.rawText, req.metadata)
+        preprocess_output = spacy_preprocess(req.rawText)
+        logger.info(
+            f"spaCy preprocess: {len(preprocess_output.sentences)} sentences, "
+            f"{len(preprocess_output.entities)} entities, "
+            f"{len(preprocess_output.keywords)} keywords, "
+            f"pain={preprocess_output.validationFlags.hasPainSignal}, "
+            f"opp={preprocess_output.validationFlags.hasOpportunitySignal}"
+        )
+    except Exception as e:
+        logger.warning(f"spaCy preprocessing failed, falling back to raw text: {e}")
+        preprocess_output = None
+
+    # ── Step 3: Build enriched reasoning context ─────────────────────────
+    if preprocess_output:
+        user_content = build_reasoning_context(
+            raw_text=req.rawText,
+            preprocess=preprocess_output,
+            metadata=req.metadata,
+        )
+    else:
+        # Fallback: plain text without preprocessing evidence
+        user_content = f"Analyze the following raw project input and return the structured JSON response:\n\n---\n{req.rawText}\n---"
+        if req.metadata:
+            user_content += f"\n\nAdditional metadata: {json.dumps(req.metadata)}"
+
+    # ── Step 4: Call LLM reasoning layer ─────────────────────────────────
+    try:
+        result = await _call_llm(user_content)
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Unexpected error calling LLM")
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
-    # Validate decision gate
+    # ── Step 5: Grounding check ──────────────────────────────────────────
+    grounding_meta = None
+    if preprocess_output:
+        try:
+            grounding_result = check_grounding(result, preprocess_output)
+            grounding_meta = GroundingMetadata(
+                overallScore=grounding_result.overallScore,
+                ungroundedClaims=grounding_result.ungroundedClaims,
+                noteCount=len(grounding_result.notes),
+                groundedCount=len([n for n in grounding_result.notes if n.grounded]),
+            )
+            logger.info(
+                f"Grounding check: score={grounding_meta.overallScore}, "
+                f"grounded={grounding_meta.groundedCount}/{grounding_meta.noteCount}, "
+                f"ungrounded={len(grounding_meta.ungroundedClaims)}"
+            )
+        except Exception as e:
+            logger.warning(f"Grounding check failed (non-blocking): {e}")
+
+    # ── Step 6: Validate and build response ──────────────────────────────
     gate = result.get("decisionGate", {})
     gate_status = gate.get("status", "CLARIFICATION_NEEDED")
 
@@ -415,6 +483,10 @@ async def translate(req: TranslateRequest):
             missingInformation=result.get("missingInformation", []),
             clarificationQuestions=result.get("clarificationQuestions", []),
         )
+
+    # Attach grounding metadata
+    if grounding_meta:
+        response.grounding = grounding_meta
 
     logger.info(f"Translate result: gate={response.decisionGate.status}")
     return response

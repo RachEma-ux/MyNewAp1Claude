@@ -113,6 +113,7 @@ def test_translate_response_shape_documentation():
         "clarificationQuestions",
         "framingNotes",
         "renderedMarkdown",
+        "grounding",
     ]
     # This test documents the contract shape even without running the LLM
     from main import TranslateResponse
@@ -148,3 +149,59 @@ def test_problem_opportunity_statuses():
         assert p.status == status
         o = OpportunityStatement(statement="test", status=status)
         assert o.status == status
+
+
+# ── Grounding Metadata in Response ───────────────────────────────────────────
+
+
+def test_grounding_metadata_model():
+    """Verify GroundingMetadata model shape."""
+    from main import GroundingMetadata
+    gm = GroundingMetadata(
+        overallScore="strong",
+        ungroundedClaims=[],
+        noteCount=5,
+        groundedCount=4,
+    )
+    assert gm.overallScore == "strong"
+    assert gm.noteCount == 5
+    assert gm.groundedCount == 4
+
+
+def test_translate_response_grounding_optional():
+    """Grounding field is optional (None by default)."""
+    from main import TranslateResponse
+    response = TranslateResponse(
+        decisionGate={"status": "CONTINUE", "reason": ""},
+    )
+    assert response.grounding is None
+
+
+def test_translate_response_with_grounding():
+    """TranslateResponse can include grounding metadata."""
+    from main import TranslateResponse, GroundingMetadata
+    response = TranslateResponse(
+        decisionGate={"status": "CONTINUE", "reason": ""},
+        grounding=GroundingMetadata(
+            overallScore="moderate",
+            ungroundedClaims=["hallucinated claim"],
+            noteCount=3,
+            groundedCount=2,
+        ),
+    )
+    assert response.grounding is not None
+    assert response.grounding.overallScore == "moderate"
+    assert len(response.grounding.ungroundedClaims) == 1
+
+
+# ── spaCy Import Smoke Test ─────────────────────────────────────────────────
+
+
+def test_spacy_modules_importable():
+    """Verify all spaCy helper modules can be imported from main.py context."""
+    from spacy_preprocess import preprocess
+    from reasoning_request import build_reasoning_context
+    from grounding import check_grounding
+    assert callable(preprocess)
+    assert callable(build_reasoning_context)
+    assert callable(check_grounding)
