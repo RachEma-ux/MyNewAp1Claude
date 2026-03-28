@@ -278,11 +278,39 @@ export async function getWorkerStatus() {
 // ── Initialize pilot adapters ────────────────────────────────────────────────
 
 export async function initializeAdapters() {
+  // 1. Documents pilot adapter (always registered)
   try {
     const { documentsGraphRagAdapter } = require("./adapters/documents-adapter");
     await registerSource(documentsGraphRagAdapter);
     console.log("[GraphRAG] Documents pilot adapter initialized and registered");
   } catch (err: any) {
     console.warn("[GraphRAG] Failed to init documents adapter:", err.message);
+  }
+
+  // 2. Sample datasets (dev/test only — never in production)
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const { sampleDatasetAdapters } = require("./adapters/sample-datasets-adapter");
+      let registered = 0;
+      for (const adapter of sampleDatasetAdapters) {
+        try {
+          await registerSource(adapter);
+          registered++;
+          console.log(
+            `[GraphRAG:SampleSeed] Registered sample dataset: ${adapter.moduleSlug}:${adapter.datasetKey} ("${adapter.displayName}")`
+          );
+        } catch (adapterErr: any) {
+          console.warn(
+            `[GraphRAG:SampleSeed] Failed to register ${adapter.datasetKey}:`,
+            adapterErr.message
+          );
+        }
+      }
+      console.log(
+        `[GraphRAG:SampleSeed] Sample dataset seeding complete: ${registered}/${sampleDatasetAdapters.length} registered`
+      );
+    } catch (err: any) {
+      console.warn("[GraphRAG:SampleSeed] Sample adapter import failed:", err.message);
+    }
   }
 }

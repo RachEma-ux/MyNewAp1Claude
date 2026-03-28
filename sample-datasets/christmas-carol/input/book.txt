@@ -1,0 +1,16 @@
+SAMPLE DATASET: A Christmas Carol (Charles Dickens, 1843, public domain)
+
+This is a placeholder text file used for GraphRAG dataset registration testing.
+It represents the classic Victorian novella about Ebenezer Scrooge's transformation.
+
+The story follows a miserly old man who is visited by three spirits on Christmas Eve.
+Through visions of past, present, and future, he learns the value of generosity and compassion.
+By morning, Scrooge becomes a changed person, embracing the holiday spirit and helping those in need.
+
+Key characters: Ebenezer Scrooge, Bob Cratchit, Tiny Tim, Jacob Marley,
+Ghost of Christmas Past, Ghost of Christmas Present, Ghost of Christmas Yet to Come.
+
+Themes: redemption, generosity, social responsibility, the spirit of Christmas.
+
+This sample file is checked into the repository for deterministic local dev/test use.
+It does not require internet access at runtime.

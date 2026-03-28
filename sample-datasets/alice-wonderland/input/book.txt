@@ -1,0 +1,17 @@
+SAMPLE DATASET: Alice in Wonderland (Lewis Carroll, 1865, public domain)
+
+This is a placeholder text file used for GraphRAG dataset registration testing.
+It represents the classic fantasy novel about a girl's adventures in a surreal underground world.
+
+The story begins when Alice follows a White Rabbit down a hole and enters Wonderland.
+She encounters a series of strange characters and nonsensical situations.
+Along the way she changes size multiple times, attends a mad tea party, and plays croquet.
+The tale culminates in a chaotic trial before Alice wakes up and realizes it was all a dream.
+
+Key characters: Alice, White Rabbit, Cheshire Cat, Mad Hatter, March Hare,
+Queen of Hearts, King of Hearts, Caterpillar, Mock Turtle, Dormouse.
+
+Themes: curiosity, identity, logic vs nonsense, growing up, the nature of reality.
+
+This sample file is checked into the repository for deterministic local dev/test use.
+It does not require internet access at runtime.
