@@ -648,7 +648,11 @@ export async function* executeServiceAgentStream(input: {
 
     yield { type: "complete", runId: run.id, conversationId: 0, content };
   } catch (error) {
-    const summary = error instanceof Error ? error.message : "Service agent execution failed.";
+    const rawMessage = error instanceof Error ? error.message : "Service agent execution failed.";
+    const isOffline = rawMessage.includes("ECONNREFUSED") || rawMessage.includes("fetch failed") || rawMessage.includes("AbortError") || rawMessage.includes("timed out");
+    const summary = isOffline
+      ? `Service offline at ${serviceTarget.serviceTarget.serviceUrl} — ${rawMessage}`
+      : rawMessage;
 
     await updateExecutionRun(run.id, {
       state: "failed",

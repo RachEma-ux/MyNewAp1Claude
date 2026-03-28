@@ -52,7 +52,7 @@ type ExecutionMode = "online" | "llm-fallback" | "degraded" | "no-llm" | "unavai
 
 export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Props) {
   const [rawText, setRawText] = useState("");
-  const [result, setResult] = useState<(TranslateResponse & { _source?: string; _resolvedLlm?: { displayName?: string; provider?: string; model?: string } | null }) | null>(null);
+  const [result, setResult] = useState<(TranslateResponse & { _source?: string; _resolvedLlm?: { displayName?: string; provider?: string; model?: string } | null; _serviceError?: string | null; _serviceUrl?: string | null }) | null>(null);
   const [showResult, setShowResult] = useState(false);
   const utils = trpc.useUtils();
 
@@ -156,6 +156,16 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                         LLM: {runtime.resolvedLlm.displayName || `${runtime.resolvedLlm.provider}/${runtime.resolvedLlm.model}`}
                       </p>
                     )}
+                    {runtime?.serviceUrl && !runtime.serviceOnline && (
+                      <p className="text-[10px] opacity-70 font-mono">
+                        Service: {runtime.serviceUrl}
+                      </p>
+                    )}
+                    {runtime?.healthError && (
+                      <p className="text-[10px] opacity-70">
+                        Error: {runtime.healthError}
+                      </p>
+                    )}
                     {runtime?.target && (
                       <p className="text-[10px] opacity-70">
                         Catalog: {runtime.target.catalogEntryName || runtime.target.displayName || "resolved"}
@@ -193,13 +203,21 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
           )}
 
           {executionMode === "no-llm" && (
-            <div className="flex items-start gap-2 p-2 rounded bg-amber-500/5 border border-amber-500/20">
-              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-              <div className="text-xs text-amber-600">
-                <span className="font-medium">No LLM configured</span>
-                <span className="block text-amber-500/80 mt-0.5">
-                  Python service offline and no Default Reasoning LLM selected.
-                  Select a reasoning LLM in the Catalog for the Context Translator agent.
+            <div className="flex items-start gap-2 p-2 rounded bg-red-500/5 border border-red-500/20">
+              <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+              <div className="text-xs text-red-600">
+                <span className="font-medium">Project Context Translator service is offline — no LLM fallback available</span>
+                {runtime?.serviceUrl && (
+                  <span className="block text-red-500/70 mt-0.5 font-mono text-[10px]">
+                    {runtime.serviceUrl}
+                  </span>
+                )}
+                {runtime?.healthError && (
+                  <span className="block text-red-500/70 mt-0.5">{runtime.healthError}</span>
+                )}
+                <span className="block text-red-500/80 mt-1">
+                  No Default Reasoning LLM selected and no provider-registry LLM available.
+                  Template-only output. Select a reasoning LLM in the Catalog for the Context Translator agent.
                 </span>
               </div>
             </div>
@@ -209,9 +227,17 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
             <div className="flex items-start gap-2 p-2 rounded bg-amber-500/5 border border-amber-500/20">
               <Info className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
               <div className="text-xs text-amber-600">
-                <span className="font-medium">Degraded mode — using provider registry LLM</span>
-                <span className="block text-amber-500/80 mt-0.5">
-                  Python service offline. No catalog LLM selected. Using first available provider.
+                <span className="font-medium">Project Context Translator service is offline — degraded mode</span>
+                {runtime?.serviceUrl && (
+                  <span className="block text-amber-500/70 mt-0.5 font-mono text-[10px]">
+                    {runtime.serviceUrl}
+                  </span>
+                )}
+                {runtime?.healthError && (
+                  <span className="block text-amber-500/70 mt-0.5">{runtime.healthError}</span>
+                )}
+                <span className="block text-amber-500/80 mt-1">
+                  No catalog LLM selected. Using first available provider-registry LLM.
                   For best results, select a Default Reasoning LLM in the agent catalog entry.
                 </span>
               </div>
@@ -219,11 +245,22 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
           )}
 
           {executionMode === "llm-fallback" && (
-            <div className="flex items-center gap-2 p-2 rounded bg-blue-500/5 border border-blue-500/20">
-              <Info className="w-4 h-4 text-blue-500 shrink-0" />
-              <span className="text-xs text-blue-600">
-                Python service offline — using {runtime?.resolvedLlm?.displayName || "catalog LLM"} via built-in agent
-              </span>
+            <div className="flex items-start gap-2 p-2 rounded bg-blue-500/5 border border-blue-500/20">
+              <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+              <div className="text-xs text-blue-600">
+                <span className="font-medium">Project Context Translator service is offline</span>
+                {runtime?.serviceUrl && (
+                  <span className="block text-blue-500/80 mt-0.5 font-mono text-[10px]">
+                    {runtime.serviceUrl}
+                  </span>
+                )}
+                {runtime?.healthError && (
+                  <span className="block text-blue-500/70 mt-0.5">{runtime.healthError}</span>
+                )}
+                <span className="block text-blue-500/80 mt-1">
+                  Using {runtime?.resolvedLlm?.displayName || "catalog LLM"} via built-in agent as fallback.
+                </span>
+              </div>
             </div>
           )}
 
@@ -271,6 +308,30 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
       {/* Results */}
       {showResult && result && (
         <>
+          {/* Service offline notice on results */}
+          {result._serviceError && (
+            <Card className="border-amber-500/30">
+              <CardContent className="py-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                  <div className="text-xs">
+                    <span className="font-medium text-amber-600">
+                      Project Context Translator service was offline during this request
+                    </span>
+                    {result._serviceUrl && (
+                      <span className="block text-muted-foreground font-mono text-[10px] mt-0.5">
+                        {result._serviceUrl}
+                      </span>
+                    )}
+                    <span className="block text-muted-foreground mt-0.5">
+                      {result._serviceError}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Execution source badge */}
           {result._source && result._source !== "service" && (
             <Card>
@@ -578,25 +639,25 @@ function getStatusPillConfig(mode: ExecutionMode, isChecking: boolean) {
       return {
         pillClass: "bg-blue-500/10 text-blue-600 border-blue-500/30",
         dotClass: "bg-blue-500",
-        pillLabel: "LLM Fallback",
-        tooltipTitle: "Service Offline — Using Catalog LLM",
-        tooltipDetail: "Python service unreachable. Using the selected Default Reasoning LLM via built-in agent.",
+        pillLabel: "Service Offline",
+        tooltipTitle: "Python Translator Service Offline",
+        tooltipDetail: "The dedicated Python translator service is unreachable. Using the selected Default Reasoning LLM via built-in agent as fallback.",
       };
     case "degraded":
       return {
         pillClass: "bg-amber-500/10 text-amber-600 border-amber-500/30",
         dotClass: "bg-amber-500",
-        pillLabel: "Degraded",
-        tooltipTitle: "Degraded Mode",
-        tooltipDetail: "Python service offline and no catalog LLM selected. Using provider-registry fallback. Select a Default Reasoning LLM for better results.",
+        pillLabel: "Service Offline",
+        tooltipTitle: "Python Translator Service Offline — Degraded",
+        tooltipDetail: "The dedicated Python translator service is offline and no catalog LLM is selected. Using provider-registry fallback. Select a Default Reasoning LLM for better results.",
       };
     case "no-llm":
       return {
         pillClass: "bg-red-500/10 text-red-500 border-red-500/30",
         dotClass: "bg-red-500",
-        pillLabel: "No LLM",
-        tooltipTitle: "No LLM Available",
-        tooltipDetail: "No Python service, no catalog LLM, no provider-registry LLM. Template output only.",
+        pillLabel: "Service Offline",
+        tooltipTitle: "Python Translator Service Offline — No LLM",
+        tooltipDetail: "The dedicated Python translator service is offline, no catalog LLM configured, no provider-registry LLM available. Template output only.",
       };
     case "unavailable":
     default:

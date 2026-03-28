@@ -152,9 +152,13 @@ export const contextTranslatorRouter = router({
           }
         : undefined;
 
-      // Step 3: Try the Python service (primary path)
+      // Step 3: Resolve service URL for diagnostics
+      const serviceUrl = process.env.PROJECT_CONTEXT_TRANSLATOR_URL || "http://localhost:8585";
+
+      // Step 4: Try the Python service (primary path)
       let result: client.TranslateResponse;
       let source: ExecutionSource = "service";
+      let serviceError: string | null = null;
 
       try {
         result = await client.translate({
@@ -162,8 +166,11 @@ export const contextTranslatorRouter = router({
           metadata: input.metadata,
           llmOverride,
         });
-      } catch (serviceErr) {
-        // Python service unavailable — fall back to built-in agent
+      } catch (serviceErr: any) {
+        // Capture the real service error for diagnostics
+        serviceError = serviceErr.message || "Python translator service is unreachable";
+
+        // Fall back to built-in agent
         try {
           result = await analyzeRawInput(input.rawText, {
             provider: resolvedLlm?.provider,
@@ -182,12 +189,12 @@ export const contextTranslatorRouter = router({
         } catch (fallbackErr: any) {
           throw new TRPCError({
             code: "BAD_GATEWAY",
-            message: fallbackErr.message || "Both Python service and built-in translator failed",
+            message: `Python translator service offline at ${serviceUrl}. Built-in fallback also failed: ${fallbackErr.message || "unknown error"}`,
           });
         }
       }
 
-      // Step 4: Persist the translator run
+      // Step 5: Persist the translator run
       const db = getDb();
       if (db) {
         try {
@@ -209,6 +216,8 @@ export const contextTranslatorRouter = router({
         _resolvedLlm: resolvedLlm
           ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
           : null,
+        _serviceError: serviceError,
+        _serviceUrl: serviceError ? serviceUrl : null,
       };
     }),
 
@@ -395,6 +404,9 @@ export const contextTranslatorRouter = router({
       llmConfigured: boolean;
       resolvedLlm: { displayName?: string; provider?: string; model?: string } | null;
       builtInAvailable: boolean;
+      serviceUrl: string | null;
+      healthUrl: string | null;
+      healthError: string | null;
       error: string | null;
     }> => {
       const builtInAvailable = true;
@@ -422,6 +434,9 @@ export const contextTranslatorRouter = router({
               ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
               : null,
             builtInAvailable,
+            serviceUrl: null,
+            healthUrl: null,
+            healthError: null,
             error: `Catalog entry '${AGENT_CATALOG_ID}' not found`,
           };
         }
@@ -440,6 +455,9 @@ export const contextTranslatorRouter = router({
             ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
             : null,
           builtInAvailable,
+          serviceUrl: target.serviceUrl,
+          healthUrl: target.healthUrl,
+          healthError: serviceOnline ? null : (health.error || "Service did not respond"),
           error: null,
         };
       } catch (err: any) {
@@ -453,6 +471,9 @@ export const contextTranslatorRouter = router({
             ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
             : null,
           builtInAvailable,
+          serviceUrl: null,
+          healthUrl: null,
+          healthError: null,
           error: err.message || "Failed to resolve runtime",
         };
       }

@@ -4387,7 +4387,12 @@ function ExecutionObservabilityPanel({
                       {run.modelId ? ` / ${run.modelId}` : ""}
                     </div>
                     {run.blockerSummary && (
-                      <div className="text-red-400">{run.blockerSummary}</div>
+                      <div className="text-red-400">
+                        {run.blockerCode === "service_execution_error" && (
+                          <span className="font-medium">Service Offline — </span>
+                        )}
+                        {run.blockerSummary}
+                      </div>
                     )}
                   </div>
                 </button>
@@ -4427,6 +4432,11 @@ function ExecutionObservabilityPanel({
                 <div>Provider: {selectedRun.provider || "Unknown"}</div>
                 <div>Model: {selectedRun.modelId || "Unknown"}</div>
                 <div>Trigger: {selectedRun.triggerSource}</div>
+                {selectedRun.metadata?.serviceUrl && (
+                  <div className="text-xs font-mono text-muted-foreground">
+                    Service: {String(selectedRun.metadata.serviceUrl)}
+                  </div>
+                )}
                 <div>
                   Outcome:{" "}
                   {selectedRun.success === true
@@ -4445,8 +4455,18 @@ function ExecutionObservabilityPanel({
                   <div>Finish reason: {selectedRun.finishReason}</div>
                 )}
                 {selectedRun.blockerSummary && (
-                  <div className="rounded border border-red-600/30 bg-red-950/20 p-2 text-red-200">
-                    {selectedRun.blockerSummary}
+                  <div className="rounded border border-red-600/30 bg-red-950/20 p-2 text-red-200 space-y-1">
+                    {selectedRun.blockerCode === "service_execution_error" ? (
+                      <>
+                        <div className="font-medium text-red-300">Service Offline</div>
+                        <div className="text-xs">{selectedRun.blockerSummary}</div>
+                        <div className="text-[10px] text-red-400/70 mt-1">
+                          Blocker: {selectedRun.blockerCode} / {selectedRun.blockerCategory || "technical_error"}
+                        </div>
+                      </>
+                    ) : (
+                      <div>{selectedRun.blockerSummary}</div>
+                    )}
                   </div>
                 )}
               </div>
