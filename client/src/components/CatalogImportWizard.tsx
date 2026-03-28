@@ -133,7 +133,7 @@ const METHODS = [
     label: "File Import",
     description: "Import from CSV, JSON, or YAML file",
     icon: FileUp,
-    enabled: false,
+    enabled: true,
   },
   {
     id: "registry_sync" as const,
@@ -185,12 +185,96 @@ export function CatalogImportWizard({
   const [batchResults, setBatchResults] = useState<Array<{ url: string; status: "pending" | "discovering" | "found" | "failed"; data?: any; registered?: boolean }>>([]);
   const [batchDiscovering, setBatchDiscovering] = useState(false);
   const [batchPopupOpen, setBatchPopupOpen] = useState(false);
+  // File Import state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileParseErrors, setFileParseErrors] = useState<string[]>([]);
+  const [detectedFormat, setDetectedFormat] = useState<string | null>(null);
   const normalizeUrl = (u: string) => {
     const v = u.trim();
     if (!v) return v;
     return /^https?:\/\//i.test(v) ? v : `https://${v}`;
   };
 
+  // File Import: handle file selection
+  const handleFileSelect = (file: File | null) => {
+    setSelectedFile(file);
+    setFileParseErrors([]);
+    setDetectedFormat(null);
+    setError(null);
+  };
+
+  // File Import: read file, send to backend, advance to preview
+  const handleFileUpload = async () => {
+    if (!selectedFile) return;
+    setError(null);
+    setFileParseErrors([]);
+
+    // Validate file extension
+    const ext = selectedFile.name.split(".").pop()?.toLowerCase();
+    if (!ext || !["csv", "json", "yaml", "yml"].includes(ext)) {
+      setError("Unsupported file type. Please upload a CSV, JSON, or YAML file.");
+      return;
+    }
+
+    // Validate file size (2MB)
+    if (selectedFile.size > 2 * 1024 * 1024) {
+      setError("File too large. Maximum size is 2MB.");
+      return;
+    }
+
+    try {
+      // Read file content as base64
+      const buffer = await selectedFile.arrayBuffer();
+      const base64 = btoa(
+        new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
+      );
+
+      const result = await parseFileMutation.mutateAsync({
+        filename: selectedFile.name,
+        contentBase64: base64,
+      });
+
+      if (result.error) {
+        setError(result.error);
+        if ((result as any).parseErrors) {
+          setFileParseErrors((result as any).parseErrors);
+        }
+        return;
+      }
+
+      if (!result.sessionId) {
+        setError("Failed to create import session");
+        return;
+      }
+
+      setSessionId(result.sessionId);
+      if ((result as any).format) setDetectedFormat((result as any).format);
+      if ((result as any).parseErrors) setFileParseErrors((result as any).parseErrors);
+
+      // Fetch preview using the sessionId
+      const preview = await trpcUtils.catalogImport.getPreview.fetch(
+        { sessionId: result.sessionId }
+      );
+      if (preview && preview.rows.length > 0) {
+        setPreviewRows(
+          preview.rows.map((r: PreviewEntry) => {
+            const hasErrors = r.validationIssues?.some((i) => i.severity === "error");
+            return {
+              ...r,
+              selected: !hasErrors && (r.duplicateStatus === "new" || r.duplicateStatus === "fuzzy_match"),
+            };
+          })
+        );
+        setStep(3);
+      } else {
+        setError("File parsed but no valid entries were found");
+      }
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const parseFileMutation = trpc.catalogImport.parseFileUpload.useMutation();
   const discoverMutation = trpc.catalogImport.discoverFromApi.useMutation();
   const websiteDiscoverMutation = trpc.catalogManage.discoverProvider.useMutation();
   const trpcUtils = trpc.useUtils();
@@ -318,6 +402,9 @@ export function CatalogImportWizard({
       setForceConflicts(false);
       setSelectedProviderId("");
       setWebsiteUrl("");
+      setSelectedFile(null);
+      setFileParseErrors([]);
+      setDetectedFormat(null);
     }
     onOpenChange(isOpen);
   };
@@ -773,12 +860,123 @@ export function CatalogImportWizard({
           </div>
         )}
 
+        {/* Step 2: File Import */}
+        {step === 2 && method === "file_upload" && (
+          <div className="space-y-4 py-4">
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2 font-medium text-sm">
+                <FileUp className="h-4 w-4" />
+                Upload a file
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Supported formats: <strong>CSV</strong>, <strong>JSON</strong>, <strong>YAML</strong> — max 2MB, up to 500 entries
+              </p>
+
+              {/* Drop zone / file input */}
+              <div
+                className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                  selectedFile ? "border-primary bg-accent/30" : "border-border hover:border-muted-foreground/50"
+                }`}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) handleFileSelect(file);
+                }}
+              >
+                {selectedFile ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-400" />
+                      <span className="font-medium text-sm">{selectedFile.name}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(selectedFile.size / 1024).toFixed(1)} KB
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-muted-foreground"
+                      onClick={() => handleFileSelect(null)}
+                    >
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Remove
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <FileUp className="h-8 w-8 mx-auto text-muted-foreground" />
+                    <div className="text-sm text-muted-foreground">
+                      Drag and drop a file here, or
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = ".csv,.json,.yaml,.yml";
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0];
+                          if (file) handleFileSelect(file);
+                        };
+                        input.click();
+                      }}
+                    >
+                      Choose File
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Format info / help */}
+              <div className="border rounded-md p-3 bg-muted/20 text-xs space-y-1.5">
+                <div className="font-medium text-sm">Supported file contract</div>
+                <div><strong>JSON / YAML:</strong> Array of objects, or <code>{`{ "entries": [...] }`}</code> / <code>{`{ "data": [...] }`}</code> wrapper</div>
+                <div><strong>CSV:</strong> Header row + data rows. Use <code>|</code> to separate array values (e.g. <code>tag1|tag2</code>)</div>
+                <div className="pt-1">
+                  Required: <Badge variant="outline" className="text-[10px] mx-0.5">name</Badge>
+                  <Badge variant="outline" className="text-[10px] mx-0.5">entryType</Badge>
+                  <span className="text-muted-foreground ml-1">(provider | model | llm | bot)</span>
+                </div>
+                <div>
+                  Optional: <span className="text-muted-foreground">displayName, description, category, subCategory, tags, capabilities, scope, config</span>
+                </div>
+                <div>
+                  Aliases accepted: <span className="text-muted-foreground">key/slug &rarr; name, label/title &rarr; displayName, type/kind &rarr; entryType</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Parse errors */}
+            {fileParseErrors.length > 0 && (
+              <div className="space-y-1 p-3 rounded-md bg-yellow-900/20 border border-yellow-800/30">
+                <div className="flex items-center gap-2 text-yellow-400 text-sm font-medium">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Parse warnings
+                </div>
+                {fileParseErrors.map((err, i) => (
+                  <div key={i} className="text-xs text-yellow-400/80 ml-6">{err}</div>
+                ))}
+              </div>
+            )}
+
+            {error && (
+              <div className="flex items-center gap-2 p-3 rounded-md bg-red-900/20 border border-red-800/30 text-red-400 text-sm">
+                <XCircle className="h-4 w-4 shrink-0" />
+                {error}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Step 3: Preview Table */}
         {step === 3 && (
           <div className="py-4 space-y-4">
             {/* Summary bar */}
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline">{previewRows.length} discovered</Badge>
+              <Badge variant="outline">{previewRows.length} {method === "file_upload" ? "parsed" : "discovered"}</Badge>
               <Badge className="bg-green-600/20 text-green-400 border-green-600/30">
                 {previewRows.filter((r) => r.duplicateStatus === "new").length} new
               </Badge>
@@ -797,6 +995,11 @@ export function CatalogImportWizard({
                   {previewRows.filter((r) => r.duplicateStatus === "conflict").length} conflicts
                 </Badge>
               )}
+              {method === "file_upload" && previewRows.filter((r) => r.validationIssues?.some((i) => i.severity === "error")).length > 0 && (
+                <Badge className="bg-red-600/20 text-red-400 border-red-600/30">
+                  {previewRows.filter((r) => r.validationIssues?.some((i) => i.severity === "error")).length} invalid
+                </Badge>
+              )}
             </div>
 
             <div className="max-h-[40vh] overflow-y-auto border rounded-md">
@@ -813,17 +1016,20 @@ export function CatalogImportWizard({
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Risk</TableHead>
+                    {method === "file_upload" && <TableHead>Issues</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {previewRows.map((row) => {
                     const dupBadge = DUPLICATE_BADGES[row.duplicateStatus];
                     const riskBadge = RISK_BADGES[row.riskLevel];
+                    const hasErrors = row.validationIssues?.some((i) => i.severity === "error");
                     return (
                       <TableRow key={row.tempId} className={row.selected ? "" : "opacity-50"}>
                         <TableCell>
                           <Checkbox
                             checked={row.selected}
+                            disabled={hasErrors}
                             onCheckedChange={() => toggleRow(row.tempId)}
                           />
                         </TableCell>
@@ -850,6 +1056,21 @@ export function CatalogImportWizard({
                             </Badge>
                           )}
                         </TableCell>
+                        {method === "file_upload" && (
+                          <TableCell>
+                            {row.validationIssues && row.validationIssues.length > 0 ? (
+                              <div className="space-y-0.5">
+                                {row.validationIssues.map((issue, i) => (
+                                  <div key={i} className={`text-[10px] ${issue.severity === "error" ? "text-red-400" : "text-yellow-400"}`}>
+                                    {issue.field}: {issue.message}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
@@ -955,7 +1176,7 @@ export function CatalogImportWizard({
             )}
           </div>
           <div className="flex gap-2">
-            {step === 2 && (
+            {step === 2 && method === "api_discovery" && (
               <Button
                 onClick={handleDiscover}
                 disabled={!baseUrl || discoverMutation.isPending}
@@ -969,6 +1190,24 @@ export function CatalogImportWizard({
                   <>
                     <Search className="h-4 w-4 mr-2" />
                     Discover
+                  </>
+                )}
+              </Button>
+            )}
+            {step === 2 && method === "file_upload" && (
+              <Button
+                onClick={handleFileUpload}
+                disabled={!selectedFile || parseFileMutation.isPending}
+              >
+                {parseFileMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Parsing...
+                  </>
+                ) : (
+                  <>
+                    <FileUp className="h-4 w-4 mr-2" />
+                    Parse &amp; Preview
                   </>
                 )}
               </Button>

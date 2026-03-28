@@ -1,0 +1,44 @@
+# Catalog Import — Sample YAML
+# Upload this file in Import Catalog Entries → File Import
+#
+# Supported shapes:
+#   - Top-level sequence (this file)
+#   - Mapping with entries: [...] or data: [...]
+#
+# Required fields: name, entryType (provider | model | llm | bot)
+# Optional fields: displayName, description, category, subCategory,
+#                  tags, capabilities, scope, config
+
+- name: yaml-cloud-provider
+  displayName: YAML Cloud Provider
+  entryType: provider
+  description: A sample provider imported from YAML.
+  category: cloud_api
+  tags:
+    - cloud
+    - yaml-example
+  scope: app
+  config:
+    baseUrl: https://api.yaml-example.com/v1
+    authType: api_key
+
+- name: yaml-local-model
+  displayName: YAML Local Model 3B
+  entryType: model
+  description: A sample local model imported from YAML.
+  category: local_runtime
+  subCategory: quantized
+  tags:
+    - local
+    - 3b
+  capabilities:
+    - low_latency
+    - sandbox
+
+- name: yaml-llm-entry
+  displayName: YAML LLM Entry
+  entryType: llm
+  description: A sample LLM catalog entry.
+  tags:
+    - llm
+    - yaml-example

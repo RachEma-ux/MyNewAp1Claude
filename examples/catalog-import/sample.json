@@ -1,0 +1,52 @@
+[
+  {
+    "name": "example-cloud-provider",
+    "displayName": "Example Cloud LLM Provider",
+    "entryType": "provider",
+    "description": "A sample cloud LLM provider for import testing.",
+    "category": "cloud_api",
+    "tags": ["cloud", "example"],
+    "capabilities": ["streaming", "function_calling"],
+    "scope": "app",
+    "config": {
+      "baseUrl": "https://api.example.com/v1",
+      "authType": "api_key"
+    }
+  },
+  {
+    "name": "example-base-model",
+    "displayName": "Example Base Model 7B",
+    "entryType": "model",
+    "description": "A sample 7B parameter base model.",
+    "category": "base_llm",
+    "subCategory": "text_generation",
+    "tags": ["7b", "text-generation"],
+    "capabilities": ["low_latency"]
+  },
+  {
+    "name": "example-embedding-model",
+    "displayName": "Example Embedding Model",
+    "entryType": "model",
+    "description": "A sample embedding model for vector search.",
+    "category": "embedding",
+    "subCategory": "text_only",
+    "tags": ["embedding", "search"],
+    "capabilities": ["embedding"]
+  },
+  {
+    "name": "example-llm-entry",
+    "displayName": "Example LLM",
+    "entryType": "llm",
+    "description": "A sample LLM catalog entry.",
+    "category": "large_language_model",
+    "tags": ["llm", "example"]
+  },
+  {
+    "name": "example-bot-entry",
+    "displayName": "Example Bot",
+    "entryType": "bot",
+    "description": "A sample bot entry for import testing.",
+    "tags": ["bot", "example"],
+    "capabilities": ["web_search", "summarization"]
+  }
+]

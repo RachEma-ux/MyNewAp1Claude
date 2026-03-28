@@ -1,0 +1,6 @@
+name,entryType,displayName,description,category,subCategory,tags,capabilities,scope
+example-openai,provider,Example OpenAI Provider,A sample OpenAI-compatible provider.,cloud_api,,cloud|openai|example,streaming|function_calling,app
+example-base-7b,model,Example Base 7B,A sample 7B parameter base model.,base_llm,text_generation,7b|text-generation,low_latency,
+example-embed,model,Example Embedding,A sample embedding model for vector search.,embedding,text_only,embedding|search,embedding,
+example-llm,llm,Example LLM,A sample LLM catalog entry.,large_language_model,,llm|example,,
+example-bot,bot,Example Bot,A sample bot entry for testing.,custom_bot,,bot|example,web_search|summarization,

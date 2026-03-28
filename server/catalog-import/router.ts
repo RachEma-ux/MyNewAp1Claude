@@ -12,6 +12,7 @@ import {
 } from "./session-service";
 import { checkDuplicates, buildPreviewSummary } from "./dedup-service";
 import { discoverFromApiUrl } from "./discovery-service";
+import { parseFileContent, buildFileImportPreview } from "./file-parser";
 import { createCatalogEntry, createCatalogAuditEvent, getDb, getCatalogEntryById, updateCatalogEntry } from "../db";
 import { getProvidersByType, updateProvider } from "../providers/db";
 import { importAuditLogs } from "../../drizzle/schema";
@@ -106,12 +107,75 @@ export const catalogImportRouter = router({
     }),
 
   /**
-   * Parse an uploaded file (stub for Phase 2)
+   * Parse an uploaded file (CSV / JSON / YAML) and create a preview session.
+   * File content is sent as base64 to avoid multer/express middleware.
+   * Max 2MB file size limit enforced by the parser.
    */
-  parseFile: governedProcedure
-    .input(z.object({ fileId: z.string() }))
-    .mutation(async () => {
-      throw new Error("File import is not yet implemented (Phase 2)");
+  parseFileUpload: governedProcedure
+    .input(
+      z.object({
+        filename: z.string().min(1).max(255),
+        contentBase64: z.string().min(1).max(4 * 1024 * 1024), // ~3MB base64 ≈ 2MB raw
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Decode base64 content
+      let content: string;
+      try {
+        content = Buffer.from(input.contentBase64, "base64").toString("utf-8");
+      } catch {
+        return { sessionId: null, error: "Failed to decode file content" };
+      }
+
+      if (!content.trim()) {
+        return { sessionId: null, error: "File is empty" };
+      }
+
+      // Parse file into PreviewEntry[] format
+      const parseResult = parseFileContent(content, input.filename);
+      const { entries, parseErrors, format, globalIssues } = parseResult;
+
+      if (entries.length === 0) {
+        const errorMsg = parseErrors.length > 0
+          ? parseErrors.join("; ")
+          : "No valid entries found in file";
+        return { sessionId: null, error: errorMsg, parseErrors, format, globalIssues };
+      }
+
+      // Create import session
+      const session = await createSession(
+        ctx.user?.id ?? 1,
+        "file_upload",
+        `file:${input.filename}`
+      );
+
+      try {
+        await updateSessionStatus(session.id, "discovering");
+
+        // Run deduplication against existing catalog
+        const dedupedRows = await checkDuplicates(entries);
+        const summary = buildPreviewSummary(dedupedRows);
+
+        // Store preview rows
+        await addPreviewRows(session.id, dedupedRows);
+
+        // Update session to previewing
+        await updateSessionStatus(session.id, "previewing", summary);
+
+        // Build enhanced preview response
+        const preview = buildFileImportPreview(parseResult, dedupedRows);
+
+        return {
+          sessionId: session.id,
+          format,
+          parseErrors: parseErrors.length > 0 ? parseErrors : undefined,
+          globalIssues: globalIssues.length > 0 ? globalIssues : undefined,
+          preview,
+        };
+      } catch (e: any) {
+        await updateSessionStatus(session.id, "failed", null, e.message);
+        return { sessionId: session.id, error: e.message };
+      }
     }),
 
   /**
@@ -217,21 +281,31 @@ export const catalogImportRouter = router({
         }
 
         try {
+          // Extract enrichment from metadata (set by file parser or discovery)
+          const meta = (row.metadata || {}) as Record<string, any>;
+          const displayName = meta.displayName || row.name;
+          const category = meta.category || null;
+          const subCategory = meta.subCategory || null;
+          const scope = meta.scope || "app";
+          const capabilities = Array.isArray(meta.capabilities) ? meta.capabilities : null;
+          const fileTags = Array.isArray(meta.tags) ? meta.tags : [];
+          const origin = row.source === "file_import" ? "import" : "discovery";
+
           const catalogEntry = await createCatalogEntry({
             name: row.name,
-            displayName: row.name,
+            displayName,
             description: row.description,
             entryType: row.type,
-            scope: "app",
+            scope,
             status: "draft",
-            origin: "discovery",
+            origin,
             reviewState: "needs_review",
             providerId: null,
             config: row.metadata,
-            tags: [row.source],
-            category: null,
-            subCategory: null,
-            capabilities: null,
+            tags: [row.source, ...fileTags],
+            category,
+            subCategory,
+            capabilities,
             createdBy: ctx.user?.id ?? 1,
           });
 
