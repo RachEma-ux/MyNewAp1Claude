@@ -15,8 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SaveStatus } from "./PSIdeationMobileBar";
-import type { IdeationStepKey } from "../../../../../server/ps/ps.ideation-types";
-import { IDEATION_STEP_LABELS } from "../../../../../server/ps/ps.ideation-types";
+import { IDEATION_STEP_LABELS, type IdeationStepKey } from "@shared/ps-ideation-constants";
 import { ContextDefinitionToolPanel } from "./ContextDefinitionToolPanel";
 import { ProblemDefinitionToolPanel } from "./ProblemDefinitionToolPanel";
 import { OpportunityDefinitionToolPanel } from "./OpportunityDefinitionToolPanel";

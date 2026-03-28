@@ -19,7 +19,7 @@ import {
   IDEATION_STEP_KEYS,
   IDEATION_STEP_LABELS,
   type IdeationStepKey,
-} from "../../../../../server/ps/ps.ideation-types";
+} from "@shared/ps-ideation-constants";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "unsaved" | "error";
 

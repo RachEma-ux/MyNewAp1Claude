@@ -29,7 +29,7 @@ import {
   Copy,
 } from "lucide-react";
 import { Link } from "wouter";
-import type { IdeationLifecycleStatus } from "../../../../../server/ps/ps.ideation-types";
+import type { IdeationLifecycleStatus } from "@shared/ps-ideation-constants";
 import type { SaveStatus } from "./PSIdeationMobileBar";
 import { IDEATION_SOURCE_CONFIGS } from "@/config/psNavConfig";
 

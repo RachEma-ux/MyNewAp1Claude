@@ -15,7 +15,7 @@ import { PSIdeationHeader } from "./PSIdeationHeader";
 import { PSIdeationConceptView } from "./PSIdeationConceptView";
 import { PSIdeationWizardHandoffView } from "./PSIdeationWizardHandoffView";
 import { PSIdeationActivityView } from "./PSIdeationActivityView";
-import { IDEATION_STEP_KEYS } from "../../../../../server/ps/ps.ideation-types";
+import { IDEATION_STEP_KEYS } from "@shared/ps-ideation-constants";
 import { isStepView, SUPPORT_VIEW_KEYS, type ActiveView } from "./PSIdeationWorkflowRail";
 
 // ── Helpers ─────────────────────────────────────────────────────────────

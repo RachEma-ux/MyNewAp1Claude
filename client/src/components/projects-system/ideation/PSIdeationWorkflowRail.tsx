@@ -28,7 +28,7 @@ import {
   IDEATION_STEP_KEYS,
   type IdeationStepKey,
   type IdeationStepStatus,
-} from "../../../../../server/ps/ps.ideation-types";
+} from "@shared/ps-ideation-constants";
 
 /** All possible views: workflow steps + 3 support views */
 export type ActiveView = IdeationStepKey | "concept" | "wizard_handoff" | "activity";
