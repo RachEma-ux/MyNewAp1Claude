@@ -109,18 +109,13 @@ export function getLifecycleSteps(entry: LifecycleEntry): LifecycleStep[] {
   });
 
   // Step 3: Activated
-  // Tags past activation (validated/published) imply activation happened,
-  // even if entry.status drifted from "active" (e.g. after import or re-draft).
-  const tags = entry.tags || [];
-  const impliedActive = tags.includes("validated") || tags.includes("published");
-  const isActive = entry.status === "active" || impliedActive;
+  // Current status is the single source of truth — tags do not override status.
+  const isActive = entry.status === "active";
   steps.push({
     key: "activate",
     label: "Activated",
     status: isActive ? "done" : regStatus === "approved" ? "current" : "pending",
-    detail: isActive
-      ? (entry.status === "active" ? "active" : `active (via ${tags.includes("published") ? "published" : "validated"} tag)`)
-      : entry.status,
+    detail: isActive ? "active" : entry.status,
   });
 
   // Step 4: Validation (4-step handshake)
@@ -222,18 +217,15 @@ export function isExecutionEligible(entry: LifecycleEntry): { eligible: boolean;
 }
 
 /**
- * Execution status tiers for consistent badge rendering across all surfaces.
+ * Execution status tiers for secondary badge/chip rendering.
  *
  * Lifecycle truth model:
- *   - "Published" = publish stage tag present (does NOT imply runnable)
- *   - "Active"    = entry.status === "active" (requires activation after register approval)
- *   - "Runnable"  = derived: active + published tag + validation approved
+ *   - Primary badge = entry.status (draft / active / deprecated / disabled)
+ *   - Secondary chips = approval states + metadata tags
+ *   - "Runnable" = derived: active + published tag + validation approved
  *
- * Tiers:
- *   "published"       — fully runnable (green badge: "Published")
- *   "published_not_active" — publish tag present but status !== active (amber: "Publish Approved (Not Active)")
- *   "published_not_runnable" — published + active but missing validation (amber: "Published (Not Runnable)")
- *   "not_published"   — no published tag (no badge)
+ * This function returns secondary approval chip info, NOT the primary badge.
+ * The primary badge is always entry.status rendered directly.
  */
 export type ExecutionStatusTier =
   | "published"

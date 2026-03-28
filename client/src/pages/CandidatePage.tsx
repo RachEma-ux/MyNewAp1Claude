@@ -1561,59 +1561,14 @@ export default function CandidatePage() {
                             >
                               {entry.displayName || entry.name}
                             </CardTitle>
-                            <div className="flex gap-1 shrink-0">
-                              {isAtOrPastStage(entry.tags || [], "validate") &&
-                              isBeforeStage(entry.tags || [], "publish") ? (
-                                <Button
-                                  size="sm"
-                                  onClick={() =>
-                                    governedTransition(entry, "publish")
-                                  }
-                                  disabled={
-                                    stageTransitionMutation.isPending ||
-                                    updateMutation.isPending ||
-                                    getStageReviewState(entry, "publish") !==
-                                      "approved"
-                                  }
-                                  title={
-                                    getStageReviewState(entry, "publish") !==
-                                    "approved"
-                                      ? "Review must be approved first"
-                                      : "Publish this entry"
-                                  }
-                                >
-                                  {stageTransitionMutation.isPending ? (
-                                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                  ) : (
-                                    <Rocket className="h-4 w-4 mr-1" />
-                                  )}
-                                  Publish
-                                </Button>
-                              ) : (() => {
-                                const execStatus = getExecutionStatus({
-                                  status: entry.status,
-                                  reviewState: entry.reviewState || "",
-                                  stageReviews: entry.stageReviews,
-                                  validationStatus: entry.validationStatus,
-                                  tags: entry.tags,
-                                });
-                                return execStatus.runnable ? (
-                                  <Badge className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
-                                    <Rocket className="h-3 w-3 mr-1" />
-                                    Published
-                                  </Badge>
-                                ) : (
-                                  <Badge
-                                    className="text-xs bg-amber-600/20 text-amber-400 border-amber-600/30"
-                                    title={execStatus.reasons.join("; ")}
-                                  >
-                                    <Rocket className="h-3 w-3 mr-1" />
-                                    {execStatus.label}
-                                  </Badge>
-                                );
-                              })()}
-                            </div>
+                            {/* Primary badge = real current status */}
+                            <Badge
+                              className={`text-xs shrink-0 ${STATUS_COLORS[entry.status] || ""}`}
+                            >
+                              {entry.status}
+                            </Badge>
                           </div>
+                          {/* Secondary chips: type, approvals, publish action, validation */}
                           <div className="flex flex-wrap items-center gap-1.5">
                             {(() => {
                               const Icon =
@@ -1626,11 +1581,57 @@ export default function CandidatePage() {
                                 </Badge>
                               );
                             })()}
-                            <Badge
-                              className={`text-xs ${STATUS_COLORS[entry.status] || ""}`}
-                            >
-                              {entry.status}
-                            </Badge>
+                            {/* Publish action or publish-approved chip */}
+                            {isAtOrPastStage(entry.tags || [], "validate") &&
+                            isBeforeStage(entry.tags || [], "publish") ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-xs"
+                                onClick={() =>
+                                  governedTransition(entry, "publish")
+                                }
+                                disabled={
+                                  stageTransitionMutation.isPending ||
+                                  updateMutation.isPending ||
+                                  getStageReviewState(entry, "publish") !==
+                                    "approved"
+                                }
+                                title={
+                                  getStageReviewState(entry, "publish") !==
+                                  "approved"
+                                    ? "Review must be approved first"
+                                    : "Publish this entry"
+                                }
+                              >
+                                {stageTransitionMutation.isPending ? (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                ) : (
+                                  <Rocket className="h-3 w-3 mr-1" />
+                                )}
+                                Publish
+                              </Button>
+                            ) : (entry.tags || []).includes("published") ? (
+                              <Badge
+                                variant="outline"
+                                className="text-xs border-emerald-600/30 text-emerald-400"
+                                title={(() => {
+                                  const execStatus = getExecutionStatus({
+                                    status: entry.status,
+                                    reviewState: entry.reviewState || "",
+                                    stageReviews: entry.stageReviews,
+                                    validationStatus: entry.validationStatus,
+                                    tags: entry.tags,
+                                  });
+                                  return execStatus.runnable
+                                    ? "Runnable"
+                                    : `Not runnable: ${execStatus.reasons.join("; ")}`;
+                                })()}
+                              >
+                                <Rocket className="h-3 w-3 mr-1" />
+                                Publish approved
+                              </Badge>
+                            ) : null}
                             <Badge
                               className={`text-xs cursor-pointer hover:opacity-80 ${REVIEW_COLORS[getStageReviewState(entry, "publish")] || ""}`}
                               onClick={e => {
@@ -1662,6 +1663,30 @@ export default function CandidatePage() {
                                 {entry.validationStatus}
                               </Badge>
                             )}
+                            {/* Runnable indicator */}
+                            {(() => {
+                              const execStatus = getExecutionStatus({
+                                status: entry.status,
+                                reviewState: entry.reviewState || "",
+                                stageReviews: entry.stageReviews,
+                                validationStatus: entry.validationStatus,
+                                tags: entry.tags,
+                              });
+                              return !execStatus.runnable && (entry.tags || []).includes("published") ? (
+                                <Badge
+                                  className="text-xs bg-amber-600/20 text-amber-400 border-amber-600/30"
+                                  title={execStatus.reasons.join("; ")}
+                                >
+                                  Not runnable
+                                </Badge>
+                              ) : execStatus.runnable ? (
+                                <Badge
+                                  className="text-xs bg-emerald-600/20 text-emerald-400 border-emerald-600/30"
+                                >
+                                  Runnable
+                                </Badge>
+                              ) : null;
+                            })()}
                           </div>
                           {entry.description && (
                             <p className="text-xs text-muted-foreground">
