@@ -13,6 +13,12 @@ import * as client from "./context-translator-client";
 import { psIdeations, psIdeationSteps } from "../../drizzle/tables/ps";
 import { psIdeationTranslatorRuns } from "../../drizzle/tables/ps-translator";
 import { eq, desc } from "drizzle-orm";
+import {
+  resolveServiceAgentByName,
+  checkServiceHealthByName,
+  type ServiceRuntimeTarget,
+  type ServiceHealthResult,
+} from "../catalog/service-runtime";
 
 export const contextTranslatorRouter = router({
   /**
@@ -223,5 +229,39 @@ export const contextTranslatorRouter = router({
         .where(eq(psIdeationTranslatorRuns.ideationId, input.ideationId))
         .orderBy(desc(psIdeationTranslatorRuns.createdAt))
         .limit(20);
+    }),
+
+  /**
+   * Resolve the catalog agent entry into a runtime target.
+   * Returns service URL, health URL, capabilities, and current health status.
+   */
+  resolveRuntime: protectedProcedure
+    .query(async (): Promise<{
+      resolved: boolean;
+      target: ServiceRuntimeTarget | null;
+      health: ServiceHealthResult | null;
+      error: string | null;
+    }> => {
+      try {
+        const target = await resolveServiceAgentByName("ps.agent.context_translator");
+        if (!target) {
+          return {
+            resolved: false,
+            target: null,
+            health: null,
+            error: "Catalog entry 'ps.agent.context_translator' not found or not a service-based agent",
+          };
+        }
+
+        const health = await checkServiceHealthByName("ps.agent.context_translator");
+        return { resolved: true, target, health, error: null };
+      } catch (err: any) {
+        return {
+          resolved: false,
+          target: null,
+          health: null,
+          error: err.message || "Failed to resolve runtime",
+        };
+      }
     }),
 });

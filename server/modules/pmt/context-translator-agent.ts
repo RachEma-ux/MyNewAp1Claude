@@ -347,6 +347,21 @@ export async function ensureContextTranslatorRegistered(): Promise<number | null
           "whatIfQuestion", "ideationWorkflowDraft", "psWizardScenarioPackage",
           "missingInformation", "framingNotes",
         ],
+        // ── Runtime metadata (service-based agent) ────────────────────────
+        runtime: {
+          kind: "service",
+          serviceKind: "python",
+          serviceName: "project-context-translator",
+          serviceUrlEnv: "PROJECT_CONTEXT_TRANSLATOR_URL",
+          serviceUrlDefault: "http://localhost:8585",
+          healthEndpoint: "/health",
+          statusEndpoint: "/status",
+          translateEndpoint: "/translate",
+          inputSchemaRef: "shared/ps-context-translator-types#TranslateRequest",
+          outputSchemaRef: "shared/ps-context-translator-types#TranslateResponse",
+          capabilityTags: ["ps-ideation", "wizard-handoff", "context-framing"],
+          bounded: true,
+        },
         taxonomyClassification: AGENT_TAXONOMY_CLASSIFICATION,
         enforcementOverlay: {
           deny: [

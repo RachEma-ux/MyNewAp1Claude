@@ -30,6 +30,7 @@ import {
   HelpCircle,
   ClipboardCheck,
   RefreshCw,
+  Activity,
 } from "lucide-react";
 import type { TranslateResponse } from "@shared/ps-context-translator-types";
 
@@ -44,6 +45,15 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
   const [result, setResult] = useState<TranslateResponse | null>(null);
   const [showResult, setShowResult] = useState(false);
   const utils = trpc.useUtils();
+
+  // Service runtime health (catalog → service resolution)
+  const { data: runtime } = trpc.ps.ideation.contextTranslator.resolveRuntime.useQuery(
+    undefined,
+    { staleTime: 30_000, refetchInterval: 60_000 },
+  );
+
+  const serviceAvailable = runtime?.health?.available === true;
+  const serviceStatus = runtime?.health?.status ?? "unknown";
 
   const translateMut = trpc.ps.ideation.contextTranslator.translate.useMutation({
     onSuccess: (data) => {
@@ -92,6 +102,20 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
           <CardTitle className="flex items-center gap-2 text-sm">
             <Sparkles className="w-4 h-4 text-purple-500" />
             Project Context Translator
+            {/* Service health badge */}
+            {runtime && (
+              <Badge
+                variant="outline"
+                className={`ml-auto text-[10px] flex items-center gap-1 ${
+                  serviceAvailable
+                    ? "bg-green-500/10 text-green-600 border-green-500/30"
+                    : "bg-red-500/10 text-red-500 border-red-500/30"
+                }`}
+              >
+                <Activity className="w-3 h-3" />
+                {serviceAvailable ? "Service Online" : "Service Offline"}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -99,6 +123,15 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
             Paste raw project description, idea, or scenario text. The AI translator will analyze it,
             frame The Problem and The Opportunity, extract drivers, and generate a structured ideation package.
           </p>
+          {runtime && !serviceAvailable && (
+            <div className="flex items-start gap-2 p-2 rounded bg-red-500/5 border border-red-500/20">
+              <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+              <div className="text-xs text-red-600">
+                <span className="font-medium">Service unavailable</span>
+                {runtime.health?.error && <span className="block text-red-500/80 mt-0.5">{runtime.health.error}</span>}
+              </div>
+            </div>
+          )}
           <Textarea
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
