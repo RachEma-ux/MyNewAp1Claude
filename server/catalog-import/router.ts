@@ -18,6 +18,9 @@ import { getProvidersByType, updateProvider } from "../providers/db";
 import { importAuditLogs } from "../../drizzle/schema";
 import type { BulkCreateResult, BulkCreateResultEntry } from "@shared/catalog-import-types";
 import { isExecutableEntryType } from "@shared/catalog-execution";
+import { createModel as createDomainModel, createLlm as createDomainLlm } from "../ai-types/service";
+import { normalizeToModel, normalizeToLlm, resolveProviderId as resolveProviderIdFromSlug } from "../ai-types/import-normalizer";
+import { linkCatalogToDomain } from "../ai-types/projection";
 
 export const catalogImportRouter = router({
   /**
@@ -344,26 +347,106 @@ export const catalogImportRouter = router({
             if (Object.keys(agentBlock).length > 0) finalConfig.agent = agentBlock;
           }
 
-          const catalogEntry = await createCatalogEntry({
-            name: row.name,
-            displayName,
-            description: row.description,
-            entryType: row.type,
-            scope,
-            status: "draft",
-            origin,
-            reviewState: "needs_review",
-            providerId: resolvedProviderId,
-            config: finalConfig,
-            tags: [row.source, ...fileTags],
-            category,
-            subCategory,
-            capabilities,
-            createdBy: ctx.user?.id ?? 1,
-          });
+          // ── Domain-first write for model/llm entries ──────────────
+          // Write to domain table first, then project to catalog.
+          // For other types (provider, agent, bot), continue with
+          // direct catalog write (existing domain tables handle those).
+          let catalogEntryId: number;
+
+          if (row.type === "model") {
+            try {
+              const domainResult = await createDomainModel({
+                name: row.name,
+                displayName,
+                description: row.description,
+                providerId: resolvedProviderId,
+                providerSlug: finalConfig.providerType ?? (typeof finalConfig.providerId === "string" ? finalConfig.providerId : null),
+                modelFamily: finalConfig.modelFamily ?? null,
+                contextLength: finalConfig.contextLength ?? null,
+                capabilities,
+                apiModelId: finalConfig.model ?? row.name,
+                baseUrl: finalConfig.baseUrl ?? null,
+                config: finalConfig,
+                canonicalKey: finalConfig.providerType ? `${finalConfig.providerType}/${row.name}` : null,
+                status: "draft",
+                createdBy: ctx.user?.id ?? 1,
+              });
+              catalogEntryId = domainResult.catalogEntry.id;
+              // Override projection defaults with import-specific values
+              await updateCatalogEntry(catalogEntryId, {
+                origin,
+                reviewState: "needs_review",
+                tags: [row.source, ...fileTags],
+                category,
+                subCategory,
+              } as any, ctx.user?.id ?? 1);
+            } catch (domainErr: any) {
+              // Fallback: write catalog directly if domain write fails
+              console.warn(`[Import] Domain-first model write failed, falling back: ${domainErr.message}`);
+              const catalogEntry = await createCatalogEntry({
+                name: row.name, displayName, description: row.description,
+                entryType: row.type, scope, status: "draft", origin,
+                reviewState: "needs_review", providerId: resolvedProviderId,
+                config: finalConfig, tags: [row.source, ...fileTags],
+                category, subCategory, capabilities, createdBy: ctx.user?.id ?? 1,
+              });
+              catalogEntryId = catalogEntry.id;
+            }
+          } else if (row.type === "llm") {
+            try {
+              const domainResult = await createDomainLlm({
+                name: row.name,
+                displayName,
+                description: row.description,
+                providerId: resolvedProviderId,
+                role: finalConfig.role ?? null,
+                config: finalConfig,
+                status: "draft",
+                createdBy: ctx.user?.id ?? 1,
+              });
+              catalogEntryId = domainResult.catalogEntry.id;
+              await updateCatalogEntry(catalogEntryId, {
+                origin,
+                reviewState: "needs_review",
+                tags: [row.source, ...fileTags],
+                category,
+                subCategory,
+              } as any, ctx.user?.id ?? 1);
+            } catch (domainErr: any) {
+              console.warn(`[Import] Domain-first LLM write failed, falling back: ${domainErr.message}`);
+              const catalogEntry = await createCatalogEntry({
+                name: row.name, displayName, description: row.description,
+                entryType: row.type, scope, status: "draft", origin,
+                reviewState: "needs_review", providerId: resolvedProviderId,
+                config: finalConfig, tags: [row.source, ...fileTags],
+                category, subCategory, capabilities, createdBy: ctx.user?.id ?? 1,
+              });
+              catalogEntryId = catalogEntry.id;
+            }
+          } else {
+            // Provider, agent, bot — direct catalog write (existing behavior)
+            const catalogEntry = await createCatalogEntry({
+              name: row.name,
+              displayName,
+              description: row.description,
+              entryType: row.type,
+              scope,
+              status: "draft",
+              origin,
+              reviewState: "needs_review",
+              providerId: resolvedProviderId,
+              config: finalConfig,
+              tags: [row.source, ...fileTags],
+              category,
+              subCategory,
+              capabilities,
+              createdBy: ctx.user?.id ?? 1,
+            });
+            catalogEntryId = catalogEntry.id;
+          }
 
           entry.outcome = "created";
-          entry.catalogEntryId = catalogEntry.id;
+          entry.catalogEntryId = catalogEntryId;
           result.created++;
         } catch (e: any) {
           entry.outcome = "error";

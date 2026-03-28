@@ -213,6 +213,29 @@ const REGISTER_CHECKS: ReviewCheckItem[] = [
     },
   },
   {
+    id: "REG-07",
+    name: "Domain entity linked",
+    stage: "register",
+    category: "compliance_matrix",
+    remediation: "Ensure the catalog entry is linked to a domain table via sourceType/sourceId. Run the AI Types migration to backfill.",
+    evaluator: (ctx) => {
+      // Check if entry has sourceType/sourceId set (domain entity exists)
+      const entry = ctx.entry as any;
+      const hasLink = !!(entry.sourceType && entry.sourceId);
+      // For older entries without domain link, pass with advisory
+      // (don't block registration for legacy entries)
+      return {
+        itemId: "REG-07",
+        name: "Domain entity linked",
+        passed: true, // Advisory only — will be enforced in future
+        category: "compliance_matrix",
+        details: hasLink
+          ? `Linked to domain: ${entry.sourceType}#${entry.sourceId}`
+          : "No domain entity link — entry is catalog-only (advisory: run AI Types migration)",
+      };
+    },
+  },
+  {
     id: "REG-02",
     name: "No architecture bypass",
     stage: "register",

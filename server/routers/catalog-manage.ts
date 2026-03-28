@@ -87,6 +87,7 @@ import { normalizeDiscovery, toArtifactSummary } from "../governance/discovery-a
 import { TRPCError } from "@trpc/server";
 import { createAppBlockerError, appBlockerToTRPCError } from "../_core/blockers";
 import { evaluateStageReview } from "../governance/stage-review";
+import { createModel as createDomainModel, createLlm as createDomainLlm, resolveProviderFromCatalogEntry } from "../ai-types/service";
 
 // ── Rate Limiting & Caching ─────────────────────────────────────────
 const _rateLimitBuckets = new Map<string, { windowStart: number; count: number }>();
@@ -337,23 +338,105 @@ export const catalogManageRouter = router({
       const origin = input.origin ?? "admin";
       const reviewState = origin !== "admin" ? "needs_review" : "approved";
 
-      const entry = await createCatalogEntry({
-        name: input.name,
-        displayName: input.displayName ?? input.name,
-        description: input.description ?? null,
-        entryType: input.entryType,
-        scope: input.scope ?? "app",
-        status: "draft",
-        origin,
-        reviewState,
-        providerId: input.providerId ?? null,
-        config: input.config ?? {},
-        tags: input.tags ?? [],
-        category: input.category ?? null,
-        subCategory: input.subCategory ?? null,
-        capabilities: input.capabilities ?? null,
-        createdBy: ctx.user.id,
-      });
+      let entry: any;
+
+      // Domain-first write for model/llm entries
+      if (input.entryType === "model") {
+        try {
+          const config = (input.config as Record<string, any>) ?? {};
+          const domainResult = await createDomainModel({
+            name: input.name,
+            displayName: input.displayName,
+            description: input.description,
+            providerId: input.providerId,
+            providerSlug: config.providerType ?? null,
+            modelFamily: config.modelFamily ?? null,
+            contextLength: config.contextLength ?? null,
+            capabilities: input.capabilities,
+            apiModelId: config.model ?? input.name,
+            baseUrl: config.baseUrl ?? null,
+            config,
+            status: "draft",
+            createdBy: ctx.user.id,
+          });
+          // Retrieve the full catalog entry (projection creates it with defaults)
+          entry = await getCatalogEntryById(domainResult.catalogEntry.id);
+          // Override with caller-specified values
+          await updateCatalogEntry(entry.id, {
+            origin,
+            reviewState,
+            tags: input.tags ?? [],
+            category: input.category ?? null,
+            subCategory: input.subCategory ?? null,
+          } as any, ctx.user.id);
+          entry = await getCatalogEntryById(entry.id);
+        } catch (domainErr: any) {
+          console.warn(`[CatalogManage] Domain-first model create failed, falling back: ${domainErr.message}`);
+          entry = await createCatalogEntry({
+            name: input.name, displayName: input.displayName ?? input.name,
+            description: input.description ?? null, entryType: input.entryType,
+            scope: input.scope ?? "app", status: "draft", origin, reviewState,
+            providerId: input.providerId ?? null, config: input.config ?? {},
+            tags: input.tags ?? [], category: input.category ?? null,
+            subCategory: input.subCategory ?? null, capabilities: input.capabilities ?? null,
+            createdBy: ctx.user.id,
+          });
+        }
+      } else if (input.entryType === "llm") {
+        try {
+          const config = (input.config as Record<string, any>) ?? {};
+          const domainResult = await createDomainLlm({
+            name: input.name,
+            displayName: input.displayName,
+            description: input.description,
+            providerId: input.providerId,
+            role: config.role ?? null,
+            config,
+            status: "draft",
+            createdBy: ctx.user.id,
+          });
+          entry = await getCatalogEntryById(domainResult.catalogEntry.id);
+          await updateCatalogEntry(entry.id, {
+            origin,
+            reviewState,
+            tags: input.tags ?? [],
+            category: input.category ?? null,
+            subCategory: input.subCategory ?? null,
+          } as any, ctx.user.id);
+          entry = await getCatalogEntryById(entry.id);
+        } catch (domainErr: any) {
+          console.warn(`[CatalogManage] Domain-first LLM create failed, falling back: ${domainErr.message}`);
+          entry = await createCatalogEntry({
+            name: input.name, displayName: input.displayName ?? input.name,
+            description: input.description ?? null, entryType: input.entryType,
+            scope: input.scope ?? "app", status: "draft", origin, reviewState,
+            providerId: input.providerId ?? null, config: input.config ?? {},
+            tags: input.tags ?? [], category: input.category ?? null,
+            subCategory: input.subCategory ?? null, capabilities: input.capabilities ?? null,
+            createdBy: ctx.user.id,
+          });
+        }
+      } else {
+        // Provider, bot — direct catalog write (existing behavior)
+        entry = await createCatalogEntry({
+          name: input.name,
+          displayName: input.displayName ?? input.name,
+          description: input.description ?? null,
+          entryType: input.entryType,
+          scope: input.scope ?? "app",
+          status: "draft",
+          origin,
+          reviewState,
+          providerId: input.providerId ?? null,
+          config: input.config ?? {},
+          tags: input.tags ?? [],
+          category: input.category ?? null,
+          subCategory: input.subCategory ?? null,
+          capabilities: input.capabilities ?? null,
+          createdBy: ctx.user.id,
+        });
+      }
+
       await audit("catalog.entry.created", entry.id, { name: entry.name, entryType: entry.entryType, origin, reviewState });
 
       // Auto-classify: assign the first axis node for this entry type
@@ -438,11 +521,22 @@ export const catalogManageRouter = router({
       const errors: string[] = [];
 
       try {
-        // Resolve the provider: use providerId from entry, or find by config
-        let providerId: number | null = entry.providerId ?? null;
+        // Resolve the provider: domain-first, then legacy config paths
+        let providerId: number | null = null;
         const config = entry.config as Record<string, any> | null;
 
-        // Try config.providerId — must be numeric (string slugs like "openai" are not valid IDs)
+        // 1. Domain-first: resolve through AI Types domain service
+        const domainProvider = await resolveProviderFromCatalogEntry({
+          sourceType: (entry as any).sourceType,
+          sourceId: (entry as any).sourceId,
+          providerId: entry.providerId,
+          config: config as any,
+        });
+        if (domainProvider) {
+          providerId = domainProvider.id;
+        }
+
+        // 2. Legacy fallback: config.providerId (numeric)
         if (!providerId && config?.providerId) {
           const parsed = typeof config.providerId === "number"
             ? config.providerId
@@ -450,7 +544,7 @@ export const catalogManageRouter = router({
           if (!isNaN(parsed)) providerId = parsed;
         }
 
-        // Try matching by providerType from config (discovery sets this)
+        // 3. Legacy: matching by providerType from config
         if (!providerId && config?.providerType) {
           const typeMap: Record<string, string> = {
             ollama: "local-ollama", openai: "openai", anthropic: "anthropic",
@@ -469,7 +563,7 @@ export const catalogManageRouter = router({
           if (match) providerId = match.id;
         }
 
-        // Try matching by string slug in config.providerId (e.g. "openai" → provider named "openai")
+        // 4. Legacy: matching by string slug in config.providerId
         if (!providerId && config?.providerId && typeof config.providerId === "string") {
           const slug = config.providerId.toLowerCase();
           const allProviders = await providerDb.getAllProviders();
@@ -479,8 +573,8 @@ export const catalogManageRouter = router({
           if (match) providerId = match.id;
         }
 
+        // 5. Legacy: name match
         if (!providerId) {
-          // Try to find provider by name match
           const allProviders = await providerDb.getAllProviders();
           const match = allProviders.find((p: any) => p.name === entry.name || p.name === entry.displayName);
           if (match) providerId = match.id;
