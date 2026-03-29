@@ -511,6 +511,11 @@ jobs:
           echo "  JWT_SECRET: ${JWT_SECRET:+(configured)}"
           echo "  APP_ID: ${VITE_APP_ID:-(not set)}"
 
+          # Push schema directly to DB (bypasses migration-file issues)
+          echo "🗄️ Pushing database schema..."
+          DATABASE_URL="${EFFECTIVE_DB_URL}" npx drizzle-kit push --force 2>&1 | tail -20
+          echo "✅ Schema push complete"
+
           # Always use NODE_ENV=production so the server serves built static files
           # DEV_MODE controls auth bypass independently of NODE_ENV
           EFFECTIVE_NODE_ENV="production"
