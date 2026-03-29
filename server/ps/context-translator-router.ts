@@ -123,14 +123,35 @@ async function resolveAgentLlm(): Promise<ResolvedLlm | null> {
  */
 type ExecutionSource = "service" | "built-in-llm" | "built-in-catalog-llm" | "fallback-template";
 
+/** Shared persist helper — used by both translate and translateFallback */
+async function persistTranslatorRun(
+  userId: number,
+  ideationId: number,
+  rawText: string,
+  result: client.TranslateResponse,
+) {
+  const db = getDb();
+  if (!db) return;
+  try {
+    await db.insert(psIdeationTranslatorRuns).values({
+      ideationId,
+      rawInput: rawText,
+      decisionGateStatus: result.decisionGate.status,
+      resultJson: result as any,
+      createdBy: userId,
+    });
+  } catch (persistErr: any) {
+    console.error("Failed to persist translator run:", persistErr.message);
+  }
+}
+
 export const contextTranslatorRouter = router({
   /**
-   * POST /translate — Run the Project Context Translator on raw text.
+   * POST /translate — Run the Project Context Translator via service-backed path ONLY.
    *
-   * Precedence:
-   *   1. Python service (with resolved LLM override from catalog)
-   *   2. Built-in LLM agent (with resolved catalog LLM or provider registry)
-   *   3. Template fallback (clearly labeled degraded output)
+   * Strict mode: does NOT auto-fallback to built-in LLM agent.
+   * If the Python service is offline, this mutation throws BAD_GATEWAY.
+   * The client must offer the built-in fallback as a separate explicit action.
    */
   translate: governedProcedure
     .input(z.object({
@@ -139,10 +160,8 @@ export const contextTranslatorRouter = router({
       metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Step 1: Resolve the agent's selected Default Reasoning LLM
       const resolvedLlm = await resolveAgentLlm();
 
-      // Step 2: Build the llmOverride payload for the Python service
       const llmOverride: client.LlmOverride | undefined = resolvedLlm
         ? {
             provider: resolvedLlm.provider,
@@ -152,14 +171,9 @@ export const contextTranslatorRouter = router({
           }
         : undefined;
 
-      // Step 3: Resolve service URL for diagnostics
       const serviceUrl = process.env.PROJECT_CONTEXT_TRANSLATOR_URL || "http://localhost:8585";
 
-      // Step 4: Try the Python service (primary path)
       let result: client.TranslateResponse;
-      let source: ExecutionSource = "service";
-      let serviceError: string | null = null;
-
       try {
         result = await client.translate({
           rawText: input.rawText,
@@ -167,48 +181,68 @@ export const contextTranslatorRouter = router({
           llmOverride,
         });
       } catch (serviceErr: any) {
-        // Capture the real service error for diagnostics
-        serviceError = serviceErr.message || "Python translator service is unreachable";
-
-        // Fall back to built-in agent
-        try {
-          result = await analyzeRawInput(input.rawText, {
-            provider: resolvedLlm?.provider,
-            model: resolvedLlm?.model,
-            apiBaseUrl: resolvedLlm?.apiBaseUrl,
-          });
-
-          // Determine which built-in path was actually used
-          if (result.decisionGate.reason?.includes("without LLM")) {
-            source = "fallback-template";
-          } else if (resolvedLlm) {
-            source = "built-in-catalog-llm";
-          } else {
-            source = "built-in-llm";
-          }
-        } catch (fallbackErr: any) {
-          throw new TRPCError({
-            code: "BAD_GATEWAY",
-            message: `Python translator service offline at ${serviceUrl}. Built-in fallback also failed: ${fallbackErr.message || "unknown error"}`,
-          });
-        }
+        // Strict: do NOT auto-fallback. Throw so the client can offer fallback explicitly.
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: `Project Context Translator service is offline at ${serviceUrl}. ${serviceErr.message || "Service unreachable"}. Use the built-in fallback action if available.`,
+        });
       }
 
-      // Step 5: Persist the translator run
-      const db = getDb();
-      if (db) {
-        try {
-          await db.insert(psIdeationTranslatorRuns).values({
-            ideationId: input.ideationId,
-            rawInput: input.rawText,
-            decisionGateStatus: result.decisionGate.status,
-            resultJson: result as any,
-            createdBy: ctx.user.id,
-          });
-        } catch (persistErr: any) {
-          console.error("Failed to persist translator run:", persistErr.message);
+      // Persist the translator run
+      await persistTranslatorRun(ctx.user.id, input.ideationId, input.rawText, result);
+
+      return {
+        ...result,
+        _source: "service" as ExecutionSource,
+        _resolvedLlm: resolvedLlm
+          ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
+          : null,
+        _serviceError: null,
+        _serviceUrl: null,
+      };
+    }),
+
+  /**
+   * POST /translateFallback — Run the built-in LLM fallback explicitly.
+   *
+   * This is the secondary path. It does NOT attempt the Python service.
+   * The user must explicitly choose this action from the UI.
+   * Results are always labeled as fallback output.
+   */
+  translateFallback: governedProcedure
+    .input(z.object({
+      ideationId: z.number().int().positive(),
+      rawText: z.string().min(10).max(10000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const resolvedLlm = await resolveAgentLlm();
+
+      let result: client.TranslateResponse;
+      let source: ExecutionSource;
+
+      try {
+        result = await analyzeRawInput(input.rawText, {
+          provider: resolvedLlm?.provider,
+          model: resolvedLlm?.model,
+          apiBaseUrl: resolvedLlm?.apiBaseUrl,
+        });
+
+        if (result.decisionGate.reason?.includes("without LLM")) {
+          source = "fallback-template";
+        } else if (resolvedLlm) {
+          source = "built-in-catalog-llm";
+        } else {
+          source = "built-in-llm";
         }
+      } catch (fallbackErr: any) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Built-in fallback failed: ${fallbackErr.message || "unknown error"}`,
+        });
       }
+
+      // Persist the translator run
+      await persistTranslatorRun(ctx.user.id, input.ideationId, input.rawText, result);
 
       return {
         ...result,
@@ -216,8 +250,8 @@ export const contextTranslatorRouter = router({
         _resolvedLlm: resolvedLlm
           ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
           : null,
-        _serviceError: serviceError,
-        _serviceUrl: serviceError ? serviceUrl : null,
+        _serviceError: null,
+        _serviceUrl: null,
       };
     }),
 

@@ -8,12 +8,12 @@
  * Trigger, Project Context Result, What If? Question, ideation workflow draft,
  * and clarification questions when needed.
  *
- * Execution states (truthful, distinct):
- *   - "online"         → Python service reachable, primary path
- *   - "llm-fallback"   → Service offline, using catalog LLM via built-in agent
- *   - "degraded"       → Service offline, no catalog LLM, provider-registry LLM
- *   - "no-llm"         → No LLM configured anywhere, template only
- *   - "unavailable"    → Agent not in catalog
+ * Execution states (strict, no auto-fallback):
+ *   - "online"           → Python service reachable, primary path available
+ *   - "offline"          → Service offline, built-in fallback available as separate action
+ *   - "offline-no-llm"   → Service offline, no LLM configured, no usable fallback
+ *   - "unavailable"      → Agent not in catalog
+ *   - "checking"         → Health check in progress
  */
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,7 +48,15 @@ interface Props {
   onApplied?: () => void;
 }
 
-type ExecutionMode = "online" | "llm-fallback" | "degraded" | "no-llm" | "unavailable" | "checking";
+/**
+ * Execution modes — strict separation of primary vs fallback:
+ *   - "online":           Service reachable, primary path available
+ *   - "offline":          Service down, but built-in fallback is available (user must choose explicitly)
+ *   - "offline-no-llm":   Service down, no LLM configured, no usable fallback
+ *   - "unavailable":      Agent not in catalog
+ *   - "checking":         Health check in progress
+ */
+type ExecutionMode = "online" | "offline" | "offline-no-llm" | "unavailable" | "checking";
 
 export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Props) {
   const [rawText, setRawText] = useState("");
@@ -63,23 +71,41 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
       { staleTime: 30_000, refetchInterval: 60_000 },
     );
 
-  // Derive the execution mode from runtime state
+  // Derive the execution mode — strict: no auto-fallback
   const executionMode: ExecutionMode = (() => {
     if (!runtime || isHealthChecking) return "checking";
     if (!runtime.resolved && !runtime.builtInAvailable) return "unavailable";
     if (runtime.serviceOnline) return "online";
-    if (runtime.llmConfigured) return "llm-fallback";
-    if (runtime.builtInAvailable) return "degraded";
-    return "unavailable";
+    // Service is offline — check if fallback is possible
+    if (runtime.builtInAvailable && (runtime.llmConfigured || runtime.builtInAvailable)) return "offline";
+    return "offline-no-llm";
   })();
 
-  const canTranslate = executionMode !== "unavailable" && executionMode !== "checking";
+  // Primary translator: only when service is online
+  const canTranslatePrimary = executionMode === "online";
+  // Fallback: only when offline and built-in path has LLM
+  const canUseFallback = executionMode === "offline";
 
   const handleRefreshHealth = useCallback(() => {
     utils.ps.ideation.contextTranslator.resolveRuntime.invalidate();
   }, [utils]);
 
+  // Primary translator mutation — service-backed only, no auto-fallback
   const translateMut = trpc.ps.ideation.contextTranslator.translate.useMutation({
+    onSuccess: (data) => {
+      setResult(data as any);
+      setShowResult(true);
+      if (data.decisionGate.status === "CONTINUE") {
+        toast.success("Service analysis complete — review results below");
+      } else {
+        toast.info("Clarification needed — see questions below");
+      }
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Fallback mutation — built-in LLM path, user-initiated only
+  const fallbackMut = trpc.ps.ideation.contextTranslator.translateFallback.useMutation({
     onSuccess: (data) => {
       setResult(data as any);
       setShowResult(true);
@@ -88,7 +114,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
         if (src === "fallback-template") {
           toast.info("Template analysis only — configure LLM for full reasoning");
         } else {
-          toast.success("Analysis complete — review results below");
+          toast.success("Built-in fallback analysis complete — review results below");
         }
       } else {
         toast.info("Clarification needed — see questions below");
@@ -107,6 +133,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
     onError: (e) => toast.error(e.message),
   });
 
+  // Primary: service-backed translator
   const handleTranslate = () => {
     if (!rawText.trim() || rawText.trim().length < 10) {
       toast.error("Please enter at least 10 characters of project description");
@@ -115,13 +142,24 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
     translateMut.mutate({ ideationId, rawText: rawText.trim() });
   };
 
+  // Secondary: built-in fallback (user must click separate button)
+  const handleFallback = () => {
+    if (!rawText.trim() || rawText.trim().length < 10) {
+      toast.error("Please enter at least 10 characters of project description");
+      return;
+    }
+    fallbackMut.mutate({ ideationId, rawText: rawText.trim() });
+  };
+
   const handleApply = () => {
     if (!result) return;
     applyMut.mutate({ ideationId, translatorResult: result });
   };
 
+  const isAnyMutating = translateMut.isPending || fallbackMut.isPending;
   const isContinue = result?.decisionGate.status === "CONTINUE";
   const isClarification = result?.decisionGate.status === "CLARIFICATION_NEEDED";
+  const isFallbackResult = result?._source && result._source !== "service";
 
   // Status pill config
   const statusConfig = getStatusPillConfig(executionMode, isHealthChecking);
@@ -189,7 +227,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
             frame The Problem and The Opportunity, extract drivers, and generate a structured ideation package.
           </p>
 
-          {/* Status banners — truthful, distinct */}
+          {/* Status banners — strict, truthful, no auto-fallback */}
           {executionMode === "unavailable" && (
             <div className="flex items-start gap-2 p-2 rounded bg-red-500/5 border border-red-500/20">
               <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
@@ -202,11 +240,11 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
             </div>
           )}
 
-          {executionMode === "no-llm" && (
+          {executionMode === "offline-no-llm" && (
             <div className="flex items-start gap-2 p-2 rounded bg-red-500/5 border border-red-500/20">
               <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
               <div className="text-xs text-red-600">
-                <span className="font-medium">Project Context Translator service is offline — no LLM fallback available</span>
+                <span className="font-medium">Project Context Translator service is offline</span>
                 {runtime?.serviceUrl && (
                   <span className="block text-red-500/70 mt-0.5 font-mono text-[10px]">
                     {runtime.serviceUrl}
@@ -216,18 +254,18 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                   <span className="block text-red-500/70 mt-0.5">{runtime.healthError}</span>
                 )}
                 <span className="block text-red-500/80 mt-1">
-                  No Default Reasoning LLM selected and no provider-registry LLM available.
-                  Template-only output. Select a reasoning LLM in the Catalog for the Context Translator agent.
+                  Primary translator unavailable. No LLM configured for built-in fallback either.
+                  Select a Default Reasoning LLM in the Catalog to enable the fallback option.
                 </span>
               </div>
             </div>
           )}
 
-          {executionMode === "degraded" && (
+          {executionMode === "offline" && (
             <div className="flex items-start gap-2 p-2 rounded bg-amber-500/5 border border-amber-500/20">
-              <Info className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
               <div className="text-xs text-amber-600">
-                <span className="font-medium">Project Context Translator service is offline — degraded mode</span>
+                <span className="font-medium">Project Context Translator service is offline</span>
                 {runtime?.serviceUrl && (
                   <span className="block text-amber-500/70 mt-0.5 font-mono text-[10px]">
                     {runtime.serviceUrl}
@@ -237,38 +275,20 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                   <span className="block text-amber-500/70 mt-0.5">{runtime.healthError}</span>
                 )}
                 <span className="block text-amber-500/80 mt-1">
-                  No catalog LLM selected. Using first available provider-registry LLM.
-                  For best results, select a Default Reasoning LLM in the agent catalog entry.
+                  Primary translator unavailable. You can use the built-in fallback below as a secondary option.
+                  {runtime?.resolvedLlm?.displayName && (
+                    <> Fallback LLM: {runtime.resolvedLlm.displayName}.</>
+                  )}
                 </span>
               </div>
             </div>
           )}
 
-          {executionMode === "llm-fallback" && (
-            <div className="flex items-start gap-2 p-2 rounded bg-blue-500/5 border border-blue-500/20">
-              <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-              <div className="text-xs text-blue-600">
-                <span className="font-medium">Project Context Translator service is offline</span>
-                {runtime?.serviceUrl && (
-                  <span className="block text-blue-500/80 mt-0.5 font-mono text-[10px]">
-                    {runtime.serviceUrl}
-                  </span>
-                )}
-                {runtime?.healthError && (
-                  <span className="block text-blue-500/70 mt-0.5">{runtime.healthError}</span>
-                )}
-                <span className="block text-blue-500/80 mt-1">
-                  Using {runtime?.resolvedLlm?.displayName || "catalog LLM"} via built-in agent as fallback.
-                </span>
-              </div>
-            </div>
-          )}
-
-          {executionMode === "online" && runtime?.resolvedLlm && (
+          {executionMode === "online" && (
             <div className="flex items-center gap-2 p-2 rounded bg-green-500/5 border border-green-500/20">
               <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
               <span className="text-xs text-green-600">
-                Service online — using {runtime.resolvedLlm.displayName || `${runtime.resolvedLlm.provider}/${runtime.resolvedLlm.model}`}
+                Service online{runtime?.resolvedLlm ? ` — ${runtime.resolvedLlm.displayName || `${runtime.resolvedLlm.provider}/${runtime.resolvedLlm.model}`}` : ""}
               </span>
             </div>
           )}
@@ -277,30 +297,50 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
             placeholder={
-              !canTranslate
+              executionMode === "unavailable" || executionMode === "offline-no-llm"
                 ? "Translation is currently unavailable — see status above."
+                : executionMode === "offline"
+                ? "Primary translator offline. Enter text and use the built-in fallback button below."
                 : "Describe your project idea, situation, or scenario in detail. Include any context about what's driving the need, what problems exist, what opportunities you see..."
             }
             rows={6}
-            disabled={disabled || translateMut.isPending || !canTranslate}
-            className={`text-sm ${!canTranslate ? "opacity-50" : ""}`}
+            disabled={disabled || isAnyMutating || (executionMode === "unavailable")}
+            className={`text-sm ${executionMode === "unavailable" ? "opacity-50" : ""}`}
           />
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground">{rawText.length}/10000</span>
-            <Button
-              onClick={handleTranslate}
-              disabled={disabled || translateMut.isPending || rawText.trim().length < 10 || !canTranslate}
-              size="sm"
-            >
-              {translateMut.isPending ? (
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4 mr-1" />
+            <div className="flex items-center gap-2">
+              {/* Secondary: Built-in fallback — only shown when service is offline */}
+              {canUseFallback && (
+                <Button
+                  onClick={handleFallback}
+                  disabled={disabled || isAnyMutating || rawText.trim().length < 10}
+                  size="sm"
+                  variant="outline"
+                  className="text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
+                >
+                  {fallbackMut.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  ) : (
+                    <Zap className="w-4 h-4 mr-1" />
+                  )}
+                  {fallbackMut.isPending ? "Running fallback..." : "Use built-in fallback"}
+                </Button>
               )}
-              {translateMut.isPending
-                ? "Analyzing..."
-                : getButtonLabel(executionMode)}
-            </Button>
+              {/* Primary: Service-backed translator */}
+              <Button
+                onClick={handleTranslate}
+                disabled={disabled || isAnyMutating || rawText.trim().length < 10 || !canTranslatePrimary}
+                size="sm"
+              >
+                {translateMut.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4 mr-1" />
+                )}
+                {translateMut.isPending ? "Analyzing..." : "Translate Context"}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -308,41 +348,20 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
       {/* Results */}
       {showResult && result && (
         <>
-          {/* Service offline notice on results */}
-          {result._serviceError && (
+          {/* Fallback result banner — clearly distinguishes fallback from service output */}
+          {isFallbackResult && (
             <Card className="border-amber-500/30">
               <CardContent className="py-2">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                  <div className="text-xs">
-                    <span className="font-medium text-amber-600">
-                      Project Context Translator service was offline during this request
-                    </span>
-                    {result._serviceUrl && (
-                      <span className="block text-muted-foreground font-mono text-[10px] mt-0.5">
-                        {result._serviceUrl}
-                      </span>
-                    )}
-                    <span className="block text-muted-foreground mt-0.5">
-                      {result._serviceError}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Execution source badge */}
-          {result._source && result._source !== "service" && (
-            <Card>
-              <CardContent className="py-2">
                 <div className="flex items-center gap-2">
-                  <Info className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-xs text-muted-foreground">
-                    Executed via: <span className="font-medium">{getSourceLabel(result._source)}</span>
-                    {result._resolvedLlm?.displayName && (
-                      <> using <span className="font-medium">{result._resolvedLlm.displayName}</span></>
-                    )}
+                  <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span className="text-xs">
+                    <span className="font-medium text-amber-600">Built-in fallback result</span>
+                    <span className="text-muted-foreground">
+                      {" — "}Executed via: {getSourceLabel(result._source!)}
+                      {result._resolvedLlm?.displayName && (
+                        <> using {result._resolvedLlm.displayName}</>
+                      )}
+                    </span>
                   </span>
                 </div>
               </CardContent>
@@ -357,7 +376,11 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                   <>
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
                     <span className="text-sm font-medium text-green-600">
-                      {result._source === "fallback-template" ? "Template Analysis" : "Analysis Complete"}
+                      {result._source === "fallback-template"
+                        ? "Template Analysis"
+                        : isFallbackResult
+                        ? "Fallback Analysis Complete"
+                        : "Analysis Complete"}
                     </span>
                     <Badge variant="outline" className={`ml-auto text-xs ${
                       result._source === "fallback-template"
@@ -632,32 +655,24 @@ function getStatusPillConfig(mode: ExecutionMode, isChecking: boolean) {
         pillClass: "bg-green-500/10 text-green-600 border-green-500/30",
         dotClass: "bg-green-500",
         pillLabel: "Online",
-        tooltipTitle: "Python Service Online",
+        tooltipTitle: "Translator Service Online",
         tooltipDetail: "Primary execution path active. Requests go to the dedicated Python translator service.",
       };
-    case "llm-fallback":
-      return {
-        pillClass: "bg-blue-500/10 text-blue-600 border-blue-500/30",
-        dotClass: "bg-blue-500",
-        pillLabel: "Service Offline",
-        tooltipTitle: "Python Translator Service Offline",
-        tooltipDetail: "The dedicated Python translator service is unreachable. Using the selected Default Reasoning LLM via built-in agent as fallback.",
-      };
-    case "degraded":
+    case "offline":
       return {
         pillClass: "bg-amber-500/10 text-amber-600 border-amber-500/30",
         dotClass: "bg-amber-500",
         pillLabel: "Service Offline",
-        tooltipTitle: "Python Translator Service Offline — Degraded",
-        tooltipDetail: "The dedicated Python translator service is offline and no catalog LLM is selected. Using provider-registry fallback. Select a Default Reasoning LLM for better results.",
+        tooltipTitle: "Translator Service Offline",
+        tooltipDetail: "Primary translator unavailable. Built-in fallback is available as a separate action.",
       };
-    case "no-llm":
+    case "offline-no-llm":
       return {
         pillClass: "bg-red-500/10 text-red-500 border-red-500/30",
         dotClass: "bg-red-500",
         pillLabel: "Service Offline",
-        tooltipTitle: "Python Translator Service Offline — No LLM",
-        tooltipDetail: "The dedicated Python translator service is offline, no catalog LLM configured, no provider-registry LLM available. Template output only.",
+        tooltipTitle: "Translator Service Offline — No Fallback",
+        tooltipDetail: "Primary translator offline. No LLM configured for built-in fallback. Configure a Default Reasoning LLM to enable the fallback option.",
       };
     case "unavailable":
     default:
@@ -668,17 +683,6 @@ function getStatusPillConfig(mode: ExecutionMode, isChecking: boolean) {
         tooltipTitle: "Translator Unavailable",
         tooltipDetail: "Agent not found in catalog or resolution failed.",
       };
-  }
-}
-
-function getButtonLabel(mode: ExecutionMode): string {
-  switch (mode) {
-    case "online": return "Translate Context";
-    case "llm-fallback": return "Translate (LLM Fallback)";
-    case "degraded": return "Translate (Degraded)";
-    case "no-llm": return "Unavailable";
-    case "unavailable": return "Unavailable";
-    default: return "Translate Context";
   }
 }
 

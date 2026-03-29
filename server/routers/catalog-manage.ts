@@ -521,9 +521,105 @@ export const catalogManageRouter = router({
       const errors: string[] = [];
 
       try {
+        const config = entry.config as Record<string, any> | null;
+
+        // ── Service-based agent validation ──────────────────────────
+        // Service agents (runtime.kind === "service") validate against
+        // their HTTP service endpoint, not an LLM provider.
+        const runtime = config?.runtime as Record<string, any> | undefined;
+        if (entry.entryType === "agent" && runtime?.kind === "service") {
+          const serviceUrl = (runtime.serviceUrlEnv ? process.env[runtime.serviceUrlEnv] : null)
+            || runtime.serviceUrlDefault || "http://localhost:8585";
+          const healthUrl = `${serviceUrl}${runtime.healthEndpoint || "/health"}`;
+
+          // 1. Service health check
+          const healthStart = Date.now();
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            const resp = await fetch(healthUrl, { signal: controller.signal });
+            clearTimeout(timeout);
+            const latencyMs = Date.now() - healthStart;
+
+            if (resp.ok) {
+              const data = await resp.json();
+              results.health = { passed: true, message: `Service online: ${data.service || runtime.serviceName} v${data.version || "?"}`, latencyMs };
+            } else {
+              results.health = { passed: false, message: `Service returned ${resp.status}`, latencyMs };
+              errors.push(`Service health check failed: HTTP ${resp.status}`);
+            }
+          } catch (e: any) {
+            const latencyMs = Date.now() - healthStart;
+            const isOffline = e.name === "AbortError" || e.cause?.code === "ECONNREFUSED" || e.message?.includes("fetch failed");
+            results.health = {
+              passed: false,
+              message: isOffline
+                ? `Service offline at ${serviceUrl} — built-in LLM fallback will be used`
+                : `Service error: ${e.message}`,
+              latencyMs,
+            };
+            // Service offline is not a hard failure for service agents with built-in fallback
+            if (isOffline) {
+              errors.push(`Service offline at ${serviceUrl}. Built-in LLM fallback is available.`);
+            } else {
+              errors.push(`Service health error: ${e.message}`);
+            }
+          }
+
+          // 2. Capabilities — report service capabilities from config
+          const capTags = runtime.capabilityTags || [];
+          results.capabilities = {
+            passed: true,
+            data: { serviceKind: runtime.serviceKind, serviceName: runtime.serviceName, capabilities: capTags, bounded: runtime.bounded },
+            message: `Service agent: ${runtime.serviceName} (${runtime.serviceKind}), capabilities: ${capTags.join(", ") || "none listed"}`,
+          };
+
+          // 3. LLM fallback resolution — check if a reasoning LLM is configured
+          const agentConfig = config?.agent as Record<string, any> | undefined;
+          const llmRef = agentConfig?.defaultReasoningLlmRef;
+          const providerRef = agentConfig?.defaultReasoningProviderRef;
+          const modelRef = agentConfig?.defaultReasoningModel;
+          const llmDetails: string[] = [];
+          if (llmRef && llmRef !== "REPLACE_WITH_REAL_LLM_DB_ID_IN_THIS_ENV") llmDetails.push(`LLM ref: catalog #${llmRef}`);
+          if (providerRef) llmDetails.push(`Provider ref: #${providerRef}`);
+          if (modelRef) llmDetails.push(`Model: ${modelRef}`);
+
+          results.models = {
+            passed: llmDetails.length > 0,
+            models: llmDetails.length > 0 ? [llmDetails.join(", ")] : [],
+            message: llmDetails.length > 0
+              ? `Reasoning LLM configured: ${llmDetails.join(", ")}`
+              : "No Default Reasoning LLM configured. Set agent.defaultReasoningLlmRef in config.",
+          };
+          if (llmDetails.length === 0) {
+            errors.push("No Default Reasoning LLM configured for this service agent.");
+          }
+
+          // Overall: pass if capabilities resolved and LLM is configured
+          // Service being offline is a soft warning, not a hard failure
+          const allPassed = results.capabilities.passed && results.models.passed;
+          const validationStatus = allPassed ? "passed" : "failed";
+
+          await updateCatalogEntry(input.id, { status: previousStatus }, 1);
+          const { getDb } = await import("../db");
+          const db = getDb();
+          if (db) {
+            const { catalogEntries } = await import("../../drizzle/schema");
+            const { eq } = await import("drizzle-orm");
+            await db.update(catalogEntries).set({
+              validationStatus,
+              validationErrors: errors.length > 0 ? errors : null,
+              lastValidatedAt: new Date(),
+            }).where(eq(catalogEntries.id, input.id));
+          }
+
+          await audit("catalog.entry.validated", input.id, { passed: allPassed, validationStatus, errors, serviceAgent: true });
+          return { success: allPassed, results, errors };
+        }
+
+        // ── Standard LLM/model provider validation ──────────────────
         // Resolve the provider: domain-first, then legacy config paths
         let providerId: number | null = null;
-        const config = entry.config as Record<string, any> | null;
 
         // 1. Domain-first: resolve through AI Types domain service
         const domainProvider = await resolveProviderFromCatalogEntry({
