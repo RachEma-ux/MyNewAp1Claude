@@ -626,8 +626,8 @@ CREATE TABLE "ps_wizard_runs" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "workspaces" ADD COLUMN "purposeStatement" text;--> statement-breakpoint
-ALTER TABLE "workspaces" ADD COLUMN "wizardMeta" json;--> statement-breakpoint
+ALTER TABLE "workspaces" ADD COLUMN IF NOT EXISTS "purposeStatement" text;--> statement-breakpoint
+ALTER TABLE "workspaces" ADD COLUMN IF NOT EXISTS "wizardMeta" json;--> statement-breakpoint
 ALTER TABLE "hr_letters" ADD CONSTRAINT "hr_letters_worker_id_hr_worker_profiles_id_fk" FOREIGN KEY ("worker_id") REFERENCES "public"."hr_worker_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "hr_work_permits" ADD CONSTRAINT "hr_work_permits_worker_id_hr_worker_profiles_id_fk" FOREIGN KEY ("worker_id") REFERENCES "public"."hr_worker_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "hr_position_role_links" ADD CONSTRAINT "hr_position_role_links_position_id_hr_positions_id_fk" FOREIGN KEY ("position_id") REFERENCES "public"."hr_positions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
