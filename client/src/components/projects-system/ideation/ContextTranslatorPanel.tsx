@@ -21,6 +21,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -40,7 +51,12 @@ import {
   RefreshCw,
   Info,
 } from "lucide-react";
-import type { TranslateResponse, AnsweredQuestionRow } from "@shared/ps-context-translator-types";
+import type {
+  TranslateResponse,
+  AnsweredQuestionRow,
+  ClarificationPayload,
+  ClarificationChoiceGroup,
+} from "@shared/ps-context-translator-types";
 
 /**
  * Defensively render any value as a string.
@@ -79,10 +95,24 @@ interface Props {
  */
 type ExecutionMode = "online" | "offline" | "offline-no-llm" | "unavailable" | "checking";
 
+/** Extended result type with question-table + clarification fields */
+type TranslatorResult = TranslateResponse & {
+  answeredQuestions?: AnsweredQuestionRow[];
+  clarification?: ClarificationPayload;
+  _source?: string;
+  _resolvedLlm?: { displayName?: string; provider?: string; model?: string } | null;
+  _serviceError?: string | null;
+  _serviceUrl?: string | null;
+};
+
 export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Props) {
   const [rawText, setRawText] = useState("");
-  const [result, setResult] = useState<(TranslateResponse & { answeredQuestions?: AnsweredQuestionRow[]; _source?: string; _resolvedLlm?: { displayName?: string; provider?: string; model?: string } | null; _serviceError?: string | null; _serviceUrl?: string | null }) | null>(null);
+  const [result, setResult] = useState<TranslatorResult | null>(null);
   const [showResult, setShowResult] = useState(false);
+  // Clarification dialog state
+  const [showClarificationDialog, setShowClarificationDialog] = useState(false);
+  const [clarificationSelections, setClarificationSelections] = useState<Record<string, string[]>>({});
+  const [clarificationFreeText, setClarificationFreeText] = useState("");
   const utils = trpc.useUtils();
 
   // Rehydrate raw text from the most recent translator run (persisted in DB)
@@ -181,6 +211,46 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
     onError: (e) => toast.error(e.message),
   });
 
+  // Clarification submission mutation
+  const clarificationMut = trpc.ps.ideation.contextTranslator.submitClarification.useMutation({
+    onSuccess: (data) => {
+      setResult(data as any);
+      setShowClarificationDialog(false);
+      setClarificationSelections({});
+      setClarificationFreeText("");
+      if (data.decisionGate?.status === "CONTINUE") {
+        toast.success("Clarification applied — review updated results below");
+      } else {
+        toast.info("Further clarification needed — see updated questions below");
+      }
+    },
+    onError: (e) => toast.error(extractError(e)),
+  });
+
+  // Open clarification dialog with fresh state
+  const handleOpenClarification = useCallback(() => {
+    setClarificationSelections({});
+    setClarificationFreeText("");
+    setShowClarificationDialog(true);
+  }, []);
+
+  // Submit clarification selections
+  const handleSubmitClarification = useCallback(() => {
+    if (!result?.clarification) return;
+    const hasSelections = Object.values(clarificationSelections).some(arr => arr.length > 0);
+    if (!hasSelections && !clarificationFreeText.trim()) {
+      toast.error("Please select at least one option or add details");
+      return;
+    }
+    clarificationMut.mutate({
+      ideationId,
+      rawText: rawText.trim(),
+      clarificationChoices: result.clarification.clarificationChoices,
+      selections: clarificationSelections,
+      freeText: clarificationFreeText.trim() || undefined,
+    });
+  }, [result, clarificationSelections, clarificationFreeText, ideationId, rawText]);
+
   // Primary: service-backed translator
   const handleTranslate = () => {
     if (!rawText.trim() || rawText.trim().length < 10) {
@@ -204,9 +274,10 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
     applyMut.mutate({ ideationId, translatorResult: result });
   };
 
-  const isAnyMutating = translateMut.isPending || fallbackMut.isPending;
+  const isAnyMutating = translateMut.isPending || fallbackMut.isPending || clarificationMut.isPending;
   const isContinue = result?.decisionGate?.status === "CONTINUE";
   const isClarification = result?.decisionGate?.status === "CLARIFICATION_NEEDED";
+  const hasStructuredClarification = isClarification && result?.clarification?.clarificationChoices?.length > 0;
   const isFallbackResult = result?._source && result._source !== "service";
 
   // Status pill config
@@ -456,8 +527,41 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
             </CardContent>
           </Card>
 
-          {/* Clarification Questions */}
-          {isClarification && result.clarificationQuestions?.length > 0 && (
+          {/* Structured Clarification — choice dialog */}
+          {hasStructuredClarification && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm text-amber-600">
+                  <HelpCircle className="w-4 h-4" />
+                  Clarification Needed
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm">{result.clarification!.clarificationPrompt}</p>
+                <p className="text-xs text-muted-foreground">
+                  The translator identified multiple possible interpretations. Select the options that best match your intent.
+                </p>
+                <Button onClick={handleOpenClarification} size="sm" variant="outline" className="text-amber-600 border-amber-500/30">
+                  <MessageSquareWarning className="w-4 h-4 mr-1" />
+                  Open Clarification Dialog
+                </Button>
+                {result.missingInformation?.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Missing Information:</p>
+                    {result.missingInformation.map((m: any, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0 text-amber-400" />
+                        <span>{safeRender(m)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Fallback: Generic clarification questions (no structured choices) */}
+          {isClarification && !hasStructuredClarification && result.clarificationQuestions?.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm text-amber-600">
@@ -485,6 +589,21 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Clarification Dialog */}
+          {result?.clarification && (
+            <ClarificationDialog
+              open={showClarificationDialog}
+              onOpenChange={setShowClarificationDialog}
+              clarification={result.clarification}
+              selections={clarificationSelections}
+              onSelectionsChange={setClarificationSelections}
+              freeText={clarificationFreeText}
+              onFreeTextChange={setClarificationFreeText}
+              onSubmit={handleSubmitClarification}
+              isPending={clarificationMut.isPending}
+            />
           )}
 
           {/* Continue Mode — Full Results */}
@@ -753,6 +872,168 @@ function getSourceLabel(source: string): string {
     case "fallback-template": return "Template Fallback (No LLM)";
     default: return source;
   }
+}
+
+// ── Clarification Dialog ──────────────────────────────────────────────────
+
+interface ClarificationDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clarification: ClarificationPayload;
+  selections: Record<string, string[]>;
+  onSelectionsChange: (selections: Record<string, string[]>) => void;
+  freeText: string;
+  onFreeTextChange: (text: string) => void;
+  onSubmit: () => void;
+  isPending: boolean;
+}
+
+function ClarificationDialog({
+  open,
+  onOpenChange,
+  clarification,
+  selections,
+  onSelectionsChange,
+  freeText,
+  onFreeTextChange,
+  onSubmit,
+  isPending,
+}: ClarificationDialogProps) {
+  const handleSingleSelect = (groupKey: string, optionId: string) => {
+    onSelectionsChange({ ...selections, [groupKey]: [optionId] });
+  };
+
+  const handleMultiSelect = (groupKey: string, optionId: string, checked: boolean) => {
+    const current = selections[groupKey] || [];
+    if (checked) {
+      onSelectionsChange({ ...selections, [groupKey]: [...current, optionId] });
+    } else {
+      onSelectionsChange({ ...selections, [groupKey]: current.filter(id => id !== optionId) });
+    }
+  };
+
+  const hasAnySelection = Object.values(selections).some(arr => arr.length > 0) || freeText.trim().length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageSquareWarning className="w-5 h-5 text-amber-500" />
+            Clarify Your Intent
+          </DialogTitle>
+          <DialogDescription>{clarification.clarificationPrompt}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 py-2">
+          {clarification.clarificationChoices.map((group) => (
+            <div key={group.groupKey} className="space-y-2">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium">{group.groupLabel}</p>
+                <Badge variant="outline" className="text-[9px]">
+                  {group.selectMode === "single" ? "Select one" : "Select multiple"}
+                </Badge>
+              </div>
+
+              {group.selectMode === "single" ? (
+                <RadioGroup
+                  value={selections[group.groupKey]?.[0] || ""}
+                  onValueChange={(val) => handleSingleSelect(group.groupKey, val)}
+                  className="space-y-1.5"
+                >
+                  {group.options.map((opt) => (
+                    <div key={opt.id} className="flex items-start gap-2 p-2 rounded border border-border hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value={opt.id} id={`${group.groupKey}-${opt.id}`} className="mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <Label htmlFor={`${group.groupKey}-${opt.id}`} className="text-sm cursor-pointer leading-tight">
+                          {opt.label}
+                        </Label>
+                        {opt.rationale && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{opt.rationale}</p>
+                        )}
+                        {opt.confidence && (
+                          <Badge variant="outline" className={`text-[9px] mt-1 ${
+                            opt.confidence === "high" ? "bg-green-500/10 text-green-600 border-green-500/30"
+                            : opt.confidence === "medium" ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                            : "bg-red-500/10 text-red-500 border-red-500/30"
+                          }`}>{opt.confidence}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </RadioGroup>
+              ) : (
+                <div className="space-y-1.5">
+                  {group.options.map((opt) => {
+                    const checked = (selections[group.groupKey] || []).includes(opt.id);
+                    return (
+                      <div
+                        key={opt.id}
+                        className={`flex items-start gap-2 p-2 rounded border transition-colors ${
+                          checked ? "border-primary/50 bg-primary/5" : "border-border hover:bg-muted/50"
+                        }`}
+                      >
+                        <Checkbox
+                          id={`${group.groupKey}-${opt.id}`}
+                          checked={checked}
+                          onCheckedChange={(c) => handleMultiSelect(group.groupKey, opt.id, !!c)}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <Label htmlFor={`${group.groupKey}-${opt.id}`} className="text-sm cursor-pointer leading-tight">
+                            {opt.label}
+                          </Label>
+                          {opt.rationale && (
+                            <p className="text-[11px] text-muted-foreground mt-0.5">{opt.rationale}</p>
+                          )}
+                          {opt.confidence && (
+                            <Badge variant="outline" className={`text-[9px] mt-1 ${
+                              opt.confidence === "high" ? "bg-green-500/10 text-green-600 border-green-500/30"
+                              : opt.confidence === "medium" ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                              : "bg-red-500/10 text-red-500 border-red-500/30"
+                            }`}>{opt.confidence}</Badge>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Free-text area */}
+          {clarification.allowFreeText && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Additional Details</Label>
+              <Textarea
+                value={freeText}
+                onChange={(e) => onFreeTextChange(e.target.value)}
+                placeholder="Add any extra context or corrections..."
+                rows={3}
+                className="text-sm"
+                disabled={isPending}
+              />
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} disabled={isPending || !hasAnySelection}>
+            {isPending ? (
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 mr-1" />
+            )}
+            {isPending ? "Re-analyzing..." : "Apply Clarification"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // ── Collapsible Sections ────────────────────────────────────────────────────

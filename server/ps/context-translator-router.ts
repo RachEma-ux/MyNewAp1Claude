@@ -36,8 +36,9 @@ import {
   normalizeTranslateResponse,
   analyzeWithQuestionTable,
   deriveTranslateResponse,
+  buildClarificationEnrichedText,
 } from "../modules/pmt/context-translator-agent";
-import type { QuestionTableResponse, AnsweredQuestionRow } from "@shared/ps-context-translator-types";
+import type { QuestionTableResponse, AnsweredQuestionRow, ClarificationChoiceGroup } from "@shared/ps-context-translator-types";
 
 // ── LLM Resolution ─────────────────────────────────────────────────────────
 
@@ -271,6 +272,91 @@ export const contextTranslatorRouter = router({
       return {
         ...legacyResult,
         answeredQuestions: qtResult.answeredQuestions,
+        clarification: qtResult.clarification,
+        _source: source,
+        _resolvedLlm: resolvedLlm
+          ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
+          : null,
+        _serviceError: null,
+        _serviceUrl: null,
+      };
+    }),
+
+  /**
+   * POST /submitClarification — Re-run the translator with user's clarification selections.
+   *
+   * Takes the original raw text, the structured clarification choices from the
+   * previous CLARIFICATION_NEEDED result, and the user's selections.
+   * Enriches the raw text with the selected answers and re-analyzes.
+   */
+  submitClarification: protectedProcedure
+    .input(z.object({
+      ideationId: z.number().int().positive(),
+      rawText: z.string().min(10).max(10000),
+      clarificationChoices: z.array(z.object({
+        groupKey: z.string(),
+        groupLabel: z.string(),
+        selectMode: z.enum(["single", "multi"]),
+        options: z.array(z.object({
+          id: z.string(),
+          label: z.string(),
+          rationale: z.string().optional(),
+          confidence: z.enum(["high", "medium", "low"]).optional(),
+        })),
+        correspondingFields: z.array(z.string()),
+        stepKey: z.string(),
+      })),
+      selections: z.record(z.string(), z.array(z.string())),
+      freeText: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Build enriched text from original + user's clarification selections
+      const enrichedText = buildClarificationEnrichedText(
+        input.rawText,
+        input.clarificationChoices as ClarificationChoiceGroup[],
+        { selections: input.selections, freeText: input.freeText },
+      );
+
+      let resolvedLlm: Awaited<ReturnType<typeof resolveAgentLlm>> = null;
+      try { resolvedLlm = await resolveAgentLlm(); } catch { /* non-fatal */ }
+
+      let qtResult: QuestionTableResponse;
+      let source: ExecutionSource;
+
+      try {
+        qtResult = await analyzeWithQuestionTable(enrichedText, {
+          provider: resolvedLlm?.provider,
+          model: resolvedLlm?.model,
+          apiBaseUrl: resolvedLlm?.apiBaseUrl,
+        });
+
+        const reason = qtResult.decisionGate?.reason ?? "";
+        if (typeof reason === "string" && reason.includes("without LLM")) {
+          source = "fallback-template";
+        } else if (resolvedLlm) {
+          source = "built-in-catalog-llm";
+        } else {
+          source = "built-in-llm";
+        }
+      } catch (err: any) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Clarification re-analysis failed: ${err.message || "unknown error"}`,
+        });
+      }
+
+      // Derive legacy response for display backward compat
+      const legacyResult = deriveTranslateResponse(qtResult);
+
+      // Persist the re-analysis run
+      try {
+        await persistTranslatorRun(ctx.user.id, input.ideationId, enrichedText, qtResult);
+      } catch { /* non-fatal */ }
+
+      return {
+        ...legacyResult,
+        answeredQuestions: qtResult.answeredQuestions,
+        clarification: qtResult.clarification,
         _source: source,
         _resolvedLlm: resolvedLlm
           ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }

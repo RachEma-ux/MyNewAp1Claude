@@ -66,10 +66,49 @@ export interface AnsweredQuestionRow extends QuestionTableRow {
   evidence?: string;
 }
 
+// ── Structured Clarification Types ─────────────────────────────────────
+
+/** Selection mode: radio (single-select) vs checkbox (multi-select) */
+export type ClarificationSelectMode = "single" | "multi";
+
+/** A single selectable option in a clarification group */
+export interface ClarificationOption {
+  id: string;
+  label: string;
+  rationale?: string;
+  confidence?: "high" | "medium" | "low";
+}
+
+/** A group of clarification options targeting specific ideation fields */
+export interface ClarificationChoiceGroup {
+  groupKey: string;                // e.g., "primaryProblems"
+  groupLabel: string;              // e.g., "Primary Problem"
+  selectMode: ClarificationSelectMode;
+  options: ClarificationOption[];
+  correspondingFields: string[];   // ideation field keys this group fills
+  stepKey: string;                 // ideation step: "context", "problem", etc.
+}
+
+/** Full clarification payload returned when CLARIFICATION_NEEDED */
+export interface ClarificationPayload {
+  clarificationMode: "choice_dialog";
+  clarificationPrompt: string;
+  clarificationChoices: ClarificationChoiceGroup[];
+  allowFreeText: boolean;
+}
+
+/** User's clarification submission from the popup */
+export interface ClarificationSubmission {
+  selections: Record<string, string[]>;  // groupKey → selected option IDs
+  freeText?: string;
+}
+
 /** New translator response shape (question-table-driven) */
 export interface QuestionTableResponse {
   decisionGate: DecisionGate;
   answeredQuestions: AnsweredQuestionRow[];
+  /** Structured clarification when CLARIFICATION_NEEDED */
+  clarification?: ClarificationPayload;
   /** Derived TranslateResponse for display/persistence backward compat */
   legacyResponse?: TranslateResponse;
 }

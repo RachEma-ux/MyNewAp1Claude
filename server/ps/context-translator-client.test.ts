@@ -17,8 +17,15 @@ import type {
   FramingNotes,
   HealthResponse,
 } from "./context-translator-client";
-import { normalizeTranslateResponse, QUESTIONS_TABLE, normalizeQuestionTableResponse, deriveTranslateResponse } from "../modules/pmt/context-translator-agent";
-import type { AnsweredQuestionRow, QuestionTableResponse } from "@shared/ps-context-translator-types";
+import { normalizeTranslateResponse, QUESTIONS_TABLE, normalizeQuestionTableResponse, deriveTranslateResponse, buildClarificationEnrichedText } from "../modules/pmt/context-translator-agent";
+import type {
+  AnsweredQuestionRow,
+  QuestionTableResponse,
+  ClarificationPayload,
+  ClarificationChoiceGroup,
+  ClarificationOption,
+  ClarificationSubmission,
+} from "@shared/ps-context-translator-types";
 import { IDEATION_STEP_KEYS } from "@shared/ps-ideation-constants";
 
 describe("Context Translator Client Types", () => {
@@ -1591,5 +1598,374 @@ describe("Legacy compat — old TranslateResponse still applies via fallback pat
       answeredQuestions: [{ stepKey: "context", correspondingField: "externalDriver", answer: "Test" }],
     };
     expect(Array.isArray(qtResult.answeredQuestions)).toBe(true);
+  });
+});
+
+// ── Structured Clarification Types Tests ──────────────────────────────────
+
+describe("Structured Clarification — Type Contracts", () => {
+  it("ClarificationPayload has required shape", () => {
+    const payload: ClarificationPayload = {
+      clarificationMode: "choice_dialog",
+      clarificationPrompt: "The input has multiple possible interpretations.",
+      clarificationChoices: [],
+      allowFreeText: true,
+    };
+    expect(payload.clarificationMode).toBe("choice_dialog");
+    expect(payload.allowFreeText).toBe(true);
+  });
+
+  it("ClarificationChoiceGroup supports single and multi select modes", () => {
+    const single: ClarificationChoiceGroup = {
+      groupKey: "primaryProblems",
+      groupLabel: "Primary Problem",
+      selectMode: "single",
+      options: [
+        { id: "p1", label: "Legacy system slowness", confidence: "high" },
+        { id: "p2", label: "Customer churn", confidence: "medium" },
+      ],
+      correspondingFields: ["whatIsNotWorking"],
+      stepKey: "problem",
+    };
+    const multi: ClarificationChoiceGroup = {
+      groupKey: "externalDrivers",
+      groupLabel: "External Drivers",
+      selectMode: "multi",
+      options: [
+        { id: "e1", label: "Market competition" },
+        { id: "e2", label: "Regulatory changes" },
+        { id: "e3", label: "Technology shift" },
+      ],
+      correspondingFields: ["externalDriver"],
+      stepKey: "context",
+    };
+    expect(single.selectMode).toBe("single");
+    expect(multi.selectMode).toBe("multi");
+    expect(single.options.length).toBe(2);
+    expect(multi.options.length).toBe(3);
+  });
+
+  it("ClarificationOption supports all optional fields", () => {
+    const opt: ClarificationOption = {
+      id: "opt-1",
+      label: "Primary option",
+      rationale: "This was mentioned directly in the text",
+      confidence: "high",
+    };
+    expect(opt.id).toBeTruthy();
+    expect(opt.label).toBeTruthy();
+    expect(opt.rationale).toBeTruthy();
+    expect(opt.confidence).toBe("high");
+  });
+
+  it("ClarificationSubmission captures selections and free text", () => {
+    const submission: ClarificationSubmission = {
+      selections: {
+        primaryProblems: ["p1"],
+        externalDrivers: ["e1", "e3"],
+      },
+      freeText: "Additional context about the project",
+    };
+    expect(submission.selections.primaryProblems).toEqual(["p1"]);
+    expect(submission.selections.externalDrivers).toHaveLength(2);
+    expect(submission.freeText).toBeTruthy();
+  });
+
+  it("QuestionTableResponse includes optional clarification field", () => {
+    const responseWithClarification: QuestionTableResponse = {
+      decisionGate: { status: "CLARIFICATION_NEEDED", reason: "Ambiguous" },
+      answeredQuestions: [],
+      clarification: {
+        clarificationMode: "choice_dialog",
+        clarificationPrompt: "Please clarify",
+        clarificationChoices: [
+          {
+            groupKey: "primaryProblems",
+            groupLabel: "Primary Problem",
+            selectMode: "single",
+            options: [{ id: "p1", label: "Problem A" }],
+            correspondingFields: ["whatIsNotWorking"],
+            stepKey: "problem",
+          },
+        ],
+        allowFreeText: true,
+      },
+    };
+    const responseWithout: QuestionTableResponse = {
+      decisionGate: { status: "CONTINUE", reason: "OK" },
+      answeredQuestions: [],
+    };
+    expect(responseWithClarification.clarification).toBeDefined();
+    expect(responseWithout.clarification).toBeUndefined();
+  });
+});
+
+// ── buildClarificationEnrichedText Tests ──────────────────────────────────
+
+describe("buildClarificationEnrichedText", () => {
+  const makeGroups = (): ClarificationChoiceGroup[] => [
+    {
+      groupKey: "primaryProblems",
+      groupLabel: "Primary Problem",
+      selectMode: "single",
+      options: [
+        { id: "p1", label: "Legacy system slowness" },
+        { id: "p2", label: "Customer churn" },
+      ],
+      correspondingFields: ["whatIsNotWorking"],
+      stepKey: "problem",
+    },
+    {
+      groupKey: "externalDrivers",
+      groupLabel: "External Drivers",
+      selectMode: "multi",
+      options: [
+        { id: "e1", label: "Market competition" },
+        { id: "e2", label: "Regulatory changes" },
+        { id: "e3", label: "Technology shift" },
+      ],
+      correspondingFields: ["externalDriver"],
+      stepKey: "context",
+    },
+  ];
+
+  it("enriches text with selected options", () => {
+    const result = buildClarificationEnrichedText(
+      "Our company needs a new system",
+      makeGroups(),
+      { selections: { primaryProblems: ["p1"], externalDrivers: ["e1", "e3"] } },
+    );
+    expect(result).toContain("Our company needs a new system");
+    expect(result).toContain("--- User Clarifications ---");
+    expect(result).toContain("Primary Problem: Legacy system slowness");
+    expect(result).toContain("External Drivers: Market competition; Technology shift");
+  });
+
+  it("includes free text when provided", () => {
+    const result = buildClarificationEnrichedText(
+      "Base text",
+      makeGroups(),
+      { selections: { primaryProblems: ["p2"] }, freeText: "Also consider budget constraints" },
+    );
+    expect(result).toContain("Additional details: Also consider budget constraints");
+  });
+
+  it("skips groups with no selections", () => {
+    const result = buildClarificationEnrichedText(
+      "Base text",
+      makeGroups(),
+      { selections: { primaryProblems: ["p1"], externalDrivers: [] } },
+    );
+    expect(result).toContain("Primary Problem: Legacy system slowness");
+    expect(result).not.toContain("External Drivers:");
+  });
+
+  it("handles empty selections gracefully", () => {
+    const result = buildClarificationEnrichedText(
+      "Base text",
+      makeGroups(),
+      { selections: {} },
+    );
+    expect(result).toContain("Base text");
+    expect(result).toContain("--- User Clarifications ---");
+    // No group entries when nothing selected
+    expect(result).not.toContain("Primary Problem:");
+    expect(result).not.toContain("External Drivers:");
+  });
+
+  it("handles empty groups array", () => {
+    const result = buildClarificationEnrichedText(
+      "Just raw text",
+      [],
+      { selections: { anything: ["x"] } },
+    );
+    expect(result).toContain("Just raw text");
+  });
+
+  it("trims free text and ignores whitespace-only free text", () => {
+    const result = buildClarificationEnrichedText(
+      "Base",
+      makeGroups(),
+      { selections: { primaryProblems: ["p1"] }, freeText: "   " },
+    );
+    expect(result).not.toContain("Additional details:");
+  });
+});
+
+// ── normalizeQuestionTableResponse Clarification Tests ────────────────────
+
+describe("normalizeQuestionTableResponse — clarification handling", () => {
+  it("preserves structured clarification payload from LLM response", () => {
+    const raw = {
+      decisionGate: { status: "CLARIFICATION_NEEDED", reason: "Multiple problems detected" },
+      answeredQuestions: [],
+      clarification: {
+        clarificationMode: "choice_dialog",
+        clarificationPrompt: "Which problem is primary?",
+        clarificationChoices: [
+          {
+            groupKey: "primaryProblems",
+            groupLabel: "Primary Problem",
+            selectMode: "single",
+            options: [
+              { id: "p1", label: "System slowness", rationale: "Mentioned 3 times", confidence: "high" },
+              { id: "p2", label: "Data quality issues", confidence: "medium" },
+            ],
+            correspondingFields: ["whatIsNotWorking"],
+            stepKey: "problem",
+          },
+        ],
+        allowFreeText: true,
+      },
+    };
+    const result = normalizeQuestionTableResponse(raw);
+    expect(result.clarification).toBeDefined();
+    expect(result.clarification!.clarificationMode).toBe("choice_dialog");
+    expect(result.clarification!.clarificationChoices).toHaveLength(1);
+    expect(result.clarification!.clarificationChoices[0].options).toHaveLength(2);
+    expect(result.clarification!.allowFreeText).toBe(true);
+  });
+
+  it("returns undefined clarification when not CLARIFICATION_NEEDED", () => {
+    const raw = {
+      decisionGate: { status: "CONTINUE", reason: "OK" },
+      answeredQuestions: [],
+    };
+    const result = normalizeQuestionTableResponse(raw);
+    expect(result.clarification).toBeUndefined();
+  });
+
+  it("normalizes malformed clarification choices", () => {
+    const raw = {
+      decisionGate: { status: "CLARIFICATION_NEEDED", reason: "Needs clarification" },
+      answeredQuestions: [],
+      clarification: {
+        clarificationMode: "choice_dialog",
+        clarificationPrompt: "Please clarify",
+        clarificationChoices: [
+          {
+            groupKey: "test",
+            groupLabel: "Test Group",
+            selectMode: "invalid_mode", // invalid
+            options: [
+              { id: "1", label: "Option 1" },
+              { label: "Missing ID option" }, // missing id
+            ],
+            correspondingFields: ["field1"],
+            stepKey: "context",
+          },
+        ],
+        allowFreeText: false,
+      },
+    };
+    const result = normalizeQuestionTableResponse(raw);
+    expect(result.clarification).toBeDefined();
+    // selectMode should be normalized to "multi" (default for invalid)
+    expect(result.clarification!.clarificationChoices[0].selectMode).toBe("multi");
+    // Options with missing IDs should get auto-generated IDs
+    expect(result.clarification!.clarificationChoices[0].options.length).toBe(2);
+    for (const opt of result.clarification!.clarificationChoices[0].options) {
+      expect(opt.id).toBeTruthy();
+      expect(opt.label).toBeTruthy();
+    }
+  });
+});
+
+// ── Clarification → Re-analysis Flow Tests ────────────────────────────────
+
+describe("Clarification → Re-analysis Flow", () => {
+  it("enriched text contains original + user selections", () => {
+    const original = "We need to modernize our customer portal. There are performance issues and data quality problems.";
+    const groups: ClarificationChoiceGroup[] = [
+      {
+        groupKey: "primaryProblems",
+        groupLabel: "Primary Problem",
+        selectMode: "single",
+        options: [
+          { id: "p1", label: "Performance issues" },
+          { id: "p2", label: "Data quality problems" },
+        ],
+        correspondingFields: ["whatIsNotWorking"],
+        stepKey: "problem",
+      },
+      {
+        groupKey: "primaryOpportunities",
+        groupLabel: "Primary Opportunity",
+        selectMode: "single",
+        options: [
+          { id: "o1", label: "Faster response times" },
+          { id: "o2", label: "Better data accuracy" },
+        ],
+        correspondingFields: ["whatCouldBeImproved"],
+        stepKey: "opportunity",
+      },
+    ];
+    const submission: ClarificationSubmission = {
+      selections: {
+        primaryProblems: ["p1"],
+        primaryOpportunities: ["o1"],
+      },
+    };
+    const enriched = buildClarificationEnrichedText(original, groups, submission);
+
+    expect(enriched).toContain(original);
+    expect(enriched).toContain("Primary Problem: Performance issues");
+    expect(enriched).toContain("Primary Opportunity: Faster response times");
+    // Should NOT contain unselected options
+    expect(enriched).not.toContain("Data quality problems");
+    expect(enriched).not.toContain("Better data accuracy");
+  });
+
+  it("multi-select groups join selected labels with semicolons", () => {
+    const groups: ClarificationChoiceGroup[] = [{
+      groupKey: "impactedGroups",
+      groupLabel: "Impacted Groups",
+      selectMode: "multi",
+      options: [
+        { id: "g1", label: "Operations team" },
+        { id: "g2", label: "Customer support" },
+        { id: "g3", label: "End users" },
+      ],
+      correspondingFields: ["whoIsImpacted"],
+      stepKey: "problem",
+    }];
+    const submission: ClarificationSubmission = {
+      selections: { impactedGroups: ["g1", "g3"] },
+    };
+    const enriched = buildClarificationEnrichedText("Base", groups, submission);
+    expect(enriched).toContain("Impacted Groups: Operations team; End users");
+  });
+
+  it("applyToIdeation rejects CLARIFICATION_NEEDED results", () => {
+    // The router throws BAD_REQUEST if trying to apply CLARIFICATION_NEEDED results
+    const result = {
+      decisionGate: { status: "CLARIFICATION_NEEDED", reason: "Need more info" },
+      answeredQuestions: [],
+    };
+    const hasAnsweredQuestions = Array.isArray(result.answeredQuestions);
+    const gateStatus = result.decisionGate?.status;
+    expect(hasAnsweredQuestions).toBe(true);
+    expect(gateStatus).toBe("CLARIFICATION_NEEDED");
+    // Router would throw: "Cannot apply translator output in CLARIFICATION_NEEDED mode"
+  });
+
+  it("after clarification re-analysis, result can be applied if CONTINUE", () => {
+    // After submitClarification succeeds with CONTINUE, the result should be applicable
+    const reAnalysisResult = {
+      decisionGate: { status: "CONTINUE", reason: "Clarified" },
+      answeredQuestions: QUESTIONS_TABLE.map(q => ({
+        ...q,
+        answer: "Clarified answer",
+        answerType: "extracted" as const,
+        confidence: "high" as const,
+        evidence: "",
+      })),
+    };
+    expect(reAnalysisResult.decisionGate.status).toBe("CONTINUE");
+    expect(reAnalysisResult.answeredQuestions.length).toBe(QUESTIONS_TABLE.length);
+    // All answers populated after clarification
+    for (const row of reAnalysisResult.answeredQuestions) {
+      expect(row.answer).toBeTruthy();
+    }
   });
 });

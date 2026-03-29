@@ -21,7 +21,7 @@
 import { getAvailableProvider, callLLM, parseLLMJson } from "./idea-builder-agent";
 import type { Message } from "../../providers/types";
 import { createCatalogEntry, updateCatalogEntry, getCatalogEntries, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../db/catalog";
-import type { TranslateResponse, QuestionTableRow, AnsweredQuestionRow, QuestionTableResponse } from "@shared/ps-context-translator-types";
+import type { TranslateResponse, QuestionTableRow, AnsweredQuestionRow, QuestionTableResponse, ClarificationPayload, ClarificationChoiceGroup, ClarificationOption, ClarificationSubmission } from "@shared/ps-context-translator-types";
 
 // ── Agent Identity ──────────────────────────────────────────────────────────
 
@@ -329,6 +329,10 @@ export const QUESTION_TABLE_SYSTEM_PROMPT = `You are a Project Context Translato
 
 Given raw text and a Questions Table (JSON array of {step, stepKey, question, correspondingField}), answer every question based on the raw text.
 
+If you can identify a clear problem AND opportunity, return status "CONTINUE" with all answers.
+
+If the input is too vague or ambiguous to identify a clear problem or opportunity, return status "CLARIFICATION_NEEDED" AND include a "clarification" object with structured choices the user can select from.
+
 Return JSON:
 {
   "decisionGate": { "status": "CONTINUE"|"CLARIFICATION_NEEDED", "reason": "..." },
@@ -339,7 +343,65 @@ Return JSON:
       "confidence": "high"|"medium"|"low",
       "evidence": "quote or reference from input" },
     ...
-  ]
+  ],
+  "clarification": {
+    "clarificationMode": "choice_dialog",
+    "clarificationPrompt": "We found multiple possible interpretations. Please select the options that best describe your project.",
+    "allowFreeText": true,
+    "clarificationChoices": [
+      {
+        "groupKey": "primaryProblems",
+        "groupLabel": "Primary Problem",
+        "selectMode": "single",
+        "stepKey": "problem",
+        "correspondingFields": ["whatIsNotWorking"],
+        "options": [
+          { "id": "p1", "label": "...", "rationale": "...", "confidence": "medium" },
+          { "id": "p2", "label": "...", "rationale": "...", "confidence": "low" }
+        ]
+      },
+      {
+        "groupKey": "primaryOpportunities",
+        "groupLabel": "Primary Opportunity",
+        "selectMode": "single",
+        "stepKey": "opportunity",
+        "correspondingFields": ["whatCouldBeImproved"],
+        "options": [...]
+      },
+      {
+        "groupKey": "externalDrivers",
+        "groupLabel": "External Drivers",
+        "selectMode": "multi",
+        "stepKey": "context",
+        "correspondingFields": ["externalDriver"],
+        "options": [...]
+      },
+      {
+        "groupKey": "internalDrivers",
+        "groupLabel": "Internal Drivers",
+        "selectMode": "multi",
+        "stepKey": "context",
+        "correspondingFields": ["internalDriver"],
+        "options": [...]
+      },
+      {
+        "groupKey": "impactedGroups",
+        "groupLabel": "Impacted Groups",
+        "selectMode": "multi",
+        "stepKey": "problem",
+        "correspondingFields": ["whoIsImpacted"],
+        "options": [...]
+      },
+      {
+        "groupKey": "consequencesOfDoingNothing",
+        "groupLabel": "Consequences of Doing Nothing",
+        "selectMode": "multi",
+        "stepKey": "problem",
+        "correspondingFields": ["consequencesOfDoingNothing"],
+        "options": [...]
+      }
+    ]
+  }
 }
 
 Rules:
@@ -349,6 +411,10 @@ Rules:
 - "extracted" = directly from user input. "inferred" = logically derived. "proposed" = suggested based on domain knowledge.
 - Each answer should be concise (1-3 sentences).
 - If the input lacks a clear problem OR opportunity, set decisionGate status to "CLARIFICATION_NEEDED".
+- When CLARIFICATION_NEEDED, you MUST include the "clarification" object with at least primaryProblems and primaryOpportunities groups.
+- Each option must have a unique id (e.g., "p1", "p2", "ed1", "ed2"), a clear user-facing label, and optionally a rationale.
+- Generate 2-4 options per group based on what you can infer from the input.
+- When status is "CONTINUE", omit the "clarification" field entirely.
 - Return ONLY the JSON, no markdown wrapping.`;
 
 // ── Question-Table Analysis Function ─────────────────────────────────────
@@ -446,7 +512,89 @@ export function normalizeQuestionTableResponse(raw: unknown): QuestionTableRespo
     };
   });
 
-  return { decisionGate, answeredQuestions };
+  // Normalize clarification payload (only when CLARIFICATION_NEEDED)
+  let clarification: ClarificationPayload | undefined;
+  if (decisionGate.status === "CLARIFICATION_NEEDED" && r.clarification && typeof r.clarification === "object") {
+    clarification = normalizeClarificationPayload(r.clarification as Record<string, unknown>);
+  }
+
+  return { decisionGate, answeredQuestions, ...(clarification ? { clarification } : {}) };
+}
+
+/**
+ * Normalize a raw clarification payload from the LLM into a valid ClarificationPayload.
+ */
+function normalizeClarificationPayload(raw: Record<string, unknown>): ClarificationPayload {
+  const choices: ClarificationChoiceGroup[] = [];
+
+  if (Array.isArray(raw.clarificationChoices)) {
+    for (const group of raw.clarificationChoices) {
+      if (!group || typeof group !== "object") continue;
+      const g = group as Record<string, unknown>;
+      const options: ClarificationOption[] = [];
+      if (Array.isArray(g.options)) {
+        for (const opt of g.options) {
+          if (!opt || typeof opt !== "object") continue;
+          const o = opt as Record<string, unknown>;
+          options.push({
+            id: typeof o.id === "string" ? o.id : `opt_${options.length}`,
+            label: typeof o.label === "string" ? o.label : "",
+            rationale: typeof o.rationale === "string" ? o.rationale : undefined,
+            confidence: (o.confidence === "high" || o.confidence === "medium" || o.confidence === "low")
+              ? o.confidence : undefined,
+          });
+        }
+      }
+      if (options.length === 0) continue;
+
+      choices.push({
+        groupKey: typeof g.groupKey === "string" ? g.groupKey : `group_${choices.length}`,
+        groupLabel: typeof g.groupLabel === "string" ? g.groupLabel : "",
+        selectMode: g.selectMode === "single" ? "single" : "multi",
+        options,
+        correspondingFields: Array.isArray(g.correspondingFields)
+          ? g.correspondingFields.map(String) : [],
+        stepKey: typeof g.stepKey === "string" ? g.stepKey : "",
+      });
+    }
+  }
+
+  return {
+    clarificationMode: "choice_dialog",
+    clarificationPrompt: typeof raw.clarificationPrompt === "string"
+      ? raw.clarificationPrompt
+      : "Please select the options that best describe your project context.",
+    clarificationChoices: choices,
+    allowFreeText: raw.allowFreeText !== false,
+  };
+}
+
+/**
+ * Build enriched raw text from original text + user's clarification selections.
+ * Maps selections back to readable sentences for re-analysis.
+ */
+export function buildClarificationEnrichedText(
+  originalRawText: string,
+  clarificationChoices: ClarificationChoiceGroup[],
+  submission: ClarificationSubmission,
+): string {
+  const parts = [originalRawText, "\n\n--- User Clarifications ---\n"];
+
+  for (const group of clarificationChoices) {
+    const selectedIds = submission.selections[group.groupKey] || [];
+    if (selectedIds.length === 0) continue;
+    const selectedLabels = group.options
+      .filter(o => selectedIds.includes(o.id))
+      .map(o => o.label);
+    if (selectedLabels.length === 0) continue;
+    parts.push(`${group.groupLabel}: ${selectedLabels.join("; ")}`);
+  }
+
+  if (submission.freeText?.trim()) {
+    parts.push(`\nAdditional details: ${submission.freeText.trim()}`);
+  }
+
+  return parts.join("\n");
 }
 
 /**
