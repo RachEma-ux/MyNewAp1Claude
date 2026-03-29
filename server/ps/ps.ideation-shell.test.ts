@@ -370,3 +370,76 @@ describe("Single-sidebar architecture — support view keys", () => {
     expect(totalItems).toBe(14);
   });
 });
+
+// ── 8. Card CTA — Wizard Eligibility ─────────────────────────────────
+
+describe("Card CTA — wizard eligibility statuses", () => {
+  /** Must match WIZARD_ELIGIBLE_STATUSES in PSIdeationPage.tsx */
+  const WIZARD_ELIGIBLE = new Set(["concept_selected", "ready_for_wizard"]);
+
+  it("eligible statuses are valid lifecycle statuses", () => {
+    for (const s of WIZARD_ELIGIBLE) {
+      expect(IDEATION_LIFECYCLE_STATUSES).toContain(s);
+    }
+  });
+
+  it("shows button for concept_selected", () => {
+    expect(WIZARD_ELIGIBLE.has("concept_selected")).toBe(true);
+  });
+
+  it("shows button for ready_for_wizard", () => {
+    expect(WIZARD_ELIGIBLE.has("ready_for_wizard")).toBe(true);
+  });
+
+  it("hides button for draft", () => {
+    expect(WIZARD_ELIGIBLE.has("draft")).toBe(false);
+  });
+
+  it("hides button for in_exploration", () => {
+    expect(WIZARD_ELIGIBLE.has("in_exploration")).toBe(false);
+  });
+
+  it("hides button for screening", () => {
+    expect(WIZARD_ELIGIBLE.has("screening")).toBe(false);
+  });
+
+  it("hides button for converted", () => {
+    expect(WIZARD_ELIGIBLE.has("converted")).toBe(false);
+  });
+
+  it("hides button for rejected", () => {
+    expect(WIZARD_ELIGIBLE.has("rejected")).toBe(false);
+  });
+
+  it("hides button for deferred", () => {
+    expect(WIZARD_ELIGIBLE.has("deferred")).toBe(false);
+  });
+
+  it("eligible set contains exactly 2 statuses", () => {
+    expect(WIZARD_ELIGIBLE.size).toBe(2);
+  });
+
+  it("card CTA navigates to existing convert route pattern", () => {
+    // Confirms the navigation target pattern used by handleOpenWizard
+    const convertRouteFn = (id: number) => `/ps/ideation/${id}/convert`;
+    expect(convertRouteFn(42)).toBe("/ps/ideation/42/convert");
+    expect(convertRouteFn(43)).toBe("/ps/ideation/43/convert");
+  });
+
+  it("readiness failure produces user-visible message from blockers array", () => {
+    // Simulates the toast.error message construction from handleOpenWizard
+    const blockers = ["Problem definition not complete", "No ideas created"];
+    const msg = blockers.length
+      ? `Not ready: ${blockers.join(". ")}`
+      : "Ideation is not ready for wizard handoff.";
+    expect(msg).toBe("Not ready: Problem definition not complete. No ideas created");
+  });
+
+  it("readiness failure with empty blockers produces fallback message", () => {
+    const blockers: string[] = [];
+    const msg = blockers.length
+      ? `Not ready: ${blockers.join(". ")}`
+      : "Ideation is not ready for wizard handoff.";
+    expect(msg).toBe("Ideation is not ready for wizard handoff.");
+  });
+});

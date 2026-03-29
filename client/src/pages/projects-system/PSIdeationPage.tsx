@@ -27,6 +27,7 @@ import {
   Search,
   FolderOpen,
   Trash2,
+  Wand2,
 } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -51,6 +52,9 @@ const STATUS_LABELS: Record<string, string> = {
   converted: "Converted",
 };
 
+/** Statuses where wizard handoff is plausible */
+const WIZARD_ELIGIBLE_STATUSES = new Set(["concept_selected", "ready_for_wizard"]);
+
 // Default workspace for top-level PS pages
 const DEFAULT_WORKSPACE_ID = 1;
 
@@ -62,6 +66,7 @@ export function PSIdeationPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; title: string } | null>(null);
+  const [checkingWizardId, setCheckingWizardId] = useState<number | null>(null);
 
   const { data: ideations, isLoading } = trpc.ps.ideation.list.useQuery(
     { workspaceId: DEFAULT_WORKSPACE_ID },
@@ -89,6 +94,25 @@ export function PSIdeationPage() {
   const handleCreate = () => {
     if (!newTitle.trim()) return;
     createMut.mutate({ workspaceId: DEFAULT_WORKSPACE_ID, title: newTitle.trim() });
+  };
+
+  const handleOpenWizard = async (ideationId: number) => {
+    setCheckingWizardId(ideationId);
+    try {
+      const readiness = await utils.ps.ideation.readiness.evaluate.fetch({ ideationId });
+      if (readiness.ready) {
+        navigate(`/ps/ideation/${ideationId}/convert`);
+      } else {
+        const msg = readiness.blockers.length
+          ? `Not ready: ${readiness.blockers.join(". ")}`
+          : "Ideation is not ready for wizard handoff.";
+        toast.error(msg);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to check readiness");
+    } finally {
+      setCheckingWizardId(null);
+    }
   };
 
   const filtered = (ideations || []).filter((i: any) => {
@@ -176,6 +200,24 @@ export function PSIdeationPage() {
                   <Badge variant="outline" className={STATUS_COLORS[ideation.lifecycleStatus] || ""}>
                     {STATUS_LABELS[ideation.lifecycleStatus] || ideation.lifecycleStatus}
                   </Badge>
+                  {WIZARD_ELIGIBLE_STATUSES.has(ideation.lifecycleStatus) && (
+                    <Button
+                      size="sm"
+                      className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white"
+                      disabled={checkingWizardId === ideation.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenWizard(ideation.id);
+                      }}
+                    >
+                      {checkingWizardId === ideation.id ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <Wand2 className="w-3.5 h-3.5 mr-1" />
+                      )}
+                      {checkingWizardId === ideation.id ? "Checking..." : "Open in PS Wizard"}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
