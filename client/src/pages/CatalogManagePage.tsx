@@ -3525,7 +3525,8 @@ function LifecyclePanel({
   const steps = getLifecycleSteps(lifecycleEntry);
   const progress = getLifecycleProgress(lifecycleEntry);
   const available = getAvailableActions(lifecycleEntry);
-  const valResult = validationResults[entry.id];
+  const rawValResult = validationResults[entry.id];
+  const valResult = rawValResult?.results || rawValResult;
   const TypeIcon = TYPE_ICONS[entry.entryType] || Package;
 
   const stepIcon = (status: string) => {
@@ -3666,50 +3667,50 @@ function LifecyclePanel({
                       <div className="flex gap-3">
                         <span
                           className={
-                            valResult.health?.status === "ok"
+                            valResult.health?.passed
                               ? "text-green-400"
                               : "text-red-400"
                           }
                         >
                           Health:{" "}
-                          {valResult.health?.status === "ok"
+                          {valResult.health?.passed
                             ? "\u2713"
                             : "\u2717"}
                         </span>
                         <span
                           className={
-                            valResult.capabilities?.length > 0
+                            valResult.capabilities?.passed
                               ? "text-green-400"
                               : "text-red-400"
                           }
                         >
                           Caps:{" "}
-                          {valResult.capabilities?.length > 0
+                          {valResult.capabilities?.passed
                             ? "\u2713"
                             : "\u2717"}
                         </span>
                         <span
                           className={
-                            valResult.models?.count > 0
+                            valResult.models?.passed
                               ? "text-green-400"
                               : "text-red-400"
                           }
                         >
                           Models:{" "}
-                          {valResult.models?.count > 0
-                            ? `\u2713 (${valResult.models.count})`
+                          {valResult.models?.passed
+                            ? `\u2713 (${valResult.models.models?.length ?? 0})`
                             : "\u2717"}
                         </span>
                         {valResult.testPrompt && (
                           <span
                             className={
-                              valResult.testPrompt?.status === "ok"
+                              valResult.testPrompt?.passed
                                 ? "text-green-400"
                                 : "text-red-400"
                             }
                           >
                             Test:{" "}
-                            {valResult.testPrompt?.status === "ok"
+                            {valResult.testPrompt?.passed
                               ? `\u2713 (${valResult.testPrompt.latencyMs}ms)`
                               : "\u2717"}
                           </span>
