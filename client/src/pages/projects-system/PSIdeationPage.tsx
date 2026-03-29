@@ -160,35 +160,36 @@ export function PSIdeationPage() {
       ) : (
         <div className="grid gap-3">
           {filtered.map((ideation: any) => (
-            <Link key={ideation.id} href={`/ps/ideation/${ideation.id}`}>
-              <Card className="cursor-pointer hover:border-primary/50 transition-colors">
-                <CardContent className="flex items-center justify-between py-3 px-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">{ideation.title}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      Step: {ideation.currentStepKey || "context"} | Created: {new Date(ideation.createdAt).toLocaleDateString()}
-                    </div>
+            <Card
+              key={ideation.id}
+              className="cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => navigate(`/ps/ideation/${ideation.id}`)}
+            >
+              <CardContent className="flex items-center justify-between py-3 px-4">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{ideation.title}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Step: {ideation.currentStepKey || "context"} | Created: {new Date(ideation.createdAt).toLocaleDateString()}
                   </div>
-                  <div className="flex items-center gap-2 ml-3 shrink-0">
-                    <Badge variant="outline" className={STATUS_COLORS[ideation.lifecycleStatus] || ""}>
-                      {STATUS_LABELS[ideation.lifecycleStatus] || ideation.lifecycleStatus}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDeleteTarget({ id: ideation.id, title: ideation.title });
-                      }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                </div>
+                <div className="flex items-center gap-2 ml-3 shrink-0">
+                  <Badge variant="outline" className={STATUS_COLORS[ideation.lifecycleStatus] || ""}>
+                    {STATUS_LABELS[ideation.lifecycleStatus] || ideation.lifecycleStatus}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget({ id: ideation.id, title: ideation.title });
+                    }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
