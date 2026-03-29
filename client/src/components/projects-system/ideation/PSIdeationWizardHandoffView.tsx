@@ -137,7 +137,7 @@ export function PSIdeationWizardHandoffView({ ideationId, readiness, isConverted
                 {wizardHandoff.feasibilityNotes && (
                   <div><span className="font-medium text-muted-foreground">Feasibility:</span> {wizardHandoff.feasibilityNotes}</div>
                 )}
-                {wizardHandoff.openQuestions?.length > 0 && (
+                {Array.isArray(wizardHandoff.openQuestions) && wizardHandoff.openQuestions.length > 0 && (
                   <div>
                     <span className="font-medium text-muted-foreground">Open Questions:</span>
                     <ul className="list-disc ml-4 mt-1">
