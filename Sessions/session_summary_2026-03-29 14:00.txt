@@ -1,0 +1,51 @@
+Session Summary — 2026-03-29 14:00
+
+## Task: Refactor Context Translator to Question-Table-Driven Architecture (continued)
+
+### What was done
+Continued from a previous session where the Planner phase was in progress.
+Completed the Builder phase: expanded and finalized the question-table-driven
+architecture for the PS Ideation Context Translator.
+
+### Changes (5 files, 1146 insertions, 137 deletions)
+
+1. **shared/ps-context-translator-types.ts**
+   - Added QuestionTableRow, AnsweredQuestionRow, QuestionTableResponse types
+   - Kept existing TranslateResponse for backward compatibility
+
+2. **server/modules/pmt/context-translator-agent.ts**
+   - Expanded QUESTIONS_TABLE from 32 to 41 rows:
+     * Step 6 (Clustering): 1 → 3 Qs (patternsObserved, themeLabels, ideaThemeGrouping)
+     * Step 7 (Screening): 1 → 3 Qs (screeningCriteria, promisingIdeas, deferredIdeas)
+     * Step 8 (Scenarios): 1 → 7 Qs (notes + 6 scenario-specific fields)
+     * Step 9 (Feasibility): 1 → 4 Qs (notes, testPerformed, keyFindings, feasibilityRating)
+     * Step 10 (Selection): 6 → 3 Qs (selectedIdea, rationale, nextStep — simplified)
+     * Step 11 (Summary): 8 → 7 Qs (removed overrideText)
+   - Updated deriveTranslateResponse() for expanded fields
+   - Enhanced initialScreening, scenarioExploration, quickFeasibilityChecks derivation
+
+3. **server/ps/context-translator-router.ts**
+   - Updated question-table path in applyToIdeation for all expanded payloads
+   - Step 10: Combined rationale → rationale.strategicAlignment for tool panel compat
+   - Steps 6-9: Store expanded fields in step payloads
+
+4. **client/src/components/projects-system/ideation/ContextTranslatorPanel.tsx**
+   - AnsweredQuestionsTable component displays grouped Q&A with confidence badges
+   - No changes needed this session (already working from prior session)
+
+5. **server/ps/context-translator-client.test.ts**
+   - Updated question counts: 41 total
+   - Added tests for Steps 6-9 expanded questions and fields
+   - Updated Step 10 from 6 to 3 questions
+   - Updated Step 11 from 8 to 7 questions (removed overrideText refs)
+   - Fixed overrideText references in existing tests
+
+### Architecture
+RAW TEXT + QUESTIONS_TABLE (41 rows) → LLM → ANSWERED TABLE → FIELDS
+- Each question maps 1:1 to a UI field
+- No backfill chains needed
+- Dual-path applyToIdeation supports both new table-driven and legacy shapes
+- deriveTranslateResponse() converts table → legacy shape for backward compat
+
+### Commit
+fdd0298 — feat: refactor Context Translator to question-table-driven architecture
