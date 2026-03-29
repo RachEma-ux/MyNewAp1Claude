@@ -354,20 +354,22 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                   {fallbackMut.isPending ? "Running fallback..." : "Use built-in fallback"}
                 </Button>
               )}
-              {/* Primary: Service-backed translator */}
-              <Button
-                onClick={handleTranslate}
-                disabled={disabled || isAnyMutating || rawText.trim().length < 10 || !canTranslatePrimary}
-                size="sm"
-              >
-                {translateMut.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4 mr-1" />
-                )}
-                {translateMut.isPending ? "Analyzing..." : "Translate Context"}
-              </Button>
             </div>
+          </div>
+          {/* Translate Context button — full width below */}
+          <div className="flex justify-end">
+            <Button
+              onClick={handleTranslate}
+              disabled={disabled || isAnyMutating || rawText.trim().length < 10 || !canTranslatePrimary}
+              size="sm"
+            >
+              {translateMut.isPending ? (
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-1" />
+              )}
+              {translateMut.isPending ? "Analyzing..." : "Translate Context"}
+            </Button>
           </div>
         </CardContent>
       </Card>
