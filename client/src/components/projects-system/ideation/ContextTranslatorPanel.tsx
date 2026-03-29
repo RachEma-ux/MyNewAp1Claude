@@ -15,7 +15,7 @@
  *   - "unavailable"      → Agent not in catalog
  *   - "checking"         → Health check in progress
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,6 +84,19 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
   const [result, setResult] = useState<(TranslateResponse & { _source?: string; _resolvedLlm?: { displayName?: string; provider?: string; model?: string } | null; _serviceError?: string | null; _serviceUrl?: string | null }) | null>(null);
   const [showResult, setShowResult] = useState(false);
   const utils = trpc.useUtils();
+
+  // Rehydrate raw text from the most recent translator run (persisted in DB)
+  const { data: prevRuns } = trpc.ps.ideation.contextTranslator.listRuns.useQuery(
+    { ideationId },
+    { enabled: !!ideationId, staleTime: Infinity },
+  );
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (!hydratedRef.current && prevRuns?.length && !rawText) {
+      setRawText(prevRuns[0].rawInput);
+      hydratedRef.current = true;
+    }
+  }, [prevRuns]);
 
   // Service runtime health (catalog → service resolution)
   const { data: runtime, isFetching: isHealthChecking, dataUpdatedAt } =

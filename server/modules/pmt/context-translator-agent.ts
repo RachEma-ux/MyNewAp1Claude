@@ -224,7 +224,7 @@ export function normalizeTranslateResponse(raw: unknown): TranslateResponse {
     return { externalDrivers: [], internalDrivers: [], trigger: "" };
   };
 
-  return {
+  const result: TranslateResponse = {
     decisionGate,
     extractedFacts: Array.isArray(r.extractedFacts) ? r.extractedFacts.map(String) : [],
     problem: normProblem(r.problem),
@@ -246,6 +246,50 @@ export function normalizeTranslateResponse(raw: unknown): TranslateResponse {
       : { extracted: [], inferred: [], proposed: [] },
     renderedMarkdown: typeof r.renderedMarkdown === "string" ? r.renderedMarkdown : "",
   };
+
+  // ── Coherence enforcement ─────────────────────────────────────────
+  enforceCoherence(result);
+
+  return result;
+}
+
+/**
+ * Cross-fill between top-level fields and ideationWorkflowDraft.onePageSummary
+ * to prevent semantic inconsistency (e.g., populated problem but empty summary).
+ * Mutates the response in place.
+ */
+function enforceCoherence(r: TranslateResponse): void {
+  const summary = r.ideationWorkflowDraft?.onePageSummary;
+  if (!summary) return;
+
+  const isEmpty = (s: string | undefined | null): boolean =>
+    !s || s.trim().length === 0;
+
+  // Forward-fill: top-level → onePageSummary
+  if (!isEmpty(r.problem?.statement) && isEmpty(summary.problem)) {
+    summary.problem = r.problem.statement;
+  }
+  if (!isEmpty(r.opportunity?.statement) && isEmpty(summary.opportunity)) {
+    summary.opportunity = r.opportunity.statement;
+  }
+
+  // Backfill: onePageSummary → top-level (only if top-level is truly empty)
+  if (isEmpty(r.problem?.statement) && !isEmpty(summary.problem)) {
+    r.problem.statement = summary.problem;
+    if (r.problem.status === "missing") r.problem.status = "unclear";
+  }
+  if (isEmpty(r.opportunity?.statement) && !isEmpty(summary.opportunity)) {
+    r.opportunity.statement = summary.opportunity;
+    if (r.opportunity.status === "missing") r.opportunity.status = "unclear";
+  }
+
+  // Cross-fill whatIfQuestion
+  const draftWhatIf = r.ideationWorkflowDraft?.whatIfQuestion;
+  if (isEmpty(r.whatIfQuestion) && !isEmpty(draftWhatIf)) {
+    r.whatIfQuestion = draftWhatIf;
+  } else if (!isEmpty(r.whatIfQuestion) && isEmpty(draftWhatIf)) {
+    r.ideationWorkflowDraft.whatIfQuestion = r.whatIfQuestion;
+  }
 }
 
 /**
@@ -304,6 +348,10 @@ function createFallbackResponse(rawText: string): TranslateResponse {
   const words = rawText.split(/\s+/);
   const hasEnoughContent = words.length >= 10;
 
+  // Unified placeholder — every analytical field uses this exact string
+  // so the output is semantically coherent (no mix of different wordings).
+  const P = "Awaiting LLM analysis";
+
   return {
     decisionGate: {
       status: hasEnoughContent ? "CONTINUE" : "CLARIFICATION_NEEDED",
@@ -315,68 +363,68 @@ function createFallbackResponse(rawText: string): TranslateResponse {
       ? [`Input contains ${words.length} words`, "No LLM available for deep analysis"]
       : ["Input too brief for fact extraction"],
     problem: {
-      statement: "Unable to determine — no LLM provider configured",
+      statement: P,
       status: "unclear",
     },
     opportunity: {
-      statement: "Unable to determine — no LLM provider configured",
+      statement: P,
       status: "unclear",
     },
     coreSignals: {
-      externalDrivers: ["Not determinable without LLM analysis"],
-      internalDrivers: ["Not determinable without LLM analysis"],
-      trigger: "Not determinable without LLM analysis",
+      externalDrivers: [P],
+      internalDrivers: [P],
+      trigger: P,
     },
     projectContextFormula: "Project Context = External Drivers + Internal Drivers + Trigger",
-    projectContextResult: "Unable to synthesize — configure an LLM provider for full analysis",
-    whatIfQuestion: "What if this project idea were fully analyzed with AI assistance?",
+    projectContextResult: P,
+    whatIfQuestion: P,
     ideationWorkflowDraft: {
       contextOfProject: rawText,
-      problem: "Requires LLM analysis",
-      opportunity: "Requires LLM analysis",
-      whatIfQuestion: "Requires LLM analysis",
-      ideaGeneration: ["Configure an LLM provider to generate ideas"],
+      problem: P,
+      opportunity: P,
+      whatIfQuestion: P,
+      ideaGeneration: [P],
       ideaClusteringAndTheming: [],
       initialScreening: {
         promisingIdeas: [],
         deferredIdeas: [],
-        reasoning: "LLM required for screening",
+        reasoning: P,
       },
       scenarioExploration: {
         scenarios: [],
-        insights: "LLM required for scenario exploration",
+        insights: P,
       },
       quickFeasibilityChecks: {
-        idea: "N/A",
-        testPerformed: "None — no LLM available",
+        idea: P,
+        testPerformed: P,
         keyFindings: [],
-        feasibilityRating: "Unknown",
+        feasibilityRating: P,
       },
       conceptSelection: {
-        selectedIdea: "N/A",
-        rationale: "LLM required for concept selection",
+        selectedIdea: P,
+        rationale: P,
         nextStep: "Configure an LLM provider and re-run",
       },
       onePageSummary: {
-        problem: "Requires analysis",
-        opportunity: "Requires analysis",
+        problem: P,
+        opportunity: P,
         topIdeas: [],
-        feasibilityInsight: "Requires analysis",
-        selectedConcept: "N/A",
-        reasonForSelection: "LLM provider not configured",
+        feasibilityInsight: P,
+        selectedConcept: P,
+        reasonForSelection: P,
       },
     },
     psWizardScenarioPackage: {
       scenarioTitle: "Untitled Project — Awaiting Analysis",
       scenarioSummary: rawText.substring(0, 200),
-      businessNeed: "To be determined via LLM analysis",
-      primaryProblem: "To be determined via LLM analysis",
-      opportunityStatement: "To be determined via LLM analysis",
-      urgencyDriver: "To be determined via LLM analysis",
-      recommendedDirection: "Configure LLM provider and re-analyze",
-      recommendedDirectionRationale: "Full analysis requires an active LLM provider",
-      whatIfQuestion: "What if this idea were fully analyzed?",
-      feasibilityNotes: "No feasibility assessment without LLM",
+      businessNeed: P,
+      primaryProblem: P,
+      opportunityStatement: P,
+      urgencyDriver: P,
+      recommendedDirection: "Configure an LLM provider and re-analyze",
+      recommendedDirectionRationale: P,
+      whatIfQuestion: P,
+      feasibilityNotes: P,
       openQuestions: ["What is the core problem?", "What is the business opportunity?", "What is driving urgency?"],
       assumptions: ["User will configure an LLM provider for full analysis"],
       insights: ["Raw input captured for future analysis"],

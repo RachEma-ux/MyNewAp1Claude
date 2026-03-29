@@ -333,6 +333,23 @@ export const contextTranslatorRouter = router({
           // Canonical key: whatIf
           whatIf: toStr(result.whatIfQuestion),
         },
+        one_page_summary: {
+          // Canonical keys matching OnePageSummaryToolPanel
+          theProblem: toStr(result.problem?.statement),
+          theOpportunity: toStr(result.opportunity?.statement),
+          topIdeas: (Array.isArray(result.ideationWorkflowDraft?.onePageSummary?.topIdeas) &&
+            result.ideationWorkflowDraft.onePageSummary.topIdeas.length > 0)
+              ? result.ideationWorkflowDraft.onePageSummary.topIdeas.join("\n")
+              : (result.ideationWorkflowDraft?.ideaGeneration || []).map(toStr).join("\n"),
+          scenariosExplored: toStr(result.ideationWorkflowDraft?.scenarioExploration?.insights),
+          feasibilityInsights: toStr(result.ideationWorkflowDraft?.onePageSummary?.feasibilityInsight)
+            || toStr(result.ideationWorkflowDraft?.quickFeasibilityChecks?.feasibilityRating),
+          selectedConcept: toStr(result.ideationWorkflowDraft?.onePageSummary?.selectedConcept)
+            || toStr(result.ideationWorkflowDraft?.conceptSelection?.selectedIdea),
+          reasonForSelection: toStr(result.ideationWorkflowDraft?.onePageSummary?.reasonForSelection)
+            || toStr(result.ideationWorkflowDraft?.conceptSelection?.rationale),
+          overrideText: "", // Always leave for user
+        },
       };
 
       // Upsert step payloads
@@ -366,7 +383,8 @@ export const contextTranslatorRouter = router({
           await db.update(psIdeationSteps)
             .set({
               payloadJson: merged,
-              stepStatus: "in_progress",
+              stepStatus: "complete",
+              completedAt: now,
               lastSavedAt: now,
             })
             .where(eq(psIdeationSteps.id, existing.id));
@@ -375,7 +393,8 @@ export const contextTranslatorRouter = router({
             ideationId: input.ideationId,
             stepKey,
             stepOrder: stepOrder >= 0 ? stepOrder : 0,
-            stepStatus: "in_progress",
+            stepStatus: "complete",
+            completedAt: now,
             payloadJson: { ...payload, _translatorApplied: true },
             lastSavedAt: now,
           });
