@@ -164,14 +164,11 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
   });
 
   const applyMut = trpc.ps.ideation.contextTranslator.applyToIdeation.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async () => {
       toast.success("Translator output applied to ideation fields");
-      // Synchronously update the steps cache with server-returned data so
-      // tool panels display applied values immediately (no async refetch gap)
-      if (data.steps) {
-        utils.ps.ideation.steps.get.setData({ ideationId }, data.steps as any);
-      }
-      utils.ps.ideation.steps.get.invalidate({ ideationId });
+      // Await the steps refetch so tool panels display applied values immediately.
+      // invalidate() returns a promise that resolves when the background refetch completes.
+      await utils.ps.ideation.steps.get.invalidate({ ideationId });
       utils.ps.ideation.getById.invalidate({ id: ideationId });
       onApplied?.();
     },
