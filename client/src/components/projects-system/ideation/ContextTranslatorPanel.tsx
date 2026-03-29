@@ -40,7 +40,7 @@ import {
   RefreshCw,
   Info,
 } from "lucide-react";
-import type { TranslateResponse } from "@shared/ps-context-translator-types";
+import type { TranslateResponse, AnsweredQuestionRow } from "@shared/ps-context-translator-types";
 
 /**
  * Defensively render any value as a string.
@@ -81,7 +81,7 @@ type ExecutionMode = "online" | "offline" | "offline-no-llm" | "unavailable" | "
 
 export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Props) {
   const [rawText, setRawText] = useState("");
-  const [result, setResult] = useState<(TranslateResponse & { _source?: string; _resolvedLlm?: { displayName?: string; provider?: string; model?: string } | null; _serviceError?: string | null; _serviceUrl?: string | null }) | null>(null);
+  const [result, setResult] = useState<(TranslateResponse & { answeredQuestions?: AnsweredQuestionRow[]; _source?: string; _resolvedLlm?: { displayName?: string; provider?: string; model?: string } | null; _serviceError?: string | null; _serviceUrl?: string | null }) | null>(null);
   const [showResult, setShowResult] = useState(false);
   const utils = trpc.useUtils();
 
@@ -490,6 +490,11 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
           {/* Continue Mode — Full Results */}
           {isContinue && (
             <>
+              {/* Answered Questions Table (question-table-driven results) */}
+              {result.answeredQuestions && result.answeredQuestions.length > 0 && (
+                <AnsweredQuestionsTable questions={result.answeredQuestions} />
+              )}
+
               {/* The Problem */}
               <Card>
                 <CardHeader className="pb-2">
@@ -751,6 +756,92 @@ function getSourceLabel(source: string): string {
 }
 
 // ── Collapsible Sections ────────────────────────────────────────────────────
+
+// ── Answered Questions Table ─────────────────────────────────────────────
+
+function AnsweredQuestionsTable({ questions }: { questions: AnsweredQuestionRow[] }) {
+  // Group by stepKey, preserving order
+  const groups: { step: string; stepKey: string; rows: AnsweredQuestionRow[] }[] = [];
+  const seenSteps = new Set<string>();
+  for (const q of questions) {
+    if (!seenSteps.has(q.stepKey)) {
+      seenSteps.add(q.stepKey);
+      groups.push({ step: q.step, stepKey: q.stepKey, rows: [] });
+    }
+    groups.find(g => g.stepKey === q.stepKey)!.rows.push(q);
+  }
+
+  const confidenceBadge = (c?: string) => {
+    if (!c) return null;
+    const cls = c === "high"
+      ? "bg-green-500/10 text-green-600 border-green-500/30"
+      : c === "medium"
+      ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+      : "bg-red-500/10 text-red-500 border-red-500/30";
+    return <Badge variant="outline" className={`text-[9px] ${cls}`}>{c}</Badge>;
+  };
+
+  const typeBadge = (t?: string) => {
+    if (!t) return null;
+    const cls = t === "extracted"
+      ? "bg-green-500/10 text-green-600 border-green-500/30"
+      : t === "inferred"
+      ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+      : "bg-purple-500/10 text-purple-600 border-purple-500/30";
+    return <Badge variant="outline" className={`text-[9px] ${cls}`}>{t}</Badge>;
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <ClipboardCheck className="w-4 h-4 text-blue-500" />
+          Answered Questions Table
+          <Badge variant="outline" className="text-[10px] ml-auto">
+            {questions.filter(q => q.answer).length}/{questions.length} answered
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {groups.map((group) => (
+          <div key={group.stepKey}>
+            <p className="text-xs font-medium text-muted-foreground mb-2">{group.step}</p>
+            <div className="space-y-2 ml-2">
+              {group.rows.map((row, i) => (
+                <div key={i} className="border-l-2 border-border pl-3 py-1">
+                  <div className="flex items-start gap-1.5">
+                    <span className="text-xs text-muted-foreground shrink-0">Q:</span>
+                    <span className="text-xs text-muted-foreground">{row.question}</span>
+                  </div>
+                  <div className="flex items-start gap-1.5 mt-0.5">
+                    <span className="text-xs font-medium shrink-0">A:</span>
+                    <span className="text-xs">{row.answer || <span className="text-muted-foreground italic">No answer</span>}</span>
+                  </div>
+                  {(row.answerType || row.confidence) && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {typeBadge(row.answerType)}
+                      {confidenceBadge(row.confidence)}
+                      {row.evidence && (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="w-3 h-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-[300px]">
+                            <p className="text-[10px]">{row.evidence}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 function IdeationWorkflowDraftSection({ draft }: { draft: TranslateResponse["ideationWorkflowDraft"] }) {
   const [expanded, setExpanded] = useState(false);

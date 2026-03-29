@@ -17,7 +17,9 @@ import type {
   FramingNotes,
   HealthResponse,
 } from "./context-translator-client";
-import { normalizeTranslateResponse } from "../modules/pmt/context-translator-agent";
+import { normalizeTranslateResponse, QUESTIONS_TABLE, normalizeQuestionTableResponse, deriveTranslateResponse } from "../modules/pmt/context-translator-agent";
+import type { AnsweredQuestionRow, QuestionTableResponse } from "@shared/ps-context-translator-types";
+import { IDEATION_STEP_KEYS } from "@shared/ps-ideation-constants";
 
 describe("Context Translator Client Types", () => {
   it("TranslateRequest requires rawText", () => {
@@ -627,7 +629,6 @@ describe("Step 11 One-Page Summary Canonical Key Mapping", () => {
         || toStr(response.ideationWorkflowDraft?.conceptSelection?.selectedIdea),
       reasonForSelection: toStr(response.ideationWorkflowDraft?.onePageSummary?.reasonForSelection)
         || toStr(response.ideationWorkflowDraft?.conceptSelection?.rationale),
-      overrideText: "",
     };
 
     // Verify canonical keys match OnePageSummaryToolPanel expectations
@@ -638,7 +639,6 @@ describe("Step 11 One-Page Summary Canonical Key Mapping", () => {
     expect(summaryPayload.feasibilityInsights).toBe("Medium complexity, high ROI");
     expect(summaryPayload.selectedConcept).toBe("Microservices rewrite");
     expect(summaryPayload.reasonForSelection).toBe("Best long-term architecture fit");
-    expect(summaryPayload.overrideText).toBe("");
   });
 
   it("falls back to ideaGeneration when onePageSummary.topIdeas is empty", () => {
@@ -666,7 +666,7 @@ describe("Step 11 One-Page Summary Canonical Key Mapping", () => {
 
   it("Step 11 uses OnePageSummaryToolPanel keys, not internal keys", () => {
     const canonicalKeys = ["theProblem", "theOpportunity", "topIdeas", "scenariosExplored",
-      "feasibilityInsights", "selectedConcept", "reasonForSelection", "overrideText"];
+      "feasibilityInsights", "selectedConcept", "reasonForSelection"];
 
     // Internal/draft keys that must NOT appear in Step 11 payload
     const internalKeys = ["problem", "opportunity", "feasibilityInsight"];
@@ -951,7 +951,7 @@ describe("Steps 2–4 hydration after Apply (no regression)", () => {
   });
 
   it("Step 11 OnePageSummaryToolPanel uses JSON.stringify payloadKey", () => {
-    const payload = { theProblem: "Slow portal", theOpportunity: "Modern self-service", topIdeas: "Idea A\nIdea B", overrideText: "" };
+    const payload = { theProblem: "Slow portal", theOpportunity: "Modern self-service", topIdeas: "Idea A\nIdea B", reasonForSelection: "" };
     const payloadKey = JSON.stringify(payload);
     expect(payloadKey).toContain("theProblem");
     const theProblem = (payload.theProblem as string) || "";
@@ -966,7 +966,7 @@ describe("Steps 2–4 hydration after Apply (no regression)", () => {
       { whatIsNotWorking: "X", whoIsImpacted: "Y", consequencesOfDoingNothing: "Z" },    // Step 2
       { whatCouldBeImproved: "X", whatValueCouldBeCreated: "Y", strategicAdvantage: "Z" },// Step 3
       { whatIf: "X" },                                                                    // Step 4
-      { theProblem: "X", theOpportunity: "Y", topIdeas: "Z", overrideText: "" },          // Step 11
+      { theProblem: "X", theOpportunity: "Y", topIdeas: "Z", reasonForSelection: "" },      // Step 11
     ];
     // JSON.stringify works consistently for all shapes
     for (const p of payloads) {
@@ -1239,5 +1239,357 @@ describe("Steps 2–4 and Step 11 no regression after backfill changes", () => {
     // Coherence should have forward-filled summary
     expect(result.ideationWorkflowDraft.onePageSummary.problem).toBe("Slow portal");
     expect(result.ideationWorkflowDraft.onePageSummary.opportunity).toBe("Modern self-service");
+  });
+});
+
+// ── Question-Table-Driven Architecture Tests ────────────────────────────
+
+describe("QUESTIONS_TABLE completeness", () => {
+  it("covers all 11 IDEATION_STEP_KEYS", () => {
+    const coveredStepKeys = new Set(QUESTIONS_TABLE.map(q => q.stepKey));
+    for (const key of IDEATION_STEP_KEYS) {
+      expect(coveredStepKeys.has(key)).toBe(true);
+    }
+  });
+
+  it("has exactly 41 question rows", () => {
+    expect(QUESTIONS_TABLE.length).toBe(41);
+  });
+
+  it("every row has non-empty step, stepKey, question, correspondingField", () => {
+    for (const row of QUESTIONS_TABLE) {
+      expect(row.step.trim().length).toBeGreaterThan(0);
+      expect(row.stepKey.trim().length).toBeGreaterThan(0);
+      expect(row.question.trim().length).toBeGreaterThan(0);
+      expect(row.correspondingField.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("Step 1 has exactly 4 questions (context)", () => {
+    const step1 = QUESTIONS_TABLE.filter(q => q.stepKey === "context");
+    expect(step1.length).toBe(4);
+    expect(step1.map(q => q.correspondingField).sort()).toEqual(
+      ["externalDriver", "internalDriver", "shapesNeed", "triggerEvent"]
+    );
+  });
+
+  it("Step 2 has exactly 3 questions (problem)", () => {
+    const step2 = QUESTIONS_TABLE.filter(q => q.stepKey === "problem");
+    expect(step2.length).toBe(3);
+    expect(step2.map(q => q.correspondingField).sort()).toEqual(
+      ["consequencesOfDoingNothing", "whatIsNotWorking", "whoIsImpacted"]
+    );
+  });
+
+  it("Step 3 has exactly 3 questions (opportunity)", () => {
+    const step3 = QUESTIONS_TABLE.filter(q => q.stepKey === "opportunity");
+    expect(step3.length).toBe(3);
+    expect(step3.map(q => q.correspondingField).sort()).toEqual(
+      ["strategicAdvantage", "whatCouldBeImproved", "whatValueCouldBeCreated"]
+    );
+  });
+
+  it("Step 4 has exactly 1 question (guiding_question)", () => {
+    const step4 = QUESTIONS_TABLE.filter(q => q.stepKey === "guiding_question");
+    expect(step4.length).toBe(1);
+    expect(step4[0].correspondingField).toBe("whatIf");
+  });
+
+  it("Step 6 has exactly 3 questions (clustering)", () => {
+    const step6 = QUESTIONS_TABLE.filter(q => q.stepKey === "clustering");
+    expect(step6.length).toBe(3);
+    expect(step6.map(q => q.correspondingField).sort()).toEqual([
+      "ideaThemeGrouping", "patternsObserved", "themeLabels",
+    ]);
+  });
+
+  it("Step 7 has exactly 3 questions (screening)", () => {
+    const step7 = QUESTIONS_TABLE.filter(q => q.stepKey === "screening");
+    expect(step7.length).toBe(3);
+    expect(step7.map(q => q.correspondingField).sort()).toEqual([
+      "deferredIdeas", "promisingIdeas", "screeningCriteria",
+    ]);
+  });
+
+  it("Step 8 has exactly 7 questions (scenario_exploration)", () => {
+    const step8 = QUESTIONS_TABLE.filter(q => q.stepKey === "scenario_exploration");
+    expect(step8.length).toBe(7);
+    expect(step8.map(q => q.correspondingField).sort()).toEqual([
+      "adoptionHighScenario", "adoptionLowScenario", "competitorReactionScenario",
+      "costIncreaseScenario", "notes", "scenarioInsights", "technologyLimitScenario",
+    ]);
+  });
+
+  it("Step 9 has exactly 4 questions (feasibility)", () => {
+    const step9 = QUESTIONS_TABLE.filter(q => q.stepKey === "feasibility");
+    expect(step9.length).toBe(4);
+    expect(step9.map(q => q.correspondingField).sort()).toEqual([
+      "feasibilityRating", "keyFindings", "notes", "testPerformed",
+    ]);
+  });
+
+  it("Step 10 has exactly 3 questions (concept_selection)", () => {
+    const step10 = QUESTIONS_TABLE.filter(q => q.stepKey === "concept_selection");
+    expect(step10.length).toBe(3);
+    expect(step10.map(q => q.correspondingField).sort()).toEqual([
+      "nextStep", "rationale", "selectedIdea",
+    ]);
+  });
+
+  it("Step 11 has exactly 7 questions (one_page_summary)", () => {
+    const step11 = QUESTIONS_TABLE.filter(q => q.stepKey === "one_page_summary");
+    expect(step11.length).toBe(7);
+    expect(step11.map(q => q.correspondingField).sort()).toEqual([
+      "feasibilityInsights", "reasonForSelection",
+      "scenariosExplored", "selectedConcept", "theProblem",
+      "theOpportunity", "topIdeas",
+    ]);
+  });
+});
+
+describe("normalizeQuestionTableResponse", () => {
+  it("handles null/undefined input gracefully", () => {
+    const result = normalizeQuestionTableResponse(null);
+    expect(result.decisionGate.status).toBeDefined();
+    expect(result.answeredQuestions.length).toBe(QUESTIONS_TABLE.length);
+  });
+
+  it("handles empty object input", () => {
+    const result = normalizeQuestionTableResponse({});
+    expect(result.decisionGate.status).toBe("CONTINUE");
+    expect(result.answeredQuestions.length).toBe(QUESTIONS_TABLE.length);
+    // All answers should be empty since no data was provided
+    for (const row of result.answeredQuestions) {
+      expect(row.answer).toBe("");
+    }
+  });
+
+  it("fills missing rows from QUESTIONS_TABLE", () => {
+    const raw = {
+      decisionGate: { status: "CONTINUE", reason: "OK" },
+      answeredQuestions: [
+        { stepKey: "context", correspondingField: "externalDriver", answer: "Market pressure", answerType: "extracted", confidence: "high" },
+      ],
+    };
+    const result = normalizeQuestionTableResponse(raw);
+    expect(result.answeredQuestions.length).toBe(QUESTIONS_TABLE.length);
+    // The provided answer should be preserved
+    const extDriver = result.answeredQuestions.find(q => q.correspondingField === "externalDriver");
+    expect(extDriver?.answer).toBe("Market pressure");
+    expect(extDriver?.answerType).toBe("extracted");
+    expect(extDriver?.confidence).toBe("high");
+    // Missing rows should have empty answers
+    const intDriver = result.answeredQuestions.find(q => q.correspondingField === "internalDriver");
+    expect(intDriver?.answer).toBe("");
+    expect(intDriver?.confidence).toBe("low");
+  });
+
+  it("normalizes invalid answerType and confidence values", () => {
+    const raw = {
+      decisionGate: { status: "CONTINUE", reason: "" },
+      answeredQuestions: [
+        { stepKey: "context", correspondingField: "externalDriver", answer: "Test", answerType: "invalid_type", confidence: "invalid_conf" },
+      ],
+    };
+    const result = normalizeQuestionTableResponse(raw);
+    const row = result.answeredQuestions.find(q => q.correspondingField === "externalDriver");
+    expect(row?.answerType).toBe("proposed"); // defaults to proposed
+    expect(row?.confidence).toBe("low"); // defaults to low
+  });
+
+  it("preserves CLARIFICATION_NEEDED status", () => {
+    const raw = {
+      decisionGate: { status: "CLARIFICATION_NEEDED", reason: "Not enough info" },
+      answeredQuestions: [],
+    };
+    const result = normalizeQuestionTableResponse(raw);
+    expect(result.decisionGate.status).toBe("CLARIFICATION_NEEDED");
+    expect(result.decisionGate.reason).toBe("Not enough info");
+  });
+});
+
+describe("deriveTranslateResponse", () => {
+  it("derives a valid TranslateResponse from answered questions", () => {
+    const qt: QuestionTableResponse = {
+      decisionGate: { status: "CONTINUE", reason: "OK" },
+      answeredQuestions: QUESTIONS_TABLE.map(q => ({
+        ...q,
+        answer: q.stepKey === "context" && q.correspondingField === "externalDriver"
+          ? "Market competition increasing"
+          : q.stepKey === "problem" && q.correspondingField === "whatIsNotWorking"
+          ? "Legacy system is slow"
+          : q.stepKey === "opportunity" && q.correspondingField === "whatCouldBeImproved"
+          ? "Build modern portal"
+          : q.stepKey === "guiding_question"
+          ? "What if we modernized?"
+          : "",
+        answerType: "extracted" as const,
+        confidence: "high" as const,
+        evidence: "",
+      })),
+    };
+
+    const result = deriveTranslateResponse(qt);
+    expect(result.decisionGate.status).toBe("CONTINUE");
+    expect(result.problem.statement).toBe("Legacy system is slow");
+    expect(result.problem.status).toBe("clear");
+    expect(result.opportunity.statement).toBe("Build modern portal");
+    expect(result.opportunity.status).toBe("clear");
+    expect(result.coreSignals.externalDrivers).toContain("Market competition increasing");
+    expect(result.whatIfQuestion).toBe("What if we modernized?");
+  });
+
+  it("marks empty problem/opportunity as missing", () => {
+    const qt: QuestionTableResponse = {
+      decisionGate: { status: "CONTINUE", reason: "" },
+      answeredQuestions: QUESTIONS_TABLE.map(q => ({
+        ...q,
+        answer: "",
+        answerType: "proposed" as const,
+        confidence: "low" as const,
+        evidence: "",
+      })),
+    };
+
+    const result = deriveTranslateResponse(qt);
+    expect(result.problem.status).toBe("missing");
+    expect(result.opportunity.status).toBe("missing");
+  });
+
+  it("populates missingInformation for unanswered non-summary questions", () => {
+    const qt: QuestionTableResponse = {
+      decisionGate: { status: "CONTINUE", reason: "" },
+      answeredQuestions: QUESTIONS_TABLE.map(q => ({
+        ...q,
+        answer: "",
+        answerType: "proposed" as const,
+        confidence: "low" as const,
+        evidence: "",
+      })),
+    };
+
+    const result = deriveTranslateResponse(qt);
+    // Should have missing info entries for all questions except one_page_summary
+    const nonSummaryCount = QUESTIONS_TABLE.filter(q => q.stepKey !== "one_page_summary").length;
+    expect(result.missingInformation.length).toBe(nonSummaryCount);
+  });
+});
+
+describe("Direct field mapping — answered table to step payloads", () => {
+  it("maps answered questions to correct step payload keys", () => {
+    const answeredQuestions: AnsweredQuestionRow[] = QUESTIONS_TABLE.map(q => ({
+      ...q,
+      answer: `Answer for ${q.correspondingField}`,
+      answerType: "extracted" as const,
+      confidence: "high" as const,
+      evidence: "",
+    }));
+
+    // Simulate the router's grouping logic
+    const byStep: Record<string, Record<string, string>> = {};
+    for (const row of answeredQuestions) {
+      if (!byStep[row.stepKey]) byStep[row.stepKey] = {};
+      byStep[row.stepKey][row.correspondingField] = row.answer || "";
+    }
+
+    // Step 1: context
+    expect(byStep.context.externalDriver).toBe("Answer for externalDriver");
+    expect(byStep.context.internalDriver).toBe("Answer for internalDriver");
+    expect(byStep.context.triggerEvent).toBe("Answer for triggerEvent");
+    expect(byStep.context.shapesNeed).toBe("Answer for shapesNeed");
+
+    // Step 2: problem — all 3 fields populated (not just 1 like legacy)
+    expect(byStep.problem.whatIsNotWorking).toBe("Answer for whatIsNotWorking");
+    expect(byStep.problem.whoIsImpacted).toBe("Answer for whoIsImpacted");
+    expect(byStep.problem.consequencesOfDoingNothing).toBe("Answer for consequencesOfDoingNothing");
+
+    // Step 3: opportunity — all 3 fields populated
+    expect(byStep.opportunity.whatCouldBeImproved).toBe("Answer for whatCouldBeImproved");
+    expect(byStep.opportunity.whatValueCouldBeCreated).toBe("Answer for whatValueCouldBeCreated");
+    expect(byStep.opportunity.strategicAdvantage).toBe("Answer for strategicAdvantage");
+
+    // Step 4: guiding_question
+    expect(byStep.guiding_question.whatIf).toBe("Answer for whatIf");
+
+    // Step 6: clustering — expanded fields
+    expect(byStep.clustering.patternsObserved).toBe("Answer for patternsObserved");
+    expect(byStep.clustering.themeLabels).toBe("Answer for themeLabels");
+    expect(byStep.clustering.ideaThemeGrouping).toBe("Answer for ideaThemeGrouping");
+
+    // Step 7: screening — expanded fields
+    expect(byStep.screening.screeningCriteria).toBe("Answer for screeningCriteria");
+    expect(byStep.screening.promisingIdeas).toBe("Answer for promisingIdeas");
+    expect(byStep.screening.deferredIdeas).toBe("Answer for deferredIdeas");
+
+    // Step 8: scenario_exploration — expanded fields
+    expect(byStep.scenario_exploration.notes).toBe("Answer for notes");
+    expect(byStep.scenario_exploration.adoptionHighScenario).toBe("Answer for adoptionHighScenario");
+    expect(byStep.scenario_exploration.competitorReactionScenario).toBe("Answer for competitorReactionScenario");
+
+    // Step 9: feasibility — expanded fields
+    expect(byStep.feasibility.notes).toBe("Answer for notes");
+    expect(byStep.feasibility.testPerformed).toBe("Answer for testPerformed");
+    expect(byStep.feasibility.feasibilityRating).toBe("Answer for feasibilityRating");
+
+    // Step 10: concept_selection — simplified to 3 questions
+    expect(byStep.concept_selection.selectedIdea).toBe("Answer for selectedIdea");
+    expect(byStep.concept_selection.rationale).toBe("Answer for rationale");
+    expect(byStep.concept_selection.nextStep).toBe("Answer for nextStep");
+
+    // Step 11: one_page_summary — 7 questions (no overrideText)
+    expect(byStep.one_page_summary.theProblem).toBe("Answer for theProblem");
+    expect(byStep.one_page_summary.reasonForSelection).toBe("Answer for reasonForSelection");
+  });
+
+  it("question-table path fills Steps 2-3 fields that legacy path left blank", () => {
+    // The key improvement: Steps 2 and 3 now get whoIsImpacted, consequencesOfDoingNothing,
+    // whatValueCouldBeCreated, and strategicAdvantage filled directly from LLM answers.
+    // Legacy path left these as "" because coreSignals/problem/opportunity objects lacked them.
+    const answeredQuestions: AnsweredQuestionRow[] = QUESTIONS_TABLE.map(q => ({
+      ...q,
+      answer: q.correspondingField === "whoIsImpacted" ? "Operations team and customers"
+        : q.correspondingField === "consequencesOfDoingNothing" ? "Revenue decline 10%"
+        : q.correspondingField === "whatValueCouldBeCreated" ? "50% faster onboarding"
+        : q.correspondingField === "strategicAdvantage" ? "First-mover advantage in market"
+        : "",
+      answerType: "inferred" as const,
+      confidence: "medium" as const,
+      evidence: "",
+    }));
+
+    const byStep: Record<string, Record<string, string>> = {};
+    for (const row of answeredQuestions) {
+      if (!byStep[row.stepKey]) byStep[row.stepKey] = {};
+      byStep[row.stepKey][row.correspondingField] = row.answer || "";
+    }
+
+    // These were always empty in legacy path
+    expect(byStep.problem.whoIsImpacted).toBe("Operations team and customers");
+    expect(byStep.problem.consequencesOfDoingNothing).toBe("Revenue decline 10%");
+    expect(byStep.opportunity.whatValueCouldBeCreated).toBe("50% faster onboarding");
+    expect(byStep.opportunity.strategicAdvantage).toBe("First-mover advantage in market");
+  });
+});
+
+describe("Legacy compat — old TranslateResponse still applies via fallback path", () => {
+  it("applyToIdeation detects legacy shape (no answeredQuestions)", () => {
+    const legacyResult = {
+      decisionGate: { status: "CONTINUE", reason: "" },
+      problem: { statement: "Old problem", status: "clear" },
+      opportunity: { statement: "Old opportunity", status: "clear" },
+      coreSignals: { externalDrivers: ["Driver"], internalDrivers: ["Internal"], trigger: "Trigger" },
+      whatIfQuestion: "What if?",
+      projectContextResult: "Context",
+    };
+    // Detection: no answeredQuestions array
+    expect(Array.isArray(legacyResult.answeredQuestions)).toBe(false);
+  });
+
+  it("applyToIdeation detects question-table shape (has answeredQuestions)", () => {
+    const qtResult = {
+      decisionGate: { status: "CONTINUE", reason: "" },
+      answeredQuestions: [{ stepKey: "context", correspondingField: "externalDriver", answer: "Test" }],
+    };
+    expect(Array.isArray(qtResult.answeredQuestions)).toBe(true);
   });
 });

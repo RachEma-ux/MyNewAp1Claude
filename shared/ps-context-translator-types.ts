@@ -48,6 +48,34 @@ export interface FramingNotes {
   proposed: string[];
 }
 
+// ── Question-Table-Driven Architecture Types ─────────────────────────────
+
+/** Single row in the Questions Table */
+export interface QuestionTableRow {
+  step: string;           // e.g., "1. Context of the Project"
+  stepKey: string;        // canonical key: "context", "problem", etc.
+  question: string;       // the question text
+  correspondingField: string; // UI field key: "externalDriver", "whatIsNotWorking", etc.
+}
+
+/** Answered row returned by LLM */
+export interface AnsweredQuestionRow extends QuestionTableRow {
+  answer: string;
+  answerType?: "extracted" | "inferred" | "proposed";
+  confidence?: "high" | "medium" | "low";
+  evidence?: string;
+}
+
+/** New translator response shape (question-table-driven) */
+export interface QuestionTableResponse {
+  decisionGate: DecisionGate;
+  answeredQuestions: AnsweredQuestionRow[];
+  /** Derived TranslateResponse for display/persistence backward compat */
+  legacyResponse?: TranslateResponse;
+}
+
+// ── Legacy Types (kept for backward compat with persisted runs) ──────────
+
 export interface TranslateResponse {
   decisionGate: DecisionGate;
   extractedFacts: string[];

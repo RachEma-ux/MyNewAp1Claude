@@ -31,7 +31,13 @@ import {
   getDefaultReasoningProviderRef,
   getDefaultReasoningModel,
 } from "@shared/catalog-execution";
-import { AGENT_CATALOG_ID, analyzeRawInput, normalizeTranslateResponse } from "../modules/pmt/context-translator-agent";
+import {
+  AGENT_CATALOG_ID,
+  normalizeTranslateResponse,
+  analyzeWithQuestionTable,
+  deriveTranslateResponse,
+} from "../modules/pmt/context-translator-agent";
+import type { QuestionTableResponse, AnsweredQuestionRow } from "@shared/ps-context-translator-types";
 
 // ── LLM Resolution ─────────────────────────────────────────────────────────
 
@@ -128,15 +134,16 @@ async function persistTranslatorRun(
   userId: number,
   ideationId: number,
   rawText: string,
-  result: client.TranslateResponse,
+  result: client.TranslateResponse | QuestionTableResponse,
 ) {
   const db = getDb();
   if (!db) return;
   try {
+    const gateStatus = result.decisionGate?.status ?? "CONTINUE";
     await db.insert(psIdeationTranslatorRuns).values({
       ideationId,
       rawInput: rawText,
-      decisionGateStatus: result.decisionGate?.status ?? "CONTINUE",
+      decisionGateStatus: gateStatus,
       resultJson: result as any,
       createdBy: userId,
     });
@@ -224,18 +231,18 @@ export const contextTranslatorRouter = router({
         console.warn(`[ContextTranslator] LLM resolution failed: ${llmErr.message}`);
       }
 
-      let result: client.TranslateResponse;
+      let qtResult: QuestionTableResponse;
       let source: ExecutionSource;
 
       try {
-        result = await analyzeRawInput(input.rawText, {
+        qtResult = await analyzeWithQuestionTable(input.rawText, {
           provider: resolvedLlm?.provider,
           model: resolvedLlm?.model,
           apiBaseUrl: resolvedLlm?.apiBaseUrl,
         });
 
-        // Determine execution source — fully guard decisionGate access
-        const reason = result.decisionGate?.reason ?? "";
+        // Determine execution source
+        const reason = qtResult.decisionGate?.reason ?? "";
         if (typeof reason === "string" && reason.includes("without LLM")) {
           source = "fallback-template";
         } else if (resolvedLlm) {
@@ -251,15 +258,19 @@ export const contextTranslatorRouter = router({
         });
       }
 
+      // Derive legacy response for persistence and display backward compat
+      const legacyResult = deriveTranslateResponse(qtResult);
+
       // Persist the translator run (non-fatal)
       try {
-        await persistTranslatorRun(ctx.user.id, input.ideationId, input.rawText, result);
+        await persistTranslatorRun(ctx.user.id, input.ideationId, input.rawText, qtResult);
       } catch (persistErr: any) {
         console.error("[ContextTranslator] persist failed in fallback path:", persistErr.message);
       }
 
       return {
-        ...result,
+        ...legacyResult,
+        answeredQuestions: qtResult.answeredQuestions,
         _source: source,
         _resolvedLlm: resolvedLlm
           ? { displayName: resolvedLlm.displayName, provider: resolvedLlm.provider, model: resolvedLlm.model }
@@ -281,23 +292,16 @@ export const contextTranslatorRouter = router({
   applyToIdeation: governedProcedure
     .input(z.object({
       ideationId: z.number().int().positive(),
-      translatorResult: z.any(), // TranslateResponse shape
+      translatorResult: z.any(), // TranslateResponse or QuestionTableResponse shape
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // Normalize through the shared normalizer to guard against malformed LLM output
-      const result = normalizeTranslateResponse(input.translatorResult);
+      // Detect response shape: new question-table-driven vs legacy
+      const hasAnsweredQuestions = Array.isArray(input.translatorResult?.answeredQuestions);
 
-      if (result.decisionGate.status !== "CONTINUE") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot apply translator output in CLARIFICATION_NEEDED mode",
-        });
-      }
-
-      // Safely extract string from a value that may be an object (e.g. {signal, confidence})
+      // Safely extract string from a value that may be an object
       const toStr = (v: unknown): string => {
         if (v == null) return "";
         if (typeof v === "string") return v;
@@ -308,126 +312,224 @@ export const contextTranslatorRouter = router({
         return String(v);
       };
 
-      // ── Step 1 resilient backfill ───────────────────────────────────
-      // Primary: coreSignals. If empty, backfill from richer downstream
-      // sections so Step 1 is never blank when the translator clearly
-      // contains enough context. enforceCoherence() already enriches
-      // coreSignals during normalization, but we add a second safety net
-      // here at the persistence boundary.
+      let stepPayloads: Record<string, Record<string, unknown>>;
+      let problemSnapshot: string;
+      let opportunitySnapshot: string;
+      let guidingQuestionSnapshot: string;
 
-      const pkg = result.psWizardScenarioPackage;
-      const draft = result.ideationWorkflowDraft;
-      const notes = result.framingNotes;
+      if (hasAnsweredQuestions) {
+        // ── New question-table-driven path ────────────────────────────
+        const answeredQuestions: AnsweredQuestionRow[] = input.translatorResult.answeredQuestions;
 
-      const joinArr = (arr: unknown[] | undefined): string =>
-        (arr || []).map(toStr).filter(s => s.trim()).join("; ");
+        // Check decision gate
+        const gateStatus = input.translatorResult.decisionGate?.status;
+        if (gateStatus === "CLARIFICATION_NEEDED") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot apply translator output in CLARIFICATION_NEEDED mode",
+          });
+        }
 
-      let externalDriver = joinArr(result.coreSignals?.externalDrivers);
-      if (!externalDriver.trim()) {
-        externalDriver = joinArr(notes?.extracted)
-          || toStr(pkg?.urgencyDriver)
-          || toStr(pkg?.businessNeed)
-          || joinArr(result.extractedFacts?.slice(0, 2));
-      }
+        // Group answered questions by stepKey → field → answer
+        const byStep: Record<string, Record<string, string>> = {};
+        for (const row of answeredQuestions) {
+          if (!byStep[row.stepKey]) byStep[row.stepKey] = {};
+          byStep[row.stepKey][row.correspondingField] = row.answer || "";
+        }
 
-      let internalDriver = joinArr(result.coreSignals?.internalDrivers);
-      if (!internalDriver.trim()) {
-        internalDriver = joinArr(notes?.inferred)
-          || toStr(result.problem?.statement)
-          || toStr(pkg?.primaryProblem);
-      }
+        // Build step payloads directly from answers — no backfill chains needed
+        stepPayloads = {
+          context: {
+            externalDriver: byStep.context?.externalDriver || "",
+            internalDriver: byStep.context?.internalDriver || "",
+            triggerEvent: byStep.context?.triggerEvent || "",
+            shapesNeed: byStep.context?.shapesNeed || "",
+          },
+          problem: {
+            whatIsNotWorking: byStep.problem?.whatIsNotWorking || "",
+            whoIsImpacted: byStep.problem?.whoIsImpacted || "",
+            consequencesOfDoingNothing: byStep.problem?.consequencesOfDoingNothing || "",
+          },
+          opportunity: {
+            whatCouldBeImproved: byStep.opportunity?.whatCouldBeImproved || "",
+            whatValueCouldBeCreated: byStep.opportunity?.whatValueCouldBeCreated || "",
+            strategicAdvantage: byStep.opportunity?.strategicAdvantage || "",
+          },
+          guiding_question: {
+            whatIf: byStep.guiding_question?.whatIf || "",
+          },
+          idea_generation: {
+            brainstormingMethod: byStep.idea_generation?.brainstormingMethod || "",
+            participants: byStep.idea_generation?.participants || "",
+            rawIdeaList: byStep.idea_generation?.rawIdeaList || "",
+          },
+          clustering: {
+            patternsObserved: byStep.clustering?.patternsObserved || "",
+            themeLabels: byStep.clustering?.themeLabels || "",
+            ideaThemeGrouping: byStep.clustering?.ideaThemeGrouping || "",
+          },
+          screening: {
+            screeningCriteria: byStep.screening?.screeningCriteria || "",
+            promisingIdeas: byStep.screening?.promisingIdeas || "",
+            deferredIdeas: byStep.screening?.deferredIdeas || "",
+          },
+          scenario_exploration: {
+            notes: byStep.scenario_exploration?.notes || "",
+            adoptionHighScenario: byStep.scenario_exploration?.adoptionHighScenario || "",
+            adoptionLowScenario: byStep.scenario_exploration?.adoptionLowScenario || "",
+            costIncreaseScenario: byStep.scenario_exploration?.costIncreaseScenario || "",
+            competitorReactionScenario: byStep.scenario_exploration?.competitorReactionScenario || "",
+            technologyLimitScenario: byStep.scenario_exploration?.technologyLimitScenario || "",
+            scenarioInsights: byStep.scenario_exploration?.scenarioInsights || "",
+          },
+          feasibility: {
+            notes: byStep.feasibility?.notes || "",
+            testPerformed: byStep.feasibility?.testPerformed || "",
+            keyFindings: byStep.feasibility?.keyFindings || "",
+            feasibilityRating: byStep.feasibility?.feasibilityRating || "",
+          },
+          concept_selection: {
+            selectedIdea: byStep.concept_selection?.selectedIdea || "",
+            rationale: {
+              strategicAlignment: byStep.concept_selection?.rationale || "",
+              expectedValue: "",
+              feasibility: "",
+              riskProfile: "",
+              stakeholderSupport: "",
+            },
+            nextStep: byStep.concept_selection?.nextStep || "",
+          },
+          one_page_summary: {
+            theProblem: byStep.one_page_summary?.theProblem || "",
+            theOpportunity: byStep.one_page_summary?.theOpportunity || "",
+            topIdeas: byStep.one_page_summary?.topIdeas || "",
+            scenariosExplored: byStep.one_page_summary?.scenariosExplored || "",
+            feasibilityInsights: byStep.one_page_summary?.feasibilityInsights || "",
+            selectedConcept: byStep.one_page_summary?.selectedConcept || "",
+            reasonForSelection: byStep.one_page_summary?.reasonForSelection || "",
+          },
+        };
 
-      let triggerEvent = toStr(result.coreSignals?.trigger);
-      if (!triggerEvent.trim()) {
-        triggerEvent = toStr(pkg?.urgencyDriver)
-          || toStr(result.decisionGate?.reason)
-          || (draft?.contextOfProject ? draft.contextOfProject.split(/[.!?]\s/)[0] || "" : "");
-      }
+        problemSnapshot = byStep.problem?.whatIsNotWorking || "";
+        opportunitySnapshot = byStep.opportunity?.whatCouldBeImproved || "";
+        guidingQuestionSnapshot = byStep.guiding_question?.whatIf || "";
 
-      let shapesNeed = toStr(result.projectContextResult);
-      if (!shapesNeed.trim()) {
-        shapesNeed = toStr(draft?.contextOfProject)
-          || toStr(pkg?.scenarioSummary)
-          || [externalDriver, internalDriver, triggerEvent].filter(Boolean).join(" — ");
-      }
+      } else {
+        // ── Legacy path (old TranslateResponse shape) ─────────────────
+        const result = normalizeTranslateResponse(input.translatorResult);
 
-      // Map to step payloads using CANONICAL UI field keys
-      // These must match what each ToolPanel reads from payloadJson
-      const stepPayloads: Record<string, Record<string, unknown>> = {
-        context: {
-          externalDriver,
-          internalDriver,
-          triggerEvent,
-          shapesNeed,
-        },
-        problem: {
-          // Canonical keys: whatIsNotWorking, whoIsImpacted, consequencesOfDoingNothing
-          whatIsNotWorking: toStr(result.problem?.statement),
-          whoIsImpacted: "",       // Not extractable from translator — leave for user
-          consequencesOfDoingNothing: "", // Not extractable — leave for user
-        },
-        opportunity: {
-          // Canonical keys: whatCouldBeImproved, whatValueCouldBeCreated, strategicAdvantage
-          whatCouldBeImproved: toStr(result.opportunity?.statement),
-          whatValueCouldBeCreated: "", // Not extractable — leave for user
-          strategicAdvantage: "",     // Not extractable — leave for user
-        },
-        guiding_question: {
-          // Canonical key: whatIf
-          whatIf: toStr(result.whatIfQuestion),
-        },
-        one_page_summary: {
-          // Canonical keys matching OnePageSummaryToolPanel
-          // Each field has fallback sources when primary is empty
-          theProblem: toStr(result.ideationWorkflowDraft?.onePageSummary?.problem)
+        if (result.decisionGate.status !== "CONTINUE") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot apply translator output in CLARIFICATION_NEEDED mode",
+          });
+        }
+
+        const pkg = result.psWizardScenarioPackage;
+        const draft = result.ideationWorkflowDraft;
+        const notes = result.framingNotes;
+
+        const joinArr = (arr: unknown[] | undefined): string =>
+          (arr || []).map(toStr).filter(s => s.trim()).join("; ");
+
+        let externalDriver = joinArr(result.coreSignals?.externalDrivers);
+        if (!externalDriver.trim()) {
+          externalDriver = joinArr(notes?.extracted)
+            || toStr(pkg?.urgencyDriver)
+            || toStr(pkg?.businessNeed)
+            || joinArr(result.extractedFacts?.slice(0, 2));
+        }
+
+        let internalDriver = joinArr(result.coreSignals?.internalDrivers);
+        if (!internalDriver.trim()) {
+          internalDriver = joinArr(notes?.inferred)
             || toStr(result.problem?.statement)
-            || toStr(pkg?.primaryProblem),
-          theOpportunity: toStr(result.ideationWorkflowDraft?.onePageSummary?.opportunity)
-            || toStr(result.opportunity?.statement)
-            || toStr(pkg?.opportunityStatement),
-          topIdeas: (Array.isArray(result.ideationWorkflowDraft?.onePageSummary?.topIdeas) &&
-            result.ideationWorkflowDraft.onePageSummary.topIdeas.length > 0)
-              ? result.ideationWorkflowDraft.onePageSummary.topIdeas.join("\n")
-              : (result.ideationWorkflowDraft?.ideaGeneration || []).map(toStr).filter(s => s.trim()).join("\n")
+            || toStr(pkg?.primaryProblem);
+        }
+
+        let triggerEvent = toStr(result.coreSignals?.trigger);
+        if (!triggerEvent.trim()) {
+          triggerEvent = toStr(pkg?.urgencyDriver)
+            || toStr(result.decisionGate?.reason)
+            || (draft?.contextOfProject ? draft.contextOfProject.split(/[.!?]\s/)[0] || "" : "");
+        }
+
+        let shapesNeed = toStr(result.projectContextResult);
+        if (!shapesNeed.trim()) {
+          shapesNeed = toStr(draft?.contextOfProject)
+            || toStr(pkg?.scenarioSummary)
+            || [externalDriver, internalDriver, triggerEvent].filter(Boolean).join(" — ");
+        }
+
+        stepPayloads = {
+          context: { externalDriver, internalDriver, triggerEvent, shapesNeed },
+          problem: {
+            whatIsNotWorking: toStr(result.problem?.statement),
+            whoIsImpacted: "",
+            consequencesOfDoingNothing: "",
+          },
+          opportunity: {
+            whatCouldBeImproved: toStr(result.opportunity?.statement),
+            whatValueCouldBeCreated: "",
+            strategicAdvantage: "",
+          },
+          guiding_question: {
+            whatIf: toStr(result.whatIfQuestion),
+          },
+          one_page_summary: {
+            theProblem: toStr(result.ideationWorkflowDraft?.onePageSummary?.problem)
+              || toStr(result.problem?.statement)
+              || toStr(pkg?.primaryProblem),
+            theOpportunity: toStr(result.ideationWorkflowDraft?.onePageSummary?.opportunity)
+              || toStr(result.opportunity?.statement)
+              || toStr(pkg?.opportunityStatement),
+            topIdeas: (Array.isArray(result.ideationWorkflowDraft?.onePageSummary?.topIdeas) &&
+              result.ideationWorkflowDraft.onePageSummary.topIdeas.length > 0)
+                ? result.ideationWorkflowDraft.onePageSummary.topIdeas.join("\n")
+                : (result.ideationWorkflowDraft?.ideaGeneration || []).map(toStr).filter(s => s.trim()).join("\n")
+                || toStr(pkg?.recommendedDirection),
+            scenariosExplored: toStr(result.ideationWorkflowDraft?.scenarioExploration?.insights)
+              || toStr(pkg?.feasibilityNotes),
+            feasibilityInsights: toStr(result.ideationWorkflowDraft?.onePageSummary?.feasibilityInsight)
+              || toStr(result.ideationWorkflowDraft?.quickFeasibilityChecks?.feasibilityRating)
+              || toStr(pkg?.feasibilityNotes),
+            selectedConcept: toStr(result.ideationWorkflowDraft?.onePageSummary?.selectedConcept)
+              || toStr(result.ideationWorkflowDraft?.conceptSelection?.selectedIdea)
               || toStr(pkg?.recommendedDirection),
-          scenariosExplored: toStr(result.ideationWorkflowDraft?.scenarioExploration?.insights)
-            || toStr(pkg?.feasibilityNotes),
-          feasibilityInsights: toStr(result.ideationWorkflowDraft?.onePageSummary?.feasibilityInsight)
-            || toStr(result.ideationWorkflowDraft?.quickFeasibilityChecks?.feasibilityRating)
-            || toStr(pkg?.feasibilityNotes),
-          selectedConcept: toStr(result.ideationWorkflowDraft?.onePageSummary?.selectedConcept)
-            || toStr(result.ideationWorkflowDraft?.conceptSelection?.selectedIdea)
-            || toStr(pkg?.recommendedDirection),
-          reasonForSelection: toStr(result.ideationWorkflowDraft?.onePageSummary?.reasonForSelection)
-            || toStr(result.ideationWorkflowDraft?.conceptSelection?.rationale)
-            || toStr(pkg?.recommendedDirectionRationale),
-          overrideText: "", // Always leave for user
-        },
-      };
+            reasonForSelection: toStr(result.ideationWorkflowDraft?.onePageSummary?.reasonForSelection)
+              || toStr(result.ideationWorkflowDraft?.conceptSelection?.rationale)
+              || toStr(pkg?.recommendedDirectionRationale),
+            overrideText: "",
+          },
+        };
 
-      // Upsert step payloads
+        problemSnapshot = toStr(result.problem?.statement);
+        opportunitySnapshot = toStr(result.opportunity?.statement);
+        guidingQuestionSnapshot = toStr(result.whatIfQuestion);
+      }
+
+      // Upsert step payloads (shared by both paths)
       const now = new Date();
-      for (const [stepKey, payload] of Object.entries(stepPayloads)) {
-        const stepOrder = [
-          "context", "problem", "opportunity", "guiding_question",
-          "idea_generation", "clustering", "screening",
-          "scenario_exploration", "feasibility",
-          "concept_selection", "one_page_summary",
-        ].indexOf(stepKey);
+      const stepOrderMap = [
+        "context", "problem", "opportunity", "guiding_question",
+        "idea_generation", "clustering", "screening",
+        "scenario_exploration", "feasibility",
+        "concept_selection", "one_page_summary",
+      ];
 
-        // Check if step exists
+      for (const [stepKey, payload] of Object.entries(stepPayloads)) {
+        const stepOrder = stepOrderMap.indexOf(stepKey);
+
         const existing = await db.select()
           .from(psIdeationSteps)
           .where(eq(psIdeationSteps.ideationId, input.ideationId))
           .then(rows => rows.find(r => r.stepKey === stepKey));
 
         if (existing) {
-          // Merge payload: preserve non-empty user-entered fields, only fill blanks
           const prev = (existing.payloadJson || {}) as Record<string, unknown>;
           const merged: Record<string, unknown> = { ...prev };
           for (const [k, v] of Object.entries(payload)) {
             const existingVal = prev[k];
-            // Only overwrite if existing field is empty/missing
             if (!existingVal || (typeof existingVal === "string" && !existingVal.trim())) {
               merged[k] = v;
             }
@@ -454,25 +556,23 @@ export const contextTranslatorRouter = router({
         }
       }
 
-      // Update ideation snapshots — use canonical payload values
+      // Update ideation snapshots
       await db.update(psIdeations)
         .set({
-          problemStatementSnapshot: toStr(result.problem?.statement) || null,
-          opportunityStatementSnapshot: toStr(result.opportunity?.statement) || null,
-          guidingQuestionSnapshot: toStr(result.whatIfQuestion) || null,
+          problemStatementSnapshot: problemSnapshot || null,
+          opportunityStatementSnapshot: opportunitySnapshot || null,
+          guidingQuestionSnapshot: guidingQuestionSnapshot || null,
           updatedBy: ctx.user.id,
           updatedAt: now,
         })
         .where(eq(psIdeations.id, input.ideationId));
 
-      // Return fresh step data so the client can update the cache immediately
-      // (avoids the async refetch timing gap that causes stale placeholder display)
       const updatedSteps = await db.select()
         .from(psIdeationSteps)
         .where(eq(psIdeationSteps.ideationId, input.ideationId))
         .orderBy(psIdeationSteps.stepOrder);
 
-      // Build warnings for fields that remain empty despite backfill attempts
+      // Build warnings for fields that remain empty
       const warnings: string[] = [];
       const ctx1 = stepPayloads.context;
       if (!String(ctx1.externalDriver || "").trim()) warnings.push("External Driver could not be determined");
