@@ -29,10 +29,19 @@ export function ContextDefinitionToolPanel({ payload, onSave, disabled }: Props)
 
   useEffect(() => {
     if (payload) {
-      setExternalDriver((payload.externalDriver as string) || "");
-      setInternalDriver((payload.internalDriver as string) || "");
-      setTriggerEvent((payload.triggerEvent as string) || "");
-      setShapesNeed((payload.shapesNeed as string) || "");
+      const str = (v: unknown): string => {
+        if (v == null) return "";
+        if (typeof v === "string") return v;
+        if (typeof v === "object") {
+          const o = v as Record<string, unknown>;
+          return String(o.signal || o.text || o.value || o.statement || JSON.stringify(v));
+        }
+        return String(v);
+      };
+      setExternalDriver(str(payload.externalDriver));
+      setInternalDriver(str(payload.internalDriver));
+      setTriggerEvent(str(payload.triggerEvent));
+      setShapesNeed(str(payload.shapesNeed));
     }
   }, [payload]);
 

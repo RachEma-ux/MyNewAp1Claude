@@ -42,6 +42,27 @@ import {
 } from "lucide-react";
 import type { TranslateResponse } from "@shared/ps-context-translator-types";
 
+/**
+ * Defensively render any value as a string.
+ * LLM responses may return objects (e.g. {signal, confidence}) where plain
+ * strings are expected. This prevents "Objects are not valid as a React child".
+ */
+function safeRender(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(safeRender).join(", ");
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    // Common LLM object shapes: {signal, confidence}, {idea, ...}, {item, ...}, etc.
+    for (const key of ["signal", "idea", "item", "text", "value", "label", "name", "statement", "description", "scenario", "check", "claim", "recommendedApproach"]) {
+      if (obj[key] != null) return String(obj[key]);
+    }
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
 interface Props {
   ideationId: number;
   disabled?: boolean;
@@ -400,14 +421,14 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                   </>
                 )}
               </div>
-              {result.decisionGate.reason && (
-                <p className="text-xs text-muted-foreground mt-1">{result.decisionGate.reason}</p>
+              {result.decisionGate?.reason && (
+                <p className="text-xs text-muted-foreground mt-1">{safeRender(result.decisionGate.reason)}</p>
               )}
             </CardContent>
           </Card>
 
           {/* Clarification Questions */}
-          {isClarification && result.clarificationQuestions.length > 0 && (
+          {isClarification && result.clarificationQuestions?.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm text-amber-600">
@@ -416,19 +437,19 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {result.clarificationQuestions.map((q, i) => (
+                {result.clarificationQuestions.map((q: any, i: number) => (
                   <div key={i} className="flex items-start gap-2 text-sm">
                     <span className="text-amber-500 font-medium shrink-0">{i + 1}.</span>
-                    <span>{q}</span>
+                    <span>{safeRender(q)}</span>
                   </div>
                 ))}
-                {result.missingInformation.length > 0 && (
+                {result.missingInformation?.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-border">
                     <p className="text-xs font-medium text-muted-foreground mb-1">Missing Information:</p>
-                    {result.missingInformation.map((m, i) => (
+                    {result.missingInformation.map((m: any, i: number) => (
                       <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
                         <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0 text-amber-400" />
-                        <span>{m}</span>
+                        <span>{safeRender(m)}</span>
                       </div>
                     ))}
                   </div>
@@ -447,12 +468,12 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                     <XCircle className="w-4 h-4 text-red-500" />
                     The Problem
                     <Badge variant="outline" className="text-[10px] ml-auto">
-                      {result.problem.status}
+                      {safeRender(result.problem?.status || (result.problem as any)?.classification)}
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm">{result.problem.statement || "Not identified"}</p>
+                  <p className="text-sm">{safeRender(result.problem?.statement) || "Not identified"}</p>
                 </CardContent>
               </Card>
 
@@ -463,12 +484,12 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                     <Target className="w-4 h-4 text-green-500" />
                     The Opportunity
                     <Badge variant="outline" className="text-[10px] ml-auto">
-                      {result.opportunity.status}
+                      {safeRender(result.opportunity?.status || (result.opportunity as any)?.classification)}
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm">{result.opportunity.statement || "Not identified"}</p>
+                  <p className="text-sm">{safeRender(result.opportunity?.statement) || "Not identified"}</p>
                 </CardContent>
               </Card>
 
@@ -488,9 +509,11 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-1">External Drivers</p>
                     <div className="flex flex-wrap gap-1">
-                      {result.coreSignals.externalDrivers.length > 0 ? (
-                        result.coreSignals.externalDrivers.map((d, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">{d}</Badge>
+                      {result.coreSignals?.externalDrivers?.length > 0 ? (
+                        result.coreSignals.externalDrivers.map((d: any, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">
+                            {safeRender(d)}
+                          </Badge>
                         ))
                       ) : (
                         <span className="text-xs text-muted-foreground">None identified</span>
@@ -501,9 +524,11 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-1">Internal Drivers</p>
                     <div className="flex flex-wrap gap-1">
-                      {result.coreSignals.internalDrivers.length > 0 ? (
-                        result.coreSignals.internalDrivers.map((d, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">{d}</Badge>
+                      {result.coreSignals?.internalDrivers?.length > 0 ? (
+                        result.coreSignals.internalDrivers.map((d: any, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">
+                            {safeRender(d)}
+                          </Badge>
                         ))
                       ) : (
                         <span className="text-xs text-muted-foreground">None identified</span>
@@ -513,13 +538,13 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
 
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-1">Trigger</p>
-                    <p className="text-sm">{result.coreSignals.trigger || "Not identified"}</p>
+                    <p className="text-sm">{safeRender(result.coreSignals?.trigger) || "Not identified"}</p>
                   </div>
 
                   {result.projectContextResult && (
                     <div className="pt-2 border-t border-border">
                       <p className="text-xs font-medium text-muted-foreground mb-1">Project Context Result</p>
-                      <p className="text-sm">{result.projectContextResult}</p>
+                      <p className="text-sm">{safeRender(result.projectContextResult)}</p>
                     </div>
                   )}
                 </CardContent>
@@ -535,7 +560,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm italic">{result.whatIfQuestion}</p>
+                    <p className="text-sm italic">{safeRender(result.whatIfQuestion)}</p>
                   </CardContent>
                 </Card>
               )}
@@ -552,33 +577,33 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {result.framingNotes.extracted.length > 0 && (
+                  {result.framingNotes?.extracted?.length > 0 && (
                     <div>
                       <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-600 border-green-500/30 mb-1">
                         Extracted
                       </Badge>
                       <ul className="text-xs space-y-0.5 ml-2">
-                        {result.framingNotes.extracted.map((n, i) => <li key={i}>{n}</li>)}
+                        {result.framingNotes.extracted.map((n: any, i: number) => <li key={i}>{safeRender(n)}</li>)}
                       </ul>
                     </div>
                   )}
-                  {result.framingNotes.inferred.length > 0 && (
+                  {result.framingNotes?.inferred?.length > 0 && (
                     <div>
                       <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/30 mb-1">
                         Inferred
                       </Badge>
                       <ul className="text-xs space-y-0.5 ml-2">
-                        {result.framingNotes.inferred.map((n, i) => <li key={i}>{n}</li>)}
+                        {result.framingNotes.inferred.map((n: any, i: number) => <li key={i}>{safeRender(n)}</li>)}
                       </ul>
                     </div>
                   )}
-                  {result.framingNotes.proposed.length > 0 && (
+                  {result.framingNotes?.proposed?.length > 0 && (
                     <div>
                       <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-600 border-purple-500/30 mb-1">
                         Proposed
                       </Badge>
                       <ul className="text-xs space-y-0.5 ml-2">
-                        {result.framingNotes.proposed.map((n, i) => <li key={i}>{n}</li>)}
+                        {result.framingNotes.proposed.map((n: any, i: number) => <li key={i}>{safeRender(n)}</li>)}
                       </ul>
                     </div>
                   )}
@@ -586,7 +611,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
               </Card>
 
               {/* PS Wizard Scenario Package Preview */}
-              {result.psWizardScenarioPackage.scenarioTitle && (
+              {result.psWizardScenarioPackage?.scenarioTitle && (
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-sm">
@@ -595,13 +620,13 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2 text-xs">
-                    <div><span className="font-medium text-muted-foreground">Title:</span> {result.psWizardScenarioPackage.scenarioTitle}</div>
-                    <div><span className="font-medium text-muted-foreground">Summary:</span> {result.psWizardScenarioPackage.scenarioSummary}</div>
-                    <div><span className="font-medium text-muted-foreground">Business Need:</span> {result.psWizardScenarioPackage.businessNeed}</div>
-                    <div><span className="font-medium text-muted-foreground">Primary Problem:</span> {result.psWizardScenarioPackage.primaryProblem}</div>
-                    <div><span className="font-medium text-muted-foreground">Opportunity:</span> {result.psWizardScenarioPackage.opportunityStatement}</div>
-                    <div><span className="font-medium text-muted-foreground">Urgency Driver:</span> {result.psWizardScenarioPackage.urgencyDriver}</div>
-                    <div><span className="font-medium text-muted-foreground">Recommended Direction:</span> {result.psWizardScenarioPackage.recommendedDirection}</div>
+                    <div><span className="font-medium text-muted-foreground">Title:</span> {safeRender(result.psWizardScenarioPackage.scenarioTitle)}</div>
+                    <div><span className="font-medium text-muted-foreground">Summary:</span> {safeRender(result.psWizardScenarioPackage.scenarioSummary)}</div>
+                    <div><span className="font-medium text-muted-foreground">Business Need:</span> {safeRender(result.psWizardScenarioPackage.businessNeed)}</div>
+                    <div><span className="font-medium text-muted-foreground">Primary Problem:</span> {safeRender(result.psWizardScenarioPackage.primaryProblem)}</div>
+                    <div><span className="font-medium text-muted-foreground">Opportunity:</span> {safeRender(result.psWizardScenarioPackage.opportunityStatement)}</div>
+                    <div><span className="font-medium text-muted-foreground">Urgency Driver:</span> {safeRender(result.psWizardScenarioPackage.urgencyDriver)}</div>
+                    <div><span className="font-medium text-muted-foreground">Recommended Direction:</span> {safeRender(result.psWizardScenarioPackage.recommendedDirection)}</div>
                   </CardContent>
                 </Card>
               )}
@@ -719,40 +744,48 @@ function IdeationWorkflowDraftSection({ draft }: { draft: TranslateResponse["ide
           {draft.contextOfProject && (
             <div>
               <p className="font-medium text-muted-foreground mb-1">Context</p>
-              <p>{draft.contextOfProject}</p>
+              <p>{safeRender(draft.contextOfProject)}</p>
             </div>
           )}
-          {draft.ideaGeneration.length > 0 && (
+          {draft.ideaGeneration?.length > 0 && (
             <div>
               <p className="font-medium text-muted-foreground mb-1">Ideas Generated</p>
               <ol className="list-decimal ml-4 space-y-0.5">
-                {draft.ideaGeneration.map((idea, i) => <li key={i}>{idea}</li>)}
+                {draft.ideaGeneration.map((idea: any, i: number) => <li key={i}>{safeRender(idea)}</li>)}
               </ol>
             </div>
           )}
-          {draft.initialScreening.promisingIdeas.length > 0 && (
+          {draft.initialScreening?.promisingIdeas?.length > 0 && (
             <div>
               <p className="font-medium text-muted-foreground mb-1">Promising Ideas</p>
               <ul className="list-disc ml-4 space-y-0.5">
-                {draft.initialScreening.promisingIdeas.map((idea, i) => <li key={i}>{idea}</li>)}
+                {draft.initialScreening.promisingIdeas.map((idea: any, i: number) => <li key={i}>{safeRender(idea)}</li>)}
               </ul>
             </div>
           )}
-          {draft.conceptSelection.selectedIdea && (
+          {(draft.conceptSelection?.selectedIdea || (draft.conceptSelection as any)?.recommendedApproach) && (
             <div>
               <p className="font-medium text-muted-foreground mb-1">Selected Concept</p>
-              <p className="font-medium">{draft.conceptSelection.selectedIdea}</p>
-              <p className="text-muted-foreground mt-0.5">{draft.conceptSelection.rationale}</p>
+              <p className="font-medium">{safeRender(draft.conceptSelection?.selectedIdea || (draft.conceptSelection as any)?.recommendedApproach)}</p>
+              <p className="text-muted-foreground mt-0.5">{safeRender(draft.conceptSelection?.rationale)}</p>
             </div>
           )}
-          {draft.quickFeasibilityChecks.feasibilityRating && (
+          {(draft.quickFeasibilityChecks?.feasibilityRating || (Array.isArray(draft.quickFeasibilityChecks) && draft.quickFeasibilityChecks.length > 0)) && (
             <div>
               <p className="font-medium text-muted-foreground mb-1">Feasibility</p>
-              <Badge variant="outline">{draft.quickFeasibilityChecks.feasibilityRating}</Badge>
-              {draft.quickFeasibilityChecks.keyFindings.length > 0 && (
-                <ul className="list-disc ml-4 mt-1 space-y-0.5">
-                  {draft.quickFeasibilityChecks.keyFindings.map((f, i) => <li key={i}>{f}</li>)}
+              {Array.isArray(draft.quickFeasibilityChecks) ? (
+                <ul className="list-disc ml-4 space-y-0.5">
+                  {(draft.quickFeasibilityChecks as any[]).map((f: any, i: number) => <li key={i}>{safeRender(f)}</li>)}
                 </ul>
+              ) : (
+                <>
+                  <Badge variant="outline">{safeRender(draft.quickFeasibilityChecks.feasibilityRating)}</Badge>
+                  {draft.quickFeasibilityChecks.keyFindings?.length > 0 && (
+                    <ul className="list-disc ml-4 mt-1 space-y-0.5">
+                      {draft.quickFeasibilityChecks.keyFindings.map((f: any, i: number) => <li key={i}>{safeRender(f)}</li>)}
+                    </ul>
+                  )}
+                </>
               )}
             </div>
           )}

@@ -58,6 +58,14 @@ export class OpenAIProvider extends BaseProvider {
     const model = request.model || this.getConfigValue<string>('defaultModel', 'gpt-4o-mini');
 
     try {
+      // Newer OpenAI models (o1, o3, gpt-4o, etc.) require max_completion_tokens
+      // instead of max_tokens. Use max_completion_tokens for all models — the SDK
+      // handles backwards compatibility for older models.
+      const tokenParam: Record<string, number | undefined> = {};
+      if (request.maxTokens) {
+        tokenParam.max_completion_tokens = request.maxTokens;
+      }
+
       const response = await this.client.chat.completions.create({
         model,
         messages: request.messages.map(msg => ({
@@ -65,7 +73,7 @@ export class OpenAIProvider extends BaseProvider {
           content: msg.content,
         })),
         temperature: request.temperature ?? 0.7,
-        max_tokens: request.maxTokens,
+        ...tokenParam,
         top_p: request.topP,
         stop: request.stopSequences,
         stream: false,
@@ -111,6 +119,11 @@ export class OpenAIProvider extends BaseProvider {
     const model = request.model || this.getConfigValue<string>('defaultModel', 'gpt-4o-mini');
 
     try {
+      const streamTokenParam: Record<string, number | undefined> = {};
+      if (request.maxTokens) {
+        streamTokenParam.max_completion_tokens = request.maxTokens;
+      }
+
       const stream = await this.client.chat.completions.create({
         model,
         messages: request.messages.map(msg => ({
@@ -118,7 +131,7 @@ export class OpenAIProvider extends BaseProvider {
           content: msg.content,
         })),
         temperature: request.temperature ?? 0.7,
-        max_tokens: request.maxTokens,
+        ...streamTokenParam,
         top_p: request.topP,
         stop: request.stopSequences,
         stream: true,

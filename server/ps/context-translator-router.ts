@@ -277,24 +277,35 @@ export const contextTranslatorRouter = router({
         });
       }
 
+      // Safely extract string from a value that may be an object (e.g. {signal, confidence})
+      const toStr = (v: unknown): string => {
+        if (v == null) return "";
+        if (typeof v === "string") return v;
+        if (typeof v === "object") {
+          const o = v as Record<string, unknown>;
+          return String(o.signal || o.text || o.value || o.statement || JSON.stringify(v));
+        }
+        return String(v);
+      };
+
       // Map to step payloads
       const stepPayloads: Record<string, Record<string, unknown>> = {
         context: {
-          externalDriver: result.coreSignals.externalDrivers.join("; "),
-          internalDriver: result.coreSignals.internalDrivers.join("; "),
-          triggerEvent: result.coreSignals.trigger,
-          shapesNeed: result.projectContextResult,
+          externalDriver: (result.coreSignals?.externalDrivers || []).map(toStr).join("; "),
+          internalDriver: (result.coreSignals?.internalDrivers || []).map(toStr).join("; "),
+          triggerEvent: toStr(result.coreSignals?.trigger),
+          shapesNeed: toStr(result.projectContextResult),
         },
         problem: {
-          problemStatement: result.problem.statement,
-          status: result.problem.status,
+          problemStatement: toStr(result.problem?.statement),
+          status: toStr(result.problem?.status || (result.problem as any)?.classification),
         },
         opportunity: {
-          opportunityStatement: result.opportunity.statement,
-          status: result.opportunity.status,
+          opportunityStatement: toStr(result.opportunity?.statement),
+          status: toStr(result.opportunity?.status || (result.opportunity as any)?.classification),
         },
         guiding_question: {
-          whatIfQuestion: result.whatIfQuestion,
+          whatIfQuestion: toStr(result.whatIfQuestion),
         },
       };
 
@@ -339,9 +350,9 @@ export const contextTranslatorRouter = router({
       // Update ideation snapshots
       await db.update(psIdeations)
         .set({
-          problemStatementSnapshot: result.problem.statement || null,
-          opportunityStatementSnapshot: result.opportunity.statement || null,
-          guidingQuestionSnapshot: result.whatIfQuestion || null,
+          problemStatementSnapshot: toStr(result.problem?.statement) || null,
+          opportunityStatementSnapshot: toStr(result.opportunity?.statement) || null,
+          guidingQuestionSnapshot: toStr(result.whatIfQuestion) || null,
           updatedBy: ctx.user.id,
           updatedAt: now,
         })
