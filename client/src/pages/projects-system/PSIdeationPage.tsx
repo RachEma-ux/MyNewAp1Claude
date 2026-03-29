@@ -189,47 +189,49 @@ export function PSIdeationPage() {
               className="cursor-pointer hover:border-primary/50 transition-colors"
               onClick={() => navigate(`/ps/ideation/${ideation.id}`)}
             >
-              <CardContent className="flex items-center justify-between py-3 px-4">
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium truncate">{ideation.title}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    Step: {ideation.currentStepKey || "context"} | Created: {new Date(ideation.createdAt).toLocaleDateString()}
+              <CardContent className="py-3 px-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium truncate">{ideation.title}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Step: {ideation.currentStepKey || "context"} | Created: {new Date(ideation.createdAt).toLocaleDateString()}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 ml-3 shrink-0">
-                  <Badge variant="outline" className={STATUS_COLORS[ideation.lifecycleStatus] || ""}>
-                    {STATUS_LABELS[ideation.lifecycleStatus] || ideation.lifecycleStatus}
-                  </Badge>
-                  {WIZARD_ELIGIBLE_STATUSES.has(ideation.lifecycleStatus) && (
+                  <div className="flex items-center gap-2 ml-3 shrink-0">
+                    <Badge variant="outline" className={STATUS_COLORS[ideation.lifecycleStatus] || ""}>
+                      {STATUS_LABELS[ideation.lifecycleStatus] || ideation.lifecycleStatus}
+                    </Badge>
                     <Button
+                      variant="ghost"
                       size="sm"
-                      className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white"
-                      disabled={checkingWizardId === ideation.id}
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleOpenWizard(ideation.id);
+                        setDeleteTarget({ id: ideation.id, title: ideation.title });
                       }}
                     >
-                      {checkingWizardId === ideation.id ? (
-                        <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                      ) : (
-                        <Wand2 className="w-3.5 h-3.5 mr-1" />
-                      )}
-                      {checkingWizardId === ideation.id ? "Checking..." : "Open in PS Wizard"}
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
-                  )}
+                  </div>
+                </div>
+                {WIZARD_ELIGIBLE_STATUSES.has(ideation.lifecycleStatus) && (
                   <Button
-                    variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                    className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
+                    disabled={checkingWizardId === ideation.id}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setDeleteTarget({ id: ideation.id, title: ideation.title });
+                      handleOpenWizard(ideation.id);
                     }}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    {checkingWizardId === ideation.id ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                    ) : (
+                      <Wand2 className="w-3.5 h-3.5 mr-1" />
+                    )}
+                    {checkingWizardId === ideation.id ? "Checking..." : "Open in PS Wizard"}
                   </Button>
-                </div>
+                )}
               </CardContent>
             </Card>
           ))}
