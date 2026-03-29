@@ -22,9 +22,7 @@ export function ProblemDefinitionToolPanel({ payload, onSave, disabled }: Props)
   const [consequencesOfDoingNothing, setConsequencesOfDoingNothing] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const payloadKey = payload
-    ? `${payload.whatIsNotWorking}|${payload.whoIsImpacted}|${payload.consequencesOfDoingNothing}`
-    : "";
+  const payloadKey = JSON.stringify(payload);
 
   useEffect(() => {
     if (payload) {

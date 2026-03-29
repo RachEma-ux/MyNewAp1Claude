@@ -412,7 +412,14 @@ export const contextTranslatorRouter = router({
         })
         .where(eq(psIdeations.id, input.ideationId));
 
-      return { applied: true, stepsUpdated: Object.keys(stepPayloads) };
+      // Return fresh step data so the client can update the cache immediately
+      // (avoids the async refetch timing gap that causes stale placeholder display)
+      const updatedSteps = await db.select()
+        .from(psIdeationSteps)
+        .where(eq(psIdeationSteps.ideationId, input.ideationId))
+        .orderBy(psIdeationSteps.stepOrder);
+
+      return { applied: true, stepsUpdated: Object.keys(stepPayloads), steps: updatedSteps };
     }),
 
   /**

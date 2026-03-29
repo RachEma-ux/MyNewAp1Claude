@@ -20,7 +20,7 @@ export function GuidingWhatIfToolPanel({ payload, onSave, disabled }: Props) {
   const [whatIf, setWhatIf] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const payloadKey = payload ? `${payload.whatIf}` : "";
+  const payloadKey = JSON.stringify(payload);
 
   useEffect(() => {
     if (payload) {

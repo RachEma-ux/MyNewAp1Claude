@@ -22,9 +22,7 @@ export function OpportunityDefinitionToolPanel({ payload, onSave, disabled }: Pr
   const [strategicAdvantage, setStrategicAdvantage] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const payloadKey = payload
-    ? `${payload.whatCouldBeImproved}|${payload.whatValueCouldBeCreated}|${payload.strategicAdvantage}`
-    : "";
+  const payloadKey = JSON.stringify(payload);
 
   useEffect(() => {
     if (payload) {

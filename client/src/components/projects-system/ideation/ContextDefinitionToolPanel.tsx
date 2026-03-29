@@ -27,12 +27,10 @@ export function ContextDefinitionToolPanel({ payload, onSave, disabled }: Props)
   const [shapesNeed, setShapesNeed] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Serialize relevant payload fields into a primitive key so the effect
-  // fires reliably — object reference equality (React Query structural
-  // sharing) can silently skip updates when only values change.
-  const payloadKey = payload
-    ? `${payload.externalDriver}|${payload.internalDriver}|${payload.triggerEvent}|${payload.shapesNeed}`
-    : "";
+  // Serialize the full payload into a primitive key so the effect fires
+  // reliably — object reference equality (React Query structural sharing)
+  // can silently skip updates when only values change.
+  const payloadKey = JSON.stringify(payload);
 
   useEffect(() => {
     if (payload) {

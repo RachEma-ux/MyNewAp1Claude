@@ -29,9 +29,7 @@ export function OnePageSummaryToolPanel({ payload, autoSummary, onSave, disabled
   const [overrideText, setOverrideText] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const payloadKey = payload
-    ? `${payload.theProblem}|${payload.theOpportunity}|${payload.topIdeas}|${payload.selectedConcept}`
-    : "";
+  const payloadKey = JSON.stringify(payload);
 
   useEffect(() => {
     if (payload) {
