@@ -55,8 +55,25 @@ export async function evaluateReadiness(ideation: PsIdeation): Promise<Readiness
     blockers.push("Multiple concepts selected — exactly one required");
   }
 
-  // 5. Concept rationale present
-  if (!ideation.rationaleSummary && !ideation.selectedConceptSummary) {
+  // 5. Concept rationale present (check ideation snapshots + step payload)
+  let hasRationale = !!(ideation.rationaleSummary || ideation.selectedConceptSummary);
+  if (!hasRationale) {
+    // Also check the concept_selection step payload (translator may have set it there)
+    const csStep = await db.select().from(psIdeationSteps)
+      .where(and(eq(psIdeationSteps.ideationId, ideation.id), eq(psIdeationSteps.stepKey, "concept_selection")))
+      .then(r => r[0]);
+    if (csStep?.payloadJson) {
+      const payload = csStep.payloadJson as Record<string, unknown>;
+      const rationale = payload.rationale as Record<string, string> | undefined;
+      if (rationale && Object.values(rationale).some(v => typeof v === "string" && v.trim())) {
+        hasRationale = true;
+      }
+      if (payload.selectedIdea && typeof payload.selectedIdea === "string" && payload.selectedIdea.trim()) {
+        hasRationale = true;
+      }
+    }
+  }
+  if (!hasRationale) {
     blockers.push("Concept rationale not provided");
   }
 

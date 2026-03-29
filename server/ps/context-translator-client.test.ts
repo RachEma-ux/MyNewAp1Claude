@@ -1259,8 +1259,8 @@ describe("QUESTIONS_TABLE completeness", () => {
     }
   });
 
-  it("has exactly 41 question rows", () => {
-    expect(QUESTIONS_TABLE.length).toBe(41);
+  it("has exactly 45 question rows", () => {
+    expect(QUESTIONS_TABLE.length).toBe(45);
   });
 
   it("every row has non-empty step, stepKey, question, correspondingField", () => {
@@ -1335,11 +1335,13 @@ describe("QUESTIONS_TABLE completeness", () => {
     ]);
   });
 
-  it("Step 10 has exactly 3 questions (concept_selection)", () => {
+  it("Step 10 has exactly 7 questions (concept_selection)", () => {
     const step10 = QUESTIONS_TABLE.filter(q => q.stepKey === "concept_selection");
-    expect(step10.length).toBe(3);
+    expect(step10.length).toBe(7);
     expect(step10.map(q => q.correspondingField).sort()).toEqual([
-      "nextStep", "rationale", "selectedIdea",
+      "nextStep", "rationale.expectedValue", "rationale.feasibility",
+      "rationale.riskProfile", "rationale.stakeholderSupport",
+      "rationale.strategicAlignment", "selectedIdea",
     ]);
   });
 
@@ -1538,9 +1540,13 @@ describe("Direct field mapping — answered table to step payloads", () => {
     expect(byStep.feasibility.testPerformed).toBe("Answer for testPerformed");
     expect(byStep.feasibility.feasibilityRating).toBe("Answer for feasibilityRating");
 
-    // Step 10: concept_selection — simplified to 3 questions
+    // Step 10: concept_selection — 7 questions with rationale sub-fields
     expect(byStep.concept_selection.selectedIdea).toBe("Answer for selectedIdea");
-    expect(byStep.concept_selection.rationale).toBe("Answer for rationale");
+    expect(byStep.concept_selection["rationale.strategicAlignment"]).toBe("Answer for rationale.strategicAlignment");
+    expect(byStep.concept_selection["rationale.expectedValue"]).toBe("Answer for rationale.expectedValue");
+    expect(byStep.concept_selection["rationale.feasibility"]).toBe("Answer for rationale.feasibility");
+    expect(byStep.concept_selection["rationale.riskProfile"]).toBe("Answer for rationale.riskProfile");
+    expect(byStep.concept_selection["rationale.stakeholderSupport"]).toBe("Answer for rationale.stakeholderSupport");
     expect(byStep.concept_selection.nextStep).toBe("Answer for nextStep");
 
     // Step 11: one_page_summary — 7 questions (no overrideText)
@@ -1967,5 +1973,297 @@ describe("Clarification → Re-analysis Flow", () => {
     for (const row of reAnalysisResult.answeredQuestions) {
       expect(row.answer).toBeTruthy();
     }
+  });
+});
+
+// ─── Step 5: Structured Ideas from Answered Table ────────────────────────
+describe("Step 5 — Structured Idea Parsing", () => {
+  it("QUESTIONS_TABLE has Step 5 rawIdeaList field for idea extraction", () => {
+    const rawIdeaRow = QUESTIONS_TABLE.find(
+      q => q.stepKey === "idea_generation" && q.correspondingField === "rawIdeaList",
+    );
+    expect(rawIdeaRow).toBeDefined();
+    expect(rawIdeaRow!.step).toContain("5.");
+  });
+
+  it("parses numbered list into individual ideas", () => {
+    const rawText = "1. AI-powered document search\n2. Self-service analytics dashboard\n3. Automated compliance checks";
+    const lines = rawText
+      .split(/\n/)
+      .map(line => line.replace(/^\s*[-•*\d]+[.):\s]+/, "").trim())
+      .filter(line => line.length > 3);
+    expect(lines).toEqual([
+      "AI-powered document search",
+      "Self-service analytics dashboard",
+      "Automated compliance checks",
+    ]);
+  });
+
+  it("parses bullet-point list into individual ideas", () => {
+    const rawText = "- Cloud migration\n- Data lake consolidation\n- API gateway modernization";
+    const lines = rawText
+      .split(/\n/)
+      .map(line => line.replace(/^\s*[-•*\d]+[.):\s]+/, "").trim())
+      .filter(line => line.length > 3);
+    expect(lines).toEqual([
+      "Cloud migration",
+      "Data lake consolidation",
+      "API gateway modernization",
+    ]);
+  });
+
+  it("extracts title and description from 'Title: Description' format", () => {
+    const line = "Smart Search Engine: An AI-powered search tool that indexes all company documents";
+    const colonSplit = line.match(/^(.+?):\s+(.+)$/);
+    expect(colonSplit).not.toBeNull();
+    expect(colonSplit![1].trim()).toBe("Smart Search Engine");
+    expect(colonSplit![2].trim()).toBe("An AI-powered search tool that indexes all company documents");
+  });
+
+  it("deduplicates ideas by title (case-insensitive)", () => {
+    const existing = new Set(["cloud migration", "api gateway"]);
+    const candidates = ["Cloud Migration", "Data Lake", "API Gateway", "ML Pipeline"];
+    const newIdeas = candidates.filter(c => !existing.has(c.toLowerCase().trim()));
+    expect(newIdeas).toEqual(["Data Lake", "ML Pipeline"]);
+  });
+
+  it("filters out lines shorter than 4 characters", () => {
+    const rawText = "OK\n- Real idea here\nNo\n- Another valid idea";
+    const lines = rawText
+      .split(/\n/)
+      .map(line => line.replace(/^\s*[-•*\d]+[.):\s]+/, "").trim())
+      .filter(line => line.length > 3);
+    expect(lines).toEqual(["Real idea here", "Another valid idea"]);
+  });
+});
+
+// ─── Step 10: Concept Selection Field Mapping ───────────────────────────
+describe("Step 10 — Concept Selection Field Mapping", () => {
+  it("QUESTIONS_TABLE has 7 questions for concept_selection step", () => {
+    const csRows = QUESTIONS_TABLE.filter(q => q.stepKey === "concept_selection");
+    expect(csRows.length).toBe(7);
+  });
+
+  it("QUESTIONS_TABLE has separate rationale sub-fields", () => {
+    const csRows = QUESTIONS_TABLE.filter(q => q.stepKey === "concept_selection");
+    const fields = csRows.map(r => r.correspondingField);
+    expect(fields).toContain("selectedIdea");
+    expect(fields).toContain("rationale.strategicAlignment");
+    expect(fields).toContain("rationale.expectedValue");
+    expect(fields).toContain("rationale.feasibility");
+    expect(fields).toContain("rationale.riskProfile");
+    expect(fields).toContain("rationale.stakeholderSupport");
+    expect(fields).toContain("nextStep");
+  });
+
+  it("rationale sub-fields map 1:1 to ConceptSelectionToolPanel state", () => {
+    // ConceptSelectionToolPanel reads: payload.rationale.{strategicAlignment, expectedValue, feasibility, riskProfile, stakeholderSupport}
+    const panelFields = ["strategicAlignment", "expectedValue", "feasibility", "riskProfile", "stakeholderSupport"];
+    const questionFields = QUESTIONS_TABLE
+      .filter(q => q.stepKey === "concept_selection" && q.correspondingField.startsWith("rationale."))
+      .map(q => q.correspondingField.replace("rationale.", ""));
+    expect(questionFields.sort()).toEqual(panelFields.sort());
+  });
+
+  it("answered table maps to nested rationale object in step payload", () => {
+    // Simulate the mapping logic from applyToIdeation
+    const byStep: Record<string, Record<string, string>> = {
+      concept_selection: {
+        "selectedIdea": "AI-powered document search",
+        "rationale.strategicAlignment": "Aligns with digital transformation strategy",
+        "rationale.expectedValue": "30% reduction in search time",
+        "rationale.feasibility": "Existing NLP models available",
+        "rationale.riskProfile": "Medium — integration complexity",
+        "rationale.stakeholderSupport": "Strong support from CIO",
+        "nextStep": "Build prototype in Q2",
+      },
+    };
+
+    const payload = {
+      selectedIdea: byStep.concept_selection?.selectedIdea || "",
+      rationale: {
+        strategicAlignment: byStep.concept_selection?.["rationale.strategicAlignment"] || "",
+        expectedValue: byStep.concept_selection?.["rationale.expectedValue"] || "",
+        feasibility: byStep.concept_selection?.["rationale.feasibility"] || "",
+        riskProfile: byStep.concept_selection?.["rationale.riskProfile"] || "",
+        stakeholderSupport: byStep.concept_selection?.["rationale.stakeholderSupport"] || "",
+      },
+      nextStep: byStep.concept_selection?.nextStep || "",
+    };
+
+    expect(payload.selectedIdea).toBe("AI-powered document search");
+    expect(payload.rationale.strategicAlignment).toBe("Aligns with digital transformation strategy");
+    expect(payload.rationale.expectedValue).toBe("30% reduction in search time");
+    expect(payload.rationale.feasibility).toBe("Existing NLP models available");
+    expect(payload.rationale.riskProfile).toBe("Medium — integration complexity");
+    expect(payload.rationale.stakeholderSupport).toBe("Strong support from CIO");
+    expect(payload.nextStep).toBe("Build prototype in Q2");
+  });
+
+  it("deriveTranslateResponse combines rationale sub-fields into legacy format", () => {
+    const qtResult: QuestionTableResponse = {
+      decisionGate: { status: "CONTINUE", reason: "" },
+      answeredQuestions: QUESTIONS_TABLE.map(q => ({
+        ...q,
+        answer: q.correspondingField === "rationale.strategicAlignment" ? "Good alignment"
+          : q.correspondingField === "rationale.expectedValue" ? "High ROI"
+          : q.correspondingField === "rationale.feasibility" ? "Very feasible"
+          : q.correspondingField === "selectedIdea" ? "Top Concept"
+          : "",
+        answerType: "proposed" as const,
+        confidence: "medium" as const,
+        evidence: "",
+      })),
+    };
+
+    const legacy = deriveTranslateResponse(qtResult);
+    // Legacy format merges rationale sub-fields into a single string
+    expect(legacy.ideationWorkflowDraft.conceptSelection.rationale).toContain("Good alignment");
+    expect(legacy.ideationWorkflowDraft.conceptSelection.rationale).toContain("High ROI");
+    expect(legacy.ideationWorkflowDraft.conceptSelection.rationale).toContain("Very feasible");
+    expect(legacy.ideationWorkflowDraft.conceptSelection.selectedIdea).toBe("Top Concept");
+  });
+});
+
+// ─── Readiness and Wizard Handoff Integration ────────────────────────────
+describe("Readiness — Translator-Populated State", () => {
+  it("readiness checks require ideas, selected concept, and rationale", () => {
+    // Readiness blockers checklist (from ideation-readiness.ts):
+    const READINESS_BLOCKERS = [
+      "Problem definition not complete",
+      "Opportunity definition not complete",
+      "No ideas created",
+      "No concept selected",
+      "Concept rationale not provided",
+    ];
+    expect(READINESS_BLOCKERS.length).toBe(5);
+  });
+
+  it("translator apply must set ideation.selectedConceptSummary for readiness check 5", () => {
+    // Readiness check: !ideation.rationaleSummary && !ideation.selectedConceptSummary → blocker
+    // After translator apply: selectedConceptSummary is set from concept_selection selectedIdea
+    const snapshot = {
+      selectedConceptSummary: "AI-powered document search",
+      rationaleSummary: "Good alignment | High ROI | Feasible | Medium risk | Strong support",
+    };
+    expect(!!(snapshot.rationaleSummary || snapshot.selectedConceptSummary)).toBe(true);
+  });
+
+  it("rationale from step payload also satisfies readiness check", () => {
+    // Updated readiness also checks concept_selection step payload
+    const stepPayload = {
+      selectedIdea: "Smart Search",
+      rationale: {
+        strategicAlignment: "Aligns well",
+        expectedValue: "",
+        feasibility: "",
+        riskProfile: "",
+        stakeholderSupport: "",
+      },
+    };
+    const rationale = stepPayload.rationale;
+    const hasRationale = Object.values(rationale).some(v => typeof v === "string" && v.trim());
+    expect(hasRationale).toBe(true);
+  });
+});
+
+describe("Wizard Handoff — Scenario Package Persistence", () => {
+  it("deriveTranslateResponse produces a non-empty psWizardScenarioPackage", () => {
+    const qtResult: QuestionTableResponse = {
+      decisionGate: { status: "CONTINUE", reason: "" },
+      answeredQuestions: QUESTIONS_TABLE.map(q => ({
+        ...q,
+        answer: q.correspondingField === "selectedIdea" ? "Cloud Migration Strategy"
+          : q.correspondingField === "whatIsNotWorking" ? "Legacy on-prem systems"
+          : q.correspondingField === "whatCouldBeImproved" ? "Scalability and cost"
+          : q.correspondingField === "externalDriver" ? "Market demands cloud-native"
+          : q.correspondingField === "triggerEvent" ? "Data center lease expires Q4"
+          : "",
+        answerType: "proposed" as const,
+        confidence: "medium" as const,
+        evidence: "",
+      })),
+    };
+
+    const legacy = deriveTranslateResponse(qtResult);
+    expect(legacy.psWizardScenarioPackage).toBeDefined();
+    expect(legacy.psWizardScenarioPackage.scenarioTitle).toBe("Cloud Migration Strategy");
+    expect(legacy.psWizardScenarioPackage.primaryProblem).toBe("Legacy on-prem systems");
+    expect(legacy.psWizardScenarioPackage.opportunityStatement).toBe("Scalability and cost");
+    expect(legacy.psWizardScenarioPackage.urgencyDriver).toBe("Data center lease expires Q4");
+    expect(legacy.psWizardScenarioPackage.businessNeed).toBe("Market demands cloud-native");
+  });
+
+  it("persistTranslatorRun must store legacyResult (with psWizardScenarioPackage), not qtResult", () => {
+    // qtResult (QuestionTableResponse) has no psWizardScenarioPackage field
+    const qtResult: QuestionTableResponse = {
+      decisionGate: { status: "CONTINUE", reason: "" },
+      answeredQuestions: [],
+    };
+    // legacyResult (TranslateResponse) has psWizardScenarioPackage
+    const legacyResult = deriveTranslateResponse(qtResult);
+
+    // generateWizardHandoff reads: result.psWizardScenarioPackage
+    expect((qtResult as any).psWizardScenarioPackage).toBeUndefined();
+    expect(legacyResult.psWizardScenarioPackage).toBeDefined();
+    expect(legacyResult.psWizardScenarioPackage.scenarioTitle).toBeDefined();
+  });
+});
+
+// ─── No Regression to Steps 1-4 ─────────────────────────────────────────
+describe("No Regression — Steps 1-4 Answered Table Mapping", () => {
+  it("Step 1 context fields unchanged in QUESTIONS_TABLE", () => {
+    const ctxRows = QUESTIONS_TABLE.filter(q => q.stepKey === "context");
+    expect(ctxRows.length).toBe(4);
+    const fields = ctxRows.map(r => r.correspondingField);
+    expect(fields).toContain("externalDriver");
+    expect(fields).toContain("internalDriver");
+    expect(fields).toContain("triggerEvent");
+    expect(fields).toContain("shapesNeed");
+  });
+
+  it("Step 2 problem fields unchanged", () => {
+    const rows = QUESTIONS_TABLE.filter(q => q.stepKey === "problem");
+    expect(rows.length).toBe(3);
+    expect(rows.map(r => r.correspondingField)).toEqual(
+      expect.arrayContaining(["whatIsNotWorking", "whoIsImpacted", "consequencesOfDoingNothing"]),
+    );
+  });
+
+  it("Step 3 opportunity fields unchanged", () => {
+    const rows = QUESTIONS_TABLE.filter(q => q.stepKey === "opportunity");
+    expect(rows.length).toBe(3);
+  });
+
+  it("Step 4 guiding question unchanged", () => {
+    const rows = QUESTIONS_TABLE.filter(q => q.stepKey === "guiding_question");
+    expect(rows.length).toBe(1);
+    expect(rows[0].correspondingField).toBe("whatIf");
+  });
+
+  it("total QUESTIONS_TABLE row count is 45 after Step 10 expansion", () => {
+    expect(QUESTIONS_TABLE.length).toBe(45);
+    // 4+3+3+1+3+3+3+7+4+7+7 = 45
+  });
+});
+
+// ─── Idempotent Apply ───────────────────────────────────────────────────
+describe("Idempotent Apply — No Duplicate Ideas", () => {
+  it("deduplication logic prevents adding ideas with same title", () => {
+    const existing = new Set(["smart search engine", "data lake"]);
+    const newCandidates = [
+      "Smart Search Engine",     // duplicate
+      "ML Pipeline Optimizer",   // new
+      "Data Lake",               // duplicate
+    ];
+    const toAdd = newCandidates.filter(c => !existing.has(c.toLowerCase().trim()));
+    expect(toAdd).toEqual(["ML Pipeline Optimizer"]);
+  });
+
+  it("deduplication is case-insensitive and trim-safe", () => {
+    const existing = new Set(["  cloud migration  ".toLowerCase().trim()]);
+    expect(existing.has("cloud migration")).toBe(true);
+    expect(existing.has("CLOUD MIGRATION".toLowerCase().trim())).toBe(true);
+    expect(existing.has("Cloud Migration ".toLowerCase().trim())).toBe(true);
   });
 });

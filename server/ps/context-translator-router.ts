@@ -16,9 +16,9 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { getDb } from "../db/connection";
 import * as client from "./context-translator-client";
-import { psIdeations, psIdeationSteps } from "../../drizzle/tables/ps";
+import { psIdeations, psIdeationSteps, psIdeationIdeas, psIdeationThemes } from "../../drizzle/tables/ps";
 import { psIdeationTranslatorRuns } from "../../drizzle/tables/ps-translator";
-import { eq, desc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import {
   resolveServiceAgentByName,
   checkServiceHealthByName,
@@ -262,9 +262,9 @@ export const contextTranslatorRouter = router({
       // Derive legacy response for persistence and display backward compat
       const legacyResult = deriveTranslateResponse(qtResult);
 
-      // Persist the translator run (non-fatal)
+      // Persist the translator run with legacyResult (contains psWizardScenarioPackage for handoff)
       try {
-        await persistTranslatorRun(ctx.user.id, input.ideationId, input.rawText, qtResult);
+        await persistTranslatorRun(ctx.user.id, input.ideationId, input.rawText, legacyResult);
       } catch (persistErr: any) {
         console.error("[ContextTranslator] persist failed in fallback path:", persistErr.message);
       }
@@ -348,9 +348,9 @@ export const contextTranslatorRouter = router({
       // Derive legacy response for display backward compat
       const legacyResult = deriveTranslateResponse(qtResult);
 
-      // Persist the re-analysis run
+      // Persist the re-analysis run with legacyResult (contains psWizardScenarioPackage)
       try {
-        await persistTranslatorRun(ctx.user.id, input.ideationId, enrichedText, qtResult);
+        await persistTranslatorRun(ctx.user.id, input.ideationId, enrichedText, legacyResult);
       } catch { /* non-fatal */ }
 
       return {
@@ -477,11 +477,11 @@ export const contextTranslatorRouter = router({
           concept_selection: {
             selectedIdea: byStep.concept_selection?.selectedIdea || "",
             rationale: {
-              strategicAlignment: byStep.concept_selection?.rationale || "",
-              expectedValue: "",
-              feasibility: "",
-              riskProfile: "",
-              stakeholderSupport: "",
+              strategicAlignment: byStep.concept_selection?.["rationale.strategicAlignment"] || "",
+              expectedValue: byStep.concept_selection?.["rationale.expectedValue"] || "",
+              feasibility: byStep.concept_selection?.["rationale.feasibility"] || "",
+              riskProfile: byStep.concept_selection?.["rationale.riskProfile"] || "",
+              stakeholderSupport: byStep.concept_selection?.["rationale.stakeholderSupport"] || "",
             },
             nextStep: byStep.concept_selection?.nextStep || "",
           },
@@ -642,7 +642,135 @@ export const contextTranslatorRouter = router({
         }
       }
 
-      // Update ideation snapshots
+      // ── Child Record Creation (question-table path only) ────────────
+      if (hasAnsweredQuestions) {
+        // A. Step 5: Create structured ideas from rawIdeaList
+        const rawIdeaText = String(stepPayloads.idea_generation?.rawIdeaList || "");
+        if (rawIdeaText.trim()) {
+          const existingIdeas = await db.select().from(psIdeationIdeas)
+            .where(eq(psIdeationIdeas.ideationId, input.ideationId));
+          const existingTitles = new Set(existingIdeas.map(i => i.title.toLowerCase().trim()));
+
+          // Parse ideas from numbered lists, bullet points, or newlines
+          const ideaLines = rawIdeaText
+            .split(/\n/)
+            .map(line => line.replace(/^\s*[-•*\d]+[.):\s]+/, "").trim())
+            .filter(line => line.length > 3);
+
+          for (const line of ideaLines) {
+            // Extract title and description: "Title: Description" or "Title - Description"
+            let title = line;
+            let description: string | null = null;
+            const colonSplit = line.match(/^(.+?):\s+(.+)$/);
+            const dashSplit = line.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+            if (colonSplit && colonSplit[1].length < 100) {
+              title = colonSplit[1].trim();
+              description = colonSplit[2].trim();
+            } else if (dashSplit && dashSplit[1].length < 100) {
+              title = dashSplit[1].trim();
+              description = dashSplit[2].trim();
+            }
+            // Truncate if too long for a title
+            if (title.length > 200) {
+              description = title;
+              title = title.substring(0, 80) + "…";
+            }
+
+            // Deduplicate by title (case-insensitive)
+            if (existingTitles.has(title.toLowerCase().trim())) continue;
+            existingTitles.add(title.toLowerCase().trim());
+
+            await db.insert(psIdeationIdeas).values({
+              ideationId: input.ideationId,
+              title,
+              description,
+              sourceType: "translator",
+            });
+          }
+        }
+
+        // B. Step 6: Create themes from themeLabels
+        const themeLabelsText = String(stepPayloads.clustering?.themeLabels || "");
+        if (themeLabelsText.trim()) {
+          const existingThemes = await db.select().from(psIdeationThemes)
+            .where(eq(psIdeationThemes.ideationId, input.ideationId));
+          const existingLabels = new Set(existingThemes.map(t => t.label.toLowerCase().trim()));
+
+          const themeLines = themeLabelsText
+            .split(/[,;\n]/)
+            .map(s => s.replace(/^\s*[-•*\d]+[.):\s]+/, "").trim())
+            .filter(s => s.length > 1);
+
+          for (let i = 0; i < themeLines.length; i++) {
+            const label = themeLines[i];
+            if (existingLabels.has(label.toLowerCase().trim())) continue;
+            existingLabels.add(label.toLowerCase().trim());
+
+            await db.insert(psIdeationThemes).values({
+              ideationId: input.ideationId,
+              label,
+              sortOrder: existingThemes.length + i,
+            });
+          }
+        }
+
+        // C. Step 7: Mark promising ideas as shortlisted
+        const promisingText = String(stepPayloads.screening?.promisingIdeas || "");
+        if (promisingText.trim()) {
+          const allIdeas = await db.select().from(psIdeationIdeas)
+            .where(eq(psIdeationIdeas.ideationId, input.ideationId));
+          const promisingNames = promisingText.toLowerCase();
+          for (const idea of allIdeas) {
+            if (promisingNames.includes(idea.title.toLowerCase())) {
+              await db.update(psIdeationIdeas)
+                .set({ isShortlisted: 1, updatedAt: now })
+                .where(eq(psIdeationIdeas.id, idea.id));
+            }
+          }
+        }
+
+        // D. Step 10: Select the winning concept + update ideation snapshots
+        const selectedIdeaText = String(stepPayloads.concept_selection?.selectedIdea || "").trim();
+        const rationaleObj = stepPayloads.concept_selection?.rationale as Record<string, string> | undefined;
+        if (selectedIdeaText) {
+          const allIdeas = await db.select().from(psIdeationIdeas)
+            .where(eq(psIdeationIdeas.ideationId, input.ideationId));
+
+          // Find best matching idea by title (case-insensitive substring match)
+          const selectedLower = selectedIdeaText.toLowerCase();
+          let matchedIdea = allIdeas.find(i => i.title.toLowerCase() === selectedLower)
+            || allIdeas.find(i => selectedLower.includes(i.title.toLowerCase()))
+            || allIdeas.find(i => i.title.toLowerCase().includes(selectedLower.substring(0, 30)));
+
+          if (matchedIdea) {
+            // Deselect all, then select the match
+            await db.update(psIdeationIdeas)
+              .set({ isSelected: 0, updatedAt: now })
+              .where(eq(psIdeationIdeas.ideationId, input.ideationId));
+            await db.update(psIdeationIdeas)
+              .set({ isSelected: 1, isShortlisted: 1, updatedAt: now })
+              .where(eq(psIdeationIdeas.id, matchedIdea.id));
+          }
+
+          // Build rationale summary from sub-fields
+          const rationaleSummary = rationaleObj
+            ? Object.values(rationaleObj).filter(v => typeof v === "string" && v.trim()).join(" | ")
+            : "";
+
+          // Update ideation-level snapshots (readiness checks these)
+          await db.update(psIdeations)
+            .set({
+              selectedIdeaId: matchedIdea?.id || null,
+              selectedConceptSummary: selectedIdeaText,
+              rationaleSummary: rationaleSummary || null,
+              updatedBy: ctx.user.id,
+              updatedAt: now,
+            })
+            .where(eq(psIdeations.id, input.ideationId));
+        }
+      }
+
+      // Update ideation snapshots (problem, opportunity, guiding question)
       await db.update(psIdeations)
         .set({
           problemStatementSnapshot: problemSnapshot || null,

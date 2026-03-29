@@ -284,14 +284,26 @@ export const QUESTIONS_TABLE: QuestionTableRow[] = [
     question: "What is the overall feasibility rating (High/Medium/Low)?",
     correspondingField: "feasibilityRating" },
 
-  // ── Step 10: Concept Selection (3 Qs) ─────────────────
+  // ── Step 10: Concept Selection (7 Qs) ─────────────────
   // ConceptSelectionToolPanel: selectedIdeaId (FK), rationale (nested), nextStep
   { step: "10. Concept Selection", stepKey: "concept_selection",
     question: "Which idea or concept is recommended for selection, and why?",
     correspondingField: "selectedIdea" },
   { step: "10. Concept Selection", stepKey: "concept_selection",
-    question: "What is the overall rationale for selecting this concept (strategic alignment, expected value, feasibility, risk, stakeholder support)?",
-    correspondingField: "rationale" },
+    question: "How well does the recommended concept align with strategic goals?",
+    correspondingField: "rationale.strategicAlignment" },
+  { step: "10. Concept Selection", stepKey: "concept_selection",
+    question: "What is the expected value or benefit of this concept?",
+    correspondingField: "rationale.expectedValue" },
+  { step: "10. Concept Selection", stepKey: "concept_selection",
+    question: "How feasible is this concept to implement?",
+    correspondingField: "rationale.feasibility" },
+  { step: "10. Concept Selection", stepKey: "concept_selection",
+    question: "What is the risk profile of this concept?",
+    correspondingField: "rationale.riskProfile" },
+  { step: "10. Concept Selection", stepKey: "concept_selection",
+    question: "What level of stakeholder support exists for this concept?",
+    correspondingField: "rationale.stakeholderSupport" },
   { step: "10. Concept Selection", stepKey: "concept_selection",
     question: "What should be the immediate next step after selecting this concept?",
     correspondingField: "nextStep" },
@@ -321,7 +333,7 @@ export const QUESTIONS_TABLE: QuestionTableRow[] = [
     question: "Why was this concept selected over alternatives?",
     correspondingField: "reasonForSelection" },
 ];
-// Total: 41 rows (4+3+3+1+3+3+3+7+4+3+7)
+// Total: 45 rows (4+3+3+1+3+3+3+7+4+7+7)
 
 // ── Question-Table System Prompt ─────────────────────────────────────────
 
@@ -700,7 +712,13 @@ export function deriveTranslateResponse(qt: QuestionTableResponse): TranslateRes
       conceptSelection: {
         selectedIdea: getAnswer("concept_selection", "selectedIdea")
           || getAnswer("one_page_summary", "selectedConcept"),
-        rationale: getAnswer("concept_selection", "rationale")
+        rationale: [
+          getAnswer("concept_selection", "rationale.strategicAlignment"),
+          getAnswer("concept_selection", "rationale.expectedValue"),
+          getAnswer("concept_selection", "rationale.feasibility"),
+          getAnswer("concept_selection", "rationale.riskProfile"),
+          getAnswer("concept_selection", "rationale.stakeholderSupport"),
+        ].filter(Boolean).join(" | ")
           || getAnswer("one_page_summary", "reasonForSelection"),
         nextStep: getAnswer("concept_selection", "nextStep"),
       },
