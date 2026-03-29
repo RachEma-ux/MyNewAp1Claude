@@ -40,6 +40,69 @@ import {
 } from "../modules/pmt/context-translator-agent";
 import type { QuestionTableResponse, AnsweredQuestionRow, ClarificationChoiceGroup } from "@shared/ps-context-translator-types";
 
+// ── Idea Matching Utility ──────────────────────────────────────────────────
+
+/**
+ * Find the best matching idea from a list, given the LLM's selectedIdea answer text.
+ *
+ * The LLM answer for "Which idea is recommended?" may contain:
+ * - Just the idea name (ideal)
+ * - The idea name + rationale ("Smart Search — aligns with strategy...")
+ * - Multiple idea names listed (buggy case: the entire idea block)
+ *
+ * Matching strategy:
+ * 1. Exact title match (highest priority)
+ * 2. Position-scored substring match (earliest mention wins)
+ * 3. First-line fallback (match against just the first sentence)
+ */
+export function findBestIdeaMatch<T extends { id: number; title: string }>(
+  selectedIdeaText: string,
+  ideas: T[],
+): T | null {
+  if (!selectedIdeaText.trim() || ideas.length === 0) return null;
+
+  const selectedLower = selectedIdeaText.toLowerCase().trim();
+
+  // 1. Exact title match (highest priority)
+  const exact = ideas.find(i => i.title.toLowerCase().trim() === selectedLower);
+  if (exact) return exact;
+
+  // 2. Score each idea by how early its title appears in the selectedIdea text.
+  //    When the LLM answer mentions multiple ideas, the recommended one
+  //    is typically the first mentioned.
+  const scored = ideas
+    .map(idea => {
+      const titleLower = idea.title.toLowerCase().trim();
+      if (titleLower.length < 3) return null;
+      const idx = selectedLower.indexOf(titleLower);
+      if (idx === -1) return null;
+      return { idea, titleLen: titleLower.length, position: idx };
+    })
+    .filter((s): s is NonNullable<typeof s> => s !== null);
+
+  if (scored.length === 1) {
+    // Only one idea title found in the text — unambiguous match
+    return scored[0].idea;
+  }
+  if (scored.length > 1) {
+    // Multiple idea titles found — pick the one mentioned first (earliest position),
+    // breaking ties by longer title (more specific match)
+    scored.sort((a, b) => a.position - b.position || b.titleLen - a.titleLen);
+    return scored[0].idea;
+  }
+
+  // 3. Fallback: match against just the first line/sentence of the answer
+  const firstLine = selectedIdeaText.split(/[\n.]/)[0].trim();
+  if (firstLine.length > 3) {
+    const firstLower = firstLine.toLowerCase();
+    return ideas.find(i => firstLower.includes(i.title.toLowerCase().trim()))
+      || ideas.find(i => i.title.toLowerCase().trim().startsWith(firstLower.substring(0, 40)))
+      || null;
+  }
+
+  return null;
+}
+
 // ── LLM Resolution ─────────────────────────────────────────────────────────
 
 interface ResolvedLlm {
@@ -736,11 +799,8 @@ export const contextTranslatorRouter = router({
           const allIdeas = await db.select().from(psIdeationIdeas)
             .where(eq(psIdeationIdeas.ideationId, input.ideationId));
 
-          // Find best matching idea by title (case-insensitive substring match)
-          const selectedLower = selectedIdeaText.toLowerCase();
-          let matchedIdea = allIdeas.find(i => i.title.toLowerCase() === selectedLower)
-            || allIdeas.find(i => selectedLower.includes(i.title.toLowerCase()))
-            || allIdeas.find(i => i.title.toLowerCase().includes(selectedLower.substring(0, 30)));
+          // Use position-scored matching to find exactly one idea
+          const matchedIdea = findBestIdeaMatch(selectedIdeaText, allIdeas);
 
           if (matchedIdea) {
             // Deselect all, then select the match
@@ -758,10 +818,12 @@ export const contextTranslatorRouter = router({
             : "";
 
           // Update ideation-level snapshots (readiness checks these)
+          // CRITICAL: Use matchedIdea.title (clean name) instead of raw LLM text
+          // which may contain multiple idea names concatenated
           await db.update(psIdeations)
             .set({
               selectedIdeaId: matchedIdea?.id || null,
-              selectedConceptSummary: selectedIdeaText,
+              selectedConceptSummary: matchedIdea ? matchedIdea.title : selectedIdeaText,
               rationaleSummary: rationaleSummary || null,
               updatedBy: ctx.user.id,
               updatedAt: now,

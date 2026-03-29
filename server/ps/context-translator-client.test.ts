@@ -18,6 +18,7 @@ import type {
   HealthResponse,
 } from "./context-translator-client";
 import { normalizeTranslateResponse, QUESTIONS_TABLE, normalizeQuestionTableResponse, deriveTranslateResponse, buildClarificationEnrichedText } from "../modules/pmt/context-translator-agent";
+import { findBestIdeaMatch } from "./context-translator-router";
 import type {
   AnsweredQuestionRow,
   QuestionTableResponse,
@@ -2265,5 +2266,133 @@ describe("Idempotent Apply — No Duplicate Ideas", () => {
     expect(existing.has("cloud migration")).toBe(true);
     expect(existing.has("CLOUD MIGRATION".toLowerCase().trim())).toBe(true);
     expect(existing.has("Cloud Migration ".toLowerCase().trim())).toBe(true);
+  });
+});
+
+// ─── Step 10: findBestIdeaMatch — Position-Scored Concept Selection ──────
+describe("findBestIdeaMatch — Concept Selection Resolution", () => {
+  const ideas = [
+    { id: 1, title: "AI-powered document search" },
+    { id: 2, title: "Self-service analytics dashboard" },
+    { id: 3, title: "Automated compliance checks" },
+  ];
+
+  it("exact title match returns the correct idea", () => {
+    const match = findBestIdeaMatch("AI-powered document search", ideas);
+    expect(match).not.toBeNull();
+    expect(match!.id).toBe(1);
+    expect(match!.title).toBe("AI-powered document search");
+  });
+
+  it("exact match is case-insensitive", () => {
+    const match = findBestIdeaMatch("ai-powered document search", ideas);
+    expect(match).not.toBeNull();
+    expect(match!.id).toBe(1);
+  });
+
+  it("returns the idea mentioned FIRST when LLM answer contains multiple idea titles", () => {
+    // This is THE core bug fix: the LLM returned all ideas concatenated,
+    // old code picked whichever idea appeared first in DB order via .find(),
+    // new code picks the one mentioned earliest in the text.
+    const multiIdeaAnswer =
+      "Self-service analytics dashboard is the recommended concept because it provides " +
+      "immediate value. AI-powered document search was also considered. " +
+      "Automated compliance checks was deferred.";
+    const match = findBestIdeaMatch(multiIdeaAnswer, ideas);
+    expect(match).not.toBeNull();
+    expect(match!.id).toBe(2); // "Self-service analytics dashboard" appears first in the text
+    expect(match!.title).toBe("Self-service analytics dashboard");
+  });
+
+  it("returns the idea mentioned first even with reversed DB order", () => {
+    const reversed = [...ideas].reverse(); // DB order: 3, 2, 1
+    const answer = "Automated compliance checks is the strongest choice. " +
+      "AI-powered document search and Self-service analytics were also evaluated.";
+    const match = findBestIdeaMatch(answer, reversed);
+    expect(match).not.toBeNull();
+    expect(match!.id).toBe(3); // "Automated compliance checks" mentioned first
+  });
+
+  it("handles idea title followed by rationale text", () => {
+    const answer = "AI-powered document search — aligns with digital transformation strategy and has highest ROI";
+    const match = findBestIdeaMatch(answer, ideas);
+    expect(match).not.toBeNull();
+    expect(match!.id).toBe(1);
+  });
+
+  it("returns null when no ideas match at all", () => {
+    const match = findBestIdeaMatch("Blockchain integration platform", ideas);
+    expect(match).toBeNull();
+  });
+
+  it("returns null for empty text", () => {
+    expect(findBestIdeaMatch("", ideas)).toBeNull();
+    expect(findBestIdeaMatch("   ", ideas)).toBeNull();
+  });
+
+  it("returns null for empty ideas array", () => {
+    expect(findBestIdeaMatch("Some idea", [])).toBeNull();
+  });
+
+  it("first-line fallback matches when full text does not contain exact title", () => {
+    // First line contains partial match
+    const answer = "AI-powered document search\nThis concept was selected based on feasibility.";
+    const match = findBestIdeaMatch(answer, ideas);
+    expect(match).not.toBeNull();
+    expect(match!.id).toBe(1);
+  });
+
+  it("prefers longer title when two ideas match at the same position", () => {
+    const overlapping = [
+      { id: 10, title: "Data" },
+      { id: 11, title: "Data Lake Consolidation" },
+    ];
+    const answer = "Data Lake Consolidation is the recommended concept.";
+    const match = findBestIdeaMatch(answer, overlapping);
+    expect(match).not.toBeNull();
+    expect(match!.id).toBe(11); // Longer, more specific match wins
+  });
+
+  it("skips very short titles (< 3 chars) to avoid false positives", () => {
+    const withShort = [
+      { id: 20, title: "AI" }, // too short
+      { id: 21, title: "Machine Learning Pipeline" },
+    ];
+    const answer = "AI and Machine Learning Pipeline are both viable. Machine Learning Pipeline is recommended.";
+    const match = findBestIdeaMatch(answer, withShort);
+    expect(match).not.toBeNull();
+    expect(match!.id).toBe(21); // "AI" is skipped (< 3 chars)
+  });
+});
+
+// ─── Step 10: selectedConceptSummary uses matched title ──────────────────
+describe("Step 10 — selectedConceptSummary uses matched idea title", () => {
+  it("snapshot stores matched idea title, not raw LLM answer text", () => {
+    // Simulates the fix: when a match is found, use matchedIdea.title
+    const ideas = [
+      { id: 1, title: "Smart Search Engine" },
+      { id: 2, title: "Analytics Dashboard" },
+    ];
+    const rawLlmAnswer = "Smart Search Engine is recommended because it aligns with strategy. " +
+      "Analytics Dashboard was also considered but deferred.";
+
+    const matchedIdea = findBestIdeaMatch(rawLlmAnswer, ideas);
+    // The fixed code uses: matchedIdea ? matchedIdea.title : selectedIdeaText
+    const selectedConceptSummary = matchedIdea ? matchedIdea.title : rawLlmAnswer;
+
+    expect(selectedConceptSummary).toBe("Smart Search Engine");
+    expect(selectedConceptSummary).not.toContain("Analytics Dashboard");
+    expect(selectedConceptSummary).not.toContain("recommended because");
+  });
+
+  it("falls back to raw text when no match found", () => {
+    const ideas = [{ id: 1, title: "Cloud Migration" }];
+    const rawLlmAnswer = "Blockchain integration is recommended.";
+
+    const matchedIdea = findBestIdeaMatch(rawLlmAnswer, ideas);
+    const selectedConceptSummary = matchedIdea ? matchedIdea.title : rawLlmAnswer;
+
+    expect(matchedIdea).toBeNull();
+    expect(selectedConceptSummary).toBe(rawLlmAnswer);
   });
 });
