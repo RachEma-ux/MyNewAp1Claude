@@ -405,6 +405,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
 
   // ── PS Ideation — Context Translator ───────────────────────────────
   "ps.ideation.contextTranslator.translate": "ps.ideation.contextTranslator.translate",
+  "ps.ideation.contextTranslator.translateFallback": "ps.ideation.contextTranslator.translateFallback",
   "ps.ideation.contextTranslator.applyToIdeation": "ps.ideation.contextTranslator.apply",
 
   // ── Modules (Engine Binding) ─────────────────────────────────────────────

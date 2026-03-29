@@ -185,12 +185,18 @@ export async function analyzeRawInput(
   ];
 
   // Use the catalog-resolved model if provided, otherwise let the provider choose
-  const raw = await callLLM(provider, messages, {
-    temperature: 0.3,
-    maxTokens: 8000,
-    model: llmHint?.model || undefined,
-  });
-  return parseLLMJson<TranslateResponse>(raw);
+  try {
+    const raw = await callLLM(provider, messages, {
+      temperature: 0.3,
+      maxTokens: 8000,
+      model: llmHint?.model || undefined,
+    });
+    return parseLLMJson<TranslateResponse>(raw);
+  } catch (err: any) {
+    // LLM call failed (quota exceeded, network error, etc.) — degrade gracefully
+    console.warn(`[ContextTranslator] LLM call failed (${err.code || err.message}), falling back to template`);
+    return createFallbackResponse(rawText);
+  }
 }
 
 /** Generate a PS Wizard scenario package from raw input */

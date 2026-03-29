@@ -209,7 +209,7 @@ export const contextTranslatorRouter = router({
    * The user must explicitly choose this action from the UI.
    * Results are always labeled as fallback output.
    */
-  translateFallback: governedProcedure
+  translateFallback: protectedProcedure
     .input(z.object({
       ideationId: z.number().int().positive(),
       rawText: z.string().min(10).max(10000),
