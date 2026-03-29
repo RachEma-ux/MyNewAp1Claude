@@ -235,6 +235,20 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Setup Python for Context Translator
+        if: ${{ github.event.inputs.run_app == 'yes' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Context Translator dependencies
+        if: ${{ github.event.inputs.run_app == 'yes' }}
+        run: |
+          echo "🐍 Installing Project Context Translator dependencies..."
+          pip install -r services/project-context-translator/requirements.txt
+          python -m spacy download en_core_web_sm
+          echo "✅ Context Translator dependencies installed"
+
       # ========== BUILD PHASE ==========
       - name: Install dependencies
         run: |
@@ -454,6 +468,25 @@ jobs:
 
           echo "🚀 Starting application..."
 
+          # Start Project Context Translator (Python FastAPI on port 8585)
+          echo "🐍 Starting Project Context Translator service..."
+          PCT_LLM_PROVIDER="${PCT_LLM_PROVIDER:-openai}" \
+          PCT_LLM_API_KEY="${OPENAI_API_KEY}" \
+          PCT_LLM_MODEL="${PCT_LLM_MODEL:-gpt-4o-mini}" \
+          python -m uvicorn main:app --host 0.0.0.0 --port 8585 \
+            --app-dir services/project-context-translator \
+            > pct-service.log 2>&1 &
+          PCT_PID=$!
+          sleep 3
+
+          # Verify Context Translator is up
+          if curl -fsS http://localhost:8585/health > /dev/null 2>&1; then
+            echo "✅ Context Translator service healthy on port 8585"
+          else
+            echo "⚠️ Context Translator service not responding (non-blocking)"
+            cat pct-service.log 2>/dev/null | tail -20 || true
+          fi
+
           # Start Ollama server (models already pulled)
           echo "🦙 Starting Ollama server..."
           ollama serve &
@@ -496,6 +529,7 @@ jobs:
           OPENAI_API_KEY="${OPENAI_API_KEY}" \
           ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
           GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
+          PROJECT_CONTEXT_TRANSLATOR_URL="http://localhost:8585" \
           node dist/index.js > server.log 2>&1 &
           SERVER_PID=$!
 
@@ -619,6 +653,7 @@ jobs:
           kill $SERVER_PID 2>/dev/null || true
           kill $TUNNEL_PID 2>/dev/null || true
           kill $OLLAMA_PID 2>/dev/null || true
+          kill $PCT_PID 2>/dev/null || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -630,6 +665,7 @@ jobs:
             server.log
             health.log
             tunnel.log
+            pct-service.log
             pack-output/pack.json
             ${{ env.ARCHIVE_NAME }}
           retention-days: 7
