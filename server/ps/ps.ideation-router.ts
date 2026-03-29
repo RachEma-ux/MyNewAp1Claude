@@ -248,7 +248,7 @@ export const ideationRouter = router({
       });
     }),
 
-  deleteDraft: governedProcedure
+  deleteDraft: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       return service.deleteIdeationDraft(input.id, ctx.user.id);

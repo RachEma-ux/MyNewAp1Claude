@@ -200,8 +200,11 @@ export async function deleteIdeationDraft(id: number, actorId: number) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Converted ideations cannot be deleted" });
   }
 
-  // Cascade delete child entities
-  await db.delete(psIdeationTranslatorRuns).where(eq(psIdeationTranslatorRuns.ideationId, id));
+  // Cascade delete child entities (order: deepest children first)
+  // Translator runs table may not exist if migration hasn't run yet
+  try {
+    await db.delete(psIdeationTranslatorRuns).where(eq(psIdeationTranslatorRuns.ideationId, id));
+  } catch { /* table may not exist yet */ }
   await db.delete(psIdeationActivity).where(eq(psIdeationActivity.ideationId, id));
   await db.delete(psIdeationFeasibilityChecks).where(eq(psIdeationFeasibilityChecks.ideationId, id));
   await db.delete(psIdeationScenarios).where(eq(psIdeationScenarios.ideationId, id));
