@@ -136,7 +136,7 @@ async function persistTranslatorRun(
     await db.insert(psIdeationTranslatorRuns).values({
       ideationId,
       rawInput: rawText,
-      decisionGateStatus: result.decisionGate.status,
+      decisionGateStatus: result.decisionGate?.status ?? "CONTINUE",
       resultJson: result as any,
       createdBy: userId,
     });
@@ -145,6 +145,7 @@ async function persistTranslatorRun(
   }
 }
 
+// Force restart — debug logging enabled
 export const contextTranslatorRouter = router({
   /**
    * POST /translate — Run the Project Context Translator via service-backed path ONLY.
@@ -160,7 +161,8 @@ export const contextTranslatorRouter = router({
       metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const resolvedLlm = await resolveAgentLlm();
+      let resolvedLlm: Awaited<ReturnType<typeof resolveAgentLlm>> = null;
+      try { resolvedLlm = await resolveAgentLlm(); } catch { /* non-fatal */ }
 
       const llmOverride: client.LlmOverride | undefined = resolvedLlm
         ? {
@@ -215,7 +217,12 @@ export const contextTranslatorRouter = router({
       rawText: z.string().min(10).max(10000),
     }))
     .mutation(async ({ ctx, input }) => {
-      const resolvedLlm = await resolveAgentLlm();
+      let resolvedLlm: Awaited<ReturnType<typeof resolveAgentLlm>> = null;
+      try {
+        resolvedLlm = await resolveAgentLlm();
+      } catch (llmErr: any) {
+        console.warn(`[ContextTranslator] LLM resolution failed: ${llmErr.message}`);
+      }
 
       let result: client.TranslateResponse;
       let source: ExecutionSource;
@@ -227,7 +234,7 @@ export const contextTranslatorRouter = router({
           apiBaseUrl: resolvedLlm?.apiBaseUrl,
         });
 
-        if (result.decisionGate.reason?.includes("without LLM")) {
+        if (result.decisionGate?.reason?.includes("without LLM")) {
           source = "fallback-template";
         } else if (resolvedLlm) {
           source = "built-in-catalog-llm";
@@ -235,6 +242,7 @@ export const contextTranslatorRouter = router({
           source = "built-in-llm";
         }
       } catch (fallbackErr: any) {
+        console.error(`[ContextTranslator] translateFallback error:`, fallbackErr);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Built-in fallback failed: ${fallbackErr.message || "unknown error"}`,
@@ -270,7 +278,7 @@ export const contextTranslatorRouter = router({
 
       const result = input.translatorResult as client.TranslateResponse;
 
-      if (result.decisionGate.status !== "CONTINUE") {
+      if (result.decisionGate?.status !== "CONTINUE") {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Cannot apply translator output in CLARIFICATION_NEEDED mode",

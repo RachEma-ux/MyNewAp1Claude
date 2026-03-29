@@ -111,6 +111,12 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
     utils.ps.ideation.contextTranslator.resolveRuntime.invalidate();
   }, [utils]);
 
+  // Extract the real error from tRPC's appBlocker wrapper
+  const extractError = (e: any): string => {
+    const tech = e?.data?.appBlocker?.technicalDetails;
+    return tech || e.message || "Unknown error";
+  };
+
   // Primary translator mutation — service-backed only, no auto-fallback
   const translateMut = trpc.ps.ideation.contextTranslator.translate.useMutation({
     onSuccess: (data) => {
@@ -122,7 +128,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
         toast.info("Clarification needed — see questions below");
       }
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(extractError(e)),
   });
 
   // Fallback mutation — built-in LLM path, user-initiated only
@@ -141,7 +147,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
         toast.info("Clarification needed — see questions below");
       }
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(extractError(e)),
   });
 
   const applyMut = trpc.ps.ideation.contextTranslator.applyToIdeation.useMutation({
