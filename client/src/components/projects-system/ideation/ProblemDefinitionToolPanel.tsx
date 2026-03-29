@@ -22,6 +22,10 @@ export function ProblemDefinitionToolPanel({ payload, onSave, disabled }: Props)
   const [consequencesOfDoingNothing, setConsequencesOfDoingNothing] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const payloadKey = payload
+    ? `${payload.whatIsNotWorking}|${payload.whoIsImpacted}|${payload.consequencesOfDoingNothing}`
+    : "";
+
   useEffect(() => {
     if (payload) {
       // Canonical keys with backward-compat aliases for older saved records
@@ -31,7 +35,7 @@ export function ProblemDefinitionToolPanel({ payload, onSave, disabled }: Props)
       setWhoIsImpacted((payload.whoIsImpacted as string) || "");
       setConsequencesOfDoingNothing((payload.consequencesOfDoingNothing as string) || "");
     }
-  }, [payload]);
+  }, [payloadKey]);
 
   const handleSave = async () => {
     setSaving(true);

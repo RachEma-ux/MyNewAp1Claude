@@ -114,6 +114,7 @@ interface Props {
   onUpsertFeasibility: (check: any) => Promise<void>;
   onPrev: () => void;
   onNext: () => void;
+  onApplied?: () => void;
   saveStatus: SaveStatus;
   stepIndex: number;
   stepCount: number;
@@ -129,7 +130,7 @@ export function PSIdeationWorkspace({
   autoSummary, ideationId, isConverted,
   onSaveStep, onAddIdea, onSelectIdea, onUpsertTheme, onAssignIdea,
   onSaveScore, onUpsertScenario, onUpsertFeasibility,
-  onPrev, onNext, saveStatus, stepIndex, stepCount,
+  onPrev, onNext, onApplied, saveStatus, stepIndex, stepCount,
 }: Props) {
   const payload = getStepPayload(steps, currentStep);
   const disabled = isConverted;
@@ -152,7 +153,7 @@ export function PSIdeationWorkspace({
       <StepErrorBoundary stepKey={currentStep}>
         {currentStep === "context" && (
           <>
-            <ContextTranslatorPanel ideationId={ideationId} disabled={disabled} />
+            <ContextTranslatorPanel ideationId={ideationId} disabled={disabled} onApplied={onApplied} />
             <div className="my-4 border-t border-border" />
             <ContextDefinitionToolPanel payload={payload} onSave={saveHandler("context")} disabled={disabled} />
           </>

@@ -27,6 +27,13 @@ export function ContextDefinitionToolPanel({ payload, onSave, disabled }: Props)
   const [shapesNeed, setShapesNeed] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Serialize relevant payload fields into a primitive key so the effect
+  // fires reliably — object reference equality (React Query structural
+  // sharing) can silently skip updates when only values change.
+  const payloadKey = payload
+    ? `${payload.externalDriver}|${payload.internalDriver}|${payload.triggerEvent}|${payload.shapesNeed}`
+    : "";
+
   useEffect(() => {
     if (payload) {
       const str = (v: unknown): string => {
@@ -43,7 +50,7 @@ export function ContextDefinitionToolPanel({ payload, onSave, disabled }: Props)
       setTriggerEvent(str(payload.triggerEvent));
       setShapesNeed(str(payload.shapesNeed));
     }
-  }, [payload]);
+  }, [payloadKey]);
 
   const handleSave = async () => {
     setSaving(true);

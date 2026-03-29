@@ -352,6 +352,7 @@ export function PSIdeationShell({ ideationId }: Props) {
           onUpsertFeasibility={handleUpsertFeasibility}
           onPrev={handlePrev}
           onNext={handleNext}
+          onApplied={invalidateAll}
           saveStatus={saveStatus}
           stepIndex={stepIndex}
           stepCount={IDEATION_STEP_KEYS.length}

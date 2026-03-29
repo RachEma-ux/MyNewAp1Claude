@@ -20,12 +20,14 @@ export function GuidingWhatIfToolPanel({ payload, onSave, disabled }: Props) {
   const [whatIf, setWhatIf] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const payloadKey = payload ? `${payload.whatIf}` : "";
+
   useEffect(() => {
     if (payload) {
       // Canonical key with backward-compat alias for older saved records
       setWhatIf((payload.whatIf as string) || (payload.whatIfQuestion as string) || "");
     }
-  }, [payload]);
+  }, [payloadKey]);
 
   const handleSave = async () => {
     setSaving(true);

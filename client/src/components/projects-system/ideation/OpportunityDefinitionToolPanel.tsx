@@ -22,6 +22,10 @@ export function OpportunityDefinitionToolPanel({ payload, onSave, disabled }: Pr
   const [strategicAdvantage, setStrategicAdvantage] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const payloadKey = payload
+    ? `${payload.whatCouldBeImproved}|${payload.whatValueCouldBeCreated}|${payload.strategicAdvantage}`
+    : "";
+
   useEffect(() => {
     if (payload) {
       // Canonical keys with backward-compat aliases for older saved records
@@ -31,7 +35,7 @@ export function OpportunityDefinitionToolPanel({ payload, onSave, disabled }: Pr
       setWhatValueCouldBeCreated((payload.whatValueCouldBeCreated as string) || "");
       setStrategicAdvantage((payload.strategicAdvantage as string) || "");
     }
-  }, [payload]);
+  }, [payloadKey]);
 
   const handleSave = async () => {
     setSaving(true);

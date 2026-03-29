@@ -29,6 +29,10 @@ export function OnePageSummaryToolPanel({ payload, autoSummary, onSave, disabled
   const [overrideText, setOverrideText] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const payloadKey = payload
+    ? `${payload.theProblem}|${payload.theOpportunity}|${payload.topIdeas}|${payload.selectedConcept}`
+    : "";
+
   useEffect(() => {
     if (payload) {
       setTheProblem((payload.theProblem as string) || "");
@@ -40,7 +44,7 @@ export function OnePageSummaryToolPanel({ payload, autoSummary, onSave, disabled
       setReasonForSelection((payload.reasonForSelection as string) || "");
       setOverrideText((payload.overrideText as string) || "");
     }
-  }, [payload]);
+  }, [payloadKey]);
 
   const handleSave = async () => {
     setSaving(true);
