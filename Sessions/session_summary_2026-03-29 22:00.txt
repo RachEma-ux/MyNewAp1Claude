@@ -1,0 +1,67 @@
+Session Summary — 2026-03-29 22:00
+
+## Context
+Continued from previous session that ran out of context. Previous session had fixed Step 10 concept selection matching (findBestIdeaMatch) and relaxed readiness checks with payload fallbacks.
+
+## Tasks Completed
+
+### 1. Fixed Wizard Handoff Readiness Crash (ROOT CAUSE)
+The PS Wizard Handoff was permanently showing "Complete required steps to unlock wizard handoff" even when all 11 steps were green.
+
+**Root cause discovered**: The `readiness.evaluate` tRPC endpoint was crashing with a 500 error due to schema mismatches between Drizzle ORM definitions and actual DB tables:
+- `ps_ideation_screening_scores` missing `scored_by` column
+- `ps_ideation_scenarios` missing `created_by` and `updated_by` columns
+- `ps_ideation_feasibility_checks` missing `created_by`, `updated_by` columns + had `finding1`/`finding2` instead of expected `finding_1`/`finding_2`
+
+The 500 error meant `readiness` was `undefined` on the client, causing the UI to fall through to the "Complete required steps" message.
+
+**Fix**: Added missing columns via ALTER TABLE (applied locally) and created migration file `drizzle/0032_ps_ideation_schema_sync.sql` for CI/deploy persistence.
+
+**Verified**: Both ideations (42, 43) now return `ready: true` with 0 blockers.
+
+Commit: `9a58170` — tagged as `v99.99.141` (stable)
+
+### 2. Added "Open in PS Wizard" Button to Ideation List Cards
+Full implementation following Planner → Builder → Reviewer → Tester → Governance execution order.
+
+**What was built**:
+- Green "Open in PS Wizard" button on ideation cards in PSIdeationPage
+- Button shown only for `concept_selected` and `ready_for_wizard` statuses
+- Hidden for `draft`, `in_exploration`, `screening`, `converted`, `rejected`, `deferred`
+
+**Click flow**:
+1. Evaluates readiness via `utils.ps.ideation.readiness.evaluate.fetch()`
+2. If ready → navigates to existing `/ps/ideation/:id/convert` page
+3. If not ready → shows toast with specific blockers
+4. Shows loading spinner ("Checking...") during readiness evaluation
+
+**Architecture**: Reuses existing readiness, concept package, and conversion infrastructure. No new routes, endpoints, or parallel handoff paths.
+
+Commit: `a4844a3`
+
+### 3. Fixed Button Layout Overlap
+Moved the green wizard button from inline (beside badge) to below the card content row to prevent overlapping on mobile/narrow screens. Full width on mobile, auto-width on desktop.
+
+Commit: `9140905`
+
+### 4. Copied PSWizardPage to Downloads
+Saved `PSWizardPage.tsx` as `PSWizardPage.md` to device downloads folder.
+
+## Files Changed
+| File | Change |
+|------|--------|
+| `drizzle/0032_ps_ideation_schema_sync.sql` | NEW — migration to add missing DB columns |
+| `client/src/pages/projects-system/PSIdeationPage.tsx` | Added green wizard CTA button + readiness handler |
+| `server/ps/ps.ideation-shell.test.ts` | Added 12 tests for card CTA eligibility and behavior |
+
+## Git State
+- Branch: main
+- Latest commit: `9140905` (fix: move button below card row)
+- Stable tag: `v99.99.141` (at `9a58170`)
+- Working tree: clean
+- All pushed to origin
+
+## Key Learnings
+- Drizzle ORM crashes silently when DB columns are missing — the SQL query includes all schema-defined columns, and PostgreSQL throws an error if any don't exist
+- The readiness endpoint 500 error was masked on the client as `undefined` readiness, not as a visible error message
+- `trpc.useUtils().path.query.fetch()` is the correct way to call a tRPC query imperatively (returns a promise)
