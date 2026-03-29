@@ -17,6 +17,7 @@ import {
   psIdeationFeasibilityChecks,
   psIdeationActivity,
 } from "../../drizzle/tables/ps";
+import { psIdeationTranslatorRuns } from "../../drizzle/tables/ps-translator";
 import { IDEATION_STEP_KEYS, type IdeationStepKey, type IdeationLifecycleStatus } from "./ps.ideation-types";
 import { emitIdeationEvent } from "./ideation-audit";
 import { logPsAudit } from "./ps.audit";
@@ -195,11 +196,12 @@ export async function duplicateIdeation(
 export async function deleteIdeationDraft(id: number, actorId: number) {
   const db = requireDb();
   const ideation = await getIdeationById(id);
-  if (ideation.lifecycleStatus !== "draft") {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Only draft ideations can be deleted" });
+  if (ideation.lifecycleStatus === "converted") {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Converted ideations cannot be deleted" });
   }
 
   // Cascade delete child entities
+  await db.delete(psIdeationTranslatorRuns).where(eq(psIdeationTranslatorRuns.ideationId, id));
   await db.delete(psIdeationActivity).where(eq(psIdeationActivity.ideationId, id));
   await db.delete(psIdeationFeasibilityChecks).where(eq(psIdeationFeasibilityChecks.ideationId, id));
   await db.delete(psIdeationScenarios).where(eq(psIdeationScenarios.ideationId, id));
