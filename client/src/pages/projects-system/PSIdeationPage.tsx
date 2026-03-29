@@ -26,6 +26,7 @@ import {
   ArrowLeft,
   Search,
   FolderOpen,
+  Trash2,
 } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -55,10 +56,12 @@ const DEFAULT_WORKSPACE_ID = 1;
 
 export function PSIdeationPage() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; title: string } | null>(null);
 
   const { data: ideations, isLoading } = trpc.ps.ideation.list.useQuery(
     { workspaceId: DEFAULT_WORKSPACE_ID },
@@ -70,6 +73,15 @@ export function PSIdeationPage() {
       setDialogOpen(false);
       setNewTitle("");
       navigate(`/ps/ideation/${data.id}`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteMut = trpc.ps.ideation.deleteDraft.useMutation({
+    onSuccess: () => {
+      toast.success("Ideation deleted");
+      setDeleteTarget(null);
+      utils.ps.ideation.list.invalidate();
     },
     onError: (e) => toast.error(e.message),
   });
@@ -157,15 +169,54 @@ export function PSIdeationPage() {
                       Step: {ideation.currentStepKey || "context"} | Created: {new Date(ideation.createdAt).toLocaleDateString()}
                     </div>
                   </div>
-                  <Badge variant="outline" className={STATUS_COLORS[ideation.lifecycleStatus] || ""}>
-                    {STATUS_LABELS[ideation.lifecycleStatus] || ideation.lifecycleStatus}
-                  </Badge>
+                  <div className="flex items-center gap-2 ml-3 shrink-0">
+                    <Badge variant="outline" className={STATUS_COLORS[ideation.lifecycleStatus] || ""}>
+                      {STATUS_LABELS[ideation.lifecycleStatus] || ideation.lifecycleStatus}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeleteTarget({ id: ideation.id, title: ideation.title });
+                      }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </Link>
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Ideation</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            Are you sure you want to delete <span className="font-medium text-foreground">"{deleteTarget?.title}"</span>? This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteTarget && deleteMut.mutate({ id: deleteTarget.id })}
+              disabled={deleteMut.isPending}
+            >
+              {deleteMut.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
