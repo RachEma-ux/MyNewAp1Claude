@@ -164,8 +164,14 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
   });
 
   const applyMut = trpc.ps.ideation.contextTranslator.applyToIdeation.useMutation({
-    onSuccess: async () => {
-      toast.success("Translator output applied to ideation fields");
+    onSuccess: async (data) => {
+      // Truthful feedback: warn if Step 1 fields couldn't be populated
+      const warnings = (data as any)?.warnings as string[] | undefined;
+      if (warnings && warnings.length > 0) {
+        toast.warning(`Applied with gaps: ${warnings.join("; ")}`, { duration: 6000 });
+      } else {
+        toast.success("Translator output applied to ideation fields");
+      }
       // Await the steps refetch so tool panels display applied values immediately.
       // invalidate() returns a promise that resolves when the background refetch completes.
       await utils.ps.ideation.steps.get.invalidate({ ideationId });

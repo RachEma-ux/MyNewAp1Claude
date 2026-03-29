@@ -254,33 +254,99 @@ export function normalizeTranslateResponse(raw: unknown): TranslateResponse {
 }
 
 /**
- * Cross-fill between top-level fields and ideationWorkflowDraft.onePageSummary
- * to prevent semantic inconsistency (e.g., populated problem but empty summary).
+ * Cross-fill between top-level fields and ideationWorkflowDraft.onePageSummary,
+ * and enrich weak coreSignals from richer downstream sources.
  * Mutates the response in place.
  */
 function enforceCoherence(r: TranslateResponse): void {
   const summary = r.ideationWorkflowDraft?.onePageSummary;
-  if (!summary) return;
 
   const isEmpty = (s: string | undefined | null): boolean =>
     !s || s.trim().length === 0;
 
-  // Forward-fill: top-level → onePageSummary
-  if (!isEmpty(r.problem?.statement) && isEmpty(summary.problem)) {
-    summary.problem = r.problem.statement;
-  }
-  if (!isEmpty(r.opportunity?.statement) && isEmpty(summary.opportunity)) {
-    summary.opportunity = r.opportunity.statement;
+  const isEmptyArr = (a: unknown[] | undefined | null): boolean =>
+    !a || a.length === 0 || a.every(v => isEmpty(typeof v === "string" ? v : ""));
+
+  // ── coreSignals enrichment from richer downstream sources ──────────
+  // LLMs frequently populate psWizardScenarioPackage, framingNotes, and
+  // ideationWorkflowDraft.contextOfProject but leave coreSignals sparse.
+  // Cross-fill so that Step 1 mapping never writes blank strings when
+  // richer context exists elsewhere in the response.
+
+  const pkg = r.psWizardScenarioPackage;
+  const notes = r.framingNotes;
+  const draft = r.ideationWorkflowDraft;
+
+  // External drivers: backfill from framing notes (extracted), wizard package, or facts
+  if (isEmptyArr(r.coreSignals?.externalDrivers)) {
+    const candidates: string[] = [];
+    if (notes?.extracted?.length) candidates.push(...notes.extracted.filter(s => s && s.trim()));
+    if (!isEmpty(pkg?.urgencyDriver)) candidates.push(pkg.urgencyDriver);
+    if (!isEmpty(pkg?.businessNeed)) candidates.push(pkg.businessNeed);
+    if (candidates.length === 0 && r.extractedFacts?.length) {
+      candidates.push(...r.extractedFacts.filter(s => s && s.trim()).slice(0, 2));
+    }
+    if (candidates.length > 0) {
+      r.coreSignals.externalDrivers = candidates;
+    }
   }
 
-  // Backfill: onePageSummary → top-level (only if top-level is truly empty)
-  if (isEmpty(r.problem?.statement) && !isEmpty(summary.problem)) {
-    r.problem.statement = summary.problem;
-    if (r.problem.status === "missing") r.problem.status = "unclear";
+  // Internal drivers: backfill from framing notes (inferred), problem, wizard package
+  if (isEmptyArr(r.coreSignals?.internalDrivers)) {
+    const candidates: string[] = [];
+    if (notes?.inferred?.length) candidates.push(...notes.inferred.filter(s => s && s.trim()));
+    if (!isEmpty(r.problem?.statement)) candidates.push(r.problem.statement);
+    if (!isEmpty(pkg?.primaryProblem) && pkg.primaryProblem !== r.problem?.statement) {
+      candidates.push(pkg.primaryProblem);
+    }
+    if (candidates.length > 0) {
+      r.coreSignals.internalDrivers = candidates;
+    }
   }
-  if (isEmpty(r.opportunity?.statement) && !isEmpty(summary.opportunity)) {
-    r.opportunity.statement = summary.opportunity;
-    if (r.opportunity.status === "missing") r.opportunity.status = "unclear";
+
+  // Trigger: backfill from wizard urgencyDriver, decision gate reason, or draft context
+  if (isEmpty(r.coreSignals?.trigger)) {
+    if (!isEmpty(pkg?.urgencyDriver)) {
+      r.coreSignals.trigger = pkg.urgencyDriver;
+    } else if (!isEmpty(r.decisionGate?.reason) && r.decisionGate.status === "CONTINUE") {
+      r.coreSignals.trigger = r.decisionGate.reason;
+    } else if (!isEmpty(draft?.contextOfProject)) {
+      // Use first sentence of contextOfProject as trigger approximation
+      const first = draft.contextOfProject.split(/[.!?]\s/)[0];
+      if (first && first.trim().length > 10) {
+        r.coreSignals.trigger = first.trim();
+      }
+    }
+  }
+
+  // projectContextResult: backfill from draft contextOfProject or wizard scenarioSummary
+  if (isEmpty(r.projectContextResult)) {
+    if (!isEmpty(draft?.contextOfProject)) {
+      r.projectContextResult = draft.contextOfProject;
+    } else if (!isEmpty(pkg?.scenarioSummary)) {
+      r.projectContextResult = pkg.scenarioSummary;
+    }
+  }
+
+  // ── onePageSummary cross-fill (existing logic) ─────────────────────
+  if (summary) {
+    // Forward-fill: top-level → onePageSummary
+    if (!isEmpty(r.problem?.statement) && isEmpty(summary.problem)) {
+      summary.problem = r.problem.statement;
+    }
+    if (!isEmpty(r.opportunity?.statement) && isEmpty(summary.opportunity)) {
+      summary.opportunity = r.opportunity.statement;
+    }
+
+    // Backfill: onePageSummary → top-level (only if top-level is truly empty)
+    if (isEmpty(r.problem?.statement) && !isEmpty(summary.problem)) {
+      r.problem.statement = summary.problem;
+      if (r.problem.status === "missing") r.problem.status = "unclear";
+    }
+    if (isEmpty(r.opportunity?.statement) && !isEmpty(summary.opportunity)) {
+      r.opportunity.statement = summary.opportunity;
+      if (r.opportunity.status === "missing") r.opportunity.status = "unclear";
+    }
   }
 
   // Cross-fill whatIfQuestion

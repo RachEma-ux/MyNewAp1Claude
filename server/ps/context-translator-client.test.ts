@@ -905,19 +905,17 @@ describe("Immediate value display after Apply to Ideation Fields", () => {
     expect(JSON.stringify(obj1)).not.toBe(JSON.stringify(obj3)); // Different values = different key
   });
 
-  it("setData + invalidate pattern: immediate display + eventual consistency", () => {
-    // The fix uses a two-step pattern:
-    // 1. setData() — synchronously updates the React Query cache (immediate display)
-    // 2. invalidate() — triggers async refetch for eventual consistency
-    // This guarantees tool panels show values immediately AND stay fresh.
+  it("await invalidate pattern: immediate display + eventual consistency", () => {
+    // The fix uses await invalidate() — waits for the React Query background
+    // refetch to complete before calling onApplied(), ensuring tool panels
+    // receive fresh payload data and useEffect fires.
     const cacheOperations: string[] = [];
     // Simulate the onSuccess callback order
-    cacheOperations.push("setData");    // Step 1: synchronous
-    cacheOperations.push("invalidate"); // Step 2: async
-    cacheOperations.push("onApplied");  // Step 3: parent callback
-    expect(cacheOperations[0]).toBe("setData");
-    expect(cacheOperations[1]).toBe("invalidate");
-    expect(cacheOperations.indexOf("setData")).toBeLessThan(cacheOperations.indexOf("invalidate"));
+    cacheOperations.push("await invalidate"); // Step 1: awaited refetch
+    cacheOperations.push("onApplied");        // Step 2: parent callback
+    expect(cacheOperations[0]).toBe("await invalidate");
+    expect(cacheOperations[1]).toBe("onApplied");
+    expect(cacheOperations.indexOf("await invalidate")).toBeLessThan(cacheOperations.indexOf("onApplied"));
   });
 });
 
@@ -979,5 +977,267 @@ describe("Steps 2–4 hydration after Apply (no regression)", () => {
       const modified = { ...p, __test: true };
       expect(JSON.stringify(modified)).not.toBe(key);
     }
+  });
+});
+
+// ─── Step 1 resilient backfill from enriched coreSignals ─────────────────
+describe("Step 1 resilient backfill — coreSignals enrichment", () => {
+  it("empty coreSignals backfilled from psWizardScenarioPackage and framingNotes", () => {
+    // Simulate a response where coreSignals are empty but richer context exists
+    const raw = {
+      decisionGate: { status: "CONTINUE", reason: "Analysis complete" },
+      coreSignals: { externalDrivers: [], internalDrivers: [], trigger: "" },
+      problem: { statement: "Legacy system is slow", status: "clear" },
+      opportunity: { statement: "Build modern portal", status: "clear" },
+      projectContextResult: "",
+      psWizardScenarioPackage: {
+        urgencyDriver: "Q4 deadline approaching",
+        businessNeed: "Customer retention dropping",
+        primaryProblem: "System downtime exceeds SLA",
+        scenarioSummary: "Modernize the customer portal to reduce churn",
+      },
+      framingNotes: {
+        extracted: ["Market share declining 5% QoQ"],
+        inferred: ["Internal team lacks modern tooling"],
+        proposed: [],
+      },
+      ideationWorkflowDraft: {
+        contextOfProject: "The org faces mounting competitive pressure and internal capability gaps",
+        problem: "", opportunity: "", whatIfQuestion: "",
+        ideaGeneration: [], ideaClusteringAndTheming: [],
+        initialScreening: { promisingIdeas: [], deferredIdeas: [], reasoning: "" },
+        scenarioExploration: { scenarios: [], insights: "" },
+        quickFeasibilityChecks: { idea: "", testPerformed: "", keyFindings: [], feasibilityRating: "" },
+        conceptSelection: { selectedIdea: "", rationale: "", nextStep: "" },
+        onePageSummary: { problem: "", opportunity: "", topIdeas: [], feasibilityInsight: "", selectedConcept: "", reasonForSelection: "" },
+      },
+      extractedFacts: [],
+      whatIfQuestion: "",
+      projectContextFormula: "",
+      missingInformation: [],
+      clarificationQuestions: [],
+      renderedMarkdown: "",
+    };
+
+    const result = normalizeTranslateResponse(raw);
+
+    // coreSignals should be enriched by enforceCoherence
+    expect(result.coreSignals.externalDrivers.length).toBeGreaterThan(0);
+    expect(result.coreSignals.internalDrivers.length).toBeGreaterThan(0);
+    expect(result.coreSignals.trigger.trim().length).toBeGreaterThan(0);
+    // projectContextResult should be backfilled
+    expect(result.projectContextResult.trim().length).toBeGreaterThan(0);
+  });
+
+  it("populated coreSignals are NOT overwritten by backfill", () => {
+    const raw = {
+      decisionGate: { status: "CONTINUE", reason: "" },
+      coreSignals: {
+        externalDrivers: ["Regulatory compliance deadline"],
+        internalDrivers: ["Legacy tech debt"],
+        trigger: "New GDPR amendment effective Jan 2026",
+      },
+      problem: { statement: "Non-compliant data handling", status: "clear" },
+      opportunity: { statement: "Achieve full compliance", status: "clear" },
+      projectContextResult: "GDPR drives modernization of data pipelines",
+      psWizardScenarioPackage: {
+        urgencyDriver: "Different urgency text",
+        businessNeed: "Different business need",
+      },
+      framingNotes: { extracted: ["Different extracted"], inferred: ["Different inferred"], proposed: [] },
+      ideationWorkflowDraft: {
+        contextOfProject: "Different context", problem: "", opportunity: "", whatIfQuestion: "",
+        ideaGeneration: [], ideaClusteringAndTheming: [],
+        initialScreening: { promisingIdeas: [], deferredIdeas: [], reasoning: "" },
+        scenarioExploration: { scenarios: [], insights: "" },
+        quickFeasibilityChecks: { idea: "", testPerformed: "", keyFindings: [], feasibilityRating: "" },
+        conceptSelection: { selectedIdea: "", rationale: "", nextStep: "" },
+        onePageSummary: { problem: "", opportunity: "", topIdeas: [], feasibilityInsight: "", selectedConcept: "", reasonForSelection: "" },
+      },
+      extractedFacts: [], whatIfQuestion: "", projectContextFormula: "",
+      missingInformation: [], clarificationQuestions: [], renderedMarkdown: "",
+    };
+
+    const result = normalizeTranslateResponse(raw);
+
+    // Original values preserved — NOT overwritten by downstream sources
+    expect(result.coreSignals.externalDrivers).toEqual(["Regulatory compliance deadline"]);
+    expect(result.coreSignals.internalDrivers).toEqual(["Legacy tech debt"]);
+    expect(result.coreSignals.trigger).toBe("New GDPR amendment effective Jan 2026");
+    expect(result.projectContextResult).toBe("GDPR drives modernization of data pipelines");
+  });
+
+  it("Step 1 apply mapping produces non-blank fields when coreSignals enriched", () => {
+    // Simulate the toStr + joinArr logic from applyToIdeation
+    const toStr = (v: unknown): string => {
+      if (v == null) return "";
+      if (typeof v === "string") return v;
+      if (typeof v === "object") {
+        const o = v as Record<string, unknown>;
+        return String(o.signal || o.text || o.value || o.statement || JSON.stringify(v));
+      }
+      return String(v);
+    };
+    const joinArr = (arr: unknown[] | undefined): string =>
+      (arr || []).map(toStr).filter(s => (s as string).trim()).join("; ");
+
+    // After normalization + enrichment
+    const enriched = {
+      coreSignals: {
+        externalDrivers: ["Market share declining 5% QoQ"],
+        internalDrivers: ["Internal team lacks modern tooling"],
+        trigger: "Q4 deadline approaching",
+      },
+      projectContextResult: "The org faces mounting competitive pressure and internal capability gaps",
+    };
+
+    const externalDriver = joinArr(enriched.coreSignals.externalDrivers);
+    const internalDriver = joinArr(enriched.coreSignals.internalDrivers);
+    const triggerEvent = toStr(enriched.coreSignals.trigger);
+    const shapesNeed = toStr(enriched.projectContextResult);
+
+    expect(externalDriver.trim().length).toBeGreaterThan(0);
+    expect(internalDriver.trim().length).toBeGreaterThan(0);
+    expect(triggerEvent.trim().length).toBeGreaterThan(0);
+    expect(shapesNeed.trim().length).toBeGreaterThan(0);
+    expect(externalDriver).toBe("Market share declining 5% QoQ");
+    expect(internalDriver).toBe("Internal team lacks modern tooling");
+    expect(triggerEvent).toBe("Q4 deadline approaching");
+  });
+
+  it("double-fallback: router backfill catches anything normalizer missed", () => {
+    // Even if enforceCoherence couldn't enrich coreSignals (e.g., framingNotes also empty),
+    // the router's own backfill chain should still find values from deeper sources.
+    const toStr = (v: unknown): string => {
+      if (v == null) return "";
+      if (typeof v === "string") return v;
+      return String(v);
+    };
+    const joinArr = (arr: unknown[] | undefined): string =>
+      (arr || []).map(toStr).filter(s => (s as string).trim()).join("; ");
+
+    // Simulate: coreSignals still empty after normalization, but pkg has data
+    const coreSignals = { externalDrivers: [] as string[], internalDrivers: [] as string[], trigger: "" };
+    const pkg = { urgencyDriver: "Board meeting in 2 weeks", businessNeed: "Revenue target gap", primaryProblem: "Churn rate 15%" };
+    const problem = { statement: "Customer churn exceeds target" };
+    const notes = { extracted: [] as string[], inferred: [] as string[], proposed: [] as string[] };
+    const draft = { contextOfProject: "The company must address customer retention before Q4 closes." };
+
+    // Router backfill logic
+    let externalDriver = joinArr(coreSignals.externalDrivers);
+    if (!externalDriver.trim()) {
+      externalDriver = joinArr(notes.extracted) || toStr(pkg.urgencyDriver) || toStr(pkg.businessNeed);
+    }
+    let internalDriver = joinArr(coreSignals.internalDrivers);
+    if (!internalDriver.trim()) {
+      internalDriver = joinArr(notes.inferred) || toStr(problem.statement) || toStr(pkg.primaryProblem);
+    }
+    let triggerEvent = toStr(coreSignals.trigger);
+    if (!triggerEvent.trim()) {
+      triggerEvent = toStr(pkg.urgencyDriver);
+    }
+    let shapesNeed = "";
+    if (!shapesNeed.trim()) {
+      shapesNeed = toStr(draft.contextOfProject);
+    }
+
+    expect(externalDriver).toBe("Board meeting in 2 weeks");
+    expect(internalDriver).toBe("Customer churn exceeds target");
+    expect(triggerEvent).toBe("Board meeting in 2 weeks");
+    expect(shapesNeed).toBe("The company must address customer retention before Q4 closes.");
+  });
+});
+
+// ─── Apply result truthfulness (warnings) ────────────────────────────────
+describe("Apply result truthfulness — warnings", () => {
+  it("no warnings when all Step 1 fields are populated", () => {
+    const ctx1 = {
+      externalDriver: "Market pressure",
+      internalDriver: "Tech debt",
+      triggerEvent: "CEO mandate",
+      shapesNeed: "Digital transformation needed",
+    };
+    const warnings: string[] = [];
+    if (!String(ctx1.externalDriver || "").trim()) warnings.push("External Driver could not be determined");
+    if (!String(ctx1.internalDriver || "").trim()) warnings.push("Internal Driver could not be determined");
+    if (!String(ctx1.triggerEvent || "").trim()) warnings.push("Trigger Event could not be determined");
+    if (!String(ctx1.shapesNeed || "").trim()) warnings.push("Project Context could not be determined");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("warnings generated for each empty Step 1 field", () => {
+    const ctx1 = {
+      externalDriver: "",
+      internalDriver: "Tech debt",
+      triggerEvent: "",
+      shapesNeed: "Context exists",
+    };
+    const warnings: string[] = [];
+    if (!String(ctx1.externalDriver || "").trim()) warnings.push("External Driver could not be determined");
+    if (!String(ctx1.internalDriver || "").trim()) warnings.push("Internal Driver could not be determined");
+    if (!String(ctx1.triggerEvent || "").trim()) warnings.push("Trigger Event could not be determined");
+    if (!String(ctx1.shapesNeed || "").trim()) warnings.push("Project Context could not be determined");
+    expect(warnings).toHaveLength(2);
+    expect(warnings).toContain("External Driver could not be determined");
+    expect(warnings).toContain("Trigger Event could not be determined");
+  });
+
+  it("client shows warning toast when warnings present, success when absent", () => {
+    // Simulate client onSuccess logic
+    const showToast = (warnings: string[] | undefined): "success" | "warning" => {
+      if (warnings && warnings.length > 0) return "warning";
+      return "success";
+    };
+    expect(showToast([])).toBe("success");
+    expect(showToast(undefined)).toBe("success");
+    expect(showToast(["External Driver could not be determined"])).toBe("warning");
+    expect(showToast(["A", "B"])).toBe("warning");
+  });
+});
+
+// ─── Steps 2–4 and Step 11 no regression after backfill changes ──────────
+describe("Steps 2–4 and Step 11 no regression after backfill changes", () => {
+  it("problem mapping still uses result.problem.statement", () => {
+    const result = normalizeTranslateResponse({
+      problem: { statement: "System is unreliable", status: "clear" },
+    });
+    expect(result.problem.statement).toBe("System is unreliable");
+  });
+
+  it("opportunity mapping still uses result.opportunity.statement", () => {
+    const result = normalizeTranslateResponse({
+      opportunity: { statement: "Build reliable platform", status: "clear" },
+    });
+    expect(result.opportunity.statement).toBe("Build reliable platform");
+  });
+
+  it("guiding question mapping still uses result.whatIfQuestion", () => {
+    const result = normalizeTranslateResponse({
+      whatIfQuestion: "What if we rebuilt from scratch?",
+    });
+    expect(result.whatIfQuestion).toBe("What if we rebuilt from scratch?");
+  });
+
+  it("Step 11 summary mapping still produces correct canonical keys", () => {
+    const toStr = (v: unknown): string => (v == null ? "" : typeof v === "string" ? v : String(v));
+    const result = normalizeTranslateResponse({
+      problem: { statement: "Slow portal", status: "clear" },
+      opportunity: { statement: "Modern self-service", status: "clear" },
+      ideationWorkflowDraft: {
+        contextOfProject: "", problem: "", opportunity: "", whatIfQuestion: "",
+        ideaGeneration: ["Idea A"], ideaClusteringAndTheming: [],
+        initialScreening: { promisingIdeas: [], deferredIdeas: [], reasoning: "" },
+        scenarioExploration: { scenarios: [], insights: "Good insights" },
+        quickFeasibilityChecks: { idea: "", testPerformed: "", keyFindings: [], feasibilityRating: "High" },
+        conceptSelection: { selectedIdea: "Idea A", rationale: "Best fit", nextStep: "" },
+        onePageSummary: { problem: "", opportunity: "", topIdeas: [], feasibilityInsight: "", selectedConcept: "", reasonForSelection: "" },
+      },
+    });
+    // Step 11 canonical keys derived from result
+    expect(toStr(result.problem?.statement)).toBe("Slow portal");
+    expect(toStr(result.opportunity?.statement)).toBe("Modern self-service");
+    // Coherence should have forward-filled summary
+    expect(result.ideationWorkflowDraft.onePageSummary.problem).toBe("Slow portal");
+    expect(result.ideationWorkflowDraft.onePageSummary.opportunity).toBe("Modern self-service");
   });
 });

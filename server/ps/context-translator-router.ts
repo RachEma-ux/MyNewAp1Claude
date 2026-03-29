@@ -308,14 +308,57 @@ export const contextTranslatorRouter = router({
         return String(v);
       };
 
+      // ── Step 1 resilient backfill ───────────────────────────────────
+      // Primary: coreSignals. If empty, backfill from richer downstream
+      // sections so Step 1 is never blank when the translator clearly
+      // contains enough context. enforceCoherence() already enriches
+      // coreSignals during normalization, but we add a second safety net
+      // here at the persistence boundary.
+
+      const pkg = result.psWizardScenarioPackage;
+      const draft = result.ideationWorkflowDraft;
+      const notes = result.framingNotes;
+
+      const joinArr = (arr: unknown[] | undefined): string =>
+        (arr || []).map(toStr).filter(s => s.trim()).join("; ");
+
+      let externalDriver = joinArr(result.coreSignals?.externalDrivers);
+      if (!externalDriver.trim()) {
+        externalDriver = joinArr(notes?.extracted)
+          || toStr(pkg?.urgencyDriver)
+          || toStr(pkg?.businessNeed)
+          || joinArr(result.extractedFacts?.slice(0, 2));
+      }
+
+      let internalDriver = joinArr(result.coreSignals?.internalDrivers);
+      if (!internalDriver.trim()) {
+        internalDriver = joinArr(notes?.inferred)
+          || toStr(result.problem?.statement)
+          || toStr(pkg?.primaryProblem);
+      }
+
+      let triggerEvent = toStr(result.coreSignals?.trigger);
+      if (!triggerEvent.trim()) {
+        triggerEvent = toStr(pkg?.urgencyDriver)
+          || toStr(result.decisionGate?.reason)
+          || (draft?.contextOfProject ? draft.contextOfProject.split(/[.!?]\s/)[0] || "" : "");
+      }
+
+      let shapesNeed = toStr(result.projectContextResult);
+      if (!shapesNeed.trim()) {
+        shapesNeed = toStr(draft?.contextOfProject)
+          || toStr(pkg?.scenarioSummary)
+          || [externalDriver, internalDriver, triggerEvent].filter(Boolean).join(" — ");
+      }
+
       // Map to step payloads using CANONICAL UI field keys
       // These must match what each ToolPanel reads from payloadJson
       const stepPayloads: Record<string, Record<string, unknown>> = {
         context: {
-          externalDriver: (result.coreSignals?.externalDrivers || []).map(toStr).join("; "),
-          internalDriver: (result.coreSignals?.internalDrivers || []).map(toStr).join("; "),
-          triggerEvent: toStr(result.coreSignals?.trigger),
-          shapesNeed: toStr(result.projectContextResult),
+          externalDriver,
+          internalDriver,
+          triggerEvent,
+          shapesNeed,
         },
         problem: {
           // Canonical keys: whatIsNotWorking, whoIsImpacted, consequencesOfDoingNothing
@@ -419,7 +462,20 @@ export const contextTranslatorRouter = router({
         .where(eq(psIdeationSteps.ideationId, input.ideationId))
         .orderBy(psIdeationSteps.stepOrder);
 
-      return { applied: true, stepsUpdated: Object.keys(stepPayloads), steps: updatedSteps };
+      // Build warnings for fields that remain empty despite backfill attempts
+      const warnings: string[] = [];
+      const ctx1 = stepPayloads.context;
+      if (!String(ctx1.externalDriver || "").trim()) warnings.push("External Driver could not be determined");
+      if (!String(ctx1.internalDriver || "").trim()) warnings.push("Internal Driver could not be determined");
+      if (!String(ctx1.triggerEvent || "").trim()) warnings.push("Trigger Event could not be determined");
+      if (!String(ctx1.shapesNeed || "").trim()) warnings.push("Project Context could not be determined");
+
+      return {
+        applied: true,
+        stepsUpdated: Object.keys(stepPayloads),
+        steps: updatedSteps,
+        warnings,
+      };
     }),
 
   /**
