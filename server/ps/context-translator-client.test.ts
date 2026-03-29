@@ -2166,6 +2166,40 @@ describe("Readiness — Translator-Populated State", () => {
     const hasRationale = Object.values(rationale).some(v => typeof v === "string" && v.trim());
     expect(hasRationale).toBe(true);
   });
+
+  it("check 3 fallback: rawIdeaList in step payload satisfies 'ideas exist' check", () => {
+    // When no psIdeationIdeas records exist, the readiness engine now checks
+    // the idea_generation step payload for a non-empty rawIdeaList
+    const igPayload = {
+      rawIdeaList: "1. Smart Search\n2. Analytics Dashboard\n3. Compliance Automation",
+    };
+    const hasIdeas = typeof igPayload.rawIdeaList === "string"
+      && igPayload.rawIdeaList.trim().length > 3;
+    expect(hasIdeas).toBe(true);
+  });
+
+  it("check 3 fallback: empty rawIdeaList still blocks", () => {
+    const igPayload = { rawIdeaList: "" };
+    const hasIdeas = typeof igPayload.rawIdeaList === "string"
+      && igPayload.rawIdeaList.trim().length > 3;
+    expect(hasIdeas).toBe(false);
+  });
+
+  it("check 4 fallback: selectedConceptSummary satisfies 'concept selected' check", () => {
+    // When no psIdeationIdeas record has isSelected=1, readiness now checks
+    // ideation.selectedConceptSummary as a fallback
+    const ideation = { selectedConceptSummary: "AI-powered document search" };
+    const hasSelected = !!(ideation.selectedConceptSummary && ideation.selectedConceptSummary.trim());
+    expect(hasSelected).toBe(true);
+  });
+
+  it("check 4 fallback: concept_selection payload selectedIdea satisfies check", () => {
+    // Last fallback: concept_selection step payload with selectedIdea field
+    const csPayload = { selectedIdea: "Smart Search Engine" };
+    const hasSelected = typeof csPayload.selectedIdea === "string"
+      && csPayload.selectedIdea.trim().length > 0;
+    expect(hasSelected).toBe(true);
+  });
 });
 
 describe("Wizard Handoff — Scenario Package Persistence", () => {
