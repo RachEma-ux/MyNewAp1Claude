@@ -378,19 +378,29 @@ export const contextTranslatorRouter = router({
         },
         one_page_summary: {
           // Canonical keys matching OnePageSummaryToolPanel
-          theProblem: toStr(result.problem?.statement),
-          theOpportunity: toStr(result.opportunity?.statement),
+          // Each field has fallback sources when primary is empty
+          theProblem: toStr(result.ideationWorkflowDraft?.onePageSummary?.problem)
+            || toStr(result.problem?.statement)
+            || toStr(pkg?.primaryProblem),
+          theOpportunity: toStr(result.ideationWorkflowDraft?.onePageSummary?.opportunity)
+            || toStr(result.opportunity?.statement)
+            || toStr(pkg?.opportunityStatement),
           topIdeas: (Array.isArray(result.ideationWorkflowDraft?.onePageSummary?.topIdeas) &&
             result.ideationWorkflowDraft.onePageSummary.topIdeas.length > 0)
               ? result.ideationWorkflowDraft.onePageSummary.topIdeas.join("\n")
-              : (result.ideationWorkflowDraft?.ideaGeneration || []).map(toStr).join("\n"),
-          scenariosExplored: toStr(result.ideationWorkflowDraft?.scenarioExploration?.insights),
+              : (result.ideationWorkflowDraft?.ideaGeneration || []).map(toStr).filter(s => s.trim()).join("\n")
+              || toStr(pkg?.recommendedDirection),
+          scenariosExplored: toStr(result.ideationWorkflowDraft?.scenarioExploration?.insights)
+            || toStr(pkg?.feasibilityNotes),
           feasibilityInsights: toStr(result.ideationWorkflowDraft?.onePageSummary?.feasibilityInsight)
-            || toStr(result.ideationWorkflowDraft?.quickFeasibilityChecks?.feasibilityRating),
+            || toStr(result.ideationWorkflowDraft?.quickFeasibilityChecks?.feasibilityRating)
+            || toStr(pkg?.feasibilityNotes),
           selectedConcept: toStr(result.ideationWorkflowDraft?.onePageSummary?.selectedConcept)
-            || toStr(result.ideationWorkflowDraft?.conceptSelection?.selectedIdea),
+            || toStr(result.ideationWorkflowDraft?.conceptSelection?.selectedIdea)
+            || toStr(pkg?.recommendedDirection),
           reasonForSelection: toStr(result.ideationWorkflowDraft?.onePageSummary?.reasonForSelection)
-            || toStr(result.ideationWorkflowDraft?.conceptSelection?.rationale),
+            || toStr(result.ideationWorkflowDraft?.conceptSelection?.rationale)
+            || toStr(pkg?.recommendedDirectionRationale),
           overrideText: "", // Always leave for user
         },
       };
