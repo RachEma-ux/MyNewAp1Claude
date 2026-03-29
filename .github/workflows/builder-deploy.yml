@@ -416,9 +416,14 @@ jobs:
       # ========== RUN PHASE (Optional) ==========
       - name: Install Ollama and pull models
         if: ${{ github.event.inputs.run_app == 'yes' }}
+        continue-on-error: true
         run: |
           echo "🦙 Installing Ollama..."
-          curl -fsSL https://ollama.com/install.sh | sh
+          for i in 1 2 3; do
+            curl -fsSL https://ollama.com/install.sh | sh && break
+            echo "⚠️ Ollama install attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
 
           echo "🦙 Starting Ollama server for model pull..."
           ollama serve &
@@ -488,10 +493,15 @@ jobs:
           fi
 
           # Start Ollama server (models already pulled)
-          echo "🦙 Starting Ollama server..."
-          ollama serve &
-          OLLAMA_PID=$!
-          sleep 3
+          OLLAMA_PID=""
+          if command -v ollama &>/dev/null; then
+            echo "🦙 Starting Ollama server..."
+            ollama serve &
+            OLLAMA_PID=$!
+            sleep 3
+          else
+            echo "⚠️ Ollama not available — skipping local LLM"
+          fi
 
           # Use input DATABASE_URL if provided, otherwise use the service container
           if [ -n "$DATABASE_URL_INPUT" ]; then
@@ -657,7 +667,7 @@ jobs:
           # Cleanup
           kill $SERVER_PID 2>/dev/null || true
           kill $TUNNEL_PID 2>/dev/null || true
-          kill $OLLAMA_PID 2>/dev/null || true
+          [ -n "$OLLAMA_PID" ] && kill $OLLAMA_PID 2>/dev/null || true
           kill $PCT_PID 2>/dev/null || true
 
       - name: Upload artifacts
