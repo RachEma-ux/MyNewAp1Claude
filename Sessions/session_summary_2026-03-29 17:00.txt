@@ -1,0 +1,60 @@
+Session Summary — 2026-03-29 17:00
+=====================================
+
+## Stable Version Tag
+- Tag: stable-2026-03-29
+- Commit: 65ace6d (main)
+- Version: 99.99.138
+
+## Work Completed
+
+### 1. Structured Clarification Popup (Builder Phase — COMPLETED)
+Finished the structured clarification popup for the Context Translator:
+
+- **Router fix** (`server/ps/context-translator-router.ts`):
+  Added `clarification: qtResult.clarification` to `translateFallback` return so client receives structured clarification data.
+
+- **ClarificationDialog component** (`client/src/.../ContextTranslatorPanel.tsx`):
+  Built full dialog with RadioGroup (single-select) and Checkbox (multi-select) controls using shadcn/ui + Radix primitives. Added state management, mutation hooks, and UI flow for structured clarification.
+
+- **Tests** (`server/ps/context-translator-client.test.ts`):
+  Added ~100 lines covering type contracts, buildClarificationEnrichedText, normalization, and re-analysis flow.
+
+- Committed as `65ace6d`: "feat: structured clarification popup for Context Translator"
+
+### 2. Full Local Reset, Clean Restart, and Redeploy (Ops — COMPLETED)
+Performed complete ops cycle following AGENTS.md Planner→Builder→Reviewer→Tester→Governance order:
+
+1. Inspected state — 5 processes, port 3000 not bound, PostgreSQL running
+2. Killed all app processes, stopped PostgreSQL
+3. Verified git clean, no unpushed commits
+4. Cleaned runtime caches (node_modules/.cache, .vite, dist/, tsx-* temp dirs)
+5. Checked database health — 250 tables, no corruption
+6. Fresh restart — PostgreSQL (PID 7648) + dev server on port 3000
+7. Triggered Builder Deploy workflow (run ID 23711266075)
+8. Both targets verified:
+   - Local: http://localhost:3000/ — HTTP 200, 11ms
+   - Remote: https://collecting-operate-might-embassy.trycloudflare.com/ — HTTP 200, 501ms
+
+### 3. Stable Version Backup (COMPLETED)
+- Created git tag `stable-2026-03-29` at commit 65ace6d
+- Pushed tag to origin
+- Previous stable tag: `stable-2026-03-28`
+
+## Restoring from Stable Backup
+To restore to this version:
+  git checkout stable-2026-03-29
+  # or create a branch from it:
+  git checkout -b restore-from-stable stable-2026-03-29
+
+## Files Modified This Session
+- server/ps/context-translator-router.ts (clarification pass-through)
+- client/src/components/projects-system/ideation/ContextTranslatorPanel.tsx (ClarificationDialog)
+- server/ps/context-translator-client.test.ts (clarification tests)
+
+## Current State
+- App running on localhost:3000
+- PostgreSQL running (PID 7648)
+- Database: mynewap1claude (250 tables, healthy)
+- Git: clean, all pushed, on main branch
+- Tunnel: active (collecting-operate-might-embassy.trycloudflare.com)
