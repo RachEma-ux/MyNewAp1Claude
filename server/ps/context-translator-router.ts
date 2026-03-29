@@ -31,7 +31,7 @@ import {
   getDefaultReasoningProviderRef,
   getDefaultReasoningModel,
 } from "@shared/catalog-execution";
-import { AGENT_CATALOG_ID, analyzeRawInput } from "../modules/pmt/context-translator-agent";
+import { AGENT_CATALOG_ID, analyzeRawInput, normalizeTranslateResponse } from "../modules/pmt/context-translator-agent";
 
 // ── LLM Resolution ─────────────────────────────────────────────────────────
 
@@ -234,7 +234,9 @@ export const contextTranslatorRouter = router({
           apiBaseUrl: resolvedLlm?.apiBaseUrl,
         });
 
-        if (result.decisionGate?.reason?.includes("without LLM")) {
+        // Determine execution source — fully guard decisionGate access
+        const reason = result.decisionGate?.reason ?? "";
+        if (typeof reason === "string" && reason.includes("without LLM")) {
           source = "fallback-template";
         } else if (resolvedLlm) {
           source = "built-in-catalog-llm";
@@ -249,8 +251,12 @@ export const contextTranslatorRouter = router({
         });
       }
 
-      // Persist the translator run
-      await persistTranslatorRun(ctx.user.id, input.ideationId, input.rawText, result);
+      // Persist the translator run (non-fatal)
+      try {
+        await persistTranslatorRun(ctx.user.id, input.ideationId, input.rawText, result);
+      } catch (persistErr: any) {
+        console.error("[ContextTranslator] persist failed in fallback path:", persistErr.message);
+      }
 
       return {
         ...result,
@@ -265,7 +271,12 @@ export const contextTranslatorRouter = router({
 
   /**
    * Apply translator output to PS Ideation step payloads.
-   * Maps the structured output into the existing step storage.
+   * Maps the structured output into canonical UI payload keys that the
+   * tool panels actually read:
+   *   context:          externalDriver, internalDriver, triggerEvent, shapesNeed
+   *   problem:          whatIsNotWorking, whoIsImpacted, consequencesOfDoingNothing
+   *   opportunity:      whatCouldBeImproved, whatValueCouldBeCreated, strategicAdvantage
+   *   guiding_question: whatIf
    */
   applyToIdeation: governedProcedure
     .input(z.object({
@@ -276,9 +287,10 @@ export const contextTranslatorRouter = router({
       const db = getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      const result = input.translatorResult as client.TranslateResponse;
+      // Normalize through the shared normalizer to guard against malformed LLM output
+      const result = normalizeTranslateResponse(input.translatorResult);
 
-      if (result.decisionGate?.status !== "CONTINUE") {
+      if (result.decisionGate.status !== "CONTINUE") {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Cannot apply translator output in CLARIFICATION_NEEDED mode",
@@ -296,7 +308,8 @@ export const contextTranslatorRouter = router({
         return String(v);
       };
 
-      // Map to step payloads
+      // Map to step payloads using CANONICAL UI field keys
+      // These must match what each ToolPanel reads from payloadJson
       const stepPayloads: Record<string, Record<string, unknown>> = {
         context: {
           externalDriver: (result.coreSignals?.externalDrivers || []).map(toStr).join("; "),
@@ -305,15 +318,20 @@ export const contextTranslatorRouter = router({
           shapesNeed: toStr(result.projectContextResult),
         },
         problem: {
-          problemStatement: toStr(result.problem?.statement),
-          status: toStr(result.problem?.status || (result.problem as any)?.classification),
+          // Canonical keys: whatIsNotWorking, whoIsImpacted, consequencesOfDoingNothing
+          whatIsNotWorking: toStr(result.problem?.statement),
+          whoIsImpacted: "",       // Not extractable from translator — leave for user
+          consequencesOfDoingNothing: "", // Not extractable — leave for user
         },
         opportunity: {
-          opportunityStatement: toStr(result.opportunity?.statement),
-          status: toStr(result.opportunity?.status || (result.opportunity as any)?.classification),
+          // Canonical keys: whatCouldBeImproved, whatValueCouldBeCreated, strategicAdvantage
+          whatCouldBeImproved: toStr(result.opportunity?.statement),
+          whatValueCouldBeCreated: "", // Not extractable — leave for user
+          strategicAdvantage: "",     // Not extractable — leave for user
         },
         guiding_question: {
-          whatIfQuestion: toStr(result.whatIfQuestion),
+          // Canonical key: whatIf
+          whatIf: toStr(result.whatIfQuestion),
         },
       };
 
@@ -334,8 +352,17 @@ export const contextTranslatorRouter = router({
           .then(rows => rows.find(r => r.stepKey === stepKey));
 
         if (existing) {
-          // Merge payload (keep user edits, add translator data)
-          const merged = { ...(existing.payloadJson || {}), ...payload, _translatorApplied: true };
+          // Merge payload: preserve non-empty user-entered fields, only fill blanks
+          const prev = (existing.payloadJson || {}) as Record<string, unknown>;
+          const merged: Record<string, unknown> = { ...prev };
+          for (const [k, v] of Object.entries(payload)) {
+            const existingVal = prev[k];
+            // Only overwrite if existing field is empty/missing
+            if (!existingVal || (typeof existingVal === "string" && !existingVal.trim())) {
+              merged[k] = v;
+            }
+          }
+          merged._translatorApplied = true;
           await db.update(psIdeationSteps)
             .set({
               payloadJson: merged,
@@ -355,7 +382,7 @@ export const contextTranslatorRouter = router({
         }
       }
 
-      // Update ideation snapshots
+      // Update ideation snapshots — use canonical payload values
       await db.update(psIdeations)
         .set({
           problemStatementSnapshot: toStr(result.problem?.statement) || null,

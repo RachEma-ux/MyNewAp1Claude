@@ -158,6 +158,97 @@ export interface LlmOverrideHint {
 }
 
 /**
+ * Normalize a raw parsed object into a safe TranslateResponse.
+ * LLM responses frequently omit fields or use unexpected shapes
+ * (e.g., decisionGate as a string instead of {status, reason}).
+ * This ensures every required field exists with a safe default.
+ */
+export function normalizeTranslateResponse(raw: unknown): TranslateResponse {
+  if (!raw || typeof raw !== "object") {
+    return createFallbackResponse("");
+  }
+
+  const r = raw as Record<string, unknown>;
+
+  // Normalize decisionGate — must always be {status, reason}
+  let decisionGate: TranslateResponse["decisionGate"];
+  if (r.decisionGate && typeof r.decisionGate === "object") {
+    const dg = r.decisionGate as Record<string, unknown>;
+    decisionGate = {
+      status: dg.status === "CLARIFICATION_NEEDED" ? "CLARIFICATION_NEEDED" : "CONTINUE",
+      reason: typeof dg.reason === "string" ? dg.reason : "",
+    };
+  } else if (typeof r.decisionGate === "string") {
+    decisionGate = {
+      status: r.decisionGate === "CLARIFICATION_NEEDED" ? "CLARIFICATION_NEEDED" : "CONTINUE",
+      reason: "",
+    };
+  } else {
+    decisionGate = { status: "CONTINUE", reason: "" };
+  }
+
+  // Normalize problem
+  const normProblem = (v: unknown): TranslateResponse["problem"] => {
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      return {
+        statement: typeof o.statement === "string" ? o.statement : "",
+        status: (o.status === "clear" || o.status === "unclear" || o.status === "missing") ? o.status : "unclear",
+      };
+    }
+    return { statement: typeof v === "string" ? v : "", status: "unclear" };
+  };
+
+  // Normalize opportunity
+  const normOpportunity = (v: unknown): TranslateResponse["opportunity"] => {
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      return {
+        statement: typeof o.statement === "string" ? o.statement : "",
+        status: (o.status === "clear" || o.status === "unclear" || o.status === "missing") ? o.status : "unclear",
+      };
+    }
+    return { statement: typeof v === "string" ? v : "", status: "unclear" };
+  };
+
+  // Normalize coreSignals
+  const normSignals = (v: unknown): TranslateResponse["coreSignals"] => {
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      return {
+        externalDrivers: Array.isArray(o.externalDrivers) ? o.externalDrivers.map(String) : [],
+        internalDrivers: Array.isArray(o.internalDrivers) ? o.internalDrivers.map(String) : [],
+        trigger: typeof o.trigger === "string" ? o.trigger : "",
+      };
+    }
+    return { externalDrivers: [], internalDrivers: [], trigger: "" };
+  };
+
+  return {
+    decisionGate,
+    extractedFacts: Array.isArray(r.extractedFacts) ? r.extractedFacts.map(String) : [],
+    problem: normProblem(r.problem),
+    opportunity: normOpportunity(r.opportunity),
+    coreSignals: normSignals(r.coreSignals),
+    projectContextFormula: typeof r.projectContextFormula === "string" ? r.projectContextFormula : "",
+    projectContextResult: typeof r.projectContextResult === "string" ? r.projectContextResult : "",
+    whatIfQuestion: typeof r.whatIfQuestion === "string" ? r.whatIfQuestion : "",
+    ideationWorkflowDraft: (r.ideationWorkflowDraft && typeof r.ideationWorkflowDraft === "object")
+      ? r.ideationWorkflowDraft as TranslateResponse["ideationWorkflowDraft"]
+      : { contextOfProject: "", problem: "", opportunity: "", whatIfQuestion: "", ideaGeneration: [], ideaClusteringAndTheming: [], initialScreening: { promisingIdeas: [], deferredIdeas: [], reasoning: "" }, scenarioExploration: { scenarios: [], insights: "" }, quickFeasibilityChecks: { idea: "", testPerformed: "", keyFindings: [], feasibilityRating: "" }, conceptSelection: { selectedIdea: "", rationale: "", nextStep: "" }, onePageSummary: { problem: "", opportunity: "", topIdeas: [], feasibilityInsight: "", selectedConcept: "", reasonForSelection: "" } },
+    psWizardScenarioPackage: (r.psWizardScenarioPackage && typeof r.psWizardScenarioPackage === "object")
+      ? r.psWizardScenarioPackage as TranslateResponse["psWizardScenarioPackage"]
+      : { scenarioTitle: "", scenarioSummary: "", businessNeed: "", primaryProblem: "", opportunityStatement: "", urgencyDriver: "", recommendedDirection: "", recommendedDirectionRationale: "", whatIfQuestion: "", feasibilityNotes: "", openQuestions: [], assumptions: [], insights: [] },
+    missingInformation: Array.isArray(r.missingInformation) ? r.missingInformation.map(String) : [],
+    clarificationQuestions: Array.isArray(r.clarificationQuestions) ? r.clarificationQuestions.map(String) : [],
+    framingNotes: (r.framingNotes && typeof r.framingNotes === "object")
+      ? r.framingNotes as TranslateResponse["framingNotes"]
+      : { extracted: [], inferred: [], proposed: [] },
+    renderedMarkdown: typeof r.renderedMarkdown === "string" ? r.renderedMarkdown : "",
+  };
+}
+
+/**
  * Analyze raw user input and produce a structured context translation.
  *
  * @param rawText - The unstructured project text to analyze
@@ -191,7 +282,8 @@ export async function analyzeRawInput(
       maxTokens: 8000,
       model: llmHint?.model || undefined,
     });
-    return parseLLMJson<TranslateResponse>(raw);
+    const parsed = parseLLMJson(raw);
+    return normalizeTranslateResponse(parsed);
   } catch (err: any) {
     // LLM call failed (quota exceeded, network error, etc.) — degrade gracefully
     console.warn(`[ContextTranslator] LLM call failed (${err.code || err.message}), falling back to template`);

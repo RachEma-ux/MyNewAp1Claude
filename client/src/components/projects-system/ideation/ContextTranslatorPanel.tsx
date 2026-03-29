@@ -122,7 +122,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
     onSuccess: (data) => {
       setResult(data as any);
       setShowResult(true);
-      if (data.decisionGate.status === "CONTINUE") {
+      if (data.decisionGate?.status === "CONTINUE") {
         toast.success("Service analysis complete — review results below");
       } else {
         toast.info("Clarification needed — see questions below");
@@ -136,7 +136,7 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
     onSuccess: (data) => {
       setResult(data as any);
       setShowResult(true);
-      if (data.decisionGate.status === "CONTINUE") {
+      if (data.decisionGate?.status === "CONTINUE") {
         const src = (data as any)._source;
         if (src === "fallback-template") {
           toast.info("Template analysis only — configure LLM for full reasoning");
@@ -184,8 +184,8 @@ export function ContextTranslatorPanel({ ideationId, disabled, onApplied }: Prop
   };
 
   const isAnyMutating = translateMut.isPending || fallbackMut.isPending;
-  const isContinue = result?.decisionGate.status === "CONTINUE";
-  const isClarification = result?.decisionGate.status === "CLARIFICATION_NEEDED";
+  const isContinue = result?.decisionGate?.status === "CONTINUE";
+  const isClarification = result?.decisionGate?.status === "CLARIFICATION_NEEDED";
   const isFallbackResult = result?._source && result._source !== "service";
 
   // Status pill config

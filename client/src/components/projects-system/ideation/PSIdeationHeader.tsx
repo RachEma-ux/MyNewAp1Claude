@@ -184,14 +184,14 @@ export function PSIdeationHeader({
       {/* Progress row — step indicator + bar */}
       <div className="flex items-center gap-2 px-3 pb-1.5">
         <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
-          Step {stepIndex + 1}/{stepCount}
+          Step {stepIndex + 1} of {stepCount}
         </span>
         <Progress value={progressPct} className="h-1.5 flex-1" />
         <span className="text-[10px] text-muted-foreground shrink-0 truncate max-w-[140px] hidden sm:inline">
           {stepLabel}
         </span>
         <span className="text-[10px] text-muted-foreground shrink-0">
-          {completedCount}/{stepCount}
+          {completedCount}/{stepCount} done
         </span>
       </div>
     </div>

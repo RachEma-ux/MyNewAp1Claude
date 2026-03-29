@@ -24,7 +24,10 @@ export function ProblemDefinitionToolPanel({ payload, onSave, disabled }: Props)
 
   useEffect(() => {
     if (payload) {
-      setWhatIsNotWorking((payload.whatIsNotWorking as string) || "");
+      // Canonical keys with backward-compat aliases for older saved records
+      setWhatIsNotWorking(
+        (payload.whatIsNotWorking as string) || (payload.problemStatement as string) || ""
+      );
       setWhoIsImpacted((payload.whoIsImpacted as string) || "");
       setConsequencesOfDoingNothing((payload.consequencesOfDoingNothing as string) || "");
     }

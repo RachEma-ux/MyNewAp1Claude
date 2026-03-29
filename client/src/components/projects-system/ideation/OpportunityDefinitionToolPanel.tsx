@@ -24,7 +24,10 @@ export function OpportunityDefinitionToolPanel({ payload, onSave, disabled }: Pr
 
   useEffect(() => {
     if (payload) {
-      setWhatCouldBeImproved((payload.whatCouldBeImproved as string) || "");
+      // Canonical keys with backward-compat aliases for older saved records
+      setWhatCouldBeImproved(
+        (payload.whatCouldBeImproved as string) || (payload.opportunityStatement as string) || ""
+      );
       setWhatValueCouldBeCreated((payload.whatValueCouldBeCreated as string) || "");
       setStrategicAdvantage((payload.strategicAdvantage as string) || "");
     }
