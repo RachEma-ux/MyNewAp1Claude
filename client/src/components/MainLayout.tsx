@@ -78,6 +78,8 @@ import {
   ClipboardList,
   Lightbulb,
   BrainCircuit,
+  GitBranch,
+  Wind,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -310,9 +312,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
           href: section.currentRoute ?? section.href,
         })),
         { label: "WCP Workflows", icon: <Activity className="w-4 h-4" />, href: "/wcp/workflows" },
+        { label: "Flow Chart", icon: <GitBranch className="w-4 h-4" />, href: "/automation/flowchart" },
+        { label: "Airflow", icon: <Wind className="w-4 h-4" />, href: "/automation/airflow" },
+        { label: "Airbyte", icon: <Activity className="w-4 h-4" />, href: "/automation/airbyte" },
       ],
     },
-    { 
+    {
       label: "Infrastructure", 
       icon: <Activity className="w-5 h-5" />,
       children: [

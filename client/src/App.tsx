@@ -40,6 +40,9 @@ const AutomationExecutionDetails = lazy(() => import("./pages/AutomationExecutio
 const TriggersStore = lazy(() => import("./pages/TriggersStore"));
 const ActionsStore = lazy(() => import("./pages/ActionsStore"));
 const AutomationSettings = lazy(() => import("./pages/AutomationSettings"));
+const FlowChartPage = lazy(() => import("./pages/FlowChartPage"));
+const AirflowPage = lazy(() => import("./pages/AirflowPage"));
+const AirbytePage = lazy(() => import("./pages/AirbytePage"));
 const DocumentUpload = lazy(() => import("./pages/DocumentUpload"));
 const CodeEditor = lazy(() => import("./pages/CodeEditor"));
 const EmbeddingsManagement = lazy(() => import("./pages/EmbeddingsManagement"));
@@ -417,6 +420,9 @@ function Router() {
       <Route path="/automation/actions" component={() => <ProtectedRoute component={ActionsStore} />} />
       <Route path="/automation/settings" component={() => <ProtectedRoute component={AutomationSettings} />} />
       <Route path="/automation/secrets" component={() => <ProtectedRoute component={SecretsPage} />} />
+      <Route path="/automation/flowchart" component={() => <ProtectedRoute component={FlowChartPage} />} />
+      <Route path="/automation/airflow" component={() => <ProtectedRoute component={AirflowPage} />} />
+      <Route path="/automation/airbyte" component={() => <ProtectedRoute component={AirbytePage} />} />
       <Route path="/templates" component={() => <ProtectedRoute component={TemplatesPage} />} />
       <Route path="/agents" component={() => <ProtectedRoute component={AgentsPage} />} />
       <Route path="/agents/create" component={() => <ProtectedRoute component={AgentsPage} />} />
