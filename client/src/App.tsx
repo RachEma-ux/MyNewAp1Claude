@@ -182,6 +182,8 @@ const AgentRunDetailPanel = lazy(() => import("@/pages/pm-central/AgentRunDetail
 const IdeaBuilderWizard = lazy(() => import("@/pages/pm-central/IdeaBuilderWizard"));
 // Data Analysis — GraphRAG
 const GraphRAGPage = lazy(() => import("@/pages/data-analysis/GraphRAGPage"));
+// Data Analysis — Data Warehouse
+const DataWarehousePage = lazy(() => import("@/pages/data-analysis/DataWarehousePage"));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, loading } = useAuth();
@@ -548,6 +550,8 @@ function Router() {
       <Route path="/pm-central" component={() => <ProtectedRoute component={PMCentralPage} />} />
       {/* Data Analysis — GraphRAG */}
       <Route path="/data-analysis/graphrag" component={() => <ProtectedRoute component={GraphRAGPage} />} />
+      {/* Data Analysis — Data Warehouse */}
+      <Route path="/data-analysis/data-warehouse" component={() => <ProtectedRoute component={DataWarehousePage} />} />
       <Route path="/data-analysis" component={() => <Redirect to="/data-analysis/graphrag" />} />
       {/* UI Showcase — living documentation for shared components */}
       <Route path="/ui-showcase" component={() => <ProtectedRoute component={UIShowcasePage} />} />

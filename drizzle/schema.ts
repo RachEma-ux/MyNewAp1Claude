@@ -43,3 +43,4 @@ export * from './tables/ps';
 export * from './tables/ps-translator';
 export * from './tables/graphrag';
 export * from './tables/ai-types';
+export * from './tables/data-warehouse';

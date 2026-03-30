@@ -290,6 +290,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       icon: <BrainCircuit className="w-5 h-5" />,
       children: [
         { label: "GraphRAG", icon: <BrainCircuit className="w-4 h-4" />, href: "/data-analysis/graphrag" },
+        { label: "Data Warehouse", icon: <Database className="w-4 h-4" />, href: "/data-analysis/data-warehouse" },
       ],
     },
     {
