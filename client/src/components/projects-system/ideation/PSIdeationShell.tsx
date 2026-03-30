@@ -1,7 +1,12 @@
 /**
- * PS Ideation — Shell
+ * PS Ideation — Shell (IBM Carbon pattern)
  *
- * Composes: Header + WorkflowRail (left sidebar) + Center Canvas
+ * Composes: Header + WorkflowRail (left sidebar) + Center Canvas + Status Bar
+ *
+ * Carbon Shell elements:
+ *   - Branded sidebar header with icon + title + collapse toggle
+ *   - Icon-only collapsed state (w-12) instead of full hide
+ *   - Persistent status bar footer with live stats
  *
  * Single-sidebar architecture:
  *   Left sidebar = workflow steps + Concept + Wizard Handoff + Activity
@@ -10,14 +15,15 @@
  *
  * Responsive:
  *   mobile  → left drawer (Sheet) + in-card footer navigation
- *   tablet  → collapsible left sidebar
+ *   tablet  → collapsible left sidebar (icon-only)
  *   desktop → persistent left sidebar
  */
 import { useState, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
+import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2, PanelLeftOpen } from "lucide-react";
+import { Loader2, PanelLeftOpen, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -52,6 +58,77 @@ function useIsMobile(breakpoint = 768) {
   }, [breakpoint]);
   return isMobile;
 }
+
+// ── Status Bar ────────────────────────────────────────────────────────────────
+
+const STATUS_COLORS_SB: Record<string, string> = {
+  draft: "text-gray-400",
+  in_exploration: "text-blue-400",
+  screening: "text-amber-400",
+  concept_selected: "text-purple-400",
+  ready_for_wizard: "text-green-400",
+  deferred: "text-orange-400",
+  rejected: "text-red-400",
+  converted: "text-indigo-400",
+};
+
+const STATUS_LABELS_SB: Record<string, string> = {
+  draft: "Draft",
+  in_exploration: "Exploring",
+  screening: "Screening",
+  concept_selected: "Concept Selected",
+  ready_for_wizard: "Ready",
+  deferred: "Deferred",
+  rejected: "Rejected",
+  converted: "Converted",
+};
+
+function PSIdeationStatusBar({
+  lifecycleStatus,
+  stepIndex,
+  stepCount,
+  completedCount,
+  ideaCount,
+  conceptName,
+}: {
+  lifecycleStatus: string;
+  stepIndex: number;
+  stepCount: number;
+  completedCount: number;
+  ideaCount: number;
+  conceptName: string | null;
+}) {
+  return (
+    <div className="flex items-center justify-between border-t bg-card/50 px-4 h-7 text-xs text-muted-foreground shrink-0">
+      <div className="flex items-center gap-4">
+        <span className="font-mono text-yellow-500">PS Ideation</span>
+        <span>Step {stepIndex + 1}/{stepCount}</span>
+        <span>{completedCount} complete</span>
+        {ideaCount > 0 && <span>{ideaCount} ideas</span>}
+      </div>
+      <div className="flex items-center gap-3">
+        {conceptName && (
+          <span className="truncate max-w-[200px]">Concept: {conceptName}</span>
+        )}
+        <div className="flex items-center gap-1">
+          <div className={cn(
+            "h-1.5 w-1.5 rounded-full",
+            lifecycleStatus === "converted" ? "bg-indigo-500" :
+            lifecycleStatus === "ready_for_wizard" ? "bg-green-500" :
+            lifecycleStatus === "rejected" ? "bg-red-500" :
+            lifecycleStatus === "deferred" ? "bg-orange-500" :
+            "bg-yellow-500"
+          )} />
+          <span className={STATUS_COLORS_SB[lifecycleStatus] || "text-muted-foreground"}>
+            {STATUS_LABELS_SB[lifecycleStatus] || lifecycleStatus}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Shell ────────────────────────────────────────────────────────────────
 
 export function PSIdeationShell({ ideationId }: Props) {
   const [, navigate] = useLocation();
@@ -202,10 +279,11 @@ export function PSIdeationShell({ ideationId }: Props) {
     (s: any) => s.stepStatus === "complete",
   ).length;
   const selectedConcept = ((ideas as any[]) || []).find((i: any) => i.isSelected === 1) || null;
+  const ideaCount = ((ideas as any[]) || []).length;
 
   // ── View state (local — support views are not persisted) ──────────────
   const [activeView, setActiveView] = useState<ActiveView>(currentStepKey);
-  const [railOpen, setRailOpen] = useState(!isMobile);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
 
   // Sync activeView when server step changes (e.g. on initial load)
@@ -423,7 +501,7 @@ export function PSIdeationShell({ ideationId }: Props) {
       />
 
       <div className="flex flex-1 min-h-0">
-        {/* ── Left rail (single sidebar) ────────────────────────── */}
+        {/* ── Left rail (Carbon Shell sidebar) ────────────────────── */}
         {isMobile ? (
           <>
             <div className="border-r border-border flex flex-col items-center py-2 px-1">
@@ -442,28 +520,29 @@ export function PSIdeationShell({ ideationId }: Props) {
             />
           </>
         ) : (
-          <>
-            {!railOpen ? (
-              <div className="border-r border-border flex flex-col items-center py-2 px-1">
-                <Button variant="ghost" size="sm" onClick={() => setRailOpen(true)} title="Show navigation" className="h-7 w-7 p-0">
-                  <PanelLeftOpen className="w-4 h-4" />
-                </Button>
-              </div>
-            ) : (
-              <PSIdeationWorkflowRail
-                steps={(steps as any[]) || []}
-                activeView={activeView}
-                onViewSelect={handleViewSelect}
-                isConverted={isConverted}
-                onCollapse={() => setRailOpen(false)}
-              />
-            )}
-          </>
+          <PSIdeationWorkflowRail
+            steps={(steps as any[]) || []}
+            activeView={activeView}
+            onViewSelect={handleViewSelect}
+            isConverted={isConverted}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+          />
         )}
 
         {/* ── Center canvas (full width) ────────────────────────── */}
         {renderCenterCanvas()}
       </div>
+
+      {/* ── Carbon Status Bar ────────────────────────────────────── */}
+      <PSIdeationStatusBar
+        lifecycleStatus={ideation.lifecycleStatus}
+        stepIndex={stepIndex}
+        stepCount={IDEATION_STEP_KEYS.length}
+        completedCount={completedCount}
+        ideaCount={ideaCount}
+        conceptName={selectedConcept?.title || null}
+      />
 
       {/* ── Confirmation dialog ─────────────────────────────── */}
       <AlertDialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog((d) => ({ ...d, open: false }))}>

@@ -10,7 +10,9 @@ import * as dwSchema from "../../../drizzle/tables/data-warehouse";
 
 let _dwDb: ReturnType<typeof drizzle<typeof dwSchema>> | null = null;
 
-const DEFAULT_DW_URL = "postgresql://localhost:5432/datawarehouse";
+const DEFAULT_DW_URL = process.env.DATABASE_URL
+  ? process.env.DATABASE_URL.replace(/\/[^/]+$/, "/datawarehouse")
+  : "postgresql://localhost:5432/datawarehouse";
 
 export function getWarehouseDb() {
   if (!_dwDb) {
