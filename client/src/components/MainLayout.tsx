@@ -115,6 +115,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [cvMenuOpen, setCvMenuOpen] = useState(false);
   const [psMenuOpen, setPsMenuOpen] = useState(false);
   const [dataAnalysisMenuOpen, setDataAnalysisMenuOpen] = useState(false);
+  const [appComponentsMenuOpen, setAppComponentsMenuOpen] = useState(false);
   const [aiTypesSubMenus, setAiTypesSubMenus] = useState<Record<string, boolean>>({});
   const hrRole = useHrRole();
   const logoutMutation = trpc.auth.logout.useMutation();
@@ -126,47 +127,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const navItems: NavItem[] = [
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/" },
-    {
-      label: "Org Management",
-      icon: <Building2 className="w-5 h-5" />,
-      children: [
-        { label: "Portfolio", icon: <LayoutDashboard className="w-4 h-4" />, href: "/om/portfolio" },
-        { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/om/control-panel" },
-        { label: "OM Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/om/wizard" },
-        { label: "OM Records", icon: <List className="w-4 h-4" />, href: "/om/list" },
-        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/om/settings" },
-      ],
-    },
-    {
-      label: "Culture Values",
-      icon: <Award className="w-5 h-5" />,
-      children: [
-        { label: "Portfolio", icon: <LayoutDashboard className="w-4 h-4" />, href: "/cv/portfolio" },
-        { label: "Values Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/cv/wizard" },
-        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/cv/settings" },
-      ],
-    },
-    {
-      label: "Communication",
-      icon: <Radio className="w-5 h-5" />,
-      children: [
-        { label: "Chat", icon: <MessageSquare className="w-4 h-4" />, href: "/chat" },
-        { label: "Conversations", icon: <MessagesSquare className="w-4 h-4" />, href: "/conversations" },
-        { label: "Video Meeting", icon: <Video className="w-4 h-4" />, href: "/video-meeting" },
-      ]
-    },
-    {
-      label: "Workspaces",
-      icon: <Sparkles className="w-5 h-5" />,
-      children: [
-        { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/ws/dashboard" },
-        { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/ws/control-panel" },
-        { label: "Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/ws/wizard" },
-        { label: "WS List", icon: <List className="w-4 h-4" />, href: "/ws/list" },
-        { label: "WS Catalog", icon: <BookOpen className="w-4 h-4" />, href: "/ws/catalog" },
-      ]
-    },
-    { label: "Documents", icon: <FileText className="w-5 h-5" />, href: "/documents/dashboard" },
     {
       label: "AI Types",
       icon: <Database className="w-5 h-5" />,
@@ -228,9 +188,58 @@ export default function MainLayout({ children }: MainLayoutProps) {
       ]
     },
     {
-      label: "Run Console",
-      icon: <Terminal className="w-5 h-5" />,
-      href: "/run-console",
+      label: "App Components",
+      icon: <Package className="w-5 h-5" />,
+      children: [
+        { label: "Simple Shell", icon: <LayoutDashboard className="w-4 h-4" />, href: "/components/simple-shell" },
+        { label: "Double Shell", icon: <LayoutDashboard className="w-4 h-4" />, href: "/components/double-shell" },
+      ],
+    },
+    {
+      label: "Automation",
+      icon: <Zap className="w-5 h-5" />,
+      children: [
+        ...AUTOMATION_NAV_CONFIG.sections.map((section) => ({
+          label: section.label,
+          icon: <Zap className="w-4 h-4" />,
+          href: section.currentRoute ?? section.href,
+        })),
+        { label: "WCP Workflows", icon: <Activity className="w-4 h-4" />, href: "/wcp/workflows" },
+        { label: "Flow Chart", icon: <GitBranch className="w-4 h-4" />, href: "/automation/flowchart" },
+        { label: "Airflow", icon: <Wind className="w-4 h-4" />, href: "/automation/airflow" },
+        { label: "Airbyte", icon: <Activity className="w-4 h-4" />, href: "/automation/airbyte" },
+      ],
+    },
+    {
+      label: "Collaboration",
+      icon: <MessagesSquare className="w-5 h-5" />,
+      href: "/collaboration",
+    },
+    {
+      label: "Communication",
+      icon: <Radio className="w-5 h-5" />,
+      children: [
+        { label: "Chat", icon: <MessageSquare className="w-4 h-4" />, href: "/chat" },
+        { label: "Conversations", icon: <MessagesSquare className="w-4 h-4" />, href: "/conversations" },
+        { label: "Video Meeting", icon: <Video className="w-4 h-4" />, href: "/video-meeting" },
+      ]
+    },
+    {
+      label: "Culture Values",
+      icon: <Award className="w-5 h-5" />,
+      children: [
+        { label: "Portfolio", icon: <LayoutDashboard className="w-4 h-4" />, href: "/cv/portfolio" },
+        { label: "Values Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/cv/wizard" },
+        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/cv/settings" },
+      ],
+    },
+    {
+      label: "Data Analysis",
+      icon: <BrainCircuit className="w-5 h-5" />,
+      children: [
+        { label: "GraphRAG", icon: <BrainCircuit className="w-4 h-4" />, href: "/data-analysis/graphrag" },
+        { label: "Data Warehouse", icon: <Database className="w-4 h-4" />, href: "/data-analysis/data-warehouse" },
+      ],
     },
     {
       label: "Digital HQ",
@@ -246,6 +255,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Collaboration", icon: <BarChart3 className="w-4 h-4" />, href: "/hq/collaboration" },
       ]
     },
+    { label: "Documents", icon: <FileText className="w-5 h-5" />, href: "/documents/dashboard" },
     {
       label: "Governance Center",
       icon: <ShieldCheck className="w-5 h-5" />,
@@ -261,9 +271,56 @@ export default function MainLayout({ children }: MainLayoutProps) {
       ]
     },
     {
-      label: "Collaboration",
-      icon: <MessagesSquare className="w-5 h-5" />,
-      href: "/collaboration",
+      label: "Human Resources",
+      icon: <Users className="w-5 h-5" />,
+      children: HR_NAV_CONFIG.sections.map((section) => ({
+        label: section.label,
+        icon: <Users className="w-4 h-4" />,
+        href: section.href,
+        requiredAction: section.requiredAction,
+      })),
+    },
+    {
+      label: "Infrastructure",
+      icon: <Activity className="w-5 h-5" />,
+      children: [
+        {
+          label: "Hardware",
+          icon: <Package className="w-4 h-4" />,
+          children: [
+            { label: "Mobiles", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/mobiles" },
+            { label: "Personal Computers", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/pcs" },
+            { label: "Servers", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/servers" },
+            { label: "Censors", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/censors" },
+            { label: "Machines", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/machines" },
+            { label: "Robots", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/robots" },
+          ]
+        },
+        {
+          label: "Software",
+          icon: <Package className="w-4 h-4" />,
+          children: [
+            { label: "Item 1", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item1" },
+            { label: "Item 2", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item2" },
+            { label: "Item 3", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item3" },
+            { label: "Item 4", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item4" },
+            { label: "Item 5", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item5" },
+            { label: "Item 6", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item6" },
+            { label: "Item 7", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item7" },
+          ]
+        },
+      ]
+    },
+    {
+      label: "Org Management",
+      icon: <Building2 className="w-5 h-5" />,
+      children: [
+        { label: "Portfolio", icon: <LayoutDashboard className="w-4 h-4" />, href: "/om/portfolio" },
+        { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/om/control-panel" },
+        { label: "OM Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/om/wizard" },
+        { label: "OM Records", icon: <List className="w-4 h-4" />, href: "/om/list" },
+        { label: "Settings", icon: <Settings className="w-4 h-4" />, href: "/om/settings" },
+      ],
     },
     {
       label: "PM Central",
@@ -285,72 +342,24 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "PS List", icon: <List className="w-4 h-4" />, href: "/ps/list" },
       ],
     },
+    { label: "Resources", icon: <Activity className="w-5 h-5" />, href: "/resources" },
     {
-      label: "Data Analysis",
-      icon: <BrainCircuit className="w-5 h-5" />,
-      children: [
-        { label: "GraphRAG", icon: <BrainCircuit className="w-4 h-4" />, href: "/data-analysis/graphrag" },
-        { label: "Data Warehouse", icon: <Database className="w-4 h-4" />, href: "/data-analysis/data-warehouse" },
-      ],
+      label: "Run Console",
+      icon: <Terminal className="w-5 h-5" />,
+      href: "/run-console",
     },
+    { label: "Wiki", icon: <BookOpen className="w-5 h-5" />, href: "/wiki" },
     {
-      label: "Human Resources",
-      icon: <Users className="w-5 h-5" />,
-      children: HR_NAV_CONFIG.sections.map((section) => ({
-        label: section.label,
-        icon: <Users className="w-4 h-4" />,
-        href: section.href,
-        requiredAction: section.requiredAction,
-      })),
-    },
-    {
-      label: "Automation",
-      icon: <Zap className="w-5 h-5" />,
+      label: "Workspaces",
+      icon: <Sparkles className="w-5 h-5" />,
       children: [
-        ...AUTOMATION_NAV_CONFIG.sections.map((section) => ({
-          label: section.label,
-          icon: <Zap className="w-4 h-4" />,
-          href: section.currentRoute ?? section.href,
-        })),
-        { label: "WCP Workflows", icon: <Activity className="w-4 h-4" />, href: "/wcp/workflows" },
-        { label: "Flow Chart", icon: <GitBranch className="w-4 h-4" />, href: "/automation/flowchart" },
-        { label: "Airflow", icon: <Wind className="w-4 h-4" />, href: "/automation/airflow" },
-        { label: "Airbyte", icon: <Activity className="w-4 h-4" />, href: "/automation/airbyte" },
-      ],
-    },
-    {
-      label: "Infrastructure", 
-      icon: <Activity className="w-5 h-5" />,
-      children: [
-        { 
-          label: "Hardware", 
-          icon: <Package className="w-4 h-4" />,
-          children: [
-            { label: "Mobiles", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/mobiles" },
-            { label: "Personal Computers", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/pcs" },
-            { label: "Servers", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/servers" },
-            { label: "Censors", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/censors" },
-            { label: "Machines", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/machines" },
-            { label: "Robots", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/hardware/robots" },
-          ]
-        },
-        { 
-          label: "Software", 
-          icon: <Package className="w-4 h-4" />,
-          children: [
-            { label: "Item 1", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item1" },
-            { label: "Item 2", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item2" },
-            { label: "Item 3", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item3" },
-            { label: "Item 4", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item4" },
-            { label: "Item 5", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item5" },
-            { label: "Item 6", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item6" },
-            { label: "Item 7", icon: <Activity className="w-3 h-3" />, href: "/infrastructure/software/item7" },
-          ]
-        },
+        { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/ws/dashboard" },
+        { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/ws/control-panel" },
+        { label: "Wizard", icon: <Wand2 className="w-4 h-4" />, href: "/ws/wizard" },
+        { label: "WS List", icon: <List className="w-4 h-4" />, href: "/ws/list" },
+        { label: "WS Catalog", icon: <BookOpen className="w-4 h-4" />, href: "/ws/catalog" },
       ]
     },
-    { label: "Resources", icon: <Activity className="w-5 h-5" />, href: "/resources" },
-    { label: "Wiki", icon: <BookOpen className="w-5 h-5" />, href: "/wiki" },
   ];
 
   const isActive = (href: string) => {
@@ -423,6 +432,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setPsMenuOpen(!psMenuOpen);
                       } else if (item.label === "Data Analysis") {
                         setDataAnalysisMenuOpen(!dataAnalysisMenuOpen);
+                      } else if (item.label === "App Components") {
+                        setAppComponentsMenuOpen(!appComponentsMenuOpen);
                       }
                     }}
                     className="flex w-full items-center justify-between space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -431,10 +442,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Human Resources" && hrMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) || (item.label === "Data Analysis" && dataAnalysisMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Human Resources" && hrMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) || (item.label === "Data Analysis" && dataAnalysisMenuOpen) || (item.label === "App Components" && appComponentsMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* Automation / Digital HQ menus (2-level) */}
-                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) || (item.label === "Data Analysis" && dataAnalysisMenuOpen)) && (
+                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) || (item.label === "Data Analysis" && dataAnalysisMenuOpen) || (item.label === "App Components" && appComponentsMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>

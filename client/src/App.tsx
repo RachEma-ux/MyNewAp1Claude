@@ -147,6 +147,8 @@ const CVTopLevelPage = lazy(() => import("@/pages/culture-values/CVTopLevelPage"
 const PSTopLevelPage = lazy(() => import("@/pages/projects-system/PSTopLevelPage"));
 const PSIdeationDetailPage = lazy(() => import("@/pages/projects-system/PSIdeationDetailPage"));
 const PSIdeationConvertPage = lazy(() => import("@/pages/projects-system/PSIdeationConvertPage"));
+const SimpleShellPage = lazy(() => import("@/pages/components/SimpleShellPage"));
+const DoubleShellPage = lazy(() => import("@/pages/components/DoubleShellPage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
@@ -383,6 +385,9 @@ function Router() {
       {/* Culture Values — top-level (auto-selects default workspace) */}
       <Route path="/cv/:item" component={() => <ProtectedRoute component={CVTopLevelPage} />} />
       <Route path="/cv" component={() => <ProtectedRoute component={CVTopLevelPage} />} />
+      {/* App Components — Shell demos */}
+      <Route path="/components/simple-shell" component={() => <ProtectedRoute component={SimpleShellPage} />} />
+      <Route path="/components/double-shell" component={() => <ProtectedRoute component={DoubleShellPage} />} />
       {/* Projects System — Ideation detail routes (must precede generic /ps/:item) */}
       <Route path="/ps/ideation/:id/convert" component={() => <ProtectedRoute component={PSIdeationConvertPage} />} />
       <Route path="/ps/ideation/:id" component={() => <ProtectedRoute component={PSIdeationDetailPage} />} />

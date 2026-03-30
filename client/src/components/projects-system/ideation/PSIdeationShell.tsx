@@ -23,7 +23,7 @@ import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2, PanelLeftOpen, Lightbulb } from "lucide-react";
+import { Loader2, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -478,73 +478,55 @@ export function PSIdeationShell({ ideationId }: Props) {
   }
 
   // ── Render ────────────────────────────────────────────────────────────
+  // Returns Fragment — parent (PSIdeationDetailPage) provides the flex wrapper
+  // cloned from PmCentralSidebarLayout pattern.
   return (
-    <div className="flex flex-col h-full">
-      <PSIdeationHeader
-        title={ideation.title}
-        sourceType={ideation.sourceType}
-        lifecycleStatus={ideation.lifecycleStatus as any}
+    <>
+      {/* Sidebar — always collapsed on mobile, same as PM Central */}
+      <PSIdeationWorkflowRail
+        steps={(steps as any[]) || []}
+        activeView={activeView}
+        onViewSelect={handleViewSelect}
         isConverted={isConverted}
-        readiness={readiness as any}
-        saveStatus={saveStatus}
-        stepIndex={stepIndex}
-        stepCount={IDEATION_STEP_KEYS.length}
-        stepLabel={stepLabel}
-        completedCount={completedCount}
-        onConvert={handleConvert}
-        onDuplicate={handleDuplicate}
-        onDelete={handleDelete}
-        onDefer={handleDefer}
-        onReject={handleReject}
-        deleting={deleteMut.isPending}
-        duplicating={duplicateMut.isPending}
+        collapsed={isMobile || sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
       />
 
-      <div className="flex flex-1 min-h-0">
-        {/* ── Left rail (Carbon Shell sidebar) ────────────────────── */}
-        {isMobile ? (
-          <>
-            <div className="border-r border-border flex flex-col items-center py-2 px-1">
-              <Button variant="ghost" size="sm" onClick={() => setMobileRailOpen(true)} title="Navigation" className="h-7 w-7 p-0">
-                <PanelLeftOpen className="w-4 h-4" />
-              </Button>
-            </div>
-            <PSIdeationWorkflowRail
-              steps={(steps as any[]) || []}
-              activeView={activeView}
-              onViewSelect={handleViewSelect}
-              isConverted={isConverted}
-              mobileSheet
-              mobileOpen={mobileRailOpen}
-              onMobileClose={() => setMobileRailOpen(false)}
-            />
-          </>
-        ) : (
-          <PSIdeationWorkflowRail
-            steps={(steps as any[]) || []}
-            activeView={activeView}
-            onViewSelect={handleViewSelect}
-            isConverted={isConverted}
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
-          />
-        )}
+      <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+        <PSIdeationHeader
+          title={ideation.title}
+          sourceType={ideation.sourceType}
+          lifecycleStatus={ideation.lifecycleStatus as any}
+          isConverted={isConverted}
+          readiness={readiness as any}
+          saveStatus={saveStatus}
+          stepIndex={stepIndex}
+          stepCount={IDEATION_STEP_KEYS.length}
+          stepLabel={stepLabel}
+          completedCount={completedCount}
+          onConvert={handleConvert}
+          onDuplicate={handleDuplicate}
+          onDelete={handleDelete}
+          onDefer={handleDefer}
+          onReject={handleReject}
+          deleting={deleteMut.isPending}
+          duplicating={duplicateMut.isPending}
+        />
 
-        {/* ── Center canvas (full width) ────────────────────────── */}
-        {renderCenterCanvas()}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {renderCenterCanvas()}
+        </div>
+
+        <PSIdeationStatusBar
+          lifecycleStatus={ideation.lifecycleStatus}
+          stepIndex={stepIndex}
+          stepCount={IDEATION_STEP_KEYS.length}
+          completedCount={completedCount}
+          ideaCount={ideaCount}
+          conceptName={selectedConcept?.title || null}
+        />
       </div>
 
-      {/* ── Carbon Status Bar ────────────────────────────────────── */}
-      <PSIdeationStatusBar
-        lifecycleStatus={ideation.lifecycleStatus}
-        stepIndex={stepIndex}
-        stepCount={IDEATION_STEP_KEYS.length}
-        completedCount={completedCount}
-        ideaCount={ideaCount}
-        conceptName={selectedConcept?.title || null}
-      />
-
-      {/* ── Confirmation dialog ─────────────────────────────── */}
       <AlertDialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog((d) => ({ ...d, open: false }))}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -562,6 +544,6 @@ export function PSIdeationShell({ ideationId }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }

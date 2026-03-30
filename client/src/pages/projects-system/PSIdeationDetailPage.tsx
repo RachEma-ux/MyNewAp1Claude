@@ -1,8 +1,8 @@
 /**
  * PS Ideation — Detail Page
  *
- * Wraps the PSIdeationShell with route parameter extraction.
- * Applies safe-area-inset for mobile devices with notches.
+ * Layout cloned from PmCentralSidebarLayout (no cross-module import).
+ * Pattern: "flex -mx-6 -mt-6 overflow-hidden" with calc(100vh - 4rem).
  */
 import { useParams } from "wouter";
 import { PSIdeationShell } from "@/components/projects-system/ideation/PSIdeationShell";
@@ -21,8 +21,8 @@ export function PSIdeationDetailPage() {
 
   return (
     <div
-      className="h-[calc(100vh-64px)] overflow-hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      className="flex -mx-6 -mt-6 overflow-hidden"
+      style={{ height: "calc(100vh - 4rem)" }}
     >
       <PSIdeationShell ideationId={ideationId} />
     </div>
