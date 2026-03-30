@@ -218,6 +218,20 @@
       "when": 1774944000000,
       "tag": "0031_ps_ideation_translator_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1775030400000,
+      "tag": "0032_ps_ideation_schema_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1775116800000,
+      "tag": "0033_ps_wizard_phase_a",
+      "breakpoints": true
     }
   ]
 }

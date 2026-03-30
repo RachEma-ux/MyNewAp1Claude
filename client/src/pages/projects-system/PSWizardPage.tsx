@@ -1,17 +1,21 @@
 /**
- * PS Wizard — 13-step flow
+ * PS Wizard — 11-step flow (Phase A)
  *
- * Scenario → Context → NLP → Auto Name → Questions → Scoring →
+ * Intake (Scenario+Context) → Analysis (NLP+AutoName) → Questions → Scoring →
  * Explainability → Recommendation → Accept → Create PS Project →
  * Validation → PM Central → Feedback
  *
- * All steps DB-driven, no hardcoded logic.
+ * Phase A additions:
+ * - Confidence gate after scoring (HIGH/MEDIUM/LOW based on winnerMargin)
+ * - Override reason persisted end-to-end
+ * - KPI target fields on Accept step
+ * - Merged step pairs: Scenario+Context, NLP+AutoName
  */
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
 type ContextState = {
   businessUnit: string;
@@ -36,11 +40,32 @@ type Recommendation = {
   };
 };
 
+type KpiTargets = {
+  expectedCostSavings: string;
+  expectedTimeReductionPercent: string;
+  expectedRevenueImpact: string;
+  expectedDeliveryTimelineWeeks: string;
+  primarySuccessMetric: string;
+};
+
+// ── Confidence Gate Thresholds ──────────────────────────────────────────
+const CONFIDENCE_GATE = {
+  HIGH_THRESHOLD: 15,   // winnerMargin >= 15
+  MEDIUM_THRESHOLD: 8,  // winnerMargin >= 8 and < 15
+  // LOW: winnerMargin < 8
+} as const;
+
+type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW";
+
+function getConfidenceLevel(winnerMargin: number): ConfidenceLevel {
+  if (winnerMargin >= CONFIDENCE_GATE.HIGH_THRESHOLD) return "HIGH";
+  if (winnerMargin >= CONFIDENCE_GATE.MEDIUM_THRESHOLD) return "MEDIUM";
+  return "LOW";
+}
+
 const STEP_LABELS = [
-  "Scenario",
-  "Context",
-  "NLP",
-  "Auto Name",
+  "Intake",
+  "Analysis",
   "Questions",
   "Scoring",
   "Explainability",
@@ -79,6 +104,27 @@ export default function PSWizardPage() {
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [overrideReason, setOverrideReason] = useState("");
 
+  // ── Confidence gate state ────────────────────────────────────────────
+  const [lowConfidenceAcknowledged, setLowConfidenceAcknowledged] = useState(false);
+
+  // ── KPI targets ──────────────────────────────────────────────────────
+  const [kpiTargets, setKpiTargets] = useState<KpiTargets>({
+    expectedCostSavings: "",
+    expectedTimeReductionPercent: "",
+    expectedRevenueImpact: "",
+    expectedDeliveryTimelineWeeks: "",
+    primarySuccessMetric: "",
+  });
+
+  // ── Text analysis state ────────────────────────────────────────────
+  const [textSignals, setTextSignals] = useState<Array<{
+    questionCode: string;
+    suggestedAnswer: "Yes" | "No" | null;
+    matchedKeywords: string[];
+    confidence: "strong" | "weak" | "none";
+  }>>([]);
+  const [analysisRan, setAnalysisRan] = useState(false);
+
   // ── Post-creation state ──────────────────────────────────────────────
   const [createdProjectId, setCreatedProjectId] = useState<number | null>(null);
   const [createError, setCreateError] = useState("");
@@ -92,6 +138,9 @@ export default function PSWizardPage() {
 
   // Classification mutation
   const classifyMutation = trpc.ps.classifyScenario.useMutation();
+
+  // Text analysis mutation
+  const analyzeTextMut = trpc.ps.analyzeText.useMutation();
 
   // Project CRUD
   const utils = trpc.useUtils();
@@ -116,51 +165,93 @@ export default function PSWizardPage() {
   const questions = matrixData?.available ? matrixData.questions : [];
   const dimensions = matrixData?.available ? matrixData.dimensions : [];
 
+  // Derived: confidence level
+  const confidenceLevel: ConfidenceLevel | null = recommendation
+    ? getConfidenceLevel(recommendation.winnerMargin)
+    : null;
+
   // ── Step navigation ──────────────────────────────────────────────────
 
   const canGoNext =
-    (step === 1 && scenario.trim().length > 0) ||
-    step === 2 ||
-    step === 3 ||
-    (step === 4 && generatedName.trim().length > 0) ||
-    step === 5 ||
-    (step >= 6 && step <= 8 && recommendation !== null) ||
-    (step === 9 && recommendation !== null) ||
-    (step === 10 && createdProjectId !== null) ||
-    (step === 11 && createdProject !== null) ||
-    step === 12 ||
-    false; // step 13 = final
+    (step === 1 && scenario.trim().length > 0) || // Intake: need scenario
+    (step === 2 && generatedName.trim().length > 0) || // Analysis: need name
+    step === 3 || // Questions: optional answers
+    (step >= 4 && step <= 6 && recommendation !== null) || // Scoring/Explain/Recommend
+    (step === 7 && recommendation !== null && canCreateProject()) || // Accept: gate check
+    (step === 8 && createdProjectId !== null) || // Create: project exists
+    (step === 9 && createdProject !== null) || // Validation
+    step === 10 || // PM Central
+    false; // step 11 = final
+
+  /** Check if project creation is allowed based on confidence gate */
+  function canCreateProject(): boolean {
+    if (!recommendation) return false;
+    const level = getConfidenceLevel(recommendation.winnerMargin);
+    if (level === "HIGH") return true;
+    if (level === "MEDIUM") return true; // warning shown but allowed
+    // LOW: must have override reason and explicit acknowledgment
+    return overrideReason.trim().length > 0 && lowConfidenceAcknowledged;
+  }
 
   function nextStep() {
     if (!canGoNext) return;
 
-    // Step 3 (NLP) → Step 4 (Auto Name): auto-derive name
-    if (step === 3) {
+    // Step 1 (Intake) → Step 2 (Analysis): auto-derive name + run text analysis
+    if (step === 1) {
       if (!generatedName) {
         setGeneratedName(deriveProjectName(scenario));
       }
-      setStep(4);
+      // Run text analysis to auto-extract answers
+      if (questions.length > 0) {
+        analyzeTextMut.mutate(
+          {
+            scenario,
+            context,
+            questionCodes: questions.map((q) => q.code),
+          },
+          {
+            onSuccess: (result) => {
+              setTextSignals(result.signals);
+              setAnalysisRan(true);
+              // Pre-fill answers with suggested values (user can override on Questions step)
+              if (Object.keys(result.suggestedAnswers).length > 0) {
+                setAnswers((prev) => {
+                  const merged = { ...prev };
+                  for (const [code, val] of Object.entries(result.suggestedAnswers)) {
+                    // Only pre-fill if user hasn't already answered
+                    if (!merged[code]) {
+                      merged[code] = val;
+                    }
+                  }
+                  return merged;
+                });
+              }
+            },
+          },
+        );
+      }
+      setStep(2);
       return;
     }
 
-    // Step 5 (Questions) → Step 6 (Scoring): run classification
-    if (step === 5) {
+    // Step 3 (Questions) → Step 4 (Scoring): run classification
+    if (step === 3) {
       handleRunClassification();
       return;
     }
 
-    // Step 9 (Accept) → Step 10 (Create): create the project
-    if (step === 9) {
+    // Step 7 (Accept) → Step 8 (Create): create the project
+    if (step === 7) {
       handleCreateProject();
       return;
     }
 
-    if (step < 13) setStep((s) => (s + 1) as Step);
+    if (step < 11) setStep((s) => (s + 1) as Step);
   }
 
   function prevStep() {
     // Don't go back past creation
-    if (step <= 1 || step > 10) return;
+    if (step <= 1 || step > 8) return;
     setStep((s) => (s - 1) as Step);
   }
 
@@ -175,7 +266,9 @@ export default function PSWizardPage() {
         answers,
       });
       setRecommendation(result);
-      setStep(6);
+      // Reset confidence gate state for new classification
+      setLowConfidenceAcknowledged(false);
+      setStep(4);
     } catch (err: any) {
       const msg = err?.message || "Classification failed";
       setCreateError(msg);
@@ -189,6 +282,19 @@ export default function PSWizardPage() {
       setCreateError("No recommendation available — go back and classify first.");
       return;
     }
+
+    const level = getConfidenceLevel(recommendation.winnerMargin);
+
+    // Enforce confidence gate: LOW requires override reason
+    if (level === "LOW" && !overrideReason.trim()) {
+      setCreateError("Low-confidence classification requires an override reason before creating.");
+      return;
+    }
+    if (level === "LOW" && !lowConfidenceAcknowledged) {
+      setCreateError("Please acknowledge the low-confidence decision before creating.");
+      return;
+    }
+
     setCreateError("");
     try {
       const projectName = generatedName.trim() || recommendation.selectedScope || "Untitled Project";
@@ -205,13 +311,17 @@ export default function PSWizardPage() {
           score: t.score,
         })),
         confidence: recommendation.confidence,
+        winnerMargin: recommendation.winnerMargin,
         explainability: recommendation.explainability,
         matrixVersionId: recommendation.matrixVersionId,
         matrixVersion: recommendation.matrixVersion,
+        overrideReason: overrideReason.trim() || "",
+        confidenceGateResult: level,
+        kpiTargets: kpiTargets,
       });
       setCreatedProjectId(project.id);
       await utils.ps.projects.list.invalidate();
-      setStep(10);
+      setStep(8);
     } catch (err: any) {
       setCreateError(err?.message || "Failed to create PS project");
     }
@@ -259,7 +369,7 @@ export default function PSWizardPage() {
 
   // ── Rendering ────────────────────────────────────────────────────────
 
-  const isPostCreation = step >= 10;
+  const isPostCreation = step >= 8;
   const isClassifying = classifyMutation.isPending;
   const isCreating = createProjectMut.isPending;
 
@@ -296,77 +406,158 @@ export default function PSWizardPage() {
         {/* ── Step Content ────────────────────────────────────────────── */}
         <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
 
-          {/* Step 1: Scenario */}
+          {/* Step 1: Intake (Scenario + Context merged) */}
           {step === 1 && (
-            <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">1. Scenario</h2>
-              <p className="text-white/70">Describe the project scenario in detail</p>
-              <textarea
-                value={scenario}
-                onChange={(e) => setScenario(e.target.value)}
-                placeholder="Describe the project scenario..."
-                rows={8}
-                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
-              />
-              <div className="text-sm text-white/50">{scenario.length}/5000 characters</div>
-            </div>
-          )}
+            <div className="space-y-6">
+              <h2 className="text-2xl font-semibold">1. Intake</h2>
+              <p className="text-white/70">Describe the project scenario and set organizational context</p>
 
-          {/* Step 2: Context */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">2. Context</h2>
-              <p className="text-white/70">Set organizational context</p>
-              <div className="grid gap-4 md:grid-cols-2">
-                <input
-                  value={context.businessUnit}
-                  onChange={(e) => setContext({ ...context, businessUnit: e.target.value })}
-                  placeholder="Business Unit"
-                  className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
+              {/* Scenario section */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-indigo-300">Project Scenario</label>
+                <textarea
+                  value={scenario}
+                  onChange={(e) => setScenario(e.target.value)}
+                  placeholder="Describe the project scenario..."
+                  rows={6}
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
                 />
-                <input
-                  value={context.region}
-                  onChange={(e) => setContext({ ...context, region: e.target.value })}
-                  placeholder="Region"
-                  className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
-                />
-                <input
-                  value={context.strategicImportance}
-                  onChange={(e) => setContext({ ...context, strategicImportance: e.target.value })}
-                  placeholder="Strategic Importance"
-                  className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
+                <div className="text-sm text-white/50">{scenario.length}/5000 characters</div>
+              </div>
+
+              {/* Context section */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-indigo-300">Organizational Context</label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <input
+                    value={context.businessUnit}
+                    onChange={(e) => setContext({ ...context, businessUnit: e.target.value })}
+                    placeholder="Business Unit"
+                    className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
+                  />
+                  <input
+                    value={context.region}
+                    onChange={(e) => setContext({ ...context, region: e.target.value })}
+                    placeholder="Region"
+                    className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
+                  />
+                  <input
+                    value={context.strategicImportance}
+                    onChange={(e) => setContext({ ...context, strategicImportance: e.target.value })}
+                    placeholder="Strategic Importance"
+                    className="rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
+                  />
+                </div>
+                <textarea
+                  value={context.existingSituation}
+                  onChange={(e) => setContext({ ...context, existingSituation: e.target.value })}
+                  placeholder="Describe what is existing if any..."
+                  rows={4}
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
                 />
               </div>
-              <textarea
-                value={context.existingSituation}
-                onChange={(e) => setContext({ ...context, existingSituation: e.target.value })}
-                placeholder="Describe what is existing if any..."
-                rows={6}
-                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
-              />
             </div>
           )}
 
-          {/* Step 3: NLP — DB-driven dimension extraction */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">3. NLP Analysis</h2>
+          {/* Step 2: Analysis (NLP + Auto Name merged) */}
+          {step === 2 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-semibold">2. Analysis</h2>
               <p className="text-white/70">
-                Automatic dimension extraction from scenario and context
+                Text analysis, auto-extracted answers, and project naming
               </p>
 
+              {/* Text Analysis Results */}
               <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4 space-y-4">
                 <div className="text-sm font-semibold text-indigo-300">
-                  Scenario text analysed ({scenario.length} chars)
+                  Scenario analysed ({scenario.length} chars)
                 </div>
-                <div className="rounded-lg bg-black/40 px-3 py-2 text-sm text-white/70 max-h-32 overflow-y-auto">
-                  {scenario.slice(0, 200)}{scenario.length > 200 ? "..." : ""}
+                <div className="rounded-lg bg-black/40 px-3 py-2 text-sm text-white/70 max-h-24 overflow-y-auto">
+                  {scenario.slice(0, 300)}{scenario.length > 300 ? "..." : ""}
                 </div>
 
-                {dimensions.length > 0 ? (
+                {/* Auto-extracted answers */}
+                {analyzeTextMut.isPending && (
+                  <div className="text-sm text-blue-400">Analysing scenario text...</div>
+                )}
+
+                {analysisRan && textSignals.length > 0 && (
                   <>
                     <div className="text-sm font-semibold text-indigo-300">
-                      Classification Dimensions (from active matrix)
+                      Auto-Extracted Answers (from text analysis)
+                    </div>
+                    <div className="space-y-2">
+                      {textSignals.map((sig) => {
+                        const q = questions.find((qq) => qq.code === sig.questionCode);
+                        return (
+                          <div key={sig.questionCode} className="rounded-lg bg-black/40 px-3 py-2 text-sm flex items-center gap-3">
+                            <div className="flex-1">
+                              <span className="text-white/80">{q?.label ?? sig.questionCode}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {sig.suggestedAnswer ? (
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                  sig.suggestedAnswer === "Yes"
+                                    ? "bg-green-500/20 text-green-400"
+                                    : "bg-red-500/20 text-red-400"
+                                }`}>
+                                  {sig.suggestedAnswer}
+                                </span>
+                              ) : (
+                                <span className="rounded-full px-2 py-0.5 text-xs bg-white/5 text-white/40">
+                                  —
+                                </span>
+                              )}
+                              <span className={`text-xs ${
+                                sig.confidence === "strong" ? "text-green-400"
+                                  : sig.confidence === "weak" ? "text-yellow-400"
+                                    : "text-white/30"
+                              }`}>
+                                {sig.confidence}
+                              </span>
+                            </div>
+                            {sig.matchedKeywords.length > 0 && (
+                              <div className="text-xs text-white/40 max-w-[200px] truncate" title={sig.matchedKeywords.join(", ")}>
+                                {sig.matchedKeywords.slice(0, 3).join(", ")}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="text-xs text-white/40">
+                      These answers are pre-filled on the Questions step. You can override them.
+                    </div>
+                  </>
+                )}
+
+                {analysisRan && textSignals.filter(s => s.suggestedAnswer).length === 0 && (
+                  <div className="text-sm text-white/50">
+                    No strong signals detected from scenario text. Answer questions manually on the next step.
+                  </div>
+                )}
+
+                {/* Context signals */}
+                {(context.businessUnit || context.region || context.strategicImportance) && (
+                  <>
+                    <div className="text-sm font-semibold text-indigo-300">
+                      Context Signals
+                    </div>
+                    <ul className="space-y-1 text-sm text-white/80">
+                      {context.businessUnit && <li>Business Unit: {context.businessUnit}</li>}
+                      {context.region && <li>Region: {context.region}</li>}
+                      {context.strategicImportance && (
+                        <li>Strategic Importance: {context.strategicImportance}</li>
+                      )}
+                    </ul>
+                  </>
+                )}
+
+                {/* Dimensions from matrix */}
+                {dimensions.length > 0 && (
+                  <>
+                    <div className="text-sm font-semibold text-indigo-300">
+                      Classification Dimensions
                     </div>
                     <div className="grid gap-2 md:grid-cols-2">
                       {dimensions.map((dim) => (
@@ -381,53 +572,29 @@ export default function PSWizardPage() {
                       ))}
                     </div>
                   </>
-                ) : (
-                  <div className="text-sm text-white/50">
-                    No dimensions loaded — ensure an active matrix version exists.
-                  </div>
                 )}
+              </div>
 
-                {context.businessUnit || context.region || context.strategicImportance ? (
-                  <>
-                    <div className="text-sm font-semibold text-indigo-300">
-                      Extracted Context Signals
-                    </div>
-                    <ul className="space-y-1 text-sm text-white/80">
-                      {context.businessUnit && <li>Business Unit: {context.businessUnit}</li>}
-                      {context.region && <li>Region: {context.region}</li>}
-                      {context.strategicImportance && (
-                        <li>Strategic Importance: {context.strategicImportance}</li>
-                      )}
-                    </ul>
-                  </>
-                ) : null}
+              {/* Auto Name section */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-indigo-300">Project Name</label>
+                <input
+                  value={generatedName}
+                  onChange={(e) => setGeneratedName(e.target.value)}
+                  placeholder="Project name"
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-lg font-semibold text-white outline-none"
+                />
+                <div className="text-sm text-white/50">
+                  Auto-derived from scenario — edit if needed
+                </div>
               </div>
             </div>
           )}
 
-          {/* Step 4: Auto Name */}
-          {step === 4 && (
+          {/* Step 3: Questions */}
+          {step === 3 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">4. Auto Name</h2>
-              <p className="text-white/70">
-                Auto-generated project name from scenario. Edit if needed.
-              </p>
-              <input
-                value={generatedName}
-                onChange={(e) => setGeneratedName(e.target.value)}
-                placeholder="Project name"
-                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-lg font-semibold text-white outline-none"
-              />
-              <div className="text-sm text-white/50">
-                Derived from first sentence of scenario text
-              </div>
-            </div>
-          )}
-
-          {/* Step 5: Questions */}
-          {step === 5 && (
-            <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">5. Questions</h2>
+              <h2 className="text-2xl font-semibold">3. Questions</h2>
               <p className="text-white/70">DB-driven classification questions from active matrix</p>
 
               {questions.length === 0 ? (
@@ -474,49 +641,83 @@ export default function PSWizardPage() {
             </div>
           )}
 
-          {/* Step 6: Scoring */}
-          {step === 6 && (
+          {/* Step 4: Scoring + Confidence Gate */}
+          {step === 4 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">6. Scoring</h2>
+              <h2 className="text-2xl font-semibold">4. Scoring</h2>
               <p className="text-white/70">Matrix evaluation scores per scope</p>
 
               {recommendation ? (
-                <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
-                  <div className="text-sm text-white/50">Ranked Scopes (Top 3)</div>
-                  <ol className="list-decimal space-y-2 pl-5">
-                    {recommendation.top3.map((item, idx) => (
-                      <li key={item.scopeId}>
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium">{item.scopeLabel}</span>
-                          <span className="text-sm text-white/50">({item.scopeCode})</span>
-                          <div className="ml-auto flex items-center gap-2">
-                            <div className="h-2 rounded-full bg-white/10 w-32">
-                              <div
-                                className={`h-2 rounded-full ${idx === 0 ? "bg-indigo-500" : "bg-white/30"}`}
-                                style={{
-                                  width: `${recommendation.top3[0].score > 0
-                                    ? (item.score / recommendation.top3[0].score) * 100
-                                    : 0}%`,
-                                }}
-                              />
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
+                    <div className="text-sm text-white/50">Ranked Scopes (Top 3)</div>
+                    <ol className="list-decimal space-y-2 pl-5">
+                      {recommendation.top3.map((item, idx) => (
+                        <li key={item.scopeId}>
+                          <div className="flex items-center gap-3">
+                            <span className="font-medium">{item.scopeLabel}</span>
+                            <span className="text-sm text-white/50">({item.scopeCode})</span>
+                            <div className="ml-auto flex items-center gap-2">
+                              <div className="h-2 rounded-full bg-white/10 w-32">
+                                <div
+                                  className={`h-2 rounded-full ${idx === 0 ? "bg-indigo-500" : "bg-white/30"}`}
+                                  style={{
+                                    width: `${recommendation.top3[0].score > 0
+                                      ? (item.score / recommendation.top3[0].score) * 100
+                                      : 0}%`,
+                                  }}
+                                />
+                              </div>
+                              <span className="text-sm font-mono w-8 text-right">{item.score}</span>
                             </div>
-                            <span className="text-sm font-mono w-8 text-right">{item.score}</span>
                           </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
+                        </li>
+                      ))}
+                    </ol>
 
-                  <div className="grid gap-4 md:grid-cols-2 pt-2">
-                    <div>
-                      <div className="text-sm text-white/50">Winner Margin</div>
-                      <div className="font-semibold text-lg">+{recommendation.winnerMargin}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-white/50">Confidence</div>
-                      <div className="font-semibold text-lg">{recommendation.confidence}</div>
+                    <div className="grid gap-4 md:grid-cols-2 pt-2">
+                      <div>
+                        <div className="text-sm text-white/50">Winner Margin</div>
+                        <div className="font-semibold text-lg">+{recommendation.winnerMargin}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-white/50">Confidence</div>
+                        <div className="font-semibold text-lg">{recommendation.confidence}</div>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Confidence Gate Banner */}
+                  {confidenceLevel && (
+                    <div className={`rounded-xl border p-4 ${
+                      confidenceLevel === "HIGH"
+                        ? "border-green-500/30 bg-green-500/10"
+                        : confidenceLevel === "MEDIUM"
+                          ? "border-yellow-500/30 bg-yellow-500/10"
+                          : "border-red-500/30 bg-red-500/10"
+                    }`}>
+                      <div className={`text-sm font-semibold ${
+                        confidenceLevel === "HIGH"
+                          ? "text-green-400"
+                          : confidenceLevel === "MEDIUM"
+                            ? "text-yellow-400"
+                            : "text-red-400"
+                      }`}>
+                        Confidence Gate: {confidenceLevel}
+                      </div>
+                      <div className="mt-1 text-sm text-white/70">
+                        {confidenceLevel === "HIGH" && (
+                          <>Winner margin +{recommendation.winnerMargin} meets high-confidence threshold (&ge;{CONFIDENCE_GATE.HIGH_THRESHOLD}). Normal flow.</>
+                        )}
+                        {confidenceLevel === "MEDIUM" && (
+                          <>Winner margin +{recommendation.winnerMargin} is moderate ({CONFIDENCE_GATE.MEDIUM_THRESHOLD}–{CONFIDENCE_GATE.HIGH_THRESHOLD - 1}). You may proceed, but review the recommendation carefully.</>
+                        )}
+                        {confidenceLevel === "LOW" && (
+                          <>Winner margin +{recommendation.winnerMargin} is below threshold (&lt;{CONFIDENCE_GATE.MEDIUM_THRESHOLD}). An override reason is required to create this project.</>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-white/50">
@@ -526,10 +727,10 @@ export default function PSWizardPage() {
             </div>
           )}
 
-          {/* Step 7: Explainability */}
-          {step === 7 && (
+          {/* Step 5: Explainability */}
+          {step === 5 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">7. Explainability</h2>
+              <h2 className="text-2xl font-semibold">5. Explainability</h2>
               <p className="text-white/70">Why this scope was selected</p>
 
               {recommendation ? (
@@ -570,10 +771,10 @@ export default function PSWizardPage() {
             </div>
           )}
 
-          {/* Step 8: Recommendation */}
-          {step === 8 && (
+          {/* Step 6: Recommendation */}
+          {step === 6 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">8. Recommendation</h2>
+              <h2 className="text-2xl font-semibold">6. Recommendation</h2>
               <p className="text-white/70">Final scope recommendation</p>
 
               {recommendation ? (
@@ -586,16 +787,48 @@ export default function PSWizardPage() {
                     Code: {recommendation.selectedScopeCode} | Matrix: {recommendation.matrixVersion}
                   </div>
 
+                  {/* Override reason — always shown, required for LOW confidence */}
                   <div>
-                    <div className="text-sm text-white/50 mt-4">Override (optional)</div>
+                    <div className="text-sm text-white/50 mt-4">
+                      Override Reason
+                      {confidenceLevel === "LOW" && (
+                        <span className="text-red-400 ml-1">(Required — low confidence)</span>
+                      )}
+                      {confidenceLevel !== "LOW" && (
+                        <span className="text-white/30 ml-1">(Optional)</span>
+                      )}
+                    </div>
                     <textarea
                       value={overrideReason}
                       onChange={(e) => setOverrideReason(e.target.value)}
-                      placeholder="If you disagree with the recommendation, explain why..."
+                      placeholder={
+                        confidenceLevel === "LOW"
+                          ? "Required: explain why you are proceeding despite low confidence..."
+                          : "If you disagree with the recommendation, explain why..."
+                      }
                       rows={3}
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none"
+                      className={`mt-1 w-full rounded-xl border px-4 py-3 text-white outline-none bg-black ${
+                        confidenceLevel === "LOW" && !overrideReason.trim()
+                          ? "border-red-500/50"
+                          : "border-white/10"
+                      }`}
                     />
                   </div>
+
+                  {/* Low confidence acknowledgment checkbox */}
+                  {confidenceLevel === "LOW" && (
+                    <label className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={lowConfidenceAcknowledged}
+                        onChange={(e) => setLowConfidenceAcknowledged(e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded"
+                      />
+                      <span className="text-sm text-red-300">
+                        I acknowledge this is a low-confidence classification (winner margin +{recommendation.winnerMargin}) and I am proceeding with an explicit override decision.
+                      </span>
+                    </label>
+                  )}
                 </div>
               ) : (
                 <div className="text-white/50">No recommendation available</div>
@@ -603,11 +836,11 @@ export default function PSWizardPage() {
             </div>
           )}
 
-          {/* Step 9: Accept */}
-          {step === 9 && (
+          {/* Step 7: Accept (with KPI targets) */}
+          {step === 7 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">9. Accept</h2>
-              <p className="text-white/70">Review and confirm all inputs before project creation</p>
+              <h2 className="text-2xl font-semibold">7. Accept</h2>
+              <p className="text-white/70">Review inputs, set KPI targets, and confirm before project creation</p>
 
               <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-3">
                 <div>
@@ -634,8 +867,12 @@ export default function PSWizardPage() {
                 </div>
                 <div className="grid gap-3 md:grid-cols-3">
                   <div>
-                    <div className="text-sm text-white/50">Confidence</div>
-                    <div className="text-sm">{recommendation?.confidence ?? "—"}</div>
+                    <div className="text-sm text-white/50">Confidence Gate</div>
+                    <div className={`text-sm font-semibold ${
+                      confidenceLevel === "HIGH" ? "text-green-400"
+                        : confidenceLevel === "MEDIUM" ? "text-yellow-400"
+                          : "text-red-400"
+                    }`}>{confidenceLevel ?? "—"}</div>
                   </div>
                   <div>
                     <div className="text-sm text-white/50">Matrix Version</div>
@@ -649,7 +886,7 @@ export default function PSWizardPage() {
                 <div>
                   <div className="text-sm text-white/50">Decision Trace</div>
                   <div className="mt-1 rounded-lg bg-black/40 px-3 py-2 text-xs text-white/60 font-mono">
-                    scope={recommendation?.selectedScopeCode} | confidence={recommendation?.confidence} | matrix_v={recommendation?.matrixVersion} | top3=[{recommendation?.top3.map(t => t.scopeCode).join(", ")}]
+                    scope={recommendation?.selectedScopeCode} | gate={confidenceLevel} | margin=+{recommendation?.winnerMargin} | matrix_v={recommendation?.matrixVersion} | top3=[{recommendation?.top3.map(t => t.scopeCode).join(", ")}]
                   </div>
                 </div>
                 {overrideReason && (
@@ -660,6 +897,65 @@ export default function PSWizardPage() {
                 )}
               </div>
 
+              {/* KPI Targets */}
+              <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4 space-y-4">
+                <div className="text-sm font-semibold text-indigo-300">KPI Targets (Optional)</div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/50">Expected Cost Savings</label>
+                    <input
+                      value={kpiTargets.expectedCostSavings}
+                      onChange={(e) => setKpiTargets({ ...kpiTargets, expectedCostSavings: e.target.value })}
+                      placeholder="e.g. $50,000 or 15%"
+                      className="w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/50">Expected Time Reduction %</label>
+                    <input
+                      value={kpiTargets.expectedTimeReductionPercent}
+                      onChange={(e) => setKpiTargets({ ...kpiTargets, expectedTimeReductionPercent: e.target.value })}
+                      placeholder="e.g. 20"
+                      className="w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/50">Expected Revenue Impact</label>
+                    <input
+                      value={kpiTargets.expectedRevenueImpact}
+                      onChange={(e) => setKpiTargets({ ...kpiTargets, expectedRevenueImpact: e.target.value })}
+                      placeholder="e.g. $200,000 ARR"
+                      className="w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/50">Delivery Timeline (weeks)</label>
+                    <input
+                      value={kpiTargets.expectedDeliveryTimelineWeeks}
+                      onChange={(e) => setKpiTargets({ ...kpiTargets, expectedDeliveryTimelineWeeks: e.target.value })}
+                      placeholder="e.g. 12"
+                      className="w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-white/50">Primary Success Metric</label>
+                  <input
+                    value={kpiTargets.primarySuccessMetric}
+                    onChange={(e) => setKpiTargets({ ...kpiTargets, primarySuccessMetric: e.target.value })}
+                    placeholder="e.g. Reduce incident response time by 30%"
+                    className="w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Confidence gate warning at create time */}
+              {confidenceLevel === "LOW" && (!overrideReason.trim() || !lowConfidenceAcknowledged) && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                  Cannot create: Low-confidence classification requires an override reason and explicit acknowledgment (set in Recommendation step).
+                </div>
+              )}
+
               {createError && (
                 <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
                   {createError}
@@ -668,10 +964,10 @@ export default function PSWizardPage() {
             </div>
           )}
 
-          {/* Step 10: Create PS Project */}
-          {step === 10 && (
+          {/* Step 8: Create PS Project */}
+          {step === 8 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">10. Create PS Project</h2>
+              <h2 className="text-2xl font-semibold">8. Create PS Project</h2>
 
               {createdProjectId ? (
                 <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 space-y-3">
@@ -681,6 +977,12 @@ export default function PSWizardPage() {
                   <div className="text-sm text-white/70">
                     Project ID: {createdProjectId} | Status: DRAFT
                   </div>
+                  {confidenceLevel && confidenceLevel !== "HIGH" && (
+                    <div className="text-sm text-white/50">
+                      Created under {confidenceLevel} confidence gate
+                      {overrideReason && " with override reason recorded"}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-3">
@@ -699,10 +1001,10 @@ export default function PSWizardPage() {
             </div>
           )}
 
-          {/* Step 11: Validation */}
-          {step === 11 && (
+          {/* Step 9: Validation */}
+          {step === 9 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">11. Validation</h2>
+              <h2 className="text-2xl font-semibold">9. Validation</h2>
               <p className="text-white/70">Submit project for validation review</p>
 
               <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
@@ -744,10 +1046,10 @@ export default function PSWizardPage() {
             </div>
           )}
 
-          {/* Step 12: PM Central */}
-          {step === 12 && (
+          {/* Step 10: PM Central */}
+          {step === 10 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">12. PM Central</h2>
+              <h2 className="text-2xl font-semibold">10. PM Central</h2>
               <p className="text-white/70">Handoff to PM Central for execution</p>
 
               <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
@@ -789,10 +1091,10 @@ export default function PSWizardPage() {
             </div>
           )}
 
-          {/* Step 13: Feedback */}
-          {step === 13 && (
+          {/* Step 11: Feedback */}
+          {step === 11 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">13. Feedback</h2>
+              <h2 className="text-2xl font-semibold">11. Feedback</h2>
               <p className="text-white/70">Record execution feedback for this project</p>
 
               <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
@@ -857,7 +1159,7 @@ export default function PSWizardPage() {
         {/* ── Footer Navigation ──────────────────────────────────────── */}
         <div className="mt-6 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="text-white/60">
-            Step {step} of 13 — {STEP_LABELS[step - 1]}
+            Step {step} of 11 — {STEP_LABELS[step - 1]}
           </div>
 
           <div className="flex gap-3">
@@ -869,7 +1171,7 @@ export default function PSWizardPage() {
             >
               Back
             </button>
-            {step < 13 && (
+            {step < 11 && (
               <button
                 type="button"
                 onClick={nextStep}
@@ -877,13 +1179,13 @@ export default function PSWizardPage() {
                   !canGoNext ||
                   isClassifying ||
                   isCreating ||
-                  (step === 9 && isCreating)
+                  (step === 7 && isCreating)
                 }
                 className="rounded-xl bg-blue-600 px-5 py-2 font-medium disabled:opacity-40"
               >
-                {step === 5
+                {step === 3
                   ? "Classify"
-                  : step === 9
+                  : step === 7
                     ? "Accept & Create"
                     : "Next"}
               </button>

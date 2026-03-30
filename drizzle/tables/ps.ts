@@ -551,6 +551,20 @@ export const psProjects = pgTable("ps_projects", {
   validatedAt: timestamp("validated_at"),
   /** PM Central project ID after handoff */
   pmProjectId: integer("pm_project_id"),
+  /** Override reason when user overrides recommendation or creates under low confidence */
+  overrideReason: text("override_reason"),
+  /** Winner margin from scoring (top score minus second score) */
+  winnerMargin: numeric("winner_margin", { precision: 10, scale: 2 }),
+  /** Confidence gate result: HIGH | MEDIUM | LOW */
+  confidenceGateResult: varchar("confidence_gate_result", { length: 20 }),
+  /** KPI targets captured at project creation */
+  kpiTargetsJson: json("kpi_targets_json").$type<{
+    expectedCostSavings?: string;
+    expectedTimeReductionPercent?: string;
+    expectedRevenueImpact?: string;
+    expectedDeliveryTimelineWeeks?: string;
+    primarySuccessMetric?: string;
+  }>(),
   createdBy: integer("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

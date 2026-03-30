@@ -48,12 +48,22 @@ export type CreatePSProjectInput = {
   selectedScopeLabel: string;
   topScopes: Array<{ scopeCode: string; scopeLabel: string; score: number }>;
   confidence: string;
+  winnerMargin?: number;
   explainability: {
     positiveContributors: string[];
     negativeContributors: string[];
   };
   matrixVersionId: number;
   matrixVersion: string;
+  overrideReason?: string;
+  confidenceGateResult?: "HIGH" | "MEDIUM" | "LOW";
+  kpiTargets?: {
+    expectedCostSavings?: string;
+    expectedTimeReductionPercent?: string;
+    expectedRevenueImpact?: string;
+    expectedDeliveryTimelineWeeks?: string;
+    primarySuccessMetric?: string;
+  };
 };
 
 export async function createPSProjectFromWizard(
@@ -107,6 +117,10 @@ export async function createPSProjectFromWizard(
         selectedScopeCode: input.selectedScopeCode,
         topScopesJson: input.topScopes,
         confidence: input.confidence,
+        winnerMargin: input.winnerMargin != null ? String(input.winnerMargin) : null,
+        overrideReason: input.overrideReason || null,
+        confidenceGateResult: input.confidenceGateResult || null,
+        kpiTargetsJson: input.kpiTargets || null,
         explainabilityJson: input.explainability,
         matrixVersionId: input.matrixVersionId,
         templateBundleJson: {
@@ -141,7 +155,11 @@ export async function createPSProjectFromWizard(
       wizardRunId: result.wizardRun.id,
       selectedScopeCode: input.selectedScopeCode,
       confidence: input.confidence,
+      confidenceGateResult: input.confidenceGateResult || null,
+      winnerMargin: input.winnerMargin ?? null,
+      overrideReason: input.overrideReason || null,
       matrixVersionId: input.matrixVersionId,
+      hasKpiTargets: !!input.kpiTargets,
     },
   });
 

@@ -122,6 +122,7 @@ import * as governance from "./ps.governance";
 import * as pmBridge from "./ps.pm-bridge";
 import { loadActiveMatrix } from "./ps.matrix-engine";
 import { ideationRouter } from "./ps.ideation-router";
+import { analyzeScenarioText } from "./ps.text-analysis";
 
 const systemsRouter = router({
   create: governedProcedure
@@ -934,12 +935,22 @@ const projectsRouter = router({
         score: z.number(),
       })),
       confidence: z.string(),
+      winnerMargin: z.number().default(0),
       explainability: z.object({
         positiveContributors: z.array(z.string()),
         negativeContributors: z.array(z.string()),
       }),
       matrixVersionId: z.number().int().positive(),
       matrixVersion: z.string().min(1),
+      overrideReason: z.string().optional().default(""),
+      confidenceGateResult: z.enum(["HIGH", "MEDIUM", "LOW"]).optional(),
+      kpiTargets: z.object({
+        expectedCostSavings: z.string().optional().default(""),
+        expectedTimeReductionPercent: z.string().optional().default(""),
+        expectedRevenueImpact: z.string().optional().default(""),
+        expectedDeliveryTimelineWeeks: z.string().optional().default(""),
+        primarySuccessMetric: z.string().optional().default(""),
+      }).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       return projectService.createPSProjectFromWizard(input, ctx.user.id);
@@ -1114,6 +1125,21 @@ export const psRouter = router({
     }))
     .mutation(async ({ input }) => {
       return service.classifyWizardScenario(input);
+    }),
+
+  analyzeText: protectedProcedure
+    .input(z.object({
+      scenario: z.string().min(1),
+      context: z.object({
+        businessUnit: z.string().optional().default(""),
+        region: z.string().optional().default(""),
+        strategicImportance: z.string().optional().default(""),
+        existingSituation: z.string().optional().default(""),
+      }),
+      questionCodes: z.array(z.string()),
+    }))
+    .mutation(async ({ input }) => {
+      return analyzeScenarioText(input.scenario, input.context, input.questionCodes);
     }),
 
   catalog: protectedProcedure
