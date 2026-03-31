@@ -17,6 +17,7 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { useCatalogEntries } from "@/hooks/useCatalogEntries";
 import { useLocation } from "wouter";
+import { MaestroChatWindow } from "@/components/automation/MaestroChatWindow";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -331,6 +332,7 @@ export default function SandboxWFPage() {
   }, [allWorkflows]);
 
   return (
+    <>
     <div
       className="flex -mx-6 -mt-6 overflow-hidden"
       style={{ height: "calc(100vh - 4rem)" }}
@@ -884,6 +886,8 @@ export default function SandboxWFPage() {
         isImporting={importCatalogMutation.isPending}
       />
     </div>
+    <MaestroChatWindow catalogImports={catalogImports} />
+    </>
   );
 }
 

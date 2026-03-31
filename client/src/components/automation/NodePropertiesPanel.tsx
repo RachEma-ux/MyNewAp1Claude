@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Trash2, Settings2, Zap, GitBranch, Globe, Brain, Shield, Clock, FileText } from "lucide-react";
+import { X, Trash2, Settings2, Zap, GitBranch, Globe, Brain, Shield, Clock, FileText, Merge } from "lucide-react";
 import type { Node } from "reactflow";
 
 // ── Types ────────────────────────────────────────────────
@@ -100,6 +100,8 @@ const TYPE_ICONS: Record<string, any> = {
   escalation: Shield,
   log_message: FileText,
   catalog_agent: Brain,
+  parallel_fan_out: Merge,
+  quality_gate: Shield,
 };
 
 // ── Field Components ─────────────────────────────────────
@@ -302,6 +304,53 @@ export function NodePropertiesPanel({ node, onClose, onUpdateNode, onDeleteNode 
     </>
   );
 
+  const renderParallelFanOutConfig = () => (
+    <>
+      <FieldLabel label="Max Concurrency" hint="1-20" />
+      <Input className="h-7 text-xs mb-2" type="number" min={1} max={20} placeholder="10" value={config.maxConcurrency || ""} onChange={(e) => updateConfig("maxConcurrency", parseInt(e.target.value) || 10)} />
+      <FieldLabel label="Failure Strategy" />
+      <Select value={config.failStrategy || "continue_all"} onValueChange={(v) => updateConfig("failStrategy", v)}>
+        <SelectTrigger className="h-7 text-xs mb-2"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="continue_all" className="text-xs">Continue All (collect all results)</SelectItem>
+          <SelectItem value="fail_fast" className="text-xs">Fail Fast (stop on first error)</SelectItem>
+        </SelectContent>
+      </Select>
+      <FieldLabel label="Tasks" hint="JSON array" />
+      <Textarea
+        className="text-xs min-h-[80px] font-mono"
+        placeholder={'[\n  {"key":"t1","label":"Task 1","catalogEntryId":239,"userPrompt":"..."}\n]'}
+        value={config.tasks ? JSON.stringify(config.tasks, null, 2) : ""}
+        onChange={(e) => {
+          try {
+            const parsed = JSON.parse(e.target.value);
+            updateConfig("tasks", parsed);
+          } catch {
+            // Allow typing invalid JSON while editing
+          }
+        }}
+      />
+      <p className="text-[10px] text-muted-foreground mt-1">
+        Each task: <code className="bg-muted px-1 rounded">key</code>, <code className="bg-muted px-1 rounded">label</code>, optional <code className="bg-muted px-1 rounded">catalogEntryId</code>, <code className="bg-muted px-1 rounded">userPrompt</code>
+      </p>
+    </>
+  );
+
+  const renderQualityGateConfig = () => (
+    <>
+      <FieldLabel label="Source Step Key" hint="step to review" />
+      <Input className="h-7 text-xs mb-2" placeholder="e.g. summarize_1" value={config.sourceStepKey || ""} onChange={(e) => updateConfig("sourceStepKey", e.target.value)} />
+      <FieldLabel label="Reviewer Catalog Entry ID" hint="optional — uses LLM if empty" />
+      <Input className="h-7 text-xs mb-2" type="number" placeholder="Catalog entry ID" value={config.reviewerCatalogEntryId || ""} onChange={(e) => updateConfig("reviewerCatalogEntryId", parseInt(e.target.value) || undefined)} />
+      <FieldLabel label="Pass Threshold" hint="0.0 to 1.0" />
+      <Input className="h-7 text-xs mb-2" type="number" step="0.1" min={0} max={1} placeholder="0.7" value={config.passThreshold ?? ""} onChange={(e) => updateConfig("passThreshold", parseFloat(e.target.value) || 0.7)} />
+      <FieldLabel label="Max Retries" hint="re-plan attempts on fail" />
+      <Input className="h-7 text-xs mb-2" type="number" min={0} max={5} placeholder="1" value={config.maxRetries ?? ""} onChange={(e) => updateConfig("maxRetries", parseInt(e.target.value) || 1)} />
+      <FieldLabel label="Reviewer Prompt" hint="custom review instructions" />
+      <Textarea className="text-xs min-h-[60px]" placeholder="Review the output for quality..." value={config.reviewerPrompt || ""} onChange={(e) => updateConfig("reviewerPrompt", e.target.value)} />
+    </>
+  );
+
   const renderConfig = () => {
     switch (nodeType) {
       case "http_request":
@@ -333,6 +382,10 @@ export function NodePropertiesPanel({ node, onClose, onUpdateNode, onDeleteNode 
         return renderLogConfig();
       case "catalog_agent":
         return renderCatalogAgentConfig();
+      case "parallel_fan_out":
+        return renderParallelFanOutConfig();
+      case "quality_gate":
+        return renderQualityGateConfig();
       default:
         return (
           <p className="text-[10px] text-muted-foreground italic">
@@ -360,6 +413,10 @@ export function NodePropertiesPanel({ node, onClose, onUpdateNode, onDeleteNode 
         return !!(config.to);
       case "catalog_agent":
         return !!(config.catalogEntryId);
+      case "parallel_fan_out":
+        return !!(config.tasks && config.tasks.length > 0);
+      case "quality_gate":
+        return !!(config.sourceStepKey || config.reviewerCatalogEntryId);
       default:
         return true;
     }

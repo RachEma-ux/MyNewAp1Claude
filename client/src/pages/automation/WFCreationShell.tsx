@@ -96,6 +96,7 @@ import "reactflow/dist/style.css";
 
 import { NodePropertiesPanel } from "@/components/automation/NodePropertiesPanel";
 import { ExecutionMonitor } from "@/components/automation/ExecutionMonitor";
+import { MaestroChatWindow } from "@/components/automation/MaestroChatWindow";
 
 // ── Constants ────────────────────────────────────────────
 
@@ -189,6 +190,9 @@ const NODE_TYPES: NodeTypeDefinition[] = [
   { type: "log_message", label: "Log Message", icon: Terminal, color: "#f472b6", category: "governance" },
   // Catalog Agent (base type; dynamic entries added from imports)
   { type: "catalog_agent", label: "Catalog Agent", icon: Brain, color: "#06b6d4", category: "catalog" },
+  // Orchestrator (Phase A)
+  { type: "parallel_fan_out", label: "Parallel Fan-Out", icon: Merge, color: "#06b6d4", category: "logic" },
+  { type: "quality_gate", label: "Quality Gate", icon: Shield, color: "#06b6d4", category: "governance" },
 ];
 
 const NODE_CATEGORIES = [
@@ -735,6 +739,7 @@ export default function WFCreationShell() {
   };
 
   return (
+    <>
     <div
       className="flex -mx-6 -mt-6 overflow-hidden"
       style={{ height: "calc(100vh - 4rem)" }}
@@ -1253,5 +1258,7 @@ export default function WFCreationShell() {
         </DialogContent>
       </Dialog>
     </div>
+    <MaestroChatWindow catalogImports={catalogImports} />
+    </>
   );
 }

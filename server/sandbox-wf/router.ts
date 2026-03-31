@@ -231,6 +231,34 @@ export const sandboxWfRouter = router({
       }),
   }),
 
+  // ── Maestro (Round-Table Chat) ─────────────────────────────────────────────
+  maestro: router({
+    roundTable: publicProcedure
+      .input(
+        z.object({
+          message: z.string(),
+          participants: z.array(
+            z.object({
+              catalogEntryId: z.number(),
+              name: z.string(),
+            }),
+          ),
+          conversationHistory: z
+            .array(
+              z.object({
+                role: z.string(),
+                sender: z.string(),
+                content: z.string(),
+              }),
+            )
+            .optional(),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        return service.executeRoundTable(input);
+      }),
+  }),
+
   // ── Stats ──────────────────────────────────────────────────────────────────
   stats: publicProcedure.query(async () => {
     return service.getStats();

@@ -11,6 +11,7 @@ import { sql } from "drizzle-orm";
 import { getWfDb, resetWfDb } from "./connection";
 import { wfWorkflows, wfSteps, wfTriggers, wfTemplates } from "../../drizzle/tables/wfdb";
 import { WORKFLOW_TEMPLATES } from "./templates";
+import { seedWfOrchestrators } from "./seed-orchestrator";
 
 // ── Workflow Seed Data ───────────────────────────────────────────────────────
 
@@ -311,6 +312,11 @@ async function createTables(db: NonNullable<ReturnType<typeof getWfDb>>) {
     )
   `);
 
+  // Phase A: Budget tracking columns on executions
+  await db.execute(sql`ALTER TABLE wf_executions ADD COLUMN IF NOT EXISTS token_count INTEGER DEFAULT 0`);
+  await db.execute(sql`ALTER TABLE wf_executions ADD COLUMN IF NOT EXISTS estimated_cost NUMERIC(10,4) DEFAULT 0`);
+  await db.execute(sql`ALTER TABLE wf_executions ADD COLUMN IF NOT EXISTS budget_limit INTEGER DEFAULT 0`);
+
   // Create indexes
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_workflows_category ON wf_workflows(category)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_workflows_status ON wf_workflows(status)`);
@@ -397,7 +403,19 @@ export async function seedWfDb() {
     templatesSeeded = true;
   }
 
-  if (!workflowsSeeded && !templatesSeeded) {
+  // ── Seed WF-ORCHESTRATOR agents (idempotent) ──────────────────────
+  let orchestratorsSeeded = false;
+  try {
+    const orchResult = await seedWfOrchestrators();
+    orchestratorsSeeded = orchResult.seeded;
+    if (orchestratorsSeeded) {
+      console.log(`[WfDB] Seeded ${orchResult.count} WF-ORCHESTRATOR agents`);
+    }
+  } catch (err: any) {
+    console.warn(`[WfDB] WF-ORCHESTRATOR seed skipped: ${err.message}`);
+  }
+
+  if (!workflowsSeeded && !templatesSeeded && !orchestratorsSeeded) {
     const count = await db.select({ id: wfWorkflows.id }).from(wfWorkflows);
     return { seeded: false, workflows: count.length, message: "Already seeded" };
   }

@@ -346,6 +346,118 @@ export async function deleteTrigger(id: number) {
   return { success: true };
 }
 
+// ── Maestro Round-Table ─────────────────────────────────────────────
+
+function buildRoundTableContext(
+  history: { role: string; sender: string; content: string }[],
+  priorResults: { name: string; response: string }[],
+  currentMessage: string,
+  participantName: string,
+): string {
+  const parts: string[] = [];
+
+  // Previous conversation rounds
+  if (history.length > 0) {
+    parts.push("=== Conversation History ===");
+    for (const h of history.slice(-20)) {
+      parts.push(`[${h.sender}]: ${h.content}`);
+    }
+    parts.push("");
+  }
+
+  // Current round — what other participants already said
+  if (priorResults.length > 0) {
+    parts.push("=== This Round (other participants) ===");
+    for (const r of priorResults) {
+      parts.push(`[${r.name}]: ${r.response}`);
+    }
+    parts.push("");
+  }
+
+  parts.push(`=== User Message ===`);
+  parts.push(currentMessage);
+  parts.push("");
+  parts.push(
+    `You are "${participantName}". Respond in character. Be concise but thorough. ` +
+    `Consider what the other participants have said (if any) and build on or respectfully disagree with their points.`,
+  );
+
+  return parts.join("\n");
+}
+
+export async function executeRoundTable(input: {
+  message: string;
+  participants: { catalogEntryId: number; name: string }[];
+  conversationHistory?: { role: string; sender: string; content: string }[];
+}) {
+  const results: {
+    catalogEntryId: number;
+    name: string;
+    response: string;
+    status: string;
+  }[] = [];
+
+  for (const participant of input.participants) {
+    try {
+      const contextPrompt = buildRoundTableContext(
+        input.conversationHistory || [],
+        results,
+        input.message,
+        participant.name,
+      );
+
+      const { invokeCatalogEntry } = await import("../catalog/invoke");
+      let response = "";
+
+      for await (const event of invokeCatalogEntry({
+        catalogEntryId: participant.catalogEntryId,
+        actorUserId: 0,
+        message: contextPrompt,
+        triggerSource: "maestro_round_table",
+      })) {
+        if (event.type === "chunk") {
+          response += (event as any).text || "";
+        }
+        if (event.type === "complete") {
+          response = (event as any).result || response;
+        }
+        if (event.type === "error") {
+          results.push({
+            catalogEntryId: participant.catalogEntryId,
+            name: participant.name,
+            response: `Error: ${(event as any).error}`,
+            status: "failed",
+          });
+          // Skip to next participant on error event
+          continue;
+        }
+      }
+
+      // Only push completed if we didn't already push a failed result
+      if (!results.find((r) => r.catalogEntryId === participant.catalogEntryId)) {
+        results.push({
+          catalogEntryId: participant.catalogEntryId,
+          name: participant.name,
+          response: response || "(No response)",
+          status: "completed",
+        });
+      }
+    } catch (err: any) {
+      // Only push if not already pushed
+      if (!results.find((r) => r.catalogEntryId === participant.catalogEntryId)) {
+        results.push({
+          catalogEntryId: participant.catalogEntryId,
+          name: participant.name,
+          response: `[Error] ${err.message}`,
+          status: "failed",
+        });
+      }
+    }
+  }
+
+  return { results };
+}
+
 // ── Catalog Imports ─────────────────────────────────────────────────────
 
 export async function listCatalogImports() {

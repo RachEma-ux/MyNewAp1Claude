@@ -19,6 +19,7 @@ import {
   catalogAgentExecutionConfigSchema,
   hasPublishedCatalogTag,
   isCatalogEntryCallable,
+  isExecutableEntryType,
   type CatalogAgentExecutionConfig,
 } from "@shared/catalog-execution";
 import {
@@ -60,7 +61,7 @@ export async function resolveServiceAgentExecutionTarget(
 ): Promise<ServiceAgentExecutionTarget | null> {
   const entry = await getCatalogEntryById(catalogEntryId);
   if (!entry) return null;
-  if (entry.entryType !== "agent") return null;
+  if (!isExecutableEntryType(entry.entryType)) return null;
 
   const config = entry.config as Record<string, unknown> | null;
   if (!isServiceBasedAgent(config)) return null;
@@ -123,17 +124,17 @@ export async function resolveCatalogAgentExecutionTarget(catalogEntryId: number)
     }, "NOT_FOUND");
   }
 
-  if (entry.entryType !== "agent") {
+  if (!isExecutableEntryType(entry.entryType)) {
     throw createAppBlockerError({
-      code: "catalog_entry_not_agent",
+      code: "catalog_entry_not_executable",
       category: "validation_error",
       title: "This Catalog item cannot be run here",
-      summary: "Only Catalog agent entries can be launched from the agent runtime.",
+      summary: "Only executable Catalog entries (agent, bot) can be launched from the runtime.",
       details: [
         `Entry type: ${entry.entryType}`,
       ],
       recommendedActions: [
-        "Open an agent entry instead, or use the workflow intended for this Catalog type.",
+        "Open an agent or bot entry instead, or use the workflow intended for this Catalog type.",
       ],
       context: { catalogEntryId, entryType: entry.entryType },
     }, "BAD_REQUEST");

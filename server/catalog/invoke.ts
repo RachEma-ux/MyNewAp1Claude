@@ -21,6 +21,7 @@ import { getCatalogEntryById } from "../db";
 import {
   resolveCatalogRuntimeKind,
   getDefaultReasoningLlmRef,
+  isExecutableEntryType,
   type CatalogRuntimeKind,
 } from "@shared/catalog-execution";
 import {
@@ -53,7 +54,7 @@ export async function resolveInvokeTarget(
 ): Promise<CatalogInvokeResolution | null> {
   const entry = await getCatalogEntryById(catalogEntryId);
   if (!entry) return null;
-  if (entry.entryType !== "agent") return null;
+  if (!isExecutableEntryType(entry.entryType)) return null;
 
   const config = entry.config as Record<string, unknown> | null;
   const runtimeKind = resolveCatalogRuntimeKind(config);
@@ -88,11 +89,11 @@ export async function* invokeCatalogEntry(
     return;
   }
 
-  if (entry.entryType !== "agent") {
+  if (!isExecutableEntryType(entry.entryType)) {
     yield {
       type: "error",
       runId: 0,
-      error: `Catalog entry #${catalogEntryId} is not an agent (type: ${entry.entryType})`,
+      error: `Catalog entry #${catalogEntryId} is not an executable type (type: ${entry.entryType})`,
     };
     return;
   }

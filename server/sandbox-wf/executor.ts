@@ -46,7 +46,33 @@ interface StepConfig {
   catalogEntryId?: number;
   catalogEntryName?: string;
   message?: string;
+  // Parallel Fan-Out
+  tasks?: ParallelTask[];
+  maxConcurrency?: number;
+  failStrategy?: "fail_fast" | "continue_all";
+  // Quality Gate
+  reviewerCatalogEntryId?: number;
+  reviewerPrompt?: string;
+  passThreshold?: number;
+  maxRetries?: number;
+  sourceStepKey?: string;
   [key: string]: any;
+}
+
+interface ParallelTask {
+  key: string;
+  label: string;
+  catalogEntryId?: number;
+  userPrompt?: string;
+  nodeType?: string;
+  config?: Record<string, any>;
+}
+
+interface BudgetState {
+  tokenCount: number;
+  estimatedCost: number;
+  budgetLimit: number;  // 0 = unlimited
+  costLimit: number;    // 0 = unlimited
 }
 
 interface ExecutionContext {
@@ -55,6 +81,7 @@ interface ExecutionContext {
   stepOutputs: Record<string, any>;
   variables: Record<string, any>;
   startTime: number;
+  budget: BudgetState;
 }
 
 // ── DB Helper ────────────────────────────────────────────────────────────────
@@ -214,6 +241,185 @@ async function executeCatalogAgent(config: StepConfig, ctx: ExecutionContext): P
   }
 }
 
+// ── Parallel Fan-Out Executor ────────────────────────────────────────────────
+
+async function executeParallelFanOut(config: StepConfig, ctx: ExecutionContext): Promise<Record<string, any>> {
+  const tasks = config.tasks || [];
+  if (tasks.length === 0) {
+    return { status: "skipped", reason: "No tasks defined for parallel fan-out" };
+  }
+
+  const maxConcurrency = Math.min(config.maxConcurrency || 10, 20);
+  const failStrategy = config.failStrategy || "continue_all";
+
+  await writeLog(ctx.executionId, "", "INFO", `[Parallel] Launching ${tasks.length} tasks (max concurrency: ${maxConcurrency})`);
+
+  // Execute tasks in batches limited by maxConcurrency
+  const results: Record<string, any> = {};
+  let failed = 0;
+  let completed = 0;
+
+  for (let i = 0; i < tasks.length; i += maxConcurrency) {
+    const batch = tasks.slice(i, i + maxConcurrency);
+
+    const batchResults = await Promise.allSettled(
+      batch.map(async (task) => {
+        const taskStart = Date.now();
+        const taskConfig: StepConfig = {
+          ...task.config,
+          catalogEntryId: task.catalogEntryId,
+          userPrompt: task.userPrompt ? resolveTemplate(task.userPrompt, ctx) : undefined,
+        };
+
+        let output: any;
+        const nodeType = task.nodeType || (task.catalogEntryId ? "catalog_agent" : "llm_prompt");
+
+        switch (nodeType) {
+          case "catalog_agent":
+            output = await executeCatalogAgent(taskConfig, ctx);
+            break;
+          case "llm_prompt":
+            output = await executeLlmPrompt(taskConfig, ctx);
+            break;
+          case "http_request":
+            output = await executeHttpRequest(taskConfig, ctx);
+            break;
+          case "transform":
+            output = executeTransform(taskConfig, ctx);
+            break;
+          default:
+            output = { type: nodeType, label: task.label, status: "executed" };
+        }
+
+        // Track tokens from task output
+        if (output?.tokens) {
+          ctx.budget.tokenCount += (output.tokens.prompt || 0) + (output.tokens.completion || 0);
+          ctx.budget.estimatedCost += estimateTokenCost(output.tokens);
+        }
+
+        return { key: task.key, label: task.label, output, duration: Date.now() - taskStart };
+      })
+    );
+
+    for (const result of batchResults) {
+      if (result.status === "fulfilled") {
+        const { key, output, duration } = result.value;
+        results[key] = output;
+        completed++;
+        await writeLog(ctx.executionId, key, "INFO", `[Parallel/${key}] Completed in ${duration}ms`);
+      } else {
+        failed++;
+        const errMsg = result.reason?.message || String(result.reason);
+        await writeLog(ctx.executionId, "", "ERROR", `[Parallel] Task failed: ${errMsg}`);
+        if (failStrategy === "fail_fast") {
+          return { status: "failed", completed, failed, results, error: errMsg };
+        }
+      }
+    }
+  }
+
+  return { status: failed > 0 ? "partial" : "completed", completed, failed, total: tasks.length, results };
+}
+
+// ── Quality Gate Executor ───────────────────────────────────────────────────
+
+async function executeQualityGate(config: StepConfig, ctx: ExecutionContext): Promise<Record<string, any>> {
+  const sourceKey = config.sourceStepKey;
+  const sourceOutput = sourceKey ? ctx.stepOutputs[sourceKey] : null;
+  const passThreshold = config.passThreshold ?? 0.7;
+  const maxRetries = config.maxRetries ?? 1;
+
+  if (!sourceOutput && sourceKey) {
+    return { verdict: "skip", reason: `Source step "${sourceKey}" has no output` };
+  }
+
+  // Build review prompt
+  const basePrompt = config.reviewerPrompt || "Review the following output for quality, accuracy, and completeness. Return a JSON object with: {\"score\": 0.0-1.0, \"verdict\": \"pass\"|\"fail\"|\"replan\", \"feedback\": \"...\"}";
+  const reviewInput = JSON.stringify(sourceOutput || ctx.stepOutputs, null, 2).slice(0, 4000);
+  const fullPrompt = `${resolveTemplate(basePrompt, ctx)}\n\n--- OUTPUT TO REVIEW ---\n${reviewInput}`;
+
+  // Use reviewer catalog agent if specified, otherwise fallback to LLM
+  let reviewResult: any;
+  if (config.reviewerCatalogEntryId) {
+    reviewResult = await executeCatalogAgent({
+      catalogEntryId: config.reviewerCatalogEntryId,
+      userPrompt: fullPrompt,
+    }, ctx);
+  } else {
+    reviewResult = await executeLlmPrompt({
+      systemPrompt: "You are a quality gate reviewer. Always respond in valid JSON: {\"score\": number, \"verdict\": \"pass\"|\"fail\"|\"replan\", \"feedback\": \"string\"}",
+      userPrompt: fullPrompt,
+      temperature: 0.2,
+    }, ctx);
+  }
+
+  // Track tokens
+  if (reviewResult?.tokens) {
+    ctx.budget.tokenCount += (reviewResult.tokens.prompt || 0) + (reviewResult.tokens.completion || 0);
+    ctx.budget.estimatedCost += estimateTokenCost(reviewResult.tokens);
+  }
+
+  // Parse verdict from response
+  let score = 0;
+  let verdict = "fail";
+  let feedback = "";
+
+  try {
+    const responseText = reviewResult?.response || reviewResult?.result || "";
+    const jsonMatch = responseText.match(/\{[\s\S]*?"score"[\s\S]*?\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      score = typeof parsed.score === "number" ? parsed.score : 0;
+      verdict = parsed.verdict || (score >= passThreshold ? "pass" : "fail");
+      feedback = parsed.feedback || "";
+    } else {
+      // No JSON found — treat as pass with note
+      verdict = "pass";
+      score = 0.5;
+      feedback = "Reviewer did not return structured JSON; auto-passed with low confidence";
+    }
+  } catch {
+    verdict = "pass";
+    score = 0.5;
+    feedback = "Could not parse reviewer response; auto-passed with low confidence";
+  }
+
+  await writeLog(
+    ctx.executionId, "", "INFO",
+    `[QualityGate] Verdict: ${verdict} (score: ${score.toFixed(2)}, threshold: ${passThreshold})`
+  );
+
+  return {
+    verdict,
+    score,
+    passThreshold,
+    feedback,
+    maxRetries,
+    sourceStepKey: sourceKey || null,
+    reviewerResponse: reviewResult,
+  };
+}
+
+// ── Budget Guard ────────────────────────────────────────────────────────────
+
+function checkBudgetGuard(ctx: ExecutionContext): { allowed: boolean; reason?: string } {
+  const { budget } = ctx;
+  if (budget.budgetLimit > 0 && budget.tokenCount >= budget.budgetLimit) {
+    return { allowed: false, reason: `Token budget exceeded: ${budget.tokenCount}/${budget.budgetLimit}` };
+  }
+  if (budget.costLimit > 0 && budget.estimatedCost >= budget.costLimit) {
+    return { allowed: false, reason: `Cost budget exceeded: $${budget.estimatedCost.toFixed(4)}/$${budget.costLimit.toFixed(4)}` };
+  }
+  return { allowed: true };
+}
+
+function estimateTokenCost(tokens: { prompt?: number; completion?: number }): number {
+  // Rough estimate: $0.01 per 1K prompt tokens, $0.03 per 1K completion tokens (GPT-4 range)
+  const promptCost = ((tokens.prompt || 0) / 1000) * 0.01;
+  const completionCost = ((tokens.completion || 0) / 1000) * 0.03;
+  return promptCost + completionCost;
+}
+
 // ── Template Resolution ──────────────────────────────────────────────────────
 
 function resolveTemplate(template: string, ctx: ExecutionContext): string {
@@ -260,6 +466,12 @@ export async function executeWorkflow(workflowId: number, triggerType = "manual"
     stepOutputs: {},
     variables: { triggerType, workflowId },
     startTime,
+    budget: {
+      tokenCount: 0,
+      estimatedCost: 0,
+      budgetLimit: 0,   // 0 = unlimited; can be set per-workflow in future
+      costLimit: 0,
+    },
   };
 
   let hasError = false;
@@ -271,6 +483,15 @@ export async function executeWorkflow(workflowId: number, triggerType = "manual"
     const nodeType = step.nodeType || "action";
 
     await writeLog(executionId, step.key, "INFO", `[${step.label}] Starting (type: ${nodeType})...`);
+
+    // Budget guard — check before each step
+    const budgetCheck = checkBudgetGuard(ctx);
+    if (!budgetCheck.allowed) {
+      hasError = true;
+      await writeLog(executionId, step.key, "ERROR", `[BudgetGuard] ${budgetCheck.reason}`);
+      await db().update(wfSteps).set({ status: "failed" }).where(eq(wfSteps.id, step.id));
+      break;
+    }
 
     // Update step status to running
     await db().update(wfSteps).set({ status: "running" }).where(eq(wfSteps.id, step.id));
@@ -303,10 +524,22 @@ export async function executeWorkflow(workflowId: number, triggerType = "manual"
         case "catalog_agent":
           output = await executeCatalogAgent(config, ctx);
           break;
+        case "parallel_fan_out":
+          output = await executeParallelFanOut(config, ctx);
+          break;
+        case "quality_gate":
+          output = await executeQualityGate(config, ctx);
+          break;
         default:
           // Generic action — pass through
           output = { type: nodeType, label: step.label, status: "executed" };
           break;
+      }
+
+      // Track token usage from LLM/agent steps
+      if (output?.tokens) {
+        ctx.budget.tokenCount += (output.tokens.prompt || 0) + (output.tokens.completion || 0);
+        ctx.budget.estimatedCost += estimateTokenCost(output.tokens);
       }
 
       const duration = Date.now() - stepStart;
@@ -351,8 +584,10 @@ export async function executeWorkflow(workflowId: number, triggerType = "manual"
   }
 
   const finalStatus = hasError ? "failed" : "completed";
-  await completeExecution(executionId, startTime, finalStatus);
-  await writeLog(executionId, "", "INFO", `[Execution #${executionId}] ${finalStatus} — ${steps.length} steps processed in ${Date.now() - startTime}ms`);
+  await completeExecution(executionId, startTime, finalStatus, ctx.budget);
+  await writeLog(executionId, "", "INFO",
+    `[Execution #${executionId}] ${finalStatus} — ${steps.length} steps in ${Date.now() - startTime}ms | tokens: ${ctx.budget.tokenCount} | cost: $${ctx.budget.estimatedCost.toFixed(4)}`
+  );
 
   return executionId;
 }
@@ -369,13 +604,18 @@ async function writeLog(executionId: number, stepKey: string, level: string, mes
   });
 }
 
-async function completeExecution(executionId: number, startTime: number, status: string) {
+async function completeExecution(executionId: number, startTime: number, status: string, budget?: BudgetState) {
+  const updates: any = {
+    status,
+    completedAt: new Date(),
+    duration: Date.now() - startTime,
+  };
+  if (budget) {
+    updates.tokenCount = budget.tokenCount;
+    updates.estimatedCost = Math.round(budget.estimatedCost * 10000) / 10000; // 4 decimal places
+  }
   await db()
     .update(wfExecutions)
-    .set({
-      status,
-      completedAt: new Date(),
-      duration: Date.now() - startTime,
-    })
+    .set(updates)
     .where(eq(wfExecutions.id, executionId));
 }

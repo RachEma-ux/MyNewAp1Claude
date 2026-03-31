@@ -14,6 +14,7 @@ import {
   timestamp,
   json,
   index,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 // ── Table 1: Workflows ──────────────────────────────────────────────────────
@@ -81,6 +82,9 @@ export const wfExecutions = pgTable(
     triggerType: varchar("trigger_type", { length: 50 }).default("manual"),
     triggerData: json("trigger_data").$type<Record<string, any>>().default({}),
     error: text("error"),
+    tokenCount: integer("token_count").default(0),
+    estimatedCost: numeric("estimated_cost", { precision: 10, scale: 4 }).default("0"),
+    budgetLimit: integer("budget_limit").default(0),
   },
   (table) => ({
     workflowIdx: index("idx_wf_executions_workflow").on(table.workflowId),
