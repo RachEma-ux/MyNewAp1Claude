@@ -1,0 +1,72 @@
+SESSION SUMMARY — 2026-03-31 16:00
+====================================
+
+## Session Focus
+Making the Sandbox WF platform fully operational: connecting the n8n-style Designer to the wfdb backend, adding form lifecycle actions, and deep UX/UI analysis.
+
+## Commits Made (chronological)
+
+1. `5c134cd` — feat: n8n-style Designer canvas (WFCreationShell) committed from previous session
+2. `29bd458` — feat: Designer node palette uses 5 Sandbox Tools from editor
+3. `cb8f050` — feat: trigger nodes show dropdown of existing triggers from wfdb
+4. `f6cf3c2` — fix: ReferenceError triggers before initialization (declaration order)
+5. `023301e` — feat: open existing workflows in Designer via /automation/sandbox-wf/:id
+6. `62dbc24` — feat: Form section in sidebar with New Form, Open, Save, Test, Run, Publish
+7. `e23c5d8` — feat: activate all icons, rename Save (Draft) to Save
+8. `b96a8d6` — fix: New Form opens directly in Designer mode with blank canvas
+9. `c57d043` — feat: Save dialog prompts for name + category when saving new draft
+10. `69fb2e3` — fix: stay on Designer after save (savedId state pattern)
+
+## Key Technical Decisions
+
+### savedId State Pattern
+Problem: After saving a new workflow, the app would navigate away from the Designer.
+Solution: Track `savedId` in React state instead of URL changes. The editId is derived as:
+  `const editId = savedId ?? (urlEditMode ? urlId : null);`
+This avoids any URL/navigation change that would cause wouter to re-render the page.
+Previous failed attempts: navigate(), history.replaceState() (both caused re-renders).
+
+### Triggers Declaration Order
+tRPC query `triggersQuery` and derived `triggers` array must be declared BEFORE any useEffect that references them, otherwise ReferenceError occurs due to temporal dead zone.
+
+### resetForm Must Use setMode("designer")
+When creating a new form, resetForm sets mode to "designer" (not "form") so the user lands directly on the blank canvas, which is the expected UX flow.
+
+## Files Modified This Session
+- client/src/pages/automation/WFCreationShell.tsx (primary — heavily modified)
+- client/src/pages/automation/SandboxWFPage.tsx (added Designer button)
+- client/src/App.tsx (added /automation/sandbox-wf/:id route)
+
+## Deep UX/UI Analysis Results
+
+### Scores (Professional Workflow Platform Criteria)
+- Backend/API: 8.5/10
+- List View (SandboxWFPage): 7/10
+- Designer Canvas: 3.5/10
+- Node Palette: 3/10
+- Node Properties: 1/10
+- Execution Engine: 2.5/10
+- Data Flow: 1.5/10
+- Error Handling: 2/10
+- Versioning: 0/10
+- Templates: 0/10
+- Collaboration: 0/10
+
+### Blueprint Coverage
+Current implementation covers ~25-30% of the AppDescription/AppDesign vision.
+Primary gaps: node library (uses admin tools instead of workflow blocks), no properties panel, no real execution, no data flow visualization, no versioning, no templates.
+
+### Critical Issue Identified
+NODE_PALETTE contains 5 editor admin tools (WF Editor, Triggers, Debug Console, Deploy, Metrics) instead of workflow building blocks (HTTP Request, If/Else, Transform, etc.). This is a fundamental UX mismatch — users can't build real workflows.
+
+## Deliverables Created
+1. Reports/WF-Platform-UX-Improvement-Plan.md — 5-phase improvement plan with 6 task groups, acceptance criteria, file lists, priority matrix, and coverage projections
+2. Sessions/session_summary_2026-03-31 16:00.txt — this file
+
+## Current State
+- Branch: main
+- Last commit: 69fb2e3
+- Working tree: clean (after committing all changes)
+- Server: running on localhost:3000
+- WfDB: 19 workflows seeded, CRUD operational
+- Designer: functional but at prototype stage per analysis
