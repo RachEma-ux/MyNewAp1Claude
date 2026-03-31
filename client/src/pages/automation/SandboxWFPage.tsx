@@ -71,6 +71,15 @@ interface WFWorkflow {
   updatedAgo: string;
 }
 
+// ── S2 tool items (Sandbox Tools) ────────────────────────
+const S2_TOOLS = [
+  { key: "editor", label: "WF Editor", icon: GitBranch, color: "text-blue-400" },
+  { key: "triggers", label: "Triggers", icon: Zap, color: "text-yellow-400" },
+  { key: "debug", label: "Debug Console", icon: Eye, color: "text-orange-400" },
+  { key: "deploy", label: "Deploy", icon: Gauge, color: "text-green-400" },
+  { key: "metrics", label: "Metrics", icon: BarChart3, color: "text-purple-400" },
+];
+
 // ── S1 nav items (Categories from AppDescription pillars) ──
 
 const S1_ITEMS = [
@@ -456,28 +465,53 @@ export default function SandboxWFPage() {
         </ScrollArea>
       </div>
 
-      {/* ── S2: Workflow Steps (of selected WF) ───────── */}
+      {/* ── S2: Sandbox Tools + Workflow Steps ─────────── */}
       {!isCollapsed && (
         <div className="border-r bg-background flex flex-col h-full transition-all duration-200 shrink-0 w-56">
+          {/* S2 Header */}
           <div className="flex items-center border-b px-2 py-1.5">
             <div className="flex items-center gap-2 min-w-0">
               <Boxes className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
               <span className="text-xs font-semibold text-muted-foreground truncate">
-                {selectedWF ? "Steps" : "Select a workflow"}
+                Sandbox Tools
               </span>
             </div>
           </div>
 
           <ScrollArea className="flex-1">
+            {/* Tools nav */}
+            <div className="py-1">
+              {S2_TOOLS.map(({ key, label, icon: Icon, color }) => (
+                <button
+                  key={key}
+                  onClick={() => setS2Active(key)}
+                  className={cn(
+                    "flex items-center gap-2 w-full px-3 py-1.5 text-xs rounded-sm transition-colors",
+                    s2Active === key
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                  )}
+                >
+                  <Icon className={cn("h-3.5 w-3.5 shrink-0", s2Active === key ? "" : color)} />
+                  <span className="truncate">{label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Separator + Steps of selected WF */}
+            <Separator />
+            <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {selectedWF ? "Workflow Steps" : "No Workflow Selected"}
+            </div>
+
             {selectedWF ? (
               <div className="p-1">
-                <div className="px-2 py-1.5 mb-1">
+                <div className="px-2 py-1 mb-1">
                   <p className="text-[10px] font-semibold text-foreground truncate">{selectedWF.name}</p>
                   <p className="text-[10px] text-muted-foreground">
                     {selectedWF.steps.filter((s) => s.status === "done").length}/{selectedWF.steps.length} steps done
                   </p>
                 </div>
-                <Separator className="mb-1" />
                 {selectedWF.steps.map((step, i) => (
                   <div
                     key={step.key}
@@ -511,9 +545,9 @@ export default function SandboxWFPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-40 text-muted-foreground px-4">
-                <ArrowRight className="h-5 w-5 mb-2 opacity-30" />
-                <p className="text-[10px] text-center">Click a workflow card to see its steps here</p>
+              <div className="flex flex-col items-center justify-center h-24 text-muted-foreground px-4">
+                <ArrowRight className="h-4 w-4 mb-1 opacity-30" />
+                <p className="text-[10px] text-center">Click a workflow card</p>
               </div>
             )}
           </ScrollArea>
@@ -532,16 +566,21 @@ export default function SandboxWFPage() {
             </Badge>
             <span className="text-[10px] text-muted-foreground">{filtered.length} workflows</span>
           </div>
-          {selectedWF && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-[10px]"
-              onClick={() => setSelectedWF(null)}
-            >
-              Clear selection
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-[10px]">
+              {S2_TOOLS.find((t) => t.key === s2Active)?.label}
+            </Badge>
+            {selectedWF && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-[10px]"
+                onClick={() => setSelectedWF(null)}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Main content area */}
