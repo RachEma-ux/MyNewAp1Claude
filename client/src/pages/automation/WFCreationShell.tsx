@@ -215,6 +215,7 @@ export default function WFCreationShell() {
   const [mode, setMode] = useState<"form" | "designer">("form");
   const [loaded, setLoaded] = useState(false);
   const [showOpenPicker, setShowOpenPicker] = useState(false);
+  const [formKey, setFormKey] = useState(0);
 
   // ── Form State ─────────────────────────────────────────
 
@@ -273,6 +274,23 @@ export default function WFCreationShell() {
     (params: Connection) => setEdges((eds) => addEdge({ ...params, animated: true, markerEnd: { type: MarkerType.ArrowClosed } }, eds)),
     [setEdges],
   );
+
+  // ── Reset form to virgin state ──────────────────────────
+
+  const resetForm = useCallback(() => {
+    setName("");
+    setCategory("decision");
+    setStatus("draft");
+    setDescription("");
+    setTags("");
+    setSteps([{ key: "step-1", label: "", description: "", status: "pending" }]);
+    setSelectedStepIdx(0);
+    setNodes([]);
+    setEdges([]);
+    setLoaded(false);
+    setShowOpenPicker(false);
+    setMode("form");
+  }, [setNodes, setEdges]);
 
   // Callback for trigger dropdown selection inside a node
   const handleTriggerSelect = useCallback(
@@ -446,20 +464,10 @@ export default function WFCreationShell() {
   const handleFormAction = (key: string) => {
     switch (key) {
       case "new":
-        // Navigate to /new to clear any :id param, then reset all state
-        setName("");
-        setCategory("decision");
-        setStatus("draft");
-        setDescription("");
-        setTags("");
-        setSteps([{ key: "step-1", label: "", description: "", status: "pending" }]);
-        setSelectedStepIdx(0);
-        setNodes([]);
-        setEdges([]);
-        setLoaded(false);
-        setShowOpenPicker(false);
-        if (mode === "designer") setMode("form");
-        navigate("/automation/sandbox-wf/new");
+        resetForm();
+        setFormKey((k) => k + 1);
+        // Navigate to /new to clear any :id param
+        if (isEditMode) navigate("/automation/sandbox-wf/new");
         break;
       case "open":
         setShowOpenPicker(!showOpenPicker);
