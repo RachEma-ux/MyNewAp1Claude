@@ -95,8 +95,8 @@ function useIsMobile(breakpoint = 768) {
 export default function WFCreationShell() {
   const [, navigate] = useLocation();
   const isMobile = useIsMobile();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const collapsed = isMobile || sidebarCollapsed;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isMobile);
+  const collapsed = sidebarCollapsed;
 
   // ── Form State ─────────────────────────────────────────
 
