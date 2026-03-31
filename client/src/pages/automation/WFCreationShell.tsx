@@ -108,7 +108,7 @@ interface StepDraft {
 const FORM_ACTIONS = [
   { key: "new", label: "New Form", icon: Plus, color: "text-blue-400" },
   { key: "open", label: "Open", icon: FolderOpen, color: "text-yellow-400" },
-  { key: "save", label: "Save (Draft)", icon: Save, color: "text-green-400" },
+  { key: "save", label: "Save", icon: Save, color: "text-green-400" },
   { key: "test", label: "Test", icon: FlaskConical, color: "text-orange-400" },
   { key: "run", label: "Run", icon: Play, color: "text-cyan-400" },
   { key: "publish", label: "Publish", icon: Upload, color: "text-purple-400" },
@@ -455,15 +455,20 @@ export default function WFCreationShell() {
         handleSubmit();
         break;
       case "test":
-        // Switch to designer to visualize
         handleModeSwitch("designer");
         break;
       case "run":
-        if (isEditMode) executeMutation.mutate({ workflowId: editId!, triggerType: "manual" });
+        if (isEditMode) {
+          executeMutation.mutate({ workflowId: editId!, triggerType: "manual" });
+        } else {
+          handleSubmit(); // save first
+        }
         break;
       case "publish":
         if (isEditMode) {
           updateMutation.mutate({ id: editId!, status: "running" });
+        } else {
+          handleSubmit(); // save first
         }
         break;
     }
@@ -617,20 +622,14 @@ export default function WFCreationShell() {
               </div>
             )}
             {FORM_ACTIONS.map(({ key, label, icon: Icon, color }) => {
-              const disabled =
-                (key === "run" && !isEditMode) ||
-                (key === "publish" && !isEditMode) ||
-                (key === "save" && !canSubmit);
               return collapsed ? (
                 <button
                   key={key}
-                  onClick={() => !disabled && handleFormAction(key)}
+                  onClick={() => handleFormAction(key)}
                   title={label}
                   className={cn(
                     "flex items-center justify-center w-full py-1.5 rounded-sm transition-colors",
-                    disabled
-                      ? "opacity-30 cursor-not-allowed"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                     showOpenPicker && key === "open" && "bg-primary/10 text-primary",
                   )}
                 >
@@ -639,12 +638,10 @@ export default function WFCreationShell() {
               ) : (
                 <button
                   key={key}
-                  onClick={() => !disabled && handleFormAction(key)}
+                  onClick={() => handleFormAction(key)}
                   className={cn(
                     "flex items-center gap-2 w-full px-3 py-1.5 text-xs rounded-sm transition-colors",
-                    disabled
-                      ? "opacity-30 cursor-not-allowed"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                     showOpenPicker && key === "open" && "bg-primary/10 text-primary",
                   )}
                 >
