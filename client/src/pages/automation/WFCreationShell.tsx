@@ -289,7 +289,7 @@ export default function WFCreationShell() {
     setEdges([]);
     setLoaded(false);
     setShowOpenPicker(false);
-    setMode("form");
+    setMode("designer");
   }, [setNodes, setEdges]);
 
   // Callback for trigger dropdown selection inside a node
