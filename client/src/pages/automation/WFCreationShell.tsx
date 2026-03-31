@@ -1136,6 +1136,12 @@ export default function WFCreationShell() {
               node={selectedNode}
               onClose={() => setSelectedNodeId(null)}
               onUpdateNode={handleUpdateNode}
+              onDeleteNode={(nodeId) => {
+                setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+                setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+                setSelectedNodeId(null);
+                toast("Node deleted");
+              }}
             />
           )}
         </div>

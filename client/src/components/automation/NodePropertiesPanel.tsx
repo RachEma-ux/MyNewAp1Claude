@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Settings2, Zap, GitBranch, Globe, Brain, Shield, Clock, FileText } from "lucide-react";
+import { X, Trash2, Settings2, Zap, GitBranch, Globe, Brain, Shield, Clock, FileText } from "lucide-react";
 import type { Node } from "reactflow";
 
 // ── Types ────────────────────────────────────────────────
@@ -53,6 +53,7 @@ interface NodePropertiesPanelProps {
   node: Node | null;
   onClose: () => void;
   onUpdateNode: (nodeId: string, data: Partial<Node["data"]>) => void;
+  onDeleteNode?: (nodeId: string) => void;
 }
 
 // ── Operator Options ─────────────────────────────────────
@@ -113,7 +114,7 @@ function FieldLabel({ label, hint }: { label: string; hint?: string }) {
 
 // ── Main Component ───────────────────────────────────────
 
-export function NodePropertiesPanel({ node, onClose, onUpdateNode }: NodePropertiesPanelProps) {
+export function NodePropertiesPanel({ node, onClose, onUpdateNode, onDeleteNode }: NodePropertiesPanelProps) {
   const [config, setConfig] = useState<NodeConfig>({});
   const [label, setLabel] = useState("");
   const [description, setDescription] = useState("");
@@ -378,6 +379,21 @@ export function NodePropertiesPanel({ node, onClose, onUpdateNode }: NodePropert
               Use <code className="bg-muted px-1 rounded">{"{{var.name}}"}</code> for workflow variables.
             </p>
           </div>
+
+          {onDeleteNode && (
+            <>
+              <Separator />
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => onDeleteNode(node.id)}
+              >
+                <Trash2 className="h-3 w-3 mr-1.5" />
+                Delete Node
+              </Button>
+            </>
+          )}
         </div>
       </ScrollArea>
     </div>
