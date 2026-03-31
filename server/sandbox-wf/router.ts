@@ -99,6 +99,41 @@ export const sandboxWfRouter = router({
       .query(async ({ input }) => {
         return service.listTriggers(input?.workflowId);
       }),
+
+    create: publicProcedure
+      .input(
+        z.object({
+          workflowId: z.number(),
+          name: z.string(),
+          type: z.string(),
+          config: z.record(z.any()).optional(),
+          status: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return service.createTrigger(input);
+      }),
+
+    update: publicProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          type: z.string().optional(),
+          config: z.record(z.any()).optional(),
+          status: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        return service.updateTrigger(id, data);
+      }),
+
+    delete: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return service.deleteTrigger(input.id);
+      }),
   }),
 
   // ── Executions ─────────────────────────────────────────────────────────────
@@ -124,6 +159,46 @@ export const sandboxWfRouter = router({
       .input(z.object({ executionId: z.number() }))
       .query(async ({ input }) => {
         return service.getExecutionLogs(input.executionId);
+      }),
+  }),
+
+  // ── Versions ───────────────────────────────────────────────────────────────
+  versions: router({
+    list: publicProcedure
+      .input(z.object({ workflowId: z.number() }))
+      .query(async ({ input }) => {
+        return service.listVersions(input.workflowId);
+      }),
+
+    create: publicProcedure
+      .input(z.object({ workflowId: z.number() }))
+      .mutation(async ({ input }) => {
+        return service.createVersion(input.workflowId);
+      }),
+
+    restore: publicProcedure
+      .input(z.object({ workflowId: z.number(), versionId: z.number() }))
+      .mutation(async ({ input }) => {
+        return service.restoreVersion(input.workflowId, input.versionId);
+      }),
+  }),
+
+  // ── Templates ──────────────────────────────────────────────────────────────
+  templates: router({
+    list: publicProcedure.query(async () => {
+      return service.listTemplates();
+    }),
+
+    get: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return service.getTemplate(input.id);
+      }),
+
+    createFrom: publicProcedure
+      .input(z.object({ templateId: z.number(), name: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        return service.createFromTemplate(input.templateId, input.name || "");
       }),
   }),
 

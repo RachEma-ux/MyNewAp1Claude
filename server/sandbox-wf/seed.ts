@@ -9,7 +9,8 @@
 
 import { sql } from "drizzle-orm";
 import { getWfDb, resetWfDb } from "./connection";
-import { wfWorkflows, wfSteps, wfTriggers } from "../../drizzle/tables/wfdb";
+import { wfWorkflows, wfSteps, wfTriggers, wfTemplates } from "../../drizzle/tables/wfdb";
+import { WORKFLOW_TEMPLATES } from "./templates";
 
 // ── Workflow Seed Data ───────────────────────────────────────────────────────
 
@@ -262,6 +263,38 @@ async function createTables(db: NonNullable<ReturnType<typeof getWfDb>>) {
     )
   `);
 
+  // New columns (safe to re-run)
+  await db.execute(sql`ALTER TABLE wf_steps ADD COLUMN IF NOT EXISTS node_type VARCHAR(50) DEFAULT 'action'`);
+  await db.execute(sql`ALTER TABLE wf_steps ADD COLUMN IF NOT EXISTS config JSON DEFAULT '{}'`);
+  await db.execute(sql`ALTER TABLE wf_workflows ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1`);
+
+  // Table 6: Versions
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS wf_versions (
+      id SERIAL PRIMARY KEY,
+      workflow_id INTEGER NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      snapshot JSON DEFAULT '{}',
+      created_at TIMESTAMP DEFAULT NOW() NOT NULL
+    )
+  `);
+
+  // Table 7: Templates
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS wf_templates (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      category VARCHAR(50) NOT NULL,
+      icon VARCHAR(50) DEFAULT '',
+      nodes JSON DEFAULT '[]',
+      edges JSON DEFAULT '[]',
+      steps JSON DEFAULT '[]',
+      tags JSON DEFAULT '[]',
+      created_at TIMESTAMP DEFAULT NOW() NOT NULL
+    )
+  `);
+
   // Create indexes
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_workflows_category ON wf_workflows(category)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_workflows_status ON wf_workflows(status)`);
@@ -270,6 +303,8 @@ async function createTables(db: NonNullable<ReturnType<typeof getWfDb>>) {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_executions_status ON wf_executions(status)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_exec_logs_execution ON wf_execution_logs(execution_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_triggers_workflow ON wf_triggers(workflow_id)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_versions_workflow ON wf_versions(workflow_id)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_templates_category ON wf_templates(category)`);
 }
 
 // ── Seed Execution ───────────────────────────────────────────────────────────
@@ -330,6 +365,21 @@ export async function seedWfDb() {
     });
   }
 
+  // Insert templates (idempotent)
+  const existingTemplates = await db.select({ id: wfTemplates.id }).from(wfTemplates).limit(1);
+  if (existingTemplates.length === 0) {
+    for (const tmpl of WORKFLOW_TEMPLATES) {
+      await db.insert(wfTemplates).values({
+        name: tmpl.name,
+        description: tmpl.description,
+        category: tmpl.category,
+        icon: tmpl.icon,
+        steps: tmpl.steps,
+        tags: tmpl.tags,
+      });
+    }
+  }
+
   resetWfDb();
 
   return {
@@ -337,6 +387,7 @@ export async function seedWfDb() {
     workflows: WORKFLOWS.length,
     triggers: TRIGGERS.length,
     steps: WORKFLOWS.reduce((a, w) => a + w.steps.length, 0),
+    templates: WORKFLOW_TEMPLATES.length,
   };
 }
 

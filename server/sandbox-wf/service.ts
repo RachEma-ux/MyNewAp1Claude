@@ -12,7 +12,10 @@ import {
   wfExecutions,
   wfExecutionLogs,
   wfTriggers,
+  wfVersions,
+  wfTemplates,
 } from "../../drizzle/tables/wfdb";
+import { executeWorkflow as runWorkflow } from "./executor";
 
 function db() {
   const d = getWfDb();
@@ -161,61 +164,14 @@ export async function listExecutions(workflowId?: number) {
 }
 
 export async function createExecution(workflowId: number, triggerType: string = "manual") {
+  // Use the real execution engine
+  const executionId = await runWorkflow(workflowId, triggerType);
+  // Fetch and return the execution record
   const [exec] = await db()
-    .insert(wfExecutions)
-    .values({
-      workflowId,
-      status: "running",
-      triggerType,
-    })
-    .returning();
-
-  // Get workflow steps and create log entries for each
-  const steps = await db()
     .select()
-    .from(wfSteps)
-    .where(eq(wfSteps.workflowId, workflowId))
-    .orderBy(wfSteps.sortOrder);
-
-  // Create initial log entry
-  await db().insert(wfExecutionLogs).values({
-    executionId: exec.id,
-    stepKey: "",
-    status: "info",
-    logLevel: "INFO",
-    message: `[Execution #${exec.id}] Started for workflow #${workflowId} (trigger: ${triggerType})`,
-  });
-
-  // Simulate step execution by creating log entries
-  for (const step of steps) {
-    await db().insert(wfExecutionLogs).values({
-      executionId: exec.id,
-      stepKey: step.key,
-      status: step.status === "done" ? "completed" : step.status === "failed" ? "failed" : "running",
-      logLevel: step.status === "failed" ? "ERROR" : "INFO",
-      message: `[${step.label}] ${step.description}`,
-    });
-  }
-
-  // Mark execution completed
-  await db()
-    .update(wfExecutions)
-    .set({
-      status: "completed",
-      completedAt: new Date(),
-      duration: Math.floor(Math.random() * 5000) + 500,
-    })
-    .where(eq(wfExecutions.id, exec.id));
-
-  // Final log
-  await db().insert(wfExecutionLogs).values({
-    executionId: exec.id,
-    stepKey: "",
-    status: "info",
-    logLevel: "INFO",
-    message: `[Execution #${exec.id}] Completed — ${steps.length} steps processed`,
-  });
-
+    .from(wfExecutions)
+    .where(eq(wfExecutions.id, executionId))
+    .limit(1);
   return exec;
 }
 
@@ -242,4 +198,149 @@ export async function getStats() {
     totalSteps: steps.length,
     doneSteps: steps.filter((s) => s.status === "done").length,
   };
+}
+
+// ── Versions ─────────────────────────────────────────────────────────────────
+
+export async function createVersion(workflowId: number) {
+  // Get current workflow state
+  const wf = await getWorkflow(workflowId);
+  if (!wf) throw new Error("Workflow not found");
+
+  // Get current max version
+  const versions = await db()
+    .select()
+    .from(wfVersions)
+    .where(eq(wfVersions.workflowId, workflowId))
+    .orderBy(desc(wfVersions.version));
+  const nextVersion = versions.length > 0 ? versions[0].version + 1 : 1;
+
+  // Save snapshot
+  const [version] = await db()
+    .insert(wfVersions)
+    .values({
+      workflowId,
+      version: nextVersion,
+      snapshot: {
+        name: wf.name,
+        description: wf.description,
+        category: wf.category,
+        status: wf.status,
+        tags: wf.tags,
+        steps: wf.steps,
+      },
+    })
+    .returning();
+
+  // Update workflow version number
+  await db()
+    .update(wfWorkflows)
+    .set({ version: nextVersion, updatedAt: new Date() })
+    .where(eq(wfWorkflows.id, workflowId));
+
+  return version;
+}
+
+export async function listVersions(workflowId: number) {
+  return db()
+    .select()
+    .from(wfVersions)
+    .where(eq(wfVersions.workflowId, workflowId))
+    .orderBy(desc(wfVersions.version));
+}
+
+export async function restoreVersion(workflowId: number, versionId: number) {
+  const [version] = await db()
+    .select()
+    .from(wfVersions)
+    .where(eq(wfVersions.id, versionId))
+    .limit(1);
+
+  if (!version) throw new Error("Version not found");
+  const snap = version.snapshot as any;
+
+  await db()
+    .update(wfWorkflows)
+    .set({
+      name: snap.name,
+      description: snap.description,
+      category: snap.category,
+      tags: snap.tags,
+      updatedAt: new Date(),
+    })
+    .where(eq(wfWorkflows.id, workflowId));
+
+  return getWorkflow(workflowId);
+}
+
+// ── Templates ────────────────────────────────────────────────────────────────
+
+export async function listTemplates() {
+  return db().select().from(wfTemplates).orderBy(wfTemplates.id);
+}
+
+export async function getTemplate(id: number) {
+  const [tmpl] = await db()
+    .select()
+    .from(wfTemplates)
+    .where(eq(wfTemplates.id, id))
+    .limit(1);
+  return tmpl || null;
+}
+
+export async function createFromTemplate(templateId: number, name: string) {
+  const tmpl = await getTemplate(templateId);
+  if (!tmpl) throw new Error("Template not found");
+
+  const steps = (tmpl.steps as any[]) || [];
+  return createWorkflow({
+    name: name || tmpl.name,
+    description: tmpl.description,
+    category: tmpl.category,
+    tags: (tmpl.tags as string[]) || [],
+    steps: steps.map((s: any) => ({
+      key: s.key,
+      label: s.label,
+      description: s.description || "",
+      status: "pending",
+    })),
+  });
+}
+
+// ── Trigger CRUD ─────────────────────────────────────────────────────────────
+
+export async function createTrigger(data: {
+  workflowId: number;
+  name: string;
+  type: string;
+  config?: Record<string, any>;
+  status?: string;
+}) {
+  const [trigger] = await db()
+    .insert(wfTriggers)
+    .values({
+      workflowId: data.workflowId,
+      name: data.name,
+      type: data.type,
+      config: data.config || {},
+      status: data.status || "active",
+    })
+    .returning();
+  return trigger;
+}
+
+export async function updateTrigger(id: number, data: { name?: string; type?: string; config?: Record<string, any>; status?: string }) {
+  const updates: any = {};
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.type !== undefined) updates.type = data.type;
+  if (data.config !== undefined) updates.config = data.config;
+  if (data.status !== undefined) updates.status = data.status;
+  await db().update(wfTriggers).set(updates).where(eq(wfTriggers.id, id));
+  const [trigger] = await db().select().from(wfTriggers).where(eq(wfTriggers.id, id)).limit(1);
+  return trigger;
+}
+
+export async function deleteTrigger(id: number) {
+  await db().delete(wfTriggers).where(eq(wfTriggers.id, id));
+  return { success: true };
 }

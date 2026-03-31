@@ -29,6 +29,7 @@ export const wfWorkflows = pgTable(
     tags: json("tags").$type<string[]>().default([]),
     nodes: text("nodes").default(""),
     edges: text("edges").default(""),
+    version: integer("version").default(1),
     updatedAgo: varchar("updated_ago", { length: 50 }).default(""),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -53,6 +54,8 @@ export const wfSteps = pgTable(
     label: varchar("label", { length: 255 }).notNull(),
     description: text("description").default("").notNull(),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
+    nodeType: varchar("node_type", { length: 50 }).default("action"),
+    config: json("config").$type<Record<string, any>>().default({}),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -136,3 +139,46 @@ export const wfTriggers = pgTable(
 
 export type WfTrigger = typeof wfTriggers.$inferSelect;
 export type InsertWfTrigger = typeof wfTriggers.$inferInsert;
+
+// ── Table 6: Workflow Versions ────────────────────────────────────────────
+
+export const wfVersions = pgTable(
+  "wf_versions",
+  {
+    id: serial("id").primaryKey(),
+    workflowId: integer("workflow_id").notNull(),
+    version: integer("version").notNull().default(1),
+    snapshot: json("snapshot").$type<Record<string, any>>().default({}),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    workflowIdx: index("idx_wf_versions_workflow").on(table.workflowId),
+  })
+);
+
+export type WfVersion = typeof wfVersions.$inferSelect;
+export type InsertWfVersion = typeof wfVersions.$inferInsert;
+
+// ── Table 7: Workflow Templates ───────────────────────────────────────────
+
+export const wfTemplates = pgTable(
+  "wf_templates",
+  {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description").default("").notNull(),
+    category: varchar("category", { length: 50 }).notNull(),
+    icon: varchar("icon", { length: 50 }).default(""),
+    nodes: json("nodes").$type<any[]>().default([]),
+    edges: json("edges").$type<any[]>().default([]),
+    steps: json("steps").$type<any[]>().default([]),
+    tags: json("tags").$type<string[]>().default([]),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    categoryIdx: index("idx_wf_templates_category").on(table.category),
+  })
+);
+
+export type WfTemplate = typeof wfTemplates.$inferSelect;
+export type InsertWfTemplate = typeof wfTemplates.$inferInsert;
