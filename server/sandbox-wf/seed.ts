@@ -316,56 +316,55 @@ export async function seedWfDb() {
   // Create tables
   await createTables(db);
 
-  // Check if already seeded
+  // ── Seed workflows (idempotent) ──────────────────────────────────────────
+  let workflowsSeeded = false;
   const existing = await db.select({ id: wfWorkflows.id }).from(wfWorkflows).limit(1);
-  if (existing.length > 0) {
-    const count = await db.select({ id: wfWorkflows.id }).from(wfWorkflows);
-    return { seeded: false, workflows: count.length, message: "Already seeded" };
-  }
+  if (existing.length === 0) {
+    for (const wfData of WORKFLOWS) {
+      const [wf] = await db
+        .insert(wfWorkflows)
+        .values({
+          name: wfData.name,
+          description: wfData.description,
+          category: wfData.category,
+          status: wfData.status,
+          tags: wfData.tags,
+          updatedAgo: wfData.updatedAgo,
+        })
+        .returning();
 
-  // Insert workflows + steps
-  for (const wfData of WORKFLOWS) {
-    const [wf] = await db
-      .insert(wfWorkflows)
-      .values({
-        name: wfData.name,
-        description: wfData.description,
-        category: wfData.category,
-        status: wfData.status,
-        tags: wfData.tags,
-        updatedAgo: wfData.updatedAgo,
-      })
-      .returning();
-
-    if (wfData.steps.length > 0) {
-      await db.insert(wfSteps).values(
-        wfData.steps.map((s, i) => ({
-          workflowId: wf.id,
-          key: s.key,
-          label: s.label,
-          description: s.description,
-          status: s.status,
-          sortOrder: i,
-        }))
-      );
+      if (wfData.steps.length > 0) {
+        await db.insert(wfSteps).values(
+          wfData.steps.map((s, i) => ({
+            workflowId: wf.id,
+            key: s.key,
+            label: s.label,
+            description: s.description,
+            status: s.status,
+            sortOrder: i,
+          }))
+        );
+      }
     }
+
+    // Insert triggers — map target workflow names to IDs
+    const allWfs = await db.select().from(wfWorkflows);
+    for (const trig of TRIGGERS) {
+      const targetWf = allWfs.find((w) => w.name === trig.targetWfName);
+      await db.insert(wfTriggers).values({
+        workflowId: targetWf?.id || 0,
+        name: trig.name,
+        type: trig.type,
+        status: trig.status,
+        fireCount: trig.fireCount,
+        targetWorkflowName: trig.targetWfName,
+      });
+    }
+    workflowsSeeded = true;
   }
 
-  // Insert triggers — map target workflow names to IDs
-  const allWfs = await db.select().from(wfWorkflows);
-  for (const trig of TRIGGERS) {
-    const targetWf = allWfs.find((w) => w.name === trig.targetWfName);
-    await db.insert(wfTriggers).values({
-      workflowId: targetWf?.id || 0,
-      name: trig.name,
-      type: trig.type,
-      status: trig.status,
-      fireCount: trig.fireCount,
-      targetWorkflowName: trig.targetWfName,
-    });
-  }
-
-  // Insert templates (idempotent)
+  // ── Seed templates (independent, idempotent) ───────────────────────────
+  let templatesSeeded = false;
   const existingTemplates = await db.select({ id: wfTemplates.id }).from(wfTemplates).limit(1);
   if (existingTemplates.length === 0) {
     for (const tmpl of WORKFLOW_TEMPLATES) {
@@ -378,13 +377,20 @@ export async function seedWfDb() {
         tags: tmpl.tags,
       });
     }
+    templatesSeeded = true;
+  }
+
+  if (!workflowsSeeded && !templatesSeeded) {
+    const count = await db.select({ id: wfWorkflows.id }).from(wfWorkflows);
+    return { seeded: false, workflows: count.length, message: "Already seeded" };
   }
 
   resetWfDb();
 
+  const wfCount = await db.select({ id: wfWorkflows.id }).from(wfWorkflows);
   return {
     seeded: true,
-    workflows: WORKFLOWS.length,
+    workflows: wfCount.length,
     triggers: TRIGGERS.length,
     steps: WORKFLOWS.reduce((a, w) => a + w.steps.length, 0),
     templates: WORKFLOW_TEMPLATES.length,
