@@ -185,14 +185,14 @@ async function startServer() {
   // Auto-provision providers from env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
   await autoProvisionProviders();
 
-  // Initialize providers from database
-  await initializeProviders();
-
-  // Auto-seed catalog entries from PROVIDERS constant
+  // Catalog-first: seed catalog entries BEFORE provider init so the catalog gate has data
   await syncRegistryOnStartup();
 
   // Auto-detect live models from configured providers (Ollama, etc.)
   await autoDetectLiveModels();
+
+  // Initialize providers from database — filtered through catalog (only active+approved entries load)
+  await initializeProviders();
 
   // Auto-seed taxonomy nodes from multi-axis definitions
   try {
