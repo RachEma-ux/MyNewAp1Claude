@@ -1,0 +1,73 @@
+Session Summary — 2026-03-31 22:30
+====================================
+
+Commit: c5c9dd0 (main)
+Previous baseline: 5273b90
+
+## App Version Reference
+
+- Commit: c5c9dd0
+- Branch: main
+- Local: http://localhost:3000/ — HTTP 200, server running
+- DB: mynewap1claude — 250 public tables, 203 catalog entries
+- WfDB: wfdb — 32 workflows, 7 active catalog imports (orchestrator crew)
+- Providers: openai loaded (id=2), ollama-local skipped (not running)
+- Git: clean, synced to remote
+
+## What Was Done
+
+### 1. Orchestrator Crew — Design & File Creation
+- Designed 7 default WF Sandbox crew members based on earlier architecture sessions
+- Created 3 import files in Downloads/Agents/:
+  - Orchestrator_WF.json (13K)
+  - Orchestrator_WF.yaml (16K)
+  - Orchestrator_WF.csv (4.2K)
+- Members: Maestro (orchestrator/agent), Classifier (worker/agent), Summarizer (worker/agent),
+  Writer (worker/agent), Gatekeeper (bot), Formatter (bot), Dispatcher (bot)
+
+### 2. AI Types Module Import
+- Imported all 7 crew members via Catalog Import Wizard → File Import
+- Each entry has full config: systemPrompt, inputContract, outputContract, behavior, costTier, crewRole
+- All linked to openai runtime provider (id=2)
+
+### 3. Bugs Fixed (5 total)
+
+Fix 1: Writer config empty after import
+  - id=242 had config={} — restored full JSON via SQL
+
+Fix 2: Wrong providerId on all 7 crew entries (7 instead of 2)
+  - Import wizard used catalog entry ID instead of runtime provider ID
+  - SQL fix: set providerId=2 on all 7 entries
+
+Fix 3: Catalog gate blocking all providers at startup
+  - openai (catalog id=7) and ollama (catalog id=67) had providerId=NULL
+  - SQL fix: linked to runtime provider IDs (2 and 1)
+  - Result: "Catalog gate: 2 approved provider(s)" on restart
+
+Fix 4: WF Sandbox import mutation crash — z.record(z.any())
+  - tRPC 11 can't resolve z.any() inside z.record() — _zod undefined
+  - Code fix: z.record(z.any()) → z.any() in server/sandbox-wf/router.ts (3 places)
+
+Fix 5: No toast feedback on import button click
+  - Added toast.success/error + sonner import to SandboxWFPage.tsx
+
+### 4. Design Documents (earlier in session, already committed)
+- Super-AI-Orchestrator-Design.md in Downloads — full architecture doc with:
+  - Agent vs Bot strategy
+  - 4-phase orchestrator (Planner → Assigner → Executor → Reviewer)
+  - Default crew (7 members) with cost profiles
+  - Full orchestrator definition (8 core components)
+
+## Commits This Session
+- c5c9dd0 fix: WF Sandbox catalog import — z.record(z.any()) crash + toast feedback
+
+## Files Changed
+- server/sandbox-wf/router.ts — z.record(z.any()) → z.any() (3 places)
+- client/src/pages/automation/SandboxWFPage.tsx — toast import, success/error, null guards
+
+## Current State
+- All 7 orchestrator crew members in AI Types catalog (ids 239-245)
+- All 7 imported into WF Sandbox (wf_catalog_imports table)
+- WF Sandbox → AI Catalog → Import AI Types → fully functional
+- Server running with openai provider loaded
+- Fix log saved to memory/fix-log.md
