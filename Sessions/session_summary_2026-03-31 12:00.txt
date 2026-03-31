@@ -1,0 +1,46 @@
+Session Summary — 2026-03-31 12:00
+====================================
+
+## What was done
+
+### 1. Sandbox WF Page (Automation menu)
+- Created `client/src/pages/automation/SandboxWFPage.tsx` under Hamburger > Automation
+- Started as Double Shell, iterated through multiple bug fixes, then rewrote as **Simple IBM Shell**
+- Final layout: single sidebar with 3 sections:
+  - **Sandbox Tools** (top): WF Editor, Triggers, Debug Console, Deploy, Metrics
+  - **Categories** (middle): All Workflows + 6 pillars (Decision Engine, Integrations, AI Intelligence, Governance, Offline Exec, Canvas Builder)
+  - **By Status** (bottom): Running, Completed, Failed, Drafts
+- 12 real workflows derived from AppDescription.docx and AppDesign-ReadyBlueprint.docx
+- 5 tool content panels with real data (editor with cards, triggers list, debug console, deploy status, metrics dashboard)
+- Category/Status clicks switch content to editor panel with filtered workflows
+- Sidebar toggle works on all screens (fixed mobile lock bug)
+- Auto-collapse on mobile after item selection
+
+### 2. AppDescription + AppDesign Report
+- Read both .docx files from ~/Download folder
+- Created `Reports/AppDescription-AppDesign-Report.md` — combined analysis covering:
+  - 6 platform pillars, operating modes, target users
+  - Key design screens, non-functional requirements
+  - Gap analysis: described features vs current app status
+
+### 3. Bug Fixes (during iteration)
+- `s2Active is not defined` — added missing useState
+- Sidebar won't expand on mobile — removed `isMobile ||` from collapsed logic
+- S2 tool clicks do nothing — added content panel switching
+- HMR not taking effect — restarted dev server
+- Sidebar stays open after click — added auto-collapse on mobile
+- Category icons don't show content — added `setActiveTool("editor")` to category/status handlers
+
+### 4. Other
+- Fixed perl/sleep issue permanently in MEMORY.md
+- Builder deploy triggered and tunnel URL obtained
+
+## Key Files Modified
+- `client/src/pages/automation/SandboxWFPage.tsx` (created, main file)
+- `client/src/App.tsx` (added lazy import + route)
+- `client/src/components/MainLayout.tsx` (added Automation menu item)
+- `Reports/AppDescription-AppDesign-Report.md` (created)
+
+## Final Commit
+- `35028dd` — feat: Sandbox WF Simple Shell with 3-section sidebar, category/status filtering, 5 tool panels
+- Pushed to main
