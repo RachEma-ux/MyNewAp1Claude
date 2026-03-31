@@ -43,6 +43,7 @@ const AutomationSettings = lazy(() => import("./pages/AutomationSettings"));
 const FlowChartPage = lazy(() => import("./pages/FlowChartPage"));
 const AirflowPage = lazy(() => import("./pages/AirflowPage"));
 const AirbytePage = lazy(() => import("./pages/AirbytePage"));
+const SandboxWFPage = lazy(() => import("./pages/automation/SandboxWFPage"));
 const DocumentUpload = lazy(() => import("./pages/DocumentUpload"));
 const CodeEditor = lazy(() => import("./pages/CodeEditor"));
 const EmbeddingsManagement = lazy(() => import("./pages/EmbeddingsManagement"));
@@ -430,6 +431,7 @@ function Router() {
       <Route path="/automation/flowchart" component={() => <ProtectedRoute component={FlowChartPage} />} />
       <Route path="/automation/airflow" component={() => <ProtectedRoute component={AirflowPage} />} />
       <Route path="/automation/airbyte" component={() => <ProtectedRoute component={AirbytePage} />} />
+      <Route path="/automation/sandbox-wf" component={() => <ProtectedRoute component={SandboxWFPage} />} />
       <Route path="/templates" component={() => <ProtectedRoute component={TemplatesPage} />} />
       <Route path="/agents" component={() => <ProtectedRoute component={AgentsPage} />} />
       <Route path="/agents/create" component={() => <ProtectedRoute component={AgentsPage} />} />

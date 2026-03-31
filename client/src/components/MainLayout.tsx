@@ -80,6 +80,7 @@ import {
   BrainCircuit,
   GitBranch,
   Wind,
+  Workflow,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -208,6 +209,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Flow Chart", icon: <GitBranch className="w-4 h-4" />, href: "/automation/flowchart" },
         { label: "Airflow", icon: <Wind className="w-4 h-4" />, href: "/automation/airflow" },
         { label: "Airbyte", icon: <Activity className="w-4 h-4" />, href: "/automation/airbyte" },
+        { label: "Sandbox WF", icon: <Workflow className="w-4 h-4" />, href: "/automation/sandbox-wf" },
       ],
     },
     {
