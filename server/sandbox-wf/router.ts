@@ -106,7 +106,7 @@ export const sandboxWfRouter = router({
           workflowId: z.number(),
           name: z.string(),
           type: z.string(),
-          config: z.record(z.any()).optional(),
+          config: z.any().optional(),
           status: z.string().optional(),
         })
       )
@@ -120,7 +120,7 @@ export const sandboxWfRouter = router({
           id: z.number(),
           name: z.string().optional(),
           type: z.string().optional(),
-          config: z.record(z.any()).optional(),
+          config: z.any().optional(),
           status: z.string().optional(),
         })
       )
@@ -217,7 +217,7 @@ export const sandboxWfRouter = router({
           description: z.string().optional(),
           category: z.string().optional(),
           tags: z.array(z.string()).optional(),
-          config: z.record(z.any()).optional(),
+          config: z.any().optional(),
         })
       )
       .mutation(async ({ input }) => {

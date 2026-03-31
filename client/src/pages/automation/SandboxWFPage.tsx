@@ -14,6 +14,7 @@
  *   - Single toggle, collapsed on mobile
  */
 import { useState, useEffect, useMemo } from "react";
+import { toast } from "sonner";
 import { useCatalogEntries } from "@/hooks/useCatalogEntries";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -263,7 +264,13 @@ export default function SandboxWFPage() {
   const catalogImports = catalogImportsQuery.data ?? [];
 
   const importCatalogMutation = trpc.sandboxWf.catalogImports.import.useMutation({
-    onSuccess: () => { utils.sandboxWf.catalogImports.list.invalidate(); },
+    onSuccess: (data) => {
+      utils.sandboxWf.catalogImports.list.invalidate();
+      toast.success(`Imported "${data?.name || "entry"}" into WF Sandbox`);
+    },
+    onError: (err) => {
+      toast.error(`Import failed: ${err.message}`);
+    },
   });
 
   const removeCatalogMutation = trpc.sandboxWf.catalogImports.remove.useMutation({
@@ -862,15 +869,17 @@ export default function SandboxWFPage() {
         tab={catalogTab}
         onTabChange={setCatalogTab}
         onImport={(entry: any) => {
-          importCatalogMutation.mutate({
-            catalogEntryId: entry.id,
-            entryType: entry.entryType || "agent",
-            name: entry.displayName || entry.name,
-            description: entry.description || "",
-            category: entry.category || "",
-            tags: entry.tags || [],
-            config: entry.config || {},
-          });
+          const payload = {
+            catalogEntryId: Number(entry.id),
+            entryType: String(entry.entryType || "agent"),
+            name: String(entry.displayName || entry.name || "Unknown"),
+            description: String(entry.description ?? ""),
+            category: String(entry.category ?? ""),
+            tags: Array.isArray(entry.tags) ? entry.tags.map(String) : [],
+            config: (entry.config && typeof entry.config === "object" && !Array.isArray(entry.config)) ? entry.config : {},
+          };
+          console.log("[WF Import] payload:", JSON.stringify(payload).slice(0, 500));
+          importCatalogMutation.mutate(payload);
         }}
         isImporting={importCatalogMutation.isPending}
       />
