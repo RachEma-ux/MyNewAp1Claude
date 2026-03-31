@@ -433,6 +433,7 @@ function Router() {
       <Route path="/automation/airflow" component={() => <ProtectedRoute component={AirflowPage} />} />
       <Route path="/automation/airbyte" component={() => <ProtectedRoute component={AirbytePage} />} />
       <Route path="/automation/sandbox-wf/new" component={() => <ProtectedRoute component={WFCreationShell} />} />
+      <Route path="/automation/sandbox-wf/:id" component={() => <ProtectedRoute component={WFCreationShell} />} />
       <Route path="/automation/sandbox-wf" component={() => <ProtectedRoute component={SandboxWFPage} />} />
       <Route path="/templates" component={() => <ProtectedRoute component={TemplatesPage} />} />
       <Route path="/agents" component={() => <ProtectedRoute component={AgentsPage} />} />

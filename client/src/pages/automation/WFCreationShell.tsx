@@ -6,7 +6,7 @@
  *   - Designer: n8n-style ReactFlow canvas with draggable nodes
  */
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -189,10 +189,15 @@ function useIsMobile(breakpoint = 768) {
 
 export default function WFCreationShell() {
   const [, navigate] = useLocation();
+  const [, params] = useRoute("/automation/sandbox-wf/:id");
+  const editId = params?.id ? parseInt(params.id, 10) : null;
+  const isEditMode = editId !== null && !isNaN(editId);
+
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isMobile);
   const collapsed = sidebarCollapsed;
   const [mode, setMode] = useState<"form" | "designer">("form");
+  const [loaded, setLoaded] = useState(false);
 
   // ── Form State ─────────────────────────────────────────
 
@@ -210,6 +215,35 @@ export default function WFCreationShell() {
 
   const triggersQuery = trpc.sandboxWf.triggers.list.useQuery({});
   const triggers = triggersQuery.data ?? [];
+
+  // Fetch existing workflow when editing
+  const workflowQuery = trpc.sandboxWf.workflows.get.useQuery(
+    { id: editId! },
+    { enabled: isEditMode },
+  );
+
+  // Populate form when workflow data loads
+  useEffect(() => {
+    if (isEditMode && workflowQuery.data && !loaded) {
+      const wf = workflowQuery.data;
+      setName(wf.name);
+      setCategory(wf.category);
+      setStatus(wf.status);
+      setDescription(wf.description || "");
+      setTags((wf.tags as string[] || []).join(", "));
+      if (wf.steps && wf.steps.length > 0) {
+        setSteps(
+          wf.steps.map((s: any) => ({
+            key: s.key,
+            label: s.label,
+            description: s.description || "",
+            status: s.status,
+          })),
+        );
+      }
+      setLoaded(true);
+    }
+  }, [isEditMode, workflowQuery.data, loaded]);
 
   // ── ReactFlow State ────────────────────────────────────
 
@@ -294,6 +328,12 @@ export default function WFCreationShell() {
       navigate("/automation/sandbox-wf");
     },
   });
+  const updateMutation = trpc.sandboxWf.workflows.update.useMutation({
+    onSuccess: () => {
+      utils.sandboxWf.invalidate();
+      navigate("/automation/sandbox-wf");
+    },
+  });
 
   // ── Step Handlers ──────────────────────────────────────
 
@@ -343,25 +383,37 @@ export default function WFCreationShell() {
 
   // ── Submit ─────────────────────────────────────────────
 
+  const isSaving = createMutation.isPending || updateMutation.isPending;
   const canSubmit = name.trim().length > 0 && steps.some((s) => s.label.trim().length > 0);
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    createMutation.mutate({
-      name: name.trim(),
-      category,
-      status,
-      description: description.trim(),
-      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-      steps: steps
-        .filter((s) => s.label.trim().length > 0)
-        .map((s) => ({
-          key: s.key,
-          label: s.label.trim(),
-          description: s.description.trim(),
-          status: s.status,
-        })),
-    });
+    if (isEditMode) {
+      updateMutation.mutate({
+        id: editId!,
+        name: name.trim(),
+        category,
+        status,
+        description: description.trim(),
+        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+      });
+    } else {
+      createMutation.mutate({
+        name: name.trim(),
+        category,
+        status,
+        description: description.trim(),
+        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+        steps: steps
+          .filter((s) => s.label.trim().length > 0)
+          .map((s) => ({
+            key: s.key,
+            label: s.label.trim(),
+            description: s.description.trim(),
+            status: s.status,
+          })),
+      });
+    }
   };
 
   // ── Mode switch handler ────────────────────────────────
@@ -513,8 +565,14 @@ export default function WFCreationShell() {
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => navigate("/automation/sandbox-wf")} title="Back">
               <ArrowLeft className="h-3.5 w-3.5" />
             </Button>
-            <Plus className="h-4 w-4 text-blue-400" />
-            <h1 className="text-sm font-semibold">New Workflow</h1>
+            {isEditMode ? (
+              <Workflow className="h-4 w-4 text-blue-400" />
+            ) : (
+              <Plus className="h-4 w-4 text-blue-400" />
+            )}
+            <h1 className="text-sm font-semibold truncate">
+              {isEditMode ? (name || "Loading...") : "New Workflow"}
+            </h1>
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -531,12 +589,12 @@ export default function WFCreationShell() {
             <Button
               size="sm" className="h-7 text-xs px-3"
               onClick={handleSubmit}
-              disabled={!canSubmit || createMutation.isPending}
+              disabled={!canSubmit || isSaving}
             >
-              {createMutation.isPending ? (
+              {isSaving ? (
                 <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Saving...</>
               ) : (
-                <><Save className="h-3 w-3 mr-1" /> Save</>
+                <><Save className="h-3 w-3 mr-1" /> {isEditMode ? "Update" : "Save"}</>
               )}
             </Button>
           </div>
@@ -707,9 +765,9 @@ export default function WFCreationShell() {
               </Card>
 
               {/* Error display */}
-              {createMutation.isError && (
+              {(createMutation.isError || updateMutation.isError) && (
                 <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded p-3">
-                  {createMutation.error.message}
+                  {createMutation.error?.message || updateMutation.error?.message}
                 </div>
               )}
             </div>
@@ -753,7 +811,7 @@ export default function WFCreationShell() {
         {/* Status bar */}
         <div className="flex items-center justify-between border-t bg-card/50 px-4 h-7 text-xs text-muted-foreground shrink-0">
           <div className="flex items-center gap-4">
-            <span className="font-mono text-blue-500">New Workflow</span>
+            <span className="font-mono text-blue-500">{isEditMode ? "Edit Workflow" : "New Workflow"}</span>
             <span>
               {mode === "form"
                 ? `${steps.filter((s) => s.label.trim()).length} steps`

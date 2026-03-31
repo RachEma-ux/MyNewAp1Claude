@@ -33,6 +33,7 @@ import {
   GitBranch,
   Layers,
   Zap,
+  PenTool,
   Clock,
   BarChart3,
   Shield,
@@ -465,6 +466,12 @@ export default function SandboxWFPage() {
                         <p className="text-xs text-muted-foreground mt-1">{selectedWF.description}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 ml-3">
+                        <Button
+                          variant="outline" size="sm" className="h-6 text-[10px] px-2"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/automation/sandbox-wf/${selectedWF.id}`); }}
+                        >
+                          <PenTool className="h-3 w-3 mr-1" /> Designer
+                        </Button>
                         <Button
                           variant="outline" size="sm" className="h-6 text-[10px] px-2"
                           onClick={(e) => { e.stopPropagation(); handleExecute(selectedWF.id); }}
