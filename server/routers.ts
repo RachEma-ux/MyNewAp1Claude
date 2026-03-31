@@ -49,6 +49,7 @@ import { organizationManagementRouter } from "./organization-management/router";
 import { cultureValuesRouter } from "./culture-values/router";
 import { psRouter } from "./ps/ps.router";
 import { dataAnalysisRouter } from "./data-analysis/router";
+import { sandboxWfRouter } from "./sandbox-wf/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -97,6 +98,7 @@ export const appRouter = router({
   models: modelsRouter, // Model Registry (governed)
   bots: botsRouter, // Bot Domain (governed lifecycle)
   dataAnalysis: dataAnalysisRouter, // Data Analysis — GraphRAG engine + future analytical tools
+  sandboxWf: sandboxWfRouter, // Sandbox WF — dedicated wfdb workflows, steps, executions, triggers
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

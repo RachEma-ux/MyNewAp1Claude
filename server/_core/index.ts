@@ -255,6 +255,19 @@ async function startServer() {
     console.warn(`[GraphRAG] Adapter init skipped — ${error.message}`);
   }
 
+  // Seed WfDB (dedicated workflow database — idempotent)
+  try {
+    const { ensureWfDbSeeded } = await import("../sandbox-wf/seed");
+    const wfResult = await ensureWfDbSeeded();
+    if (wfResult.seeded) {
+      console.log(`[WfDB] Seeded ${wfResult.workflows} workflows, ${wfResult.triggers} triggers, ${wfResult.steps} steps`);
+    } else {
+      console.log(`[WfDB] Already populated (${wfResult.workflows} workflows)`);
+    }
+  } catch (error: any) {
+    console.warn(`[WfDB] Seed skipped — ${error.message}`);
+  }
+
   // Initialize Governance Engine (CGT v2)
   initializeGovernance();
 
