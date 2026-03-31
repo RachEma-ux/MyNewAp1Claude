@@ -206,6 +206,11 @@ export default function WFCreationShell() {
   ]);
   const [selectedStepIdx, setSelectedStepIdx] = useState(0);
 
+  // ── tRPC (must be before effects that depend on query data) ──
+
+  const triggersQuery = trpc.sandboxWf.triggers.list.useQuery({});
+  const triggers = triggersQuery.data ?? [];
+
   // ── ReactFlow State ────────────────────────────────────
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -214,6 +219,20 @@ export default function WFCreationShell() {
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge({ ...params, animated: true, markerEnd: { type: MarkerType.ArrowClosed } }, eds)),
     [setEdges],
+  );
+
+  // Callback for trigger dropdown selection inside a node
+  const handleTriggerSelect = useCallback(
+    (nodeId: string, triggerId: string) => {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? { ...n, data: { ...n.data, selectedTriggerId: triggerId } }
+            : n,
+        ),
+      );
+    },
+    [setNodes],
   );
 
   // Keep triggers data fresh on trigger nodes
@@ -268,11 +287,6 @@ export default function WFCreationShell() {
     setSteps(updated);
   }, [nodes]);
 
-  // ── tRPC ───────────────────────────────────────────────
-
-  const triggersQuery = trpc.sandboxWf.triggers.list.useQuery({});
-  const triggers = triggersQuery.data ?? [];
-
   const utils = trpc.useUtils();
   const createMutation = trpc.sandboxWf.workflows.create.useMutation({
     onSuccess: () => {
@@ -306,20 +320,6 @@ export default function WFCreationShell() {
   };
 
   // ── Designer: add node from palette ────────────────────
-
-  // Callback for trigger dropdown selection inside a node
-  const handleTriggerSelect = useCallback(
-    (nodeId: string, triggerId: string) => {
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === nodeId
-            ? { ...n, data: { ...n.data, selectedTriggerId: triggerId } }
-            : n,
-        ),
-      );
-    },
-    [setNodes],
-  );
 
   const addNodeFromPalette = (paletteType: string, paletteLabel: string) => {
     const id = `${paletteType}-${Date.now()}`;
