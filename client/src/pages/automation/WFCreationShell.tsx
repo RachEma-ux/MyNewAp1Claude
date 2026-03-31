@@ -372,14 +372,16 @@ export default function WFCreationShell() {
   const createMutation = trpc.sandboxWf.workflows.create.useMutation({
     onSuccess: (data) => {
       utils.sandboxWf.invalidate();
-      // Stay on the newly created workflow
-      if (data?.id) navigate(`/automation/sandbox-wf/${data.id}`);
+      // Silently update URL so we're now in edit mode, without re-rendering
+      if (data?.id) {
+        setLoaded(true);
+        window.history.replaceState(null, "", `/automation/sandbox-wf/${data.id}`);
+      }
     },
   });
   const updateMutation = trpc.sandboxWf.workflows.update.useMutation({
     onSuccess: () => {
       utils.sandboxWf.invalidate();
-      // Stay on current page — don't navigate away
     },
   });
 
