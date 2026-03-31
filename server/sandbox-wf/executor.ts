@@ -42,6 +42,10 @@ interface StepConfig {
   approvers?: string;
   // Log
   logMessage?: string;
+  // Catalog Agent
+  catalogEntryId?: number;
+  catalogEntryName?: string;
+  message?: string;
   [key: string]: any;
 }
 
@@ -131,14 +135,83 @@ function executeApprovalGate(config: StepConfig) {
   return { approved: true, approvers: config.approvers || "auto", mode: "sandbox-auto-approve" };
 }
 
-function executeLlmPrompt(config: StepConfig) {
-  // Placeholder — returns mock response in sandbox
+async function executeLlmPrompt(config: StepConfig, ctx: ExecutionContext): Promise<Record<string, any>> {
+  // Try real LLM via Provider Hub; fall back to mock if unavailable
+  try {
+    const { getAvailableProvider, callLLM } = await import("../modules/pmt/idea-builder-agent");
+    const provider = getAvailableProvider();
+
+    if (provider) {
+      const systemPrompt = resolveTemplate(config.systemPrompt || "You are a helpful assistant.", ctx);
+      const userPrompt = resolveTemplate(config.userPrompt || "", ctx);
+
+      const response = await callLLM(provider, [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ], {
+        temperature: config.temperature ?? 0.7,
+        maxTokens: 2000,
+        model: config.model || undefined,
+      });
+
+      return {
+        provider: provider.type,
+        model: config.model || provider.name,
+        response,
+        tokens: { prompt: 50, completion: 100 }, // estimate
+      };
+    }
+  } catch {
+    // Provider Hub unavailable — fall through to mock
+  }
+
+  // Graceful degradation — no LLM available
   return {
-    provider: config.provider || "sandbox",
-    model: config.model || "mock",
-    response: `[Sandbox] LLM response for: "${config.userPrompt || "no prompt"}"`,
-    tokens: { prompt: 50, completion: 100 },
+    provider: "sandbox",
+    model: "mock",
+    response: `[Sandbox] No LLM provider available. Mock response for: "${config.userPrompt || "no prompt"}"`,
+    tokens: { prompt: 0, completion: 0 },
   };
+}
+
+async function executeCatalogAgent(config: StepConfig, ctx: ExecutionContext): Promise<Record<string, any>> {
+  const catalogEntryId = config.catalogEntryId;
+  if (!catalogEntryId) {
+    return { error: "No catalogEntryId configured", status: "skipped" };
+  }
+
+  try {
+    const { invokeCatalogEntry } = await import("../catalog/invoke");
+    const message = resolveTemplate(config.userPrompt || config.message || "", ctx);
+
+    let result: any = {};
+    for await (const event of invokeCatalogEntry({
+      catalogEntryId,
+      actorUserId: 0,
+      message,
+      triggerSource: "wf_sandbox",
+    })) {
+      if (event.type === "complete") {
+        result = { status: "completed", response: (event as any).result || event };
+      } else if (event.type === "error") {
+        result = { status: "failed", error: (event as any).error };
+      } else if (event.type === "chunk") {
+        result.response = (result.response || "") + ((event as any).text || "");
+      }
+    }
+    return {
+      catalogEntryId,
+      entryName: config.catalogEntryName || `Entry #${catalogEntryId}`,
+      ...result,
+    };
+  } catch (err: any) {
+    return {
+      catalogEntryId,
+      status: "failed",
+      error: err.message,
+      mode: "sandbox-fallback",
+    };
+  }
 }
 
 // ── Template Resolution ──────────────────────────────────────────────────────
@@ -225,7 +298,10 @@ export async function executeWorkflow(workflowId: number, triggerType = "manual"
           output = executeApprovalGate(config);
           break;
         case "llm_prompt":
-          output = executeLlmPrompt(config);
+          output = await executeLlmPrompt(config, ctx);
+          break;
+        case "catalog_agent":
+          output = await executeCatalogAgent(config, ctx);
           break;
         default:
           // Generic action — pass through

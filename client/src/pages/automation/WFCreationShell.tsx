@@ -147,7 +147,7 @@ interface NodeTypeDefinition {
   label: string;
   icon: any;
   color: string;
-  category: "triggers" | "actions" | "logic" | "ai" | "integrations" | "governance";
+  category: "triggers" | "actions" | "logic" | "ai" | "integrations" | "governance" | "catalog";
 }
 
 const NODE_TYPES: NodeTypeDefinition[] = [
@@ -187,6 +187,8 @@ const NODE_TYPES: NodeTypeDefinition[] = [
   { type: "human_review", label: "Human Review", icon: Shield, color: "#f472b6", category: "governance" },
   { type: "escalation", label: "Escalation", icon: AlertTriangle, color: "#f472b6", category: "governance" },
   { type: "log_message", label: "Log Message", icon: Terminal, color: "#f472b6", category: "governance" },
+  // Catalog Agent (base type; dynamic entries added from imports)
+  { type: "catalog_agent", label: "Catalog Agent", icon: Brain, color: "#06b6d4", category: "catalog" },
 ];
 
 const NODE_CATEGORIES = [
@@ -196,6 +198,7 @@ const NODE_CATEGORIES = [
   { key: "ai", label: "AI", icon: Brain, color: "#a78bfa" },
   { key: "integrations", label: "Integrations", icon: Plug, color: "#4ade80" },
   { key: "governance", label: "Governance", icon: Shield, color: "#f472b6" },
+  { key: "catalog", label: "Catalog Agents", icon: Brain, color: "#06b6d4" },
 ];
 
 // ── n8n-style Custom Node ────────────────────────────────
@@ -208,7 +211,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function N8nNode({ data, selected }: NodeProps) {
-  const nodeDef = NODE_TYPES.find((t) => t.type === data.nodeType);
+  const nodeDef = NODE_TYPES.find((t) => t.type === data.nodeType)
+    || (data.nodeType === "catalog_agent" ? { type: "catalog_agent", label: "Catalog Agent", icon: Brain, color: "#06b6d4", category: "catalog" } : null);
   const Icon = nodeDef?.icon || Workflow;
   const nodeColor = nodeDef?.color || "#64748b";
   const statusColor = STATUS_COLORS[data.status] || "#64748b";
@@ -285,7 +289,7 @@ export default function WFCreationShell() {
   const [saveName, setSaveName] = useState("");
   const [saveCategory, setSaveCategory] = useState("decision");
   const [paletteSearch, setPaletteSearch] = useState("");
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({ triggers: true, actions: true, logic: true, ai: true, integrations: true, governance: true });
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({ triggers: true, actions: true, logic: true, ai: true, integrations: true, governance: true, catalog: true });
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [activeExecutionId, setActiveExecutionId] = useState<number | null>(null);
 
@@ -310,6 +314,9 @@ export default function WFCreationShell() {
   const allWorkflows = allWorkflowsQuery.data ?? [];
   const templatesQuery = trpc.sandboxWf.templates.list.useQuery();
   const templates = templatesQuery.data ?? [];
+  const catalogImportsQuery = trpc.sandboxWf.catalogImports.list.useQuery();
+  const catalogImports = catalogImportsQuery.data ?? [];
+
   const versionsQuery = trpc.sandboxWf.versions.list.useQuery(
     { workflowId: editId! },
     { enabled: isEditMode },
@@ -526,8 +533,14 @@ export default function WFCreationShell() {
 
   // ── Designer: add node from palette ────────────────────
 
-  const addNodeFromPalette = (typeDef: NodeTypeDefinition) => {
+  const addNodeFromPalette = (typeDef: NodeTypeDefinition & { catalogEntryId?: number; catalogEntryName?: string; entryType?: string }) => {
     const id = `${typeDef.type}-${Date.now()}`;
+    const nodeConfig: Record<string, any> = {};
+    if (typeDef.catalogEntryId) {
+      nodeConfig.catalogEntryId = typeDef.catalogEntryId;
+      nodeConfig.catalogEntryName = typeDef.catalogEntryName || typeDef.label;
+      nodeConfig.entryType = typeDef.entryType || "agent";
+    }
     const newNode: Node = {
       id,
       type: "n8nNode",
@@ -536,8 +549,8 @@ export default function WFCreationShell() {
         label: typeDef.label,
         description: "",
         status: "pending",
-        nodeType: typeDef.type,
-        config: {},
+        nodeType: typeDef.catalogEntryId ? "catalog_agent" : typeDef.type,
+        config: nodeConfig,
       },
     };
     setNodes((nds) => [...nds, newNode]);
@@ -695,11 +708,27 @@ export default function WFCreationShell() {
 
   // ── Filtered palette ───────────────────────────────────
 
+  // Build dynamic catalog entries from imports
+  const catalogNodeTypes = useMemo<(NodeTypeDefinition & { catalogEntryId?: number; catalogEntryName?: string; entryType?: string })[]>(() => {
+    return catalogImports.map((imp) => ({
+      type: `catalog_agent_${imp.catalogEntryId}`,
+      label: imp.name,
+      icon: Brain,
+      color: "#06b6d4",
+      category: "catalog" as const,
+      catalogEntryId: imp.catalogEntryId,
+      catalogEntryName: imp.name,
+      entryType: imp.entryType,
+    }));
+  }, [catalogImports]);
+
+  const allNodeTypes = useMemo(() => [...NODE_TYPES, ...catalogNodeTypes], [catalogNodeTypes]);
+
   const filteredTypes = useMemo(() => {
-    if (!paletteSearch) return NODE_TYPES;
+    if (!paletteSearch) return allNodeTypes;
     const q = paletteSearch.toLowerCase();
-    return NODE_TYPES.filter((t) => t.label.toLowerCase().includes(q) || t.type.includes(q) || t.category.includes(q));
-  }, [paletteSearch]);
+    return allNodeTypes.filter((t) => t.label.toLowerCase().includes(q) || t.type.includes(q) || t.category.includes(q));
+  }, [paletteSearch, allNodeTypes]);
 
   const toggleCategory = (key: string) => {
     setExpandedCategories((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -1109,6 +1138,7 @@ export default function WFCreationShell() {
                   <Controls className="!bg-card !border-border !shadow-lg [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted" />
                   <MiniMap
                     nodeColor={(node) => {
+                      if (node.data?.nodeType === "catalog_agent") return "#06b6d4";
                       const def = NODE_TYPES.find((x) => x.type === node.data?.nodeType);
                       return def?.color || "#64748b";
                     }}

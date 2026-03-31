@@ -202,6 +202,35 @@ export const sandboxWfRouter = router({
       }),
   }),
 
+  // ── Catalog Imports ────────────────────────────────────────────────────────
+  catalogImports: router({
+    list: publicProcedure.query(async () => {
+      return service.listCatalogImports();
+    }),
+
+    import: publicProcedure
+      .input(
+        z.object({
+          catalogEntryId: z.number(),
+          entryType: z.string(),
+          name: z.string(),
+          description: z.string().optional(),
+          category: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+          config: z.record(z.any()).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return service.importCatalogEntry(input);
+      }),
+
+    remove: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return service.removeCatalogImport(input.id);
+      }),
+  }),
+
   // ── Stats ──────────────────────────────────────────────────────────────────
   stats: publicProcedure.query(async () => {
     return service.getStats();

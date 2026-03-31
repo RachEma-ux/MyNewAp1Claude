@@ -14,6 +14,7 @@ import {
   wfTriggers,
   wfVersions,
   wfTemplates,
+  wfCatalogImports,
 } from "../../drizzle/tables/wfdb";
 import { executeWorkflow as runWorkflow } from "./executor";
 
@@ -342,5 +343,62 @@ export async function updateTrigger(id: number, data: { name?: string; type?: st
 
 export async function deleteTrigger(id: number) {
   await db().delete(wfTriggers).where(eq(wfTriggers.id, id));
+  return { success: true };
+}
+
+// ── Catalog Imports ─────────────────────────────────────────────────────
+
+export async function listCatalogImports() {
+  return db()
+    .select()
+    .from(wfCatalogImports)
+    .where(eq(wfCatalogImports.status, "active"))
+    .orderBy(wfCatalogImports.id);
+}
+
+export async function importCatalogEntry(data: {
+  catalogEntryId: number;
+  entryType: string;
+  name: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  config?: Record<string, any>;
+}) {
+  // Check if already imported
+  const existing = await db()
+    .select()
+    .from(wfCatalogImports)
+    .where(
+      and(
+        eq(wfCatalogImports.catalogEntryId, data.catalogEntryId),
+        eq(wfCatalogImports.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (existing.length > 0) {
+    return existing[0];
+  }
+
+  const [imported] = await db()
+    .insert(wfCatalogImports)
+    .values({
+      catalogEntryId: data.catalogEntryId,
+      entryType: data.entryType,
+      name: data.name,
+      description: data.description || "",
+      category: data.category || "",
+      tags: data.tags || [],
+      config: data.config || {},
+    })
+    .returning();
+  return imported;
+}
+
+export async function removeCatalogImport(id: number) {
+  await db()
+    .update(wfCatalogImports)
+    .set({ status: "removed" })
+    .where(eq(wfCatalogImports.id, id));
   return { success: true };
 }

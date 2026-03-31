@@ -295,6 +295,22 @@ async function createTables(db: NonNullable<ReturnType<typeof getWfDb>>) {
     )
   `);
 
+  // Table 8: Catalog Imports
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS wf_catalog_imports (
+      id SERIAL PRIMARY KEY,
+      catalog_entry_id INTEGER NOT NULL,
+      entry_type VARCHAR(20) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT DEFAULT '',
+      category VARCHAR(50) DEFAULT '',
+      tags JSON DEFAULT '[]',
+      config JSON DEFAULT '{}',
+      status VARCHAR(20) DEFAULT 'active',
+      created_at TIMESTAMP DEFAULT NOW() NOT NULL
+    )
+  `);
+
   // Create indexes
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_workflows_category ON wf_workflows(category)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_workflows_status ON wf_workflows(status)`);
@@ -305,6 +321,7 @@ async function createTables(db: NonNullable<ReturnType<typeof getWfDb>>) {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_triggers_workflow ON wf_triggers(workflow_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_versions_workflow ON wf_versions(workflow_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_templates_category ON wf_templates(category)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_wf_catalog_imports_entry ON wf_catalog_imports(catalog_entry_id)`);
 }
 
 // ── Seed Execution ───────────────────────────────────────────────────────────

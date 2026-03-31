@@ -99,6 +99,7 @@ const TYPE_ICONS: Record<string, any> = {
   human_review: Shield,
   escalation: Shield,
   log_message: FileText,
+  catalog_agent: Brain,
 };
 
 // ── Field Components ─────────────────────────────────────
@@ -265,6 +266,42 @@ export function NodePropertiesPanel({ node, onClose, onUpdateNode, onDeleteNode 
     </>
   );
 
+  const renderCatalogAgentConfig = () => (
+    <>
+      <div className="space-y-1.5 mb-2">
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="text-muted-foreground">Catalog Entry ID:</span>
+          <Badge variant="outline" className="text-[9px] px-1 py-0 font-mono">{config.catalogEntryId || "—"}</Badge>
+        </div>
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="text-muted-foreground">Entry Name:</span>
+          <span className="text-xs">{config.catalogEntryName || "—"}</span>
+        </div>
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="text-muted-foreground">Entry Type:</span>
+          <Badge variant="outline" className="text-[9px] px-1 py-0 capitalize">{config.entryType || "agent"}</Badge>
+        </div>
+      </div>
+      <FieldLabel label="User Prompt / Message" hint="supports {{step.field}}" />
+      <Textarea
+        className="text-xs min-h-[60px] mb-2"
+        placeholder="Message to send to the catalog agent..."
+        value={config.userPrompt || config.message || ""}
+        onChange={(e) => updateConfig("userPrompt", e.target.value)}
+      />
+      {config.catalogEntryId && (
+        <a
+          href="/ai-types"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10px] text-cyan-500 hover:underline"
+        >
+          View in AI Types Catalog →
+        </a>
+      )}
+    </>
+  );
+
   const renderConfig = () => {
     switch (nodeType) {
       case "http_request":
@@ -294,6 +331,8 @@ export function NodePropertiesPanel({ node, onClose, onUpdateNode, onDeleteNode 
       case "log_message":
       case "audit_log":
         return renderLogConfig();
+      case "catalog_agent":
+        return renderCatalogAgentConfig();
       default:
         return (
           <p className="text-[10px] text-muted-foreground italic">
@@ -319,6 +358,8 @@ export function NodePropertiesPanel({ node, onClose, onUpdateNode, onDeleteNode 
         return !!(config.cron);
       case "send_email":
         return !!(config.to);
+      case "catalog_agent":
+        return !!(config.catalogEntryId);
       default:
         return true;
     }
