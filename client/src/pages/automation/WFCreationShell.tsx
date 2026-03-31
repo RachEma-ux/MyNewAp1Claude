@@ -213,8 +213,13 @@ function useIsMobile(breakpoint = 768) {
 export default function WFCreationShell() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/automation/sandbox-wf/:id");
-  const editId = params?.id ? parseInt(params.id, 10) : null;
-  const isEditMode = editId !== null && !isNaN(editId);
+  const urlId = params?.id ? parseInt(params.id, 10) : null;
+  const urlEditMode = urlId !== null && !isNaN(urlId);
+
+  // savedId tracks the ID after first save — avoids navigation
+  const [savedId, setSavedId] = useState<number | null>(null);
+  const editId = savedId ?? (urlEditMode ? urlId : null);
+  const isEditMode = editId !== null;
 
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isMobile);
@@ -298,6 +303,7 @@ export default function WFCreationShell() {
     setNodes([]);
     setEdges([]);
     setLoaded(false);
+    setSavedId(null);
     setShowOpenPicker(false);
     setMode("designer");
   }, [setNodes, setEdges]);
@@ -372,10 +378,10 @@ export default function WFCreationShell() {
   const createMutation = trpc.sandboxWf.workflows.create.useMutation({
     onSuccess: (data) => {
       utils.sandboxWf.invalidate();
-      // Silently update URL so we're now in edit mode, without re-rendering
+      // Track saved ID in state — no navigation, no URL change, stay on canvas
       if (data?.id) {
+        setSavedId(data.id);
         setLoaded(true);
-        window.history.replaceState(null, "", `/automation/sandbox-wf/${data.id}`);
       }
     },
   });
