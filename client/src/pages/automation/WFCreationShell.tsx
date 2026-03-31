@@ -446,7 +446,19 @@ export default function WFCreationShell() {
   const handleFormAction = (key: string) => {
     switch (key) {
       case "new":
-        navigate("/automation/sandbox-wf/new");
+        // Reset to a blank form — don't navigate or create anything
+        setName("");
+        setCategory("decision");
+        setStatus("draft");
+        setDescription("");
+        setTags("");
+        setSteps([{ key: "step-1", label: "", description: "", status: "pending" }]);
+        setSelectedStepIdx(0);
+        setNodes([]);
+        setEdges([]);
+        setLoaded(false);
+        setShowOpenPicker(false);
+        if (mode === "designer") setMode("form");
         break;
       case "open":
         setShowOpenPicker(!showOpenPicker);
