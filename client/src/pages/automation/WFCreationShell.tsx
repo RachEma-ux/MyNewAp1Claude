@@ -446,7 +446,7 @@ export default function WFCreationShell() {
   const handleFormAction = (key: string) => {
     switch (key) {
       case "new":
-        // Reset to a blank form — don't navigate or create anything
+        // Navigate to /new to clear any :id param, then reset all state
         setName("");
         setCategory("decision");
         setStatus("draft");
@@ -459,6 +459,7 @@ export default function WFCreationShell() {
         setLoaded(false);
         setShowOpenPicker(false);
         if (mode === "designer") setMode("form");
+        navigate("/automation/sandbox-wf/new");
         break;
       case "open":
         setShowOpenPicker(!showOpenPicker);
