@@ -370,15 +370,16 @@ export default function WFCreationShell() {
 
   const utils = trpc.useUtils();
   const createMutation = trpc.sandboxWf.workflows.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.sandboxWf.invalidate();
-      navigate("/automation/sandbox-wf");
+      // Stay on the newly created workflow
+      if (data?.id) navigate(`/automation/sandbox-wf/${data.id}`);
     },
   });
   const updateMutation = trpc.sandboxWf.workflows.update.useMutation({
     onSuccess: () => {
       utils.sandboxWf.invalidate();
-      navigate("/automation/sandbox-wf");
+      // Stay on current page — don't navigate away
     },
   });
 
