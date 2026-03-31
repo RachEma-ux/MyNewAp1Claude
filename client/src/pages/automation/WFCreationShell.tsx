@@ -17,6 +17,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -216,6 +223,9 @@ export default function WFCreationShell() {
   const [loaded, setLoaded] = useState(false);
   const [showOpenPicker, setShowOpenPicker] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [saveCategory, setSaveCategory] = useState("decision");
 
   // ── Form State ─────────────────────────────────────────
 
@@ -473,7 +483,15 @@ export default function WFCreationShell() {
         setShowOpenPicker(!showOpenPicker);
         break;
       case "save":
-        handleSubmit();
+        if (isEditMode) {
+          // Already saved — update as draft
+          handleSubmit();
+        } else {
+          // New form — ask for name + category
+          setSaveName(name);
+          setSaveCategory(category);
+          setShowSaveDialog(true);
+        }
         break;
       case "test":
         handleModeSwitch("designer");
@@ -494,6 +512,33 @@ export default function WFCreationShell() {
         break;
     }
     if (isMobile && key !== "open") setSidebarCollapsed(true);
+  };
+
+  // ── Save as Draft (from dialog) ──────────────────────────
+
+  const handleSaveAsDraft = () => {
+    if (!saveName.trim()) return;
+    // Sync nodes to steps if in designer
+    if (mode === "designer") syncNodesToSteps();
+    setName(saveName.trim());
+    setCategory(saveCategory);
+    setStatus("draft");
+    createMutation.mutate({
+      name: saveName.trim(),
+      category: saveCategory,
+      status: "draft",
+      description: description.trim(),
+      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+      steps: steps
+        .filter((s) => s.label.trim().length > 0)
+        .map((s) => ({
+          key: s.key,
+          label: s.label.trim(),
+          description: s.description.trim(),
+          status: s.status,
+        })),
+    });
+    setShowSaveDialog(false);
   };
 
   // ── Mode switch handler ────────────────────────────────
@@ -980,6 +1025,56 @@ export default function WFCreationShell() {
           </div>
         </div>
       </div>
+
+      {/* ── Save as Draft Dialog ── */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Save as Draft</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Workflow Name</label>
+              <Input
+                placeholder="e.g. Invoice Approval Pipeline"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                className="h-8 text-sm"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Category</label>
+              <Select value={saveCategory} onValueChange={setSaveCategory}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => (
+                    <SelectItem key={c.key} value={c.key} className="text-xs">{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowSaveDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm" className="h-7 text-xs"
+              onClick={handleSaveAsDraft}
+              disabled={!saveName.trim() || createMutation.isPending}
+            >
+              {createMutation.isPending ? (
+                <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Saving...</>
+              ) : (
+                <><Save className="h-3 w-3 mr-1" /> Save Draft</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
