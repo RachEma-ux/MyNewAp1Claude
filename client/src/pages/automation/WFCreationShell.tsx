@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -48,6 +49,10 @@ import {
   Eye,
   Gauge,
   BarChart3,
+  FolderOpen,
+  FlaskConical,
+  Rocket,
+  Upload,
 } from "lucide-react";
 import ReactFlow, {
   Background,
@@ -97,6 +102,17 @@ interface StepDraft {
   description: string;
   status: string;
 }
+
+// ── Form Actions ─────────────────────────────────────────
+
+const FORM_ACTIONS = [
+  { key: "new", label: "New Form", icon: Plus, color: "text-blue-400" },
+  { key: "open", label: "Open", icon: FolderOpen, color: "text-yellow-400" },
+  { key: "save", label: "Save (Draft)", icon: Save, color: "text-green-400" },
+  { key: "test", label: "Test", icon: FlaskConical, color: "text-orange-400" },
+  { key: "run", label: "Run", icon: Play, color: "text-cyan-400" },
+  { key: "publish", label: "Publish", icon: Upload, color: "text-purple-400" },
+];
 
 // ── n8n Node Palette ─────────────────────────────────────
 
@@ -198,6 +214,7 @@ export default function WFCreationShell() {
   const collapsed = sidebarCollapsed;
   const [mode, setMode] = useState<"form" | "designer">("form");
   const [loaded, setLoaded] = useState(false);
+  const [showOpenPicker, setShowOpenPicker] = useState(false);
 
   // ── Form State ─────────────────────────────────────────
 
@@ -215,6 +232,8 @@ export default function WFCreationShell() {
 
   const triggersQuery = trpc.sandboxWf.triggers.list.useQuery({});
   const triggers = triggersQuery.data ?? [];
+  const allWorkflowsQuery = trpc.sandboxWf.workflows.list.useQuery({});
+  const allWorkflows = allWorkflowsQuery.data ?? [];
 
   // Fetch existing workflow when editing
   const workflowQuery = trpc.sandboxWf.workflows.get.useQuery(
@@ -416,6 +435,41 @@ export default function WFCreationShell() {
     }
   };
 
+  // ── Execute (for Run action) ──────────────────────────
+
+  const executeMutation = trpc.sandboxWf.executions.create.useMutation({
+    onSuccess: () => utils.sandboxWf.invalidate(),
+  });
+
+  // ── Form section action handler ─────────────────────────
+
+  const handleFormAction = (key: string) => {
+    switch (key) {
+      case "new":
+        navigate("/automation/sandbox-wf/new");
+        break;
+      case "open":
+        setShowOpenPicker(!showOpenPicker);
+        break;
+      case "save":
+        handleSubmit();
+        break;
+      case "test":
+        // Switch to designer to visualize
+        handleModeSwitch("designer");
+        break;
+      case "run":
+        if (isEditMode) executeMutation.mutate({ workflowId: editId!, triggerType: "manual" });
+        break;
+      case "publish":
+        if (isEditMode) {
+          updateMutation.mutate({ id: editId!, status: "running" });
+        }
+        break;
+    }
+    if (isMobile && key !== "open") setSidebarCollapsed(true);
+  };
+
   // ── Mode switch handler ────────────────────────────────
 
   const handleModeSwitch = (newMode: "form" | "designer") => {
@@ -551,6 +605,87 @@ export default function WFCreationShell() {
                     </button>
                   );
                 })}
+              </>
+            )}
+
+            <Separator className="my-1.5" />
+
+            {/* ── Form section (always visible) ── */}
+            {!collapsed && (
+              <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Form
+              </div>
+            )}
+            {FORM_ACTIONS.map(({ key, label, icon: Icon, color }) => {
+              const disabled =
+                (key === "run" && !isEditMode) ||
+                (key === "publish" && !isEditMode) ||
+                (key === "save" && !canSubmit);
+              return collapsed ? (
+                <button
+                  key={key}
+                  onClick={() => !disabled && handleFormAction(key)}
+                  title={label}
+                  className={cn(
+                    "flex items-center justify-center w-full py-1.5 rounded-sm transition-colors",
+                    disabled
+                      ? "opacity-30 cursor-not-allowed"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    showOpenPicker && key === "open" && "bg-primary/10 text-primary",
+                  )}
+                >
+                  <Icon className={cn("h-3.5 w-3.5", color)} />
+                </button>
+              ) : (
+                <button
+                  key={key}
+                  onClick={() => !disabled && handleFormAction(key)}
+                  className={cn(
+                    "flex items-center gap-2 w-full px-3 py-1.5 text-xs rounded-sm transition-colors",
+                    disabled
+                      ? "opacity-30 cursor-not-allowed"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    showOpenPicker && key === "open" && "bg-primary/10 text-primary",
+                  )}
+                >
+                  <Icon className={cn("h-3.5 w-3.5 shrink-0", color)} />
+                  <span className="truncate">{label}</span>
+                </button>
+              );
+            })}
+
+            {/* ── Open Workflow Picker ── */}
+            {showOpenPicker && !collapsed && (
+              <>
+                <Separator className="my-1.5" />
+                {!collapsed && (
+                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Open Workflow
+                  </div>
+                )}
+                {allWorkflows.length === 0 ? (
+                  <div className="px-3 py-2 text-[10px] text-muted-foreground italic">No workflows</div>
+                ) : (
+                  allWorkflows.map((wf) => (
+                    <button
+                      key={wf.id}
+                      onClick={() => {
+                        setShowOpenPicker(false);
+                        navigate(`/automation/sandbox-wf/${wf.id}`);
+                      }}
+                      className={cn(
+                        "flex items-center gap-2 w-full px-3 py-1.5 text-xs rounded-sm transition-colors",
+                        editId === wf.id
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                      )}
+                    >
+                      <Workflow className="h-3 w-3 shrink-0 text-blue-400" />
+                      <span className="truncate flex-1 text-left">{wf.name}</span>
+                      <Badge variant="outline" className="text-[9px] px-1 py-0 capitalize shrink-0">{wf.status}</Badge>
+                    </button>
+                  ))
+                )}
               </>
             )}
           </div>
