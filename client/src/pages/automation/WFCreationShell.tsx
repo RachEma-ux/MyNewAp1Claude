@@ -142,7 +142,23 @@ function N8nNode({ data, selected }: NodeProps) {
       </div>
       {/* Body */}
       <div className="px-3 py-2">
-        <p className="text-[10px] text-muted-foreground line-clamp-2">{data.description || "No description"}</p>
+        {/* Triggers node: dropdown of existing triggers */}
+        {data.nodeType === "triggers" && data.triggers?.length > 0 ? (
+          <select
+            className="w-full text-[10px] bg-muted/50 border border-border rounded px-1.5 py-1 text-foreground mb-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+            value={data.selectedTriggerId || ""}
+            onChange={(e) => data.onTriggerSelect?.(e.target.value)}
+          >
+            <option value="">Select trigger...</option>
+            {data.triggers.map((t: any) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.type}) — {t.status}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="text-[10px] text-muted-foreground line-clamp-2">{data.description || "No description"}</p>
+        )}
         <div className="flex items-center gap-1.5 mt-1.5">
           <div className="h-2 w-2 rounded-full" style={{ background: statusColor }} />
           <span className="text-[10px] capitalize text-muted-foreground">{data.status}</span>
@@ -200,6 +216,19 @@ export default function WFCreationShell() {
     [setEdges],
   );
 
+  // Keep triggers data fresh on trigger nodes
+  useEffect(() => {
+    if (mode === "designer" && triggers.length > 0) {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.data.nodeType === "triggers"
+            ? { ...n, data: { ...n.data, triggers, onTriggerSelect: (val: string) => handleTriggerSelect(n.id, val) } }
+            : n,
+        ),
+      );
+    }
+  }, [triggers, mode]);
+
   // Sync steps → nodes when switching to designer
   useEffect(() => {
     if (mode === "designer") {
@@ -241,6 +270,9 @@ export default function WFCreationShell() {
 
   // ── tRPC ───────────────────────────────────────────────
 
+  const triggersQuery = trpc.sandboxWf.triggers.list.useQuery({});
+  const triggers = triggersQuery.data ?? [];
+
   const utils = trpc.useUtils();
   const createMutation = trpc.sandboxWf.workflows.create.useMutation({
     onSuccess: () => {
@@ -275,6 +307,20 @@ export default function WFCreationShell() {
 
   // ── Designer: add node from palette ────────────────────
 
+  // Callback for trigger dropdown selection inside a node
+  const handleTriggerSelect = useCallback(
+    (nodeId: string, triggerId: string) => {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? { ...n, data: { ...n.data, selectedTriggerId: triggerId } }
+            : n,
+        ),
+      );
+    },
+    [setNodes],
+  );
+
   const addNodeFromPalette = (paletteType: string, paletteLabel: string) => {
     const id = `${paletteType}-${Date.now()}`;
     const newNode: Node = {
@@ -286,6 +332,10 @@ export default function WFCreationShell() {
         description: "",
         status: "pending",
         nodeType: paletteType,
+        ...(paletteType === "triggers" && {
+          triggers,
+          onTriggerSelect: (val: string) => handleTriggerSelect(id, val),
+        }),
       },
     };
     setNodes((nds) => [...nds, newNode]);
