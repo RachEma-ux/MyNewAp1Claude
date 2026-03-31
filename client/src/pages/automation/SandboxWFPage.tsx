@@ -14,6 +14,7 @@
  *   - Single toggle, collapsed on mobile
  */
 import { useState, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ import {
   FileCode,
   Database,
   RefreshCw,
+  Plus,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────
@@ -188,6 +190,7 @@ function NavItem({ icon, label, active, collapsed, count, color, onClick }: {
 // ── Main Component ───────────────────────────────────────
 
 export default function SandboxWFPage() {
+  const [, navigate] = useLocation();
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [activeTool, setActiveTool] = useState("editor");
@@ -392,29 +395,17 @@ export default function SandboxWFPage() {
         {/* Header bar */}
         <div className="flex items-center justify-between border-b px-4 h-10 shrink-0">
           <div className="flex items-center gap-2">
-            <Workflow className="h-4 w-4 text-blue-500" />
-            <h1 className="text-sm font-semibold">Sandbox WF</h1>
-            <Badge variant="outline" className="text-[10px]">
-              {CATEGORIES.find((c) => c.key === activeCategory)?.label}
-            </Badge>
-            {activeStatus && (
-              <Badge variant="secondary" className="text-[10px] capitalize">{activeStatus}</Badge>
-            )}
-            <span className="text-[10px] text-muted-foreground">{workflows.length} workflows</span>
+            {(() => { const tool = TOOLS.find((t) => t.key === activeTool); return tool ? <tool.icon className={cn("h-4 w-4", tool.color)} /> : null; })()}
+            <h1 className="text-sm font-semibold">{TOOLS.find((t) => t.key === activeTool)?.label}</h1>
             {isLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-[10px]">
-              {TOOLS.find((t) => t.key === activeTool)?.label}
-            </Badge>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => navigate("/automation/sandbox-wf/new")} title="New Workflow">
+              <Plus className="h-3 w-3" />
+            </Button>
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => utils.sandboxWf.invalidate()} title="Refresh">
               <RefreshCw className="h-3 w-3" />
             </Button>
-            {selectedWF && (
-              <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setSelectedWF(null)}>
-                Clear
-              </Button>
-            )}
           </div>
         </div>
 
