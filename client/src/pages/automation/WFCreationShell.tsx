@@ -473,10 +473,25 @@ export default function WFCreationShell() {
     onError: (e) => toast.error(e.message),
   });
   const templateMutation = trpc.sandboxWf.templates.createFrom.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       utils.sandboxWf.invalidate();
       if (data?.id) {
         setSavedId(data.id);
+        setName(data.name || "");
+        setCategory(data.category || "decision");
+        setStatus(data.status || "draft");
+        setDescription(data.description || "");
+        setTags((data.tags as string[] || []).join(", "));
+        if (data.steps && data.steps.length > 0) {
+          setSteps(
+            data.steps.map((s: any) => ({
+              key: s.key,
+              label: s.label,
+              description: s.description || "",
+              status: s.status || "pending",
+            })),
+          );
+        }
         setLoaded(true);
         setShowTemplates(false);
         toast.success("Created from template");
