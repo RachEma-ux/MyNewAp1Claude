@@ -45,13 +45,9 @@ import {
   PenTool,
   FileText,
   Zap,
-  Settings,
-  Code,
-  Database,
-  Mail,
-  Globe,
-  Clock,
-  Filter,
+  Eye,
+  Gauge,
+  BarChart3,
 } from "lucide-react";
 import ReactFlow, {
   Background,
@@ -105,16 +101,11 @@ interface StepDraft {
 // ── n8n Node Palette ─────────────────────────────────────
 
 const NODE_PALETTE = [
-  { type: "trigger", label: "Trigger", icon: Zap, color: "#eab308" },
-  { type: "action", label: "Action", icon: Play, color: "#3b82f6" },
-  { type: "condition", label: "Condition", icon: GitBranch, color: "#a855f7" },
-  { type: "transform", label: "Transform", icon: Filter, color: "#22c55e" },
-  { type: "http", label: "HTTP Request", icon: Globe, color: "#f97316" },
-  { type: "code", label: "Code", icon: Code, color: "#6366f1" },
-  { type: "database", label: "Database", icon: Database, color: "#06b6d4" },
-  { type: "email", label: "Email", icon: Mail, color: "#ec4899" },
-  { type: "delay", label: "Delay", icon: Clock, color: "#64748b" },
-  { type: "webhook", label: "Webhook", icon: Settings, color: "#84cc16" },
+  { type: "editor", label: "WF Editor", icon: GitBranch, color: "#60a5fa" },
+  { type: "triggers", label: "Triggers", icon: Zap, color: "#facc15" },
+  { type: "debug", label: "Debug Console", icon: Eye, color: "#fb923c" },
+  { type: "deploy", label: "Deploy", icon: Gauge, color: "#4ade80" },
+  { type: "metrics", label: "Metrics", icon: BarChart3, color: "#a78bfa" },
 ];
 
 // ── n8n-style Custom Node ────────────────────────────────
