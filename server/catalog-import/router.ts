@@ -354,75 +354,50 @@ export const catalogImportRouter = router({
           let catalogEntryId: number;
 
           if (row.type === "model") {
-            try {
-              const domainResult = await createDomainModel({
-                name: row.name,
-                displayName,
-                description: row.description,
-                providerId: resolvedProviderId,
-                providerSlug: finalConfig.providerType ?? (typeof finalConfig.providerId === "string" ? finalConfig.providerId : null),
-                modelFamily: finalConfig.modelFamily ?? null,
-                contextLength: finalConfig.contextLength ?? null,
-                capabilities,
-                apiModelId: finalConfig.model ?? row.name,
-                baseUrl: finalConfig.baseUrl ?? null,
-                config: finalConfig,
-                canonicalKey: finalConfig.providerType ? `${finalConfig.providerType}/${row.name}` : null,
-                status: "draft",
-                createdBy: ctx.user?.id ?? 1,
-              });
-              catalogEntryId = domainResult.catalogEntry.id;
-              // Override projection defaults with import-specific values
-              await updateCatalogEntry(catalogEntryId, {
-                origin,
-                reviewState: "needs_review",
-                tags: [row.source, ...fileTags],
-                category,
-                subCategory,
-              } as any, ctx.user?.id ?? 1);
-            } catch (domainErr: any) {
-              // Fallback: write catalog directly if domain write fails
-              console.warn(`[Import] Domain-first model write failed, falling back: ${domainErr.message}`);
-              const catalogEntry = await createCatalogEntry({
-                name: row.name, displayName, description: row.description,
-                entryType: row.type, scope, status: "draft", origin,
-                reviewState: "needs_review", providerId: resolvedProviderId,
-                config: finalConfig, tags: [row.source, ...fileTags],
-                category, subCategory, capabilities, createdBy: ctx.user?.id ?? 1,
-              });
-              catalogEntryId = catalogEntry.id;
-            }
+            const domainResult = await createDomainModel({
+              name: row.name,
+              displayName,
+              description: row.description,
+              providerId: resolvedProviderId,
+              providerSlug: finalConfig.providerType ?? (typeof finalConfig.providerId === "string" ? finalConfig.providerId : null),
+              modelFamily: finalConfig.modelFamily ?? null,
+              contextLength: finalConfig.contextLength ?? null,
+              capabilities,
+              apiModelId: finalConfig.model ?? row.name,
+              baseUrl: finalConfig.baseUrl ?? null,
+              config: finalConfig,
+              canonicalKey: finalConfig.providerType ? `${finalConfig.providerType}/${row.name}` : null,
+              status: "draft",
+              createdBy: ctx.user?.id ?? 1,
+            });
+            catalogEntryId = domainResult.catalogEntry.id;
+            // Override projection defaults with import-specific values
+            await updateCatalogEntry(catalogEntryId, {
+              origin,
+              reviewState: "needs_review",
+              tags: [row.source, ...fileTags],
+              category,
+              subCategory,
+            } as any, ctx.user?.id ?? 1);
           } else if (row.type === "llm") {
-            try {
-              const domainResult = await createDomainLlm({
-                name: row.name,
-                displayName,
-                description: row.description,
-                providerId: resolvedProviderId,
-                role: finalConfig.role ?? null,
-                config: finalConfig,
-                status: "draft",
-                createdBy: ctx.user?.id ?? 1,
-              });
-              catalogEntryId = domainResult.catalogEntry.id;
-              await updateCatalogEntry(catalogEntryId, {
-                origin,
-                reviewState: "needs_review",
-                tags: [row.source, ...fileTags],
-                category,
-                subCategory,
-              } as any, ctx.user?.id ?? 1);
-            } catch (domainErr: any) {
-              console.warn(`[Import] Domain-first LLM write failed, falling back: ${domainErr.message}`);
-              const catalogEntry = await createCatalogEntry({
-                name: row.name, displayName, description: row.description,
-                entryType: row.type, scope, status: "draft", origin,
-                reviewState: "needs_review", providerId: resolvedProviderId,
-                config: finalConfig, tags: [row.source, ...fileTags],
-                category, subCategory, capabilities, createdBy: ctx.user?.id ?? 1,
-              });
-              catalogEntryId = catalogEntry.id;
-            }
+            const domainResult = await createDomainLlm({
+              name: row.name,
+              displayName,
+              description: row.description,
+              providerId: resolvedProviderId,
+              role: finalConfig.role ?? null,
+              config: finalConfig,
+              status: "draft",
+              createdBy: ctx.user?.id ?? 1,
+            });
+            catalogEntryId = domainResult.catalogEntry.id;
+            await updateCatalogEntry(catalogEntryId, {
+              origin,
+              reviewState: "needs_review",
+              tags: [row.source, ...fileTags],
+              category,
+              subCategory,
+            } as any, ctx.user?.id ?? 1);
           } else {
             // Provider, agent, bot — direct catalog write (existing behavior)
             const catalogEntry = await createCatalogEntry({
@@ -490,7 +465,7 @@ export const catalogImportRouter = router({
    * Scans entries with import-origin tags and attempts to resolve providerId
    * from config.providerId or config.providerType + config.baseUrl.
    */
-  repairProviderLinks: protectedProcedure
+  repairProviderLinks: governedProcedure
     .input(z.object({
       entryIds: z.array(z.number().int().positive()).optional(),
       dryRun: z.boolean().optional(),

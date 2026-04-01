@@ -15,7 +15,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { publicProcedure, protectedProcedure, governedProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, governedProcedure, governedAdminProcedure, router } from "../_core/trpc";
 import { createAppBlockerError } from "../_core/blockers";
 import { getDb } from "../db";
 import { agents, policies, catalogEntries } from "../../drizzle/schema";
@@ -697,8 +697,8 @@ export const agentsRouter = router({
       };
     }),
 
-  // Promote agent through the enforced lifecycle
-  promote: governedProcedure
+  // Promote agent through the enforced lifecycle — authority operation
+  promote: governedAdminProcedure
     .input(z.object({
       id: z.number(),
       targetStatus: z.enum(["sandbox", "governed", "deployable"]).optional(),

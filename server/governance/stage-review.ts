@@ -222,16 +222,14 @@ const REGISTER_CHECKS: ReviewCheckItem[] = [
       // Check if entry has sourceType/sourceId set (domain entity exists)
       const entry = ctx.entry as any;
       const hasLink = !!(entry.sourceType && entry.sourceId);
-      // For older entries without domain link, pass with advisory
-      // (don't block registration for legacy entries)
       return {
         itemId: "REG-07",
         name: "Domain entity linked",
-        passed: true, // Advisory only — will be enforced in future
+        passed: hasLink,
         category: "compliance_matrix",
         details: hasLink
           ? `Linked to domain: ${entry.sourceType}#${entry.sourceId}`
-          : "No domain entity link — entry is catalog-only (advisory: run AI Types migration)",
+          : "No domain entity link — entry must be created through the domain-first path",
       };
     },
   },

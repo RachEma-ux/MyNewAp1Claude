@@ -21,8 +21,10 @@
  *
  * Auth model:
  * - Read ops (list, getById, listVersions, listBundles): protectedProcedure
- * - Authoring ops (create, update, delete, validate): protectedProcedure
- * - Authority ops (publish, recall, activate, approve, reject): adminProcedure
+ * - Authoring ops (create, update, delete): governedProcedure
+ * - Validation ops (validate, discoverProvider): governedProcedure
+ * - Authority ops (approve, reject, activate, publish, recall): governedAdminProcedure
+ * - Sync ops (syncProviders, syncRegistry): governedAdminProcedure
  */
 
 import { z } from "zod";
@@ -345,7 +347,9 @@ export const catalogManageRouter = router({
       }
 
       const origin = input.origin ?? "admin";
-      const reviewState = origin !== "admin" ? "needs_review" : "approved";
+      // All entries start as needs_review — must go through stage reviews
+      // regardless of origin. Admin can approve immediately after creation.
+      const reviewState = "needs_review";
 
       let entry: any;
 
@@ -487,7 +491,7 @@ export const catalogManageRouter = router({
    * Validate a catalog entry via orchestrator handshake
    * Allowed on draft and active entries. Restores previous status on completion.
    */
-  validate: protectedProcedure
+  validate: governedProcedure
     .input(z.object({
       id: z.number().int().positive(),
       runTestPrompt: z.boolean().optional(),
@@ -862,13 +866,28 @@ export const catalogManageRouter = router({
 
       const stage = input.stage;
 
+      const currentStageReviewsMap = (entry as any).stageReviews || {};
+
       // Prevent duplicate stage approval — each stage can only be approved once
-      const currentStageState = ((entry as any).stageReviews || {})[stage];
-      if (currentStageState === "approved") {
+      if (currentStageReviewsMap[stage] === "approved") {
         const stageLabel = stage === "register" ? "Registration" : stage === "validate" ? "Validation" : "Publication";
         throw new TRPCError({
           code: "CONFLICT",
           message: `${stageLabel} already approved — each stage can only be approved once`,
+        });
+      }
+
+      // Enforce stage ordering — prerequisite stages must be approved first
+      if (stage === "validate" && currentStageReviewsMap.register !== "approved") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Registration stage must be approved before validation review",
+        });
+      }
+      if (stage === "publish" && currentStageReviewsMap.validate !== "approved") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Validation stage must be approved before publication review",
         });
       }
 
@@ -903,11 +922,10 @@ export const catalogManageRouter = router({
       // Update per-stage review tracking — approve ONLY marks the review as done.
       // Lifecycle tag propagation (registered/validated/published) happens via the
       // separate governance.stageTransition mutation, which the user triggers explicitly.
-      const currentStageReviews = (entry as any).stageReviews || {};
-      const updatedStageReviews = { ...currentStageReviews, [stage]: "approved" };
+      const updatedStageReviews = { ...currentStageReviewsMap, [stage]: "approved" };
 
       // When register stage is approved, also flip top-level reviewState to "approved"
-      // so the entry becomes eligible for activation (activate requires reviewState === "approved")
+      // for backward compatibility with queries that filter on reviewState
       // NOTE: Do NOT add lifecycle tags ("registered", "validated", "published") here.
       // Tag propagation happens ONLY via governance.stageTransition to avoid
       // advancing the lifecycle stage before the explicit transition is requested.
@@ -949,7 +967,7 @@ export const catalogManageRouter = router({
 
   /**
    * Activate a catalog entry — sets status to "active"
-   * Entry must have reviewState = "approved"
+   * Entry must have stageReviews.register = "approved" (explicit register approval required)
    */
   activate: governedAdminProcedure
     .input(z.object({
@@ -965,8 +983,13 @@ export const catalogManageRouter = router({
       const entry = await getCatalogEntryById(input.id);
       if (!entry) throw new Error(`Catalog entry ${input.id} not found`);
 
-      if (entry.reviewState !== "approved") {
-        throw new Error(`Entry must be approved before activation (current reviewState: ${entry.reviewState})`);
+      // Require explicit register stage approval — reviewState alone is not sufficient
+      const stageReviews = (entry as any).stageReviews || {};
+      if (stageReviews.register !== "approved") {
+        throw new Error(
+          `Entry must have registration stage approved before activation. ` +
+          `Run approve(stage="register") first.`
+        );
       }
 
       // Governance gate: run Register stage review (activation requires register approval)
@@ -1069,10 +1092,29 @@ export const catalogManageRouter = router({
         });
       }
 
+      // Both register and validate stage reviews must be explicitly approved
       const stageReviews = (entry as any).stageReviews || {};
-      const allPriorStagesApproved = stageReviews.register === "approved" && stageReviews.validate === "approved";
-      if (entry.reviewState !== "approved" && !allPriorStagesApproved) {
-        throw new Error(`Entry must have all prior stages approved before publishing`);
+      if (stageReviews.register !== "approved" || stageReviews.validate !== "approved") {
+        const missing: string[] = [];
+        if (stageReviews.register !== "approved") missing.push("register");
+        if (stageReviews.validate !== "approved") missing.push("validate");
+        throw new Error(
+          `All prior stage reviews must be approved before publishing. ` +
+          `Missing: ${missing.join(", ")}`
+        );
+      }
+
+      // Dependency guard: verify upstream dependencies are available before publishing
+      if ((entry.entryType === "model" || entry.entryType === "llm") && entry.providerId) {
+        const { isCatalogEntryAvailableForAppUse } = await import("../ai-types/availability");
+        const providerEntries = await getCatalogEntries({ entryType: "provider" });
+        const providerEntry = providerEntries.find((e) => e.providerId === entry.providerId);
+        if (providerEntry && !isCatalogEntryAvailableForAppUse(providerEntry)) {
+          throw new Error(
+            `Cannot publish: upstream provider "${providerEntry.name}" is not available ` +
+            `(status: ${providerEntry.status}, reviewState: ${providerEntry.reviewState})`
+          );
+        }
       }
 
       // Governance gate: run Publish stage review (Triple Validation)
@@ -1163,7 +1205,7 @@ export const catalogManageRouter = router({
    * Sync providers — auto-creates catalog entries for providers that don't have one.
    * Returns the number of entries created.
    */
-  syncProviders: governedProcedure
+  syncProviders: governedAdminProcedure
     .mutation(async () => {
       const allProviders = await providerDb.getAllProviders();
       const existingEntries = await getCatalogEntries({ entryType: "provider" });
@@ -1195,6 +1237,8 @@ export const catalogManageRouter = router({
           displayName: provider.name,
           description: `Auto-synced from provider: ${provider.type}`,
           entryType: "provider",
+          sourceType: "provider",
+          sourceId: provider.id,
           scope: "app",
           status: "active",
           origin: "discovery",
@@ -1219,7 +1263,7 @@ export const catalogManageRouter = router({
    * Seeds catalog entries for each provider AND each of their models.
    * Skips entries that already exist (matched by name).
    */
-  syncRegistry: governedProcedure
+  syncRegistry: governedAdminProcedure
     .mutation(async () => {
       const { PROVIDERS } = await import("../llm/providers");
       const existingEntries = await getCatalogEntries({});
@@ -1440,7 +1484,22 @@ export const catalogManageRouter = router({
         ...CATALOG_AVAILABILITY_FILTERS,
       });
 
-      let result = entries;
+      // Dependency guard: filter out entries whose upstream dependencies
+      // are not available (e.g., model with a disabled provider)
+      const allAvailable = await getCatalogEntries(CATALOG_AVAILABILITY_FILTERS);
+      const availableProviderIds = new Set(
+        allAvailable
+          .filter((e) => e.entryType === "provider" && e.providerId != null)
+          .map((e) => e.providerId!)
+      );
+
+      let result = entries.filter((e) => {
+        // Models/LLMs require their provider to be available
+        if ((e.entryType === "model" || e.entryType === "llm") && e.providerId) {
+          if (!availableProviderIds.has(e.providerId)) return false;
+        }
+        return true;
+      });
 
       // Search filter
       if (input?.search) {

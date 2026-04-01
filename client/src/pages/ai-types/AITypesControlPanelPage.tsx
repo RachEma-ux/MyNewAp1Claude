@@ -37,6 +37,30 @@ export default function AITypesControlPanelPage() {
     onError: (err) => toast.error(err.message),
   });
 
+  const syncProvidersMutation = trpc.aiTypes.catalog.syncProviders.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Synced providers: ${result.created} created, ${result.total} total`);
+      utils.aiTypes.orchestration.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const syncRegistryMutation = trpc.aiTypes.catalog.syncRegistry.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Synced registry: ${result.providersCreated} providers, ${result.modelsCreated} models`);
+      utils.aiTypes.orchestration.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const repairLinksMutation = trpc.aiTypes.import.repairProviderLinks.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Repaired ${result.repaired} links, ${result.unresolved} unresolved`);
+      utils.aiTypes.orchestration.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const [rescanning, setRescanning] = useState(false);
   const handleRescan = async () => {
     setRescanning(true);
@@ -139,6 +163,63 @@ export default function AITypesControlPanelPage() {
             >
               {seedMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />}
               Seed
+            </Button>
+          </div>
+
+          <div className="border-t border-zinc-800" />
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-zinc-200">Sync Providers</div>
+              <div className="text-xs text-zinc-500">Auto-create catalog entries for DB providers missing one</div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncProvidersMutation.mutate()}
+              disabled={syncProvidersMutation.isPending}
+              className="gap-1.5"
+            >
+              {syncProvidersMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
+              Sync
+            </Button>
+          </div>
+
+          <div className="border-t border-zinc-800" />
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-zinc-200">Sync Registry</div>
+              <div className="text-xs text-zinc-500">Seed catalog from built-in provider and model registry</div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncRegistryMutation.mutate()}
+              disabled={syncRegistryMutation.isPending}
+              className="gap-1.5"
+            >
+              {syncRegistryMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Sync
+            </Button>
+          </div>
+
+          <div className="border-t border-zinc-800" />
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-zinc-200">Repair Provider Links</div>
+              <div className="text-xs text-zinc-500">Fix entries missing provider association by auto-resolving</div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => repairLinksMutation.mutate({})}
+              disabled={repairLinksMutation.isPending}
+              className="gap-1.5"
+            >
+              {repairLinksMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+              Repair
             </Button>
           </div>
         </CardContent>
