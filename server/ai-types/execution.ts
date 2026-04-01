@@ -377,6 +377,7 @@ async function prepareCatalogExecution(input: {
   try {
     target = await resolveCatalogAgentExecutionTarget(catalogEntryId);
   } catch (error) {
+    console.error("[CatalogExec] resolveCatalogAgentExecutionTarget failed:", error);
     const blocker = toExecutionRunBlocker(error, {
       code: "catalog_execution_unavailable",
       category: "technical_error",
@@ -405,7 +406,7 @@ async function prepareCatalogExecution(input: {
 
   // Use provider port instead of direct import
   const providerRegistry = getProviderPort().getRegistry();
-  const provider = providerRegistry.getProvider(String(providerId));
+  const provider = providerRegistry.getProvider(providerId);
   if (!provider) {
     const blocker = {
       code: "provider_unavailable",

@@ -27,7 +27,7 @@ export interface IStreamingProvider {
 }
 
 export interface IProviderRegistry {
-  getProvider(providerId: string): IStreamingProvider | undefined;
+  getProvider(providerId: number): IStreamingProvider | undefined;
   getAllProviders(): IStreamingProvider[];
 }
 
