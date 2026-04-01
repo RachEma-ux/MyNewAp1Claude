@@ -9,6 +9,7 @@
  * This is a standalone clone — no cross-module imports.
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -211,10 +212,10 @@ export function PSIdeationChatWindow({ catalogImports }: PSIdeationChatWindowPro
   // Unread count (messages since last close — simplified: 0 when open)
   const unreadCount = isOpen ? 0 : messages.filter((m) => m.role === "assistant").length;
 
-  // ── FAB (collapsed) ──────────────────────────────────────
+  // ── Render via portal (escapes overflow-hidden shell wrapper) ────────
 
   if (!isOpen) {
-    return (
+    return createPortal(
       <button
         onClick={() => setIsOpen(true)}
         className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 transition-all flex items-center justify-center group"
@@ -226,13 +227,12 @@ export function PSIdeationChatWindow({ catalogImports }: PSIdeationChatWindowPro
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
-      </button>
+      </button>,
+      document.body,
     );
   }
 
-  // ── Expanded panel ──────────────────────────────────────
-
-  return (
+  return createPortal(
     <div className="fixed bottom-4 right-4 z-50 w-[380px] h-[520px] flex flex-col rounded-xl border bg-card shadow-2xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b bg-card shrink-0">
@@ -435,6 +435,7 @@ export function PSIdeationChatWindow({ catalogImports }: PSIdeationChatWindowPro
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
