@@ -147,29 +147,29 @@ export default function MainLayout({ children }: MainLayoutProps) {
             { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/providers/dashboard" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/providers/control-panel" },
             { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/providers/wizard" },
-            { label: "Providers List", icon: <List className="w-3 h-3" />, href: "/list/providers" },
+            { label: "Providers List", icon: <List className="w-3 h-3" />, href: "/providers/list" },
           ]
         },
         {
           label: "LLMs",
           icon: <Database className="w-4 h-4" />,
           children: [
-            { label: "Dashboard", icon: <LayoutDashboard className="w-3 h-3" />, href: "/llm" },
+            { label: "Dashboard", icon: <LayoutDashboard className="w-3 h-3" />, href: "/llm/dashboard" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/llm/control-panel" },
             { label: "LLMs Register", icon: <FileStack className="w-3 h-3" />, href: "/llm/register" },
             { label: "LLM Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/llm/wizard" },
-            { label: "LLMs List", icon: <List className="w-3 h-3" />, href: "/list/llms" },
+            { label: "LLMs List", icon: <List className="w-3 h-3" />, href: "/llm/list" },
           ]
         },
         {
           label: "Models",
           icon: <Package className="w-4 h-4" />,
           children: [
-            { label: "Browse", icon: <Package className="w-3 h-3" />, href: "/models" },
+            { label: "Browse", icon: <Package className="w-3 h-3" />, href: "/models/browse" },
             { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/models/dashboard" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/models/control-panel" },
             { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/models/wizard" },
-            { label: "Models List", icon: <List className="w-3 h-3" />, href: "/list/models" },
+            { label: "Models List", icon: <List className="w-3 h-3" />, href: "/models/list" },
           ]
         },
         {
@@ -179,7 +179,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/agents/dashboard" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/agents/control-panel" },
             { label: "Agent Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/agents/wizard" },
-            { label: "Agents List", icon: <List className="w-3 h-3" />, href: "/list/agents" },
+            { label: "Agents List", icon: <List className="w-3 h-3" />, href: "/agents/list" },
           ]
         },
         {
@@ -189,8 +189,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
             { label: "Dashboard", icon: <BarChart3 className="w-3 h-3" />, href: "/bots/dashboard" },
             { label: "Control Panel", icon: <Settings className="w-3 h-3" />, href: "/bots/control-panel" },
             { label: "Wizard", icon: <Wand2 className="w-3 h-3" />, href: "/bots/wizard" },
-            { label: "Bots List", icon: <List className="w-3 h-3" />, href: "/list/bots" },
-            { label: "Analytics", icon: <BarChart3 className="w-3 h-3" />, href: "/analytics" },
+            { label: "Bots List", icon: <List className="w-3 h-3" />, href: "/bots/list" },
+            { label: "Analytics", icon: <BarChart3 className="w-3 h-3" />, href: "/bots/analytics" },
           ]
         },
       ]

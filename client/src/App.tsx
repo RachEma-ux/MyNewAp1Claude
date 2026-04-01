@@ -84,6 +84,12 @@ const ModelListPage = lazy(() => import("@/pages/ModelListPage"));
 const BotListPage = lazy(() => import("@/pages/BotListPage"));
 const ProviderListPage = lazy(() => import("@/pages/ProviderListPage"));
 const AutoRemediationPage = lazy(() => import("@/pages/AutoRemediationPage"));
+// Shell pages for AI Type entity modules
+const ProvidersShellPage = lazy(() => import("@/pages/ProvidersShellPage"));
+const LLMShellPage = lazy(() => import("@/pages/LLMShellPage"));
+const ModelsShellPage = lazy(() => import("@/pages/ModelsShellPage"));
+const AgentsShellPage = lazy(() => import("@/pages/AgentsShellPage"));
+const BotsShellPage = lazy(() => import("@/pages/BotsShellPage"));
 const ToolsManagementPage = lazy(() => import("@/pages/ToolsManagementPage"));
 const WikiPage = lazy(() => import("@/pages/WikiPage"));
 const WikiArticle = lazy(() => import("@/pages/WikiArticle"));
@@ -407,11 +413,13 @@ function Router() {
       <Route path="/project/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
       <Route path="/research/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
       <Route path="/research/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
-      {/* Models — governed model registry */}
-      <Route path="/models/dashboard" component={() => <ProtectedRoute component={ModelsComingSoonPage} />} />
-      <Route path="/models/control-panel" component={() => <ProtectedRoute component={ModelsComingSoonPage} />} />
-      <Route path="/models/wizard" component={() => <ProtectedRoute component={ModelsComingSoonPage} />} />
-      <Route path="/models" component={() => <ProtectedRoute component={Models} />} />
+      {/* Models — governed model registry (shell) */}
+      <Route path="/models/dashboard" component={() => <ProtectedRoute component={ModelsShellPage} />} />
+      <Route path="/models/control-panel" component={() => <ProtectedRoute component={ModelsShellPage} />} />
+      <Route path="/models/wizard" component={() => <ProtectedRoute component={ModelsShellPage} />} />
+      <Route path="/models/list" component={() => <ProtectedRoute component={ModelsShellPage} />} />
+      <Route path="/models/browse" component={() => <ProtectedRoute component={ModelsShellPage} />} />
+      <Route path="/models" component={() => <ProtectedRoute component={ModelsShellPage} />} />
       <Route path="/hardware" component={() => <ProtectedRoute component={HardwareProfile} />} />
       <Route path="/analytics/downloads" component={() => <ProtectedRoute component={DownloadAnalytics} />} />
       <Route path="/inference" component={() => <ProtectedRoute component={LocalInference} />} />
@@ -420,8 +428,8 @@ function Router() {
       <Route path="/code" component={() => <ProtectedRoute component={CodeEditor} />} />
       <Route path="/embeddings" component={() => <ProtectedRoute component={EmbeddingsManagement} />} />
       <Route path="/vectordb" component={() => <ProtectedRoute component={VectorDBManagement} />} />
-      {/* Agents — governed agent lifecycle */}
-      <Route path="/agents/dashboard" component={() => <ProtectedRoute component={AgentDashboardPage} />} />
+      {/* Agents — governed agent lifecycle (shell) */}
+      <Route path="/agents/dashboard" component={() => <ProtectedRoute component={AgentsShellPage} />} />
       <Route path="/agents/templates" component={() => <ProtectedRoute component={AgentTemplates} />} />
       <Route path="/automation/builder" component={() => <ProtectedRoute component={AutomationBuilder} />} />
       <Route path="/automation/executions/:id" component={() => <ProtectedRoute component={AutomationExecutionDetails} />} />
@@ -439,8 +447,9 @@ function Router() {
       <Route path="/templates" component={() => <ProtectedRoute component={TemplatesPage} />} />
       <Route path="/agents" component={() => <ProtectedRoute component={AgentsPage} />} />
       <Route path="/agents/create" component={() => <ProtectedRoute component={AgentsPage} />} />
-      <Route path="/agents/wizard" component={() => <ProtectedRoute component={AgentsPage} />} />
-      <Route path="/agents/control-panel" component={() => <ProtectedRoute component={AgentControlPanelPage} />} />
+      <Route path="/agents/wizard" component={() => <ProtectedRoute component={AgentsShellPage} />} />
+      <Route path="/agents/control-panel" component={() => <ProtectedRoute component={AgentsShellPage} />} />
+      <Route path="/agents/list" component={() => <ProtectedRoute component={AgentsShellPage} />} />
       <Route path="/agents/:id" component={() => <ProtectedRoute component={AgentDetailPage} />} />
       <Route path="/agent-dashboard" component={() => <ProtectedRoute component={AgentDashboardPage} />} />
       <Route path="/protocols" component={() => <ProtectedRoute component={ProtocolsPage} />} />
@@ -462,10 +471,11 @@ function Router() {
       <Route path="/wcp/executions/:id" component={() => <ProtectedRoute component={WCPExecutionDetails} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
       <Route path="/resources" component={() => <ProtectedRoute component={ResourceMonitor} />} />
-      {/* Providers — governed provider lifecycle */}
-      <Route path="/providers/control-panel" component={() => <ProtectedRoute component={ProviderControlPanelPage} />} />
-      <Route path="/providers/dashboard" component={() => <ProtectedRoute component={ProvidersComingSoonPage} />} />
-      <Route path="/providers/wizard" component={() => <ProtectedRoute component={ProviderWizardPage} />} />
+      {/* Providers — governed provider lifecycle (shell) */}
+      <Route path="/providers/dashboard" component={() => <ProtectedRoute component={ProvidersShellPage} />} />
+      <Route path="/providers/control-panel" component={() => <ProtectedRoute component={ProvidersShellPage} />} />
+      <Route path="/providers/wizard" component={() => <ProtectedRoute component={ProvidersShellPage} />} />
+      <Route path="/providers/list" component={() => <ProtectedRoute component={ProvidersShellPage} />} />
       <Route path="/providers/connections" component={() => <ProtectedRoute component={ProviderConnectionsPage} />} />
       <Route path="/providers" component={() => <ProtectedRoute component={Providers} />} />
       <Route path="/providers/:id" component={() => <ProtectedRoute component={ProviderDetail} />} />
@@ -476,21 +486,20 @@ function Router() {
       <Route path="/infrastructure/software/:item" component={() => <ProtectedRoute component={SoftwarePage} />} />
       <Route path="/error-analysis" component={() => <ProtectedRoute component={ErrorAnalysisDashboard} />} />
       <Route path="/policies" component={() => <ProtectedRoute component={PolicyManagement} />} />
-      {/* /list/llms — real LLM inventory list page */}
-      <Route path="/list/llms" component={() => <ProtectedRoute component={LLMListPage} />} />
-      {/* /list/models — real model inventory list page */}
-      <Route path="/list/models" component={() => <ProtectedRoute component={ModelListPage} />} />
-      {/* /list/bots — real bot inventory list page */}
-      <Route path="/list/bots" component={() => <ProtectedRoute component={BotListPage} />} />
-      {/* /list/providers — real provider inventory list page */}
-      <Route path="/list/providers" component={() => <ProtectedRoute component={ProviderListPage} />} />
+      {/* /list/* — redirect to shell-based list views */}
+      <Route path="/list/llms">{() => <Redirect to="/llm/list" />}</Route>
+      <Route path="/list/models">{() => <Redirect to="/models/list" />}</Route>
+      <Route path="/list/bots">{() => <Redirect to="/bots/list" />}</Route>
+      <Route path="/list/providers">{() => <Redirect to="/providers/list" />}</Route>
       {/* Coming Soon list pages */}
       <Route path="/list/:type" component={() => <ProtectedRoute component={ComingSoonListPage} />} />
-      {/* Bots — governed bot lifecycle */}
-      <Route path="/bots/dashboard" component={() => <ProtectedRoute component={BotsComingSoonPage} />} />
-      <Route path="/bots/control-panel" component={() => <ProtectedRoute component={BotsComingSoonPage} />} />
-      <Route path="/bots/wizard" component={() => <ProtectedRoute component={BotsComingSoonPage} />} />
-      <Route path="/bots" component={() => <ProtectedRoute component={BotsComingSoonPage} />} />
+      {/* Bots — governed bot lifecycle (shell) */}
+      <Route path="/bots/dashboard" component={() => <ProtectedRoute component={BotsShellPage} />} />
+      <Route path="/bots/control-panel" component={() => <ProtectedRoute component={BotsShellPage} />} />
+      <Route path="/bots/wizard" component={() => <ProtectedRoute component={BotsShellPage} />} />
+      <Route path="/bots/list" component={() => <ProtectedRoute component={BotsShellPage} />} />
+      <Route path="/bots/analytics" component={() => <ProtectedRoute component={BotsShellPage} />} />
+      <Route path="/bots" component={() => <ProtectedRoute component={BotsShellPage} />} />
       {/* Redirect stale /agent-detail/:id to canonical /agents/:id */}
       <Route path="/agent-detail/:id">{(params) => <Redirect to={`/agents/${params.id}`} />}</Route>
       {/* Governance agent routes — consolidated under /governance/agents */}
@@ -500,13 +509,16 @@ function Router() {
       <Route path="/wiki" component={() => <ProtectedRoute component={WikiPage} />} />
       <Route path="/wiki/:slug" component={() => <ProtectedRoute component={WikiArticle} />} />
       <Route path="/wiki/edit/:id" component={() => <ProtectedRoute component={WikiEditor} />} />
-      {/* LLMs — governed LLM lifecycle */}
-      <Route path="/llm" component={() => <ProtectedRoute component={LLMDashboard} />} />
-      <Route path="/llm/control-panel" component={() => <ProtectedRoute component={LLMControlPlane} />} />
+      {/* LLMs — governed LLM lifecycle (shell) */}
+      <Route path="/llm/dashboard" component={() => <ProtectedRoute component={LLMShellPage} />} />
+      <Route path="/llm/control-panel" component={() => <ProtectedRoute component={LLMShellPage} />} />
       <Route path="/llm/control-plane">{() => <Redirect to="/llm/control-panel" />}</Route>
-      <Route path="/llm/register" component={() => <ProtectedRoute component={LLMWizard} />} />
+      <Route path="/llm/register" component={() => <ProtectedRoute component={LLMShellPage} />} />
       <Route path="/llm/create">{() => <Redirect to="/llm/register" />}</Route>
-      <Route path="/llm/wizard" component={() => <ProtectedRoute component={LLMCreationWizard} />} />
+      <Route path="/llm/wizard" component={() => <ProtectedRoute component={LLMShellPage} />} />
+      <Route path="/llm/list" component={() => <ProtectedRoute component={LLMShellPage} />} />
+      <Route path="/llm/catalogue" component={() => <ProtectedRoute component={LLMShellPage} />} />
+      <Route path="/llm" component={() => <ProtectedRoute component={LLMShellPage} />} />
       <Route path="/llm/training" component={() => <ProtectedRoute component={LLMTrainingDashboard} />} />
       <Route path="/llm/promotions" component={() => <ProtectedRoute component={LLMPromotions} />} />
       {/* Provider configuration wizards (legacy LLM-scoped, redirect to /providers/wizard for new usage) */}
@@ -514,7 +526,6 @@ function Router() {
       <Route path="/llm/new-provider" component={() => <ProtectedRoute component={NewProviderPage} />} />
       <Route path="/llm/catalogue/manage" component={() => <ProtectedRoute component={CatalogManagePage} />} />
       <Route path="/llm/catalogue/candidate" component={() => <ProtectedRoute component={CandidatePage} />} />
-      <Route path="/llm/catalogue" component={() => <ProtectedRoute component={LLMCataloguePage} />} />
       {/* Deployment Status Page */}
       <Route path="/deployment-status" component={() => <ProtectedRoute component={DeploymentStatus} />} />
       {/* Deploy Page */}
