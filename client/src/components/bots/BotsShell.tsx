@@ -33,7 +33,7 @@ const Fallback = () => (
 );
 
 export default function BotsShell() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [location, navigate] = useLocation();
   const activeView = getActiveView(location);
 

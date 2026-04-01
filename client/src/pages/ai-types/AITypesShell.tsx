@@ -48,7 +48,7 @@ const Fallback = () => (
 );
 
 export default function AITypesShell() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [location, navigate] = useLocation();
   const activeKey = getActiveKey(location);
 

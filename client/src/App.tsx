@@ -152,7 +152,7 @@ const HRRoleDefinitionComparePage = lazy(() => import("@/pages/hr/HRRoleDefiniti
 // OM / CV / PS Modules — top-level pages (auto-select default workspace)
 const OMTopLevelPage = lazy(() => import("@/pages/organization-management/OMTopLevelPage"));
 const CVTopLevelPage = lazy(() => import("@/pages/culture-values/CVTopLevelPage"));
-const PSTopLevelPage = lazy(() => import("@/pages/projects-system/PSTopLevelPage"));
+const PSShellPage = lazy(() => import("@/pages/projects-system/PSShellPage"));
 const PSIdeationDetailPage = lazy(() => import("@/pages/projects-system/PSIdeationDetailPage"));
 const PSIdeationConvertPage = lazy(() => import("@/pages/projects-system/PSIdeationConvertPage"));
 const SimpleShellPage = lazy(() => import("@/pages/components/SimpleShellPage"));
@@ -397,12 +397,16 @@ function Router() {
       {/* App Components — Shell demos */}
       <Route path="/components/simple-shell" component={() => <ProtectedRoute component={SimpleShellPage} />} />
       <Route path="/components/double-shell" component={() => <ProtectedRoute component={DoubleShellPage} />} />
-      {/* Projects System — Ideation detail routes (must precede generic /ps/:item) */}
+      {/* Projects System — Ideation detail routes (must precede shell catch-all) */}
       <Route path="/ps/ideation/:id/convert" component={() => <ProtectedRoute component={PSIdeationConvertPage} />} />
       <Route path="/ps/ideation/:id" component={() => <ProtectedRoute component={PSIdeationDetailPage} />} />
-      {/* Projects System — top-level (auto-selects default workspace) */}
-      <Route path="/ps/:item" component={() => <ProtectedRoute component={PSTopLevelPage} />} />
-      <Route path="/ps" component={() => <ProtectedRoute component={PSTopLevelPage} />} />
+      {/* Projects System — Simple Shell */}
+      <Route path="/ps/catalog" component={() => <ProtectedRoute component={PSShellPage} />} />
+      <Route path="/ps/ideation" component={() => <ProtectedRoute component={PSShellPage} />} />
+      <Route path="/ps/control-panel" component={() => <ProtectedRoute component={PSShellPage} />} />
+      <Route path="/ps/wizard" component={() => <ProtectedRoute component={PSShellPage} />} />
+      <Route path="/ps/list" component={() => <ProtectedRoute component={PSShellPage} />} />
+      <Route path="/ps" component={() => <ProtectedRoute component={PSShellPage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
       <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />

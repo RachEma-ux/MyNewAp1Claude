@@ -1,10 +1,10 @@
 /**
- * PSIdeationChatWindow — Floating multi-AI chat window for PS Ideation
+ * PSIdeationChatWindow — "PS Chat" floating multi-AI chat window
  *
- * Cloned from MaestroChatWindow (automation module).
- * Intercom-style FAB at bottom-right; expands into a chat panel.
- * Users pick participants from available catalog agents,
- * then all selected participants respond in round-table sequence.
+ * Module-level chat for the Projects System. Mounted in PSShell so it
+ * stays visible across all PS pages (Catalog, Ideation, Control Panel,
+ * Wizard, List). Intercom-style FAB at bottom-right; expands into a
+ * chat panel with round-table AI participants from the catalog.
  *
  * This is a standalone clone — no cross-module imports.
  */
@@ -195,7 +195,7 @@ export function PSIdeationChatWindow({ catalogImports }: PSIdeationChatWindowPro
         setMessages((prev) => [...prev, assistantMsg]);
       }
     } catch (err: any) {
-      toast.error(`Ideation chat error: ${err.message}`);
+      toast.error(`PS Chat error: ${err.message}`);
     } finally {
       setIsStreaming(false);
       setCurrentSpeaker(null);
@@ -219,7 +219,7 @@ export function PSIdeationChatWindow({ catalogImports }: PSIdeationChatWindowPro
       <button
         onClick={() => setIsOpen(true)}
         className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 transition-all flex items-center justify-center group"
-        title="Ideation AI Chat"
+        title="PS Chat"
       >
         <Brain className="h-6 w-6 group-hover:scale-110 transition-transform" />
         {unreadCount > 0 && (
@@ -238,7 +238,7 @@ export function PSIdeationChatWindow({ catalogImports }: PSIdeationChatWindowPro
       <div className="flex items-center justify-between px-3 py-2 border-b bg-card shrink-0">
         <div className="flex items-center gap-2">
           <Brain className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold">Ideation Chat</span>
+          <span className="text-sm font-semibold">PS Chat</span>
           {selectedIds.size > 0 && (
             <Badge variant="secondary" className="text-[9px] px-1.5">
               {selectedIds.size} active
