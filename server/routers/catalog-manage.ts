@@ -328,10 +328,19 @@ export const catalogManageRouter = router({
   create: governedProcedure
     .input(createEntrySchema)
     .mutation(async ({ input, ctx }) => {
+      // ── Domain-first enforcement ─────────────────────────────────────
+      // Agents and bots must be created through their domain routers,
+      // then imported to catalog. Direct catalog creation is blocked.
       if (input.entryType === "agent") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Agent catalog items must be imported from deployable agent definitions",
+          message: "Agent catalog items must be created via agents.create, then imported with agents.importToCatalog",
+        });
+      }
+      if (input.entryType === "bot") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Bot catalog items must be created via bots.create, then imported with bots.importToCatalog",
         });
       }
 
@@ -340,100 +349,87 @@ export const catalogManageRouter = router({
 
       let entry: any;
 
-      // Domain-first write for model/llm entries
+      // Domain-first write for model entries
       if (input.entryType === "model") {
-        try {
-          const config = (input.config as Record<string, any>) ?? {};
-          const domainResult = await createDomainModel({
-            name: input.name,
-            displayName: input.displayName,
-            description: input.description,
-            providerId: input.providerId,
-            providerSlug: config.providerType ?? null,
-            modelFamily: config.modelFamily ?? null,
-            contextLength: config.contextLength ?? null,
-            capabilities: input.capabilities,
-            apiModelId: config.model ?? input.name,
-            baseUrl: config.baseUrl ?? null,
-            config,
-            status: "draft",
-            createdBy: ctx.user.id,
-          });
-          // Retrieve the full catalog entry (projection creates it with defaults)
-          entry = await getCatalogEntryById(domainResult.catalogEntry.id);
-          // Override with caller-specified values
-          await updateCatalogEntry(entry.id, {
-            origin,
-            reviewState,
-            tags: input.tags ?? [],
-            category: input.category ?? null,
-            subCategory: input.subCategory ?? null,
-          } as any, ctx.user.id);
-          entry = await getCatalogEntryById(entry.id);
-        } catch (domainErr: any) {
-          console.warn(`[CatalogManage] Domain-first model create failed, falling back: ${domainErr.message}`);
-          entry = await createCatalogEntry({
-            name: input.name, displayName: input.displayName ?? input.name,
-            description: input.description ?? null, entryType: input.entryType,
-            scope: input.scope ?? "app", status: "draft", origin, reviewState,
-            providerId: input.providerId ?? null, config: input.config ?? {},
-            tags: input.tags ?? [], category: input.category ?? null,
-            subCategory: input.subCategory ?? null, capabilities: input.capabilities ?? null,
-            createdBy: ctx.user.id,
-          });
-        }
-      } else if (input.entryType === "llm") {
-        try {
-          const config = (input.config as Record<string, any>) ?? {};
-          const domainResult = await createDomainLlm({
-            name: input.name,
-            displayName: input.displayName,
-            description: input.description,
-            providerId: input.providerId,
-            role: config.role ?? null,
-            config,
-            status: "draft",
-            createdBy: ctx.user.id,
-          });
-          entry = await getCatalogEntryById(domainResult.catalogEntry.id);
-          await updateCatalogEntry(entry.id, {
-            origin,
-            reviewState,
-            tags: input.tags ?? [],
-            category: input.category ?? null,
-            subCategory: input.subCategory ?? null,
-          } as any, ctx.user.id);
-          entry = await getCatalogEntryById(entry.id);
-        } catch (domainErr: any) {
-          console.warn(`[CatalogManage] Domain-first LLM create failed, falling back: ${domainErr.message}`);
-          entry = await createCatalogEntry({
-            name: input.name, displayName: input.displayName ?? input.name,
-            description: input.description ?? null, entryType: input.entryType,
-            scope: input.scope ?? "app", status: "draft", origin, reviewState,
-            providerId: input.providerId ?? null, config: input.config ?? {},
-            tags: input.tags ?? [], category: input.category ?? null,
-            subCategory: input.subCategory ?? null, capabilities: input.capabilities ?? null,
-            createdBy: ctx.user.id,
-          });
-        }
-      } else {
-        // Provider, bot — direct catalog write (existing behavior)
-        entry = await createCatalogEntry({
+        const config = (input.config as Record<string, any>) ?? {};
+        const domainResult = await createDomainModel({
           name: input.name,
-          displayName: input.displayName ?? input.name,
-          description: input.description ?? null,
-          entryType: input.entryType,
-          scope: input.scope ?? "app",
+          displayName: input.displayName,
+          description: input.description,
+          providerId: input.providerId,
+          providerSlug: config.providerType ?? null,
+          modelFamily: config.modelFamily ?? null,
+          contextLength: config.contextLength ?? null,
+          capabilities: input.capabilities,
+          apiModelId: config.model ?? input.name,
+          baseUrl: config.baseUrl ?? null,
+          config,
           status: "draft",
+          createdBy: ctx.user.id,
+        });
+        // Retrieve the full catalog entry (projection creates it with defaults)
+        entry = await getCatalogEntryById(domainResult.catalogEntry.id);
+        // Override with caller-specified values
+        await updateCatalogEntry(entry.id, {
           origin,
           reviewState,
-          providerId: input.providerId ?? null,
-          config: input.config ?? {},
           tags: input.tags ?? [],
           category: input.category ?? null,
           subCategory: input.subCategory ?? null,
-          capabilities: input.capabilities ?? null,
+        } as any, ctx.user.id);
+        entry = await getCatalogEntryById(entry.id);
+      } else if (input.entryType === "llm") {
+        // Domain-first write for LLM entries
+        const config = (input.config as Record<string, any>) ?? {};
+        const domainResult = await createDomainLlm({
+          name: input.name,
+          displayName: input.displayName,
+          description: input.description,
+          providerId: input.providerId,
+          role: config.role ?? null,
+          config,
+          status: "draft",
           createdBy: ctx.user.id,
+        });
+        entry = await getCatalogEntryById(domainResult.catalogEntry.id);
+        await updateCatalogEntry(entry.id, {
+          origin,
+          reviewState,
+          tags: input.tags ?? [],
+          category: input.category ?? null,
+          subCategory: input.subCategory ?? null,
+        } as any, ctx.user.id);
+        entry = await getCatalogEntryById(entry.id);
+      } else if (input.entryType === "provider") {
+        // Domain-first write for provider entries
+        const { createProviderWithProjection } = await import("../ai-types/service");
+        const config = (input.config as Record<string, any>) ?? {};
+        const domainResult = await createProviderWithProjection(
+          {
+            name: input.name,
+            type: config.providerType ?? config.type ?? "custom",
+            enabled: true,
+            priority: 50,
+            config,
+            kind: config.kind ?? "cloud",
+            capabilities: input.capabilities,
+          },
+          ctx.user.id
+        );
+        entry = await getCatalogEntryById(domainResult.catalogEntry.id);
+        await updateCatalogEntry(entry.id, {
+          origin,
+          reviewState,
+          tags: input.tags ?? [],
+          category: input.category ?? null,
+          subCategory: input.subCategory ?? null,
+        } as any, ctx.user.id);
+        entry = await getCatalogEntryById(entry.id);
+      } else {
+        // Unknown entry type — should not reach here given Zod validation
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unsupported entry type for catalog create: ${input.entryType}`,
         });
       }
 
