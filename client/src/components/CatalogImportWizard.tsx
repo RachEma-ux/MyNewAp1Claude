@@ -649,7 +649,7 @@ export function CatalogImportWizard({
   return (
     <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-3xl w-[calc(100vw-2rem)] max-h-[85vh] overflow-y-auto overflow-x-hidden">
+      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-3xl max-h-[85vh] overflow-y-auto overflow-x-hidden p-3 sm:p-6">
         <DialogHeader>
           <DialogTitle>
             Import Catalog Entries
@@ -748,8 +748,8 @@ export function CatalogImportWizard({
                   )}
                 </Button>
               </div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-green-400">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <p className="text-xs text-green-400 truncate min-w-0">
                   {websiteDiscoverMutation.isSuccess && websiteDiscoverMutation.data && (
                     <>
                       Found: {(websiteDiscoverMutation.data as any).name || (websiteDiscoverMutation.data as any).domain}
@@ -1053,7 +1053,7 @@ export function CatalogImportWizard({
 
         {/* Step 3: Preview Table */}
         {step === 3 && (
-          <div className="py-4 space-y-4">
+          <div className="py-4 space-y-4 min-w-0 overflow-hidden">
             {/* Runtime Defaults / Override Section (post-parse, for executable entries) */}
             {runtimeSectionVisible && method === "file_upload" && (
               <div className="border border-blue-600/30 rounded-lg p-4 space-y-3 bg-blue-950/10 min-w-0">
@@ -1134,8 +1134,8 @@ export function CatalogImportWizard({
                 </div>
                 {/* Validation: no runtime at all */}
                 {!runtimeLlmId && !runtimeModelId && !runtimeProviderId && (
-                  <div className="flex items-center gap-2 p-2 rounded bg-yellow-900/20 border border-yellow-800/30 text-yellow-400 text-xs">
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <div className="flex items-start gap-2 p-2 rounded bg-yellow-900/20 border border-yellow-800/30 text-yellow-400 text-xs">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                     No runtime defaults configured. Imported entries will use their own config or platform fallback.
                   </div>
                 )}
@@ -1424,7 +1424,7 @@ export function CatalogImportWizard({
 
     {/* Batch Discovery Results Popup */}
     <Dialog open={batchPopupOpen} onOpenChange={setBatchPopupOpen}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[80vh] overflow-y-auto p-3 sm:p-6">
         <DialogHeader>
           <DialogTitle>
             Batch Discovery Results

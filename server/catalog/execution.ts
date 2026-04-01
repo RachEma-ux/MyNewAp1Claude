@@ -292,6 +292,7 @@ type CatalogExecutionContext = {
   conversationId: number;
   provider: ILLMProvider;
   modelId: string | null;
+  temperature: number | null;
   providerMessages: Message[];
 };
 
@@ -464,12 +465,19 @@ async function prepareCatalogExecution(input: {
     },
   });
 
+  const systemPrompt = target.executionConfig.systemPrompt;
+  const providerMessages: Message[] = [
+    ...(systemPrompt ? [{ role: "system" as const, content: systemPrompt }] : []),
+    { role: "user" as const, content: message },
+  ];
+
   return {
     runId: run.id,
     conversationId,
     provider,
     modelId,
-    providerMessages: [{ role: "user", content: message }],
+    temperature: target.executionConfig.temperature ?? null,
+    providerMessages,
   };
 }
 
@@ -497,7 +505,7 @@ export async function* executeCatalogChatStream(input: {
     return;
   }
 
-  const { runId, conversationId, provider, providerMessages, modelId } = context;
+  const { runId, conversationId, provider, providerMessages, modelId, temperature } = context;
   yield { type: "run_started", runId, conversationId };
 
   let fullContent = "";
@@ -507,6 +515,7 @@ export async function* executeCatalogChatStream(input: {
     for await (const token of provider.generateStream({
       messages: providerMessages,
       model: modelId ?? undefined,
+      temperature: temperature ?? undefined,
     })) {
       if (token.isComplete) continue;
 
