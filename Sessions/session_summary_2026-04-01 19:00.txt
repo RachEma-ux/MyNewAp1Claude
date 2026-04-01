@@ -1,0 +1,87 @@
+Session Summary — 2026-04-01 19:00
+====================================
+
+## Objective
+Build AI Types as a standalone module — consolidate scattered catalog code into a self-contained `server/ai-types/` module with its own backend namespace, taxonomy, relationships, validation, IBM Shell UI, and clean boundaries.
+
+## Key Accomplishments
+
+### Phase 1: Technical Consolidation (4d948d5)
+- Created ports.ts with DI interfaces: ICatalogProviderPort, ICatalogAgentPort, IGovernancePort
+- Created boot.ts: lazy-wires real implementations at startup
+- Moved 5 core files from server/catalog/ and server/db/ into server/ai-types/:
+  - db/catalog.ts → ai-types/db.ts (551 lines)
+  - catalog/execution.ts → ai-types/execution.ts (697 lines)
+  - catalog/invoke.ts → ai-types/invoke.ts (158 lines)
+  - catalog/service-runtime.ts → ai-types/service-runtime.ts (235 lines)
+  - catalog/availability.ts → ai-types/availability.ts (91 lines)
+- Created ai-types/index.ts facade with full re-export surface
+- Old files converted to backward-compat shims (zero breakage)
+- Added roadmap + execution plan docs in PM/
+
+### Phase 2: Backend Router + Namespace (c4584da)
+- Created server/ai-types/router.ts composing catalog, registry, import
+- Registered aiTypes as first-class tRPC router in appRouter
+- trpc.aiTypes.catalog.* (21 procedures), .registry.* (read-only), .import.* (discovery)
+- Old catalogManage/catalogRegistry/catalogImport kept as deprecated aliases
+
+### Phase 3: Taxonomy Ownership (2952fc0)
+- Created server/ai-types/taxonomy/router.ts with 7 endpoints
+- Created /ai-types/taxonomy page with 3 tabs: Tree View, Coverage, Statistics
+- Wired into aiTypes router as trpc.aiTypes.taxonomy.*
+
+### Phase 4: Relationships + Validation (456850e)
+- Created server/ai-types/relationships/router.ts — cross-type dependency graph
+- Created server/ai-types/validation/router.ts — completeness checks
+- Created frontend pages: AITypesRelationshipsPage, AITypesValidationPage
+- Added routes in App.tsx
+
+### Phase 5: Route Family + IBM Shell (643902f)
+- Added Simple IBM Shell layout with sidebar navigation across all AI Types sub-pages
+- Created AITypesSidebar.tsx, AITypesShell.tsx (Fragment pattern)
+- Created AITypesOverviewPage, AITypesGovernancePage, AITypesControlPanelPage
+- Updated hamburger menu with module-level links
+- 7 sub-pages: overview, catalog, taxonomy, relationships, validation, governance, control panel
+
+### Phase 6: Cleanup (9abd660)
+- Deleted entire server/catalog/ directory (4 files, all consolidated)
+- Updated 16 external consumers to import from ai-types/db and ai-types/execution
+- Moved test files to server/ai-types/
+- Zero backward-compat shims remaining
+
+## Files Created (new)
+- server/ai-types/ports.ts, boot.ts, db.ts, execution.ts, invoke.ts, service-runtime.ts, availability.ts
+- server/ai-types/router.ts, taxonomy/router.ts, relationships/router.ts, validation/router.ts
+- client/src/components/ai-types/AITypesSidebar.tsx
+- client/src/pages/ai-types/AITypesShell.tsx, AITypesOverviewPage.tsx, AITypesTaxonomyPage.tsx
+- client/src/pages/ai-types/AITypesRelationshipsPage.tsx, AITypesValidationPage.tsx
+- client/src/pages/ai-types/AITypesGovernancePage.tsx, AITypesControlPanelPage.tsx
+- PM/AI-Types-Standalone-Roadmap.md, PM/AI-Types-Execution-Plan.md
+
+## Files Deleted
+- server/catalog/availability.ts, execution.ts, invoke.ts, service-runtime.ts
+
+## Files Modified (16 external consumers updated)
+- server/_core/index.ts, server/db.ts, server/db/index.ts
+- server/agents/executor.ts, server/agents/stream.ts
+- server/governance/router.ts, server/hq/router.ts, server/llm/authority.ts
+- server/modules/pmt/context-translator-agent.ts, server/modules/pmt/idea-builder-agent.ts
+- server/providers/router.ts, server/ps/context-translator-router.ts
+- server/routers/agents.ts, bots.ts, catalog-registry.ts, conversations.ts, models.ts
+- server/sandbox-wf/seed-orchestrator.ts, server/routers.ts
+- client/src/App.tsx, client/src/components/MainLayout.tsx
+
+## Commits (6)
+- 4d948d5: refactor: AI Types standalone module — Phase 1 technical consolidation
+- c4584da: feat: AI Types standalone module — Phase 2 backend router + namespace
+- 2952fc0: feat: AI Types standalone module — Phase 3 taxonomy ownership
+- 456850e: feat: AI Types standalone module — Phase 4 relationships + validation
+- 643902f: feat: AI Types standalone module — Phase 5 route family + IBM Shell
+- 9abd660: refactor: AI Types standalone module — Phase 6 cleanup
+
+## Architecture Impact
+- AI Types is now a fully self-contained module with zero cross-module imports
+- Clean DI boundaries via port interfaces
+- Own tRPC namespace (trpc.aiTypes.*) with 4 sub-routers
+- Own IBM Shell UI with 7 navigable sub-pages
+- server/catalog/ directory fully removed
