@@ -21,6 +21,8 @@ import { catalogManageRouter } from "../routers/catalog-manage";
 import { catalogRegistryRouter } from "../routers/catalog-registry";
 import { catalogImportRouter } from "../catalog-import/router";
 import { taxonomyRouter } from "./taxonomy/router";
+import { relationshipsRouter } from "./relationships/router";
+import { validationRouter } from "./validation/router";
 
 export const aiTypesRouter = router({
   // Existing functionality under new namespace
@@ -31,8 +33,10 @@ export const aiTypesRouter = router({
   // Phase 3: Taxonomy management
   taxonomy: taxonomyRouter,
 
-  // Future sub-routers (Phase 4-5):
-  // relationships: relationshipsRouter,
-  // validation: validationRouter,
+  // Phase 4: Relationships + Validation
+  relationships: relationshipsRouter,
+  validation: validationRouter,
+
+  // Future sub-routers (Phase 5):
   // controlPanel: controlPanelRouter,
 });
