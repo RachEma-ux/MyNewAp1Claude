@@ -415,20 +415,19 @@ export async function executeRoundTable(input: {
         message: contextPrompt,
         triggerSource: "maestro_round_table",
       })) {
-        if (event.type === "chunk") {
-          response += (event as any).text || "";
+        if (event.type === "token") {
+          response += event.content || "";
         }
         if (event.type === "complete") {
-          response = (event as any).result || response;
+          response = event.content || response;
         }
         if (event.type === "error") {
           results.push({
             catalogEntryId: participant.catalogEntryId,
             name: participant.name,
-            response: `Error: ${(event as any).error}`,
+            response: `Error: ${event.error}`,
             status: "failed",
           });
-          // Skip to next participant on error event
           continue;
         }
       }
