@@ -171,9 +171,7 @@ const ProviderConnectionsPage = lazy(() => import("@/pages/ProviderConnectionsPa
 const UIShowcasePage = lazy(() => import("@/pages/UIShowcasePage"));
 const GovernanceScorecard = lazy(() => import("@/pages/GovernanceScorecard"));
 const AITypesPage = lazy(() => import("@/pages/AITypesPage"));
-const AITypesTaxonomyPage = lazy(() => import("@/pages/ai-types/AITypesTaxonomyPage"));
-const AITypesRelationshipsPage = lazy(() => import("@/pages/ai-types/AITypesRelationshipsPage"));
-const AITypesValidationPage = lazy(() => import("@/pages/ai-types/AITypesValidationPage"));
+const AITypesShell = lazy(() => import("@/pages/ai-types/AITypesShell"));
 const DigitalHQPage = lazy(() => import("@/pages/DigitalHQPage"));
 const GovernanceCenterPage = lazy(() => import("@/pages/GovernanceCenterPage"));
 const RunConsolePage = lazy(() => import("@/pages/RunConsolePage"));
@@ -524,11 +522,9 @@ function Router() {
       <Route path="/llm/:id" component={() => <ProtectedRoute component={LLMDetailPage} />} />
       {/* Governance Scorecard — CGT v2 automated compliance engine */}
       <Route path="/governance/scorecard" component={() => <ProtectedRoute component={GovernanceScorecard} />} />
-      {/* AI Types Module */}
-      <Route path="/ai-types/taxonomy" component={() => <ProtectedRoute component={AITypesTaxonomyPage} />} />
-      <Route path="/ai-types/relationships" component={() => <ProtectedRoute component={AITypesRelationshipsPage} />} />
-      <Route path="/ai-types/validation" component={() => <ProtectedRoute component={AITypesValidationPage} />} />
-      <Route path="/ai-types/:type" component={() => <ProtectedRoute component={AITypesPage} />} />
+      {/* AI Types Module — Shell handles internal routing */}
+      <Route path="/ai-types/:rest*" component={() => <ProtectedRoute component={AITypesShell} />} />
+      <Route path="/ai-types" component={() => <ProtectedRoute component={AITypesShell} />} />
       {/* Backward-compatibility redirects for old namespaces */}
       <Route path="/digital-hq/:item">{(params) => <Redirect to={`/hq/${params.item}`} />}</Route>
       <Route path="/governance-center/:item">{(params) => <Redirect to={`/governance/${params.item}`} />}</Route>

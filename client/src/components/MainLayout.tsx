@@ -81,6 +81,7 @@ import {
   GitBranch,
   Wind,
   Workflow,
+  Layers,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -132,7 +133,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
       label: "AI Types",
       icon: <Database className="w-5 h-5" />,
       children: [
+        { label: "Overview", icon: <LayoutDashboard className="w-4 h-4" />, href: "/ai-types" },
         { label: "AI Catalogue", icon: <List className="w-4 h-4" />, href: "/llm/catalogue" },
+        { label: "Taxonomy", icon: <Layers className="w-4 h-4" />, href: "/ai-types/taxonomy" },
+        { label: "Relationships", icon: <GitBranch className="w-4 h-4" />, href: "/ai-types/relationships" },
+        { label: "Validation", icon: <ShieldCheck className="w-4 h-4" />, href: "/ai-types/validation" },
+        { label: "Governance", icon: <Shield className="w-4 h-4" />, href: "/ai-types/governance" },
+        { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/ai-types/control-panel" },
         {
           label: "Providers",
           icon: <Cloud className="w-4 h-4" />,
