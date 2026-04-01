@@ -20,6 +20,7 @@ import { router } from "../_core/trpc";
 import { catalogManageRouter } from "../routers/catalog-manage";
 import { catalogRegistryRouter } from "../routers/catalog-registry";
 import { catalogImportRouter } from "../catalog-import/router";
+import { taxonomyRouter } from "./taxonomy/router";
 
 export const aiTypesRouter = router({
   // Existing functionality under new namespace
@@ -27,8 +28,10 @@ export const aiTypesRouter = router({
   registry: catalogRegistryRouter,
   import: catalogImportRouter,
 
-  // Future sub-routers (Phase 3-5):
-  // taxonomy: taxonomyRouter,
+  // Phase 3: Taxonomy management
+  taxonomy: taxonomyRouter,
+
+  // Future sub-routers (Phase 4-5):
   // relationships: relationshipsRouter,
   // validation: validationRouter,
   // controlPanel: controlPanelRouter,

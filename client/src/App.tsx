@@ -171,6 +171,7 @@ const ProviderConnectionsPage = lazy(() => import("@/pages/ProviderConnectionsPa
 const UIShowcasePage = lazy(() => import("@/pages/UIShowcasePage"));
 const GovernanceScorecard = lazy(() => import("@/pages/GovernanceScorecard"));
 const AITypesPage = lazy(() => import("@/pages/AITypesPage"));
+const AITypesTaxonomyPage = lazy(() => import("@/pages/ai-types/AITypesTaxonomyPage"));
 const DigitalHQPage = lazy(() => import("@/pages/DigitalHQPage"));
 const GovernanceCenterPage = lazy(() => import("@/pages/GovernanceCenterPage"));
 const RunConsolePage = lazy(() => import("@/pages/RunConsolePage"));
@@ -521,7 +522,8 @@ function Router() {
       <Route path="/llm/:id" component={() => <ProtectedRoute component={LLMDetailPage} />} />
       {/* Governance Scorecard — CGT v2 automated compliance engine */}
       <Route path="/governance/scorecard" component={() => <ProtectedRoute component={GovernanceScorecard} />} />
-      {/* AI Types — stub pages */}
+      {/* AI Types Module */}
+      <Route path="/ai-types/taxonomy" component={() => <ProtectedRoute component={AITypesTaxonomyPage} />} />
       <Route path="/ai-types/:type" component={() => <ProtectedRoute component={AITypesPage} />} />
       {/* Backward-compatibility redirects for old namespaces */}
       <Route path="/digital-hq/:item">{(params) => <Redirect to={`/hq/${params.item}`} />}</Route>
