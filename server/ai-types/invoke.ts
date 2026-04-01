@@ -108,7 +108,7 @@ export async function* invokeCatalogEntry(
     const llmEntryId = parseInt(llmRef, 10);
     if (!isNaN(llmEntryId) && llmEntryId > 0) {
       const llmEntry = await getCatalogEntryById(llmEntryId);
-      if (llmEntry && llmEntry.entryType === "llm") {
+      if (llmEntry && (llmEntry.entryType === "llm" || llmEntry.entryType === "model")) {
         const llmConfig = llmEntry.config as Record<string, unknown> | null;
         reasoningLlm = {
           catalogEntryId: llmEntry.id,

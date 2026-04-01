@@ -18,7 +18,7 @@
  *   tablet  → collapsible left sidebar (icon-only)
  *   desktop → persistent left sidebar
  */
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -36,6 +36,7 @@ import { PSIdeationConceptView } from "./PSIdeationConceptView";
 import { PSIdeationWizardHandoffView } from "./PSIdeationWizardHandoffView";
 import { PSIdeationActivityView } from "./PSIdeationActivityView";
 import type { SaveStatus } from "./PSIdeationMobileBar";
+import { PSIdeationChatWindow } from "./PSIdeationChatWindow";
 import {
   IDEATION_STEP_KEYS,
   IDEATION_STEP_LABELS,
@@ -180,6 +181,28 @@ export function PSIdeationShell({ ideationId }: Props) {
     { ideationId },
     { enabled: !!ideationId },
   );
+
+  // Maestro chat — available AI agents from catalog
+  const { data: availableAgents } = trpc.catalogManage.available.useQuery(
+    { entryType: "agent" },
+  );
+
+  // Map catalog entries to the CatalogImport shape expected by MaestroChatWindow
+  const catalogImports = useMemo(() => {
+    if (!availableAgents) return [];
+    return availableAgents.map((e: any) => ({
+      id: e.id,
+      catalogEntryId: e.id,
+      entryType: e.sourceType,
+      name: e.displayName || e.name,
+      description: e.description || "",
+      category: e.category || "",
+      tags: e.tags || [],
+      config: e.metadata?.config || {},
+      status: e.status || "active",
+      importedAt: new Date(),
+    }));
+  }, [availableAgents]);
 
   // ── Mutations ─────────────────────────────────────────────────────────
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -544,6 +567,9 @@ export function PSIdeationShell({ ideationId }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* PS Ideation AI Chat — floating FAB */}
+      <PSIdeationChatWindow catalogImports={catalogImports} />
     </>
   );
 }

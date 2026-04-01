@@ -686,6 +686,84 @@ export async function* executeServiceAgentStream(input: {
   } catch (error) {
     const rawMessage = error instanceof Error ? error.message : "Service agent execution failed.";
     const isOffline = rawMessage.includes("ECONNREFUSED") || rawMessage.includes("fetch failed") || rawMessage.includes("AbortError") || rawMessage.includes("timed out");
+
+    // ── LLM fallback when service is offline ──────────────────────────
+    if (isOffline && input.reasoningLlm) {
+      try {
+        const llmEntry = await getCatalogEntryById(input.reasoningLlm.catalogEntryId);
+        const llmConfig = (llmEntry?.config as Record<string, unknown>) ?? {};
+        const providerId =
+          (llmConfig.providerId as number) ??
+          (llmConfig.sourceProviderId as number) ??
+          (llmEntry as any)?.providerId ??
+          null;
+
+        if (providerId) {
+          const providerRegistry = getProviderPort().getRegistry();
+          const provider = providerRegistry.getProvider(providerId);
+
+          if (provider) {
+            // Extract system prompt from the service agent's config
+            const agentConfig = (serviceTarget.entry.config as Record<string, unknown>) ?? {};
+            const systemPrompt =
+              (agentConfig.systemPrompt as string) ??
+              ((agentConfig.agent as Record<string, unknown>)?.systemPrompt as string) ??
+              null;
+
+            const modelId =
+              input.reasoningLlm.model ??
+              (llmConfig.model as string) ??
+              (llmConfig.modelId as string) ??
+              undefined;
+
+            const messages: Message[] = [
+              ...(systemPrompt ? [{ role: "system" as const, content: systemPrompt }] : []),
+              { role: "user" as const, content: input.message },
+            ];
+
+            await updateExecutionRun(run.id, {
+              state: "running",
+              provider: provider.name,
+              modelId: modelId ?? null,
+              metadata: {
+                executionKind: "service_llm_fallback",
+                originalServiceUrl: serviceTarget.serviceTarget.serviceUrl,
+                reasoningLlmRef: input.reasoningLlm.catalogEntryName,
+              },
+            });
+
+            let fullContent = "";
+            let firstTokenRecorded = false;
+
+            for await (const token of provider.generateStream({
+              messages,
+              model: modelId,
+            })) {
+              if (token.isComplete) continue;
+              if (!firstTokenRecorded) {
+                firstTokenRecorded = true;
+                await updateExecutionRun(run.id, { firstTokenAt: new Date() });
+              }
+              fullContent += token.content;
+              yield { type: "token", content: token.content };
+            }
+
+            await updateExecutionRun(run.id, {
+              state: "completed",
+              success: true,
+              completedAt: new Date(),
+            });
+
+            yield { type: "complete", runId: run.id, conversationId: 0, content: fullContent };
+            return;
+          }
+        }
+      } catch (fallbackErr: any) {
+        console.warn("[ServiceAgent] LLM fallback failed:", fallbackErr.message);
+        // Fall through to original error reporting
+      }
+    }
+
     const summary = isOffline
       ? `Service offline at ${serviceTarget.serviceTarget.serviceUrl} — ${rawMessage}`
       : rawMessage;
