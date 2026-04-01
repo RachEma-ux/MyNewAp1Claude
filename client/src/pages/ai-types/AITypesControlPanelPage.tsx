@@ -3,6 +3,8 @@
  *
  * Admin actions: re-scan catalog, seed taxonomy, bulk operations,
  * and module health summary.
+ *
+ * Consumes: trpc.aiTypes.orchestration.controlPanelSummary (single query)
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -15,6 +17,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
+  GitBranch,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,14 +26,13 @@ import { toast } from "sonner";
 
 export default function AITypesControlPanelPage() {
   const utils = trpc.useUtils();
-  const { data: validationSummary, isLoading: valLoading } = trpc.aiTypes.validation.summary.useQuery();
-  const { data: taxonomyStats } = trpc.aiTypes.taxonomy.stats.useQuery();
-  const { data: relSummary } = trpc.aiTypes.relationships.summary.useQuery();
+  const { data: summary, isLoading } = trpc.aiTypes.orchestration.controlPanelSummary.useQuery();
 
   const seedMutation = trpc.aiTypes.taxonomy.seed.useMutation({
     onSuccess: (result) => {
       toast.success(`Seeded ${result.created} taxonomy nodes`);
       utils.aiTypes.taxonomy.invalidate();
+      utils.aiTypes.orchestration.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -39,11 +41,10 @@ export default function AITypesControlPanelPage() {
   const handleRescan = async () => {
     setRescanning(true);
     try {
-      await utils.aiTypes.validation.summary.invalidate();
-      await utils.aiTypes.validation.scan.invalidate();
-      await utils.aiTypes.relationships.graph.invalidate();
-      await utils.aiTypes.relationships.summary.invalidate();
-      toast.success("Validation and relationship caches refreshed");
+      await utils.aiTypes.validation.invalidate();
+      await utils.aiTypes.relationships.invalidate();
+      await utils.aiTypes.orchestration.invalidate();
+      toast.success("Validation, relationship, and orchestration caches refreshed");
     } finally {
       setRescanning(false);
     }
@@ -65,7 +66,7 @@ export default function AITypesControlPanelPage() {
           <CardContent className="pt-4 pb-3 text-center">
             <Database className="h-5 w-5 mx-auto mb-1 text-zinc-400" />
             <div className="text-2xl font-bold text-zinc-100">
-              {valLoading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : validationSummary?.total || 0}
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : summary?.catalogEntries || 0}
             </div>
             <div className="text-xs text-zinc-500">Catalog Entries</div>
           </CardContent>
@@ -74,7 +75,7 @@ export default function AITypesControlPanelPage() {
           <CardContent className="pt-4 pb-3 text-center">
             <Layers className="h-5 w-5 mx-auto mb-1 text-zinc-400" />
             <div className="text-2xl font-bold text-zinc-100">
-              {taxonomyStats ? Object.values(taxonomyStats.byLevel as Record<string, number>).reduce((a, b) => a + b, 0) : 0}
+              {summary?.taxonomyNodes || 0}
             </div>
             <div className="text-xs text-zinc-500">Taxonomy Nodes</div>
           </CardContent>
@@ -83,16 +84,16 @@ export default function AITypesControlPanelPage() {
           <CardContent className="pt-4 pb-3 text-center">
             <ShieldCheck className="h-5 w-5 mx-auto mb-1 text-emerald-400" />
             <div className="text-2xl font-bold text-emerald-400">
-              {validationSummary?.healthPercent || 0}%
+              {summary?.healthPercent || 0}%
             </div>
             <div className="text-xs text-zinc-500">Health Score</div>
           </CardContent>
         </Card>
         <Card className="bg-zinc-900/50 border-zinc-800">
           <CardContent className="pt-4 pb-3 text-center">
-            <Settings className="h-5 w-5 mx-auto mb-1 text-purple-400" />
+            <GitBranch className="h-5 w-5 mx-auto mb-1 text-purple-400" />
             <div className="text-2xl font-bold text-purple-400">
-              {relSummary?.totalEdges || 0}
+              {summary?.relationships || 0}
             </div>
             <div className="text-xs text-zinc-500">Relationships</div>
           </CardContent>
@@ -144,7 +145,7 @@ export default function AITypesControlPanelPage() {
       </Card>
 
       {/* Issue summary */}
-      {validationSummary && (
+      {summary?.healthBreakdown && (
         <Card className="bg-zinc-900/50 border-zinc-800">
           <CardHeader>
             <CardTitle className="text-sm text-zinc-400">Issue Summary</CardTitle>
@@ -153,21 +154,21 @@ export default function AITypesControlPanelPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                <span className="text-sm text-zinc-300">{validationSummary.healthy} entries are healthy</span>
+                <span className="text-sm text-zinc-300">{summary.healthBreakdown.healthy} entries are healthy</span>
               </div>
-              {validationSummary.warnings > 0 && (
+              {summary.healthBreakdown.warnings > 0 && (
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                  <span className="text-sm text-zinc-300">{validationSummary.warnings} entries have warnings</span>
+                  <span className="text-sm text-zinc-300">{summary.healthBreakdown.warnings} entries have warnings</span>
                   <Badge variant="outline" className="text-[10px] bg-yellow-500/15 text-yellow-400 border-yellow-500/30 ml-auto">
                     needs attention
                   </Badge>
                 </div>
               )}
-              {validationSummary.errors > 0 && (
+              {summary.healthBreakdown.errors > 0 && (
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-red-400" />
-                  <span className="text-sm text-zinc-300">{validationSummary.errors} entries have errors</span>
+                  <span className="text-sm text-zinc-300">{summary.healthBreakdown.errors} entries have errors</span>
                   <Badge variant="outline" className="text-[10px] bg-red-500/15 text-red-400 border-red-500/30 ml-auto">
                     action required
                   </Badge>

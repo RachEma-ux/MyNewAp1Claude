@@ -133,7 +133,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       label: "AI Types",
       icon: <Database className="w-5 h-5" />,
       children: [
-        { label: "Overview", icon: <LayoutDashboard className="w-4 h-4" />, href: "/ai-types" },
+        { label: "Overview", icon: <LayoutDashboard className="w-4 h-4" />, href: "/ai-types/overview" },
         { label: "AI Catalogue", icon: <List className="w-4 h-4" />, href: "/llm/catalogue" },
         { label: "Taxonomy", icon: <Layers className="w-4 h-4" />, href: "/ai-types/taxonomy" },
         { label: "Relationships", icon: <GitBranch className="w-4 h-4" />, href: "/ai-types/relationships" },

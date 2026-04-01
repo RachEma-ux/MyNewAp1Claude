@@ -18,16 +18,9 @@ const AITypesValidationPage = lazy(() => import("./AITypesValidationPage"));
 const AITypesGovernancePage = lazy(() => import("./AITypesGovernancePage"));
 const AITypesControlPanelPage = lazy(() => import("./AITypesControlPanelPage"));
 
-const useIsMobile = () => {
-  const [isMobile] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth < 768 : false,
-  );
-  return isMobile;
-};
-
 /** Map sidebar key to route suffix */
 const sidebarToRoute: Record<string, string> = {
-  overview: "/ai-types",
+  overview: "/ai-types/overview",
   catalog: "/ai-types/catalog",
   taxonomy: "/ai-types/taxonomy",
   relationships: "/ai-types/relationships",
@@ -44,7 +37,8 @@ function getActiveKey(path: string): string {
   if (path.startsWith("/ai-types/validation")) return "validation";
   if (path.startsWith("/ai-types/governance")) return "governance";
   if (path.startsWith("/ai-types/control-panel")) return "control-panel";
-  return "overview";
+  if (path.startsWith("/ai-types/overview")) return "overview";
+  return "overview"; // /ai-types bare path also defaults to overview
 }
 
 const Fallback = () => (
@@ -54,13 +48,12 @@ const Fallback = () => (
 );
 
 export default function AITypesShell() {
-  const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const collapsed = isMobile || sidebarCollapsed;
   const [location, navigate] = useLocation();
   const activeKey = getActiveKey(location);
 
   // Route matchers
+  const [isOverview] = useRoute("/ai-types/overview");
   const [isTaxonomy] = useRoute("/ai-types/taxonomy");
   const [isRelationships] = useRoute("/ai-types/relationships");
   const [isValidation] = useRoute("/ai-types/validation");
@@ -74,7 +67,9 @@ export default function AITypesShell() {
   };
 
   let content: React.ReactNode;
-  if (isTaxonomy) {
+  if (isOverview) {
+    content = <AITypesOverviewPage />;
+  } else if (isTaxonomy) {
     content = <AITypesTaxonomyPage />;
   } else if (isRelationships) {
     content = <AITypesRelationshipsPage />;
@@ -96,7 +91,7 @@ export default function AITypesShell() {
       style={{ height: "calc(100vh - 4rem)" }}
     >
       <AITypesSidebar
-        collapsed={collapsed}
+        collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         active={activeKey}
         onNavigate={handleNavigate}

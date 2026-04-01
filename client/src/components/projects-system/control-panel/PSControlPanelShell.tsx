@@ -481,7 +481,7 @@ export function PSControlPanelShell() {
       <PSControlPanelSidebar
         activeView={activeView}
         onViewSelect={setActiveView}
-        collapsed={isMobile || sidebarCollapsed}
+        collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
       />
 

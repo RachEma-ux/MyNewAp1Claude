@@ -3,6 +3,8 @@
  *
  * Shows summary cards for all 5 entry types, health metrics,
  * quick links to taxonomy/relationships/validation, and recent activity.
+ *
+ * Consumes: trpc.aiTypes.orchestration.overview (single aggregated query)
  */
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
@@ -22,11 +24,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 const typeCards = [
-  { key: "providers", label: "Providers", icon: Cloud, color: "text-blue-400", route: "/ai-types/providers" },
-  { key: "llms", label: "LLMs", icon: Database, color: "text-purple-400", route: "/ai-types/llms" },
-  { key: "models", label: "Models", icon: Package, color: "text-emerald-400", route: "/ai-types/models" },
-  { key: "agents", label: "Agents", icon: Bot, color: "text-orange-400", route: "/ai-types/agents" },
-  { key: "bots", label: "Bots", icon: MessageSquare, color: "text-pink-400", route: "/ai-types/bots" },
+  { key: "provider", label: "Providers", icon: Cloud, color: "text-blue-400", route: "/ai-types/providers" },
+  { key: "llm", label: "LLMs", icon: Database, color: "text-purple-400", route: "/ai-types/llms" },
+  { key: "model", label: "Models", icon: Package, color: "text-emerald-400", route: "/ai-types/models" },
+  { key: "agent", label: "Agents", icon: Bot, color: "text-orange-400", route: "/ai-types/agents" },
+  { key: "bot", label: "Bots", icon: MessageSquare, color: "text-pink-400", route: "/ai-types/bots" },
 ];
 
 const quickLinks = [
@@ -37,18 +39,7 @@ const quickLinks = [
 
 export default function AITypesOverviewPage() {
   const [, navigate] = useLocation();
-  const { data: registryData, isLoading: regLoading } = trpc.aiTypes.registry.bundle.useQuery();
-  const { data: validationSummary } = trpc.aiTypes.validation.summary.useQuery();
-  const { data: relSummary } = trpc.aiTypes.relationships.summary.useQuery();
-
-  // Count entries by type from registry bundle
-  const typeCounts: Record<string, number> = {};
-  if (registryData?.entries) {
-    for (const entry of registryData.entries) {
-      const t = (entry as any).entryType || "unknown";
-      typeCounts[t] = (typeCounts[t] || 0) + 1;
-    }
-  }
+  const { data, isLoading } = trpc.aiTypes.orchestration.overview.useQuery();
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -69,10 +60,10 @@ export default function AITypesOverviewPage() {
           >
             <CardContent className="pt-4 pb-3 text-center">
               <Icon className={`h-5 w-5 mx-auto mb-1 ${color}`} />
-              {regLoading ? (
+              {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin mx-auto text-zinc-600" />
               ) : (
-                <div className="text-2xl font-bold text-zinc-100">{typeCounts[key === "providers" ? "provider" : key === "llms" ? "llm" : key === "models" ? "model" : key === "agents" ? "agent" : "bot"] || 0}</div>
+                <div className="text-2xl font-bold text-zinc-100">{data?.typeCounts[key] || 0}</div>
               )}
               <div className="text-xs text-zinc-500">{label}</div>
             </CardContent>
@@ -82,7 +73,7 @@ export default function AITypesOverviewPage() {
 
       {/* Health + Relationships summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {validationSummary && (
+        {data?.healthSummary && (
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-zinc-400 flex items-center gap-2">
@@ -92,16 +83,16 @@ export default function AITypesOverviewPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold text-emerald-400">{validationSummary.healthPercent}%</span>
+                <span className="text-3xl font-bold text-emerald-400">{data.healthSummary.healthPercent}%</span>
                 <div className="flex gap-2 text-xs">
                   <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
-                    {validationSummary.healthy} healthy
+                    {data.healthSummary.healthy} healthy
                   </Badge>
                   <Badge variant="outline" className="bg-yellow-500/15 text-yellow-400 border-yellow-500/30">
-                    {validationSummary.warnings} warnings
+                    {data.healthSummary.warnings} warnings
                   </Badge>
                   <Badge variant="outline" className="bg-red-500/15 text-red-400 border-red-500/30">
-                    {validationSummary.errors} errors
+                    {data.healthSummary.errors} errors
                   </Badge>
                 </div>
               </div>
@@ -109,7 +100,7 @@ export default function AITypesOverviewPage() {
           </Card>
         )}
 
-        {relSummary && (
+        {data?.relationshipSummary && (
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-zinc-400 flex items-center gap-2">
@@ -119,14 +110,14 @@ export default function AITypesOverviewPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold text-purple-400">{relSummary.totalEdges}</span>
-                <span className="text-xs text-zinc-500">edges across {relSummary.totalEntries} entries</span>
+                <span className="text-3xl font-bold text-purple-400">{data.relationshipSummary.totalEdges}</span>
+                <span className="text-xs text-zinc-500">edges across {data.healthSummary.total} entries</span>
               </div>
-              {relSummary.byTypePair && (
+              {data.relationshipSummary.byTypePair && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {Object.entries(relSummary.byTypePair).map(([pair, count]) => (
+                  {Object.entries(data.relationshipSummary.byTypePair).map(([pair, count]) => (
                     <Badge key={pair} variant="outline" className="text-[10px] text-zinc-400 border-zinc-700">
-                      {pair}: {count}
+                      {pair}: {count as number}
                     </Badge>
                   ))}
                 </div>
