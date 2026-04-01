@@ -24,8 +24,8 @@ import {
   checkServiceHealthByName,
   type ServiceRuntimeTarget,
   type ServiceHealthResult,
-} from "../catalog/service-runtime";
-import { getCatalogEntryById, getCatalogEntries } from "../db/catalog";
+} from "../ai-types/service-runtime";
+import { getCatalogEntryById, getCatalogEntries } from "../ai-types/db";
 import {
   getDefaultReasoningLlmRef,
   getDefaultReasoningProviderRef,

@@ -31,7 +31,7 @@ import {
   isCatalogImportEligible,
   type AgentStatus,
 } from "@shared/agent-lifecycle";
-import { createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
+import { createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/db";
 import { createAgentDefinition, SYSTEM_WORKSPACE_ID } from "../agents/create-definition";
 import { getAuditLogger } from "../services/auditLogger";
 

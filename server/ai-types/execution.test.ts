@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   getAgent: vi.fn(),
 }));
 
-vi.mock("../db/catalog", () => ({
+vi.mock("./db", () => ({
   getCatalogEntryById: mocks.getCatalogEntryById,
   getActiveBundleForEntry: mocks.getActiveBundleForEntry,
 }));

@@ -7,7 +7,7 @@ import { getAgent, getConversation, addMessage, getMessages } from './db';
 import { getToolRegistry } from './tools';
 import { getProviderRegistry } from '../providers/registry';
 import { EmbeddingService } from '../embeddings/service';
-import { resolveCatalogAgentExecutionTarget } from '../catalog/execution';
+import { resolveCatalogAgentExecutionTarget } from '../ai-types/execution';
 
 // Initialize embedding service
 const embeddingService = new EmbeddingService();

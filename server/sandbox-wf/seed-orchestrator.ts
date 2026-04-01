@@ -19,7 +19,7 @@
 import { createHash } from "crypto";
 import { eq, like } from "drizzle-orm";
 import { getDb } from "../db/connection";
-import { createCatalogEntry, createPublishBundle } from "../db/catalog";
+import { createCatalogEntry, createPublishBundle } from "../ai-types/db";
 import { agents } from "../../drizzle/tables/agents";
 import { providers } from "../../drizzle/tables/providers";
 import { catalogEntries } from "../../drizzle/tables/catalog";

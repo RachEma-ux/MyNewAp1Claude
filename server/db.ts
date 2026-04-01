@@ -31,5 +31,5 @@ export * from "./db/agents";
 export * from "./db/conversations";
 export * from "./db/workflows";
 export * from "./db/llms";
-export * from "./db/catalog";
+export * from "./ai-types/db";
 export * from "./db/workspace-rbac";

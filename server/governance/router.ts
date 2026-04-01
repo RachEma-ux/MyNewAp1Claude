@@ -24,7 +24,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, adminProcedure, governedProcedure, governedAdminProcedure } from "../_core/trpc";
 import { preflightCheck } from "./requireGovernedAction";
 import { getAllActionKeys } from "./action-registry";
-import { getCatalogEntryById, getEntryClassifications } from "../db/catalog";
+import { getCatalogEntryById, getEntryClassifications } from "../ai-types/db";
 import { getGovernanceEngine } from "./governance-engine";
 import { runSelfCheck } from "./self-check";
 import { validateArchitecture } from "./architecture-validator";

@@ -116,7 +116,7 @@ export const hqRouter = router({
 
     let catalogCount = 0;
     try {
-      const { getAllCatalogEntries } = require("../db/catalog");
+      const { getAllCatalogEntries } = require("../ai-types/db");
       const entries = await getAllCatalogEntries();
       catalogCount = entries.length;
     } catch { /* catalog may not be available */ }

@@ -27,7 +27,7 @@
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { createModel, getAllModels, getModelById, updateModel, isDeployable, getBlockingReasons } from "../db/models";
-import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
+import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/db";
 import { getAuditLogger } from "../services/auditLogger";
 import { getCatalogState } from "@shared/catalog-state";
 

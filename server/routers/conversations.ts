@@ -4,7 +4,7 @@ import { getDb } from "../db";
 import { conversations, messages } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { resolveCatalogAgentExecutionTarget, resolveServiceAgentExecutionTarget } from "../catalog/execution";
+import { resolveCatalogAgentExecutionTarget, resolveServiceAgentExecutionTarget } from "../ai-types/execution";
 
 /**
  * Conversations Router

@@ -30,7 +30,7 @@
 import { z } from "zod";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { createBot, getAllBots, getBotById, updateBot, isDeployable, getBlockingReasons } from "../db/bots";
-import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../db/catalog";
+import { getCatalogEntries, createCatalogEntry, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications } from "../ai-types/db";
 import { getAuditLogger } from "../services/auditLogger";
 import { getCatalogState } from "@shared/catalog-state";
 

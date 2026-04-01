@@ -16,7 +16,7 @@
 import { getProviderRegistry } from "../../providers/registry";
 import type { ILLMProvider } from "../../providers/base";
 import type { GenerationRequest, GenerationResponse, Message } from "../../providers/types";
-import { createCatalogEntry, getCatalogEntries, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../db/catalog";
+import { createCatalogEntry, getCatalogEntries, createCatalogAuditEvent, getTaxonomyNodes, setEntryClassifications, getEntryClassifications } from "../../ai-types/db";
 import type { IdeaBuilderInput } from "@shared/pm-artifact-schemas";
 
 // ── Agent Identity ──────────────────────────────────────────────────────────

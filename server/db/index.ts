@@ -16,4 +16,4 @@ export * from "./agents";
 export * from "./conversations";
 export * from "./workflows";
 export * from "./llms";
-export * from "./catalog";
+export * from "../ai-types/db";
