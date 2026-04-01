@@ -406,7 +406,7 @@ export async function executeRoundTable(input: {
         participant.name,
       );
 
-      const { invokeCatalogEntry } = await import("../catalog/invoke");
+      const { invokeCatalogEntry } = await import("../ai-types/invoke");
       let response = "";
 
       for await (const event of invokeCatalogEntry({

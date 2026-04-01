@@ -208,7 +208,7 @@ async function executeCatalogAgent(config: StepConfig, ctx: ExecutionContext): P
   }
 
   try {
-    const { invokeCatalogEntry } = await import("../catalog/invoke");
+    const { invokeCatalogEntry } = await import("../ai-types/invoke");
     const message = resolveTemplate(config.userPrompt || config.message || "", ctx);
 
     let result: any = {};

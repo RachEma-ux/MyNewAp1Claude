@@ -1420,7 +1420,7 @@ export const catalogManageRouter = router({
   /**
    * Return only Catalog-authoritative available assets for app usage.
    *
-   * Availability rule is defined in `server/catalog/availability.ts`:
+   * Availability rule is defined in `server/ai-types/availability.ts`:
    *   status === "active" AND reviewState === "approved"
    *
    * This is the ONLY endpoint that app-usage selectors should consume.
@@ -1438,7 +1438,7 @@ export const catalogManageRouter = router({
       }).optional()
     )
     .query(async ({ input }) => {
-      const { CATALOG_AVAILABILITY_FILTERS } = await import("../catalog/availability");
+      const { CATALOG_AVAILABILITY_FILTERS } = await import("../ai-types/availability");
       const entries = await getCatalogEntries({
         ...(input?.entryType && { entryType: input.entryType }),
         ...CATALOG_AVAILABILITY_FILTERS,
