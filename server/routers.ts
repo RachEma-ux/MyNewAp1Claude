@@ -50,6 +50,7 @@ import { cultureValuesRouter } from "./culture-values/router";
 import { psRouter } from "./ps/ps.router";
 import { dataAnalysisRouter } from "./data-analysis/router";
 import { sandboxWfRouter } from "./sandbox-wf/router";
+import { aiTypesRouter } from "./ai-types/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -81,9 +82,10 @@ export const appRouter = router({
   wiki: wikiRouter,
   llm: llmRouter, // LLM Control Plane
   deploy: deployRouter, // Deployment management
-  catalogManage: catalogManageRouter, // Catalog Management CRUD
-  catalogRegistry: catalogRegistryRouter, // Catalog Registry (read-only consumption)
-  catalogImport: catalogImportRouter, // Catalog Import & Discovery
+  aiTypes: aiTypesRouter, // AI Types Module (catalog, registry, import, taxonomy, relationships)
+  catalogManage: catalogManageRouter, // [DEPRECATED alias] → use aiTypes.catalog
+  catalogRegistry: catalogRegistryRouter, // [DEPRECATED alias] → use aiTypes.registry
+  catalogImport: catalogImportRouter, // [DEPRECATED alias] → use aiTypes.import
   providerConnections: providerConnectionsRouter, // Provider PAT Authentication (Governed)
   discoveryOps: discoveryOpsRouter, // Discovery Ops: monitoring, promotion, audit
   governance: governanceRouter, // Governance Engine (CGT v2)
