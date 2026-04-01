@@ -1,0 +1,54 @@
+Session Summary — 2026-04-01 17:30
+====================================
+
+## Objective
+Fix Maestro "(No response)" bug in WF Sandbox chat + deep cleanup
+
+## Key Accomplishments
+
+### 1. Fixed Catalog Agent System Prompt Injection (execution.ts)
+- BUG: `prepareCatalogExecution()` built providerMessages with ONLY the user message
+- The systemPrompt from catalogAgentExecutionConfigSchema was validated but never sent to OpenAI
+- FIX: Prepend system prompt as `{ role: "system" }` message before user message
+- Also threaded temperature from catalog config through to `provider.generateStream()`
+- Commit: 0ddb009
+
+### 2. Fixed Event Type Mismatch in Round-Table (service.ts) — THE REAL BUG
+- BUG: `executeRoundTable()` in sandbox-wf/service.ts checked for `event.type === "chunk"`
+  and read `event.text`, but the catalog execution pipeline yields `event.type === "token"`
+  with `event.content`. Every token was silently ignored → empty response → "(No response)".
+- Also: `event.type === "complete"` reads `event.result` but actual field is `event.content`
+- FIX: Changed "chunk" → "token", .text → .content, .result → .content
+- Commit: 1ef6df0
+
+### 3. Maestro Successfully Responding
+- Tested with "Hi" → proper greeting response
+- Tested with task decomposition prompt → Maestro produced correct 4-step JSON DAG with:
+  - Task dependencies (Classifier → Summarizer → Writer → Compliance)
+  - Cost/duration estimates
+  - Replanning budget
+  - Correct assignee types (bot vs worker)
+
+### 4. Deep Cleanup
+- /tmp: 445MB/467 files → 42MB/112 files (deleted old zips, PG temps, pip dirs, stale scripts)
+- npm cache cleaned
+- GitHub Actions workflow runs: 1108 → ~1040 and counting (background nuke script running)
+
+## Files Modified
+- `server/catalog/execution.ts` — system prompt injection + temperature pass-through
+- `server/sandbox-wf/service.ts` — event type fix ("chunk"→"token", .text→.content)
+
+## Commits Pushed
+- 0ddb009: fix: inject system prompt + temperature into catalog agent execution
+- 1ef6df0: fix: Maestro "(No response)" — event type mismatch in round-table + system prompt injection
+
+## Architecture Insight
+The WF Sandbox Maestro chat does NOT use the SSE `/api/catalog/:id/invoke/stream` endpoint.
+It uses tRPC mutation `sandboxWf.maestro.roundTable` → `executeRoundTable()` in
+`server/sandbox-wf/service.ts` → which calls `invokeCatalogEntry()` from `server/catalog/invoke.ts`.
+The invoke function dispatches to `executeCatalogChatStream()` based on runtime kind (llm-chat).
+
+## Status
+- App running on localhost:3000
+- Maestro fully operational
+- Background cleanup script still deleting old workflow runs
