@@ -5,7 +5,7 @@
  * Uses a short-lived in-memory cache (1 minute TTL) to avoid repeated DB queries.
  */
 
-import { getCatalogEntries } from "../db/catalog";
+import { getCatalogEntries } from "../ai-types/db";
 
 let _approvedCache: Set<number> | null = null;
 let _cacheTime = 0;

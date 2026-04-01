@@ -1,15 +1,90 @@
 /**
- * AI Types Domain — Public API
+ * AI Types Module — Public API (Façade)
  *
- * This module is the source of truth for AI Types (providers, models, LLMs, agents, bots).
- * Other modules should consume through catalog_entries and runtime APIs,
- * NOT by importing from this module directly.
+ * This is the ONLY import path external modules should use for AI Types
+ * functionality. All internal files are implementation details.
  *
- * Internal use only: server/catalog-import, server/routers/catalog-manage,
- * server/catalog, server/governance.
+ * Module boundary:
+ *   server/ai-types/index.ts → public API
+ *   server/ai-types/*.ts      → internal (do not import directly from outside)
  */
 
-// Domain CRUD + catalog projection
+// ── Boot ──────────────────────────────────────────────────────────────────
+export { bootAiTypesModule } from "./boot";
+
+// ── DB Operations (catalog entries, versions, bundles, audit, taxonomy) ───
+export {
+  getCatalogEntries,
+  getCatalogEntryById,
+  createCatalogEntry,
+  updateCatalogEntry,
+  approveCatalogEntry,
+  deleteCatalogEntry,
+  getCatalogEntryVersions,
+  getPublishBundles,
+  createPublishBundle,
+  recallPublishBundle,
+  getActiveBundles,
+  getBundleByHash,
+  getActiveBundleForEntry,
+  createCatalogAuditEvent,
+  getCatalogAuditEvents,
+  createExecutionRun,
+  updateExecutionRun,
+  getExecutionRunById,
+  listExecutionRuns,
+  getTaxonomyNodes,
+  getTaxonomyTree,
+  getTaxonomyChildren,
+  getEntryClassifications,
+  setEntryClassifications,
+  seedTaxonomy,
+} from "./db";
+
+// ── Execution Pipeline ────────────────────────────────────────────────────
+export {
+  resolveCatalogAgentExecutionTarget,
+  resolveServiceAgentExecutionTarget,
+  executeCatalogChatStream,
+  executeServiceAgentStream,
+  getExecutionRunForUi,
+  catalogExecutionQuerySchema,
+  type CatalogAgentExecutionTarget,
+  type ServiceAgentExecutionTarget,
+  type CatalogExecutionEvent,
+  type ReasoningLlmContext,
+} from "./execution";
+
+// ── Universal Invoke ──────────────────────────────────────────────────────
+export {
+  invokeCatalogEntry,
+  resolveInvokeTarget,
+  type CatalogInvokeInput,
+  type CatalogInvokeResolution,
+} from "./invoke";
+
+// ── Service Runtime ───────────────────────────────────────────────────────
+export {
+  isServiceBasedAgent,
+  resolveServiceAgent,
+  resolveServiceAgentByName,
+  checkServiceHealth,
+  checkServiceHealthByName,
+  type ServiceRuntimeConfig,
+  type ServiceRuntimeTarget,
+  type ServiceHealthResult,
+} from "./service-runtime";
+
+// ── Availability ──────────────────────────────────────────────────────────
+export {
+  checkCatalogAvailability,
+  isCatalogEntryAvailableForAppUse,
+  CATALOG_AVAILABILITY_FILTERS,
+  type CatalogAvailabilityInput,
+  type CatalogAvailabilityResult,
+} from "./availability";
+
+// ── Domain CRUD + Catalog Projection ──────────────────────────────────────
 export {
   createModel,
   updateModel,
@@ -22,7 +97,7 @@ export {
   resolveProviderFromCatalogEntry,
 } from "./service";
 
-// Projection utilities
+// ── Projection Utilities ──────────────────────────────────────────────────
 export {
   projectToCatalog,
   refreshCatalogProjection,
@@ -30,7 +105,7 @@ export {
   linkCatalogToDomain,
 } from "./projection";
 
-// Import normalization
+// ── Import Normalization ──────────────────────────────────────────────────
 export {
   normalizeToModel,
   normalizeToLlm,
@@ -38,13 +113,13 @@ export {
   getDomainTarget,
 } from "./import-normalizer";
 
-// Migration
+// ── Migration ─────────────────────────────────────────────────────────────
 export {
   backfillDomainTables,
   verifyDomainLinks,
 } from "./migration";
 
-// Types
+// ── Types ─────────────────────────────────────────────────────────────────
 export type {
   AIEntryType,
   DomainModelData,
@@ -53,3 +128,15 @@ export type {
   ProjectionResult,
   CatalogProjectionInput,
 } from "./types";
+
+// ── Ports (for boot wiring only) ──────────────────────────────────────────
+export {
+  setProviderPort,
+  setAgentPort,
+  setGovernancePort,
+  setProviderDbPort,
+  getProviderPort,
+  getAgentPort,
+  getGovernancePort,
+  getProviderDbPort,
+} from "./ports";

@@ -26,6 +26,7 @@ import { encrypt } from "./encryption";
 import { sdk } from "./sdk";
 import { initializeGovernance } from "../governance/governance-engine";
 import { syncCapabilitiesOnBoot } from "../workspace/seed/syncCapabilitiesOnBoot";
+import { bootAiTypesModule } from "../ai-types/boot";
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -184,6 +185,9 @@ async function startServer() {
 
   // Auto-provision providers from env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
   await autoProvisionProviders();
+
+  // Wire AI Types module ports (provider, agent, governance adapters)
+  bootAiTypesModule();
 
   // Catalog-first: seed catalog entries BEFORE provider init so the catalog gate has data
   await syncRegistryOnStartup();
