@@ -43,10 +43,10 @@ const NAV_LINKS = [
 
 export default function ProviderControlPanelPage() {
   const [, navigate] = useLocation();
-  const { data: providers, isLoading, refetch } = trpc.provider.list.useQuery({});
+  const { data: providers, isLoading, refetch } = trpc.providers.list.useQuery({});
   const [checkingAll, setCheckingAll] = useState(false);
 
-  const updateMutation = trpc.provider.update.useMutation({
+  const updateMutation = trpc.providers.update.useMutation({
     onSuccess: () => {
       toast.success("Provider updated");
       refetch();

@@ -70,10 +70,19 @@ export default function ProviderWizardPage() {
   const [showKey, setShowKey] = useState(false);
 
   // Test state
-  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    error?: string;
+    results?: {
+      health: { passed: boolean; message: string; latencyMs: number };
+      capabilities: { passed: boolean; data: any; message: string };
+      models: { passed: boolean; models: string[]; message: string };
+    };
+    errors?: string[];
+  } | null>(null);
   const [testing, setTesting] = useState(false);
 
-  const createMutation = trpc.provider.create.useMutation({
+  const createMutation = trpc.providers.create.useMutation({
     onSuccess: (provider) => {
       toast.success(`Provider "${provider.name}" created successfully`);
       navigate("/providers");
@@ -92,29 +101,31 @@ export default function ProviderWizardPage() {
     }
   };
 
-  const handleTest = async () => {
+  const validateMutation = trpc.providers.validateConfig.useMutation({
+    onSuccess: (data) => {
+      setTestResult(data);
+      if (data.success) {
+        toast.success("Provider validated — all checks passed");
+      } else {
+        toast.error("Validation failed — see details below");
+      }
+    },
+    onError: (err) => {
+      setTestResult({ success: false, error: err.message });
+      toast.error(`Validation error: ${err.message}`);
+    },
+    onSettled: () => setTesting(false),
+  });
+
+  const handleTest = () => {
+    if (!providerType || !baseUrl.trim()) return;
     setTesting(true);
     setTestResult(null);
-    // Simulate a connection test by attempting a basic fetch
-    try {
-      const url = baseUrl.replace(/\/+$/, "");
-      // For cloud providers, just check if URL is set and key exists
-      if (!isLocalProvider && !apiKey) {
-        setTestResult({ success: false, error: "API key is required" });
-        return;
-      }
-      if (!url) {
-        setTestResult({ success: false, error: "Base URL is required" });
-        return;
-      }
-      // We can't actually test from browser due to CORS — mark as success if fields are valid
-      setTestResult({ success: true });
-      toast.success("Connection parameters validated");
-    } catch (err: any) {
-      setTestResult({ success: false, error: err.message });
-    } finally {
-      setTesting(false);
-    }
+    validateMutation.mutate({
+      type: providerType,
+      baseUrl: baseUrl.trim(),
+      ...(apiKey && !isLocalProvider ? { apiKey } : {}),
+    });
   };
 
   const handleCreate = () => {
@@ -306,8 +317,8 @@ export default function ProviderWizardPage() {
           {step === 5 && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">Connection Test</h2>
-                <p className="text-muted-foreground text-sm">Validate your configuration before saving</p>
+                <h2 className="text-lg font-semibold">Server Validation</h2>
+                <p className="text-muted-foreground text-sm">Backend validates health, capabilities, and model discovery</p>
               </div>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -315,21 +326,74 @@ export default function ProviderWizardPage() {
                     <span className="text-muted-foreground">Type:</span>{" "}
                     <span className="font-medium">{PROVIDER_TYPES.find((t) => t.value === providerType)?.label}</span>
                   </div>
-                  <div className="p-3 bg-muted/50 rounded-lg">
+                  <div className="p-3 bg-muted/50 rounded-lg truncate">
                     <span className="text-muted-foreground">URL:</span>{" "}
-                    <span className="font-medium truncate">{baseUrl}</span>
+                    <span className="font-medium">{baseUrl}</span>
                   </div>
                 </div>
                 <Button onClick={handleTest} disabled={testing} className="w-full">
-                  {testing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plug className="h-4 w-4 mr-2" />}
-                  {testing ? "Testing..." : "Test Connection"}
+                  {testing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Shield className="h-4 w-4 mr-2" />}
+                  {testing ? "Validating..." : "Run Server Validation"}
                 </Button>
-                {testResult && (
-                  <div className={`flex items-center gap-2 p-3 rounded-lg ${testResult.success ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
-                    {testResult.success ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
-                    <span className="text-sm font-medium">
-                      {testResult.success ? "Connection validated successfully" : testResult.error || "Connection failed"}
-                    </span>
+
+                {/* Structured results */}
+                {testResult?.results && (
+                  <div className="space-y-2">
+                    {/* Health */}
+                    <div className={`flex items-start gap-2 p-3 rounded-lg text-sm ${testResult.results.health.passed ? "bg-green-500/10" : "bg-red-500/10"}`}>
+                      {testResult.results.health.passed ? <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> : <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />}
+                      <div>
+                        <span className="font-medium">Health Check</span>
+                        <span className="text-muted-foreground ml-2">({testResult.results.health.latencyMs}ms)</span>
+                        <p className="text-xs text-muted-foreground mt-0.5">{testResult.results.health.message}</p>
+                      </div>
+                    </div>
+                    {/* Capabilities */}
+                    <div className={`flex items-start gap-2 p-3 rounded-lg text-sm ${testResult.results.capabilities.passed ? "bg-green-500/10" : "bg-red-500/10"}`}>
+                      {testResult.results.capabilities.passed ? <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> : <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />}
+                      <div>
+                        <span className="font-medium">Capabilities</span>
+                        <p className="text-xs text-muted-foreground mt-0.5">{testResult.results.capabilities.message}</p>
+                      </div>
+                    </div>
+                    {/* Models */}
+                    <div className={`flex items-start gap-2 p-3 rounded-lg text-sm ${testResult.results.models.passed ? "bg-green-500/10" : "bg-amber-500/10"}`}>
+                      {testResult.results.models.passed ? <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> : <XCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />}
+                      <div>
+                        <span className="font-medium">Models</span>
+                        <p className="text-xs text-muted-foreground mt-0.5">{testResult.results.models.message}</p>
+                        {testResult.results.models.models.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {testResult.results.models.models.slice(0, 8).map((m) => (
+                              <Badge key={m} variant="outline" className="text-xs">{m}</Badge>
+                            ))}
+                            {testResult.results.models.models.length > 8 && (
+                              <Badge variant="outline" className="text-xs">+{testResult.results.models.models.length - 8} more</Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Overall result */}
+                {testResult && !testResult.results && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 text-red-500">
+                    <XCircle className="h-5 w-5 shrink-0" />
+                    <span className="text-sm font-medium">{testResult.error || "Validation failed"}</span>
+                  </div>
+                )}
+
+                {/* Error details */}
+                {testResult?.errors && testResult.errors.length > 0 && !testResult.success && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Issues found:</p>
+                    <ul className="text-xs text-muted-foreground space-y-0.5">
+                      {testResult.errors.map((e, i) => (
+                        <li key={i}>- {e}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>

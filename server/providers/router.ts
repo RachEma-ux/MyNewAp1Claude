@@ -669,6 +669,158 @@ export const providerRouter = router({
       }),
   }),
 
+  /**
+   * Validate provider config before creation — server-authoritative.
+   * Creates a temporary provider instance, runs health/capabilities/models
+   * checks, then cleans up. Never persists anything to DB.
+   * API keys are never returned to the client.
+   */
+  validateConfig: governedProcedure
+    .input(z.object({
+      type: z.enum(["local-llamacpp", "local-ollama", "openai", "anthropic", "google", "groq", "custom"]),
+      baseUrl: z.string().min(1),
+      apiKey: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const results: {
+        health: { passed: boolean; message: string; latencyMs: number };
+        capabilities: { passed: boolean; data: any; message: string };
+        models: { passed: boolean; models: string[]; message: string };
+      } = {
+        health: { passed: false, message: "Not checked", latencyMs: 0 },
+        capabilities: { passed: false, data: null, message: "Not checked" },
+        models: { passed: false, models: [], message: "Not checked" },
+      };
+      const errors: string[] = [];
+
+      // Build a temporary provider config (never stored)
+      const tempConfig: Record<string, unknown> = { baseUrl: input.baseUrl };
+      if (input.apiKey) tempConfig.apiKey = input.apiKey;
+
+      let tempProvider: import("./base").ILLMProvider | null = null;
+
+      try {
+        // Dynamically create a temporary provider instance
+        const { OpenAIProvider } = await import("./openai");
+        const { AnthropicProvider } = await import("./anthropic");
+        const { GoogleProvider } = await import("./google");
+
+        const providerConfig = {
+          id: -1, // sentinel — never stored
+          name: "__validation_temp__",
+          type: input.type as ProviderType,
+          enabled: true,
+          priority: 0,
+          config: tempConfig,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        switch (input.type) {
+          case "openai":
+            tempProvider = new OpenAIProvider(providerConfig);
+            break;
+          case "anthropic":
+            tempProvider = new AnthropicProvider(providerConfig);
+            break;
+          case "google":
+            tempProvider = new GoogleProvider(providerConfig);
+            break;
+          case "local-ollama": {
+            const { OllamaProvider } = await import("./ollama");
+            tempProvider = new OllamaProvider(providerConfig);
+            break;
+          }
+          case "local-llamacpp": {
+            const { LlamaCppProvider } = await import("./llamacpp");
+            tempProvider = new LlamaCppProvider(providerConfig);
+            break;
+          }
+          case "groq": {
+            const { CustomProvider } = await import("./custom");
+            tempProvider = new CustomProvider({
+              ...providerConfig,
+              config: { ...tempConfig, baseUrl: input.baseUrl || "https://api.groq.com/openai/v1" },
+            });
+            break;
+          }
+          case "custom": {
+            const { CustomProvider } = await import("./custom");
+            tempProvider = new CustomProvider(providerConfig);
+            break;
+          }
+        }
+
+        if (!tempProvider) {
+          return { success: false, results, errors: [`Unknown provider type: ${input.type}`] };
+        }
+
+        // Initialize the temporary provider
+        await tempProvider.initialize();
+
+        // 1. Health check (30s timeout)
+        const healthStart = Date.now();
+        try {
+          const health = await Promise.race([
+            tempProvider.healthCheck(),
+            new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Health check timed out (30s)")), 30000)),
+          ]);
+          results.health = {
+            passed: health.healthy,
+            message: health.message || (health.healthy ? "Healthy" : "Unhealthy"),
+            latencyMs: Date.now() - healthStart,
+          };
+          if (!health.healthy) errors.push(`Health check failed: ${health.message}`);
+        } catch (e: any) {
+          results.health = { passed: false, message: e.message, latencyMs: Date.now() - healthStart };
+          errors.push(`Health check error: ${e.message}`);
+        }
+
+        // 2. Capabilities
+        try {
+          const caps = tempProvider.getCapabilities();
+          results.capabilities = {
+            passed: true,
+            data: caps,
+            message: `Streaming: ${caps.supportsStreaming}, Embedding: ${caps.supportsEmbedding}, Functions: ${caps.supportsFunctionCalling}, Context: ${caps.maxContextLength}`,
+          };
+        } catch (e: any) {
+          results.capabilities = { passed: false, data: null, message: e.message };
+          errors.push(`Capabilities check error: ${e.message}`);
+        }
+
+        // 3. Models discovery
+        try {
+          let models: string[] = [];
+          if ("getSupportedModels" in tempProvider && typeof (tempProvider as any).getSupportedModels === "function") {
+            models = (tempProvider as any).getSupportedModels();
+          } else {
+            const caps = tempProvider.getCapabilities();
+            models = caps.supportedModels || [];
+          }
+          results.models = {
+            passed: models.length > 0,
+            models: models.slice(0, 50), // cap at 50 for response size
+            message: models.length > 0 ? `${models.length} model(s) discovered` : "No models found",
+          };
+          if (models.length === 0) errors.push("No models discovered from provider");
+        } catch (e: any) {
+          results.models = { passed: false, models: [], message: e.message };
+          errors.push(`Models discovery error: ${e.message}`);
+        }
+      } catch (e: any) {
+        errors.push(`Provider initialization failed: ${e.message}`);
+      } finally {
+        // Cleanup temporary provider
+        if (tempProvider) {
+          try { await tempProvider.cleanup(); } catch {}
+        }
+      }
+
+      const allPassed = results.health.passed && results.capabilities.passed && results.models.passed;
+      return { success: allPassed, results, errors };
+    }),
+
   // Test provider with comprehensive checks
   test: router({
     // Full provider test (health + sample completion + streaming + capabilities)
