@@ -21,6 +21,8 @@ const AgentEnginePanel = lazy(() => import("@/pages/pm-central/AgentEnginePanel"
 const IdeaBuilderWizard = lazy(() => import("@/pages/pm-central/IdeaBuilderWizard"));
 const InboxPage = lazy(() => import("@/pages/pm-central/InboxPage"));
 const PMShellPanel = lazy(() => import("@/pages/pm-central/PMShellPanel"));
+const ShellNewPage = lazy(() => import("@/pages/pm-central/ShellNewPage"));
+const ShellClonePage = lazy(() => import("@/pages/pm-central/ShellClonePage"));
 
 const routeMap: Record<PMCView, string> = {
   dashboard: "/pm-central/dashboard",
@@ -132,7 +134,13 @@ export default function PMCentralShell() {
       content = <InboxPage />;
       break;
     case "shell":
-      content = <PMShellPanel />;
+      if (location.startsWith("/pm-central/shell/new")) {
+        content = <ShellNewPage />;
+      } else if (location.startsWith("/pm-central/shell/clone/")) {
+        content = <ShellClonePage />;
+      } else {
+        content = <PMShellPanel />;
+      }
       break;
     default:
       content = <DashboardPanel />;

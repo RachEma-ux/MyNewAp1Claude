@@ -555,8 +555,8 @@ function Router() {
       {/* Collaboration */}
       <Route path="/collaboration" component={() => <ProtectedRoute component={CollaborationPage} />} />
       {/* PM Central — Dedicated sub-routes (must be before shell catch-all) */}
-      <Route path="/pm-central/shell/clone/:sourceId" component={() => <ProtectedRoute component={ShellClonePage} />} />
-      <Route path="/pm-central/shell/new" component={() => <ProtectedRoute component={ShellNewPage} />} />
+      <Route path="/pm-central/shell/clone/:sourceId" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/shell/new" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
       <Route path="/pm-central/methodes/detail/:methodId" component={() => <ProtectedRoute component={MethodesPage} />} />
       <Route path="/pm-central/methodes/:categoryId" component={() => <ProtectedRoute component={MethodesPage} />} />
       {/* PM Central — Wizard routes (must be before generic /p/:id/:tool) */}
