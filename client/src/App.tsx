@@ -183,6 +183,7 @@ const GovernanceCenterPage = lazy(() => import("@/pages/GovernanceCenterPage"));
 const RunConsolePage = lazy(() => import("@/pages/RunConsolePage"));
 const CollaborationPage = lazy(() => import("@/pages/CollaborationPage"));
 const PMCentralPage = lazy(() => import("@/pages/PMCentralPage"));
+const PMCentralShellPage = lazy(() => import("@/pages/pm-central/PMCentralShellPage"));
 const ProjectPage = lazy(() => import("@/pages/pm-central/ProjectPage"));
 const ShellNewPage = lazy(() => import("@/pages/pm-central/ShellNewPage"));
 const InboxPage = lazy(() => import("@/pages/pm-central/InboxPage"));
@@ -553,14 +554,11 @@ function Router() {
       <Route path="/run-console" component={() => <ProtectedRoute component={RunConsolePage} />} />
       {/* Collaboration */}
       <Route path="/collaboration" component={() => <ProtectedRoute component={CollaborationPage} />} />
-      {/* PM Central — Project creation, clone + inbox (must be before :id catch-all) */}
+      {/* PM Central — Dedicated sub-routes (must be before shell catch-all) */}
       <Route path="/pm-central/shell/clone/:sourceId" component={() => <ProtectedRoute component={ShellClonePage} />} />
       <Route path="/pm-central/shell/new" component={() => <ProtectedRoute component={ShellNewPage} />} />
-      <Route path="/pm-central/inbox" component={() => <ProtectedRoute component={InboxPage} />} />
-      {/* PM Central — Méthodes (nested routes before generic :item catch-all) */}
       <Route path="/pm-central/methodes/detail/:methodId" component={() => <ProtectedRoute component={MethodesPage} />} />
       <Route path="/pm-central/methodes/:categoryId" component={() => <ProtectedRoute component={MethodesPage} />} />
-      <Route path="/pm-central/methodes" component={() => <ProtectedRoute component={MethodesPage} />} />
       {/* PM Central — Wizard routes (must be before generic /p/:id/:tool) */}
       <Route path="/pm-central/p/:id/wizard/:step" component={() => <ProtectedRoute component={WizardPage} />} />
       <Route path="/pm-central/p/:id/wizard" component={() => <ProtectedRoute component={WizardPage} />} />
@@ -570,12 +568,25 @@ function Router() {
       {/* PM Central — Legacy route compat (/pm-central/project/:id/:tool) */}
       <Route path="/pm-central/project/:id/:tool" component={() => <ProtectedRoute component={ProjectPage} />} />
       <Route path="/pm-central/project/:id" component={() => <ProtectedRoute component={ProjectPage} />} />
-      {/* PM Central — Agent Engine run detail (must be before :item catch-all) */}
+      {/* PM Central — Agent Engine run detail (must be before shell catch-all) */}
       <Route path="/pm-central/agent-engine/run/:id" component={() => <ProtectedRoute component={AgentRunDetailPanel} />} />
-      <Route path="/pm-central/idea-builder" component={() => <ProtectedRoute component={IdeaBuilderWizard} />} />
-      {/* PM Central — Top-level views */}
-      <Route path="/pm-central/:item" component={() => <ProtectedRoute component={PMCentralPage} />} />
-      <Route path="/pm-central" component={() => <ProtectedRoute component={PMCentralPage} />} />
+      {/* PM Central — Simple IBM Shell (sidebar + content) */}
+      <Route path="/pm-central/dashboard" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/projects" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/plans" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/execution" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/changes" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/risks" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/reports" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/collaboration" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/methodes" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/templates" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/agent-engine" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/idea-builder" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/inbox" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/shell" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central/:item" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
+      <Route path="/pm-central" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
       {/* Data Analysis — GraphRAG */}
       <Route path="/data-analysis/graphrag" component={() => <ProtectedRoute component={GraphRAGPage} />} />
       {/* Data Analysis — Data Warehouse */}
