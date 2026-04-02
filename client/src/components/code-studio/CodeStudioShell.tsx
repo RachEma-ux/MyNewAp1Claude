@@ -7,9 +7,9 @@
  * Collapsed: S1 icons only (w-12), S2 hidden
  * Expanded:  S1 full + S2 visible side by side
  * Single toggle on S1 controls both sidebars.
- * Mobile: always collapsed (S2 always hidden).
+ * Starts collapsed; toggle expands/collapses on any viewport.
  */
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 import CodeStudioSidebar, { type CodeStudioView } from "./CodeStudioSidebar";
@@ -52,23 +52,9 @@ function getActiveView(path: string): CodeStudioView {
   return "dashboard";
 }
 
-/** Simple mobile detect — same as PM Central */
-function useIsMobile(breakpoint = 768) {
-  const [mobile, setMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < breakpoint : false,
-  );
-  useEffect(() => {
-    const h = () => setMobile(window.innerWidth < breakpoint);
-    window.addEventListener("resize", h);
-    return () => window.removeEventListener("resize", h);
-  }, [breakpoint]);
-  return mobile;
-}
-
 export default function CodeStudioShell() {
   const [location, navigate] = useLocation();
-  const isMobile = useIsMobile();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const active = getActiveView(location);
 
   // ── Double-shell state: S2 section nav for OpenCode Settings ──────────
@@ -76,8 +62,7 @@ export default function CodeStudioShell() {
   const [activeTab, setActiveTab] = useState<"runtime" | "tui">("runtime");
   const [dirty, setDirty] = useState(false);
 
-  const s1Collapsed = isMobile || sidebarCollapsed;
-  const showS2 = active === "opencode-settings" && !s1Collapsed;
+  const showS2 = active === "opencode-settings" && !sidebarCollapsed;
 
   const handleNavigate = (key: CodeStudioView) => {
     navigate(routeMap[key]);
@@ -114,7 +99,7 @@ export default function CodeStudioShell() {
       <CodeStudioSidebar
         active={active}
         onNavigate={handleNavigate}
-        collapsed={s1Collapsed}
+        collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
