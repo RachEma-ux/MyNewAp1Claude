@@ -567,6 +567,14 @@ jobs:
           echo "  JWT_SECRET: ${JWT_SECRET:+(configured)}"
           echo "  APP_ID: ${VITE_APP_ID:-(not set)}"
 
+          # Create dedicated module databases (CODEDB, PRMDB, PSMDB, WFDB)
+          echo "🗄️ Creating dedicated module databases..."
+          for DBNAME in codedb prmdb psmdb wfdb; do
+            PGPASSWORD=app psql -h localhost -U app -d mynewapp -tc "SELECT 1 FROM pg_database WHERE datname='$DBNAME'" | grep -q 1 \
+              || PGPASSWORD=app createdb -h localhost -U app "$DBNAME"
+            echo "  ✅ $DBNAME ready"
+          done
+
           # Push schema directly to DB (bypasses migration-file issues)
           echo "🗄️ Pushing database schema..."
           DATABASE_URL="${EFFECTIVE_DB_URL}" npx drizzle-kit push --force 2>&1 | tail -20
