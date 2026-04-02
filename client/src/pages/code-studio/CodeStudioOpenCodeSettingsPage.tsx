@@ -1,8 +1,8 @@
 /**
- * Code Studio — OpenCode Settings Page
+ * Code Studio — OpenCode Settings Page (Double Shell content area)
  *
- * Comprehensive settings surface for managing the OpenCode runtime configuration.
- * Left section nav + center config editor + right status drawer + bottom action bar.
+ * Section nav lives in S2 (OpenCodeSettingsRail), controlled by the shell.
+ * This component renders: Header + Content + Bottom Action Bar.
  */
 import { useState, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -37,7 +37,6 @@ import {
   AlertTriangle,
   Eye,
   Play,
-  RotateCcw,
   Activity,
   Server,
   Shield,
@@ -57,40 +56,7 @@ import {
   Code2,
   Braces,
 } from "lucide-react";
-
-// ── Section definitions ──────────────────────────────────────────────────────
-
-type SettingsSection =
-  | "overview"
-  | "runtime"
-  | "server"
-  | "providers"
-  | "tools"
-  | "agents"
-  | "permissions"
-  | "commands"
-  | "formatters"
-  | "mcp-plugins"
-  | "instructions"
-  | "tui"
-  | "advanced"
-  | "status";
-
-const SECTIONS: { key: SettingsSection; label: string; icon: React.ElementType }[] = [
-  { key: "overview", label: "Overview", icon: Settings2 },
-  { key: "runtime", label: "Runtime", icon: Cpu },
-  { key: "server", label: "Server", icon: Server },
-  { key: "providers", label: "Providers & Models", icon: Plug },
-  { key: "agents", label: "Agents", icon: Bot },
-  { key: "permissions", label: "Permissions", icon: Shield },
-  { key: "commands", label: "Commands", icon: Terminal },
-  { key: "formatters", label: "Formatters", icon: FileCode },
-  { key: "mcp-plugins", label: "MCP & Plugins", icon: Braces },
-  { key: "instructions", label: "Instructions & Watcher", icon: ScrollText },
-  { key: "tui", label: "TUI", icon: Palette },
-  { key: "advanced", label: "Advanced", icon: FlaskConical },
-  { key: "status", label: "Runtime Status", icon: Heart },
-];
+import type { SettingsSection } from "@/components/code-studio/OpenCodeSettingsRail";
 
 // ── Default configs ──────────────────────────────────────────────────────────
 
@@ -129,17 +95,31 @@ const DEFAULT_TUI: Record<string, any> = {
   plugin_enabled: {},
 };
 
-export default function CodeStudioOpenCodeSettingsPage() {
-  const [activeSection, setActiveSection] = useState<SettingsSection>("overview");
-  const [activeTab, setActiveTab] = useState<"runtime" | "tui">("runtime");
+// ── Props (controlled by shell) ──────────────────────────────────────────────
+
+interface Props {
+  activeSection: SettingsSection;
+  onSectionChange: (s: SettingsSection) => void;
+  activeTab: "runtime" | "tui";
+  onTabChange: (t: "runtime" | "tui") => void;
+  dirty: boolean;
+  onDirtyChange: (d: boolean) => void;
+}
+
+export default function CodeStudioOpenCodeSettingsPage({
+  activeSection,
+  onSectionChange,
+  activeTab,
+  onTabChange,
+  dirty,
+  onDirtyChange,
+}: Props) {
   const [runtimeDraft, setRuntimeDraft] = useState<Record<string, any>>({ ...DEFAULT_RUNTIME });
   const [tuiDraft, setTuiDraft] = useState<Record<string, any>>({ ...DEFAULT_TUI });
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [statusDrawerOpen, setStatusDrawerOpen] = useState(false);
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false);
   const [jsonEditorValue, setJsonEditorValue] = useState("");
   const [jsonEditorSection, setJsonEditorSection] = useState("");
-  const [dirty, setDirty] = useState(false);
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -167,7 +147,7 @@ export default function CodeStudioOpenCodeSettingsPage() {
   const updateDraftMut = trpc.codeStudio.opencodeSettings.profiles.updateDraft.useMutation({
     onSuccess: () => {
       utils.codeStudio.opencodeSettings.profiles.getActive.invalidate();
-      setDirty(false);
+      onDirtyChange(false);
       toast.success("Draft saved");
     },
     onError: (e) => toast.error(e.message),
@@ -226,8 +206,8 @@ export default function CodeStudioOpenCodeSettingsPage() {
       obj[parts[parts.length - 1]] = value;
       return next;
     });
-    setDirty(true);
-  }, [activeTab]);
+    onDirtyChange(true);
+  }, [activeTab, onDirtyChange]);
 
   const ensureProfile = useCallback(async () => {
     if (!currentProfile) {
@@ -741,11 +721,11 @@ export default function CodeStudioOpenCodeSettingsPage() {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label className="text-xs">Theme</Label>
-          <Input className="h-8 text-xs" value={tuiDraft.theme || ""} onChange={(e) => { setTuiDraft((p) => ({ ...p, theme: e.target.value })); setDirty(true); }} placeholder="catppuccin-mocha" />
+          <Input className="h-8 text-xs" value={tuiDraft.theme || ""} onChange={(e) => { setTuiDraft((p) => ({ ...p, theme: e.target.value })); onDirtyChange(true); }} placeholder="catppuccin-mocha" />
         </div>
         <div>
           <Label className="text-xs">Diff Style</Label>
-          <Select value={tuiDraft.diff_style || "auto"} onValueChange={(v) => { setTuiDraft((p) => ({ ...p, diff_style: v })); setDirty(true); }}>
+          <Select value={tuiDraft.diff_style || "auto"} onValueChange={(v) => { setTuiDraft((p) => ({ ...p, diff_style: v })); onDirtyChange(true); }}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="auto" className="text-xs">auto</SelectItem>
@@ -757,13 +737,13 @@ export default function CodeStudioOpenCodeSettingsPage() {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label className="text-xs">Scroll Speed</Label>
-          <Input className="h-8 text-xs" type="number" step="0.1" value={tuiDraft.scroll_speed ?? 1} onChange={(e) => { setTuiDraft((p) => ({ ...p, scroll_speed: parseFloat(e.target.value) || 1 })); setDirty(true); }} />
+          <Input className="h-8 text-xs" type="number" step="0.1" value={tuiDraft.scroll_speed ?? 1} onChange={(e) => { setTuiDraft((p) => ({ ...p, scroll_speed: parseFloat(e.target.value) || 1 })); onDirtyChange(true); }} />
         </div>
         <div className="flex items-end gap-2">
           <div>
             <Label className="text-xs">Scroll Acceleration</Label>
             <div className="flex items-center gap-2 h-8">
-              <Switch checked={tuiDraft.scroll_acceleration?.enabled ?? false} onCheckedChange={(v) => { setTuiDraft((p) => ({ ...p, scroll_acceleration: { ...p.scroll_acceleration, enabled: v } })); setDirty(true); }} />
+              <Switch checked={tuiDraft.scroll_acceleration?.enabled ?? false} onCheckedChange={(v) => { setTuiDraft((p) => ({ ...p, scroll_acceleration: { ...p.scroll_acceleration, enabled: v } })); onDirtyChange(true); }} />
               <span className="text-[10px] text-muted-foreground">{tuiDraft.scroll_acceleration?.enabled ? "On" : "Off"}</span>
             </div>
           </div>
@@ -795,7 +775,7 @@ export default function CodeStudioOpenCodeSettingsPage() {
       <Separator />
       <div>
         <Label className="text-xs">TUI Plugins</Label>
-        <Input className="h-8 text-xs" value={(tuiDraft.plugin ?? []).join(", ")} onChange={(e) => { setTuiDraft((p) => ({ ...p, plugin: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) })); setDirty(true); }} placeholder="plugin-name" />
+        <Input className="h-8 text-xs" value={(tuiDraft.plugin ?? []).join(", ")} onChange={(e) => { setTuiDraft((p) => ({ ...p, plugin: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) })); onDirtyChange(true); }} placeholder="plugin-name" />
       </div>
     </div>
   );
@@ -914,7 +894,7 @@ export default function CodeStudioOpenCodeSettingsPage() {
       <p className="text-[10px] text-muted-foreground">
         Tool availability is now managed through Permissions. Use the Permissions section to configure tool access rules.
       </p>
-      <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => setActiveSection("permissions")}>
+      <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => onSectionChange("permissions")}>
         <ChevronRight className="h-3 w-3 mr-1" /> Go to Permissions
       </Button>
     </div>
@@ -926,7 +906,6 @@ export default function CodeStudioOpenCodeSettingsPage() {
       case "runtime": return renderRuntime();
       case "server": return renderServer();
       case "providers": return renderProviders();
-      case "tools": return renderTools();
       case "agents": return renderAgents();
       case "permissions": return renderPermissions();
       case "commands": return renderCommands();
@@ -940,7 +919,7 @@ export default function CodeStudioOpenCodeSettingsPage() {
     }
   };
 
-  // ── Layout ─────────────────────────────────────────────────────────────
+  // ── Layout — no internal left nav, controlled by shell's S2 ──────────
 
   return (
     <div className="flex flex-col h-full">
@@ -952,7 +931,7 @@ export default function CodeStudioOpenCodeSettingsPage() {
           {dirty && <Badge variant="secondary" className="text-[9px]">Unsaved</Badge>}
         </div>
         <div className="flex items-center gap-1">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "runtime" | "tui")}>
+          <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as "runtime" | "tui")}>
             <TabsList className="h-7">
               <TabsTrigger value="runtime" className="text-[10px] px-2 h-5">Runtime</TabsTrigger>
               <TabsTrigger value="tui" className="text-[10px] px-2 h-5">TUI</TabsTrigger>
@@ -961,31 +940,10 @@ export default function CodeStudioOpenCodeSettingsPage() {
         </div>
       </div>
 
-      {/* Main body */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left nav */}
-        <div className="w-44 shrink-0 border-r overflow-y-auto">
-          {SECTIONS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveSection(key)}
-              className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs transition-colors ${
-                activeSection === key
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-            >
-              <Icon className="h-3 w-3 shrink-0 opacity-70" />
-              <span className="truncate">{label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Center content */}
-        <ScrollArea className="flex-1 p-4">
-          {renderContent()}
-        </ScrollArea>
-      </div>
+      {/* Content — full width, no internal sidebar */}
+      <ScrollArea className="flex-1 p-4">
+        {renderContent()}
+      </ScrollArea>
 
       {/* Bottom action bar */}
       <div className="flex items-center justify-between px-4 py-2 border-t bg-muted/30 shrink-0">
@@ -1023,7 +981,6 @@ export default function CodeStudioOpenCodeSettingsPage() {
               {JSON.stringify(
                 (() => {
                   const d = activeTab === "runtime" ? runtimeDraft : tuiDraft;
-                  // Client-side redaction for preview
                   return redactPreview(d);
                 })(),
                 null,

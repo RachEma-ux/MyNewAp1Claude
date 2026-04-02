@@ -1,11 +1,19 @@
 /**
- * Code Studio Shell — Simple IBM Shell (Fragment pattern)
- * Cloned from PSMShell — returns sidebar + content as flex children.
+ * Code Studio Shell — Double IBM Shell (Fragment pattern)
+ *
+ * S1 = CodeStudioSidebar (module nav)
+ * S2 = OpenCodeSettingsRail (section nav, visible only for opencode-settings)
+ *
+ * Collapsed: S1 icons only (w-12), S2 hidden
+ * Expanded:  S1 full + S2 visible side by side
+ * Single toggle on S1 controls both sidebars.
+ * Mobile: always collapsed (S2 always hidden).
  */
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 import CodeStudioSidebar, { type CodeStudioView } from "./CodeStudioSidebar";
+import OpenCodeSettingsRail, { type SettingsSection } from "./OpenCodeSettingsRail";
 
 const CodeStudioDashboardPage = lazy(() => import("@/pages/code-studio/CodeStudioDashboardPage"));
 const CodeStudioJobsPage = lazy(() => import("@/pages/code-studio/CodeStudioJobsPage"));
@@ -44,12 +52,32 @@ function getActiveView(path: string): CodeStudioView {
   return "dashboard";
 }
 
-const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+/** Simple mobile detect — same as PM Central */
+function useIsMobile(breakpoint = 768) {
+  const [mobile, setMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < breakpoint : false,
+  );
+  useEffect(() => {
+    const h = () => setMobile(window.innerWidth < breakpoint);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, [breakpoint]);
+  return mobile;
+}
 
 export default function CodeStudioShell() {
   const [location, navigate] = useLocation();
+  const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const active = getActiveView(location);
+
+  // ── Double-shell state: S2 section nav for OpenCode Settings ──────────
+  const [activeSection, setActiveSection] = useState<SettingsSection>("overview");
+  const [activeTab, setActiveTab] = useState<"runtime" | "tui">("runtime");
+  const [dirty, setDirty] = useState(false);
+
+  const s1Collapsed = isMobile || sidebarCollapsed;
+  const showS2 = active === "opencode-settings" && !s1Collapsed;
 
   const handleNavigate = (key: CodeStudioView) => {
     navigate(routeMap[key]);
@@ -65,20 +93,43 @@ export default function CodeStudioShell() {
       case "ai-catalog": return <CodeStudioAICatalogPage />;
       case "policies": return <CodeStudioPoliciesPage />;
       case "control-panel": return <CodeStudioControlPanelPage />;
-      case "opencode-settings": return <CodeStudioOpenCodeSettingsPage />;
+      case "opencode-settings":
+        return (
+          <CodeStudioOpenCodeSettingsPage
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            dirty={dirty}
+            onDirtyChange={setDirty}
+          />
+        );
       default: return <CodeStudioDashboardPage />;
     }
   };
 
   return (
     <>
+      {/* S1 — Module sidebar */}
       <CodeStudioSidebar
         active={active}
         onNavigate={handleNavigate}
-        collapsed={isMobile || sidebarCollapsed}
+        collapsed={s1Collapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
-      <div className="flex-1 overflow-auto">
+
+      {/* S2 — Section rail (Double Shell: visible only when S1 expanded + opencode-settings) */}
+      {showS2 && (
+        <OpenCodeSettingsRail
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+          activeTab={activeTab}
+          dirty={dirty}
+        />
+      )}
+
+      {/* Content */}
+      <div className="flex-1 min-w-0 overflow-auto">
         <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-5 w-5 animate-spin" /></div>}>
           {renderContent()}
         </Suspense>
