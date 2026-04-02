@@ -1,8 +1,8 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, Redirect, Router as WouterRouter } from "wouter";
+import { Route, Switch, Redirect, Router as WouterRouter, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -11,6 +11,8 @@ import MainLayout from "./components/MainLayout";
 import InstallPrompt from "./components/InstallPrompt";
 import { Loader2 } from "lucide-react";
 import { useHrRole } from "@/hooks/useHrRole";
+import { trpc } from "@/lib/trpc";
+import { PMCentralChatWindow } from "./components/pm/PMCentralChatWindow";
 
 // Lazy-loaded page components (code splitting)
 const Home = lazy(() => import("./pages/Home"));
@@ -600,6 +602,36 @@ function Router() {
   );
 }
 
+/** PM Chat FAB — lives at App level so it persists across all /pm-central/* routes */
+function PMCentralChatFAB() {
+  const [location] = useLocation();
+  const isPmCentral = location.startsWith("/pm-central");
+
+  const { data: availableAgents } = trpc.catalogManage.available.useQuery(
+    { entryType: "agent" },
+    { enabled: isPmCentral },
+  );
+
+  const catalogImports = useMemo(() => {
+    if (!availableAgents) return [];
+    return availableAgents.map((e: any) => ({
+      id: e.id,
+      catalogEntryId: e.id,
+      entryType: e.sourceType,
+      name: e.displayName || e.name,
+      description: e.description || "",
+      category: e.category || "",
+      tags: e.tags || [],
+      config: e.metadata?.config || {},
+      status: e.status || "active",
+      importedAt: new Date(),
+    }));
+  }, [availableAgents]);
+
+  if (!isPmCentral) return null;
+  return <PMCentralChatWindow catalogImports={catalogImports} />;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -611,6 +643,7 @@ function App() {
             <Suspense fallback={null}>
               <Router />
             </Suspense>
+            <PMCentralChatFAB />
           </TooltipProvider>
         </ThemeProvider>
       </WouterRouter>

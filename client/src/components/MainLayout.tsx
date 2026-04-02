@@ -1,4 +1,4 @@
-import { ReactNode, createContext, useContext, useEffect, useState, useMemo } from "react";
+import { ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 // Context for pages to inject actions into the top header bar
@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { trpc } from "@/lib/trpc";
-import { PMCentralChatWindow } from "./pm/PMCentralChatWindow";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -122,28 +121,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [aiTypesSubMenus, setAiTypesSubMenus] = useState<Record<string, boolean>>({});
   const hrRole = useHrRole();
   const logoutMutation = trpc.auth.logout.useMutation();
-
-  // PM Chat — show floating FAB on all /pm-central/* routes
-  const isPmCentral = location.startsWith("/pm-central");
-  const { data: pmChatAgents } = trpc.catalogManage.available.useQuery(
-    { entryType: "agent" },
-    { enabled: isPmCentral },
-  );
-  const pmChatImports = useMemo(() => {
-    if (!pmChatAgents) return [];
-    return pmChatAgents.map((e: any) => ({
-      id: e.id,
-      catalogEntryId: e.id,
-      entryType: e.sourceType,
-      name: e.displayName || e.name,
-      description: e.description || "",
-      category: e.category || "",
-      tags: e.tags || [],
-      config: e.metadata?.config || {},
-      status: e.status || "active",
-      importedAt: new Date(),
-    }));
-  }, [pmChatAgents]);
 
   const handleLogout = async () => {
     await logoutMutation.mutateAsync();
@@ -691,8 +668,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
         />
       )}
 
-      {/* PM Chat — floating FAB, visible across all PM Central pages */}
-      {isPmCentral && <PMCentralChatWindow catalogImports={pmChatImports} />}
     </div>
     </HeaderActionsContext.Provider>
   );
