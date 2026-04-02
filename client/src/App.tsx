@@ -155,6 +155,10 @@ const HRRoleDefinitionComparePage = lazy(() => import("@/pages/hr/HRRoleDefiniti
 const OMTopLevelPage = lazy(() => import("@/pages/organization-management/OMTopLevelPage"));
 const CVTopLevelPage = lazy(() => import("@/pages/culture-values/CVTopLevelPage"));
 const PRMShellPage = lazy(() => import("@/pages/prm/PRMShellPage"));
+const PSMShellPage = lazy(() => import("@/pages/psm/PSMShellPage"));
+const PSMCaseDetailPage = lazy(() => import("@/pages/psm/PSMCaseDetailPage"));
+const PSMRunPage = lazy(() => import("@/pages/psm/PSMRunPage"));
+const PSMMethodDetailPage = lazy(() => import("@/pages/psm/PSMMethodDetailPage"));
 const PRMCaseWorkspacePage = lazy(() => import("@/pages/prm/PRMCaseWorkspacePage"));
 const PSShellPage = lazy(() => import("@/pages/projects-system/PSShellPage"));
 const PSIdeationDetailPage = lazy(() => import("@/pages/projects-system/PSIdeationDetailPage"));
@@ -404,6 +408,17 @@ function Router() {
       <Route path="/components/simple-shell" component={() => <ProtectedRoute component={SimpleShellPage} />} />
       <Route path="/components/double-shell" component={() => <ProtectedRoute component={DoubleShellPage} />} />
       <Route path="/components/ai-catalog" component={() => <ProtectedRoute component={AICatalogPage} />} />
+      {/* PSM — Problem Solving Methods (detail routes must precede shell catch-all) */}
+      <Route path="/psm/methods/:id" component={() => <ProtectedRoute component={PSMMethodDetailPage} />} />
+      <Route path="/psm/cases/:id" component={() => <ProtectedRoute component={PSMCaseDetailPage} />} />
+      <Route path="/psm/runs/:id" component={() => <ProtectedRoute component={PSMRunPage} />} />
+      <Route path="/psm/dashboard" component={() => <ProtectedRoute component={PSMShellPage} />} />
+      <Route path="/psm/library" component={() => <ProtectedRoute component={PSMShellPage} />} />
+      <Route path="/psm/selector" component={() => <ProtectedRoute component={PSMShellPage} />} />
+      <Route path="/psm/cases" component={() => <ProtectedRoute component={PSMShellPage} />} />
+      <Route path="/psm/admin" component={() => <ProtectedRoute component={PSMShellPage} />} />
+      <Route path="/psm/analytics" component={() => <ProtectedRoute component={PSMShellPage} />} />
+      <Route path="/psm" component={() => <ProtectedRoute component={PSMShellPage} />} />
       {/* PRM — Problem Resolution Methods (case detail must precede shell catch-all) */}
       <Route path="/prm/cases/:id" component={() => <ProtectedRoute component={PRMCaseWorkspacePage} />} />
       <Route path="/prm/dashboard" component={() => <ProtectedRoute component={PRMShellPage} />} />

@@ -280,6 +280,14 @@ async function startServer() {
     console.warn(`[PRMDB] Seed skipped — ${error.message}`);
   }
 
+  // Seed PSMDB (dedicated Problem Solving Methods database — idempotent)
+  try {
+    const { seedPsmDb } = await import("../psm/seed");
+    await seedPsmDb();
+  } catch (error: any) {
+    console.warn(`[PSMDB] Seed skipped — ${error.message}`);
+  }
+
   // Initialize Governance Engine (CGT v2)
   initializeGovernance();
 
