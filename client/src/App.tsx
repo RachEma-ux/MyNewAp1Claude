@@ -154,6 +154,8 @@ const HRRoleDefinitionComparePage = lazy(() => import("@/pages/hr/HRRoleDefiniti
 // OM / CV / PS Modules — top-level pages (auto-select default workspace)
 const OMTopLevelPage = lazy(() => import("@/pages/organization-management/OMTopLevelPage"));
 const CVTopLevelPage = lazy(() => import("@/pages/culture-values/CVTopLevelPage"));
+const PRMShellPage = lazy(() => import("@/pages/prm/PRMShellPage"));
+const PRMCaseWorkspacePage = lazy(() => import("@/pages/prm/PRMCaseWorkspacePage"));
 const PSShellPage = lazy(() => import("@/pages/projects-system/PSShellPage"));
 const PSIdeationDetailPage = lazy(() => import("@/pages/projects-system/PSIdeationDetailPage"));
 const PSIdeationConvertPage = lazy(() => import("@/pages/projects-system/PSIdeationConvertPage"));
@@ -400,6 +402,16 @@ function Router() {
       {/* App Components — Shell demos */}
       <Route path="/components/simple-shell" component={() => <ProtectedRoute component={SimpleShellPage} />} />
       <Route path="/components/double-shell" component={() => <ProtectedRoute component={DoubleShellPage} />} />
+      {/* PRM — Problem Resolution Methods (case detail must precede shell catch-all) */}
+      <Route path="/prm/cases/:id" component={() => <ProtectedRoute component={PRMCaseWorkspacePage} />} />
+      <Route path="/prm/dashboard" component={() => <ProtectedRoute component={PRMShellPage} />} />
+      <Route path="/prm/new" component={() => <ProtectedRoute component={PRMShellPage} />} />
+      <Route path="/prm/cases" component={() => <ProtectedRoute component={PRMShellPage} />} />
+      <Route path="/prm/methods" component={() => <ProtectedRoute component={PRMShellPage} />} />
+      <Route path="/prm/playbooks" component={() => <ProtectedRoute component={PRMShellPage} />} />
+      <Route path="/prm/catalog" component={() => <ProtectedRoute component={PRMShellPage} />} />
+      <Route path="/prm/control-panel" component={() => <ProtectedRoute component={PRMShellPage} />} />
+      <Route path="/prm" component={() => <ProtectedRoute component={PRMShellPage} />} />
       {/* Projects System — Ideation detail routes (must precede shell catch-all) */}
       <Route path="/ps/ideation/:id/convert" component={() => <ProtectedRoute component={PSIdeationConvertPage} />} />
       <Route path="/ps/ideation/:id" component={() => <ProtectedRoute component={PSIdeationDetailPage} />} />

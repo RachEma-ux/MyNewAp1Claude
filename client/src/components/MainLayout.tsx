@@ -82,6 +82,7 @@ import {
   Wind,
   Workflow,
   Layers,
+  Wrench,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -339,6 +340,19 @@ export default function MainLayout({ children }: MainLayoutProps) {
         icon: <FolderKanban className="w-4 h-4" />,
         href: section.currentRoute ?? section.href,
       })),
+    },
+    {
+      label: "PRM",
+      icon: <Wrench className="w-5 h-5" />,
+      children: [
+        { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/prm/dashboard" },
+        { label: "New Case", icon: <FileText className="w-4 h-4" />, href: "/prm/new" },
+        { label: "Cases", icon: <List className="w-4 h-4" />, href: "/prm/cases" },
+        { label: "Methods", icon: <Wrench className="w-4 h-4" />, href: "/prm/methods" },
+        { label: "Playbooks", icon: <BookOpen className="w-4 h-4" />, href: "/prm/playbooks" },
+        { label: "Catalog", icon: <Database className="w-4 h-4" />, href: "/prm/catalog" },
+        { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/prm/control-panel" },
+      ],
     },
     {
       label: "Projects System",

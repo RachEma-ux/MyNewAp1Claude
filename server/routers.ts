@@ -51,6 +51,7 @@ import { psRouter } from "./ps/ps.router";
 import { dataAnalysisRouter } from "./data-analysis/router";
 import { sandboxWfRouter } from "./sandbox-wf/router";
 import { aiTypesRouter } from "./ai-types/router";
+import { prmRouter } from "./prm/prm.router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -100,6 +101,7 @@ export const appRouter = router({
   models: modelsRouter, // Model Registry (governed)
   bots: botsRouter, // Bot Domain (governed lifecycle)
   dataAnalysis: dataAnalysisRouter, // Data Analysis — GraphRAG engine + future analytical tools
+  prm: prmRouter, // PRM — Problem Resolution Methods (dedicated prmdb)
   sandboxWf: sandboxWfRouter, // Sandbox WF — dedicated wfdb workflows, steps, executions, triggers
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
