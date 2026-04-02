@@ -107,7 +107,7 @@ export default function CodeStudioSidebar({
       </div>
 
       {/* Nav items */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className={collapsed ? "px-1 py-1" : ""}>
           {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
             <button
