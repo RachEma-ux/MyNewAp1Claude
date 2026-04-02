@@ -86,6 +86,10 @@ const casesRouter = router({
   close: protectedProcedure.input(closeCaseSchema).mutation(async ({ input, ctx }) => {
     return service.closeCase(input.id, input.closureReason, (ctx as any).user?.id);
   }),
+
+  delete: protectedProcedure.input(byIdSchema).mutation(async ({ input }) => {
+    return repo.deleteCase(input.id);
+  }),
 });
 
 const eventsRouter = router({

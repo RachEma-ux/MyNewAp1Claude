@@ -2,14 +2,20 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Library, FolderKanban, Compass, Activity, CheckCircle2, PlayCircle } from "lucide-react";
+import { Loader2, Library, FolderKanban, Compass, Activity, CheckCircle2, PlayCircle, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 
 export default function PSMDashboardPage() {
   const [, navigate] = useLocation();
   const healthQuery = trpc.psm.health.useQuery();
   const summaryQuery = trpc.psm.analytics.summary.useQuery();
   const casesQuery = trpc.psm.cases.list.useQuery({ limit: 5 });
+
+  const deleteMutation = trpc.psm.cases.delete.useMutation({
+    onSuccess: () => { toast.success("Case deleted"); casesQuery.refetch(); summaryQuery.refetch(); },
+    onError: () => toast.error("Failed to delete case"),
+  });
 
   const health = healthQuery.data;
   const summary = summaryQuery.data;
@@ -27,6 +33,11 @@ export default function PSMDashboardPage() {
           {health?.connected ? `PSMDB Connected (${health.tableCount} tables)` : "PSMDB Disconnected"}
         </Badge>
       </div>
+
+      {/* My Cases — top action */}
+      <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate("/psm/cases")}>
+        <FolderKanban className="h-3 w-3 mr-1" /> My Cases
+      </Button>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -76,9 +87,6 @@ export default function PSMDashboardPage() {
         <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate("/psm/selector")}>
           <Compass className="h-3 w-3 mr-1" /> Method Selector
         </Button>
-        <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate("/psm/cases")}>
-          <FolderKanban className="h-3 w-3 mr-1" /> My Cases
-        </Button>
       </div>
 
       {/* Recent Cases */}
@@ -99,7 +107,21 @@ export default function PSMDashboardPage() {
                 <div key={c.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50 cursor-pointer text-xs"
                   onClick={() => navigate(`/psm/cases/${c.id}`)}>
                   <span className="truncate">{c.title}</span>
-                  <Badge variant="outline" className="text-[9px] capitalize shrink-0 ml-2">{c.status}</Badge>
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <Badge variant="outline" className="text-[9px] capitalize">{c.status}</Badge>
+                    <button
+                      title="Delete case"
+                      className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete case "${c.title}"?`)) {
+                          deleteMutation.mutate({ id: c.id });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

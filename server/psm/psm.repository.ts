@@ -160,6 +160,24 @@ export async function updateCase(id: number, data: Record<string, any>) {
   return updated;
 }
 
+export async function deleteCase(id: number) {
+  const db = getPsmDb();
+  if (!db) throw new Error("PSMDB unavailable");
+  // Delete child rows first (no FK cascade in raw-created tables)
+  const runs = await db.select({ id: schema.psmCaseRuns.id }).from(schema.psmCaseRuns).where(eq(schema.psmCaseRuns.caseId, id));
+  for (const r of runs) {
+    await db.delete(schema.psmCaseStepRuns).where(eq(schema.psmCaseStepRuns.runId, r.id));
+  }
+  await db.delete(schema.psmCaseRuns).where(eq(schema.psmCaseRuns.caseId, id));
+  await db.delete(schema.psmCaseDecisionLog).where(eq(schema.psmCaseDecisionLog.caseId, id));
+  await db.delete(schema.psmCaseNotes).where(eq(schema.psmCaseNotes.caseId, id));
+  await db.delete(schema.psmCaseSelectedMethods).where(eq(schema.psmCaseSelectedMethods.caseId, id));
+  await db.delete(schema.psmCaseRecommendations).where(eq(schema.psmCaseRecommendations.caseId, id));
+  await db.delete(schema.psmCaseInputs).where(eq(schema.psmCaseInputs.caseId, id));
+  const [deleted] = await db.delete(schema.psmCases).where(eq(schema.psmCases.id, id)).returning();
+  return deleted;
+}
+
 // ── Case Inputs ─────────────────────────────────────────────────────────────
 
 export async function saveCaseInputs(caseId: number, inputs: { dimension: string; score: number; notes?: string }[]) {

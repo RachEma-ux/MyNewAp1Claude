@@ -16,6 +16,7 @@ const SEVERITIES = ["", "critical", "high", "medium", "low"];
 export default function PRMCaseListPage() {
   const [filters, setFilters] = useState({ status: "", severity: "", search: "" });
 
+  const utils = trpc.useUtils();
   const { data, isLoading } = trpc.prm.cases.list.useQuery({
     status: (filters.status || undefined) as any,
     severity: (filters.severity || undefined) as any,
@@ -79,6 +80,7 @@ export default function PRMCaseListPage() {
                 priority={c.priority}
                 sourceType={c.sourceType}
                 createdAt={c.createdAt}
+                onDeleted={() => utils.prm.cases.list.invalidate()}
               />
             ))}
           </div>

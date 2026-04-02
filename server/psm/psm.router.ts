@@ -210,6 +210,21 @@ const casesRouter = router({
     .input(addDecisionSchema)
     .mutation(({ input }) => repo.addDecision(input)),
 
+  delete: protectedProcedure
+    .input(byIdSchema)
+    .mutation(async ({ input, ctx }) => {
+      const deleted = await repo.deleteCase(input.id);
+      if (deleted) {
+        await repo.createAuditEvent({
+          eventType: "case_deleted",
+          entityType: "case",
+          entityId: input.id,
+          actorUserId: (ctx as any).user?.id,
+        });
+      }
+      return deleted;
+    }),
+
   export: protectedProcedure
     .input(byIdSchema)
     .query(async ({ input }) => {

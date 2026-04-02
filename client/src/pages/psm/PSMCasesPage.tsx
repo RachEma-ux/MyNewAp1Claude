@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Loader2, Plus, FolderKanban } from "lucide-react";
+import { Loader2, Plus, FolderKanban, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -36,6 +36,11 @@ export default function PSMCasesPage() {
       if (data?.id) navigate(`/psm/cases/${data.id}`);
     },
     onError: () => toast.error("Failed to create case"),
+  });
+
+  const deleteMutation = trpc.psm.cases.delete.useMutation({
+    onSuccess: () => { toast.success("Case deleted"); casesQuery.refetch(); },
+    onError: () => toast.error("Failed to delete case"),
   });
 
   const statusColor = (s: string) => {
@@ -116,9 +121,23 @@ export default function PSMCasesPage() {
                       <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{c.description}</p>
                     )}
                   </div>
-                  <Badge variant="outline" className={`text-[9px] px-1 py-0 capitalize shrink-0 ml-2 ${statusColor(c.status)}`}>
-                    {c.status}
-                  </Badge>
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <Badge variant="outline" className={`text-[9px] px-1 py-0 capitalize ${statusColor(c.status)}`}>
+                      {c.status}
+                    </Badge>
+                    <button
+                      title="Delete case"
+                      className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete case "${c.title}"?`)) {
+                          deleteMutation.mutate({ id: c.id });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 text-[9px] text-muted-foreground">
                   <span>#{c.id}</span>

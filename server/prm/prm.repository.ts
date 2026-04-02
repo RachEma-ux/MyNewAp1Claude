@@ -35,6 +35,24 @@ export async function updateCase(id: number, data: Partial<schema.InsertPrmCase>
   return row;
 }
 
+export async function deleteCase(id: number) {
+  const db = getPrmDb();
+  if (!db) throw new Error("PRMDB not connected");
+  // Delete child rows first (no FK cascade)
+  await db.delete(schema.prmSyncEvents).where(eq(schema.prmSyncEvents.caseId, id));
+  await db.delete(schema.prmExternalRefs).where(eq(schema.prmExternalRefs.caseId, id));
+  await db.delete(schema.prmLessons).where(eq(schema.prmLessons.caseId, id));
+  await db.delete(schema.prmPreventionPlans).where(eq(schema.prmPreventionPlans.caseId, id));
+  await db.delete(schema.prmVerifications).where(eq(schema.prmVerifications.caseId, id));
+  await db.delete(schema.prmEvidence).where(eq(schema.prmEvidence.caseId, id));
+  await db.delete(schema.prmActions).where(eq(schema.prmActions.caseId, id));
+  await db.delete(schema.prmDecisions).where(eq(schema.prmDecisions.caseId, id));
+  await db.delete(schema.prmMethodRuns).where(eq(schema.prmMethodRuns.caseId, id));
+  await db.delete(schema.prmCaseEvents).where(eq(schema.prmCaseEvents.caseId, id));
+  const [deleted] = await db.delete(schema.prmCases).where(eq(schema.prmCases.id, id)).returning();
+  return deleted;
+}
+
 export async function listCases(filters: {
   status?: string;
   severity?: string;

@@ -2,6 +2,9 @@
  * PRM Case Card — Reusable case summary card
  */
 import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { PRMStatusBadge } from "./PRMStatusBadge";
 import { PRMSeverityBadge } from "./PRMSeverityBadge";
 
@@ -13,10 +16,16 @@ interface CaseCardProps {
   priority: string | null;
   sourceType: string | null;
   createdAt: string | Date;
+  onDeleted?: () => void;
 }
 
-export function PRMCaseCard({ id, title, status, severity, priority, sourceType, createdAt }: CaseCardProps) {
+export function PRMCaseCard({ id, title, status, severity, priority, sourceType, createdAt, onDeleted }: CaseCardProps) {
   const [, navigate] = useLocation();
+
+  const deleteMutation = trpc.prm.cases.delete.useMutation({
+    onSuccess: () => { toast.success("Case deleted"); onDeleted?.(); },
+    onError: () => toast.error("Failed to delete case"),
+  });
 
   return (
     <div
@@ -25,7 +34,21 @@ export function PRMCaseCard({ id, title, status, severity, priority, sourceType,
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <h4 className="text-sm font-medium truncate flex-1">{title}</h4>
-        <span className="text-[10px] text-muted-foreground shrink-0">#{id}</span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] text-muted-foreground">#{id}</span>
+          <button
+            title="Delete case"
+            className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm(`Delete case "${title}"?`)) {
+                deleteMutation.mutate({ id });
+              }
+            }}
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
       </div>
       <div className="flex items-center gap-1.5 flex-wrap">
         <PRMStatusBadge status={status} />

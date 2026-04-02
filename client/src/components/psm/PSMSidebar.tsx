@@ -30,9 +30,9 @@ const NAV_ITEMS: { key: PSMView; label: string; icon: React.ElementType }[] = [
   { key: "library", label: "Method Library", icon: Library },
   { key: "selector", label: "Selector", icon: Compass },
   { key: "cases", label: "Cases", icon: FolderKanban },
-  { key: "ai-catalog", label: "AI Catalog", icon: Brain },
   { key: "admin", label: "Admin", icon: Shield },
   { key: "analytics", label: "Analytics", icon: BarChart3 },
+  { key: "ai-catalog", label: "AI Catalog", icon: Brain },
 ];
 
 interface Props {

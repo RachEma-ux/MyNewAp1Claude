@@ -34,8 +34,8 @@ const NAV_ITEMS: { key: PRMView; label: string; icon: React.ElementType }[] = [
   { key: "methods", label: "Methods", icon: Wrench },
   { key: "playbooks", label: "Playbooks", icon: BookOpen },
   { key: "catalog", label: "Catalog", icon: Library },
-  { key: "ai-catalog", label: "AI Catalog", icon: Brain },
   { key: "control-panel", label: "Control Panel", icon: Settings },
+  { key: "ai-catalog", label: "AI Catalog", icon: Brain },
 ];
 
 interface Props {
