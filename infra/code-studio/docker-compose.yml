@@ -1,0 +1,27 @@
+# Code Studio — Infrastructure (Development)
+# Brings up the dedicated CODEDB PostgreSQL instance.
+# OpenCode runtime is expected to run locally via `opencode serve`.
+
+version: "3.9"
+
+services:
+  codedb:
+    image: postgres:16-alpine
+    container_name: code-studio-codedb
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: codedb
+      POSTGRES_USER: ${CODEDB_USER:-codedb}
+      POSTGRES_PASSWORD: ${CODEDB_PASSWORD:-codedb_dev}
+    volumes:
+      - codedb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CODEDB_USER:-codedb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  codedb-data:

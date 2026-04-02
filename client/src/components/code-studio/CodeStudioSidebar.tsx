@@ -1,0 +1,108 @@
+/**
+ * Code Studio Sidebar — Simple IBM Shell sidebar (cloned from PSMSidebar)
+ */
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  PanelLeftClose,
+  PanelLeftOpen,
+  LayoutDashboard,
+  Workflow,
+  Terminal,
+  ShieldCheck,
+  GitBranch,
+  Users,
+  Shield,
+  Settings,
+  Code2,
+} from "lucide-react";
+
+export type CodeStudioView =
+  | "dashboard"
+  | "jobs"
+  | "sessions"
+  | "approvals"
+  | "repos"
+  | "agents"
+  | "policies"
+  | "control-panel";
+
+const NAV_ITEMS: { key: CodeStudioView; label: string; icon: React.ElementType }[] = [
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "jobs", label: "Jobs", icon: Workflow },
+  { key: "sessions", label: "Sessions", icon: Terminal },
+  { key: "approvals", label: "Approvals", icon: ShieldCheck },
+  { key: "repos", label: "Repositories", icon: GitBranch },
+  { key: "agents", label: "Agents", icon: Users },
+  { key: "policies", label: "Policies", icon: Shield },
+  { key: "control-panel", label: "Control Panel", icon: Settings },
+];
+
+interface Props {
+  active: CodeStudioView;
+  onNavigate: (key: CodeStudioView) => void;
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+export default function CodeStudioSidebar({ active, onNavigate, collapsed, onToggle }: Props) {
+  return (
+    <div
+      className={cn(
+        "border-r bg-background flex flex-col h-full transition-all duration-200 shrink-0",
+        collapsed ? "w-12" : "w-56"
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-center border-b",
+          collapsed ? "justify-center py-1.5" : "justify-between px-2 py-1.5"
+        )}
+      >
+        {!collapsed && (
+          <div className="flex items-center gap-2 min-w-0">
+            <Code2 className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+            <span className="text-xs font-semibold text-muted-foreground truncate">
+              Code Studio
+            </span>
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0 shrink-0"
+          onClick={onToggle}
+          title={collapsed ? "Expand" : "Collapse"}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-4 w-4" />
+          ) : (
+            <PanelLeftClose className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+      <ScrollArea className="flex-1">
+        <div className={collapsed ? "px-1 py-1" : ""}>
+          {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => onNavigate(key)}
+              title={label}
+              className={cn(
+                "flex items-center w-full rounded-sm transition-colors",
+                collapsed ? "justify-center py-1.5" : "gap-2 px-3 py-1.5 text-xs",
+                active === key
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
+              {!collapsed && <span className="truncate">{label}</span>}
+            </button>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}

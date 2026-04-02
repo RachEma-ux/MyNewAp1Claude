@@ -83,6 +83,7 @@ import {
   Workflow,
   Layers,
   Wrench,
+  Code2,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -121,6 +122,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [appComponentsMenuOpen, setAppComponentsMenuOpen] = useState(false);
   const [prmMenuOpen, setPrmMenuOpen] = useState(false);
   const [psmMenuOpen, setPsmMenuOpen] = useState(false);
+  const [codeStudioMenuOpen, setCodeStudioMenuOpen] = useState(false);
   const [aiTypesSubMenus, setAiTypesSubMenus] = useState<Record<string, boolean>>({});
   const hrRole = useHrRole();
   const logoutMutation = trpc.auth.logout.useMutation();
@@ -354,8 +356,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Methods", icon: <Wrench className="w-4 h-4" />, href: "/prm/methods" },
         { label: "Playbooks", icon: <BookOpen className="w-4 h-4" />, href: "/prm/playbooks" },
         { label: "Catalog", icon: <Database className="w-4 h-4" />, href: "/prm/catalog" },
-        { label: "AI Catalog", icon: <Bot className="w-4 h-4" />, href: "/prm/ai-catalog" },
         { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/prm/control-panel" },
+        { label: "AI Catalog", icon: <Bot className="w-4 h-4" />, href: "/prm/ai-catalog" },
       ],
     },
     {
@@ -366,9 +368,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Method Library", icon: <BookOpen className="w-4 h-4" />, href: "/psm/library" },
         { label: "Selector", icon: <Sparkles className="w-4 h-4" />, href: "/psm/selector" },
         { label: "Cases", icon: <FolderKanban className="w-4 h-4" />, href: "/psm/cases" },
-        { label: "AI Catalog", icon: <BrainCircuit className="w-4 h-4" />, href: "/psm/ai-catalog" },
         { label: "Admin", icon: <Shield className="w-4 h-4" />, href: "/psm/admin" },
         { label: "Analytics", icon: <BarChart3 className="w-4 h-4" />, href: "/psm/analytics" },
+        { label: "AI Catalog", icon: <BrainCircuit className="w-4 h-4" />, href: "/psm/ai-catalog" },
+      ],
+    },
+    {
+      label: "Code Studio",
+      icon: <Code2 className="w-5 h-5" />,
+      children: [
+        { label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/code-studio/dashboard" },
+        { label: "Jobs", icon: <Workflow className="w-4 h-4" />, href: "/code-studio/jobs" },
+        { label: "Sessions", icon: <Terminal className="w-4 h-4" />, href: "/code-studio/sessions" },
+        { label: "Approvals", icon: <ShieldCheck className="w-4 h-4" />, href: "/code-studio/approvals" },
+        { label: "Repositories", icon: <GitBranch className="w-4 h-4" />, href: "/code-studio/repos" },
+        { label: "Agents", icon: <Users className="w-4 h-4" />, href: "/code-studio/agents" },
+        { label: "Policies", icon: <Shield className="w-4 h-4" />, href: "/code-studio/policies" },
+        { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/code-studio/control-panel" },
       ],
     },
     {
@@ -478,6 +494,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                         setPrmMenuOpen(!prmMenuOpen);
                       } else if (item.label === "PSM") {
                         setPsmMenuOpen(!psmMenuOpen);
+                      } else if (item.label === "Code Studio") {
+                        setCodeStudioMenuOpen(!codeStudioMenuOpen);
                       }
                     }}
                     className="flex w-full items-center justify-between space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -486,10 +504,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Human Resources" && hrMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) || (item.label === "Data Analysis" && dataAnalysisMenuOpen) || (item.label === "App Components" && appComponentsMenuOpen) || (item.label === "PRM" && prmMenuOpen) || (item.label === "PSM" && psmMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {(item.label === "Automation" && automationMenuOpen) || (item.label === "Infrastructure" && infrastructureMenuOpen) || (item.label === "AI Types" && aiTypesMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Human Resources" && hrMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) || (item.label === "Data Analysis" && dataAnalysisMenuOpen) || (item.label === "App Components" && appComponentsMenuOpen) || (item.label === "PRM" && prmMenuOpen) || (item.label === "PSM" && psmMenuOpen) || (item.label === "Code Studio" && codeStudioMenuOpen) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   {/* Automation / Digital HQ menus (2-level) */}
-                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) || (item.label === "Data Analysis" && dataAnalysisMenuOpen) || (item.label === "App Components" && appComponentsMenuOpen) || (item.label === "PRM" && prmMenuOpen) || (item.label === "PSM" && psmMenuOpen)) && (
+                  {((item.label === "Automation" && automationMenuOpen) || (item.label === "Digital HQ" && digitalHQMenuOpen) || (item.label === "Governance Center" && governanceCenterMenuOpen) || (item.label === "PM Central" && pmCentralMenuOpen) || (item.label === "Projects System" && psMenuOpen) || (item.label === "Workspaces" && wsSandboxMenuOpen) || (item.label === "Communication" && communicationMenuOpen) || (item.label === "Org Management" && omMenuOpen) || (item.label === "Culture Values" && cvMenuOpen) || (item.label === "Data Analysis" && dataAnalysisMenuOpen) || (item.label === "App Components" && appComponentsMenuOpen) || (item.label === "PRM" && prmMenuOpen) || (item.label === "PSM" && psmMenuOpen) || (item.label === "Code Studio" && codeStudioMenuOpen)) && (
                     <div className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <Link key={child.href} href={child.href!}>

@@ -288,6 +288,14 @@ async function startServer() {
     console.warn(`[PSMDB] Seed skipped — ${error.message}`);
   }
 
+  // Seed CODEDB (dedicated Code Studio database — idempotent)
+  try {
+    const { seedCodeDb } = await import("../code-studio/seed");
+    await seedCodeDb();
+  } catch (error: any) {
+    console.warn(`[CODEDB] Seed skipped — ${error.message}`);
+  }
+
   // Initialize Governance Engine (CGT v2)
   initializeGovernance();
 
