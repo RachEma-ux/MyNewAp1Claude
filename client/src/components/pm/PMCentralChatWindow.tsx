@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  FolderKanban,
+  Brain,
   X,
   Send,
   Loader2,
@@ -221,7 +221,7 @@ export function PMCentralChatWindow({ catalogImports }: PMCentralChatWindowProps
         className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 transition-all flex items-center justify-center group"
         title="PM Chat"
       >
-        <FolderKanban className="h-6 w-6 group-hover:scale-110 transition-transform" />
+        <Brain className="h-6 w-6 group-hover:scale-110 transition-transform" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -237,7 +237,7 @@ export function PMCentralChatWindow({ catalogImports }: PMCentralChatWindowProps
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b bg-card shrink-0">
         <div className="flex items-center gap-2">
-          <FolderKanban className="h-4 w-4 text-primary" />
+          <Brain className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold">PM Chat</span>
           {selectedIds.size > 0 && (
             <Badge variant="secondary" className="text-[9px] px-1.5">
@@ -319,7 +319,7 @@ export function PMCentralChatWindow({ catalogImports }: PMCentralChatWindowProps
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <FolderKanban className="h-8 w-8 mb-2 opacity-20" />
+            <Brain className="h-8 w-8 mb-2 opacity-20" />
             <p className="text-xs text-center">
               Select participants above and start a round-table conversation
             </p>
