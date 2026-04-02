@@ -295,7 +295,16 @@ export async function seedCodeDb() {
       completed_at TIMESTAMP
     );
 
-    -- Group 8: AI Catalog Imports
+    -- Group 8: Settings
+    CREATE TABLE IF NOT EXISTS code_settings (
+      id SERIAL PRIMARY KEY,
+      key VARCHAR(100) NOT NULL UNIQUE,
+      value JSONB DEFAULT '{}',
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_code_settings_key ON code_settings(key);
+
+    -- Group 9: AI Catalog Imports
     CREATE TABLE IF NOT EXISTS code_catalog_imports (
       id SERIAL PRIMARY KEY,
       catalog_entry_id INTEGER NOT NULL,

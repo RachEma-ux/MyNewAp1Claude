@@ -283,6 +283,17 @@ const opencodeRouter = router({
   }),
 });
 
+// ── Settings ────────────────────────────────────────────────────────────────
+
+const settingsRouter = router({
+  get: protectedProcedure
+    .input(z.object({ key: z.string() }))
+    .query(({ input }) => repo.getSetting(input.key)),
+  set: protectedProcedure
+    .input(z.object({ key: z.string(), value: z.any() }))
+    .mutation(({ input }) => repo.setSetting(input.key, input.value)),
+});
+
 // ── Catalog Imports ──────────────────────────────────────────────────────────
 
 const catalogImportsRouter = router({
@@ -321,4 +332,5 @@ export const codeStudioRouter = router({
   artifacts: artifactsRouter,
   opencode: opencodeRouter,
   catalogImports: catalogImportsRouter,
+  settings: settingsRouter,
 });

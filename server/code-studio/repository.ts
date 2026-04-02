@@ -342,6 +342,42 @@ export async function getModuleSummary() {
   }
 }
 
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+export async function getSetting(key: string) {
+  const db = getCodeDb();
+  if (!db) return null;
+  const [row] = await db
+    .select()
+    .from(schema.codeSettings)
+    .where(eq(schema.codeSettings.key, key))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function setSetting(key: string, value: any) {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB unavailable");
+  const existing = await db
+    .select()
+    .from(schema.codeSettings)
+    .where(eq(schema.codeSettings.key, key))
+    .limit(1);
+  if (existing.length > 0) {
+    const [updated] = await db
+      .update(schema.codeSettings)
+      .set({ value, updatedAt: new Date() })
+      .where(eq(schema.codeSettings.key, key))
+      .returning();
+    return updated;
+  }
+  const [created] = await db
+    .insert(schema.codeSettings)
+    .values({ key, value })
+    .returning();
+  return created;
+}
+
 // ── Catalog Imports ──────────────────────────────────────────────────────────
 
 export async function listCatalogImports() {

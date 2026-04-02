@@ -398,7 +398,22 @@ export const codeRetentionBatches = pgTable(
   }
 );
 
-// ── Group 8: AI Catalog Imports ────────────────────────────────────────────
+// ── Group 8: Settings (key-value store) ──────────────────────────────────
+
+export const codeSettings = pgTable(
+  "code_settings",
+  {
+    id: serial("id").primaryKey(),
+    key: varchar("key", { length: 100 }).notNull().unique(),
+    value: jsonb("value").default({}),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => ({
+    keyIdx: index("idx_code_settings_key").on(table.key),
+  })
+);
+
+// ── Group 9: AI Catalog Imports ────────────────────────────────────────────
 
 export const codeCatalogImports = pgTable(
   "code_catalog_imports",
