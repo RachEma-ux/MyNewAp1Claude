@@ -17,6 +17,7 @@ const PSWizardShell = lazy(() =>
   import("@/components/projects-system/wizard/PSWizardShell").then(m => ({ default: m.PSWizardShell }))
 );
 const PSListPage = lazy(() => import("@/pages/projects-system/PSListPage"));
+const PSAICatalogPage = lazy(() => import("@/pages/projects-system/PSAICatalogPage"));
 
 const routeMap: Record<PSView, string> = {
   catalog: "/ps/catalog",
@@ -24,6 +25,7 @@ const routeMap: Record<PSView, string> = {
   "control-panel": "/ps/control-panel",
   wizard: "/ps/wizard",
   list: "/ps/list",
+  "ai-catalog": "/ps/ai-catalog",
 };
 
 function getActiveView(path: string): PSView {
@@ -31,6 +33,7 @@ function getActiveView(path: string): PSView {
   if (path.startsWith("/ps/control-panel")) return "control-panel";
   if (path.startsWith("/ps/wizard")) return "wizard";
   if (path.startsWith("/ps/list")) return "list";
+  if (path.startsWith("/ps/ai-catalog")) return "ai-catalog";
   return "catalog";
 }
 
@@ -88,6 +91,9 @@ export default function PSShell() {
       break;
     case "list":
       content = <PSListPage />;
+      break;
+    case "ai-catalog":
+      content = <PSAICatalogPage />;
       break;
     default:
       content = <PSCatalogPage />;

@@ -12,9 +12,10 @@ import {
   Settings,
   Wand2,
   List,
+  Brain,
 } from "lucide-react";
 
-export type PSView = "catalog" | "ideation" | "control-panel" | "wizard" | "list";
+export type PSView = "catalog" | "ideation" | "control-panel" | "wizard" | "list" | "ai-catalog";
 
 const NAV_ITEMS: { key: PSView; label: string; icon: React.ElementType }[] = [
   { key: "catalog", label: "Catalog", icon: ClipboardList },
@@ -22,6 +23,7 @@ const NAV_ITEMS: { key: PSView; label: string; icon: React.ElementType }[] = [
   { key: "control-panel", label: "Control Panel", icon: Settings },
   { key: "wizard", label: "Wizard", icon: Wand2 },
   { key: "list", label: "PS List", icon: List },
+  { key: "ai-catalog", label: "AI Catalog", icon: Brain },
 ];
 
 interface Props {

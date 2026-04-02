@@ -406,6 +406,7 @@ function Router() {
       <Route path="/ps/control-panel" component={() => <ProtectedRoute component={PSShellPage} />} />
       <Route path="/ps/wizard" component={() => <ProtectedRoute component={PSShellPage} />} />
       <Route path="/ps/list" component={() => <ProtectedRoute component={PSShellPage} />} />
+      <Route path="/ps/ai-catalog" component={() => <ProtectedRoute component={PSShellPage} />} />
       <Route path="/ps" component={() => <ProtectedRoute component={PSShellPage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
