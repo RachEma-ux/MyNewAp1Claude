@@ -441,6 +441,14 @@ jobs:
           kill $OLLAMA_PID 2>/dev/null || true
           sleep 2
 
+      - name: Install OpenCode runtime
+        if: ${{ github.event.inputs.run_app == 'yes' }}
+        continue-on-error: true
+        run: |
+          echo "🔧 Installing OpenCode coding agent runtime..."
+          curl -fsSL https://opencode.ai/install | bash
+          echo "✅ OpenCode installed: $(opencode --version 2>/dev/null || echo 'version unknown')"
+
       - name: Install cloudflared
         if: ${{ github.event.inputs.run_app == 'yes' }}
         run: |
@@ -503,6 +511,44 @@ jobs:
             echo "⚠️ Ollama not available — skipping local LLM"
           fi
 
+          # Start OpenCode in serve mode (port 4096) with Ollama as provider
+          OPENCODE_PID=""
+          if command -v opencode &>/dev/null; then
+            echo "🔧 Starting OpenCode serve mode on port 4096..."
+            mkdir -p /tmp/opencode-workdir
+            cat > /tmp/opencode-workdir/opencode.json <<OCEOF
+          {
+            "\$schema": "https://opencode.ai/config.json",
+            "provider": {
+              "ollama": {
+                "npm": "@ai-sdk/openai-compatible",
+                "name": "Ollama (local)",
+                "options": {
+                  "baseURL": "http://localhost:11434/v1"
+                },
+                "models": {
+                  "tinyllama": { "name": "TinyLlama" },
+                  "phi3": { "name": "Phi-3" }
+                }
+              }
+            }
+          }
+          OCEOF
+            cd /tmp/opencode-workdir
+            opencode serve --port 4096 > /tmp/opencode-serve.log 2>&1 &
+            OPENCODE_PID=$!
+            cd "$GITHUB_WORKSPACE"
+            sleep 3
+            if curl -fsS http://127.0.0.1:4096/global/health > /dev/null 2>&1; then
+              echo "✅ OpenCode serve mode healthy on port 4096"
+            else
+              echo "⚠️ OpenCode serve not responding (non-blocking)"
+              cat /tmp/opencode-serve.log 2>/dev/null | tail -10 || true
+            fi
+          else
+            echo "⚠️ OpenCode not installed — skipping coding runtime"
+          fi
+
           # Use input DATABASE_URL if provided, otherwise use the service container
           if [ -n "$DATABASE_URL_INPUT" ]; then
             EFFECTIVE_DB_URL="$DATABASE_URL_INPUT"
@@ -545,6 +591,7 @@ jobs:
           ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
           GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
           PROJECT_CONTEXT_TRANSLATOR_URL="http://localhost:8585" \
+          OPENCODE_URL="http://127.0.0.1:4096" \
           node dist/index.js > server.log 2>&1 &
           SERVER_PID=$!
 
@@ -668,6 +715,7 @@ jobs:
           kill $SERVER_PID 2>/dev/null || true
           kill $TUNNEL_PID 2>/dev/null || true
           [ -n "$OLLAMA_PID" ] && kill $OLLAMA_PID 2>/dev/null || true
+          [ -n "$OPENCODE_PID" ] && kill $OPENCODE_PID 2>/dev/null || true
           kill $PCT_PID 2>/dev/null || true
 
       - name: Upload artifacts
