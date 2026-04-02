@@ -28,7 +28,8 @@ export type CodeStudioView =
   | "agents"
   | "policies"
   | "ai-catalog"
-  | "control-panel";
+  | "control-panel"
+  | "opencode-settings";
 
 const NAV_ITEMS: { key: CodeStudioView; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -40,6 +41,7 @@ const NAV_ITEMS: { key: CodeStudioView; label: string; icon: React.ElementType }
   { key: "ai-catalog", label: "AI Catalog", icon: BrainCircuit },
   { key: "policies", label: "Policies", icon: Shield },
   { key: "control-panel", label: "Control Panel", icon: Settings },
+  { key: "opencode-settings", label: "OpenCode", icon: Code2 },
 ];
 
 interface Props {

@@ -26,6 +26,7 @@ import {
   createPolicySchema,
   listDiffsSchema,
 } from "../shared/schemas";
+import { opencodeSettingsRouter } from "../opencode/settings-router";
 
 // ── Health ────────────────────────────────────────────────────────────────────
 
@@ -333,4 +334,5 @@ export const codeStudioRouter = router({
   opencode: opencodeRouter,
   catalogImports: catalogImportsRouter,
   settings: settingsRouter,
+  opencodeSettings: opencodeSettingsRouter,
 });

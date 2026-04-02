@@ -415,6 +415,72 @@ export const codeSettings = pgTable(
 
 // ── Group 9: AI Catalog Imports ────────────────────────────────────────────
 
+// ── Group 10: OpenCode Settings Profiles ─────────────────────────────────
+
+export const codeOpencodeProfiles = pgTable(
+  "code_opencode_profiles",
+  {
+    id: serial("id").primaryKey(),
+    profileType: varchar("profile_type", { length: 20 }).notNull(), // 'runtime' | 'tui'
+    name: varchar("name", { length: 200 }).notNull(),
+    description: text("description"),
+    configDraft: jsonb("config_draft").default({}),
+    configApplied: jsonb("config_applied"),
+    status: varchar("status", { length: 20 }).default("draft").notNull(), // 'draft' | 'applied' | 'archived'
+    isActive: boolean("is_active").default(true),
+    appliedAt: timestamp("applied_at"),
+    appliedVersion: integer("applied_version"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => ({
+    typeIdx: index("idx_code_oc_profiles_type").on(table.profileType),
+    activeIdx: index("idx_code_oc_profiles_active").on(table.isActive),
+  })
+);
+
+export const codeOpencodeProfileVersions = pgTable(
+  "code_opencode_profile_versions",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").notNull(),
+    version: integer("version").notNull(),
+    config: jsonb("config").notNull(),
+    changeSummary: text("change_summary"),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => ({
+    profileIdx: index("idx_code_oc_pv_profile").on(table.profileId),
+    versionIdx: index("idx_code_oc_pv_version").on(table.profileId, table.version),
+  })
+);
+
+export const codeOpencodeApplyEvents = pgTable(
+  "code_opencode_apply_events",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id").notNull(),
+    profileType: varchar("profile_type", { length: 20 }).notNull(),
+    version: integer("version").notNull(),
+    action: varchar("action", { length: 20 }).notNull(), // 'apply' | 'revert' | 'validate' | 'preview'
+    status: varchar("status", { length: 20 }).notNull(), // 'success' | 'failed' | 'pending'
+    generatedConfig: jsonb("generated_config"),
+    validationErrors: jsonb("validation_errors"),
+    healthCheckResult: jsonb("health_check_result"),
+    errorMessage: text("error_message"),
+    actorUserId: integer("actor_user_id"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => ({
+    profileIdx: index("idx_code_oc_apply_profile").on(table.profileId),
+    typeIdx: index("idx_code_oc_apply_type").on(table.profileType),
+    createdIdx: index("idx_code_oc_apply_created").on(table.createdAt),
+  })
+);
+
+// ── Group 9: AI Catalog Imports ────────────────────────────────────────────
+
 export const codeCatalogImports = pgTable(
   "code_catalog_imports",
   {
