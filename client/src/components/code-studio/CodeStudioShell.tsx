@@ -6,8 +6,8 @@
  *
  * Collapsed: S1 icons only (w-12), S2 hidden
  * Expanded:  S1 full + S2 visible side by side
- * Single toggle on S1 controls both sidebars.
- * Starts collapsed; toggle expands/collapses on any viewport.
+ * S1 and S2 have independent collapse toggles.
+ * S1 starts collapsed; S2 starts expanded (on opencode-settings page).
  */
 import { lazy, Suspense, useState } from "react";
 import { useLocation } from "wouter";
@@ -55,6 +55,7 @@ function getActiveView(path: string): CodeStudioView {
 export default function CodeStudioShell() {
   const [location, navigate] = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [railCollapsed, setRailCollapsed] = useState(false);
   const active = getActiveView(location);
 
   // ── Double-shell state: S2 section nav for OpenCode Settings ──────────
@@ -62,7 +63,7 @@ export default function CodeStudioShell() {
   const [activeTab, setActiveTab] = useState<"runtime" | "tui">("runtime");
   const [dirty, setDirty] = useState(false);
 
-  const showS2 = active === "opencode-settings" && !sidebarCollapsed;
+  const showS2 = active === "opencode-settings";
 
   const handleNavigate = (key: CodeStudioView) => {
     navigate(routeMap[key]);
@@ -110,6 +111,8 @@ export default function CodeStudioShell() {
           onSectionChange={setActiveSection}
           activeTab={activeTab}
           dirty={dirty}
+          collapsed={railCollapsed}
+          onToggle={() => setRailCollapsed(!railCollapsed)}
         />
       )}
 
