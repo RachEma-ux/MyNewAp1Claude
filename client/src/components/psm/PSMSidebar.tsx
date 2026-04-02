@@ -13,6 +13,7 @@ import {
   FolderKanban,
   Shield,
   BarChart3,
+  Brain,
 } from "lucide-react";
 
 export type PSMView =
@@ -21,13 +22,15 @@ export type PSMView =
   | "selector"
   | "cases"
   | "admin"
-  | "analytics";
+  | "analytics"
+  | "ai-catalog";
 
 const NAV_ITEMS: { key: PSMView; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "library", label: "Method Library", icon: Library },
   { key: "selector", label: "Selector", icon: Compass },
   { key: "cases", label: "Cases", icon: FolderKanban },
+  { key: "ai-catalog", label: "AI Catalog", icon: Brain },
   { key: "admin", label: "Admin", icon: Shield },
   { key: "analytics", label: "Analytics", icon: BarChart3 },
 ];

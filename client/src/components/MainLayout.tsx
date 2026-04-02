@@ -366,6 +366,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Method Library", icon: <BookOpen className="w-4 h-4" />, href: "/psm/library" },
         { label: "Selector", icon: <Sparkles className="w-4 h-4" />, href: "/psm/selector" },
         { label: "Cases", icon: <FolderKanban className="w-4 h-4" />, href: "/psm/cases" },
+        { label: "AI Catalog", icon: <BrainCircuit className="w-4 h-4" />, href: "/psm/ai-catalog" },
         { label: "Admin", icon: <Shield className="w-4 h-4" />, href: "/psm/admin" },
         { label: "Analytics", icon: <BarChart3 className="w-4 h-4" />, href: "/psm/analytics" },
       ],

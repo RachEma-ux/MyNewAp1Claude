@@ -436,3 +436,62 @@ export async function getMethodUsageCounts() {
     return [];
   }
 }
+
+// ── AI Catalog Imports ─────────────────────────────────────────────────────
+
+export async function listCatalogImports() {
+  const db = getPsmDb();
+  if (!db) throw new Error("PSMDB not connected");
+  return db
+    .select()
+    .from(schema.psmCatalogImports)
+    .where(eq(schema.psmCatalogImports.status, "active"))
+    .orderBy(schema.psmCatalogImports.id);
+}
+
+export async function importCatalogEntry(data: {
+  catalogEntryId: number;
+  entryType: string;
+  name: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  config?: Record<string, any>;
+}) {
+  const db = getPsmDb();
+  if (!db) throw new Error("PSMDB not connected");
+  const existing = await db
+    .select()
+    .from(schema.psmCatalogImports)
+    .where(
+      and(
+        eq(schema.psmCatalogImports.catalogEntryId, data.catalogEntryId),
+        eq(schema.psmCatalogImports.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (existing.length > 0) return existing[0];
+  const [imported] = await db
+    .insert(schema.psmCatalogImports)
+    .values({
+      catalogEntryId: data.catalogEntryId,
+      entryType: data.entryType,
+      name: data.name,
+      description: data.description || "",
+      category: data.category || "",
+      tags: data.tags || [],
+      config: data.config || {},
+    })
+    .returning();
+  return imported;
+}
+
+export async function removeCatalogImport(id: number) {
+  const db = getPsmDb();
+  if (!db) throw new Error("PSMDB not connected");
+  await db
+    .update(schema.psmCatalogImports)
+    .set({ status: "removed" })
+    .where(eq(schema.psmCatalogImports.id, id));
+  return { success: true };
+}

@@ -12,6 +12,7 @@ const PSMSelectorPage = lazy(() => import("@/pages/psm/PSMSelectorPage"));
 const PSMCasesPage = lazy(() => import("@/pages/psm/PSMCasesPage"));
 const PSMAdminPage = lazy(() => import("@/pages/psm/PSMAdminPage"));
 const PSMAnalyticsPage = lazy(() => import("@/pages/psm/PSMAnalyticsPage"));
+const PSMAICatalogPage = lazy(() => import("@/pages/psm/PSMAICatalogPage"));
 
 const routeMap: Record<PSMView, string> = {
   dashboard: "/psm/dashboard",
@@ -20,12 +21,14 @@ const routeMap: Record<PSMView, string> = {
   cases: "/psm/cases",
   admin: "/psm/admin",
   analytics: "/psm/analytics",
+  "ai-catalog": "/psm/ai-catalog",
 };
 
 function getActiveView(path: string): PSMView {
   if (path.startsWith("/psm/library")) return "library";
   if (path.startsWith("/psm/selector")) return "selector";
   if (path.startsWith("/psm/cases")) return "cases";
+  if (path.startsWith("/psm/ai-catalog")) return "ai-catalog";
   if (path.startsWith("/psm/admin")) return "admin";
   if (path.startsWith("/psm/analytics")) return "analytics";
   return "dashboard";
@@ -57,6 +60,9 @@ export default function PSMShell() {
       break;
     case "cases":
       content = <PSMCasesPage />;
+      break;
+    case "ai-catalog":
+      content = <PSMAICatalogPage />;
       break;
     case "admin":
       content = <PSMAdminPage />;

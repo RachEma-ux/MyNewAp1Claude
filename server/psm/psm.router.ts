@@ -373,6 +373,27 @@ export const psmRouter = router({
   jobs: jobsRouter,
   problemTypes: problemTypesRouter,
 
+  // AI Catalog Imports
+  catalogImports: router({
+    list: protectedProcedure.query(() => repo.listCatalogImports()),
+    import: protectedProcedure
+      .input(
+        z.object({
+          catalogEntryId: z.number(),
+          entryType: z.string(),
+          name: z.string(),
+          description: z.string().optional(),
+          category: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+          config: z.any().optional(),
+        })
+      )
+      .mutation(({ input }) => repo.importCatalogEntry(input)),
+    remove: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => repo.removeCatalogImport(input.id)),
+  }),
+
   // Health check
   health: protectedProcedure.query(() => repo.healthCheck()),
 });

@@ -416,6 +416,7 @@ function Router() {
       <Route path="/psm/library" component={() => <ProtectedRoute component={PSMShellPage} />} />
       <Route path="/psm/selector" component={() => <ProtectedRoute component={PSMShellPage} />} />
       <Route path="/psm/cases" component={() => <ProtectedRoute component={PSMShellPage} />} />
+      <Route path="/psm/ai-catalog" component={() => <ProtectedRoute component={PSMShellPage} />} />
       <Route path="/psm/admin" component={() => <ProtectedRoute component={PSMShellPage} />} />
       <Route path="/psm/analytics" component={() => <ProtectedRoute component={PSMShellPage} />} />
       <Route path="/psm" component={() => <ProtectedRoute component={PSMShellPage} />} />

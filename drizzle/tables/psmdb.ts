@@ -462,3 +462,24 @@ export const psmHealthSnapshots = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
 );
+
+// ── Group 7: AI Catalog Imports ─────────────────────────────────────────────
+
+export const psmCatalogImports = pgTable(
+  "psm_catalog_imports",
+  {
+    id: serial("id").primaryKey(),
+    catalogEntryId: integer("catalog_entry_id").notNull(),
+    entryType: varchar("entry_type", { length: 20 }).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description").default(""),
+    category: varchar("category", { length: 50 }).default(""),
+    tags: json("tags").$type<string[]>().default([]),
+    config: json("config").$type<Record<string, any>>().default({}),
+    status: varchar("status", { length: 20 }).default("active"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    catalogEntryIdx: index("idx_psm_catalog_imports_entry").on(table.catalogEntryId),
+  })
+);
