@@ -383,6 +383,33 @@ export const prmRouter = router({
   analytics: analyticsRouter,
   refs: refsRouter,
 
+  // AI Catalog Imports
+  catalogImports: router({
+    list: protectedProcedure.query(() => {
+      return repo.listCatalogImports();
+    }),
+    import: protectedProcedure
+      .input(
+        z.object({
+          catalogEntryId: z.number(),
+          entryType: z.string(),
+          name: z.string(),
+          description: z.string().optional(),
+          category: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+          config: z.any().optional(),
+        })
+      )
+      .mutation(({ input }) => {
+        return repo.importCatalogEntry(input);
+      }),
+    remove: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => {
+        return repo.removeCatalogImport(input.id);
+      }),
+  }),
+
   // Health check
   health: protectedProcedure.query(() => {
     return repo.healthCheck();

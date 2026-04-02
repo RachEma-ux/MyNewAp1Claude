@@ -450,17 +450,79 @@ export async function getDashboardStats() {
   return { ...caseStats, ...actionStats };
 }
 
+// ── Catalog Imports ─────────────────────────────────────────────────────
+
+export async function listCatalogImports() {
+  const db = getPrmDb();
+  if (!db) throw new Error("PRMDB not connected");
+  return db
+    .select()
+    .from(schema.prmCatalogImports)
+    .where(eq(schema.prmCatalogImports.status, "active"))
+    .orderBy(schema.prmCatalogImports.id);
+}
+
+export async function importCatalogEntry(data: {
+  catalogEntryId: number;
+  entryType: string;
+  name: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  config?: Record<string, any>;
+}) {
+  const db = getPrmDb();
+  if (!db) throw new Error("PRMDB not connected");
+  const existing = await db
+    .select()
+    .from(schema.prmCatalogImports)
+    .where(
+      and(
+        eq(schema.prmCatalogImports.catalogEntryId, data.catalogEntryId),
+        eq(schema.prmCatalogImports.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (existing.length > 0) return existing[0];
+  const [imported] = await db
+    .insert(schema.prmCatalogImports)
+    .values({
+      catalogEntryId: data.catalogEntryId,
+      entryType: data.entryType,
+      name: data.name,
+      description: data.description || "",
+      category: data.category || "",
+      tags: data.tags || [],
+      config: data.config || {},
+    })
+    .returning();
+  return imported;
+}
+
+export async function removeCatalogImport(id: number) {
+  const db = getPrmDb();
+  if (!db) throw new Error("PRMDB not connected");
+  await db
+    .update(schema.prmCatalogImports)
+    .set({ status: "removed" })
+    .where(eq(schema.prmCatalogImports.id, id));
+  return { success: true };
+}
+
 // ── Health ──────────────────────────────────────────────────────────────────
 
 export async function healthCheck(): Promise<{ connected: boolean; tableCount?: number }> {
   const db = getPrmDb();
   if (!db) return { connected: false };
   try {
-    const [result] = await db.execute(
+    const result = await db.execute(
       sql`SELECT count(*)::int as cnt FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'prm_%'`
     );
-    return { connected: true, tableCount: (result as any)?.cnt || 0 };
-  } catch {
+    const rows = (result as any).rows ?? result;
+    const first = Array.isArray(rows) ? rows[0] : rows;
+    return { connected: true, tableCount: Number(first?.cnt) || 0 };
+  } catch (err) {
+    console.error("[PRMDB Health] Error:", err);
     return { connected: false };
   }
 }

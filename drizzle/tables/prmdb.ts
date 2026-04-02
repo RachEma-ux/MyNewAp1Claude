@@ -465,3 +465,29 @@ export const prmPublicationStates = pgTable(
 
 export type PrmPublicationState = typeof prmPublicationStates.$inferSelect;
 export type InsertPrmPublicationState = typeof prmPublicationStates.$inferInsert;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Group 7 — AI Catalog Imports
+// ══════════════════════════════════════════════════════════════════════════════
+
+export const prmCatalogImports = pgTable(
+  "prm_catalog_imports",
+  {
+    id: serial("id").primaryKey(),
+    catalogEntryId: integer("catalog_entry_id").notNull(),
+    entryType: varchar("entry_type", { length: 20 }).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description").default(""),
+    category: varchar("category", { length: 50 }).default(""),
+    tags: json("tags").$type<string[]>().default([]),
+    config: json("config").$type<Record<string, any>>().default({}),
+    status: varchar("status", { length: 20 }).default("active"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    catalogEntryIdx: index("idx_prm_catalog_imports_entry").on(table.catalogEntryId),
+  })
+);
+
+export type PrmCatalogImport = typeof prmCatalogImports.$inferSelect;
+export type InsertPrmCatalogImport = typeof prmCatalogImports.$inferInsert;

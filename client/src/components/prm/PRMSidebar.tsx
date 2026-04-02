@@ -13,6 +13,7 @@ import {
   Wrench,
   BookOpen,
   Library,
+  Brain,
   Settings,
 } from "lucide-react";
 
@@ -23,6 +24,7 @@ export type PRMView =
   | "methods"
   | "playbooks"
   | "catalog"
+  | "ai-catalog"
   | "control-panel";
 
 const NAV_ITEMS: { key: PRMView; label: string; icon: React.ElementType }[] = [
@@ -32,6 +34,7 @@ const NAV_ITEMS: { key: PRMView; label: string; icon: React.ElementType }[] = [
   { key: "methods", label: "Methods", icon: Wrench },
   { key: "playbooks", label: "Playbooks", icon: BookOpen },
   { key: "catalog", label: "Catalog", icon: Library },
+  { key: "ai-catalog", label: "AI Catalog", icon: Brain },
   { key: "control-panel", label: "Control Panel", icon: Settings },
 ];
 

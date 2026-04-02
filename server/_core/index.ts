@@ -272,6 +272,14 @@ async function startServer() {
     console.warn(`[WfDB] Seed skipped — ${error.message}`);
   }
 
+  // Seed PRMDB (dedicated Problem Resolution Methods database — idempotent)
+  try {
+    const { seedPrmDb } = await import("../prm/seed");
+    await seedPrmDb();
+  } catch (error: any) {
+    console.warn(`[PRMDB] Seed skipped — ${error.message}`);
+  }
+
   // Initialize Governance Engine (CGT v2)
   initializeGovernance();
 

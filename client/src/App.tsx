@@ -161,6 +161,7 @@ const PSIdeationDetailPage = lazy(() => import("@/pages/projects-system/PSIdeati
 const PSIdeationConvertPage = lazy(() => import("@/pages/projects-system/PSIdeationConvertPage"));
 const SimpleShellPage = lazy(() => import("@/pages/components/SimpleShellPage"));
 const DoubleShellPage = lazy(() => import("@/pages/components/DoubleShellPage"));
+const AICatalogPage = lazy(() => import("@/pages/components/AICatalogPage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
@@ -402,6 +403,7 @@ function Router() {
       {/* App Components — Shell demos */}
       <Route path="/components/simple-shell" component={() => <ProtectedRoute component={SimpleShellPage} />} />
       <Route path="/components/double-shell" component={() => <ProtectedRoute component={DoubleShellPage} />} />
+      <Route path="/components/ai-catalog" component={() => <ProtectedRoute component={AICatalogPage} />} />
       {/* PRM — Problem Resolution Methods (case detail must precede shell catch-all) */}
       <Route path="/prm/cases/:id" component={() => <ProtectedRoute component={PRMCaseWorkspacePage} />} />
       <Route path="/prm/dashboard" component={() => <ProtectedRoute component={PRMShellPage} />} />
@@ -410,6 +412,7 @@ function Router() {
       <Route path="/prm/methods" component={() => <ProtectedRoute component={PRMShellPage} />} />
       <Route path="/prm/playbooks" component={() => <ProtectedRoute component={PRMShellPage} />} />
       <Route path="/prm/catalog" component={() => <ProtectedRoute component={PRMShellPage} />} />
+      <Route path="/prm/ai-catalog" component={() => <ProtectedRoute component={PRMShellPage} />} />
       <Route path="/prm/control-panel" component={() => <ProtectedRoute component={PRMShellPage} />} />
       <Route path="/prm" component={() => <ProtectedRoute component={PRMShellPage} />} />
       {/* Projects System — Ideation detail routes (must precede shell catch-all) */}

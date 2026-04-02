@@ -12,6 +12,7 @@ const PRMCaseListPage = lazy(() => import("@/pages/prm/PRMCaseListPage"));
 const PRMMethodsLibraryPage = lazy(() => import("@/pages/prm/PRMMethodsLibraryPage"));
 const PRMPlaybooksPage = lazy(() => import("@/pages/prm/PRMPlaybooksPage"));
 const PRMCatalogPage = lazy(() => import("@/pages/prm/PRMCatalogPage"));
+const PRMAICatalogPage = lazy(() => import("@/pages/prm/PRMAICatalogPage"));
 const PRMControlPanelPage = lazy(() => import("@/pages/prm/PRMControlPanelPage"));
 
 const routeMap: Record<PRMView, string> = {
@@ -21,6 +22,7 @@ const routeMap: Record<PRMView, string> = {
   methods: "/prm/methods",
   playbooks: "/prm/playbooks",
   catalog: "/prm/catalog",
+  "ai-catalog": "/prm/ai-catalog",
   "control-panel": "/prm/control-panel",
 };
 
@@ -29,6 +31,7 @@ function getActiveView(path: string): PRMView {
   if (path.startsWith("/prm/cases")) return "cases";
   if (path.startsWith("/prm/methods")) return "methods";
   if (path.startsWith("/prm/playbooks")) return "playbooks";
+  if (path.startsWith("/prm/ai-catalog")) return "ai-catalog";
   if (path.startsWith("/prm/catalog")) return "catalog";
   if (path.startsWith("/prm/control-panel")) return "control-panel";
   return "dashboard";
@@ -66,6 +69,9 @@ export default function PRMShell() {
       break;
     case "catalog":
       content = <PRMCatalogPage />;
+      break;
+    case "ai-catalog":
+      content = <PRMAICatalogPage />;
       break;
     case "control-panel":
       content = <PRMControlPanelPage />;
