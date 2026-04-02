@@ -294,6 +294,21 @@ export async function seedCodeDb() {
       started_at TIMESTAMP DEFAULT NOW(),
       completed_at TIMESTAMP
     );
+
+    -- Group 8: AI Catalog Imports
+    CREATE TABLE IF NOT EXISTS code_catalog_imports (
+      id SERIAL PRIMARY KEY,
+      catalog_entry_id INTEGER NOT NULL,
+      entry_type VARCHAR(20) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT DEFAULT '',
+      category VARCHAR(50) DEFAULT '',
+      tags JSON DEFAULT '[]',
+      config JSON DEFAULT '{}',
+      status VARCHAR(20) DEFAULT 'active',
+      created_at TIMESTAMP DEFAULT NOW() NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_code_catalog_imports_entry ON code_catalog_imports(catalog_entry_id);
   `);
 
   console.log("[CODEDB Seed] Tables created/verified");

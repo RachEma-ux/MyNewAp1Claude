@@ -21,15 +21,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Brain, Download, Search, Trash2, Loader2 } from "lucide-react";
+import { ENTRY_TYPES, ENTRY_TYPE_DEFS } from "@shared/catalog-taxonomy";
 
-// ── Mock catalog entries for the demo ─────────────────────────────────
+// ── Mock catalog entries for the demo (all 5 entity types) ────────────
 const MOCK_CATALOG = [
-  { id: 1, name: "GPT-4o", entryType: "llm", description: "OpenAI multimodal model", category: "General", tags: ["openai", "multimodal"] },
-  { id: 2, name: "Claude 3.5 Sonnet", entryType: "llm", description: "Anthropic reasoning model", category: "General", tags: ["anthropic", "reasoning"] },
-  { id: 3, name: "Research Agent", entryType: "agent", description: "Autonomous web research agent", category: "Research", tags: ["search", "summarize"] },
-  { id: 4, name: "Code Review Bot", entryType: "bot", description: "Automated PR reviewer", category: "DevOps", tags: ["github", "review"] },
-  { id: 5, name: "Data Analyst Agent", entryType: "agent", description: "SQL generation and chart agent", category: "Analytics", tags: ["sql", "charts"] },
-  { id: 6, name: "Llama 3.1 70B", entryType: "llm", description: "Meta open-weight model", category: "Open Source", tags: ["meta", "open-weight"] },
+  { id: 1, name: "OpenAI", entryType: "provider", description: "Cloud API provider for GPT models", category: "Cloud API", tags: ["openai", "cloud"] },
+  { id: 2, name: "Anthropic", entryType: "provider", description: "Cloud API provider for Claude models", category: "Cloud API", tags: ["anthropic", "cloud"] },
+  { id: 3, name: "GPT-4o", entryType: "llm", description: "OpenAI multimodal model", category: "General", tags: ["openai", "multimodal"] },
+  { id: 4, name: "Claude 3.5 Sonnet", entryType: "llm", description: "Anthropic reasoning model", category: "General", tags: ["anthropic", "reasoning"] },
+  { id: 5, name: "GPT-4o-2024-11-20", entryType: "model", description: "Specific GPT-4o trained snapshot", category: "Base LLM", tags: ["openai", "multimodal"] },
+  { id: 6, name: "Llama 3.1 70B Q4", entryType: "model", description: "Meta open-weight model, 4-bit quantized", category: "Quantized", tags: ["meta", "gguf"] },
+  { id: 7, name: "Research Agent", entryType: "agent", description: "Autonomous web research agent", category: "Research", tags: ["search", "summarize"] },
+  { id: 8, name: "Data Analyst Agent", entryType: "agent", description: "SQL generation and chart agent", category: "Analytics", tags: ["sql", "charts"] },
+  { id: 9, name: "Code Review Bot", entryType: "bot", description: "Automated PR reviewer", category: "DevOps", tags: ["github", "review"] },
+  { id: 10, name: "Support Q&A Bot", entryType: "bot", description: "FAQ bot for internal support", category: "Support", tags: ["faq", "helpdesk"] },
 ];
 
 type MockEntry = (typeof MOCK_CATALOG)[number];
@@ -73,7 +78,7 @@ PICKER MODAL:
 │ 🧠 Import AI Types     [×] │
 ├────────────────────────────┤
 │ 🔍 Search catalog...       │
-│ [All] [Agents] [LLMs] [B] │
+│ [All][Prov][LLM][Mod][Agt][Bot]│
 ├────────────────────────────┤
 │ ┌────────────────────────┐ │
 │ │ GPT-4o        llm [Imp]│ │
@@ -193,7 +198,7 @@ PICKER MODAL:
  * - Picker Modal (Dialog):
  *   - DialogTitle: Brain icon + "Import AI Types"
  *   - Search Input: h-8, pl-8, Search icon overlay
- *   - Tab buttons: All / Agents / LLMs / Bots
+ *   - Tab buttons: derived dynamically from ENTRY_TYPES (Provider / LLM / Model / Agent / Bot)
  *     variant="default" for active, "outline" for inactive
  *     h-6, text-[10px], px-2
  *   - Entry list in ScrollArea (max-h-[45vh]):
@@ -403,12 +408,19 @@ function CatalogPickerModal({ open, onOpenChange,
     return result;
   }, [entries, tab, search]);
 
-  const TABS = [
-    { key: "all",   label: "All" },
-    { key: "agent", label: "Agents" },
-    { key: "llm",   label: "LLMs" },
-    { key: "bot",   label: "Bots" },
-  ];
+  const TABS = useMemo(() => {
+    const typesInCatalog = new Set(entries.map((e: any) => e.entryType));
+    const allTypes = typesInCatalog.size > 0
+      ? ENTRY_TYPES.filter((t) => typesInCatalog.has(t))
+      : [...ENTRY_TYPES];
+    return [
+      { key: "all", label: "All" },
+      ...allTypes.map((t) => ({
+        key: t,
+        label: ENTRY_TYPE_DEFS[t]?.label || t,
+      })),
+    ];
+  }, [entries]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -536,12 +548,17 @@ function DemoPickerModal({
     return result;
   }, [tab, search]);
 
-  const TABS = [
-    { key: "all", label: "All" },
-    { key: "agent", label: "Agents" },
-    { key: "llm", label: "LLMs" },
-    { key: "bot", label: "Bots" },
-  ];
+  const TABS = useMemo(() => {
+    const typesInData = new Set(MOCK_CATALOG.map((e) => e.entryType));
+    const allTypes = ENTRY_TYPES.filter((t) => typesInData.has(t));
+    return [
+      { key: "all", label: "All" },
+      ...allTypes.map((t) => ({
+        key: t,
+        label: ENTRY_TYPE_DEFS[t]?.label || t,
+      })),
+    ];
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

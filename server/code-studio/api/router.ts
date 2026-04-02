@@ -5,6 +5,7 @@
  * Mounted as `codeStudio` in the platform appRouter.
  */
 
+import { z } from "zod";
 import { router, protectedProcedure } from "../../_core/trpc";
 import * as repo from "../repository";
 import * as orchestrator from "../worker/job-orchestrator";
@@ -282,6 +283,28 @@ const opencodeRouter = router({
   }),
 });
 
+// ── Catalog Imports ──────────────────────────────────────────────────────────
+
+const catalogImportsRouter = router({
+  list: protectedProcedure.query(() => repo.listCatalogImports()),
+  import: protectedProcedure
+    .input(
+      z.object({
+        catalogEntryId: z.number(),
+        entryType: z.string(),
+        name: z.string(),
+        description: z.string().optional(),
+        category: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        config: z.any().optional(),
+      })
+    )
+    .mutation(({ input }) => repo.importCatalogEntry(input)),
+  remove: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(({ input }) => repo.removeCatalogImport(input.id)),
+});
+
 // ── Compose Main Router ──────────────────────────────────────────────────────
 
 export const codeStudioRouter = router({
@@ -297,4 +320,5 @@ export const codeStudioRouter = router({
   audit: auditRouter,
   artifacts: artifactsRouter,
   opencode: opencodeRouter,
+  catalogImports: catalogImportsRouter,
 });

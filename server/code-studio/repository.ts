@@ -341,3 +341,62 @@ export async function getModuleSummary() {
     return null;
   }
 }
+
+// ── Catalog Imports ──────────────────────────────────────────────────────────
+
+export async function listCatalogImports() {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB not connected");
+  return db
+    .select()
+    .from(schema.codeCatalogImports)
+    .where(eq(schema.codeCatalogImports.status, "active"))
+    .orderBy(schema.codeCatalogImports.id);
+}
+
+export async function importCatalogEntry(data: {
+  catalogEntryId: number;
+  entryType: string;
+  name: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  config?: Record<string, any>;
+}) {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB not connected");
+  const existing = await db
+    .select()
+    .from(schema.codeCatalogImports)
+    .where(
+      and(
+        eq(schema.codeCatalogImports.catalogEntryId, data.catalogEntryId),
+        eq(schema.codeCatalogImports.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (existing.length > 0) return existing[0];
+  const [imported] = await db
+    .insert(schema.codeCatalogImports)
+    .values({
+      catalogEntryId: data.catalogEntryId,
+      entryType: data.entryType,
+      name: data.name,
+      description: data.description || "",
+      category: data.category || "",
+      tags: data.tags || [],
+      config: data.config || {},
+    })
+    .returning();
+  return imported;
+}
+
+export async function removeCatalogImport(id: number) {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB not connected");
+  await db
+    .update(schema.codeCatalogImports)
+    .set({ status: "removed" })
+    .where(eq(schema.codeCatalogImports.id, id));
+  return { success: true };
+}

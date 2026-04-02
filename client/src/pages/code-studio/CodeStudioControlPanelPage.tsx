@@ -33,14 +33,14 @@ export default function CodeStudioControlPanelPage() {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">CODEDB</span>
-                  <Badge variant={health?.codeDbConnected ? "default" : "destructive"} className="text-[9px]">
-                    {health?.codeDbConnected ? "Connected" : "Disconnected"}
+                  <Badge variant={health?.codedb?.connected ? "default" : "destructive"} className="text-[9px]">
+                    {health?.codedb?.connected ? `Connected (${health.codedb.tableCount} tables)` : "Disconnected"}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">OpenCode</span>
-                  <Badge variant={health?.openCodeReachable ? "default" : "outline"} className="text-[9px]">
-                    {health?.openCodeReachable ? "Reachable" : "Offline"}
+                  <Badge variant={health?.opencode?.healthy ? "default" : "outline"} className="text-[9px]">
+                    {health?.opencode?.healthy ? "Reachable" : "Offline"}
                   </Badge>
                 </div>
               </div>

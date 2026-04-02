@@ -16,6 +16,7 @@ import {
   Shield,
   Settings,
   Code2,
+  BrainCircuit,
 } from "lucide-react";
 
 export type CodeStudioView =
@@ -26,6 +27,7 @@ export type CodeStudioView =
   | "repos"
   | "agents"
   | "policies"
+  | "ai-catalog"
   | "control-panel";
 
 const NAV_ITEMS: { key: CodeStudioView; label: string; icon: React.ElementType }[] = [
@@ -35,6 +37,7 @@ const NAV_ITEMS: { key: CodeStudioView; label: string; icon: React.ElementType }
   { key: "approvals", label: "Approvals", icon: ShieldCheck },
   { key: "repos", label: "Repositories", icon: GitBranch },
   { key: "agents", label: "Agents", icon: Users },
+  { key: "ai-catalog", label: "AI Catalog", icon: BrainCircuit },
   { key: "policies", label: "Policies", icon: Shield },
   { key: "control-panel", label: "Control Panel", icon: Settings },
 ];

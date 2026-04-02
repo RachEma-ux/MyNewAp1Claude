@@ -383,6 +383,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Approvals", icon: <ShieldCheck className="w-4 h-4" />, href: "/code-studio/approvals" },
         { label: "Repositories", icon: <GitBranch className="w-4 h-4" />, href: "/code-studio/repos" },
         { label: "Agents", icon: <Users className="w-4 h-4" />, href: "/code-studio/agents" },
+        { label: "AI Catalog", icon: <BrainCircuit className="w-4 h-4" />, href: "/code-studio/ai-catalog" },
         { label: "Policies", icon: <Shield className="w-4 h-4" />, href: "/code-studio/policies" },
         { label: "Control Panel", icon: <Settings className="w-4 h-4" />, href: "/code-studio/control-panel" },
       ],

@@ -12,6 +12,7 @@ import {
   integer,
   boolean,
   timestamp,
+  json,
   jsonb,
   index,
   varchar,
@@ -395,4 +396,25 @@ export const codeRetentionBatches = pgTable(
     startedAt: timestamp("started_at").defaultNow(),
     completedAt: timestamp("completed_at"),
   }
+);
+
+// ── Group 8: AI Catalog Imports ────────────────────────────────────────────
+
+export const codeCatalogImports = pgTable(
+  "code_catalog_imports",
+  {
+    id: serial("id").primaryKey(),
+    catalogEntryId: integer("catalog_entry_id").notNull(),
+    entryType: varchar("entry_type", { length: 20 }).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description").default(""),
+    category: varchar("category", { length: 50 }).default(""),
+    tags: json("tags").$type<string[]>().default([]),
+    config: json("config").$type<Record<string, any>>().default({}),
+    status: varchar("status", { length: 20 }).default("active"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    catalogEntryIdx: index("idx_code_catalog_imports_entry").on(table.catalogEntryId),
+  })
 );
