@@ -6,8 +6,8 @@
  *
  * Collapsed: S1 icons only (w-12), S2 hidden
  * Expanded:  S1 full + S2 visible side by side
- * S1 and S2 have independent collapse toggles.
- * S1 starts collapsed; S2 starts expanded (on opencode-settings page).
+ * S1 has its own collapse toggle. S2 toggle lives at the bottom of S1.
+ * When S2 is collapsed it is fully hidden behind S1 (single bar visible).
  */
 import { lazy, Suspense, useState } from "react";
 import { useLocation } from "wouter";
@@ -63,7 +63,8 @@ export default function CodeStudioShell() {
   const [activeTab, setActiveTab] = useState<"runtime" | "tui">("runtime");
   const [dirty, setDirty] = useState(false);
 
-  const showS2 = active === "opencode-settings";
+  const isOpenCode = active === "opencode-settings";
+  const showS2 = isOpenCode && !railCollapsed;
 
   const handleNavigate = (key: CodeStudioView) => {
     navigate(routeMap[key]);
@@ -102,17 +103,18 @@ export default function CodeStudioShell() {
         onNavigate={handleNavigate}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        showRailToggle={isOpenCode}
+        railCollapsed={railCollapsed}
+        onRailToggle={() => setRailCollapsed(!railCollapsed)}
       />
 
-      {/* S2 — Section rail (Double Shell: visible only when S1 expanded + opencode-settings) */}
+      {/* S2 — Section rail (fully hidden when railCollapsed — hides behind S1) */}
       {showS2 && (
         <OpenCodeSettingsRail
           activeSection={activeSection}
           onSectionChange={setActiveSection}
           activeTab={activeTab}
           dirty={dirty}
-          collapsed={railCollapsed}
-          onToggle={() => setRailCollapsed(!railCollapsed)}
         />
       )}
 

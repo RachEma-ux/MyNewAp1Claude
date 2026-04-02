@@ -1,5 +1,8 @@
 /**
- * Code Studio Sidebar — Simple IBM Shell sidebar (cloned from PSMSidebar)
+ * Code Studio Sidebar — S1 in the Double IBM Shell pattern.
+ *
+ * Also hosts the S2 (OpenCode Rail) toggle at the bottom,
+ * so collapsing S2 hides it fully behind S1.
  */
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -7,6 +10,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   LayoutDashboard,
   Workflow,
   Terminal,
@@ -49,9 +54,21 @@ interface Props {
   onNavigate: (key: CodeStudioView) => void;
   collapsed: boolean;
   onToggle: () => void;
+  /** Show the S2 rail toggle at the bottom (only on opencode-settings page) */
+  showRailToggle?: boolean;
+  railCollapsed?: boolean;
+  onRailToggle?: () => void;
 }
 
-export default function CodeStudioSidebar({ active, onNavigate, collapsed, onToggle }: Props) {
+export default function CodeStudioSidebar({
+  active,
+  onNavigate,
+  collapsed,
+  onToggle,
+  showRailToggle,
+  railCollapsed,
+  onRailToggle,
+}: Props) {
   return (
     <div
       className={cn(
@@ -59,6 +76,7 @@ export default function CodeStudioSidebar({ active, onNavigate, collapsed, onTog
         collapsed ? "w-12" : "w-56"
       )}
     >
+      {/* Header with S1 toggle */}
       <div
         className={cn(
           "flex items-center border-b",
@@ -87,6 +105,8 @@ export default function CodeStudioSidebar({ active, onNavigate, collapsed, onTog
           )}
         </Button>
       </div>
+
+      {/* Nav items */}
       <ScrollArea className="flex-1">
         <div className={collapsed ? "px-1 py-1" : ""}>
           {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
@@ -108,6 +128,34 @@ export default function CodeStudioSidebar({ active, onNavigate, collapsed, onTog
           ))}
         </div>
       </ScrollArea>
+
+      {/* S2 rail toggle — pinned at bottom, only on opencode-settings */}
+      {showRailToggle && (
+        <div className={cn("border-t", collapsed ? "flex justify-center py-1.5" : "px-2 py-1.5")}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "shrink-0",
+              collapsed ? "h-7 w-7 p-0" : "h-7 w-full justify-start gap-2 px-2 text-xs text-muted-foreground hover:text-foreground"
+            )}
+            onClick={onRailToggle}
+            title={railCollapsed ? "Show Settings panel" : "Hide Settings panel"}
+          >
+            {railCollapsed ? (
+              <>
+                <PanelRightOpen className="h-3.5 w-3.5 shrink-0" />
+                {!collapsed && <span className="truncate">Show Settings</span>}
+              </>
+            ) : (
+              <>
+                <PanelRightClose className="h-3.5 w-3.5 shrink-0" />
+                {!collapsed && <span className="truncate">Hide Settings</span>}
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
