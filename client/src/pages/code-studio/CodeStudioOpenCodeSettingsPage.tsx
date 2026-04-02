@@ -152,7 +152,7 @@ export default function CodeStudioOpenCodeSettingsPage() {
     { profileType: "tui" },
   );
   const runtimeStatusQuery = trpc.codeStudio.opencodeSettings.runtimeStatus.full.useQuery();
-  const applyEventsQuery = trpc.codeStudio.opencodeSettings.apply.events.useQuery({ limit: 10 });
+  const applyEventsQuery = trpc.codeStudio.opencodeSettings.applyFlow.events.useQuery({ limit: 10 });
 
   // ── Mutations ──────────────────────────────────────────────────────────
 
@@ -176,11 +176,11 @@ export default function CodeStudioOpenCodeSettingsPage() {
   const validateMut = trpc.codeStudio.opencodeSettings.validation.validateRuntime.useMutation();
   const validateTuiMut = trpc.codeStudio.opencodeSettings.validation.validateTui.useMutation();
 
-  const applyMut = trpc.codeStudio.opencodeSettings.apply.apply.useMutation({
+  const applyMut = trpc.codeStudio.opencodeSettings.applyFlow.apply.useMutation({
     onSuccess: (data) => {
       utils.codeStudio.opencodeSettings.profiles.getActive.invalidate();
       utils.codeStudio.opencodeSettings.runtimeStatus.full.invalidate();
-      utils.codeStudio.opencodeSettings.apply.events.invalidate();
+      utils.codeStudio.opencodeSettings.applyFlow.events.invalidate();
       if (data.success) {
         toast.success("Config applied successfully");
       } else {

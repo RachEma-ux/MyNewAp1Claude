@@ -370,6 +370,6 @@ export const opencodeSettingsRouter = router({
   versions: versionsRouter,
   validation: validationRouter,
   generate: generateRouter,
-  apply: applyRouter,
+  applyFlow: applyRouter,
   runtimeStatus: runtimeStatusRouter,
 });
