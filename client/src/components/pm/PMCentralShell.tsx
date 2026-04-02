@@ -1,12 +1,10 @@
 /**
  * PM Central Shell — Simple IBM Shell (Fragment pattern)
  */
-import { useState, useMemo, lazy, Suspense } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
-import { trpc } from "@/lib/trpc";
 import PMCentralSidebar, { type PMCView } from "./PMCentralSidebar";
-import { PMCentralChatWindow } from "./PMCentralChatWindow";
 
 const DashboardPanel = lazy(() => import("@/pages/pm-central/DashboardPanel"));
 const PlansPanel = lazy(() => import("@/pages/pm-central/PlansPanel"));
@@ -74,27 +72,6 @@ export default function PMCentralShell() {
     if (route) navigate(route);
   };
 
-  // PM Chat — available AI agents from catalog
-  const { data: availableAgents } = trpc.catalogManage.available.useQuery(
-    { entryType: "agent" },
-  );
-
-  const catalogImports = useMemo(() => {
-    if (!availableAgents) return [];
-    return availableAgents.map((e: any) => ({
-      id: e.id,
-      catalogEntryId: e.id,
-      entryType: e.sourceType,
-      name: e.displayName || e.name,
-      description: e.description || "",
-      category: e.category || "",
-      tags: e.tags || [],
-      config: e.metadata?.config || {},
-      status: e.status || "active",
-      importedAt: new Date(),
-    }));
-  }, [availableAgents]);
-
   let content: React.ReactNode;
   switch (activeView) {
     case "projects":
@@ -160,8 +137,6 @@ export default function PMCentralShell() {
         </Suspense>
       </div>
 
-      {/* PM Chat — floating FAB, visible across all PM Central pages */}
-      <PMCentralChatWindow catalogImports={catalogImports} />
     </>
   );
 }
