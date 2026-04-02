@@ -158,7 +158,7 @@ const generateRouter = router({
 // ── Apply Flow ───────────────────────────────────────────────────────────────
 
 const applyRouter = router({
-  apply: protectedProcedure
+  run: protectedProcedure
     .input(
       z.object({
         profileId: z.number().int().positive(),

@@ -176,7 +176,7 @@ export default function CodeStudioOpenCodeSettingsPage() {
   const validateMut = trpc.codeStudio.opencodeSettings.validation.validateRuntime.useMutation();
   const validateTuiMut = trpc.codeStudio.opencodeSettings.validation.validateTui.useMutation();
 
-  const applyMut = trpc.codeStudio.opencodeSettings.applyFlow.apply.useMutation({
+  const applyMut = trpc.codeStudio.opencodeSettings.applyFlow.run.useMutation({
     onSuccess: (data) => {
       utils.codeStudio.opencodeSettings.profiles.getActive.invalidate();
       utils.codeStudio.opencodeSettings.runtimeStatus.full.invalidate();
