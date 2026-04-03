@@ -133,21 +133,21 @@ export default function CodeStudioSidebar({
             {!collapsed && <span className="truncate">{label}</span>}
           </button>
         ))}
-      </div>
 
-      {/* Open IDE — launches OpenCode Web in a new tab */}
-      <div className={cn("border-t", collapsed ? "flex justify-center py-1.5" : "px-2 py-1.5")}>
-        <button
-          onClick={() => window.open(OPENCODE_IDE_URL, "_blank")}
-          title="Open IDE"
-          className={cn(
-            "flex items-center w-full rounded-sm transition-colors text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10",
-            collapsed ? "justify-center py-1.5" : "gap-2 px-1 py-1.5 text-xs font-medium"
-          )}
-        >
-          <MonitorPlay className="h-3.5 w-3.5 shrink-0" />
-          {!collapsed && <span className="truncate">Open IDE</span>}
-        </button>
+        {/* Open IDE — launches OpenCode Web in a new tab */}
+        <div className={cn("border-t mt-2 pt-2", collapsed ? "" : "mx-1")}>
+          <button
+            onClick={() => window.open(OPENCODE_IDE_URL, "_blank")}
+            title="Open IDE"
+            className={cn(
+              "flex items-center w-full rounded-sm transition-colors text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10",
+              collapsed ? "justify-center py-1.5" : "gap-2 px-3 py-1.5 text-xs font-medium"
+            )}
+          >
+            <MonitorPlay className="h-3.5 w-3.5 shrink-0" />
+            {!collapsed && <span className="truncate">Open IDE</span>}
+          </button>
+        </div>
       </div>
 
       {/* S2 rail toggle — pinned at bottom, only on opencode-settings */}
