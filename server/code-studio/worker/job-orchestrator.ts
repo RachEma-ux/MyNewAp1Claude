@@ -606,9 +606,9 @@ export async function executeJob(jobId: number): Promise<void> {
         // OpenCode available — send the phase prompt and capture output
         try {
           const prompt = buildPhasePrompt(job, phase.stepName);
-          // Use job's configured model, or fall back to OpenAI GPT-5.4 Mini
-          const model = (job as any).model || process.env.OPENCODE_DEFAULT_MODEL || "openai/gpt-5.4-mini";
-          const response = await ocClient.sendMessage(ocSessionId, prompt, { model });
+          // Model is configured in opencode.jsonc — don't override here
+          // (OpenCode API rejects model as string, and the default is correct)
+          const response = await ocClient.sendMessage(ocSessionId, prompt);
 
           // Check for provider errors inside the response (HTTP 200 but no output)
           const providerError = response?.info?.error;

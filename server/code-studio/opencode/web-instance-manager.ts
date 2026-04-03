@@ -49,6 +49,38 @@ function buildLdLibraryPath(): string {
   return existing ? `${glibcDir}:${existing}` : glibcDir;
 }
 
+// ── Provider Key Injection ────────────────────────────────────────────────
+// Reads API keys from the app's providers table and sets the corresponding
+// environment variables so OpenCode can authenticate with cloud providers.
+// No keys are hardcoded — they come from the DB at spawn time.
+
+const PROVIDER_ENV_MAP: Record<string, string> = {
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+  google: "GOOGLE_API_KEY",
+};
+
+async function injectProviderKeys(env: Record<string, string>): Promise<void> {
+  try {
+    const { getDb } = await import("../../_core/db");
+    const db = getDb();
+    const rows = await db.execute(
+      `SELECT type, config::text FROM providers WHERE enabled = true`
+    ) as any;
+    for (const row of rows.rows || rows || []) {
+      const type = row.type as string;
+      const envVar = PROVIDER_ENV_MAP[type];
+      if (!envVar || env[envVar]) continue; // skip if already set or unmapped
+      try {
+        const config = typeof row.config === "string" ? JSON.parse(row.config) : row.config;
+        if (config?.apiKey) {
+          env[envVar] = config.apiKey;
+        }
+      } catch { /* skip malformed config */ }
+    }
+  } catch { /* DB not available — use whatever env vars exist */ }
+}
+
 // ── In-memory process tracking ────────────────────────────────────────────
 
 const liveProcesses = new Map<number, ChildProcess>();
@@ -169,6 +201,9 @@ async function startOpenCodeWeb(
     HOME: process.env.HOME || "",
     PATH: process.env.PATH || "",
   };
+
+  // Inject provider API keys from the app DB so OpenCode can use them
+  await injectProviderKeys(env);
 
   if (password) {
     env.OPENCODE_SERVER_PASSWORD = password;
