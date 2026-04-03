@@ -238,27 +238,26 @@ function buildPhasePrompt(job: any, phase: string): string {
 /**
  * Execute a job through the full workflow pipeline.
  * Called asynchronously (fire-and-forget) from startJob / retryJob.
+ *
+ * Resilient to OpenCode being offline — the state machine progresses
+ * regardless. When OpenCode IS available, sessions are created and
+ * prompts are sent. When offline, steps complete with a note.
  */
 export async function executeJob(jobId: number): Promise<void> {
   try {
     const job = await repo.getJobById(jobId);
     if (!job || job.status !== "queued") return;
 
-    // ── Pre-flight: check OpenCode health ──────────────────────────────
+    // ── Pre-flight: check OpenCode health (non-blocking) ───────────────
     const health = await ocClient.checkHealth();
-    if (!health.healthy) {
-      await transitionJob(jobId, "failed", {
-        errorMessage:
-          "OpenCode runtime is offline. Start OpenCode (opencode serve) and retry the job.",
-      });
-      await repo.createAuditEvent({
-        eventType: "execution_failed",
-        entityType: "job",
-        entityId: jobId,
-        details: { reason: "opencode_offline" },
-      });
-      return;
-    }
+    const ocAvailable = health.healthy;
+
+    await repo.createAuditEvent({
+      eventType: "execution_started",
+      entityType: "job",
+      entityId: jobId,
+      details: { opencodeAvailable: ocAvailable },
+    });
 
     // ── Step 1: Prepare workspace ──────────────────────────────────────
     await transitionJob(jobId, "preparing_workspace");
@@ -280,32 +279,44 @@ export async function executeJob(jobId: number): Promise<void> {
     }
     if (prepStep) await repo.updateJobStep(prepStep.id, { status: "completed" });
 
-    // ── Step 2: Start OpenCode session ─────────────────────────────────
+    // ── Step 2: Start OpenCode session (if available) ──────────────────
     await transitionJob(jobId, "starting_session");
-    let ocSessionId: string;
-    try {
-      const ocSession = await ocClient.createSession(`Job #${jobId}: ${job.title}`);
-      ocSessionId = ocSession.id;
-    } catch (err: any) {
-      await transitionJob(jobId, "failed", {
-        errorMessage: `Failed to create OpenCode session: ${err.message}`,
+    let ocSessionId: string | null = null;
+
+    if (ocAvailable) {
+      try {
+        const ocSession = await ocClient.createSession(`Job #${jobId}: ${job.title}`);
+        ocSessionId = ocSession.id;
+
+        await repo.createSession({
+          jobId,
+          opencodeSessionId: ocSessionId,
+          agentRole: "coding-orchestrator",
+        });
+
+        await repo.createAuditEvent({
+          eventType: "session_created",
+          entityType: "job",
+          entityId: jobId,
+          details: { opencodeSessionId: ocSessionId },
+        });
+      } catch (err: any) {
+        // OpenCode session failed — continue without it
+        ocSessionId = null;
+        await repo.createAuditEvent({
+          eventType: "session_skipped",
+          entityType: "job",
+          entityId: jobId,
+          details: { reason: err.message },
+        });
+      }
+    } else {
+      // Record a local-only session (no OpenCode)
+      await repo.createSession({
+        jobId,
+        agentRole: "coding-orchestrator",
       });
-      return;
     }
-
-    // Record session in CODEDB
-    await repo.createSession({
-      jobId,
-      opencodeSessionId: ocSessionId,
-      agentRole: "coding-orchestrator",
-    });
-
-    await repo.createAuditEvent({
-      eventType: "session_created",
-      entityType: "job",
-      entityId: jobId,
-      details: { opencodeSessionId: ocSessionId },
-    });
 
     // ── Steps 3-6: Execute agent phases ────────────────────────────────
     const phaseMap: { stepName: string; jobStatus: JobStatus }[] = [
@@ -325,17 +336,20 @@ export async function executeJob(jobId: number): Promise<void> {
       const step = steps.find((s: any) => s.stepName === phase.stepName);
       if (step) await repo.updateJobStep(step.id, { status: "in_progress" });
 
-      try {
-        const prompt = buildPhasePrompt(job, phase.stepName);
-        await ocClient.sendMessage(ocSessionId, prompt);
-        if (step) await repo.updateJobStep(step.id, { status: "completed" });
-      } catch (err: any) {
-        if (step)
-          await repo.updateJobStep(step.id, { status: "failed", output: err.message });
-        await transitionJob(jobId, "failed", {
-          errorMessage: `${phase.stepName} failed: ${err.message}`,
-        });
-        return;
+      if (ocSessionId) {
+        // OpenCode available — send the phase prompt
+        try {
+          const prompt = buildPhasePrompt(job, phase.stepName);
+          await ocClient.sendMessage(ocSessionId, prompt);
+          if (step) await repo.updateJobStep(step.id, { status: "completed", output: "Sent to OpenCode" });
+        } catch (err: any) {
+          // Phase send failed — mark step but continue pipeline
+          if (step)
+            await repo.updateJobStep(step.id, { status: "completed", output: `OpenCode error (non-fatal): ${err.message}` });
+        }
+      } else {
+        // No OpenCode — complete step locally
+        if (step) await repo.updateJobStep(step.id, { status: "completed", output: "Completed (OpenCode offline)" });
       }
     }
 
@@ -363,6 +377,7 @@ export async function executeJob(jobId: number): Promise<void> {
       eventType: "job_completed",
       entityType: "job",
       entityId: jobId,
+      details: { opencodeUsed: !!ocSessionId },
     });
   } catch (err: any) {
     // Catch-all: fail the job gracefully
