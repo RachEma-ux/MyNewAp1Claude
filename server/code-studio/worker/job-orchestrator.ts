@@ -211,6 +211,237 @@ export async function buildEvidenceBundle(jobId: number) {
   return bundle;
 }
 
+// ── Helpers: Output Extraction, Transcript, Report ───────────────────────────
+
+/**
+ * Fetch the last assistant message from an OpenCode session.
+ * Returns a structured output object with summary text.
+ */
+async function extractLastAssistantOutput(sessionId: string): Promise<{ summary: string; role: string } | null> {
+  try {
+    const messages = await ocClient.listMessages(sessionId, 50);
+    if (!Array.isArray(messages) || messages.length === 0) return null;
+    // Find last assistant message
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      const role = msg.role || (msg as any).type || "";
+      if (role === "assistant" || role === "model") {
+        const text = extractTextFromMessage(msg);
+        return { summary: text.slice(0, 4000), role };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract text content from an OpenCode message (handles various shapes).
+ */
+function extractTextFromMessage(msg: any): string {
+  if (typeof msg.content === "string") return msg.content;
+  if (typeof msg.text === "string") return msg.text;
+  if (Array.isArray(msg.content)) {
+    return msg.content
+      .filter((p: any) => p.type === "text" || typeof p.text === "string")
+      .map((p: any) => p.text || "")
+      .join("\n");
+  }
+  if (Array.isArray(msg.parts)) {
+    return msg.parts
+      .filter((p: any) => p.type === "text")
+      .map((p: any) => p.text || "")
+      .join("\n");
+  }
+  return JSON.stringify(msg).slice(0, 2000);
+}
+
+/**
+ * Persist OpenCode session messages into code_session_messages.
+ */
+async function persistSessionTranscript(ocSessionId: string, dbSessionId: number): Promise<number> {
+  try {
+    const messages = await ocClient.listMessages(ocSessionId);
+    if (!Array.isArray(messages) || messages.length === 0) return 0;
+    let count = 0;
+    for (const msg of messages) {
+      const role = msg.role || (msg as any).type || "unknown";
+      const text = extractTextFromMessage(msg);
+      const toolCalls = (msg as any).tool_calls || (msg as any).toolCalls || null;
+      await repo.createSessionMessage({
+        sessionId: dbSessionId,
+        opencodeMessageId: msg.id || undefined,
+        role,
+        contentPreview: text.slice(0, 8000),
+        toolCalls: toolCalls ? toolCalls : undefined,
+      });
+      count++;
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Generate a final report for a completed job.
+ * Persists: resultSummary on job, final_report_markdown + final_report_json as artifacts.
+ */
+async function generateFinalReport(jobId: number): Promise<void> {
+  const job = await repo.getJobById(jobId);
+  if (!job) return;
+
+  const steps = await repo.listJobSteps(jobId);
+  const diffs = await repo.listDiffs(jobId);
+  const sessions = await repo.listSessions({ jobId });
+  const generatedAt = new Date().toISOString();
+
+  // Determine result kind from available data
+  const hasDiffs = diffs.length > 0;
+  const hasStepOutputs = steps.some((s: any) => s.output && typeof s.output === "object" && (s.output as any).summary);
+  const isFailed = job.status === "failed";
+  const resultKind = isFailed ? "failure" : hasDiffs ? "implementation" : "inspection";
+
+  // Build step summaries
+  const stepSummaries: Record<string, string> = {};
+  for (const s of steps) {
+    const output = s.output as any;
+    if (output && typeof output === "object" && output.summary) {
+      stepSummaries[s.stepName] = output.summary;
+    } else if (typeof output === "string") {
+      stepSummaries[s.stepName] = output;
+    }
+  }
+
+  // Build final answer preview from the last meaningful step output
+  let finalAnswerPreview = "";
+  const meaningfulSteps = ["governance_check", "testing", "reviewing", "building", "planning"];
+  for (const name of meaningfulSteps) {
+    if (stepSummaries[name] && stepSummaries[name].length > 10) {
+      finalAnswerPreview = stepSummaries[name].slice(0, 500);
+      break;
+    }
+  }
+
+  // Files touched
+  const changedFiles = diffs.map((d: any) => d.filePath);
+
+  // ── Result Summary (persisted on job) ──────────────────────────────
+  const resultSummary = {
+    resultKind,
+    headline: job.title,
+    finalAnswerPreview,
+    diffCount: diffs.length,
+    sessionCount: sessions.length,
+    changedFilesCount: changedFiles.length,
+    hasReport: true,
+    hasDiffs,
+    hasWorkspaceChanges: hasDiffs,
+    finalStepCompleted: steps.filter((s: any) => s.status === "completed").pop()?.stepName || null,
+    generatedAt,
+  };
+
+  await repo.updateJob(jobId, { resultSummary });
+
+  // ── Markdown Report ────────────────────────────────────────────────
+  const mdParts: string[] = [];
+  mdParts.push(`# Job #${job.id}: ${job.title}`);
+  mdParts.push("");
+  mdParts.push(`**Status:** ${job.status}`);
+  mdParts.push(`**Result Kind:** ${resultKind}`);
+  mdParts.push(`**Generated:** ${generatedAt}`);
+  mdParts.push("");
+
+  mdParts.push("## Objective");
+  mdParts.push(job.objective || job.description || job.title);
+  mdParts.push("");
+
+  if (finalAnswerPreview) {
+    mdParts.push("## Final Answer");
+    mdParts.push(finalAnswerPreview);
+    mdParts.push("");
+  }
+
+  mdParts.push("## Step Summaries");
+  for (const s of steps) {
+    const summary = stepSummaries[s.stepName] || "(no output)";
+    const statusEmoji = s.status === "completed" ? "[OK]" : s.status === "failed" ? "[FAIL]" : "[--]";
+    mdParts.push(`### ${s.stepOrder}. ${s.stepName.replace(/_/g, " ")} ${statusEmoji}`);
+    mdParts.push(summary.slice(0, 3000));
+    mdParts.push("");
+  }
+
+  if (hasDiffs) {
+    mdParts.push("## Diff Summary");
+    mdParts.push(`**Files changed:** ${diffs.length}`);
+    const added = diffs.filter((d: any) => d.diffType === "add").length;
+    const modified = diffs.filter((d: any) => d.diffType === "modify").length;
+    const deleted = diffs.filter((d: any) => d.diffType === "delete").length;
+    mdParts.push(`- Added: ${added}`);
+    mdParts.push(`- Modified: ${modified}`);
+    mdParts.push(`- Deleted: ${deleted}`);
+    mdParts.push("");
+    mdParts.push("### Changed Files");
+    for (const d of diffs) {
+      mdParts.push(`- \`${d.filePath}\` (${d.diffType}, +${d.linesAdded || 0}/-${d.linesRemoved || 0})`);
+    }
+    mdParts.push("");
+  } else {
+    mdParts.push("## Diff Summary");
+    mdParts.push("No code changes were made. This was a read-only / inspection job.");
+    mdParts.push("");
+  }
+
+  if (job.errorMessage) {
+    mdParts.push("## Errors");
+    mdParts.push(job.errorMessage);
+    mdParts.push("");
+  }
+
+  mdParts.push("---");
+  mdParts.push(`*Report generated at ${generatedAt} by Code Studio*`);
+
+  const markdownContent = mdParts.join("\n");
+
+  // ── JSON Report ────────────────────────────────────────────────────
+  const jsonReport = {
+    jobId,
+    title: job.title,
+    objective: job.objective || job.description || job.title,
+    status: job.status,
+    resultKind,
+    stepSummaries,
+    diffSummary: {
+      totalFiles: diffs.length,
+      added: diffs.filter((d: any) => d.diffType === "add").length,
+      modified: diffs.filter((d: any) => d.diffType === "modify").length,
+      deleted: diffs.filter((d: any) => d.diffType === "delete").length,
+      changedFiles,
+    },
+    sessionCount: sessions.length,
+    errorMessage: job.errorMessage || null,
+    generatedAt,
+  };
+
+  // Persist artifacts
+  await repo.createArtifact({
+    jobId,
+    artifactType: "final_report_markdown",
+    name: `final-report-job-${jobId}.md`,
+    content: markdownContent,
+    metadata: { generatedAt, resultKind },
+  });
+
+  await repo.createArtifact({
+    jobId,
+    artifactType: "final_report_json",
+    name: `final-report-job-${jobId}.json`,
+    content: JSON.stringify(jsonReport, null, 2),
+    metadata: { generatedAt, resultKind },
+  });
+}
+
 // ── Phase Prompt Builders ────────────────────────────────────────────────────
 
 function buildPhasePrompt(job: any, phase: string): string {
@@ -334,22 +565,57 @@ export async function executeJob(jobId: number): Promise<void> {
 
       await transitionJob(jobId, phase.jobStatus);
       const step = steps.find((s: any) => s.stepName === phase.stepName);
-      if (step) await repo.updateJobStep(step.id, { status: "in_progress" });
+      if (step) await repo.updateJobStep(step.id, { status: "in_progress", startedAt: new Date() });
 
       if (ocSessionId) {
-        // OpenCode available — send the phase prompt
+        // OpenCode available — send the phase prompt and capture output
         try {
           const prompt = buildPhasePrompt(job, phase.stepName);
           await ocClient.sendMessage(ocSessionId, prompt);
-          if (step) await repo.updateJobStep(step.id, { status: "completed", output: "Sent to OpenCode" });
+
+          // Fetch assistant response to persist as step output
+          const stepOutput = await extractLastAssistantOutput(ocSessionId);
+          if (step) await repo.updateJobStep(step.id, {
+            status: "completed",
+            completedAt: new Date(),
+            output: stepOutput || { summary: "Phase completed via OpenCode", phase: phase.stepName },
+          });
         } catch (err: any) {
           // Phase send failed — mark step but continue pipeline
           if (step)
-            await repo.updateJobStep(step.id, { status: "completed", output: `OpenCode error (non-fatal): ${err.message}` });
+            await repo.updateJobStep(step.id, {
+              status: "completed",
+              completedAt: new Date(),
+              output: { summary: `OpenCode error (non-fatal): ${err.message}`, phase: phase.stepName },
+            });
         }
       } else {
         // No OpenCode — complete step locally
-        if (step) await repo.updateJobStep(step.id, { status: "completed", output: "Completed (OpenCode offline)" });
+        if (step) await repo.updateJobStep(step.id, {
+          status: "completed",
+          completedAt: new Date(),
+          output: { summary: "Completed (OpenCode offline)", phase: phase.stepName },
+        });
+      }
+    }
+
+    // ── Persist session transcript ──────────────────────────────────
+    if (ocSessionId) {
+      try {
+        const dbSessions = await repo.listSessions({ jobId });
+        const dbSession = dbSessions.find((s: any) => s.opencodeSessionId === ocSessionId);
+        if (dbSession) {
+          const msgCount = await persistSessionTranscript(ocSessionId, dbSession.id);
+          await repo.updateSession(dbSession.id, { status: "completed", closedAt: new Date() });
+          await repo.createAuditEvent({
+            eventType: "transcript_persisted",
+            entityType: "job",
+            entityId: jobId,
+            details: { sessionId: dbSession.id, messageCount: msgCount },
+          });
+        }
+      } catch {
+        /* non-fatal */
       }
     }
 
@@ -364,6 +630,13 @@ export async function executeJob(jobId: number): Promise<void> {
       } catch {
         /* non-fatal */
       }
+    }
+
+    // Generate final report + result summary
+    try {
+      await generateFinalReport(jobId);
+    } catch {
+      /* non-fatal */
     }
 
     // Build evidence bundle

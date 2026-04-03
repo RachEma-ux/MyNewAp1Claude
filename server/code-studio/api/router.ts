@@ -25,6 +25,7 @@ import {
   listAuditSchema,
   createPolicySchema,
   listDiffsSchema,
+  listSessionMessagesSchema,
 } from "../shared/schemas";
 import { opencodeSettingsRouter } from "../opencode/settings-router";
 
@@ -105,6 +106,40 @@ const jobsRouter = router({
   evidence: protectedProcedure.input(byIdSchema).query(async ({ input }) => {
     return orchestrator.buildEvidenceBundle(input.id);
   }),
+  results: protectedProcedure.input(byIdSchema).query(async ({ input }) => {
+    const job = await repo.getJobById(input.id);
+    if (!job) return null;
+    const steps = await repo.listJobSteps(input.id);
+    const artifacts = await repo.listArtifacts(input.id);
+    const sessions = await repo.listSessions({ jobId: input.id });
+    const diffs = await repo.listDiffs(input.id);
+
+    const reportMd = artifacts.find((a: any) => a.artifactType === "final_report_markdown");
+    const reportJson = artifacts.find((a: any) => a.artifactType === "final_report_json");
+
+    return {
+      jobId: input.id,
+      status: job.status,
+      resultSummary: job.resultSummary,
+      finalReportMarkdown: reportMd?.content || null,
+      finalReportJson: reportJson?.content || null,
+      stepOutputs: steps.map((s: any) => ({
+        stepName: s.stepName,
+        stepOrder: s.stepOrder,
+        status: s.status,
+        agentRole: s.agentRole,
+        output: s.output,
+      })),
+      diffCount: diffs.length,
+      sessionCount: sessions.length,
+      artifacts: artifacts.map((a: any) => ({
+        id: a.id,
+        artifactType: a.artifactType,
+        name: a.name,
+        metadata: a.metadata,
+      })),
+    };
+  }),
 });
 
 // ── Repositories ─────────────────────────────────────────────────────────────
@@ -136,6 +171,9 @@ const sessionsRouter = router({
   }),
   getById: protectedProcedure.input(byIdSchema).query(async ({ input }) => {
     return repo.getSessionById(input.id);
+  }),
+  messages: protectedProcedure.input(listSessionMessagesSchema).query(({ input }) => {
+    return repo.listSessionMessages(input.sessionId, input.limit ?? 200);
   }),
 });
 

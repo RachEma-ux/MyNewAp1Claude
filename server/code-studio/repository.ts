@@ -153,6 +153,46 @@ export async function getSessionById(id: number) {
   return row ?? null;
 }
 
+export async function updateSession(id: number, data: Record<string, any>) {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB unavailable");
+  const [updated] = await db.update(schema.codeSessions).set(data).where(eq(schema.codeSessions.id, id)).returning();
+  return updated;
+}
+
+// ── Session Messages ──────────────────────────────────────────────────────────
+
+export async function createSessionMessage(data: {
+  sessionId: number;
+  opencodeMessageId?: string;
+  role: string;
+  contentPreview?: string;
+  toolCalls?: any;
+}) {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB unavailable");
+  const [row] = await db.insert(schema.codeSessionMessages).values(data as any).returning();
+  return row;
+}
+
+export async function listSessionMessages(sessionId: number, limit: number = 200) {
+  const db = getCodeDb();
+  if (!db) return [];
+  return db.select().from(schema.codeSessionMessages)
+    .where(eq(schema.codeSessionMessages.sessionId, sessionId))
+    .orderBy(schema.codeSessionMessages.id)
+    .limit(limit);
+}
+
+export async function getArtifactByType(jobId: number, artifactType: string) {
+  const db = getCodeDb();
+  if (!db) return null;
+  const [row] = await db.select().from(schema.codeArtifacts)
+    .where(and(eq(schema.codeArtifacts.jobId, jobId), eq(schema.codeArtifacts.artifactType, artifactType)))
+    .limit(1);
+  return row ?? null;
+}
+
 // ── Approvals ────────────────────────────────────────────────────────────────
 
 export async function createPermissionRequest(data: {

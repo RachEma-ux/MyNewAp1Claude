@@ -108,3 +108,10 @@ export const createPolicySchema = z.object({
 export const listDiffsSchema = z.object({
   jobId: z.number().int().positive(),
 });
+
+// ── Session Message Schemas ─────────────────────────────────────────────────
+
+export const listSessionMessagesSchema = z.object({
+  sessionId: z.number().int().positive(),
+  limit: z.number().int().min(1).max(500).optional(),
+});
