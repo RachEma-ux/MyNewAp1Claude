@@ -1,9 +1,5 @@
 {
-  // OpenCode project configuration for MyNewAp1Claude
-  // See: https://opencode.ai/config.json
   "$schema": "https://opencode.ai/config.json",
-
-  // ── Providers ─────────────────────────────────────────────────────
   "provider": {
     "openai": {
       "models": {
@@ -22,27 +18,15 @@
       }
     }
   },
-
-  // ── Default Model ──────────────────────────────────────────────────
-  // Primary: OpenAI GPT-5.4 Mini (requires OPENAI_API_KEY)
-  // Fallback providers: Ollama (local, no key needed)
   "model": "openai/gpt-5.4-mini",
   "small_model": "openai/gpt-5.4-mini",
-
-  // ── Default Agent ─────────────────────────────────────────────────
-  // Favor planning/inspection before edits
   "default_agent": "planner",
-
-  // ── Instructions ──────────────────────────────────────────────────
-  // Loaded as project context on every session
   "instructions": [
     "AGENTS.md",
     "CLAUDE.md",
     "ARCHITECTURE.md",
     "docs/opencode/full-stack-expert-rules.md"
   ],
-
-  // ── Skills ────────────────────────────────────────────────────────
   "skills": {
     "watcher": {
       "ignore": [
@@ -54,10 +38,5 @@
       ]
     },
     "compaction": true
-  },
-
-  // ── Permissions ───────────────────────────────────────────────────
-  // Safe defaults documented in full-stack-expert-rules.md
-  // OpenCode v1.3.13 does not support a top-level permissions key.
-  // Permission behavior is controlled via agent definitions and instructions.
+  }
 }
