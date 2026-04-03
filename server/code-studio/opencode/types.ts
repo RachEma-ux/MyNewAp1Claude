@@ -92,5 +92,6 @@ export interface IdeInstance {
 export interface IdeInstanceLaunchResult {
   instance: IdeInstance;
   proxyUrl: string;
+  directUrl: string;
   isReused: boolean;
 }

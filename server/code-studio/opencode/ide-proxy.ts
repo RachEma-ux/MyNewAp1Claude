@@ -56,6 +56,7 @@ ideProxyRouter.all("/:proxyKey/*", async (req: Request, res: Response, _next: Ne
 
     // Proxy the request
     const parsed = new URL(targetUrl);
+    const baseHref = `${prefix}/`;
     const proxyReq = http.request(
       {
         hostname: parsed.hostname,
@@ -72,6 +73,25 @@ ideProxyRouter.all("/:proxyKey/*", async (req: Request, res: Response, _next: Ne
         }
         // Remove auth-related headers from upstream
         delete responseHeaders["www-authenticate"];
+
+        const contentType = proxyRes.headers["content-type"] || "";
+        const isHtml = contentType.includes("text/html");
+
+        if (isHtml && targetPath === "/") {
+          // Inject <base href> so the browser resolves absolute asset
+          // paths (e.g. /assets/index.js) through the proxy prefix.
+          const chunks: Buffer[] = [];
+          proxyRes.on("data", (chunk: Buffer) => chunks.push(chunk));
+          proxyRes.on("end", () => {
+            let body = Buffer.concat(chunks).toString("utf-8");
+            body = body.replace("<head>", `<head><base href="${baseHref}">`);
+            delete responseHeaders["content-length"];
+            delete responseHeaders["content-encoding"];
+            res.writeHead(proxyRes.statusCode || 200, responseHeaders);
+            res.end(body);
+          });
+          return;
+        }
 
         res.writeHead(proxyRes.statusCode || 502, responseHeaders);
         proxyRes.pipe(res, { end: true });

@@ -10,8 +10,8 @@ export default function CodeStudioSessionsPage() {
   const sessions = sessionsQuery.data ?? [];
   const openIdeMutation = trpc.codeStudio.ide.openForSession.useMutation({
     onSuccess: (data) => {
-      if (data?.proxyUrl) {
-        window.open(data.proxyUrl, "_blank");
+      if (data?.directUrl || data?.proxyUrl) {
+        window.open(data.directUrl || data.proxyUrl, "_blank");
         toast.success(data.isReused ? "Reusing existing IDE session" : "OpenCode Web launched");
       }
     },

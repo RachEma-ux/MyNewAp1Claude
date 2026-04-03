@@ -14,7 +14,7 @@
  * 7. Provide proxy target information
  */
 
-import { spawn, execSync, type ChildProcess } from "child_process";
+import { spawn, execFileSync, type ChildProcess } from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as repo from "../repository";
@@ -27,6 +27,21 @@ import {
   OPENCODE_BINARY_PATH,
 } from "../shared/constants";
 import type { IdeInstanceLaunchResult } from "./types";
+
+// ── Termux/Android glibc compatibility ────────────────────────────────────
+// OpenCode is a standard Linux ELF binary linked against glibc. On Termux
+// (Android), glibc lives inside a proot-distro Ubuntu rootfs. We must add
+// that path to LD_LIBRARY_PATH so the dynamic linker can resolve libc.so.6
+// and friends.
+
+function buildLdLibraryPath(): string {
+  const glibcDir =
+    process.env.OPENCODE_GLIBC_DIR ||
+    "/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/usr/lib/aarch64-linux-gnu";
+  const existing = process.env.LD_LIBRARY_PATH || "";
+  if (existing.includes(glibcDir)) return existing;
+  return existing ? `${glibcDir}:${existing}` : glibcDir;
+}
 
 // ── In-memory process tracking ────────────────────────────────────────────
 
@@ -122,11 +137,20 @@ async function startOpenCodeWeb(
     );
   }
   try {
-    execSync(`"${OPENCODE_BINARY_PATH}" version`, { timeout: 5000, stdio: "pipe" });
+    execFileSync(OPENCODE_BINARY_PATH, ["--version"], {
+      timeout: 15000,
+      stdio: "pipe",
+      env: { ...process.env, LD_LIBRARY_PATH: buildLdLibraryPath() },
+    });
   } catch (e: any) {
     throw new Error(
       `OpenCode binary at "${OPENCODE_BINARY_PATH}" cannot execute on this platform: ${e.message?.split("\n")[0]}`
     );
+  }
+
+  // Ensure workspace directory exists before spawning
+  if (!fs.existsSync(workspacePath)) {
+    fs.mkdirSync(workspacePath, { recursive: true });
   }
 
   const hostname = OPENCODE_WEB_HOSTNAME;
@@ -138,6 +162,7 @@ async function startOpenCodeWeb(
     ...process.env as Record<string, string>,
     HOME: process.env.HOME || "",
     PATH: process.env.PATH || "",
+    LD_LIBRARY_PATH: buildLdLibraryPath(),
   };
 
   if (password) {
@@ -173,6 +198,7 @@ export async function openForJob(jobId: number): Promise<IdeInstanceLaunchResult
     return {
       instance: existing as any,
       proxyUrl: `/api/code-studio/ide/${existing.proxyKey}/`,
+      directUrl: `http://${existing.hostname}:${existing.port}/`,
       isReused: true,
     };
   }
@@ -191,6 +217,7 @@ export async function openForJob(jobId: number): Promise<IdeInstanceLaunchResult
     return {
       instance: { ...wsInstance, jobId } as any,
       proxyUrl: `/api/code-studio/ide/${wsInstance.proxyKey}/`,
+      directUrl: `http://${wsInstance.hostname}:${wsInstance.port}/`,
       isReused: true,
     };
   }
@@ -257,6 +284,7 @@ export async function openForJob(jobId: number): Promise<IdeInstanceLaunchResult
     return {
       instance: updated as any,
       proxyUrl: `/api/code-studio/ide/${proxyKey}/`,
+      directUrl: `http://${OPENCODE_WEB_HOSTNAME}:${port}/`,
       isReused: false,
     };
   } catch (err: any) {

@@ -318,8 +318,8 @@ export default function CodeStudioJobDetailPage() {
   });
   const openIdeMutation = trpc.codeStudio.ide.openForJob.useMutation({
     onSuccess: (data) => {
-      if (data?.proxyUrl) {
-        window.open(data.proxyUrl, "_blank");
+      if (data?.directUrl || data?.proxyUrl) {
+        window.open(data.directUrl || data.proxyUrl, "_blank");
         toast.success(data.isReused ? "Reusing existing IDE session" : "OpenCode Web launched");
       }
     },
