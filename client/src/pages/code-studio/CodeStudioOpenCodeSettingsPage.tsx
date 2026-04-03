@@ -1136,8 +1136,8 @@ export default function CodeStudioOpenCodeSettingsPage({
         {renderContent()}
       </ScrollArea>
 
-      {/* Bottom action bar — sticky so always visible */}
-      <div className="flex items-center justify-between px-4 py-2 border-t bg-background/95 backdrop-blur shrink-0 sticky bottom-0 z-10">
+      {/* Bottom action bar — sticky, 2 rows on narrow screens */}
+      <div className="flex flex-wrap items-center justify-between gap-y-1 px-4 py-2 border-t bg-background/95 backdrop-blur shrink-0 sticky bottom-0 z-10">
         <div className="flex items-center gap-1">
           <Button variant="outline" size="sm" className="text-xs h-7" onClick={handleSave} disabled={updateDraftMut.isPending || !dirty}>
             {updateDraftMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />}
