@@ -290,27 +290,22 @@ export default function CodeStudioOpenCodeSettingsPage({
 
   // Build model options for the active provider
   const modelOptions = useMemo(() => {
-    // Determine active provider from the currently-set model value or enabled_providers
-    const activeProviderIds: string[] = [];
-    // From enabled providers
+    // If no models imported at all, return empty
+    if (importedModels.length === 0) return [];
+
+    // If user has explicitly set enabled_providers, filter by those
     const enabled = runtimeDraft.enabled_providers ?? [];
     if (enabled.length > 0) {
-      activeProviderIds.push(...enabled);
-    } else {
-      // Fallback: all imported providers
-      importedProviders.forEach((p: any) => {
-        const pid = p.config?.providerId || p.name;
-        if (pid) activeProviderIds.push(pid);
+      const lowerIds = new Set(enabled.map((id: string) => id.toLowerCase()));
+      return importedModels.filter((m: any) => {
+        const mPid = (m.config?.providerId || m.config?.providerType || "").toLowerCase();
+        return !mPid || lowerIds.has(mPid);
       });
     }
-    // Filter models by provider (case-insensitive match)
-    if (activeProviderIds.length === 0) return importedModels;
-    const lowerIds = new Set(activeProviderIds.map((id: string) => id.toLowerCase()));
-    return importedModels.filter((m: any) => {
-      const mPid = (m.config?.providerId || m.config?.providerType || "").toLowerCase();
-      return !mPid || lowerIds.has(mPid);
-    });
-  }, [runtimeDraft.enabled_providers, importedProviders, importedModels]);
+
+    // No filter — show all imported models
+    return importedModels;
+  }, [runtimeDraft.enabled_providers, importedModels]);
 
   const [customModelInput, setCustomModelInput] = useState(false);
   const [customSmallModelInput, setCustomSmallModelInput] = useState(false);
@@ -531,9 +526,17 @@ export default function CodeStudioOpenCodeSettingsPage({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Providers & Models</h3>
-          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => openJsonEditor("provider", runtimeDraft.provider)}>
-            <Code2 className="h-3 w-3 mr-1" /> Edit JSON
-          </Button>
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => {
+              // Navigate to AI Catalog to import models
+              window.location.href = "/code-studio/ai-catalog";
+            }}>
+              Import from Catalog
+            </Button>
+            <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => openJsonEditor("provider", runtimeDraft.provider)}>
+              <Code2 className="h-3 w-3 mr-1" /> Edit JSON
+            </Button>
+          </div>
         </div>
 
         {/* Primary Model */}
