@@ -280,6 +280,7 @@ export default function CodeStudioJobDetailPage() {
   const jobId = idMatch ? Number(idMatch[1]) : 0;
   const [expandedSession, setExpandedSession] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<string>("steps");
+  const [contentExpanded, setContentExpanded] = useState(false);
 
   const jobQuery = trpc.codeStudio.jobs.getById.useQuery({ id: jobId }, { enabled: !!jobId });
   const job = jobQuery.data;
@@ -326,7 +327,6 @@ export default function CodeStudioJobDetailPage() {
   const activeStep = (job.steps || []).find((s: any) => s.status === "in_progress");
   const ocHealthy = healthQuery.data?.opencode?.healthy ?? false;
 
-  const [contentExpanded, setContentExpanded] = useState(false);
   const objectiveIsLong = (job.objective?.length ?? 0) > 200;
 
   return (
