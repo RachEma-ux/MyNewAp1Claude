@@ -4,8 +4,10 @@
  * Also hosts the S2 (OpenCode Rail) toggle at the bottom,
  * so collapsing S2 hides it fully behind S1.
  */
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc";
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -24,6 +26,8 @@ import {
   BookOpen,
   FileStack,
   MonitorPlay,
+  Server,
+  Loader2,
 } from "lucide-react";
 
 export type CodeStudioView =
@@ -56,6 +60,59 @@ const NAV_ITEMS: { key: CodeStudioView; label: string; icon: React.ElementType }
 ];
 
 const OPENCODE_IDE_URL = "http://127.0.0.1:4096/";
+
+/** Sidebar action buttons: Open IDE + Ollama serve */
+function SidebarActions({ collapsed }: { collapsed: boolean }) {
+  const ollamaStatus = trpc.codeStudio.ollama.status.useQuery(undefined, {
+    refetchInterval: 10000,
+  });
+  const startOllama = trpc.codeStudio.ollama.start.useMutation({
+    onSuccess: () => ollamaStatus.refetch(),
+  });
+
+  const isRunning = ollamaStatus.data?.running ?? false;
+
+  return (
+    <div className={cn("border-t mt-2 pt-2 space-y-0.5", collapsed ? "" : "mx-1")}>
+      <button
+        onClick={() => window.open(OPENCODE_IDE_URL, "_blank")}
+        title="Open IDE"
+        className={cn(
+          "flex items-center w-full rounded-sm transition-colors text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10",
+          collapsed ? "justify-center py-1.5" : "gap-2 px-3 py-1.5 text-xs font-medium"
+        )}
+      >
+        <MonitorPlay className="h-3.5 w-3.5 shrink-0" />
+        {!collapsed && <span className="truncate">Open IDE</span>}
+      </button>
+      <button
+        onClick={() => { if (!isRunning && !startOllama.isPending) startOllama.mutate(); }}
+        title={isRunning ? "Ollama running" : "Start Ollama"}
+        className={cn(
+          "flex items-center w-full rounded-sm transition-colors",
+          isRunning
+            ? "text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+            : "text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10",
+          collapsed ? "justify-center py-1.5" : "gap-2 px-3 py-1.5 text-xs font-medium"
+        )}
+      >
+        {startOllama.isPending ? (
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+        ) : (
+          <Server className="h-3.5 w-3.5 shrink-0" />
+        )}
+        {!collapsed && (
+          <span className="truncate flex-1 text-left">
+            {startOllama.isPending ? "Starting..." : isRunning ? "Ollama" : "Start Ollama"}
+          </span>
+        )}
+        {!collapsed && isRunning && (
+          <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
+        )}
+      </button>
+    </div>
+  );
+}
 
 interface Props {
   active: CodeStudioView;
@@ -134,20 +191,8 @@ export default function CodeStudioSidebar({
           </button>
         ))}
 
-        {/* Open IDE — launches OpenCode Web in a new tab */}
-        <div className={cn("border-t mt-2 pt-2", collapsed ? "" : "mx-1")}>
-          <button
-            onClick={() => window.open(OPENCODE_IDE_URL, "_blank")}
-            title="Open IDE"
-            className={cn(
-              "flex items-center w-full rounded-sm transition-colors text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10",
-              collapsed ? "justify-center py-1.5" : "gap-2 px-3 py-1.5 text-xs font-medium"
-            )}
-          >
-            <MonitorPlay className="h-3.5 w-3.5 shrink-0" />
-            {!collapsed && <span className="truncate">Open IDE</span>}
-          </button>
-        </div>
+        {/* Actions — Open IDE + Ollama */}
+        <SidebarActions collapsed={collapsed} />
       </div>
 
       {/* S2 rail toggle — pinned at bottom, only on opencode-settings */}

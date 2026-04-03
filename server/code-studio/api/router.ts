@@ -550,6 +550,51 @@ const ideRouter = router({
   }),
 });
 
+// ── Ollama Runtime ──────────────────────────────────────────────────────────
+
+const OLLAMA_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+
+const ollamaRouter = router({
+  status: protectedProcedure.query(async () => {
+    try {
+      const res = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) {
+        const data = await res.json();
+        return { running: true, models: data.models?.map((m: any) => m.name) || [] };
+      }
+      return { running: false, models: [] };
+    } catch {
+      return { running: false, models: [] };
+    }
+  }),
+  start: protectedProcedure.mutation(async () => {
+    // Check if already running
+    try {
+      const res = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) return { started: false, message: "Ollama is already running" };
+    } catch { /* not running, proceed to start */ }
+
+    const { spawn } = await import("child_process");
+    const child = spawn("ollama", ["serve"], {
+      stdio: "ignore",
+      detached: true,
+      env: { ...process.env },
+    });
+    child.unref();
+
+    // Wait for it to come up
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        const res = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(1000) });
+        if (res.ok) return { started: true, message: "Ollama started", pid: child.pid };
+      } catch { /* still starting */ }
+    }
+
+    return { started: false, message: "Ollama process spawned but not responding after 10s" };
+  }),
+});
+
 // ── Compose Main Router ──────────────────────────────────────────────────────
 
 export const codeStudioRouter = router({
@@ -570,4 +615,5 @@ export const codeStudioRouter = router({
   opencodeSettings: opencodeSettingsRouter,
   templates: templatesRouter,
   ide: ideRouter,
+  ollama: ollamaRouter,
 });
