@@ -606,7 +606,29 @@ export async function executeJob(jobId: number): Promise<void> {
         // OpenCode available — send the phase prompt and capture output
         try {
           const prompt = buildPhasePrompt(job, phase.stepName);
-          const response = await ocClient.sendMessage(ocSessionId, prompt);
+          // Use job's configured model, or fall back to Ollama phi3 (no API key needed)
+          const model = (job as any).model || process.env.OPENCODE_DEFAULT_MODEL || "ollama/phi3";
+          const response = await ocClient.sendMessage(ocSessionId, prompt, { model });
+
+          // Check for provider errors inside the response (HTTP 200 but no output)
+          const providerError = response?.info?.error;
+          if (providerError) {
+            const errMsg = providerError.data?.message || providerError.name || "Unknown provider error";
+            if (step) await repo.updateJobStep(step.id, {
+              status: "failed",
+              completedAt: new Date(),
+              output: { summary: `Provider error: ${errMsg}`, phase: phase.stepName, error: providerError },
+            });
+            // Fail the job — no point continuing if the LLM can't respond
+            await transitionJob(jobId, "failed");
+            await repo.createAuditEvent({
+              eventType: "execution_failed",
+              entityType: "job",
+              entityId: jobId,
+              details: { phase: phase.stepName, error: errMsg },
+            });
+            return;
+          }
 
           // Extract output directly from the response (no race condition)
           const stepOutput = extractOutputFromResponse(response);
