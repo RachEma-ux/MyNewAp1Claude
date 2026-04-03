@@ -1,9 +1,11 @@
 /**
- * Home Template Demo Page
+ * Home Template — App Component demo page
  *
- * Showcases the OpenCode-inspired Home Template shell layout
- * with sample navigation, sessions, and content panels.
+ * Demonstrates the OpenCode-inspired Home Template shell layout:
+ * Topbar + collapsible sidebar (nav + sessions) + content + bottom bar.
+ * Dark muted palette cloned from OpenCode Web v1.3.13.
  */
+import { useState } from "react";
 import HomeTemplate, {
   Surface,
   InsetCard,
@@ -38,14 +40,16 @@ const sessions: SessionItem[] = [
 ];
 
 export default function HomeTemplatePage() {
+  const [activeNav, setActiveNav] = useState("dashboard");
+
   return (
     <HomeTemplate
       title="OpenCode"
       subtitle="Home Template Demo"
       logo={Code2}
       navItems={navItems}
-      activeNav="dashboard"
-      onNavigate={(key) => console.log("Navigate:", key)}
+      activeNav={activeNav}
+      onNavigate={setActiveNav}
       sessions={sessions}
       onSessionClick={(id) => console.log("Session:", id)}
       onNewSession={() => console.log("New session")}
@@ -66,71 +70,177 @@ export default function HomeTemplatePage() {
       }
     >
       <div className="space-y-4 max-w-4xl">
-        {/* Main surface panel */}
+
+        {/* ── Drawing ────────────────────────────────────────── */}
         <Surface>
-          <SectionTitle>Welcome</SectionTitle>
-          <Description>
-            This is the Home Template — a shell layout cloned from the OpenCode Web UI (v1.3.13).
-            It features a collapsible sidebar with navigation and session list, a topbar with
-            status indicator, and a bottom action bar. All colors use the OpenCode dark palette.
-          </Description>
+          <SectionTitle>Home Template — OpenCode Shell</SectionTitle>
+          <pre
+            className="text-[10px] leading-relaxed whitespace-pre font-mono rounded-lg p-4 overflow-x-auto"
+            style={{ backgroundColor: OC.bg, color: OC.textWeak, border: `1px solid ${OC.border}` }}
+          >{`┌──────────────────────────────────────────────────────────────┐
+│ TOPBAR  [Logo] Title              [Status ●]  [v1.3.13]     │
+├────────┬─────────────────────────────────────────────────────┤
+│  S1    │                                                     │
+│ ┌────┐ │   CONTENT AREA                                      │
+│ │ ≡← │ │   ┌─────────────────────────────────────────────┐   │
+│ └────┘ │   │  Surface (raised)                           │   │
+│ [Dash] │   │  Main content block                         │   │
+│ [Sess] │   └─────────────────────────────────────────────┘   │
+│ [File] │                                                     │
+│ [Actn] │   ┌──────────────────┐  ┌──────────────────────┐   │
+│ [Sett] │   │  InsetCard       │  │  InsetCard           │   │
+│ ────── │   │  Secondary block │  │  Secondary block     │   │
+│ Sessns │   └──────────────────┘  └──────────────────────┘   │
+│ ● act  │                                                     │
+│ ○ idle │   ┌──────────────────┐  ┌──────────────────────┐   │
+│ ○ idle │   │  InsetCard       │  │  InsetCard           │   │
+│ ✕ err  │   │                  │  │                      │   │
+│ ────── │   └──────────────────┘  └──────────────────────┘   │
+│ [+New] │                                                     │
+├────────┼─────────────────────────────────────────────────────┤
+│        │  BOTTOM BAR  [info]                     [4 sessions]│
+└────────┴─────────────────────────────────────────────────────┘
+
+Collapsed (w-48px):              Expanded (w-224px):
+┌──┬───────────┐                ┌──────────┬───────────┐
+│≡ │           │                │ Title  ←││           │
+│◈ │  Content  │                │ Dashboard│  Content  │
+│◈ │           │                │ Sessions │           │
+│◈ │           │                │ Files    │           │
+│──│           │                │──────────│           │
+│● │           │                │● Active  │           │
+│○ │           │                │○ Idle    │           │
+│+ │           │                │+ New Ses │           │
+└──┴───────────┘                └──────────┴───────────┘`}</pre>
         </Surface>
 
-        {/* Grid of inset cards */}
+        {/* ── Active state ───────────────────────────────────── */}
+        <Surface>
+          <p className="text-xs" style={{ color: OC.textMuted }}>
+            Active view: <span style={{ color: OC.textStrong, fontWeight: 500 }}>{activeNav}</span>
+          </p>
+          <p className="text-[10px] mt-1" style={{ color: OC.muted }}>
+            Topbar h-40px. Sidebar w-48/224px. Bottom bar h-36px. Content fills remaining space.
+            All surfaces use OpenCode gray-dark scale (#131010 → #f1ecec). Brand accent: #dcde8d.
+          </p>
+        </Surface>
+
+        {/* ── Color palette ──────────────────────────────────── */}
+        <Surface>
+          <SectionTitle>OpenCode Dark Palette</SectionTitle>
+          <div className="flex gap-1.5 flex-wrap">
+            {Object.entries(OC).map(([name, color]) => (
+              <div key={name} className="flex flex-col items-center gap-0.5">
+                <div
+                  className="w-7 h-7 rounded-sm"
+                  style={{ backgroundColor: color, border: `1px solid ${OC.borderStrong}` }}
+                />
+                <span className="text-[7px]" style={{ color: OC.textMuted }}>{name}</span>
+                <span className="text-[7px] font-mono" style={{ color: OC.muted }}>{color}</span>
+              </div>
+            ))}
+          </div>
+        </Surface>
+
+        {/* ── Grid demo ──────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <InsetCard>
-            <SectionTitle>Sidebar</SectionTitle>
+            <SectionTitle>Sidebar Mechanism</SectionTitle>
             <Description>
-              Collapsible (48px / 224px). Nav items with brand-colored active indicator.
-              Session list with status dots. New session button pinned at bottom.
+              Collapsible (48px icon-only / 224px full). Nav items with brand-colored
+              left border on active. Session list with colored status dots (green=active,
+              gray=idle, red=error). New session button pinned at bottom with blue accent.
+              Hover states use bgStronger (#2d2828).
             </Description>
           </InsetCard>
-
           <InsetCard>
-            <SectionTitle>Color Palette</SectionTitle>
-            <div className="flex gap-1 mt-2 flex-wrap">
-              {Object.entries(OC).map(([name, color]) => (
-                <div key={name} className="flex flex-col items-center gap-0.5">
-                  <div
-                    className="w-6 h-6 rounded-sm border"
-                    style={{ backgroundColor: color, borderColor: OC.borderStrong }}
-                  />
-                  <span className="text-[8px]" style={{ color: OC.textMuted }}>{name}</span>
-                </div>
-              ))}
-            </div>
-          </InsetCard>
-
-          <InsetCard>
-            <SectionTitle>Surfaces</SectionTitle>
+            <SectionTitle>Sub-components</SectionTitle>
             <Description>
-              Two levels: Surface (raised, lighter) for main content,
-              InsetCard (recessed, darker) for secondary blocks.
-              Both use the OpenCode border and background tokens.
+              Surface — raised panel (bgStrong #252121, border #343030).
+              InsetCard — recessed block (bgWeak #1b1818, border #343030).
+              SectionTitle — textStrong #f1ecec, 14px semibold.
+              Description — textMuted #7f7979, 12px relaxed.
+              OpenCodePalette — exported color object for custom content.
             </Description>
           </InsetCard>
+        </div>
 
-          <InsetCard>
-            <SectionTitle>Usage</SectionTitle>
-            <pre
-              className="text-[10px] mt-2 p-2 rounded overflow-x-auto"
-              style={{ backgroundColor: OC.bg, color: OC.textWeak, border: `1px solid ${OC.border}` }}
-            >
-{`<HomeTemplate
+        {/* ── Source Code ────────────────────────────────────── */}
+        <Surface>
+          <SectionTitle>Source Code</SectionTitle>
+          <pre
+            className="text-[10px] leading-relaxed whitespace-pre overflow-x-auto font-mono rounded-lg p-4"
+            style={{ backgroundColor: OC.bg, color: OC.textWeak, border: `1px solid ${OC.border}` }}
+          >{`/**
+ * Home Template — OpenCode-inspired Shell Layout
+ *
+ * PATTERN RULES:
+ * - Full h-dvh viewport. No parent padding to cancel.
+ * - Topbar: h-10 (40px), fixed, bgWeak with border-bottom.
+ * - Body: flex row, sidebar + content, flex-1 min-h-0.
+ * - Sidebar (S1): shrink-0, w-48px collapsed / w-224px expanded.
+ *   + Toggle in sidebar header
+ *   + Nav items with brand accent on active (left border)
+ *   + Session list with status dots (green/gray/red)
+ *   + New session button at bottom
+ *   + Hover: bgStronger (#2d2828)
+ * - Content: flex-1 min-w-0 overflow-auto p-4
+ * - Bottom bar: h-9 (36px), optional, bgWeak with border-top.
+ * - All colors from OpenCode gray-dark scale:
+ *   bg=#131010  bgWeak=#1b1818  bgStrong=#252121
+ *   border=#343030  text=#b7b1b1  textStrong=#f1ecec
+ *   brand=#dcde8d (yellow-green accent)
+ *
+ * COMPONENTS:
+ * - HomeTemplate: main shell (topbar + sidebar + content + bottom)
+ * - Surface: raised panel for primary content
+ * - InsetCard: recessed card for secondary content
+ * - SectionTitle: heading in textStrong
+ * - Description: body text in textMuted
+ * - OpenCodePalette: exported color constants
+ */
+
+// ── Imports ─────────────────────────────────────────────
+import HomeTemplate, {
+  Surface, InsetCard, SectionTitle, Description,
+  OpenCodePalette as OC,
+  type NavItem, type SessionItem,
+} from "@/components/templates/HomeTemplate";
+import { LayoutDashboard, MessageSquare, Code2 } from "lucide-react";
+
+// ── Nav + Sessions ──────────────────────────────────────
+const navItems: NavItem[] = [
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "sessions",  label: "Sessions",  icon: MessageSquare },
+];
+const sessions: SessionItem[] = [
+  { id: "1", title: "Task name", status: "active", timestamp: "2m" },
+];
+
+// ── Usage ───────────────────────────────────────────────
+<HomeTemplate
   title="My App"
-  navItems={[...]}
-  sessions={[...]}
+  logo={Code2}
+  navItems={navItems}
   activeNav="dashboard"
-  onNavigate={(k) => ...}
+  onNavigate={(key) => setActive(key)}
+  sessions={sessions}
+  onSessionClick={(id) => console.log(id)}
+  onNewSession={() => console.log("new")}
+  statusText="Connected"
+  statusColor="success"   // "success" | "warning" | "critical" | "muted"
+  bottomBar={<span>Footer</span>}
 >
   <Surface>
     <SectionTitle>Hello</SectionTitle>
-    <Description>Content</Description>
+    <Description>Content goes here.</Description>
   </Surface>
-</HomeTemplate>`}
-            </pre>
-          </InsetCard>
-        </div>
+  <div className="grid grid-cols-2 gap-3 mt-4">
+    <InsetCard><SectionTitle>A</SectionTitle></InsetCard>
+    <InsetCard><SectionTitle>B</SectionTitle></InsetCard>
+  </div>
+</HomeTemplate>`}</pre>
+        </Surface>
       </div>
     </HomeTemplate>
   );
