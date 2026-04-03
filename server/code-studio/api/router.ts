@@ -485,13 +485,21 @@ const ideRouter = router({
       }
     } catch { /* not available */ }
 
-    // On Termux/proot, Bun's listen() cannot bind ports so spawning fails.
-    // Give a clear error instead of a broken white page.
-    throw new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: "OpenCode Web IDE is not available. The OpenCode runtime is not running. "
-        + "On Termux/Android, start it manually with: opencode serve --port 4096",
-    });
+    // No existing runtime — spawn a new instance
+    try {
+      const result = await ideMgr.openForJob(input.jobId);
+      return {
+        instanceId: result.instance.id,
+        proxyUrl: result.proxyUrl,
+        directUrl: result.directUrl,
+        status: result.instance.status,
+        port: result.instance.port,
+        isReused: result.isReused,
+        workspacePath: result.instance.workspacePath,
+      };
+    } catch (err: any) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "IDE launch failed" });
+    }
   }),
   openForSession: protectedProcedure.input(openIdeForSessionSchema).mutation(async ({ input }) => {
     const runtimeUrl = process.env.OPENCODE_URL || "http://127.0.0.1:4096";
@@ -510,11 +518,20 @@ const ideRouter = router({
       }
     } catch { /* not available */ }
 
-    throw new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: "OpenCode Web IDE is not available. The OpenCode runtime is not running. "
-        + "On Termux/Android, start it manually with: opencode serve --port 4096",
-    });
+    try {
+      const result = await ideMgr.openForSession(input.sessionId);
+      return {
+        instanceId: result.instance.id,
+        proxyUrl: result.proxyUrl,
+        directUrl: result.directUrl,
+        status: result.instance.status,
+        port: result.instance.port,
+        isReused: result.isReused,
+        workspacePath: result.instance.workspacePath,
+      };
+    } catch (err: any) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "IDE launch failed" });
+    }
   }),
   getStatus: protectedProcedure.input(ideInstanceStatusSchema).query(async ({ input }) => {
     const status = await ideMgr.getInstanceStatus(input.instanceId);

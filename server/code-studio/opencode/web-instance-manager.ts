@@ -28,16 +28,22 @@ import {
 } from "../shared/constants";
 import type { IdeInstanceLaunchResult } from "./types";
 
-// ── Termux/Android glibc compatibility ────────────────────────────────────
-// OpenCode is a standard Linux ELF binary linked against glibc. On Termux
-// (Android), glibc lives inside a proot-distro Ubuntu rootfs. We must add
-// that path to LD_LIBRARY_PATH so the dynamic linker can resolve libc.so.6
-// and friends.
+// ── Termux/Android compatibility ──────────────────────────────────────────
+// OpenCode is a Bun-based Linux ELF binary. On Termux (Android + proot),
+// Bun's listen() syscall fails because proot can't intercept io_uring.
+// The fix: run OpenCode inside the Ubuntu proot-distro rootfs where glibc
+// and syscall translation work correctly.
+
+const UBUNTU_ROOTFS = process.env.OPENCODE_UBUNTU_ROOTFS
+  || "/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu";
+
+const IS_TERMUX = fs.existsSync(UBUNTU_ROOTFS) && process.platform === "linux"
+  && fs.existsSync("/data/data/com.termux");
 
 function buildLdLibraryPath(): string {
   const glibcDir =
     process.env.OPENCODE_GLIBC_DIR ||
-    "/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/usr/lib/aarch64-linux-gnu";
+    `${UBUNTU_ROOTFS}/usr/lib/aarch64-linux-gnu`;
   const existing = process.env.LD_LIBRARY_PATH || "";
   if (existing.includes(glibcDir)) return existing;
   return existing ? `${glibcDir}:${existing}` : glibcDir;
@@ -156,13 +162,12 @@ async function startOpenCodeWeb(
   const hostname = OPENCODE_WEB_HOSTNAME;
   const password = process.env.OPENCODE_WEB_PASSWORD || process.env.OPENCODE_SERVER_PASSWORD || "";
 
-  const args = ["web", "--port", String(port), "--hostname", hostname];
+  const ocArgs = ["serve", "--port", String(port), "--hostname", hostname];
 
   const env: Record<string, string> = {
     ...process.env as Record<string, string>,
     HOME: process.env.HOME || "",
     PATH: process.env.PATH || "",
-    LD_LIBRARY_PATH: buildLdLibraryPath(),
   };
 
   if (password) {
@@ -172,8 +177,31 @@ async function startOpenCodeWeb(
     env.OPENCODE_SERVER_USERNAME = process.env.OPENCODE_SERVER_USERNAME;
   }
 
-  const child = spawn(OPENCODE_BINARY_PATH, args, {
-    cwd: workspacePath,
+  let spawnCmd: string;
+  let spawnArgs: string[];
+
+  if (IS_TERMUX) {
+    // On Termux, run through proot with Ubuntu rootfs so Bun can bind ports
+    spawnCmd = "proot";
+    spawnArgs = [
+      "--kill-on-exit",
+      "-r", UBUNTU_ROOTFS,
+      "-b", "/dev:/dev",
+      "-b", "/proc:/proc",
+      "-b", `${process.env.HOME || "/data/data/com.termux/files/home"}:/home`,
+      "-b", "/data/data/com.termux/files/usr/tmp:/tmp",
+      "-w", workspacePath,
+      OPENCODE_BINARY_PATH,
+      ...ocArgs,
+    ];
+  } else {
+    spawnCmd = OPENCODE_BINARY_PATH;
+    spawnArgs = ocArgs;
+    env.LD_LIBRARY_PATH = buildLdLibraryPath();
+  }
+
+  const child = spawn(spawnCmd, spawnArgs, {
+    cwd: IS_TERMUX ? undefined : workspacePath,
     env,
     stdio: ["ignore", "pipe", "pipe"],
     detached: false,
@@ -227,7 +255,9 @@ export async function openForJob(jobId: number): Promise<IdeInstanceLaunchResult
   const proxyKey = generateProxyKey();
   const expiresAt = new Date(Date.now() + OPENCODE_WEB_TTL_MINUTES * 60 * 1000);
 
-  const launchCommand = `${OPENCODE_BINARY_PATH} web --port ${port} --hostname ${OPENCODE_WEB_HOSTNAME}`;
+  const launchCommand = IS_TERMUX
+    ? `proot -r ${UBUNTU_ROOTFS} ${OPENCODE_BINARY_PATH} serve --port ${port} --hostname ${OPENCODE_WEB_HOSTNAME}`
+    : `${OPENCODE_BINARY_PATH} serve --port ${port} --hostname ${OPENCODE_WEB_HOSTNAME}`;
 
   const instance = await repo.createIdeInstance({
     jobId,
