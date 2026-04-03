@@ -571,27 +571,38 @@ const ollamaRouter = router({
     // Check if already running
     try {
       const res = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(2000) });
-      if (res.ok) return { started: false, message: "Ollama is already running" };
+      if (res.ok) return { started: true, message: "Ollama is already running" };
     } catch { /* not running, proceed to start */ }
 
-    const { spawn } = await import("child_process");
-    const child = spawn("ollama", ["serve"], {
+    const { spawn, execSync } = await import("child_process");
+
+    // Resolve full path to ollama binary
+    let ollamaBin = "ollama";
+    try {
+      ollamaBin = execSync("which ollama", { encoding: "utf-8" }).trim();
+    } catch { /* fallback to PATH lookup */ }
+
+    const child = spawn(ollamaBin, ["serve"], {
       stdio: "ignore",
       detached: true,
       env: { ...process.env },
     });
+
+    let spawnError: string | null = null;
+    child.on("error", (err) => { spawnError = err.message; });
     child.unref();
 
     // Wait for it to come up
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 15; i++) {
       await new Promise((r) => setTimeout(r, 1000));
+      if (spawnError) return { started: false, message: `Spawn failed: ${spawnError}` };
       try {
         const res = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(1000) });
         if (res.ok) return { started: true, message: "Ollama started", pid: child.pid };
       } catch { /* still starting */ }
     }
 
-    return { started: false, message: "Ollama process spawned but not responding after 10s" };
+    return { started: false, message: "Ollama process spawned but not responding after 15s" };
   }),
 });
 
