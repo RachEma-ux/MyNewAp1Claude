@@ -4,13 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Play, XCircle, RotateCcw, FileCode2, Workflow, ArrowLeft } from "lucide-react";
-import { useLocation, useParams } from "wouter";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 export default function CodeStudioJobDetailPage() {
-  const params = useParams<{ id: string }>();
-  const jobId = Number(params.id);
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const idMatch = location.match(/\/code-studio\/jobs\/(\d+)/);
+  const jobId = idMatch ? Number(idMatch[1]) : 0;
 
   const jobQuery = trpc.codeStudio.jobs.getById.useQuery({ id: jobId }, { enabled: !!jobId });
   const job = jobQuery.data;
