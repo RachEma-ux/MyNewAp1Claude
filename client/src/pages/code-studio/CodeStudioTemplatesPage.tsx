@@ -18,7 +18,6 @@ import {
   X, PlusCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import yaml from "js-yaml";
 
 type VariableDef = {
   key: string;
@@ -204,11 +203,12 @@ export default function CodeStudioTemplatesPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const text = ev.target?.result as string;
         let parsed: any;
         if (file.name.endsWith(".yaml") || file.name.endsWith(".yml")) {
+          const yaml = await import("js-yaml");
           parsed = yaml.load(text);
         } else {
           parsed = JSON.parse(text);
