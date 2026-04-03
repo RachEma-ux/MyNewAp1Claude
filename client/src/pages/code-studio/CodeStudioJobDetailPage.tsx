@@ -323,7 +323,10 @@ export default function CodeStudioJobDetailPage() {
         toast.success(data.isReused ? "Reusing existing IDE session" : "OpenCode Web launched");
       }
     },
-    onError: (e) => toast.error(`IDE launch failed: ${e.message}`),
+    onError: (e: any) => {
+      const detail = e.data?.appBlocker?.technicalDetails || e.message;
+      toast.error(`IDE launch failed: ${detail}`);
+    },
   });
 
   if (jobQuery.isLoading) {

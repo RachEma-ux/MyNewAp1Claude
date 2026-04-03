@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../_core/trpc";
 import * as repo from "../repository";
 import * as orchestrator from "../worker/job-orchestrator";
@@ -467,26 +468,34 @@ const templatesRouter = router({
 
 const ideRouter = router({
   openForJob: protectedProcedure.input(openIdeForJobSchema).mutation(async ({ input }) => {
-    const result = await ideMgr.openForJob(input.jobId);
-    return {
-      instanceId: result.instance.id,
-      proxyUrl: result.proxyUrl,
-      status: result.instance.status,
-      port: result.instance.port,
-      isReused: result.isReused,
-      workspacePath: result.instance.workspacePath,
-    };
+    try {
+      const result = await ideMgr.openForJob(input.jobId);
+      return {
+        instanceId: result.instance.id,
+        proxyUrl: result.proxyUrl,
+        status: result.instance.status,
+        port: result.instance.port,
+        isReused: result.isReused,
+        workspacePath: result.instance.workspacePath,
+      };
+    } catch (err: any) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "IDE launch failed" });
+    }
   }),
   openForSession: protectedProcedure.input(openIdeForSessionSchema).mutation(async ({ input }) => {
-    const result = await ideMgr.openForSession(input.sessionId);
-    return {
-      instanceId: result.instance.id,
-      proxyUrl: result.proxyUrl,
-      status: result.instance.status,
-      port: result.instance.port,
-      isReused: result.isReused,
-      workspacePath: result.instance.workspacePath,
-    };
+    try {
+      const result = await ideMgr.openForSession(input.sessionId);
+      return {
+        instanceId: result.instance.id,
+        proxyUrl: result.proxyUrl,
+        status: result.instance.status,
+        port: result.instance.port,
+        isReused: result.isReused,
+        workspacePath: result.instance.workspacePath,
+      };
+    } catch (err: any) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "IDE launch failed" });
+    }
   }),
   getStatus: protectedProcedure.input(ideInstanceStatusSchema).query(async ({ input }) => {
     const status = await ideMgr.getInstanceStatus(input.instanceId);
