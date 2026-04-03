@@ -603,12 +603,18 @@ export async function executeJob(jobId: number): Promise<void> {
       if (step) await repo.updateJobStep(step.id, { status: "in_progress", startedAt: new Date() });
 
       if (ocSessionId) {
-        // OpenCode available — send the phase prompt and capture output
+        // OpenCode available — send the phase prompt and poll for response
         try {
           const prompt = buildPhasePrompt(job, phase.stepName);
-          // Model is configured in opencode.jsonc — don't override here
-          // (OpenCode API rejects model as string, and the default is correct)
-          const response = await ocClient.sendMessage(ocSessionId, prompt);
+
+          // Get current message count before sending
+          const beforeMsgs = await ocClient.listMessages(ocSessionId);
+          const beforeCount = beforeMsgs.length;
+
+          // Send async (fire), then poll for the assistant response (up to 10 min)
+          await ocClient.sendMessageAsync(ocSessionId, prompt);
+          const lastMsg = await ocClient.waitForResponse(ocSessionId, beforeCount, 600000, 5000);
+          const response = lastMsg as any;
 
           // Check for provider errors inside the response (HTTP 200 but no output)
           const providerError = response?.info?.error;

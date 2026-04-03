@@ -129,7 +129,63 @@ export async function sendMessage(
   };
   if (options?.model) body.model = options.model;
   if (options?.agent) body.agent = options.agent;
-  return ocFetch(`/session/${sessionId}/message`, { method: "POST", body: JSON.stringify(body) });
+
+  // Send the message (fire). OpenCode blocks until LLM finishes,
+  // which can take 5-10+ minutes for tool-heavy prompts.
+  // Use a 10-minute timeout for the initial POST.
+  return ocFetch(`/session/${sessionId}/message`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    timeoutMs: 600000, // 10 minutes
+  });
+}
+
+/**
+ * Send message without waiting for completion. Returns immediately.
+ * Use listMessages to poll for the response.
+ */
+export async function sendMessageAsync(
+  sessionId: string,
+  text: string,
+): Promise<void> {
+  const body = { parts: [{ type: "text", text }] };
+  // Fire and forget — use a short timeout just for the HTTP round-trip
+  // If OpenCode blocks, this will timeout, but the message is still queued
+  try {
+    await ocFetch(`/session/${sessionId}/message`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      timeoutMs: 5000,
+    });
+  } catch {
+    // Expected timeout — message was sent, LLM is processing
+  }
+}
+
+/**
+ * Poll for the last assistant message in a session.
+ * Returns when a new assistant message appears or maxWait is exceeded.
+ */
+export async function waitForResponse(
+  sessionId: string,
+  knownMessageCount: number,
+  maxWaitMs: number = 600000,
+  pollIntervalMs: number = 5000,
+): Promise<OpenCodeMessage | null> {
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    try {
+      const messages = await listMessages(sessionId);
+      if (messages.length > knownMessageCount) {
+        // Find last assistant message
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if ((messages[i] as any).info?.role === "assistant") return messages[i];
+        }
+      }
+    } catch { /* poll error, retry */ }
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
+  }
+  return null;
 }
 
 export async function listMessages(sessionId: string, limit?: number): Promise<OpenCodeMessage[]> {
