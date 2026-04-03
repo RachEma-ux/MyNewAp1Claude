@@ -6,7 +6,6 @@
  */
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -107,27 +106,25 @@ export default function CodeStudioSidebar({
       </div>
 
       {/* Nav items */}
-      <ScrollArea className="flex-1 min-h-0">
-        <div className={collapsed ? "px-1 py-1" : ""}>
-          {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => onNavigate(key)}
-              title={label}
-              className={cn(
-                "flex items-center w-full rounded-sm transition-colors",
-                collapsed ? "justify-center py-1.5" : "gap-2 px-3 py-1.5 text-xs",
-                active === key
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              )}
-            >
-              <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </button>
-          ))}
-        </div>
-      </ScrollArea>
+      <div className={cn("flex-1 min-h-0 overflow-y-auto", collapsed ? "px-1 py-1" : "")}>
+        {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => onNavigate(key)}
+            title={label}
+            className={cn(
+              "flex items-center w-full rounded-sm transition-colors",
+              collapsed ? "justify-center py-1.5" : "gap-2 px-3 py-1.5 text-xs",
+              active === key
+                ? "bg-primary/10 text-primary font-medium"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
+            {!collapsed && <span className="truncate">{label}</span>}
+          </button>
+        ))}
+      </div>
 
       {/* S2 rail toggle — pinned at bottom, only on opencode-settings */}
       {showRailToggle && (

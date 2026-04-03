@@ -55,7 +55,7 @@ function getActiveView(path: string): CodeStudioView {
 export default function CodeStudioShell() {
   const [location, navigate] = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const [railCollapsed, setRailCollapsed] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(true);
   const active = getActiveView(location);
 
   // ── Double-shell state: S2 section nav for OpenCode Settings ──────────
