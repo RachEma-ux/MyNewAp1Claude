@@ -4,7 +4,7 @@
  * Section nav lives in S2 (OpenCodeSettingsRail), controlled by the shell.
  * This component renders: Header + Content + Bottom Action Bar.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -133,6 +134,7 @@ export default function CodeStudioOpenCodeSettingsPage({
   );
   const runtimeStatusQuery = trpc.codeStudio.opencodeSettings.runtimeStatus.full.useQuery();
   const applyEventsQuery = trpc.codeStudio.opencodeSettings.applyFlow.events.useQuery({ limit: 10 });
+  const catalogImportsQuery = trpc.codeStudio.catalogImports.list.useQuery();
 
   // ── Mutations ──────────────────────────────────────────────────────────
 
@@ -273,6 +275,44 @@ export default function CodeStudioOpenCodeSettingsPage({
   const status = runtimeStatusQuery.data;
   const events = applyEventsQuery.data ?? [];
 
+  // ── Catalog-derived provider/model lists ──────────────────────────────
+  const catalogImports = catalogImportsQuery.data ?? [];
+
+  const importedProviders = useMemo(
+    () => catalogImports.filter((i: any) => i.entryType === "provider"),
+    [catalogImports],
+  );
+
+  const importedModels = useMemo(
+    () => catalogImports.filter((i: any) => i.entryType === "model"),
+    [catalogImports],
+  );
+
+  // Build model options for the active provider
+  const modelOptions = useMemo(() => {
+    // Determine active provider from the currently-set model value or enabled_providers
+    const activeProviderIds: string[] = [];
+    // From enabled providers
+    const enabled = runtimeDraft.enabled_providers ?? [];
+    if (enabled.length > 0) {
+      activeProviderIds.push(...enabled);
+    } else {
+      // Fallback: all imported providers
+      importedProviders.forEach((p: any) => {
+        const pid = p.config?.providerId || p.name;
+        if (pid) activeProviderIds.push(pid);
+      });
+    }
+    // Filter models by provider
+    if (activeProviderIds.length === 0) return importedModels;
+    return importedModels.filter((m: any) =>
+      activeProviderIds.includes(m.config?.providerId),
+    );
+  }, [runtimeDraft.enabled_providers, importedProviders, importedModels]);
+
+  const [customModelInput, setCustomModelInput] = useState(false);
+  const [customSmallModelInput, setCustomSmallModelInput] = useState(false);
+
   // ── Section renderers ──────────────────────────────────────────────────
 
   const renderOverview = () => (
@@ -370,12 +410,42 @@ export default function CodeStudioOpenCodeSettingsPage({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label className="text-xs">Model</Label>
-            <Input className="h-8 text-xs" value={runtimeDraft.model || ""} onChange={(e) => updateField("model", e.target.value)} placeholder="anthropic/claude-sonnet-4-5" />
+            {modelOptions.length > 0 ? (
+              <Select
+                value={runtimeDraft.model || "__placeholder__"}
+                onValueChange={(v) => { if (v !== "__placeholder__") updateField("model", v); }}
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select model..." /></SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((m: any) => {
+                    const val = `${m.config?.providerId || "unknown"}/${m.name}`;
+                    return <SelectItem key={m.id} value={val} className="text-xs">{m.name}</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input className="h-8 text-xs" value={runtimeDraft.model || ""} onChange={(e) => updateField("model", e.target.value)} placeholder="anthropic/claude-sonnet-4-5" />
+            )}
             <p className="text-[9px] text-muted-foreground mt-0.5">Format: provider/model-id</p>
           </div>
           <div>
             <Label className="text-xs">Small Model</Label>
-            <Input className="h-8 text-xs" value={runtimeDraft.small_model || ""} onChange={(e) => updateField("small_model", e.target.value)} placeholder="anthropic/claude-haiku-4-5" />
+            {modelOptions.length > 0 ? (
+              <Select
+                value={runtimeDraft.small_model || "__placeholder__"}
+                onValueChange={(v) => { if (v !== "__placeholder__") updateField("small_model", v); }}
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select model..." /></SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((m: any) => {
+                    const val = `${m.config?.providerId || "unknown"}/${m.name}`;
+                    return <SelectItem key={m.id} value={val} className="text-xs">{m.name}</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input className="h-8 text-xs" value={runtimeDraft.small_model || ""} onChange={(e) => updateField("small_model", e.target.value)} placeholder="anthropic/claude-haiku-4-5" />
+            )}
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -448,55 +518,176 @@ export default function CodeStudioOpenCodeSettingsPage({
     </div>
   );
 
-  const renderProviders = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Providers & Models</h3>
-        <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => openJsonEditor("provider", runtimeDraft.provider)}>
-          <Code2 className="h-3 w-3 mr-1" /> Edit JSON
-        </Button>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-xs">Primary Model</Label>
-          <Input className="h-8 text-xs" value={runtimeDraft.model || ""} onChange={(e) => updateField("model", e.target.value)} placeholder="anthropic/claude-sonnet-4-5" />
+  const renderProviders = () => {
+    const formatModelValue = (m: any) => `${m.config?.providerId || "unknown"}/${m.name}`;
+    const currentModel = runtimeDraft.model || "";
+    const currentSmallModel = runtimeDraft.small_model || "";
+    const enabledSet = new Set(runtimeDraft.enabled_providers ?? []);
+    const disabledSet = new Set(runtimeDraft.disabled_providers ?? []);
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Providers & Models</h3>
+          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => openJsonEditor("provider", runtimeDraft.provider)}>
+            <Code2 className="h-3 w-3 mr-1" /> Edit JSON
+          </Button>
         </div>
-        <div>
-          <Label className="text-xs">Small Model</Label>
-          <Input className="h-8 text-xs" value={runtimeDraft.small_model || ""} onChange={(e) => updateField("small_model", e.target.value)} placeholder="anthropic/claude-haiku-4-5" />
-        </div>
-      </div>
-      <div>
-        <Label className="text-xs">Enabled Providers</Label>
-        <Input className="h-8 text-xs" value={(runtimeDraft.enabled_providers ?? []).join(", ")} onChange={(e) => updateField("enabled_providers", e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))} placeholder="anthropic, openai, ollama" />
-        <p className="text-[9px] text-muted-foreground mt-0.5">Comma-separated. Leave empty to enable all.</p>
-      </div>
-      <div>
-        <Label className="text-xs">Disabled Providers</Label>
-        <Input className="h-8 text-xs" value={(runtimeDraft.disabled_providers ?? []).join(", ")} onChange={(e) => updateField("disabled_providers", e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))} placeholder="" />
-      </div>
-      <Separator />
-      <div>
-        <Label className="text-xs">Provider Configs (JSON)</Label>
-        <p className="text-[9px] text-muted-foreground mb-1">Use {"{{secret:key_name}}"} for API keys. They will be redacted in previews.</p>
-        {Object.keys(runtimeDraft.provider ?? {}).length === 0 ? (
-          <p className="text-[10px] text-muted-foreground">No custom provider configs. Use Edit JSON to add.</p>
-        ) : (
-          <div className="space-y-1">
-            {Object.entries(runtimeDraft.provider ?? {}).map(([key, val]: [string, any]) => (
-              <div key={key} className="flex items-center justify-between py-1 px-2 rounded bg-muted/20 text-[10px]">
-                <span className="font-medium">{key}</span>
-                <div className="flex items-center gap-2">
-                  {val?.name && <span className="text-muted-foreground">{val.name}</span>}
-                  <Button variant="ghost" size="sm" className="h-5 px-1 text-[9px]" onClick={() => openJsonEditor(`provider.${key}`, val)}>Edit</Button>
-                </div>
+
+        {/* Primary Model */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs">Primary Model</Label>
+            {customModelInput ? (
+              <div className="flex gap-1">
+                <Input className="h-8 text-xs flex-1" value={currentModel} onChange={(e) => updateField("model", e.target.value)} placeholder="provider/model-id" />
+                <Button variant="ghost" size="sm" className="h-8 text-[10px] px-2 shrink-0" onClick={() => setCustomModelInput(false)}>List</Button>
               </div>
-            ))}
+            ) : modelOptions.length > 0 ? (
+              <Select
+                value={currentModel || "__placeholder__"}
+                onValueChange={(v) => {
+                  if (v === "__custom__") { setCustomModelInput(true); return; }
+                  if (v === "__placeholder__") return;
+                  updateField("model", v);
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select a model..." /></SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((m: any) => {
+                    const val = formatModelValue(m);
+                    return <SelectItem key={m.id} value={val} className="text-xs">{m.name} <span className="text-muted-foreground ml-1">({m.config?.providerId})</span></SelectItem>;
+                  })}
+                  <SelectItem value="__custom__" className="text-xs text-muted-foreground">Custom...</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <div>
+                <Input className="h-8 text-xs" value={currentModel} onChange={(e) => updateField("model", e.target.value)} placeholder="provider/model-id" />
+                <p className="text-[9px] text-muted-foreground mt-0.5">No models imported. Import from AI Catalog.</p>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Small Model */}
+          <div>
+            <Label className="text-xs">Small Model</Label>
+            {customSmallModelInput ? (
+              <div className="flex gap-1">
+                <Input className="h-8 text-xs flex-1" value={currentSmallModel} onChange={(e) => updateField("small_model", e.target.value)} placeholder="provider/model-id" />
+                <Button variant="ghost" size="sm" className="h-8 text-[10px] px-2 shrink-0" onClick={() => setCustomSmallModelInput(false)}>List</Button>
+              </div>
+            ) : modelOptions.length > 0 ? (
+              <Select
+                value={currentSmallModel || "__placeholder__"}
+                onValueChange={(v) => {
+                  if (v === "__custom__") { setCustomSmallModelInput(true); return; }
+                  if (v === "__placeholder__") return;
+                  updateField("small_model", v);
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select a model..." /></SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((m: any) => {
+                    const val = formatModelValue(m);
+                    return <SelectItem key={m.id} value={val} className="text-xs">{m.name} <span className="text-muted-foreground ml-1">({m.config?.providerId})</span></SelectItem>;
+                  })}
+                  <SelectItem value="__custom__" className="text-xs text-muted-foreground">Custom...</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <div>
+                <Input className="h-8 text-xs" value={currentSmallModel} onChange={(e) => updateField("small_model", e.target.value)} placeholder="provider/model-id" />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Enabled Providers */}
+        <div>
+          <Label className="text-xs">Enabled Providers</Label>
+          {importedProviders.length > 0 ? (
+            <>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 mt-1.5">
+                {importedProviders.map((p: any) => {
+                  const pid = p.config?.providerId || p.name;
+                  const checked = enabledSet.has(pid);
+                  return (
+                    <label key={p.id} className="flex items-center gap-1.5 cursor-pointer">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          const next = new Set(enabledSet);
+                          if (v) next.add(pid); else next.delete(pid);
+                          updateField("enabled_providers", Array.from(next));
+                        }}
+                      />
+                      <span className="text-xs">{p.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[9px] text-muted-foreground mt-1">Leave all unchecked to enable all providers.</p>
+            </>
+          ) : (
+            <div>
+              <Input className="h-8 text-xs" value={(runtimeDraft.enabled_providers ?? []).join(", ")} onChange={(e) => updateField("enabled_providers", e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))} placeholder="anthropic, openai, ollama" />
+              <p className="text-[9px] text-muted-foreground mt-0.5">No providers imported. Import from AI Catalog for checkbox selection.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Disabled Providers */}
+        <div>
+          <Label className="text-xs">Disabled Providers</Label>
+          {importedProviders.length > 0 ? (
+            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-1.5">
+              {importedProviders.map((p: any) => {
+                const pid = p.config?.providerId || p.name;
+                const checked = disabledSet.has(pid);
+                return (
+                  <label key={p.id} className="flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(v) => {
+                        const next = new Set(disabledSet);
+                        if (v) next.add(pid); else next.delete(pid);
+                        updateField("disabled_providers", Array.from(next));
+                      }}
+                    />
+                    <span className="text-xs">{p.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          ) : (
+            <Input className="h-8 text-xs" value={(runtimeDraft.disabled_providers ?? []).join(", ")} onChange={(e) => updateField("disabled_providers", e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))} placeholder="" />
+          )}
+        </div>
+
+        <Separator />
+        <div>
+          <Label className="text-xs">Provider Configs (JSON)</Label>
+          <p className="text-[9px] text-muted-foreground mb-1">Use {"{{secret:key_name}}"} for API keys. They will be redacted in previews.</p>
+          {Object.keys(runtimeDraft.provider ?? {}).length === 0 ? (
+            <p className="text-[10px] text-muted-foreground">No custom provider configs. Use Edit JSON to add.</p>
+          ) : (
+            <div className="space-y-1">
+              {Object.entries(runtimeDraft.provider ?? {}).map(([key, val]: [string, any]) => (
+                <div key={key} className="flex items-center justify-between py-1 px-2 rounded bg-muted/20 text-[10px]">
+                  <span className="font-medium">{key}</span>
+                  <div className="flex items-center gap-2">
+                    {val?.name && <span className="text-muted-foreground">{val.name}</span>}
+                    <Button variant="ghost" size="sm" className="h-5 px-1 text-[9px]" onClick={() => openJsonEditor(`provider.${key}`, val)}>Edit</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderAgents = () => (
     <div className="space-y-4">
