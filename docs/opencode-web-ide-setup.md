@@ -11,35 +11,51 @@ OpenCode is a Bun-based Linux ELF binary. On Termux (Android + proot), two issue
 
 Run OpenCode inside the **proot-distro Ubuntu rootfs**, where glibc and syscall translation work correctly.
 
-## Prerequisites
+---
 
-1. **proot-distro with Ubuntu installed:**
-   ```bash
-   pkg install proot-distro
-   proot-distro install ubuntu
-   ```
+## Startup Protocol
 
-2. **OpenCode binary installed:**
-   ```bash
-   curl -fsSL https://opencode.ai/install | bash
-   # Installs to ~/.opencode/bin/opencode
-   ```
+### Step 0: One-time prerequisites
 
-3. **glibc linker symlink** (one-time setup):
-   ```bash
-   UBUNTU_LIB="/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/usr/lib"
-   ln -sf "$UBUNTU_LIB/ld-linux-aarch64.so.1" \
-     /data/data/com.termux/files/usr/lib/ld-linux-aarch64.so.1
-   ```
+```bash
+# 1. Install proot-distro + Ubuntu
+pkg install proot-distro
+proot-distro install ubuntu
 
-## Manual Launch
+# 2. Install OpenCode
+curl -fsSL https://opencode.ai/install | bash
 
-Start OpenCode Web IDE on port 4200 from a Termux shell:
+# 3. Create glibc linker symlink
+UBUNTU_LIB="/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/usr/lib"
+ln -sf "$UBUNTU_LIB/ld-linux-aarch64.so.1" \
+  /data/data/com.termux/files/usr/lib/ld-linux-aarch64.so.1
+```
+
+### Step 1: Start PostgreSQL
+
+PostgreSQL requires an ICU shim on recent Android versions:
+
+```bash
+export LD_PRELOAD="/apex/com.android.i18n/lib64/libicuuc.so:/apex/com.android.i18n/lib64/libicui18n.so:/apex/com.android.i18n/lib64/libicu.so:/apex/com.android.i18n/lib64/libandroidicu.so"
+pg_ctl -D /data/data/com.termux/files/usr/var/lib/postgresql start -l /data/data/com.termux/files/usr/tmp/pg.log
+unset LD_PRELOAD
+```
+
+Verify:
+```bash
+psql -d mynewap1claude -c "SELECT 1;"
+```
+
+### Step 2: Start OpenCode runtime on port 4096
+
+This is the **critical step**. Use `web` subcommand (not `serve`) — it provides both:
+- **Headless API** (`/global/health`, `/session/...`) for the app's runtime integration
+- **Web UI** (`/`) for the browser-based IDE
 
 ```bash
 UBUNTU_ROOT="/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu"
 
-proot \
+nohup proot \
   --kill-on-exit \
   -r "$UBUNTU_ROOT" \
   -b /dev:/dev \
@@ -47,57 +63,111 @@ proot \
   -b /data/data/com.termux/files/home:/home \
   -b /data/data/com.termux/files/usr/tmp:/tmp \
   -w /home/MyNewAp1Claude \
-  /home/.opencode/bin/opencode serve --port 4200 --hostname 127.0.0.1
+  /home/.opencode/bin/opencode web --port 4096 --hostname 127.0.0.1 \
+  > /data/data/com.termux/files/usr/tmp/opencode-runtime.log 2>&1 &
 ```
 
-Then open `http://localhost:4200/` in your browser.
+Verify (wait ~15 seconds for startup):
+```bash
+curl -s http://127.0.0.1:4096/global/health
+# Expected: {"healthy":true,"version":"1.3.13"}
+```
+
+### Step 3: Start the app dev server on port 3000
+
+```bash
+mkdir -p /tmp/claude-$(id -u) 2>/dev/null
+TMPDIR=/data/data/com.termux/files/usr/tmp nohup npm run dev \
+  > /data/data/com.termux/files/usr/tmp/dev-server.log 2>&1 &
+```
+
+Verify (wait ~20 seconds):
+```bash
+curl -s http://localhost:3000/api/health
+# Expected: {"status":"ok","database":"connected",...}
+```
+
+### Step 4: Open app and verify
+
+```bash
+xdg-open "http://localhost:3000/"
+```
+
+In the app:
+- OpenCode Settings page should show **Connected** status
+- Code Studio Job cards should have a working **Open IDE** button
+- Clicking IDE opens `http://127.0.0.1:4096/` with the full OpenCode Web interface
+
+---
+
+## Quick-start (all steps combined)
+
+```bash
+# 1. PostgreSQL
+export LD_PRELOAD="/apex/com.android.i18n/lib64/libicuuc.so:/apex/com.android.i18n/lib64/libicui18n.so:/apex/com.android.i18n/lib64/libicu.so:/apex/com.android.i18n/lib64/libandroidicu.so"
+pg_ctl -D /data/data/com.termux/files/usr/var/lib/postgresql start -l /data/data/com.termux/files/usr/tmp/pg.log
+unset LD_PRELOAD
+
+# 2. OpenCode runtime (port 4096)
+UBUNTU_ROOT="/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu"
+nohup proot --kill-on-exit -r "$UBUNTU_ROOT" \
+  -b /dev:/dev -b /proc:/proc \
+  -b /data/data/com.termux/files/home:/home \
+  -b /data/data/com.termux/files/usr/tmp:/tmp \
+  -w /home/MyNewAp1Claude \
+  /home/.opencode/bin/opencode web --port 4096 --hostname 127.0.0.1 \
+  > /data/data/com.termux/files/usr/tmp/opencode-runtime.log 2>&1 &
+
+# 3. App dev server (port 3000)
+sleep 5
+TMPDIR=/data/data/com.termux/files/usr/tmp nohup npm run dev \
+  > /data/data/com.termux/files/usr/tmp/dev-server.log 2>&1 &
+
+# 4. Wait and verify
+sleep 20
+curl -s http://127.0.0.1:4096/global/health && echo ""
+curl -s http://localhost:3000/api/health && echo ""
+xdg-open "http://localhost:3000/"
+```
+
+---
+
+## Why `web` not `serve`
+
+| Subcommand | Headless API | Web UI | Use case |
+|---|---|---|---|
+| `opencode serve` | Yes | No | API-only integration, no browser IDE |
+| `opencode web` | Yes | Yes | Full setup: app integration + browser IDE |
+
+Port 4096 must use `web` so the app can both:
+- Query the headless API (health checks, sessions, models)
+- Redirect the IDE button to the web interface
+
+---
 
 ## How the App Integrates It
 
-The app's Code Studio module launches OpenCode Web IDE from Job cards. The flow:
+### IDE button flow
 
-### 1. IDE button clicked (frontend)
+1. **Frontend** (`CodeStudioJobDetailPage.tsx`) calls `trpc.codeStudio.ide.openForJob`
+2. **Router** (`server/code-studio/api/router.ts`) checks `http://127.0.0.1:4096/global/health`
+3. If healthy: returns `directUrl: "http://127.0.0.1:4096/"` immediately
+4. If not running: spawns a new instance via proot on next available port (4200+)
+5. **Frontend** opens `directUrl` in a new browser tab
 
-`client/src/pages/code-studio/CodeStudioJobDetailPage.tsx` calls:
-```typescript
-trpc.codeStudio.ide.openForJob.mutate({ jobId })
-```
+### Why direct URL (not proxy)
 
-On success, opens `data.directUrl` in a new tab.
+OpenCode's JS bundle uses hardcoded absolute paths (`/global/`, `/session/`, `/assets/`). These break when served under a proxy prefix like `/api/code-studio/ide/:key/`. Opening the direct port avoids this entirely.
 
-### 2. Router checks for existing runtime (server)
-
-`server/code-studio/api/router.ts` first checks if OpenCode is already running:
-```
-GET http://127.0.0.1:4096/global/health
-```
-If healthy, returns that URL directly (no spawn needed).
-
-### 3. Spawn via proot (server)
-
-If no runtime is running, `server/code-studio/opencode/web-instance-manager.ts` spawns a new instance. On Termux, it detects the Ubuntu rootfs and wraps the command in proot:
-
-```
-proot --kill-on-exit -r <ubuntu-rootfs> \
-  -b /dev:/dev -b /proc:/proc \
-  -b <home>:/home -b <tmp>:/tmp \
-  -w <workspace-path> \
-  /home/.opencode/bin/opencode serve --port 4200 --hostname 127.0.0.1
-```
-
-On non-Termux platforms, it spawns the binary directly with `LD_LIBRARY_PATH`.
-
-### 4. Browser opens direct URL
-
-The frontend opens `http://127.0.0.1:<port>/` directly (not through a proxy), because OpenCode's JS bundle uses hardcoded absolute paths (`/global/`, `/session/`, `/assets/`) that break when served under a proxy prefix.
+---
 
 ## Key Files
 
 | File | Role |
 |---|---|
-| `server/code-studio/opencode/web-instance-manager.ts` | Spawns/manages OpenCode processes |
+| `server/code-studio/opencode/web-instance-manager.ts` | Spawns/manages OpenCode processes via proot |
 | `server/code-studio/api/router.ts` | tRPC route — checks runtime, falls back to spawn |
-| `server/code-studio/opencode/ide-proxy.ts` | HTTP proxy (kept as fallback, not used for direct URLs) |
+| `server/code-studio/opencode/ide-proxy.ts` | HTTP proxy (fallback, not used for direct URLs) |
 | `server/code-studio/shared/constants.ts` | Port ranges, binary path, hostname defaults |
 | `client/src/pages/code-studio/CodeStudioJobDetailPage.tsx` | Frontend IDE button handler |
 
@@ -105,33 +175,44 @@ The frontend opens `http://127.0.0.1:<port>/` directly (not through a proxy), be
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `OPENCODE_URL` | `http://127.0.0.1:4096` | Existing OpenCode runtime to check first |
+| `OPENCODE_URL` | `http://127.0.0.1:4096` | Existing runtime to check first |
 | `OPENCODE_BINARY_PATH` | `$HOME/.opencode/bin/opencode` | Path to OpenCode binary |
 | `OPENCODE_UBUNTU_ROOTFS` | `.../proot-distro/installed-rootfs/ubuntu` | Ubuntu rootfs for proot wrapper |
-| `OPENCODE_WEB_BASE_PORT` | `4200` | First port to allocate for new instances |
+| `OPENCODE_WEB_BASE_PORT` | `4200` | First port for new instances |
 | `OPENCODE_WEB_MAX_PORT` | `4299` | Last port in allocation range |
 | `OPENCODE_WEB_HOSTNAME` | `127.0.0.1` | Bind hostname |
-| `OPENCODE_WEB_TTL_MINUTES` | `120` | Auto-expire instances after this duration |
-| `OPENCODE_SERVER_PASSWORD` | *(unset)* | Basic auth password for OpenCode Web |
+| `OPENCODE_WEB_TTL_MINUTES` | `120` | Auto-expire instances after this |
+| `OPENCODE_SERVER_PASSWORD` | *(unset)* | Basic auth password |
+
+---
 
 ## Troubleshooting
 
+### OpenCode shows "offline" in the app
+Port 4096 is not running. Start it with the Step 2 command above. Always use `web` not `serve`.
+
 ### "Failed to start server on port XXXX"
-OpenCode was spawned without proot. Verify `IS_TERMUX` detection:
+OpenCode was spawned without proot. Verify:
 ```bash
 ls /data/data/com.termux  # must exist
-ls <OPENCODE_UBUNTU_ROOTFS>/usr/bin/bash  # must exist
+ls /data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/usr/bin/bash
 ```
+
+### PostgreSQL won't start (`libicu.so` error)
+Android moved ICU to APEX. Use the `LD_PRELOAD` command from Step 1.
 
 ### White page when opening IDE
-The browser opened the proxy URL instead of the direct URL. Check that `directUrl` is returned by the API and used by the frontend.
+Browser opened the proxy URL instead of the direct URL. Verify `directUrl` is returned.
 
 ### "cannot execute" or "libc.so.6 not found"
-The glibc linker symlink is missing. Run the one-time setup from Prerequisites step 3.
+The glibc linker symlink is missing. Run Prerequisites step 3.
 
 ### Port already in use
-Kill stale instances:
 ```bash
-lsof -ti :4200 | xargs kill 2>/dev/null
+kill $(lsof -ti :4096) 2>/dev/null
+kill $(lsof -ti :4200) 2>/dev/null
 psql -d codedb -c "DELETE FROM code_ide_instances WHERE status != 'running';"
 ```
+
+### Startup takes >15 seconds
+First launch runs a SQLite migration. Subsequent starts are faster (~8 seconds).
