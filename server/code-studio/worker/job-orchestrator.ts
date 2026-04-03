@@ -606,8 +606,8 @@ export async function executeJob(jobId: number): Promise<void> {
         // OpenCode available — send the phase prompt and capture output
         try {
           const prompt = buildPhasePrompt(job, phase.stepName);
-          // Use job's configured model, or fall back to Ollama phi3 (no API key needed)
-          const model = (job as any).model || process.env.OPENCODE_DEFAULT_MODEL || "ollama/phi3";
+          // Use job's configured model, or fall back to OpenAI GPT-5.4 Mini
+          const model = (job as any).model || process.env.OPENCODE_DEFAULT_MODEL || "openai/gpt-5.4-mini";
           const response = await ocClient.sendMessage(ocSessionId, prompt, { model });
 
           // Check for provider errors inside the response (HTTP 200 but no output)

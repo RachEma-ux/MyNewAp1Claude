@@ -24,9 +24,10 @@
   },
 
   // ── Default Model ──────────────────────────────────────────────────
-  // Use Ollama locally (no API key needed). Override with OPENAI_API_KEY for cloud.
-  "model": "ollama/phi3",
-  "small_model": "ollama/tinyllama",
+  // Primary: OpenAI GPT-5.4 Mini (requires OPENAI_API_KEY)
+  // Fallback providers: Ollama (local, no key needed)
+  "model": "openai/gpt-5.4-mini",
+  "small_model": "openai/gpt-5.4-mini",
 
   // ── Default Agent ─────────────────────────────────────────────────
   // Favor planning/inspection before edits
