@@ -366,6 +366,47 @@ export async function seedCodeDb() {
     CREATE INDEX IF NOT EXISTS idx_code_oc_apply_profile ON code_opencode_apply_events(profile_id);
     CREATE INDEX IF NOT EXISTS idx_code_oc_apply_type ON code_opencode_apply_events(profile_type);
     CREATE INDEX IF NOT EXISTS idx_code_oc_apply_created ON code_opencode_apply_events(created_at);
+
+    -- Group 11: Job Templates
+    CREATE TABLE IF NOT EXISTS code_job_templates (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(200) NOT NULL,
+      description TEXT,
+      category VARCHAR(50) DEFAULT 'general',
+      template_yaml TEXT NOT NULL,
+      is_builtin BOOLEAN DEFAULT false,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_code_job_templates_name ON code_job_templates(name);
+    CREATE INDEX IF NOT EXISTS idx_code_job_templates_category ON code_job_templates(category);
+
+    -- Group 12: IDE Instances (OpenCode Web)
+    CREATE TABLE IF NOT EXISTS code_ide_instances (
+      id SERIAL PRIMARY KEY,
+      job_id INTEGER,
+      session_id INTEGER,
+      workspace_id INTEGER,
+      workspace_path TEXT NOT NULL,
+      instance_type VARCHAR(30) DEFAULT 'opencode_web' NOT NULL,
+      status VARCHAR(30) DEFAULT 'starting' NOT NULL,
+      hostname VARCHAR(100) DEFAULT '127.0.0.1',
+      port INTEGER NOT NULL,
+      proxy_key VARCHAR(100) NOT NULL,
+      process_id INTEGER,
+      launch_command TEXT,
+      started_at TIMESTAMP DEFAULT NOW(),
+      last_accessed_at TIMESTAMP DEFAULT NOW(),
+      expires_at TIMESTAMP,
+      closed_at TIMESTAMP,
+      error_message TEXT,
+      metadata JSONB DEFAULT '{}'
+    );
+    CREATE INDEX IF NOT EXISTS idx_code_ide_instances_job ON code_ide_instances(job_id);
+    CREATE INDEX IF NOT EXISTS idx_code_ide_instances_session ON code_ide_instances(session_id);
+    CREATE INDEX IF NOT EXISTS idx_code_ide_instances_proxy_key ON code_ide_instances(proxy_key);
+    CREATE INDEX IF NOT EXISTS idx_code_ide_instances_status ON code_ide_instances(status);
   `);
 
   console.log("[CODEDB Seed] Tables created/verified");
