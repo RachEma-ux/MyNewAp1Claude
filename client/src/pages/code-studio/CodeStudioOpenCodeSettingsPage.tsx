@@ -303,11 +303,13 @@ export default function CodeStudioOpenCodeSettingsPage({
         if (pid) activeProviderIds.push(pid);
       });
     }
-    // Filter models by provider
+    // Filter models by provider (case-insensitive match)
     if (activeProviderIds.length === 0) return importedModels;
-    return importedModels.filter((m: any) =>
-      activeProviderIds.includes(m.config?.providerId),
-    );
+    const lowerIds = new Set(activeProviderIds.map((id: string) => id.toLowerCase()));
+    return importedModels.filter((m: any) => {
+      const mPid = (m.config?.providerId || m.config?.providerType || "").toLowerCase();
+      return !mPid || lowerIds.has(mPid);
+    });
   }, [runtimeDraft.enabled_providers, importedProviders, importedModels]);
 
   const [customModelInput, setCustomModelInput] = useState(false);
