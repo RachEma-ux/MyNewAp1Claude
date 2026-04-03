@@ -38,7 +38,7 @@ class OpenCodeClientError extends Error {
   }
 }
 
-async function ocFetch(path: string, options: RequestInit = {}): Promise<any> {
+async function ocFetch(path: string, options: RequestInit & { timeoutMs?: number } = {}): Promise<any> {
   const baseUrl = getOpenCodeBaseUrl();
   const url = `${baseUrl}${path}`;
   const headers = {
@@ -47,8 +47,16 @@ async function ocFetch(path: string, options: RequestInit = {}): Promise<any> {
     ...(options.headers || {}),
   };
 
+  // Message sends can take minutes (LLM + tool use). Default 5 min for POST, 15s for GET.
+  const timeout = options.timeoutMs ?? (options.method === "POST" ? 300000 : 15000);
+  const { timeoutMs: _, ...fetchOpts } = options;
+
   try {
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, {
+      ...fetchOpts,
+      headers,
+      signal: AbortSignal.timeout(timeout),
+    });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new OpenCodeClientError(
