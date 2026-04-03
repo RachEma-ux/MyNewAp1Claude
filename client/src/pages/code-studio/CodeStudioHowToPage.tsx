@@ -5,6 +5,7 @@
  * Covers platform use cases, job-to-be-done use cases, the normal
  * operating flow, and the screen layout model.
  */
+import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -34,6 +35,18 @@ import {
   Shield,
   ClipboardCheck,
   MessageSquare,
+  Zap,
+  Server,
+  Brain,
+  Lock,
+  GitBranch,
+  Layers,
+  Globe,
+  Bell,
+  Play,
+  FileText,
+  Activity,
+  Cpu,
 } from "lucide-react";
 
 // ── Content Data ──────────────────────────────────────────────────────────────
@@ -212,6 +225,125 @@ const LAYOUT_PANELS: LayoutPanel[] = [
   { position: "Bottom", label: "Status Bar", items: ["Connected", "Running", "Waiting approval", "Complete"], icon: Layout },
 ];
 
+// ── OpenCode Role & Advantages ────────────────────────────────────────────────
+
+interface Advantage {
+  title: string;
+  description: string;
+  icon: React.ElementType;
+}
+
+const OPENCODE_ADVANTAGES: Advantage[] = [
+  { title: "Headless API", description: "No terminal needed. The app controls everything via HTTP — sessions, messages, diffs. Any UX can be built on top.", icon: Server },
+  { title: "Session Isolation", description: "Each job gets its own session. Multiple jobs run in parallel without interference. Sessions persist for later inspection.", icon: Layers },
+  { title: "Built-in Agent System", description: "Ships with agents (build, plan, explore, review). The job orchestrator maps pipeline phases directly to these agents.", icon: Brain },
+  { title: "Permission Control", description: "The API exposes permission requests. The governance engine intercepts dangerous operations and requires approval.", icon: Lock },
+  { title: "Diff Tracking", description: "Every code change is captured as a structured diff. The app can display, approve, or revert changes with full visibility.", icon: GitBranch },
+  { title: "Provider-Agnostic", description: "Supports Anthropic, OpenAI, Ollama, Google, and more. Provider/model settings flow directly from the app's config.", icon: Globe },
+  { title: "Local-First", description: "Runs on 127.0.0.1. Code never leaves the device unless a remote provider is configured. Enterprise/privacy ready.", icon: Shield },
+];
+
+const VALUE_COMPARISON: { without: string; with: string }[] = [
+  { without: "App manages LLM configs, providers, agents", with: "App executes real coding tasks end-to-end" },
+  { without: "Users configure settings manually", with: "Settings are applied to a live runtime" },
+  { without: "Job pipeline is theoretical", with: "Jobs actually run — AI writes, reviews, tests code" },
+  { without: "Static dashboard", with: "Live sessions with streaming messages, diffs, permissions" },
+];
+
+// ── Walkthrough Steps ────────────────────────────────────────────────────────
+
+interface WalkthroughStep {
+  step: number;
+  title: string;
+  icon: React.ElementType;
+  status: string;
+  description: string;
+  detail: string;
+}
+
+const WALKTHROUGH_STEPS: WalkthroughStep[] = [
+  {
+    step: 1,
+    title: "Create a Job",
+    icon: FileText,
+    status: "draft",
+    description: "Open Code Studio Dashboard and click New Job.",
+    detail: "Fill in: Title = \"Add user notifications system\", Description = \"Create a notifications table, tRPC endpoints for list/mark-read/delete, a bell icon in the header with unread badge and dropdown. Support types: info, warning, success, error.\", Agent = build. Click Create.",
+  },
+  {
+    step: 2,
+    title: "Queue the Job",
+    icon: Play,
+    status: "draft → queued → preparing_workspace",
+    description: "Click Queue. The orchestrator picks up the job.",
+    detail: "The Job Orchestrator creates an isolated workspace. The target repo is cloned/linked so all changes are sandboxed and reversible.",
+  },
+  {
+    step: 3,
+    title: "Planning Phase",
+    icon: Lightbulb,
+    status: "starting_session → planning",
+    description: "OpenCode's plan agent explores the repo and produces a step-by-step plan.",
+    detail: "The plan covers: schema table creation, tRPC router with 4 endpoints, NotificationBell component with dropdown and badge, header integration, and seed data. All based on reading the actual codebase.",
+  },
+  {
+    step: 4,
+    title: "Review & Approve Plan",
+    icon: CheckCircle2,
+    status: "planning → awaiting_approval",
+    description: "You review the plan in the UI and add feedback.",
+    detail: "Example feedback: \"Also add a toast notification when a new notification arrives. Use the existing sonner toast system.\" Click Approve with feedback. Your input is sent back to the OpenCode session.",
+  },
+  {
+    step: 5,
+    title: "Build Phase — AI Writes Code",
+    icon: Code2,
+    status: "awaiting_approval → building",
+    description: "The build agent writes all the code. You see live streaming messages.",
+    detail: "Permission requests appear for risky actions (e.g., modifying drizzle/schema.ts). The governance engine auto-approves low-risk actions (new files) and flags high-risk ones for your review. You approve or deny each one.",
+  },
+  {
+    step: 6,
+    title: "Review Phase",
+    icon: Eye,
+    status: "building → reviewing",
+    description: "The review agent checks code quality, security, and style.",
+    detail: "Structured diffs show every file changed. The reviewer catches issues like missing auth checks on mutations and fixes them in the same session. You see the full diff with syntax highlighting.",
+  },
+  {
+    step: 7,
+    title: "Testing Phase",
+    icon: Activity,
+    status: "reviewing → testing",
+    description: "OpenCode runs type checking and verifies integration.",
+    detail: "Runs tsc --noEmit, confirms no type errors, verifies the new router integrates correctly with the existing appRouter. Reports pass/fail.",
+  },
+  {
+    step: 8,
+    title: "Governance Check",
+    icon: ShieldCheck,
+    status: "testing → governance_check",
+    description: "The Governance Engine runs automated policy rules.",
+    detail: "Checks: no secrets in code, uses Drizzle ORM (no raw SQL), schema migration is additive only, naming conventions followed, auth on all mutations. Risk level: LOW. All pass — auto-approved.",
+  },
+  {
+    step: 9,
+    title: "Completed",
+    icon: CheckCircle2,
+    status: "governance_check → completed",
+    description: "Job finished. 4 files changed, +246 lines, 4 minutes total.",
+    detail: "Full history available: every message, the plan, approval, review notes, all diffs, permission decisions, and governance audit trail. About 1 minute of your active time for a feature that normally takes a full day.",
+  },
+  {
+    step: 10,
+    title: "Apply Changes",
+    icon: Zap,
+    status: "completed → applied",
+    description: "Review final diffs and apply to your repo.",
+    detail: "The notification bell appears in the header, API endpoints work, and the schema is ready for migration. You're done.",
+  },
+];
+
 // ── Page Component ───────────────────────────────────────────────────────────
 
 export default function CodeStudioHowToPage() {
@@ -229,6 +361,124 @@ export default function CodeStudioHowToPage() {
           full control over every change.
         </p>
       </div>
+
+      <Separator />
+
+      {/* ── What Is OpenCode ───────────────────────────────────────────────── */}
+      <section>
+        <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+          <Cpu className="h-4 w-4 text-violet-500" /> What Is OpenCode?
+        </h2>
+        <p className="text-xs text-muted-foreground mb-3">
+          OpenCode is an <strong>AI coding agent</strong> that runs as a <strong>headless HTTP server</strong>.
+          Instead of a human typing in a terminal, Code Studio talks to it programmatically via REST API.
+          It is the <strong>execution engine</strong> behind Code Studio — the app is the control plane
+          (manage, configure, govern); OpenCode is the runtime (do the actual coding work).
+        </p>
+        <pre className="text-[10px] text-muted-foreground font-mono bg-muted/30 rounded-lg p-3 overflow-x-auto">{`User → Code Studio UI → Job Orchestrator → OpenCode API → AI writes code
+              ↑                                        ↓
+       governance, approval                 diffs, messages, results`}</pre>
+
+        {/* Value comparison */}
+        <div className="mt-4 mb-4">
+          <h3 className="text-xs font-semibold mb-2">Added Value</h3>
+          <div className="grid grid-cols-2 gap-0 text-[10px] border rounded-md overflow-hidden">
+            <div className="bg-muted/40 px-2 py-1.5 font-semibold border-b">Without OpenCode</div>
+            <div className="bg-muted/40 px-2 py-1.5 font-semibold border-b border-l">With OpenCode</div>
+            {VALUE_COMPARISON.map((row, i) => (
+              <React.Fragment key={i}>
+                <div className="px-2 py-1.5 text-muted-foreground border-b last:border-b-0">{row.without}</div>
+                <div className="px-2 py-1.5 border-l border-b last:border-b-0 font-medium">{row.with}</div>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+
+        {/* Advantages */}
+        <h3 className="text-xs font-semibold mb-2">Key Advantages</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {OPENCODE_ADVANTAGES.map((adv) => (
+            <Card key={adv.title}>
+              <CardContent className="p-2.5">
+                <div className="flex items-center gap-2 mb-1">
+                  <adv.icon className="h-3.5 w-3.5 text-violet-500 opacity-70 shrink-0" />
+                  <span className="text-xs font-medium">{adv.title}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground pl-5">{adv.description}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* ── Real-World Walkthrough ─────────────────────────────────────────── */}
+      <section>
+        <h2 className="text-sm font-semibold mb-1 flex items-center gap-2">
+          <Bell className="h-4 w-4 text-violet-500" /> Real-World Walkthrough
+        </h2>
+        <p className="text-xs text-muted-foreground mb-3">
+          End-to-end scenario: <strong>"Add a Notifications System"</strong> — from job creation to shipped feature in 4 minutes.
+        </p>
+        <div className="space-y-2">
+          {WALKTHROUGH_STEPS.map((ws) => (
+            <Card key={ws.step}>
+              <CardContent className="p-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-500/10 shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-violet-500">{ws.step}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <ws.icon className="h-3.5 w-3.5 text-violet-500 opacity-70 shrink-0" />
+                      <span className="text-xs font-medium">{ws.title}</span>
+                      <Badge variant="outline" className="text-[9px] px-1 h-4 font-mono">{ws.status}</Badge>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">{ws.description}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 pl-0 border-l-2 border-violet-500/20 ml-0 pl-2">{ws.detail}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Summary table */}
+        <Card className="mt-3">
+          <CardContent className="p-3">
+            <h3 className="text-xs font-semibold mb-2">Summary</h3>
+            <div className="grid grid-cols-3 gap-0 text-[10px] border rounded-md overflow-hidden">
+              <div className="bg-muted/40 px-2 py-1 font-semibold border-b">Phase</div>
+              <div className="bg-muted/40 px-2 py-1 font-semibold border-b border-l">Who</div>
+              <div className="bg-muted/40 px-2 py-1 font-semibold border-b border-l">Time</div>
+              {[
+                ["Define the task", "You (30 sec)", "0:00"],
+                ["Plan implementation", "Plan agent", "0:30"],
+                ["Review & approve", "You (20 sec)", "1:00"],
+                ["Write all code", "Build agent", "1:20"],
+                ["Approve permissions", "You (10 sec)", "2:30"],
+                ["Review code quality", "Review agent", "2:40"],
+                ["Run type checks", "Test agent", "3:20"],
+                ["Governance audit", "Governance engine", "3:40"],
+                ["Done", "—", "4:00"],
+              ].map(([phase, who, time], i) => (
+                <React.Fragment key={i}>
+                  <div className="px-2 py-1 border-b last:border-b-0">{phase}</div>
+                  <div className="px-2 py-1 border-l border-b last:border-b-0 text-muted-foreground">{who}</div>
+                  <div className="px-2 py-1 border-l border-b last:border-b-0 font-mono">{time}</div>
+                </React.Fragment>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              <strong>The key insight:</strong> You didn't write code. You described intent, approved a plan,
+              supervised execution, and reviewed results. The app handled orchestration, governance, and audit.
+              OpenCode handled the coding. The shift: from <em>writing code</em> to <em>directing AI that
+              writes code</em>, with full control and traceability at every step.
+            </p>
+          </CardContent>
+        </Card>
+      </section>
 
       <Separator />
 
