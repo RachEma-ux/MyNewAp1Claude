@@ -445,6 +445,7 @@ function Router() {
       <Route path="/code-studio/policies" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/control-panel" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/opencode-settings" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
+      <Route path="/code-studio/how-to" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       {/* Projects System — Ideation detail routes (must precede shell catch-all) */}
       <Route path="/ps/ideation/:id/convert" component={() => <ProtectedRoute component={PSIdeationConvertPage} />} />

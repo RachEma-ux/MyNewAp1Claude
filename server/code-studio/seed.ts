@@ -318,6 +318,54 @@ export async function seedCodeDb() {
       created_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_code_catalog_imports_entry ON code_catalog_imports(catalog_entry_id);
+
+    -- Group 10: OpenCode Settings Profiles
+    CREATE TABLE IF NOT EXISTS code_opencode_profiles (
+      id SERIAL PRIMARY KEY,
+      profile_type VARCHAR(20) NOT NULL,
+      name VARCHAR(200) NOT NULL,
+      description TEXT,
+      config_draft JSONB DEFAULT '{}',
+      config_applied JSONB,
+      status VARCHAR(20) DEFAULT 'draft' NOT NULL,
+      is_active BOOLEAN DEFAULT true,
+      applied_at TIMESTAMP,
+      applied_version INTEGER,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_code_oc_profiles_type ON code_opencode_profiles(profile_type);
+    CREATE INDEX IF NOT EXISTS idx_code_oc_profiles_active ON code_opencode_profiles(is_active);
+
+    CREATE TABLE IF NOT EXISTS code_opencode_profile_versions (
+      id SERIAL PRIMARY KEY,
+      profile_id INTEGER NOT NULL,
+      version INTEGER NOT NULL,
+      config JSONB NOT NULL,
+      change_summary TEXT,
+      created_by INTEGER,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_code_oc_pv_profile ON code_opencode_profile_versions(profile_id);
+    CREATE INDEX IF NOT EXISTS idx_code_oc_pv_version ON code_opencode_profile_versions(profile_id, version);
+
+    CREATE TABLE IF NOT EXISTS code_opencode_apply_events (
+      id SERIAL PRIMARY KEY,
+      profile_id INTEGER NOT NULL,
+      profile_type VARCHAR(20) NOT NULL,
+      version INTEGER NOT NULL,
+      action VARCHAR(20) NOT NULL,
+      status VARCHAR(20) NOT NULL,
+      generated_config JSONB,
+      validation_errors JSONB,
+      health_check_result JSONB,
+      error_message TEXT,
+      actor_user_id INTEGER,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_code_oc_apply_profile ON code_opencode_apply_events(profile_id);
+    CREATE INDEX IF NOT EXISTS idx_code_oc_apply_type ON code_opencode_apply_events(profile_type);
+    CREATE INDEX IF NOT EXISTS idx_code_oc_apply_created ON code_opencode_apply_events(created_at);
   `);
 
   console.log("[CODEDB Seed] Tables created/verified");

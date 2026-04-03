@@ -25,6 +25,7 @@ const CodeStudioPoliciesPage = lazy(() => import("@/pages/code-studio/CodeStudio
 const CodeStudioAICatalogPage = lazy(() => import("@/pages/code-studio/CodeStudioAICatalogPage"));
 const CodeStudioControlPanelPage = lazy(() => import("@/pages/code-studio/CodeStudioControlPanelPage"));
 const CodeStudioOpenCodeSettingsPage = lazy(() => import("@/pages/code-studio/CodeStudioOpenCodeSettingsPage"));
+const CodeStudioHowToPage = lazy(() => import("@/pages/code-studio/CodeStudioHowToPage"));
 
 const routeMap: Record<CodeStudioView, string> = {
   dashboard: "/code-studio/dashboard",
@@ -37,6 +38,7 @@ const routeMap: Record<CodeStudioView, string> = {
   policies: "/code-studio/policies",
   "control-panel": "/code-studio/control-panel",
   "opencode-settings": "/code-studio/opencode-settings",
+  "how-to": "/code-studio/how-to",
 };
 
 function getActiveView(path: string): CodeStudioView {
@@ -49,6 +51,7 @@ function getActiveView(path: string): CodeStudioView {
   if (path.startsWith("/code-studio/policies")) return "policies";
   if (path.startsWith("/code-studio/control-panel")) return "control-panel";
   if (path.startsWith("/code-studio/opencode-settings")) return "opencode-settings";
+  if (path.startsWith("/code-studio/how-to")) return "how-to";
   return "dashboard";
 }
 
@@ -80,6 +83,7 @@ export default function CodeStudioShell() {
       case "ai-catalog": return <CodeStudioAICatalogPage />;
       case "policies": return <CodeStudioPoliciesPage />;
       case "control-panel": return <CodeStudioControlPanelPage />;
+      case "how-to": return <CodeStudioHowToPage />;
       case "opencode-settings":
         return (
           <CodeStudioOpenCodeSettingsPage

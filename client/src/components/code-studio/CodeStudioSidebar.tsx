@@ -21,6 +21,7 @@ import {
   Settings,
   Code2,
   BrainCircuit,
+  BookOpen,
 } from "lucide-react";
 
 export type CodeStudioView =
@@ -33,7 +34,8 @@ export type CodeStudioView =
   | "policies"
   | "ai-catalog"
   | "control-panel"
-  | "opencode-settings";
+  | "opencode-settings"
+  | "how-to";
 
 const NAV_ITEMS: { key: CodeStudioView; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -46,6 +48,7 @@ const NAV_ITEMS: { key: CodeStudioView; label: string; icon: React.ElementType }
   { key: "policies", label: "Policies", icon: Shield },
   { key: "control-panel", label: "Control Panel", icon: Settings },
   { key: "opencode-settings", label: "OpenCode", icon: Code2 },
+  { key: "how-to", label: "How To", icon: BookOpen },
 ];
 
 interface Props {
