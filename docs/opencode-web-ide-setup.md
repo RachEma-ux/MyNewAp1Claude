@@ -186,26 +186,44 @@ OpenCode's JS bundle uses hardcoded absolute paths (`/global/`, `/session/`, `/a
 
 ---
 
-## Troubleshooting
+## Termux Troubleshooting
 
 ### OpenCode shows "offline" in the app
 Port 4096 is not running. Start it with the Step 2 command above. Always use `web` not `serve`.
 
 ### "Failed to start server on port XXXX"
-OpenCode was spawned without proot. Verify:
+Bun's `listen()` cannot bind ports under Termux's default proot. OpenCode must be spawned through the Ubuntu rootfs proot. Verify the rootfs exists:
 ```bash
 ls /data/data/com.termux  # must exist
 ls /data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/usr/bin/bash
 ```
-
-### PostgreSQL won't start (`libicu.so` error)
-Android moved ICU to APEX. Use the `LD_PRELOAD` command from Step 1.
-
-### White page when opening IDE
-Browser opened the proxy URL instead of the direct URL. Verify `directUrl` is returned.
+If missing, install it:
+```bash
+pkg install proot-distro && proot-distro install ubuntu
+```
 
 ### "cannot execute" or "libc.so.6 not found"
-The glibc linker symlink is missing. Run Prerequisites step 3.
+The glibc dynamic linker symlink is missing. This is a one-time fix:
+```bash
+UBUNTU_LIB="/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/usr/lib"
+ln -sf "$UBUNTU_LIB/ld-linux-aarch64.so.1" \
+  /data/data/com.termux/files/usr/lib/ld-linux-aarch64.so.1
+```
+
+### "bad ELF magic" or shell crashes when LD_LIBRARY_PATH is set
+Never use `execSync` (spawns a shell) with glibc `LD_LIBRARY_PATH` — the Termux bionic shell tries to load glibc's `libc.so` and crashes. Use `execFileSync` (direct exec, no shell) instead. The app already handles this internally.
+
+### PostgreSQL won't start (`libicu.so` error)
+Android moved system ICU libraries to `/apex/com.android.i18n/lib64/`. PostgreSQL needs them preloaded:
+```bash
+export LD_PRELOAD="/apex/com.android.i18n/lib64/libicuuc.so:/apex/com.android.i18n/lib64/libicui18n.so:/apex/com.android.i18n/lib64/libicu.so:/apex/com.android.i18n/lib64/libandroidicu.so"
+pg_ctl -D /data/data/com.termux/files/usr/var/lib/postgresql start -l /data/data/com.termux/files/usr/tmp/pg.log
+unset LD_PRELOAD
+```
+This is required after every Android OTA update that restructures APEX modules.
+
+### White page when opening IDE
+Browser opened the proxy URL (`/api/code-studio/ide/:key/`) instead of the direct URL. OpenCode's JS uses hardcoded absolute paths (`/global/`, `/session/`, `/assets/`) that break through a proxy. The app should return `directUrl` (`http://127.0.0.1:<port>/`) — verify the frontend uses `data.directUrl`.
 
 ### Port already in use
 ```bash
@@ -215,4 +233,105 @@ psql -d codedb -c "DELETE FROM code_ide_instances WHERE status != 'running';"
 ```
 
 ### Startup takes >15 seconds
-First launch runs a SQLite migration. Subsequent starts are faster (~8 seconds).
+First launch runs a SQLite migration (`Performing one time database migration`). Delete the DB to force a clean migration if it's corrupted:
+```bash
+rm -f /home/.local/share/opencode/opencode.db*
+```
+Subsequent starts are ~8 seconds.
+
+### Termux process killed after screen off
+Android aggressively kills background processes. Options:
+- Acquire a Termux wake lock: `termux-wake-lock`
+- Disable battery optimization for Termux in Android settings
+- Use `tmux` or `screen` to keep sessions alive
+
+---
+
+## Ubuntu proot-distro Usage
+
+### Why Ubuntu is required
+
+OpenCode is built with Bun (a JavaScript runtime). Bun uses Linux-specific syscalls (`io_uring`, `epoll_create1`) that Termux's default proot cannot intercept because:
+1. Termux runs on Android's bionic libc, not glibc
+2. The default proot translates paths but not advanced syscalls
+3. Bun's compiled binary expects a full Linux userspace
+
+The Ubuntu proot-distro provides a complete Linux rootfs where these syscalls work through proot's syscall translation layer.
+
+### Managing the Ubuntu rootfs
+
+```bash
+# Install
+proot-distro install ubuntu
+
+# Login interactively
+proot-distro login ubuntu
+
+# Run a single command
+proot-distro login ubuntu -- <command>
+
+# Check installed distros
+proot-distro list
+```
+
+### Running commands through proot directly
+
+For the app's automated spawning, we use `proot` directly (not `proot-distro login`) for more control over bind mounts:
+
+```bash
+UBUNTU_ROOT="/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu"
+
+proot \
+  --kill-on-exit \
+  -r "$UBUNTU_ROOT" \
+  -b /dev:/dev \
+  -b /proc:/proc \
+  -b /data/data/com.termux/files/home:/home \
+  -b /data/data/com.termux/files/usr/tmp:/tmp \
+  -w /home/MyNewAp1Claude \
+  <command>
+```
+
+### Bind mount reference
+
+| Flag | Purpose |
+|---|---|
+| `-r $UBUNTU_ROOT` | Use Ubuntu as the root filesystem |
+| `-b /dev:/dev` | Device nodes (required for /dev/null, /dev/urandom) |
+| `-b /proc:/proc` | Process info (required for Bun runtime) |
+| `-b .../home:/home` | Termux home directory visible inside Ubuntu |
+| `-b .../tmp:/tmp` | Shared temp directory (PG sockets, logs) |
+| `-w /path` | Working directory inside proot |
+| `--kill-on-exit` | Kill child processes when proot exits |
+
+### What runs inside Ubuntu vs native Termux
+
+| Process | Where | Why |
+|---|---|---|
+| OpenCode (`web`/`serve`) | Ubuntu proot | Bun needs glibc + full syscalls |
+| PostgreSQL | Native Termux | Works natively with `LD_PRELOAD` ICU shim |
+| Node.js app (npm run dev) | Native Termux | Node.js works natively on Termux |
+| Claude Code | Native Termux | Runs through its own sandbox |
+| git, curl, npm | Native Termux | Standard Termux packages |
+
+### Updating the Ubuntu rootfs
+
+```bash
+proot-distro login ubuntu -- apt update && apt upgrade -y
+```
+
+### Disk space
+
+The Ubuntu rootfs uses ~500MB. Check usage:
+```bash
+du -sh /data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/
+```
+
+### Removing and reinstalling
+
+If the rootfs is corrupted:
+```bash
+proot-distro remove ubuntu
+proot-distro install ubuntu
+```
+OpenCode binary at `~/.opencode/bin/opencode` is outside the rootfs and will survive this.
