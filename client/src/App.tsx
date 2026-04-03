@@ -437,6 +437,7 @@ function Router() {
       <Route path="/code-studio/jobs/:id" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/dashboard" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/jobs" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
+      <Route path="/code-studio/templates" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/sessions" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/approvals" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/repos" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />

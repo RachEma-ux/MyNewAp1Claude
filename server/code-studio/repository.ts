@@ -307,6 +307,152 @@ export async function deleteArtifactsByType(jobId: number, artifactType: string)
     .where(and(eq(schema.codeArtifacts.jobId, jobId), eq(schema.codeArtifacts.artifactType, artifactType)));
 }
 
+// ── Job Templates ────────────────────────────────────────────────────────
+
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+export async function createTemplate(data: {
+  name: string;
+  description?: string;
+  category?: string;
+  templateType?: string;
+  isBuiltIn?: boolean;
+  titleTemplate?: string;
+  objectiveTemplate?: string;
+  defaultPriority?: string;
+  defaultConstraints?: any;
+  variableSchema?: any;
+  importSource?: string;
+}) {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB unavailable");
+  const slug = slugify(data.name);
+  const [row] = await db.insert(schema.codeJobTemplates).values({ ...data, slug } as any).returning();
+  return row;
+}
+
+export async function getTemplateById(id: number) {
+  const db = getCodeDb();
+  if (!db) return null;
+  const [row] = await db.select().from(schema.codeJobTemplates).where(eq(schema.codeJobTemplates.id, id)).limit(1);
+  return row ?? null;
+}
+
+export async function updateTemplate(id: number, data: Record<string, any>) {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB unavailable");
+  if (data.name) data.slug = slugify(data.name);
+  const [updated] = await db.update(schema.codeJobTemplates).set({ ...data, updatedAt: new Date() }).where(eq(schema.codeJobTemplates.id, id)).returning();
+  return updated;
+}
+
+export async function deleteTemplate(id: number) {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB unavailable");
+  const [deleted] = await db.delete(schema.codeJobTemplates).where(eq(schema.codeJobTemplates.id, id)).returning();
+  return deleted;
+}
+
+export async function listTemplates(filters: { category?: string; isActive?: boolean } = {}) {
+  const db = getCodeDb();
+  if (!db) return [];
+  const conditions: any[] = [];
+  if (filters.category) conditions.push(eq(schema.codeJobTemplates.category, filters.category));
+  if (filters.isActive !== undefined) conditions.push(eq(schema.codeJobTemplates.isActive, filters.isActive));
+  else conditions.push(eq(schema.codeJobTemplates.isActive, true));
+  return db.select().from(schema.codeJobTemplates)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(schema.codeJobTemplates.createdAt));
+}
+
+export async function getTemplateBySlug(slug: string) {
+  const db = getCodeDb();
+  if (!db) return null;
+  const [row] = await db.select().from(schema.codeJobTemplates)
+    .where(and(eq(schema.codeJobTemplates.slug, slug), eq(schema.codeJobTemplates.isActive, true)))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Render a template string by replacing {{variable}} placeholders.
+ */
+export function renderTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
+    return values[key] !== undefined ? values[key] : "";
+  });
+}
+
+/**
+ * Seed built-in templates if they don't already exist.
+ */
+export async function ensureBuiltInTemplates(): Promise<void> {
+  const db = getCodeDb();
+  if (!db) return;
+  const existing = await db.select().from(schema.codeJobTemplates)
+    .where(eq(schema.codeJobTemplates.isBuiltIn, true));
+  const hasAudit = existing.some((t: any) => t.slug === "audit-job");
+  if (!hasAudit) {
+    await createTemplate({
+      name: "Audit Job",
+      description: "Audit an implementation prompt against actual repository code. Produces a strict evidence-based verdict.",
+      category: "audit",
+      templateType: "audit",
+      isBuiltIn: true,
+      titleTemplate: "Audit: {{targetPrompt}}",
+      objectiveTemplate: `Read and follow AGENTS.md first as the mandatory repository operating policy.
+
+Mandatory execution order:
+Planner -> Builder -> Reviewer -> Tester -> Governance
+
+Do not skip Reviewer.
+Do not skip Governance.
+
+Mission:
+Audit the implementation produced by the following prompt against the actual repository code.
+
+Target prompt to audit:
+{{targetPrompt}}
+
+{{scopeNotes}}
+
+Audit requirements:
+1. Inspect the actual current repository code — not summaries or assumptions
+2. Compare implementation against every requirement in the target prompt
+3. For each requirement, verify: was it implemented correctly?
+4. Check for: regressions, scope drift, partial implementations, wrong fixes, conflicts
+5. Produce a strict evidence-based verdict with file:line references
+6. Rate overall compliance: PASS / PARTIAL / FAIL
+
+Output format:
+- Summary verdict
+- Requirement-by-requirement checklist (PASS/FAIL per item)
+- Specific issues found (with file:line references)
+- Missing implementations
+- Unexpected changes (scope drift)`,
+      defaultPriority: "normal",
+      variableSchema: [
+        {
+          key: "targetPrompt",
+          label: "Target prompt to audit",
+          type: "long_text",
+          required: true,
+          placeholder: "Paste the exact original implementation prompt here",
+        },
+        {
+          key: "scopeNotes",
+          label: "Extra audit notes",
+          type: "long_text",
+          required: false,
+          placeholder: "Optional: any additional context or focus areas for the audit",
+        },
+      ],
+    });
+  }
+}
+
 // ── Audit ────────────────────────────────────────────────────────────────────
 
 export async function createAuditEvent(data: {

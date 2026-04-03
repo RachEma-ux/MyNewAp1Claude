@@ -22,11 +22,13 @@ import {
   Code2,
   BrainCircuit,
   BookOpen,
+  FileStack,
 } from "lucide-react";
 
 export type CodeStudioView =
   | "dashboard"
   | "jobs"
+  | "templates"
   | "sessions"
   | "approvals"
   | "repos"
@@ -40,6 +42,7 @@ export type CodeStudioView =
 const NAV_ITEMS: { key: CodeStudioView; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "jobs", label: "Jobs", icon: Workflow },
+  { key: "templates", label: "Templates", icon: FileStack },
   { key: "sessions", label: "Sessions", icon: Terminal },
   { key: "approvals", label: "Approvals", icon: ShieldCheck },
   { key: "repos", label: "Repositories", icon: GitBranch },

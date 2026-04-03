@@ -415,6 +415,35 @@ export const codeSettings = pgTable(
 
 // ── Group 9: AI Catalog Imports ────────────────────────────────────────────
 
+// ── Group 11: Job Templates ──────────────────────────────────────────────
+
+export const codeJobTemplates = pgTable(
+  "code_job_templates",
+  {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 255 }).notNull(),
+    description: text("description"),
+    category: varchar("category", { length: 50 }),
+    templateType: varchar("template_type", { length: 50 }).default("general"),
+    isBuiltIn: boolean("is_built_in").default(false),
+    isActive: boolean("is_active").default(true),
+    titleTemplate: text("title_template"),
+    objectiveTemplate: text("objective_template"),
+    defaultPriority: varchar("default_priority", { length: 20 }).default("normal"),
+    defaultConstraints: jsonb("default_constraints").default({}),
+    variableSchema: jsonb("variable_schema").default([]),
+    importSource: text("import_source"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => ({
+    slugIdx: index("idx_code_job_templates_slug").on(table.slug),
+    builtInIdx: index("idx_code_job_templates_built_in").on(table.isBuiltIn),
+    activeIdx: index("idx_code_job_templates_active").on(table.isActive),
+  })
+);
+
 // ── Group 10: OpenCode Settings Profiles ─────────────────────────────────
 
 export const codeOpencodeProfiles = pgTable(

@@ -115,3 +115,64 @@ export const listSessionMessagesSchema = z.object({
   sessionId: z.number().int().positive(),
   limit: z.number().int().min(1).max(500).optional(),
 });
+
+// ── Template Schemas ────────────────────────────────────────────────────────
+
+const variableDefSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  type: z.enum(["text", "long_text"]),
+  required: z.boolean().optional(),
+  placeholder: z.string().optional(),
+  helpText: z.string().optional(),
+});
+
+export const createTemplateSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().optional(),
+  category: z.string().max(50).optional(),
+  templateType: z.string().max(50).optional(),
+  titleTemplate: z.string().optional(),
+  objectiveTemplate: z.string().optional(),
+  defaultPriority: z.enum(["low", "normal", "high", "critical"]).optional(),
+  defaultConstraints: z.record(z.any()).optional(),
+  variableSchema: z.array(variableDefSchema).optional(),
+});
+
+export const updateTemplateSchema = z.object({
+  id: z.number().int().positive(),
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().optional(),
+  category: z.string().max(50).optional(),
+  templateType: z.string().max(50).optional(),
+  isActive: z.boolean().optional(),
+  titleTemplate: z.string().optional(),
+  objectiveTemplate: z.string().optional(),
+  defaultPriority: z.enum(["low", "normal", "high", "critical"]).optional(),
+  defaultConstraints: z.record(z.any()).optional(),
+  variableSchema: z.array(variableDefSchema).optional(),
+});
+
+export const listTemplatesSchema = z.object({
+  category: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const importTemplatesSchema = z.object({
+  templates: z.array(z.object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    category: z.string().optional(),
+    templateType: z.string().optional(),
+    titleTemplate: z.string().optional(),
+    objectiveTemplate: z.string().optional(),
+    defaultPriority: z.enum(["low", "normal", "high", "critical"]).optional(),
+    defaultConstraints: z.record(z.any()).optional(),
+    variableSchema: z.array(variableDefSchema).optional(),
+  })).min(1),
+});
+
+export const generateJobDraftSchema = z.object({
+  templateId: z.number().int().positive(),
+  variables: z.record(z.string()),
+});

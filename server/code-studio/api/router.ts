@@ -26,6 +26,11 @@ import {
   createPolicySchema,
   listDiffsSchema,
   listSessionMessagesSchema,
+  createTemplateSchema,
+  updateTemplateSchema,
+  listTemplatesSchema,
+  importTemplatesSchema,
+  generateJobDraftSchema,
 } from "../shared/schemas";
 import { opencodeSettingsRouter } from "../opencode/settings-router";
 
@@ -359,6 +364,100 @@ const catalogImportsRouter = router({
     .mutation(({ input }) => repo.removeCatalogImport(input.id)),
 });
 
+// ── Templates ─────────────────────────────────────────────────────────────────
+
+const templatesRouter = router({
+  list: protectedProcedure.input(listTemplatesSchema).query(({ input }) => {
+    return repo.listTemplates(input || {});
+  }),
+  getById: protectedProcedure.input(byIdSchema).query(({ input }) => {
+    return repo.getTemplateById(input.id);
+  }),
+  create: protectedProcedure.input(createTemplateSchema).mutation(async ({ input, ctx }) => {
+    const created = await repo.createTemplate(input);
+    await repo.createAuditEvent({
+      eventType: "template_created",
+      entityType: "template",
+      entityId: created.id,
+      actorUserId: (ctx as any).user?.id,
+    });
+    return created;
+  }),
+  update: protectedProcedure.input(updateTemplateSchema).mutation(async ({ input, ctx }) => {
+    const { id, ...data } = input;
+    const updated = await repo.updateTemplate(id, data);
+    await repo.createAuditEvent({
+      eventType: "template_updated",
+      entityType: "template",
+      entityId: id,
+      actorUserId: (ctx as any).user?.id,
+    });
+    return updated;
+  }),
+  delete: protectedProcedure.input(byIdSchema).mutation(async ({ input, ctx }) => {
+    const deleted = await repo.deleteTemplate(input.id);
+    if (deleted) {
+      await repo.createAuditEvent({
+        eventType: "template_deleted",
+        entityType: "template",
+        entityId: input.id,
+        actorUserId: (ctx as any).user?.id,
+      });
+    }
+    return deleted;
+  }),
+  importFile: protectedProcedure.input(importTemplatesSchema).mutation(async ({ input, ctx }) => {
+    const results: any[] = [];
+    for (const tmpl of input.templates) {
+      const created = await repo.createTemplate({
+        ...tmpl,
+        importSource: "file_import",
+      });
+      results.push(created);
+    }
+    await repo.createAuditEvent({
+      eventType: "templates_imported",
+      entityType: "template",
+      actorUserId: (ctx as any).user?.id,
+      details: { count: results.length, names: results.map((r) => r.name) },
+    });
+    return { imported: results.length, templates: results };
+  }),
+  generateJobDraft: protectedProcedure.input(generateJobDraftSchema).query(async ({ input }) => {
+    const template = await repo.getTemplateById(input.templateId);
+    if (!template) throw new Error("Template not found");
+    const vars = input.variables;
+    // Validate required variables
+    const varDefs = (template.variableSchema as any[]) || [];
+    const missing = varDefs
+      .filter((v: any) => v.required && (!vars[v.key] || !vars[v.key].trim()))
+      .map((v: any) => v.label);
+    if (missing.length > 0) {
+      throw new Error(`Missing required fields: ${missing.join(", ")}`);
+    }
+    const title = template.titleTemplate
+      ? repo.renderTemplate(template.titleTemplate, vars).slice(0, 200)
+      : template.name;
+    const objective = template.objectiveTemplate
+      ? repo.renderTemplate(template.objectiveTemplate, vars)
+      : "";
+    return {
+      title,
+      objective,
+      priority: template.defaultPriority || "normal",
+      constraints: {
+        ...(template.defaultConstraints as any || {}),
+        _sourceTemplateId: template.id,
+        _sourceTemplateName: template.name,
+      },
+    };
+  }),
+  seed: protectedProcedure.mutation(async () => {
+    await repo.ensureBuiltInTemplates();
+    return { ok: true };
+  }),
+});
+
 // ── Compose Main Router ──────────────────────────────────────────────────────
 
 export const codeStudioRouter = router({
@@ -377,4 +476,5 @@ export const codeStudioRouter = router({
   catalogImports: catalogImportsRouter,
   settings: settingsRouter,
   opencodeSettings: opencodeSettingsRouter,
+  templates: templatesRouter,
 });

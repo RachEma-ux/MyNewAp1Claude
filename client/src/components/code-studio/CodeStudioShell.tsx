@@ -27,10 +27,12 @@ const CodeStudioAICatalogPage = lazy(() => import("@/pages/code-studio/CodeStudi
 const CodeStudioControlPanelPage = lazy(() => import("@/pages/code-studio/CodeStudioControlPanelPage"));
 const CodeStudioOpenCodeSettingsPage = lazy(() => import("@/pages/code-studio/CodeStudioOpenCodeSettingsPage"));
 const CodeStudioHowToPage = lazy(() => import("@/pages/code-studio/CodeStudioHowToPage"));
+const CodeStudioTemplatesPage = lazy(() => import("@/pages/code-studio/CodeStudioTemplatesPage"));
 
 const routeMap: Record<CodeStudioView, string> = {
   dashboard: "/code-studio/dashboard",
   jobs: "/code-studio/jobs",
+  templates: "/code-studio/templates",
   sessions: "/code-studio/sessions",
   approvals: "/code-studio/approvals",
   repos: "/code-studio/repos",
@@ -44,6 +46,7 @@ const routeMap: Record<CodeStudioView, string> = {
 
 function getActiveView(path: string): CodeStudioView {
   if (path.startsWith("/code-studio/jobs")) return "jobs";
+  if (path.startsWith("/code-studio/templates")) return "templates";
   if (path.startsWith("/code-studio/sessions")) return "sessions";
   if (path.startsWith("/code-studio/approvals")) return "approvals";
   if (path.startsWith("/code-studio/repos")) return "repos";
@@ -81,6 +84,7 @@ export default function CodeStudioShell() {
     switch (active) {
       case "jobs":
         return jobDetailMatch ? <CodeStudioJobDetailPage /> : <CodeStudioJobsPage />;
+      case "templates": return <CodeStudioTemplatesPage />;
       case "sessions": return <CodeStudioSessionsPage />;
       case "approvals": return <CodeStudioApprovalsPage />;
       case "repos": return <CodeStudioReposPage />;
