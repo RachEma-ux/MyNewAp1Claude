@@ -41,7 +41,7 @@ const profilesRouter = router({
         profileType: profileTypeSchema,
         name: z.string().min(1).max(200),
         description: z.string().max(1000).optional(),
-        configDraft: z.record(z.any()).optional(),
+        configDraft: z.any().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -60,7 +60,7 @@ const profilesRouter = router({
     .input(
       z.object({
         id: z.number().int().positive(),
-        configDraft: z.record(z.any()),
+        configDraft: z.any(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -105,7 +105,7 @@ const versionsRouter = router({
     .input(
       z.object({
         profileId: z.number().int().positive(),
-        config: z.record(z.any()),
+        config: z.any(),
         changeSummary: z.string().max(500).optional(),
       }),
     )
@@ -121,11 +121,11 @@ const versionsRouter = router({
 
 const validationRouter = router({
   validateRuntime: protectedProcedure
-    .input(z.object({ config: z.record(z.any()) }))
+    .input(z.object({ config: z.any() }))
     .mutation(({ input }) => validateRuntimeConfig(input.config)),
 
   validateTui: protectedProcedure
-    .input(z.object({ config: z.record(z.any()) }))
+    .input(z.object({ config: z.any() }))
     .mutation(({ input }) => validateTuiConfig(input.config)),
 });
 
@@ -133,7 +133,7 @@ const validationRouter = router({
 
 const generateRouter = router({
   previewRuntime: protectedProcedure
-    .input(z.object({ config: z.record(z.any()), redact: z.boolean().optional() }))
+    .input(z.object({ config: z.any(), redact: z.boolean().optional() }))
     .query(({ input }) => {
       const generated = generateRuntimeConfig(input.config);
       const output = input.redact !== false ? redactConfigSecrets(generated) : generated;
@@ -144,7 +144,7 @@ const generateRouter = router({
     }),
 
   previewTui: protectedProcedure
-    .input(z.object({ config: z.record(z.any()), redact: z.boolean().optional() }))
+    .input(z.object({ config: z.any(), redact: z.boolean().optional() }))
     .query(({ input }) => {
       const generated = generateTuiConfig(input.config);
       const output = input.redact !== false ? redactConfigSecrets(generated) : generated;
