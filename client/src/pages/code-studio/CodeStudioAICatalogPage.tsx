@@ -320,8 +320,8 @@ function CatalogPickerModal({
               </div>
             </div>
 
-            <ScrollArea className="max-h-[40vh]">
-              <div className="space-y-1.5 pr-2">
+            <div className="overflow-y-auto max-h-[40vh] pr-1">
+              <div className="space-y-1.5">
                 {providerModels.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-4">
                     No models found for this provider.
@@ -365,7 +365,7 @@ function CatalogPickerModal({
                   })
                 )}
               </div>
-            </ScrollArea>
+            </div>
 
             <div className="flex items-center justify-between pt-1">
               <p className="text-[10px] text-muted-foreground">
