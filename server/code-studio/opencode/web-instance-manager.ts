@@ -14,8 +14,9 @@
  * 7. Provide proxy target information
  */
 
-import { spawn, type ChildProcess } from "child_process";
+import { spawn, execSync, type ChildProcess } from "child_process";
 import * as crypto from "crypto";
+import * as fs from "fs";
 import * as repo from "../repository";
 import { getWorkspaceByJobId } from "../worker/workspace-manager";
 import {
@@ -113,6 +114,21 @@ async function startOpenCodeWeb(
   workspacePath: string,
   port: number
 ): Promise<ChildProcess> {
+  // Pre-flight: check binary exists and is executable
+  if (!fs.existsSync(OPENCODE_BINARY_PATH)) {
+    throw new Error(
+      `OpenCode binary not found at "${OPENCODE_BINARY_PATH}". ` +
+      `Install OpenCode or set OPENCODE_BINARY_PATH env var.`
+    );
+  }
+  try {
+    execSync(`"${OPENCODE_BINARY_PATH}" version`, { timeout: 5000, stdio: "pipe" });
+  } catch (e: any) {
+    throw new Error(
+      `OpenCode binary at "${OPENCODE_BINARY_PATH}" cannot execute on this platform: ${e.message?.split("\n")[0]}`
+    );
+  }
+
   const hostname = OPENCODE_WEB_HOSTNAME;
   const password = process.env.OPENCODE_WEB_PASSWORD || process.env.OPENCODE_SERVER_PASSWORD || "";
 

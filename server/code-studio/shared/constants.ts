@@ -78,4 +78,5 @@ export const OPENCODE_WEB_BASE_PORT = Number(process.env.OPENCODE_WEB_BASE_PORT)
 export const OPENCODE_WEB_MAX_PORT = Number(process.env.OPENCODE_WEB_MAX_PORT) || 4299;
 export const OPENCODE_WEB_HOSTNAME = process.env.OPENCODE_WEB_HOSTNAME || "127.0.0.1";
 export const OPENCODE_WEB_TTL_MINUTES = Number(process.env.OPENCODE_WEB_TTL_MINUTES) || 120;
-export const OPENCODE_BINARY_PATH = process.env.OPENCODE_BINARY_PATH || "opencode";
+export const OPENCODE_BINARY_PATH = process.env.OPENCODE_BINARY_PATH
+  || (process.env.HOME ? `${process.env.HOME}/.opencode/bin/opencode` : "opencode");
