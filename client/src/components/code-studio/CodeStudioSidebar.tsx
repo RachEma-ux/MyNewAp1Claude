@@ -63,14 +63,20 @@ const OPENCODE_IDE_URL = "http://127.0.0.1:4096/";
 
 /** Sidebar action buttons: Open IDE + Ollama serve */
 function SidebarActions({ collapsed }: { collapsed: boolean }) {
+  const [justStarted, setJustStarted] = useState(false);
   const ollamaStatus = trpc.codeStudio.ollama.status.useQuery(undefined, {
-    refetchInterval: 10000,
+    refetchInterval: justStarted ? 2000 : 10000,
   });
   const startOllama = trpc.codeStudio.ollama.start.useMutation({
-    onSuccess: () => ollamaStatus.refetch(),
+    onSettled: () => {
+      setJustStarted(true);
+      ollamaStatus.refetch();
+      setTimeout(() => setJustStarted(false), 15000);
+    },
   });
 
   const isRunning = ollamaStatus.data?.running ?? false;
+  const isStarting = startOllama.isPending;
 
   return (
     <div className={cn("border-t mt-2 pt-2 space-y-0.5", collapsed ? "" : "mx-1")}>
@@ -86,24 +92,26 @@ function SidebarActions({ collapsed }: { collapsed: boolean }) {
         {!collapsed && <span className="truncate">Open IDE</span>}
       </button>
       <button
-        onClick={() => { if (!isRunning && !startOllama.isPending) startOllama.mutate(); }}
-        title={isRunning ? "Ollama running" : "Start Ollama"}
+        onClick={() => { if (!isRunning && !isStarting) startOllama.mutate(); }}
+        title={isRunning ? "Ollama running" : isStarting ? "Starting Ollama..." : "Start Ollama"}
         className={cn(
           "flex items-center w-full rounded-sm transition-colors",
           isRunning
             ? "text-green-500 hover:text-green-400 hover:bg-green-500/10"
-            : "text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10",
+            : isStarting
+              ? "text-orange-400 hover:bg-orange-500/10"
+              : "text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10",
           collapsed ? "justify-center py-1.5" : "gap-2 px-3 py-1.5 text-xs font-medium"
         )}
       >
-        {startOllama.isPending ? (
-          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+        {isStarting ? (
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-orange-400" />
         ) : (
-          <Server className="h-3.5 w-3.5 shrink-0" />
+          <Server className={cn("h-3.5 w-3.5 shrink-0", isRunning && "text-green-500")} />
         )}
         {!collapsed && (
           <span className="truncate flex-1 text-left">
-            {startOllama.isPending ? "Starting..." : isRunning ? "Ollama" : "Start Ollama"}
+            {isStarting ? "Starting..." : isRunning ? "Ollama" : "Start Ollama"}
           </span>
         )}
         {!collapsed && isRunning && (
