@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Play, XCircle, RotateCcw, FileCode2, Workflow } from "lucide-react";
+import { Loader2, Play, XCircle, RotateCcw, FileCode2, Workflow, ArrowLeft } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 
@@ -39,9 +39,14 @@ export default function CodeStudioJobDetailPage() {
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-sm font-semibold flex items-center gap-2">
-            <Workflow className="h-4 w-4 text-violet-500" /> Job #{job.id}: {job.title}
-          </h1>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => navigate("/code-studio/jobs")} title="Back to Jobs">
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Button>
+            <h1 className="text-sm font-semibold flex items-center gap-2">
+              <Workflow className="h-4 w-4 text-violet-500" /> Job #{job.id}: {job.title}
+            </h1>
+          </div>
           {job.objective && <p className="text-[10px] text-muted-foreground mt-0.5">{job.objective}</p>}
         </div>
         <div className="flex items-center gap-2">

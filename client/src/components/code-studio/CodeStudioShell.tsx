@@ -17,6 +17,7 @@ import OpenCodeSettingsRail, { type SettingsSection } from "./OpenCodeSettingsRa
 
 const CodeStudioDashboardPage = lazy(() => import("@/pages/code-studio/CodeStudioDashboardPage"));
 const CodeStudioJobsPage = lazy(() => import("@/pages/code-studio/CodeStudioJobsPage"));
+const CodeStudioJobDetailPage = lazy(() => import("@/pages/code-studio/CodeStudioJobDetailPage"));
 const CodeStudioSessionsPage = lazy(() => import("@/pages/code-studio/CodeStudioSessionsPage"));
 const CodeStudioApprovalsPage = lazy(() => import("@/pages/code-studio/CodeStudioApprovalsPage"));
 const CodeStudioReposPage = lazy(() => import("@/pages/code-studio/CodeStudioReposPage"));
@@ -73,9 +74,13 @@ export default function CodeStudioShell() {
     navigate(routeMap[key]);
   };
 
+  // Detect job detail route: /code-studio/jobs/:id
+  const jobDetailMatch = location.match(/^\/code-studio\/jobs\/(\d+)/);
+
   const renderContent = () => {
     switch (active) {
-      case "jobs": return <CodeStudioJobsPage />;
+      case "jobs":
+        return jobDetailMatch ? <CodeStudioJobDetailPage /> : <CodeStudioJobsPage />;
       case "sessions": return <CodeStudioSessionsPage />;
       case "approvals": return <CodeStudioApprovalsPage />;
       case "repos": return <CodeStudioReposPage />;

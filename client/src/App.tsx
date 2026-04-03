@@ -161,7 +161,7 @@ const PSMRunPage = lazy(() => import("@/pages/psm/PSMRunPage"));
 const PSMMethodDetailPage = lazy(() => import("@/pages/psm/PSMMethodDetailPage"));
 const PRMCaseWorkspacePage = lazy(() => import("@/pages/prm/PRMCaseWorkspacePage"));
 const CodeStudioShellPage = lazy(() => import("@/pages/code-studio/CodeStudioShellPage"));
-const CodeStudioJobDetailPage = lazy(() => import("@/pages/code-studio/CodeStudioJobDetailPage"));
+// CodeStudioJobDetailPage now rendered inside CodeStudioShell (not standalone)
 const PSShellPage = lazy(() => import("@/pages/projects-system/PSShellPage"));
 const PSIdeationDetailPage = lazy(() => import("@/pages/projects-system/PSIdeationDetailPage"));
 const PSIdeationConvertPage = lazy(() => import("@/pages/projects-system/PSIdeationConvertPage"));
@@ -433,8 +433,8 @@ function Router() {
       <Route path="/prm/ai-catalog" component={() => <ProtectedRoute component={PRMShellPage} />} />
       <Route path="/prm/control-panel" component={() => <ProtectedRoute component={PRMShellPage} />} />
       <Route path="/prm" component={() => <ProtectedRoute component={PRMShellPage} />} />
-      {/* Code Studio — standalone coding module (job detail must precede shell catch-all) */}
-      <Route path="/code-studio/jobs/:id" component={() => <ProtectedRoute component={CodeStudioJobDetailPage} />} />
+      {/* Code Studio — job detail inside shell */}
+      <Route path="/code-studio/jobs/:id" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/dashboard" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/jobs" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/sessions" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
