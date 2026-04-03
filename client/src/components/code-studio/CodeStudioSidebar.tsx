@@ -91,7 +91,7 @@ function SidebarActions({ collapsed }: { collapsed: boolean }) {
         className={cn(
           "flex items-center w-full rounded-sm transition-colors",
           isRunning
-            ? "text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+            ? "text-green-500 hover:text-green-400 hover:bg-green-500/10"
             : "text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10",
           collapsed ? "justify-center py-1.5" : "gap-2 px-3 py-1.5 text-xs font-medium"
         )}
