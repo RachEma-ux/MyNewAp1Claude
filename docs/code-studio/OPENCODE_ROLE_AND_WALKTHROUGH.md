@@ -284,4 +284,101 @@ full control and traceability at every step.
 
 ---
 
+## Best Practices: Using OpenCode Alongside Claude Code
+
+When developing the app on Termux/Android, you have two AI coding tools:
+
+- **Claude Code** (Opus 4.6) — primary dev tool, conversational, direct file
+  edits, commit & push
+- **OpenCode** (GPT-5.4) — headless server on port 4096, same repo access,
+  job pipeline with governance
+
+The key is to use each where it adds unique value, not duplicate effort.
+
+### Recommended Task Routing
+
+| Task Type | Best Tool | Why |
+|---|---|---|
+| Complex features, architecture decisions | Claude Code | Conversational, iterative, deep context |
+| Code review of recent changes | OpenCode | Fresh eyes, different model catches different issues |
+| Codebase exploration & reports | OpenCode | Async, read-heavy, doesn't block Claude Code |
+| Standard scaffolding (CRUD, new module) | Code Studio job pipeline | Governed, audited, repeatable |
+| Quick edits, bug fixes, commit & push | Claude Code | Fastest path, no orchestration overhead |
+| Multi-model validation | Both | Build with one, review with the other |
+
+### Pattern 1: Second Opinion / Code Review
+
+After Claude Code builds a feature, send the changes to OpenCode for review.
+
+```
+You → Claude Code: "Build feature X"
+You → OpenCode:    "Review these files for bugs, security issues, missed edge cases"
+```
+
+Two different AI models catch different things. GPT-5.4 may spot what Opus
+misses and vice versa.
+
+### Pattern 2: Parallel Exploration
+
+While Claude Code writes code, send OpenCode to research.
+
+```
+Claude Code: [writing a new component]
+OpenCode:    "How does the existing sidebar pattern work? List all examples."
+```
+
+You get research results without interrupting the coding flow.
+
+### Pattern 3: Governed Job Pipeline
+
+For repeatable, well-defined tasks, Code Studio's job pipeline adds:
+
+- **Audit trail** — every step logged in the database
+- **Governance** — policy checks before code lands
+- **Reproducibility** — the same job pattern works every time
+
+Use this for standard work (add a page, scaffold a module) where you want
+traceability and consistent output.
+
+### Pattern 4: Documentation & Analysis
+
+OpenCode excels at reading the whole codebase and producing structured reports:
+
+- "Audit all pages — which ones are missing error handling?"
+- "List all tRPC endpoints that lack input validation"
+- "Generate API docs from the router definitions"
+
+These are read-heavy, output-heavy tasks that don't need file edits.
+
+### Pattern 5: Test Prompts Before Automation
+
+Before wiring a prompt into the job pipeline, test it interactively:
+
+```bash
+curl -s -X POST http://127.0.0.1:4096/session/{id}/message \
+  -H "Content-Type: application/json" \
+  -d '{"parts":[{"type":"text","text":"Add a last-updated column to code_jobs"}]}'
+```
+
+See how GPT-5.4 handles it. If the output is good, that prompt becomes a
+reusable job template.
+
+### The Power Move: Build → Review → Ship
+
+The most effective pattern:
+
+```
+1. You tell Claude Code what to build
+2. Claude Code writes the code, commits
+3. You send the diff to OpenCode: "Review this for issues"
+4. OpenCode reports back
+5. Claude Code fixes anything found
+6. You push
+```
+
+Two AI models, two perspectives, one codebase. You are the decision-maker
+in the middle.
+
+---
+
 *Created: 2026-04-03*

@@ -36,6 +36,7 @@ import {
   ClipboardCheck,
   MessageSquare,
   Zap,
+  FlaskConical,
   Server,
   Brain,
   Lock,
@@ -344,6 +345,57 @@ const WALKTHROUGH_STEPS: WalkthroughStep[] = [
   },
 ];
 
+// ── Best Practices: OpenCode + Claude Code ───────────────────────────────────
+
+interface BestPractice {
+  title: string;
+  icon: React.ElementType;
+  description: string;
+  example: string;
+}
+
+const TASK_ROUTING: { task: string; tool: string; why: string }[] = [
+  { task: "Complex features, architecture", tool: "Claude Code", why: "Conversational, iterative, deep context" },
+  { task: "Code review of recent changes", tool: "OpenCode", why: "Fresh eyes, different model catches different issues" },
+  { task: "Codebase exploration & reports", tool: "OpenCode", why: "Async, read-heavy, doesn't block Claude Code" },
+  { task: "Standard scaffolding (CRUD, module)", tool: "Code Studio Jobs", why: "Governed, audited, repeatable pipeline" },
+  { task: "Quick edits, bug fixes, push", tool: "Claude Code", why: "Fastest path, no orchestration overhead" },
+  { task: "Multi-model validation", tool: "Both", why: "Build with one, review with the other" },
+];
+
+const BEST_PRACTICES: BestPractice[] = [
+  {
+    title: "Second Opinion / Code Review",
+    icon: Eye,
+    description: "After Claude Code builds a feature, send the changes to OpenCode for review. Two different models catch different things.",
+    example: "Claude Code builds → You send diff to OpenCode: \"Review these files for bugs, security, edge cases\" → Fix anything found → Push.",
+  },
+  {
+    title: "Parallel Exploration",
+    icon: Search,
+    description: "While Claude Code writes code, send OpenCode to research patterns, existing implementations, or dependencies.",
+    example: "Claude Code: [writing component] | OpenCode: \"How does the sidebar pattern work? List all examples.\"",
+  },
+  {
+    title: "Governed Job Pipeline",
+    icon: ShieldCheck,
+    description: "For repeatable tasks, the job pipeline adds audit trail, governance checks, and reproducibility.",
+    example: "Standard work (add a page, scaffold a module) where you want traceability and consistent output.",
+  },
+  {
+    title: "Documentation & Analysis",
+    icon: FileText,
+    description: "OpenCode excels at reading the whole codebase and producing structured reports — read-heavy, no file edits needed.",
+    example: "\"Audit all pages missing error handling\" or \"List all tRPC endpoints lacking input validation.\"",
+  },
+  {
+    title: "Test Prompts Before Automation",
+    icon: FlaskConical,
+    description: "Before wiring a prompt into the job pipeline, test it interactively via the API. If the output is good, it becomes a reusable job template.",
+    example: "POST /session/{id}/message → \"Add a last-updated column to code_jobs\" → review result → save as template.",
+  },
+];
+
 // ── Page Component ───────────────────────────────────────────────────────────
 
 export default function CodeStudioHowToPage() {
@@ -475,6 +527,76 @@ export default function CodeStudioHowToPage() {
               supervised execution, and reviewed results. The app handled orchestration, governance, and audit.
               OpenCode handled the coding. The shift: from <em>writing code</em> to <em>directing AI that
               writes code</em>, with full control and traceability at every step.
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Separator />
+
+      {/* ── Best Practices: OpenCode + Claude Code ─────────────────────────── */}
+      <section>
+        <h2 className="text-sm font-semibold mb-1 flex items-center gap-2">
+          <Zap className="h-4 w-4 text-violet-500" /> Best Practices: OpenCode + Claude Code
+        </h2>
+        <p className="text-xs text-muted-foreground mb-3">
+          Two AI tools, each with unique strengths. Use each where it adds value, not where it duplicates effort.
+        </p>
+
+        {/* Task routing table */}
+        <Card className="mb-3">
+          <CardContent className="p-3">
+            <h3 className="text-xs font-semibold mb-2">Task Routing Guide</h3>
+            <div className="grid grid-cols-3 gap-0 text-[10px] border rounded-md overflow-hidden">
+              <div className="bg-muted/40 px-2 py-1.5 font-semibold border-b">Task Type</div>
+              <div className="bg-muted/40 px-2 py-1.5 font-semibold border-b border-l">Best Tool</div>
+              <div className="bg-muted/40 px-2 py-1.5 font-semibold border-b border-l">Why</div>
+              {TASK_ROUTING.map((row, i) => (
+                <React.Fragment key={i}>
+                  <div className="px-2 py-1.5 border-b last:border-b-0">{row.task}</div>
+                  <div className="px-2 py-1.5 border-l border-b last:border-b-0 font-medium">{row.tool}</div>
+                  <div className="px-2 py-1.5 border-l border-b last:border-b-0 text-muted-foreground">{row.why}</div>
+                </React.Fragment>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Practice cards */}
+        <div className="space-y-2">
+          {BEST_PRACTICES.map((bp) => (
+            <Card key={bp.title}>
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <bp.icon className="h-3.5 w-3.5 text-violet-500 opacity-70 shrink-0" />
+                  <span className="text-xs font-medium">{bp.title}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground pl-5">{bp.description}</p>
+                <div className="mt-1.5 pl-5">
+                  <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Example</span>
+                  <p className="text-[10px] font-mono bg-muted/30 rounded px-2 py-1 mt-0.5">{bp.example}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Power move */}
+        <Card className="mt-3 border-violet-500/30">
+          <CardContent className="p-3">
+            <h3 className="text-xs font-semibold mb-1 flex items-center gap-2">
+              <Zap className="h-3.5 w-3.5 text-violet-500" /> The Power Move: Build → Review → Ship
+            </h3>
+            <div className="space-y-1 pl-5 text-[10px]">
+              <div className="flex items-center gap-2"><Badge variant="outline" className="text-[9px] w-4 h-4 p-0 justify-center shrink-0">1</Badge> You tell Claude Code what to build</div>
+              <div className="flex items-center gap-2"><Badge variant="outline" className="text-[9px] w-4 h-4 p-0 justify-center shrink-0">2</Badge> Claude Code writes the code, commits</div>
+              <div className="flex items-center gap-2"><Badge variant="outline" className="text-[9px] w-4 h-4 p-0 justify-center shrink-0">3</Badge> You send the diff to OpenCode: "Review this for issues"</div>
+              <div className="flex items-center gap-2"><Badge variant="outline" className="text-[9px] w-4 h-4 p-0 justify-center shrink-0">4</Badge> OpenCode reports back</div>
+              <div className="flex items-center gap-2"><Badge variant="outline" className="text-[9px] w-4 h-4 p-0 justify-center shrink-0">5</Badge> Claude Code fixes anything found</div>
+              <div className="flex items-center gap-2"><Badge variant="outline" className="text-[9px] w-4 h-4 p-0 justify-center shrink-0">6</Badge> You push</div>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2 pl-5">
+              Two AI models, two perspectives, one codebase. You are the decision-maker in the middle.
             </p>
           </CardContent>
         </Card>
