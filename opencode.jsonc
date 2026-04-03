@@ -1,0 +1,63 @@
+{
+  // OpenCode project configuration for MyNewAp1Claude
+  // See: https://opencode.ai/config.json
+  "$schema": "https://opencode.ai/config.json",
+
+  // ── Providers ─────────────────────────────────────────────────────
+  "provider": {
+    "openai": {
+      "models": {
+        "gpt-5.4-mini": { "name": "GPT-5.4 Mini" }
+      }
+    },
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "tinyllama": { "name": "TinyLlama" },
+        "phi3": { "name": "Phi-3" }
+      }
+    }
+  },
+
+  // ── Default Agent ─────────────────────────────────────────────────
+  // Favor planning/inspection before edits
+  "default_agent": "planner",
+
+  // ── Instructions ──────────────────────────────────────────────────
+  // Loaded as project context on every session
+  "instructions": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "ARCHITECTURE.md",
+    "docs/opencode/full-stack-expert-rules.md"
+  ],
+
+  // ── Skills ────────────────────────────────────────────────────────
+  "skills": {
+    "watcher": {
+      "ignore": [
+        "node_modules",
+        "dist",
+        ".git",
+        "*.log",
+        "drizzle/meta"
+      ]
+    },
+    "compaction": true
+  },
+
+  // ── Permissions ───────────────────────────────────────────────────
+  // Safe defaults: ask before destructive operations
+  "permissions": {
+    "edit": "ask",
+    "bash": "ask",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "fetch": "ask"
+  }
+}

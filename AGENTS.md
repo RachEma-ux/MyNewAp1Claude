@@ -262,3 +262,18 @@ Use this mapping as the default interpretation:
 - Governance Agent = platform boundary and policy enforcement
 
 This team model is permanent for this repository.
+
+---
+
+## OpenCode Integration
+
+When this repository is used with OpenCode, the following structure applies:
+
+- **Expert rules**: `docs/opencode/full-stack-expert-rules.md` (loaded via `opencode.jsonc` instructions)
+- **Agents**: `.opencode/agents/` (planner, reviewer, debugger, security-reviewer, docs-writer)
+- **Commands**: `.opencode/commands/` (audit-job, inspect-module, full-review)
+- **Config**: `opencode.jsonc` (providers, permissions, default agent)
+- **Source spec**: `docs/opencode/full-stack-expert-skills.v2.json`
+
+The OpenCode agents and commands extend this team model — they do not replace it.
+AGENTS.md remains the authoritative repo operating policy.
