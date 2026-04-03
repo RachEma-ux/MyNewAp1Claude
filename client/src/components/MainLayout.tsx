@@ -206,6 +206,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       children: [
         { label: "Simple Shell", icon: <LayoutDashboard className="w-4 h-4" />, href: "/components/simple-shell" },
         { label: "Double Shell", icon: <LayoutDashboard className="w-4 h-4" />, href: "/components/double-shell" },
+        { label: "Home Template", icon: <LayoutDashboard className="w-4 h-4" />, href: "/components/home-template" },
         { label: "AI Catalog", icon: <Bot className="w-4 h-4" />, href: "/components/ai-catalog" },
       ],
     },

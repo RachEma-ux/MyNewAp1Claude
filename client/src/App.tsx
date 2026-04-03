@@ -167,6 +167,7 @@ const PSIdeationDetailPage = lazy(() => import("@/pages/projects-system/PSIdeati
 const PSIdeationConvertPage = lazy(() => import("@/pages/projects-system/PSIdeationConvertPage"));
 const SimpleShellPage = lazy(() => import("@/pages/components/SimpleShellPage"));
 const DoubleShellPage = lazy(() => import("@/pages/components/DoubleShellPage"));
+const HomeTemplatePage = lazy(() => import("@/pages/components/HomeTemplatePage"));
 const AICatalogPage = lazy(() => import("@/pages/components/AICatalogPage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
@@ -409,6 +410,7 @@ function Router() {
       {/* App Components — Shell demos */}
       <Route path="/components/simple-shell" component={() => <ProtectedRoute component={SimpleShellPage} />} />
       <Route path="/components/double-shell" component={() => <ProtectedRoute component={DoubleShellPage} />} />
+      <Route path="/components/home-template" component={() => <ProtectedRoute component={HomeTemplatePage} />} />
       <Route path="/components/ai-catalog" component={() => <ProtectedRoute component={AICatalogPage} />} />
       {/* PSM — Problem Solving Methods (detail routes must precede shell catch-all) */}
       <Route path="/psm/methods/:id" component={() => <ProtectedRoute component={PSMMethodDetailPage} />} />
