@@ -211,26 +211,24 @@ export default function CodeStudioOpenCodeSettingsPage({
     onDirtyChange(true);
   }, [activeTab, onDirtyChange]);
 
-  const ensureProfile = useCallback(async () => {
-    if (!currentProfile) {
-      await createProfileMut.mutateAsync({
-        profileType: activeTab,
-        name: activeTab === "runtime" ? "Default Runtime Profile" : "Default TUI Profile",
-        configDraft: activeTab === "runtime" ? runtimeDraft : tuiDraft,
-      });
-    }
+  const ensureProfile = useCallback(async (): Promise<{ id: number }> => {
+    if (currentProfile) return currentProfile;
+    const created = await createProfileMut.mutateAsync({
+      profileType: activeTab,
+      name: activeTab === "runtime" ? "Default Runtime Profile" : "Default TUI Profile",
+      configDraft: activeTab === "runtime" ? runtimeDraft : tuiDraft,
+    });
+    return created;
   }, [currentProfile, activeTab, runtimeDraft, tuiDraft, createProfileMut]);
 
-  const handleSave = useCallback(async () => {
-    await ensureProfile();
-    const profile = activeTab === "runtime" ? runtimeProfileQuery.data : tuiProfileQuery.data;
-    if (profile) {
-      await updateDraftMut.mutateAsync({
-        id: profile.id,
-        configDraft: activeTab === "runtime" ? runtimeDraft : tuiDraft,
-      });
-    }
-  }, [ensureProfile, activeTab, runtimeProfileQuery.data, tuiProfileQuery.data, runtimeDraft, tuiDraft, updateDraftMut]);
+  const handleSave = useCallback(async (): Promise<{ id: number }> => {
+    const profile = await ensureProfile();
+    await updateDraftMut.mutateAsync({
+      id: profile.id,
+      configDraft: activeTab === "runtime" ? runtimeDraft : tuiDraft,
+    });
+    return profile;
+  }, [ensureProfile, activeTab, runtimeDraft, tuiDraft, updateDraftMut]);
 
   const handleValidate = useCallback(async () => {
     const mut = activeTab === "runtime" ? validateMut : validateTuiMut;
@@ -244,14 +242,9 @@ export default function CodeStudioOpenCodeSettingsPage({
   }, [activeTab, currentDraft, validateMut, validateTuiMut]);
 
   const handleApply = useCallback(async () => {
-    await handleSave();
-    const profile = activeTab === "runtime" ? runtimeProfileQuery.data : tuiProfileQuery.data;
-    if (!profile) {
-      toast.error("No profile to apply");
-      return;
-    }
+    const profile = await handleSave();
     await applyMut.mutateAsync({ profileId: profile.id, changeSummary: "Applied from UI" });
-  }, [handleSave, activeTab, runtimeProfileQuery.data, tuiProfileQuery.data, applyMut]);
+  }, [handleSave, applyMut]);
 
   const openJsonEditor = useCallback((section: string, value: any) => {
     setJsonEditorSection(section);
