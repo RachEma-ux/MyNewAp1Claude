@@ -326,61 +326,58 @@ export default function CodeStudioJobDetailPage() {
   const activeStep = (job.steps || []).find((s: any) => s.status === "in_progress");
   const ocHealthy = healthQuery.data?.opencode?.healthy ?? false;
 
+  const [contentExpanded, setContentExpanded] = useState(false);
+  const objectiveIsLong = (job.objective?.length ?? 0) > 200;
+
   return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => navigate("/code-studio/jobs")} title="Back to Jobs">
-              <ArrowLeft className="h-3.5 w-3.5" />
-            </Button>
-            <h1 className="text-sm font-semibold flex items-center gap-2">
-              <Workflow className="h-4 w-4 text-violet-500" /> Job #{job.id}: {job.title}
-            </h1>
-          </div>
-          {job.objective && <p className="text-[10px] text-muted-foreground mt-0.5 ml-8">{job.objective}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className={`text-[9px] ${STATUS_COLORS[job.status] || ""}`}>
-            {job.status?.replace(/_/g, " ")}
-          </Badge>
+    <div className="p-4 space-y-3">
+      {/* ── 1. Header (title only) ── */}
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => navigate("/code-studio/jobs")} title="Back to Jobs">
+          <ArrowLeft className="h-3.5 w-3.5" />
+        </Button>
+        <h1 className="text-sm font-semibold flex items-center gap-2 min-w-0">
+          <Workflow className="h-4 w-4 text-violet-500 shrink-0" />
+          <span className="truncate">Job #{job.id}: {job.title}</span>
+        </h1>
+      </div>
+
+      {/* ── 2. Dashboard bar (always visible) ── */}
+      <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded border bg-muted/30 text-xs">
+        <Badge variant="outline" className={`text-[9px] ${STATUS_COLORS[job.status] || ""}`}>
+          {job.status?.replace(/_/g, " ")}
+        </Badge>
+        {activeStep && (
+          <span className="flex items-center gap-1.5 text-blue-400">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {activeStep.stepName?.replace(/_/g, " ")} ({activeStep.agentRole})
+          </span>
+        )}
+        <span className="flex items-center gap-1 text-[9px] ml-auto">
+          <span className={`h-1.5 w-1.5 rounded-full ${ocHealthy ? "bg-green-500" : "bg-red-500"}`} />
+          OpenCode {ocHealthy ? "online" : "offline"}
+        </span>
+        <div className="flex items-center gap-1.5">
           {job.status === "draft" && (
-            <Button size="sm" className="text-xs h-7" onClick={() => startMutation.mutate({ id: jobId })}
+            <Button size="sm" className="text-xs h-6 px-2" onClick={() => startMutation.mutate({ id: jobId })}
               disabled={startMutation.isPending}>
               <Play className="h-3 w-3 mr-1" /> Start
             </Button>
           )}
           {!TERMINAL_STATUSES.includes(job.status) && job.status !== "draft" && (
-            <Button size="sm" variant="destructive" className="text-xs h-7" onClick={() => cancelMutation.mutate({ id: jobId })}
+            <Button size="sm" variant="destructive" className="text-xs h-6 px-2" onClick={() => cancelMutation.mutate({ id: jobId })}
               disabled={cancelMutation.isPending}>
               <XCircle className="h-3 w-3 mr-1" /> Cancel
             </Button>
           )}
           {job.status === "failed" && (
-            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => retryMutation.mutate({ id: jobId })}
+            <Button size="sm" variant="outline" className="text-xs h-6 px-2" onClick={() => retryMutation.mutate({ id: jobId })}
               disabled={retryMutation.isPending}>
               <RotateCcw className="h-3 w-3 mr-1" /> Retry
             </Button>
           )}
         </div>
       </div>
-
-      {/* Execution status bar */}
-      {!isTerminal && job.status !== "draft" && (
-        <div className="flex items-center gap-3 px-3 py-2 rounded border border-blue-500/20 bg-blue-500/5 text-xs">
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500 shrink-0" />
-          <span className="text-blue-400">
-            {activeStep
-              ? `Running: ${activeStep.stepName?.replace(/_/g, " ")} (${activeStep.agentRole})`
-              : `Status: ${job.status?.replace(/_/g, " ")}`}
-          </span>
-          <span className="ml-auto flex items-center gap-1 text-[9px]">
-            <span className={`h-1.5 w-1.5 rounded-full ${ocHealthy ? "bg-green-500" : "bg-red-500"}`} />
-            OpenCode {ocHealthy ? "online" : "offline"}
-          </span>
-        </div>
-      )}
 
       {/* Error message */}
       {job.status === "failed" && job.errorMessage && (
@@ -390,6 +387,28 @@ export default function CodeStudioJobDetailPage() {
         </div>
       )}
 
+      {/* ── 3. Job content (collapsible prompt) ── */}
+      {job.objective && (
+        <Card>
+          <CardContent className="p-3">
+            <div className={`text-xs leading-relaxed whitespace-pre-wrap break-words ${!contentExpanded && objectiveIsLong ? "line-clamp-4" : ""}`}>
+              {job.objective}
+            </div>
+            {objectiveIsLong && (
+              <button
+                className="flex items-center gap-1 mt-1.5 text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
+                onClick={() => setContentExpanded(v => !v)}
+              >
+                {contentExpanded
+                  ? <><ChevronDown className="h-3 w-3" /> Show less</>
+                  : <><ChevronRight className="h-3 w-3" /> Show full prompt</>}
+              </button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── 4. Tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="h-7 flex-wrap">
           <TabsTrigger value="results" className="text-[10px] h-6">Results</TabsTrigger>
