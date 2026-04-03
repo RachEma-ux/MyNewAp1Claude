@@ -23,6 +23,7 @@ import { getSession } from "../catalog-import/session-service";
 import { providers as providersTable } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { encrypt } from "./encryption";
+import { ideProxyRouter } from "../code-studio/opencode/ide-proxy";
 import { sdk } from "./sdk";
 import { initializeGovernance } from "../governance/governance-engine";
 import { syncCapabilitiesOnBoot } from "../workspace/seed/syncCapabilitiesOnBoot";
@@ -532,12 +533,7 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Code Studio IDE proxy (OpenCode Web instances)
   // Must be mounted BEFORE body-parsing middleware interferes with proxied streams
-  try {
-    const { ideProxyRouter } = require("../code-studio/opencode/ide-proxy");
-    app.use("/api/code-studio/ide", ideProxyRouter);
-  } catch (err: any) {
-    console.warn("[IDE Proxy] Failed to mount:", err.message);
-  }
+  app.use("/api/code-studio/ide", ideProxyRouter);
 
   // File upload endpoint
   app.use("/api", uploadRouter);
