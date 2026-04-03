@@ -629,3 +629,95 @@ export async function removeCatalogImport(id: number) {
     .where(eq(schema.codeCatalogImports.id, id));
   return { success: true };
 }
+
+// ── IDE Instances ─────────────────────────────────────────────────────────
+
+export async function createIdeInstance(data: {
+  jobId?: number;
+  sessionId?: number;
+  workspaceId?: number;
+  workspacePath: string;
+  instanceType?: string;
+  hostname: string;
+  port: number;
+  proxyKey: string;
+  launchCommand?: string;
+  processId?: number;
+  expiresAt?: Date;
+}) {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB unavailable");
+  const [row] = await db.insert(schema.codeIdeInstances).values({
+    ...data,
+    status: "starting",
+  } as any).returning();
+  return row;
+}
+
+export async function getIdeInstanceById(id: number) {
+  const db = getCodeDb();
+  if (!db) return null;
+  const [row] = await db.select().from(schema.codeIdeInstances)
+    .where(eq(schema.codeIdeInstances.id, id)).limit(1);
+  return row ?? null;
+}
+
+export async function getIdeInstanceByProxyKey(proxyKey: string) {
+  const db = getCodeDb();
+  if (!db) return null;
+  const [row] = await db.select().from(schema.codeIdeInstances)
+    .where(eq(schema.codeIdeInstances.proxyKey, proxyKey)).limit(1);
+  return row ?? null;
+}
+
+export async function getRunningIdeInstanceForJob(jobId: number) {
+  const db = getCodeDb();
+  if (!db) return null;
+  const rows = await db.select().from(schema.codeIdeInstances)
+    .where(and(
+      eq(schema.codeIdeInstances.jobId, jobId),
+      eq(schema.codeIdeInstances.status, "running"),
+    )).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getRunningIdeInstanceForWorkspacePath(workspacePath: string) {
+  const db = getCodeDb();
+  if (!db) return null;
+  const rows = await db.select().from(schema.codeIdeInstances)
+    .where(and(
+      eq(schema.codeIdeInstances.workspacePath, workspacePath),
+      eq(schema.codeIdeInstances.status, "running"),
+    )).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateIdeInstance(id: number, data: Record<string, any>) {
+  const db = getCodeDb();
+  if (!db) throw new Error("CODEDB unavailable");
+  const [updated] = await db.update(schema.codeIdeInstances)
+    .set(data)
+    .where(eq(schema.codeIdeInstances.id, id)).returning();
+  return updated;
+}
+
+export async function listIdeInstances(filter?: { status?: string }) {
+  const db = getCodeDb();
+  if (!db) return [];
+  if (filter?.status) {
+    return db.select().from(schema.codeIdeInstances)
+      .where(eq(schema.codeIdeInstances.status, filter.status))
+      .orderBy(desc(schema.codeIdeInstances.startedAt));
+  }
+  return db.select().from(schema.codeIdeInstances)
+    .orderBy(desc(schema.codeIdeInstances.startedAt));
+}
+
+export async function getAllocatedPorts(): Promise<number[]> {
+  const db = getCodeDb();
+  if (!db) return [];
+  const rows = await db.select({ port: schema.codeIdeInstances.port })
+    .from(schema.codeIdeInstances)
+    .where(eq(schema.codeIdeInstances.status, "running"));
+  return rows.map(r => r.port);
+}

@@ -69,3 +69,13 @@ export const DIFF_STATUSES = ["proposed", "approved", "applied", "reverted"] as 
 
 export const OPENCODE_DEFAULT_URL = "http://127.0.0.1:4096";
 export const OPENCODE_DEFAULT_PORT = 4096;
+
+// ── IDE Web Instances ────────────────────────────────────────────────────
+export const IDE_INSTANCE_STATUSES = ["starting", "running", "stopping", "stopped", "failed", "expired"] as const;
+export type IdeInstanceStatus = (typeof IDE_INSTANCE_STATUSES)[number];
+
+export const OPENCODE_WEB_BASE_PORT = Number(process.env.OPENCODE_WEB_BASE_PORT) || 4200;
+export const OPENCODE_WEB_MAX_PORT = Number(process.env.OPENCODE_WEB_MAX_PORT) || 4299;
+export const OPENCODE_WEB_HOSTNAME = process.env.OPENCODE_WEB_HOSTNAME || "127.0.0.1";
+export const OPENCODE_WEB_TTL_MINUTES = Number(process.env.OPENCODE_WEB_TTL_MINUTES) || 120;
+export const OPENCODE_BINARY_PATH = process.env.OPENCODE_BINARY_PATH || "opencode";

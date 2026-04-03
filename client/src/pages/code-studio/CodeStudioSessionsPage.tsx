@@ -1,11 +1,22 @@
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Terminal } from "lucide-react";
+import { Loader2, Terminal, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
 
 export default function CodeStudioSessionsPage() {
   const sessionsQuery = trpc.codeStudio.sessions.list.useQuery({});
   const sessions = sessionsQuery.data ?? [];
+  const openIdeMutation = trpc.codeStudio.ide.openForSession.useMutation({
+    onSuccess: (data) => {
+      if (data?.proxyUrl) {
+        window.open(data.proxyUrl, "_blank");
+        toast.success(data.isReused ? "Reusing existing IDE session" : "OpenCode Web launched");
+      }
+    },
+    onError: (e) => toast.error(`IDE launch failed: ${e.message}`),
+  });
 
   return (
     <div className="p-4 space-y-4">
@@ -28,7 +39,14 @@ export default function CodeStudioSessionsPage() {
                   {s.agentRole && <Badge variant="secondary" className="text-[9px]">{s.agentRole}</Badge>}
                   {s.model && <span className="text-muted-foreground">{s.model}</span>}
                 </div>
-                <Badge variant="outline" className="text-[9px] capitalize">{s.status}</Badge>
+                <div className="flex items-center gap-1.5">
+                  <Button size="sm" variant="ghost" className="text-[9px] h-5 px-1.5"
+                    onClick={() => openIdeMutation.mutate({ sessionId: s.id })}
+                    disabled={openIdeMutation.isPending} title="Open in OpenCode Web">
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                  <Badge variant="outline" className="text-[9px] capitalize">{s.status}</Badge>
+                </div>
               </div>
               <div className="flex items-center gap-3 mt-1 text-[9px] text-muted-foreground">
                 <span>Job #{s.jobId}</span>

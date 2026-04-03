@@ -530,6 +530,15 @@ async function startServer() {
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  // Code Studio IDE proxy (OpenCode Web instances)
+  // Must be mounted BEFORE body-parsing middleware interferes with proxied streams
+  try {
+    const { ideProxyRouter } = require("../code-studio/opencode/ide-proxy");
+    app.use("/api/code-studio/ide", ideProxyRouter);
+  } catch (err: any) {
+    console.warn("[IDE Proxy] Failed to mount:", err.message);
+  }
+
   // File upload endpoint
   app.use("/api", uploadRouter);
   // Chat streaming endpoint

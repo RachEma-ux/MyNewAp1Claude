@@ -8,7 +8,7 @@ import {
   Loader2, Play, XCircle, RotateCcw, FileCode2, Workflow,
   ArrowLeft, Circle, CheckCircle2, AlertCircle, Terminal,
   ClipboardCopy, Download, FileText, ChevronDown, ChevronRight,
-  Search, Code2, MessageSquare,
+  Search, Code2, MessageSquare, ExternalLink,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -316,6 +316,15 @@ export default function CodeStudioJobDetailPage() {
     onSuccess: () => { toast.success("Job requeued"); jobQuery.refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  const openIdeMutation = trpc.codeStudio.ide.openForJob.useMutation({
+    onSuccess: (data) => {
+      if (data?.proxyUrl) {
+        window.open(data.proxyUrl, "_blank");
+        toast.success(data.isReused ? "Reusing existing IDE session" : "OpenCode Web launched");
+      }
+    },
+    onError: (e) => toast.error(`IDE launch failed: ${e.message}`),
+  });
 
   if (jobQuery.isLoading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="h-5 w-5 animate-spin" /></div>;
@@ -376,6 +385,14 @@ export default function CodeStudioJobDetailPage() {
               <RotateCcw className="h-3 w-3 mr-1" /> Retry
             </Button>
           )}
+          <Button size="sm" variant="outline" className="text-xs h-6 px-2"
+            onClick={() => openIdeMutation.mutate({ jobId })}
+            disabled={openIdeMutation.isPending}>
+            {openIdeMutation.isPending
+              ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              : <ExternalLink className="h-3 w-3 mr-1" />}
+            Open IDE
+          </Button>
         </div>
       </div>
 

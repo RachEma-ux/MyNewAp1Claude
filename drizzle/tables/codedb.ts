@@ -528,3 +528,35 @@ export const codeCatalogImports = pgTable(
     catalogEntryIdx: index("idx_code_catalog_imports_entry").on(table.catalogEntryId),
   })
 );
+
+// ── Group 12: IDE Instances ──────────────────────────────────────────────
+
+export const codeIdeInstances = pgTable(
+  "code_ide_instances",
+  {
+    id: serial("id").primaryKey(),
+    jobId: integer("job_id"),
+    sessionId: integer("session_id"),
+    workspaceId: integer("workspace_id"),
+    workspacePath: text("workspace_path").notNull(),
+    instanceType: varchar("instance_type", { length: 30 }).default("opencode_web").notNull(),
+    status: varchar("status", { length: 30 }).default("starting").notNull(),
+    hostname: varchar("hostname", { length: 100 }).default("127.0.0.1"),
+    port: integer("port").notNull(),
+    proxyKey: varchar("proxy_key", { length: 100 }).notNull(),
+    processId: integer("process_id"),
+    launchCommand: text("launch_command"),
+    startedAt: timestamp("started_at").defaultNow(),
+    lastAccessedAt: timestamp("last_accessed_at").defaultNow(),
+    expiresAt: timestamp("expires_at"),
+    closedAt: timestamp("closed_at"),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata").default({}),
+  },
+  (table) => ({
+    jobIdx: index("idx_code_ide_instances_job").on(table.jobId),
+    sessionIdx: index("idx_code_ide_instances_session").on(table.sessionId),
+    proxyKeyIdx: index("idx_code_ide_instances_proxy_key").on(table.proxyKey),
+    statusIdx: index("idx_code_ide_instances_status").on(table.status),
+  })
+);

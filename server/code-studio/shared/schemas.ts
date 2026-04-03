@@ -176,3 +176,21 @@ export const generateJobDraftSchema = z.object({
   templateId: z.number().int().positive(),
   variables: z.record(z.string()),
 });
+
+// ── IDE Instances ─────────────────────────────────────────────────────────
+
+export const openIdeForJobSchema = z.object({
+  jobId: z.number().int().positive(),
+});
+
+export const openIdeForSessionSchema = z.object({
+  sessionId: z.number().int().positive(),
+});
+
+export const ideInstanceStatusSchema = z.object({
+  instanceId: z.number().int().positive(),
+});
+
+export const closeIdeInstanceSchema = z.object({
+  instanceId: z.number().int().positive(),
+});

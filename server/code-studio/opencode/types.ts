@@ -65,3 +65,32 @@ export interface OpenCodeConfig {
   username: string;
   password: string;
 }
+
+// ── IDE Web Instance ──────────────────────────────────────────────────────
+
+export interface IdeInstance {
+  id: number;
+  jobId: number | null;
+  sessionId: number | null;
+  workspaceId: number | null;
+  workspacePath: string;
+  instanceType: string;
+  status: string;
+  hostname: string;
+  port: number;
+  proxyKey: string;
+  processId: number | null;
+  launchCommand: string | null;
+  startedAt: Date | null;
+  lastAccessedAt: Date | null;
+  expiresAt: Date | null;
+  closedAt: Date | null;
+  errorMessage: string | null;
+  metadata: Record<string, any>;
+}
+
+export interface IdeInstanceLaunchResult {
+  instance: IdeInstance;
+  proxyUrl: string;
+  isReused: boolean;
+}

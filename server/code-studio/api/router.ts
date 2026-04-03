@@ -31,8 +31,13 @@ import {
   listTemplatesSchema,
   importTemplatesSchema,
   generateJobDraftSchema,
+  openIdeForJobSchema,
+  openIdeForSessionSchema,
+  ideInstanceStatusSchema,
+  closeIdeInstanceSchema,
 } from "../shared/schemas";
 import { opencodeSettingsRouter } from "../opencode/settings-router";
+import * as ideMgr from "../opencode/web-instance-manager";
 
 // ── Health ────────────────────────────────────────────────────────────────────
 
@@ -458,6 +463,48 @@ const templatesRouter = router({
   }),
 });
 
+// ── IDE (OpenCode Web) ──────────────────────────────────────────────────────
+
+const ideRouter = router({
+  openForJob: protectedProcedure.input(openIdeForJobSchema).mutation(async ({ input }) => {
+    const result = await ideMgr.openForJob(input.jobId);
+    return {
+      instanceId: result.instance.id,
+      proxyUrl: result.proxyUrl,
+      status: result.instance.status,
+      port: result.instance.port,
+      isReused: result.isReused,
+      workspacePath: result.instance.workspacePath,
+    };
+  }),
+  openForSession: protectedProcedure.input(openIdeForSessionSchema).mutation(async ({ input }) => {
+    const result = await ideMgr.openForSession(input.sessionId);
+    return {
+      instanceId: result.instance.id,
+      proxyUrl: result.proxyUrl,
+      status: result.instance.status,
+      port: result.instance.port,
+      isReused: result.isReused,
+      workspacePath: result.instance.workspacePath,
+    };
+  }),
+  getStatus: protectedProcedure.input(ideInstanceStatusSchema).query(async ({ input }) => {
+    const status = await ideMgr.getInstanceStatus(input.instanceId);
+    if (!status) return null;
+    return {
+      ...status,
+      proxyUrl: `/api/code-studio/ide/${status.proxyKey}/`,
+    };
+  }),
+  close: protectedProcedure.input(closeIdeInstanceSchema).mutation(async ({ input }) => {
+    await ideMgr.closeInstance(input.instanceId);
+    return { ok: true };
+  }),
+  list: protectedProcedure.query(async () => {
+    return repo.listIdeInstances();
+  }),
+});
+
 // ── Compose Main Router ──────────────────────────────────────────────────────
 
 export const codeStudioRouter = router({
@@ -477,4 +524,5 @@ export const codeStudioRouter = router({
   settings: settingsRouter,
   opencodeSettings: opencodeSettingsRouter,
   templates: templatesRouter,
+  ide: ideRouter,
 });
