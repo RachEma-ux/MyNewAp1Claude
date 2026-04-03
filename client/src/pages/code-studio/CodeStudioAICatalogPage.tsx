@@ -293,8 +293,8 @@ function CatalogPickerModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg max-h-[70vh]">
-        <DialogHeader>
+      <DialogContent className={modelSelectionProvider ? "max-w-lg max-h-[70vh] flex flex-col overflow-hidden !grid-cols-none" : "max-w-lg max-h-[70vh]"}>
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-sm flex items-center gap-2">
             <Brain className="h-4 w-4 text-cyan-500" />
             {modelSelectionProvider
@@ -306,7 +306,7 @@ function CatalogPickerModal({
         {modelSelectionProvider ? (
           /* ── Model Selection Step ── */
           <>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between shrink-0">
               <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={handleBack}>
                 <ArrowLeft className="h-3 w-3 mr-1" /> Back to Catalog
               </Button>
@@ -320,7 +320,7 @@ function CatalogPickerModal({
               </div>
             </div>
 
-            <div className="overflow-y-auto max-h-[40vh] pr-1">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ WebkitOverflowScrolling: "touch" }}>
               <div className="space-y-1.5">
                 {providerModels.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-4">
@@ -367,7 +367,7 @@ function CatalogPickerModal({
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-between pt-1 shrink-0">
               <p className="text-[10px] text-muted-foreground">
                 {selectedModelIds.size} model{selectedModelIds.size !== 1 ? "s" : ""} selected
               </p>
