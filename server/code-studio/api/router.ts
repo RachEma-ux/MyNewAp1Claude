@@ -172,7 +172,10 @@ const sessionsRouter = router({
   getById: protectedProcedure.input(byIdSchema).query(async ({ input }) => {
     return repo.getSessionById(input.id);
   }),
-  messages: protectedProcedure.input(listSessionMessagesSchema).query(({ input }) => {
+  messages: protectedProcedure.input(listSessionMessagesSchema).query(async ({ input }) => {
+    // Authorization: verify the session exists and belongs to a valid job
+    const session = await repo.getSessionById(input.sessionId);
+    if (!session || !session.jobId) return [];
     return repo.listSessionMessages(input.sessionId, input.limit ?? 200);
   }),
 });

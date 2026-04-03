@@ -279,11 +279,17 @@ export default function CodeStudioJobDetailPage() {
   const idMatch = location.match(/\/code-studio\/jobs\/(\d+)/);
   const jobId = idMatch ? Number(idMatch[1]) : 0;
   const [expandedSession, setExpandedSession] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("steps");
 
   const jobQuery = trpc.codeStudio.jobs.getById.useQuery({ id: jobId }, { enabled: !!jobId });
   const job = jobQuery.data;
 
   const isTerminal = job && TERMINAL_STATUSES.includes(job.status);
+
+  // Auto-select Results tab when job loads as completed
+  useEffect(() => {
+    if (isTerminal) setActiveTab("results");
+  }, [isTerminal]);
 
   // Poll every 3s while job is actively executing
   useEffect(() => {
@@ -319,9 +325,6 @@ export default function CodeStudioJobDetailPage() {
 
   const activeStep = (job.steps || []).find((s: any) => s.status === "in_progress");
   const ocHealthy = healthQuery.data?.opencode?.healthy ?? false;
-
-  // Default to Results tab for completed jobs, Steps for others
-  const defaultTab = isTerminal ? "results" : "steps";
 
   return (
     <div className="p-4 space-y-4">
@@ -387,7 +390,7 @@ export default function CodeStudioJobDetailPage() {
         </div>
       )}
 
-      <Tabs defaultValue={defaultTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="h-7 flex-wrap">
           <TabsTrigger value="results" className="text-[10px] h-6">Results</TabsTrigger>
           <TabsTrigger value="steps" className="text-[10px] h-6">Steps</TabsTrigger>

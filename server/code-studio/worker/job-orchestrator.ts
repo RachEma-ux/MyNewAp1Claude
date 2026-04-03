@@ -214,26 +214,46 @@ export async function buildEvidenceBundle(jobId: number) {
 // ── Helpers: Output Extraction, Transcript, Report ───────────────────────────
 
 /**
- * Fetch the last assistant message from an OpenCode session.
- * Returns a structured output object with summary text.
+ * Extract structured output directly from a sendMessage() response.
+ * The POST response already contains the assistant reply — no need
+ * to race with a separate listMessages() call.
  */
-async function extractLastAssistantOutput(sessionId: string): Promise<{ summary: string; role: string } | null> {
-  try {
-    const messages = await ocClient.listMessages(sessionId, 50);
-    if (!Array.isArray(messages) || messages.length === 0) return null;
-    // Find last assistant message
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
+function extractOutputFromResponse(response: any): { summary: string; role: string } | null {
+  if (!response) return null;
+
+  // Direct string response
+  if (typeof response === "string") {
+    return { summary: response.slice(0, 4000), role: "assistant" };
+  }
+
+  // OpenCode shape: { info: {...}, parts: [{type: "text", text: "..."}] }
+  if (response.parts && Array.isArray(response.parts)) {
+    const textParts = response.parts
+      .filter((p: any) => p.type === "text")
+      .map((p: any) => p.text || "")
+      .join("\n");
+    if (textParts) return { summary: textParts.slice(0, 4000), role: "assistant" };
+  }
+
+  // Array of messages — find last assistant
+  if (Array.isArray(response)) {
+    for (let i = response.length - 1; i >= 0; i--) {
+      const msg = response[i];
       const role = msg.role || (msg as any).type || "";
       if (role === "assistant" || role === "model") {
         const text = extractTextFromMessage(msg);
         return { summary: text.slice(0, 4000), role };
       }
     }
-    return null;
-  } catch {
-    return null;
   }
+
+  // Fallback: try extractTextFromMessage on the response itself
+  const text = extractTextFromMessage(response);
+  if (text && text.length > 2 && !text.startsWith("{")) {
+    return { summary: text.slice(0, 4000), role: "assistant" };
+  }
+
+  return null;
 }
 
 /**
@@ -299,9 +319,20 @@ async function generateFinalReport(jobId: number): Promise<void> {
 
   // Determine result kind from available data
   const hasDiffs = diffs.length > 0;
-  const hasStepOutputs = steps.some((s: any) => s.output && typeof s.output === "object" && (s.output as any).summary);
   const isFailed = job.status === "failed";
-  const resultKind = isFailed ? "failure" : hasDiffs ? "implementation" : "inspection";
+
+  // "mixed" = has diffs AND substantial review/governance findings
+  const reviewOutput = steps.find((s: any) => s.stepName === "reviewing")?.output as any;
+  const govOutput = steps.find((s: any) => s.stepName === "governance_check")?.output as any;
+  const hasSubstantialFindings =
+    (reviewOutput?.summary?.length > 100) || (govOutput?.summary?.length > 100);
+  const resultKind = isFailed
+    ? "failure"
+    : hasDiffs && hasSubstantialFindings
+      ? "mixed"
+      : hasDiffs
+        ? "implementation"
+        : "inspection";
 
   // Build step summaries
   const stepSummaries: Record<string, string> = {};
@@ -326,23 +357,6 @@ async function generateFinalReport(jobId: number): Promise<void> {
 
   // Files touched
   const changedFiles = diffs.map((d: any) => d.filePath);
-
-  // ── Result Summary (persisted on job) ──────────────────────────────
-  const resultSummary = {
-    resultKind,
-    headline: job.title,
-    finalAnswerPreview,
-    diffCount: diffs.length,
-    sessionCount: sessions.length,
-    changedFilesCount: changedFiles.length,
-    hasReport: true,
-    hasDiffs,
-    hasWorkspaceChanges: hasDiffs,
-    finalStepCompleted: steps.filter((s: any) => s.status === "completed").pop()?.stepName || null,
-    generatedAt,
-  };
-
-  await repo.updateJob(jobId, { resultSummary });
 
   // ── Markdown Report ────────────────────────────────────────────────
   const mdParts: string[] = [];
@@ -424,6 +438,10 @@ async function generateFinalReport(jobId: number): Promise<void> {
     generatedAt,
   };
 
+  // Idempotent: remove stale report artifacts before creating new ones
+  await repo.deleteArtifactsByType(jobId, "final_report_markdown");
+  await repo.deleteArtifactsByType(jobId, "final_report_json");
+
   // Persist artifacts
   await repo.createArtifact({
     jobId,
@@ -440,6 +458,23 @@ async function generateFinalReport(jobId: number): Promise<void> {
     content: JSON.stringify(jsonReport, null, 2),
     metadata: { generatedAt, resultKind },
   });
+
+  // ── Result Summary (persisted on job AFTER artifacts succeed) ──────
+  const resultSummary = {
+    resultKind,
+    headline: job.title,
+    finalAnswerPreview,
+    diffCount: diffs.length,
+    sessionCount: sessions.length,
+    changedFilesCount: changedFiles.length,
+    hasReport: true,
+    hasDiffs,
+    hasWorkspaceChanges: hasDiffs,
+    finalStepCompleted: steps.filter((s: any) => s.status === "completed").pop()?.stepName || null,
+    generatedAt,
+  };
+
+  await repo.updateJob(jobId, { resultSummary });
 }
 
 // ── Phase Prompt Builders ────────────────────────────────────────────────────
@@ -571,10 +606,10 @@ export async function executeJob(jobId: number): Promise<void> {
         // OpenCode available — send the phase prompt and capture output
         try {
           const prompt = buildPhasePrompt(job, phase.stepName);
-          await ocClient.sendMessage(ocSessionId, prompt);
+          const response = await ocClient.sendMessage(ocSessionId, prompt);
 
-          // Fetch assistant response to persist as step output
-          const stepOutput = await extractLastAssistantOutput(ocSessionId);
+          // Extract output directly from the response (no race condition)
+          const stepOutput = extractOutputFromResponse(response);
           if (step) await repo.updateJobStep(step.id, {
             status: "completed",
             completedAt: new Date(),

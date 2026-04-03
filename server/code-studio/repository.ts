@@ -300,6 +300,13 @@ export async function listArtifacts(jobId: number) {
   return db.select().from(schema.codeArtifacts).where(eq(schema.codeArtifacts.jobId, jobId));
 }
 
+export async function deleteArtifactsByType(jobId: number, artifactType: string) {
+  const db = getCodeDb();
+  if (!db) return;
+  await db.delete(schema.codeArtifacts)
+    .where(and(eq(schema.codeArtifacts.jobId, jobId), eq(schema.codeArtifacts.artifactType, artifactType)));
+}
+
 // ── Audit ────────────────────────────────────────────────────────────────────
 
 export async function createAuditEvent(data: {
