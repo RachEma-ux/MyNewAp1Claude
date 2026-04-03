@@ -51,7 +51,8 @@ const jobsRouter = router({
     const steps = await repo.listJobSteps(input.id);
     const diffs = await repo.listDiffs(input.id);
     const workspace = await workspaceMgr.getWorkspaceByJobId(input.id);
-    return { ...job, steps, diffs, workspace };
+    const sessions = await repo.listSessions({ jobId: input.id });
+    return { ...job, steps, diffs, workspace, sessions };
   }),
   create: protectedProcedure.input(createJobSchema).mutation(async ({ input, ctx }) => {
     const job = await repo.createJob({

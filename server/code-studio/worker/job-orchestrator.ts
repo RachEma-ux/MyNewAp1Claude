@@ -10,7 +10,7 @@
 import { JOB_STATUS_TRANSITIONS, type JobStatus, type AgentRole } from "../shared/constants";
 import * as repo from "../repository";
 import * as ocClient from "../opencode/client";
-import { prepareWorkspace, finalizeWorkspace } from "./workspace-manager";
+import { prepareWorkspace, finalizeWorkspace, getWorkspaceByJobId } from "./workspace-manager";
 
 export class JobOrchestrationError extends Error {
   constructor(message: string, public jobId: number, public phase?: string) {
@@ -46,7 +46,7 @@ export async function transitionJob(jobId: number, newStatus: JobStatus, details
   if (newStatus === "completed" || newStatus === "failed" || newStatus === "cancelled") {
     updateData.completedAt = new Date();
   }
-  if (details?.errorMessage) {
+  if (details && "errorMessage" in details) {
     updateData.errorMessage = details.errorMessage;
   }
 
@@ -92,7 +92,7 @@ export async function initializeJobSteps(jobId: number) {
 }
 
 /**
- * Start a job — queue it and initialize steps.
+ * Start a job — queue it, initialize steps, and kick off async execution.
  */
 export async function startJob(jobId: number) {
   const job = await repo.getJobById(jobId);
@@ -109,6 +109,11 @@ export async function startJob(jobId: number) {
     entityType: "job",
     entityId: jobId,
     actorUserId: job.actorUserId ?? undefined,
+  });
+
+  // Fire-and-forget: execute the job asynchronously
+  executeJob(jobId).catch((err) => {
+    console.error(`[CodeStudio] executeJob(${jobId}) unhandled error:`, err);
   });
 
   return repo.getJobById(jobId);
@@ -131,10 +136,23 @@ export async function cancelJob(jobId: number, actorUserId?: number) {
 }
 
 /**
- * Retry a failed job — transition from failed back to queued.
+ * Retry a failed job — reset steps, transition to queued, and re-execute.
  */
 export async function retryJob(jobId: number) {
-  return transitionJob(jobId, "queued", { errorMessage: null });
+  // Reset all step statuses to pending
+  const steps = await repo.listJobSteps(jobId);
+  for (const step of steps) {
+    await repo.updateJobStep(step.id, { status: "pending", output: null });
+  }
+
+  const updated = await transitionJob(jobId, "queued", { errorMessage: null });
+
+  // Fire-and-forget: re-execute
+  executeJob(jobId).catch((err) => {
+    console.error(`[CodeStudio] executeJob(${jobId}) retry error:`, err);
+  });
+
+  return updated;
 }
 
 /**
@@ -191,4 +209,175 @@ export async function buildEvidenceBundle(jobId: number) {
   });
 
   return bundle;
+}
+
+// ── Phase Prompt Builders ────────────────────────────────────────────────────
+
+function buildPhasePrompt(job: any, phase: string): string {
+  const objective = job.objective || job.description || job.title;
+  const constraints = job.constraints
+    ? `\nConstraints: ${JSON.stringify(job.constraints)}`
+    : "";
+
+  switch (phase) {
+    case "planning":
+      return `You are the Planner agent for Code Studio Job #${job.id}.\n\nObjective: ${objective}${constraints}\n\nAnalyze the codebase and produce a detailed implementation plan. List files to modify, approach, risks, and validation steps.`;
+    case "building":
+      return `You are the Builder agent for Code Studio Job #${job.id}.\n\nObjective: ${objective}${constraints}\n\nImplement the planned changes. Follow existing patterns and conventions.`;
+    case "reviewing":
+      return `You are the Reviewer agent for Code Studio Job #${job.id}.\n\nObjective: ${objective}\n\nReview all changes for correctness, security, and adherence to project conventions. Report any issues.`;
+    case "testing":
+      return `You are the Tester agent for Code Studio Job #${job.id}.\n\nObjective: ${objective}\n\nRun relevant tests and verify the implementation meets the objective. Report pass/fail status.`;
+    case "governance_check":
+      return `You are the Governance agent for Code Studio Job #${job.id}.\n\nObjective: ${objective}\n\nVerify changes comply with project policies, security requirements, and coding standards.`;
+    default:
+      return `Execute phase: ${phase}\n\nObjective: ${objective}`;
+  }
+}
+
+/**
+ * Execute a job through the full workflow pipeline.
+ * Called asynchronously (fire-and-forget) from startJob / retryJob.
+ */
+export async function executeJob(jobId: number): Promise<void> {
+  try {
+    const job = await repo.getJobById(jobId);
+    if (!job || job.status !== "queued") return;
+
+    // ── Pre-flight: check OpenCode health ──────────────────────────────
+    const health = await ocClient.checkHealth();
+    if (!health.healthy) {
+      await transitionJob(jobId, "failed", {
+        errorMessage:
+          "OpenCode runtime is offline. Start OpenCode (opencode serve) and retry the job.",
+      });
+      await repo.createAuditEvent({
+        eventType: "execution_failed",
+        entityType: "job",
+        entityId: jobId,
+        details: { reason: "opencode_offline" },
+      });
+      return;
+    }
+
+    // ── Step 1: Prepare workspace ──────────────────────────────────────
+    await transitionJob(jobId, "preparing_workspace");
+    const steps = await repo.listJobSteps(jobId);
+    const prepStep = steps.find((s: any) => s.stepName === "prepare_workspace");
+    if (prepStep) await repo.updateJobStep(prepStep.id, { status: "in_progress" });
+
+    if (job.repoId) {
+      try {
+        await prepareWorkspace(jobId, job.repoId);
+      } catch (err: any) {
+        if (prepStep)
+          await repo.updateJobStep(prepStep.id, { status: "failed", output: err.message });
+        await transitionJob(jobId, "failed", {
+          errorMessage: `Workspace preparation failed: ${err.message}`,
+        });
+        return;
+      }
+    }
+    if (prepStep) await repo.updateJobStep(prepStep.id, { status: "completed" });
+
+    // ── Step 2: Start OpenCode session ─────────────────────────────────
+    await transitionJob(jobId, "starting_session");
+    let ocSessionId: string;
+    try {
+      const ocSession = await ocClient.createSession(`Job #${jobId}: ${job.title}`);
+      ocSessionId = ocSession.id;
+    } catch (err: any) {
+      await transitionJob(jobId, "failed", {
+        errorMessage: `Failed to create OpenCode session: ${err.message}`,
+      });
+      return;
+    }
+
+    // Record session in CODEDB
+    await repo.createSession({
+      jobId,
+      opencodeSessionId: ocSessionId,
+      agentRole: "coding-orchestrator",
+    });
+
+    await repo.createAuditEvent({
+      eventType: "session_created",
+      entityType: "job",
+      entityId: jobId,
+      details: { opencodeSessionId: ocSessionId },
+    });
+
+    // ── Steps 3-6: Execute agent phases ────────────────────────────────
+    const phaseMap: { stepName: string; jobStatus: JobStatus }[] = [
+      { stepName: "planning", jobStatus: "planning" },
+      { stepName: "building", jobStatus: "building" },
+      { stepName: "reviewing", jobStatus: "reviewing" },
+      { stepName: "testing", jobStatus: "testing" },
+      { stepName: "governance_check", jobStatus: "governance_check" },
+    ];
+
+    for (const phase of phaseMap) {
+      // Check if job was cancelled mid-execution
+      const currentJob = await repo.getJobById(jobId);
+      if (!currentJob || currentJob.status === "cancelled") return;
+
+      await transitionJob(jobId, phase.jobStatus);
+      const step = steps.find((s: any) => s.stepName === phase.stepName);
+      if (step) await repo.updateJobStep(step.id, { status: "in_progress" });
+
+      try {
+        const prompt = buildPhasePrompt(job, phase.stepName);
+        await ocClient.sendMessage(ocSessionId, prompt);
+        if (step) await repo.updateJobStep(step.id, { status: "completed" });
+      } catch (err: any) {
+        if (step)
+          await repo.updateJobStep(step.id, { status: "failed", output: err.message });
+        await transitionJob(jobId, "failed", {
+          errorMessage: `${phase.stepName} failed: ${err.message}`,
+        });
+        return;
+      }
+    }
+
+    // ── Complete ──────────────────────────────────────────────────────
+    await transitionJob(jobId, "completed");
+
+    // Finalize workspace if one was created
+    if (job.repoId) {
+      try {
+        const ws = await getWorkspaceByJobId(jobId);
+        if (ws) await finalizeWorkspace(ws.id, "head", []);
+      } catch {
+        /* non-fatal */
+      }
+    }
+
+    // Build evidence bundle
+    try {
+      await buildEvidenceBundle(jobId);
+    } catch {
+      /* non-fatal */
+    }
+
+    await repo.createAuditEvent({
+      eventType: "job_completed",
+      entityType: "job",
+      entityId: jobId,
+    });
+  } catch (err: any) {
+    // Catch-all: fail the job gracefully
+    try {
+      const currentJob = await repo.getJobById(jobId);
+      if (
+        currentJob &&
+        !["completed", "failed", "cancelled"].includes(currentJob.status)
+      ) {
+        await transitionJob(jobId, "failed", {
+          errorMessage: `Unexpected execution error: ${err.message}`,
+        });
+      }
+    } catch {
+      console.error(`[CodeStudio] Failed to mark job ${jobId} as failed:`, err);
+    }
+  }
 }

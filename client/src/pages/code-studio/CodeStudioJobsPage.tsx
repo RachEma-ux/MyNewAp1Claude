@@ -33,7 +33,7 @@ export default function CodeStudioJobsPage() {
   const [title, setTitle] = useState("");
   const [objective, setObjective] = useState("");
 
-  const jobsQuery = trpc.codeStudio.jobs.list.useQuery({});
+  const jobsQuery = trpc.codeStudio.jobs.list.useQuery({}, { refetchInterval: 5000 });
   const jobs = jobsQuery.data ?? [];
 
   const createMutation = trpc.codeStudio.jobs.create.useMutation({
