@@ -638,13 +638,21 @@ export async function executeJob(jobId: number): Promise<void> {
             output: stepOutput || { summary: "Phase completed via OpenCode", phase: phase.stepName },
           });
         } catch (err: any) {
-          // Phase send failed — mark step but continue pipeline
+          // Phase send failed — fail the job
           if (step)
             await repo.updateJobStep(step.id, {
-              status: "completed",
+              status: "failed",
               completedAt: new Date(),
-              output: { summary: `OpenCode error (non-fatal): ${err.message}`, phase: phase.stepName },
+              output: { summary: `OpenCode error: ${err.message}`, phase: phase.stepName },
             });
+          await transitionJob(jobId, "failed");
+          await repo.createAuditEvent({
+            eventType: "execution_failed",
+            entityType: "job",
+            entityId: jobId,
+            details: { phase: phase.stepName, error: err.message },
+          });
+          return;
         }
       } else {
         // No OpenCode — complete step locally
