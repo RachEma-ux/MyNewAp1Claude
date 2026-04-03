@@ -468,34 +468,53 @@ const templatesRouter = router({
 
 const ideRouter = router({
   openForJob: protectedProcedure.input(openIdeForJobSchema).mutation(async ({ input }) => {
+    // Check for a running OpenCode runtime (e.g. from CI deploy or manual start)
+    const runtimeUrl = process.env.OPENCODE_URL || "http://127.0.0.1:4096";
     try {
-      const result = await ideMgr.openForJob(input.jobId);
-      return {
-        instanceId: result.instance.id,
-        proxyUrl: result.proxyUrl,
-        status: result.instance.status,
-        port: result.instance.port,
-        isReused: result.isReused,
-        workspacePath: result.instance.workspacePath,
-      };
-    } catch (err: any) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "IDE launch failed" });
-    }
+      const health = await fetch(`${runtimeUrl}/global/health`, { signal: AbortSignal.timeout(2000) });
+      if (health.ok) {
+        return {
+          instanceId: 0,
+          proxyUrl: runtimeUrl,
+          directUrl: runtimeUrl,
+          status: "running" as const,
+          port: Number(new URL(runtimeUrl).port),
+          isReused: true,
+          workspacePath: process.cwd(),
+        };
+      }
+    } catch { /* not available */ }
+
+    // On Termux/proot, Bun's listen() cannot bind ports so spawning fails.
+    // Give a clear error instead of a broken white page.
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "OpenCode Web IDE is not available. The OpenCode runtime is not running. "
+        + "On Termux/Android, start it manually with: opencode serve --port 4096",
+    });
   }),
   openForSession: protectedProcedure.input(openIdeForSessionSchema).mutation(async ({ input }) => {
+    const runtimeUrl = process.env.OPENCODE_URL || "http://127.0.0.1:4096";
     try {
-      const result = await ideMgr.openForSession(input.sessionId);
-      return {
-        instanceId: result.instance.id,
-        proxyUrl: result.proxyUrl,
-        status: result.instance.status,
-        port: result.instance.port,
-        isReused: result.isReused,
-        workspacePath: result.instance.workspacePath,
-      };
-    } catch (err: any) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "IDE launch failed" });
-    }
+      const health = await fetch(`${runtimeUrl}/global/health`, { signal: AbortSignal.timeout(2000) });
+      if (health.ok) {
+        return {
+          instanceId: 0,
+          proxyUrl: runtimeUrl,
+          directUrl: runtimeUrl,
+          status: "running" as const,
+          port: Number(new URL(runtimeUrl).port),
+          isReused: true,
+          workspacePath: process.cwd(),
+        };
+      }
+    } catch { /* not available */ }
+
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "OpenCode Web IDE is not available. The OpenCode runtime is not running. "
+        + "On Termux/Android, start it manually with: opencode serve --port 4096",
+    });
   }),
   getStatus: protectedProcedure.input(ideInstanceStatusSchema).query(async ({ input }) => {
     const status = await ideMgr.getInstanceStatus(input.instanceId);
