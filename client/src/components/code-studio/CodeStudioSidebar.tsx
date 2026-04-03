@@ -74,9 +74,16 @@ function SidebarActions({ collapsed }: { collapsed: boolean }) {
       setTimeout(() => setJustStarted(false), 15000);
     },
   });
+  const stopOllama = trpc.codeStudio.ollama.stop.useMutation({
+    onSettled: () => {
+      setJustStarted(true);
+      ollamaStatus.refetch();
+      setTimeout(() => setJustStarted(false), 10000);
+    },
+  });
 
   const isRunning = ollamaStatus.data?.running ?? false;
-  const isStarting = startOllama.isPending;
+  const isBusy = startOllama.isPending || stopOllama.isPending;
 
   return (
     <div className={cn("border-t mt-2 pt-2 space-y-0.5", collapsed ? "" : "mx-1")}>
@@ -92,29 +99,33 @@ function SidebarActions({ collapsed }: { collapsed: boolean }) {
         {!collapsed && <span className="truncate">Open IDE</span>}
       </button>
       <button
-        onClick={() => { if (!isRunning && !isStarting) startOllama.mutate(); }}
-        title={isRunning ? "Ollama running" : isStarting ? "Starting Ollama..." : "Start Ollama"}
+        onClick={() => {
+          if (isBusy) return;
+          if (isRunning) stopOllama.mutate();
+          else startOllama.mutate();
+        }}
+        title={isRunning ? "Stop Ollama" : isBusy ? "Please wait..." : "Start Ollama"}
         className={cn(
           "flex items-center w-full rounded-sm transition-colors",
           isRunning
-            ? "text-green-500 hover:text-green-400 hover:bg-green-500/10"
-            : isStarting
+            ? "text-green-500 hover:text-red-400 hover:bg-red-500/10"
+            : isBusy
               ? "text-orange-400 hover:bg-orange-500/10"
               : "text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10",
           collapsed ? "justify-center py-1.5" : "gap-2 px-3 py-1.5 text-xs font-medium"
         )}
       >
-        {isStarting ? (
+        {isBusy ? (
           <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-orange-400" />
         ) : (
           <Server className={cn("h-3.5 w-3.5 shrink-0", isRunning && "text-green-500")} />
         )}
         {!collapsed && (
           <span className="truncate flex-1 text-left">
-            {isStarting ? "Starting..." : isRunning ? "Ollama" : "Start Ollama"}
+            {isBusy ? (startOllama.isPending ? "Starting..." : "Stopping...") : isRunning ? "Ollama" : "Start Ollama"}
           </span>
         )}
-        {!collapsed && isRunning && (
+        {!collapsed && isRunning && !isBusy && (
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
         )}
       </button>

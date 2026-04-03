@@ -604,6 +604,32 @@ const ollamaRouter = router({
 
     return { started: false, message: "Ollama process spawned but not responding after 15s" };
   }),
+  stop: protectedProcedure.mutation(async () => {
+    // Check if running first
+    try {
+      const res = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(2000) });
+      if (!res.ok) return { stopped: true, message: "Ollama was not running" };
+    } catch {
+      return { stopped: true, message: "Ollama was not running" };
+    }
+
+    const { execSync } = await import("child_process");
+    try {
+      execSync("pkill -f 'ollama serve'", { timeout: 5000, stdio: "ignore" });
+    } catch { /* pkill returns non-zero if no process found */ }
+
+    // Wait for it to stop
+    for (let i = 0; i < 5; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      try {
+        await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(500) });
+      } catch {
+        return { stopped: true, message: "Ollama stopped" };
+      }
+    }
+
+    return { stopped: false, message: "Ollama still responding after kill attempt" };
+  }),
 });
 
 // ── Compose Main Router ──────────────────────────────────────────────────────
