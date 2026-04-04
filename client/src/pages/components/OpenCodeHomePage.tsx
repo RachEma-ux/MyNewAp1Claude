@@ -703,29 +703,103 @@ const SOURCE_CODE = `<!-- OpenCode Home — Architecture Summary -->
   </Switch>
 </div>
 
-<!-- ═══ TRANSITIONS ═══ -->
+<!-- ═══ TRANSITIONS (all implemented) ═══ -->
 
-Sidebar open/close:     transition-[left] 200ms cubic-bezier(0.22,1,0.36,1)
-Peek panel in:          opacity+translate 180ms ease-out
-Peek panel out:         opacity+translate 120ms ease-in
-Mobile drawer:          transform 200ms ease-out
-Mobile overlay:         opacity 200ms
-Project tile:           transition-colors (border)
-Session side panel:     width 240ms cubic-bezier(0.22,1,0.36,1)
-HoverCard:              openDelay=0 closeDelay=0
-Resize:                 no transition during sizing
+/* Peek panel — always rendered, never unmounted.
+   Uses opacity + translateX toggle with separate in/out easings.
+   lastPeekId keeps panel content during fade-out. */
+
+peek-panel {
+  opacity:        hovered ? 1 : 0;
+  transform:      hovered ? translateX(0) : translateX(-8px);
+  pointer-events: hovered ? auto : none;
+  transition:     hovered
+    ? "opacity 180ms ease-out, transform 180ms ease-out"   /* IN  */
+    : "opacity 120ms ease-in,  transform 120ms ease-in";   /* OUT */
+}
+
+/* Mobile overlay — always rendered, opacity toggle */
+drawer-overlay {
+  opacity:        drawerOpen ? 1 : 0;
+  pointer-events: drawerOpen ? auto : none;
+  transition:     opacity 200ms;
+}
+
+/* Mobile drawer — always rendered, translateX toggle */
+drawer-nav {
+  transform:  drawerOpen ? translateX(0) : translateX(-100%);
+  transition: transform 200ms ease-out;
+}
+
+/* Project tile border */
+project-avatar {
+  transition: border-color 150ms, background-color 150ms;
+}
+
+/* Session item hover */
+session-row {
+  transition: background 100ms;
+}
+
+/* New session / session card hover */
+button, .session-item {
+  transition: background 150ms;
+}
+
+/* Archive button — Tailwind group-hover reveal */
+.archive { @apply opacity-0 group-hover:opacity-100 transition-opacity; }
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { animation: spin 800ms linear infinite; }
+
+/* Reduced motion — kills all transitions + animations */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}
+
+/* Full transition table:
+   Element              | Duration | Easing                          | Property
+   ─────────────────────┼──────────┼─────────────────────────────────┼─────────────────
+   Sidebar open/close   | 200ms    | cubic-bezier(0.22,1,0.36,1)    | left
+   Peek panel IN        | 180ms    | ease-out                        | opacity, transform
+   Peek panel OUT       | 120ms    | ease-in                         | opacity, transform
+   Mobile drawer        | 200ms    | ease-out                        | transform
+   Mobile overlay       | 200ms    | linear                          | opacity
+   Project tile         | 150ms    | linear                          | border-color, bg
+   Session row hover    | 100ms    | linear                          | background
+   Button hover         | 150ms    | linear                          | background
+   Archive reveal       | default  | Tailwind                        | opacity
+   Spinner              | 800ms    | linear infinite                 | rotate
+   Session side panel   | 240ms    | cubic-bezier(0.22,1,0.36,1)    | width
+   HoverCard            | 0ms      | instant                         | openDelay/closeDelay
+   Resize               | 0ms      | disabled during state.sizing    | —
+   reduced-motion       | 0ms      | forced                          | all
+*/
 
 <!-- ═══ HOVER-PEEK SYSTEM ═══ -->
 
+/* Key insight: peek panel is NEVER unmounted.
+   It stays in DOM with opacity:0 + pointer-events:none.
+   This allows CSS out-transition to play (120ms ease-in).
+   lastPeekId remembers which project was peeked so content
+   persists during fade-out instead of going blank. */
+
 createAim({
   enabled: () => !sidebar.opened() && !isTouch(),
-  onActivate: (dir) => { setHoverProject(dir) }
+  onActivate: (dir) => {
+    setHoverProject(dir)       // triggers peek IN  (180ms)
+  }
 })
 
-arm():    300ms timeout → clear hoverProject
-disarm(): cancel timeout
-mouseEnter nav → disarm()
-mouseLeave nav → arm()
+arm():    300ms timeout → setHoverProject(null)  // triggers peek OUT (120ms)
+disarm(): clearTimeout                            // cancels close
+
+mouseEnter nav       → disarm()
+mouseLeave nav       → arm()
 peek panel mouseEnter → disarm()
 peek panel mouseLeave → arm()
 
