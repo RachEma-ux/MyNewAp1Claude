@@ -305,6 +305,11 @@ export default function CodeStudioJobsPage() {
               </div>
               <div className="flex items-center gap-2 mt-1.5 text-[9px] text-muted-foreground">
                 <span>#{j.id}</span>
+                {j.providerName && (
+                  <Badge variant="outline" className="text-[8px] px-1 py-0 font-normal text-sky-400 border-sky-400/30">
+                    {j.providerName}{j.modelId ? `/${j.modelId}` : ""}
+                  </Badge>
+                )}
                 {j.priority && <span className="uppercase">{j.priority}</span>}
                 {j.createdAt && <span>{new Date(j.createdAt).toLocaleDateString()}</span>}
               </div>

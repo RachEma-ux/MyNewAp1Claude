@@ -617,6 +617,18 @@ export async function executeJob(jobId: number): Promise<void> {
           // unresponsive to other requests until this completes.
           const response = await ocClient.sendMessage(ocSessionId, prompt);
 
+          // Capture provider/model from the first response
+          const modelInfo = response?.info?.model;
+          if (modelInfo?.providerID || modelInfo?.modelID) {
+            const currentJobState = await repo.getJobById(jobId);
+            if (currentJobState && !currentJobState.providerName) {
+              await repo.updateJob(jobId, {
+                providerName: modelInfo.providerID || null,
+                modelId: modelInfo.modelID || null,
+              });
+            }
+          }
+
           // Check for provider errors inside the response (HTTP 200 but no output)
           const providerError = response?.info?.error;
           if (providerError) {

@@ -108,6 +108,8 @@ export const codeJobs = pgTable(
     sourceModule: varchar("source_module", { length: 50 }),
     sourceWorkflowId: varchar("source_workflow_id", { length: 100 }),
     actorUserId: integer("actor_user_id"),
+    providerName: varchar("provider_name", { length: 60 }),
+    modelId: varchar("model_id", { length: 120 }),
     resultSummary: jsonb("result_summary"),
     errorMessage: text("error_message"),
     startedAt: timestamp("started_at"),

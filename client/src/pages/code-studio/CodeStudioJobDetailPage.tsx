@@ -359,6 +359,11 @@ export default function CodeStudioJobDetailPage() {
         <Badge variant="outline" className={`text-[9px] ${STATUS_COLORS[job.status] || ""}`}>
           {job.status?.replace(/_/g, " ")}
         </Badge>
+        {job.providerName && (
+          <Badge variant="outline" className="text-[8px] px-1 py-0 font-normal text-sky-400 border-sky-400/30">
+            {job.providerName}{job.modelId ? `/${job.modelId}` : ""}
+          </Badge>
+        )}
         {activeStep && (
           <span className="flex items-center gap-1.5 text-blue-400">
             <Loader2 className="h-3 w-3 animate-spin" />
