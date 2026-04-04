@@ -17,6 +17,10 @@ import * as path from "path";
 const AUTH_JSON_PATH = process.env.OPENCODE_AUTH_PATH
   || path.join(process.env.HOME || "/home", ".local/share/opencode/auth.json");
 
+// On Termux, proot bind-mounts oc-local over ~/.local — write auth.json there too
+const PROOT_AUTH_JSON_PATH = "/data/data/com.termux/files/usr/tmp/oc-local/share/opencode/auth.json";
+const IS_TERMUX = fs.existsSync("/data/data/com.termux");
+
 // Map app provider types to OpenCode provider IDs
 const PROVIDER_MAP: Record<string, string> = {
   openai: "openai",
@@ -46,7 +50,7 @@ export async function syncProviderKeysToOpenCode(): Promise<{
   const errors: string[] = [];
 
   try {
-    const { getDb } = await import("../../_core/db");
+    const { getDb } = await import("../../db");
     const db = getDb();
     const rows = await db.execute(
       `SELECT type, config::text FROM providers WHERE enabled = true`
@@ -77,11 +81,24 @@ export async function syncProviderKeysToOpenCode(): Promise<{
     }
 
     // Write auth.json (used by CLI/TUI mode)
+    const authContent = JSON.stringify(auth, null, 2);
     const dir = path.dirname(AUTH_JSON_PATH);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(AUTH_JSON_PATH, JSON.stringify(auth, null, 2), "utf-8");
+    fs.writeFileSync(AUTH_JSON_PATH, authContent, "utf-8");
+
+    // On Termux, also write to the proot bind-mounted overlay so OpenCode
+    // running inside proot can read the keys (real ~/.local is SELinux-blocked)
+    if (IS_TERMUX) {
+      try {
+        const prootDir = path.dirname(PROOT_AUTH_JSON_PATH);
+        if (!fs.existsSync(prootDir)) {
+          fs.mkdirSync(prootDir, { recursive: true });
+        }
+        fs.writeFileSync(PROOT_AUTH_JSON_PATH, authContent, "utf-8");
+      } catch { /* proot overlay not available — keys still set via env vars */ }
+    }
 
     // Also set env vars on the current process so that any OpenCode serve
     // instance spawned from here inherits the latest keys without restart.

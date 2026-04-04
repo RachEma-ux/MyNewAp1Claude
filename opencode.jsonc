@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "logLevel": "INFO",
   "provider": {
     "openai": {
       "models": {
@@ -18,9 +19,24 @@
       }
     }
   },
-  "model": "openai/gpt-5.4-mini",
-  "small_model": "openai/gpt-5.4-mini",
-  "default_agent": "planner",
+  "model": "ollama/phi3",
+  "small_model": "ollama/tinyllama",
+  "default_agent": "build",
+  "share": "manual",
+  "snapshot": true,
+  "autoupdate": true,
+  "server": {
+    "cors": [],
+    "mdns": false,
+    "port": 4096,
+    "hostname": "127.0.0.1",
+    "mdnsDomain": "opencode.local"
+  },
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 10000
+  },
   "instructions": [
     "AGENTS.md",
     "CLAUDE.md",
@@ -36,7 +52,6 @@
         "*.log",
         "drizzle/meta"
       ]
-    },
-    "compaction": true
+    }
   }
 }
