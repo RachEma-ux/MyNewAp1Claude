@@ -41,7 +41,8 @@ if (ENV.isProduction) {
 }
 
 // SECURITY: Hard block DEV_MODE in production — auth bypass must never run in production
-if (ENV.isDevMode && ENV.isProduction) {
+// Exception: CI/CD deploys can set ALLOW_DEV_MODE_IN_PROD=true for tunnel testing
+if (ENV.isDevMode && ENV.isProduction && process.env.ALLOW_DEV_MODE_IN_PROD !== "true") {
   throw new Error(
     "[FATAL] DEV_MODE=true is not allowed when NODE_ENV=production. " +
     "This combination bypasses all authentication. " +
