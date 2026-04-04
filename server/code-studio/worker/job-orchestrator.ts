@@ -617,14 +617,18 @@ export async function executeJob(jobId: number): Promise<void> {
           // unresponsive to other requests until this completes.
           const response = await ocClient.sendMessage(ocSessionId, prompt);
 
-          // Capture provider/model from the first response
+          // Capture provider/model from the first response.
+          // Assistant messages have providerID/modelID flat on info,
+          // while user messages nest them under info.model.
           const modelInfo = response?.info?.model;
-          if (modelInfo?.providerID || modelInfo?.modelID) {
+          const providerID = modelInfo?.providerID || response?.info?.providerID;
+          const modelID = modelInfo?.modelID || response?.info?.modelID;
+          if (providerID || modelID) {
             const currentJobState = await repo.getJobById(jobId);
             if (currentJobState && !currentJobState.providerName) {
               await repo.updateJob(jobId, {
-                providerName: modelInfo.providerID || null,
-                modelId: modelInfo.modelID || null,
+                providerName: providerID || null,
+                modelId: modelID || null,
               });
             }
           }
