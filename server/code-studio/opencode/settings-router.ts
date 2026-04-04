@@ -250,6 +250,20 @@ const applyRouter = router({
         }
       }
 
+      // 4c. Restart running OpenCode instances to pick up new config
+      if (isRuntime && applyStatus !== "failed") {
+        try {
+          const { restartAllInstances } = await import("./web-instance-manager.js");
+          const restartResult = await restartAllInstances();
+          if (restartResult.failed > 0) {
+            console.warn(`[OpenCode] ${restartResult.failed} instance(s) failed to restart`);
+          }
+        } catch (restartErr: any) {
+          // Non-fatal: config is saved on disk; next IDE open will use it
+          console.warn(`[OpenCode] Instance restart after apply failed:`, restartErr.message);
+        }
+      }
+
       // 5. Mark profile applied
       await settingsRepo.markProfileApplied(input.profileId, version.version, draft);
 

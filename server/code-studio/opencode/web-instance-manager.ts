@@ -17,6 +17,7 @@
 import { spawn, execFileSync, type ChildProcess } from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs";
+import * as path from "path";
 import * as repo from "../repository";
 import { getWorkspaceByJobId } from "../worker/workspace-manager";
 import {
@@ -206,6 +207,16 @@ async function startOpenCodeWeb(
   // Inject provider API keys from the app DB so OpenCode can use them
   await injectProviderKeys(env);
 
+  // Inject current config so OpenCode reads settings from env (not stale file)
+  try {
+    const configPath = path.join(process.cwd(), "opencode.jsonc");
+    if (fs.existsSync(configPath)) {
+      const raw = fs.readFileSync(configPath, "utf-8");
+      const stripped = raw.replace(/\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1");
+      env.OPENCODE_CONFIG_CONTENT = stripped;
+    }
+  } catch { /* config read failed — OpenCode will use its defaults */ }
+
   if (password) {
     env.OPENCODE_SERVER_PASSWORD = password;
   }
@@ -226,6 +237,7 @@ async function startOpenCodeWeb(
       "-b", "/proc:/proc",
       "-b", `${process.env.HOME || "/data/data/com.termux/files/home"}:/home`,
       "-b", "/data/data/com.termux/files/usr/tmp:/tmp",
+      "-b", "/data/data/com.termux/files/usr/tmp/oc-local:/data/data/com.termux/files/home/.local",
       "-w", workspacePath,
       OPENCODE_BINARY_PATH,
       ...ocArgs,
@@ -434,4 +446,75 @@ export async function expireStaleInstances(): Promise<number> {
     }
   }
   return expired;
+}
+
+/**
+ * Restart all running OpenCode instances to pick up new config.
+ * Called after settings are applied so the IDE reflects the latest configuration.
+ */
+export async function restartAllInstances(): Promise<{ restarted: number; failed: number }> {
+  const running = await repo.listIdeInstances({ status: "running" });
+  let restarted = 0;
+  let failed = 0;
+
+  for (const inst of running) {
+    try {
+      // Kill existing process
+      const proc = liveProcesses.get(inst.id);
+      if (proc && proc.exitCode === null) {
+        proc.kill("SIGTERM");
+      }
+      liveProcesses.delete(inst.id);
+
+      // Brief wait for process to terminate
+      await new Promise((r) => setTimeout(r, 1500));
+
+      // Restart on same port with same workspace
+      const child = await startOpenCodeWeb(inst.workspacePath, inst.port);
+      liveProcesses.set(inst.id, child);
+
+      child.on("exit", async (code) => {
+        liveProcesses.delete(inst.id);
+        try {
+          await repo.updateIdeInstance(inst.id, {
+            status: "stopped",
+            closedAt: new Date(),
+            errorMessage: code !== 0 ? `Process exited with code ${code}` : null,
+          });
+        } catch { /* non-fatal */ }
+      });
+
+      child.on("error", async (err) => {
+        liveProcesses.delete(inst.id);
+        try {
+          await repo.updateIdeInstance(inst.id, {
+            status: "failed",
+            closedAt: new Date(),
+            errorMessage: err.message,
+          });
+        } catch { /* non-fatal */ }
+      });
+
+      await repo.updateIdeInstance(inst.id, {
+        processId: child.pid || null,
+        status: "running",
+        lastAccessedAt: new Date(),
+      });
+
+      restarted++;
+    } catch (err: any) {
+      await repo.updateIdeInstance(inst.id, {
+        status: "failed",
+        closedAt: new Date(),
+        errorMessage: `Restart failed: ${err.message}`,
+      });
+      failed++;
+    }
+  }
+
+  if (restarted > 0) {
+    console.log(`[OpenCode] Restarted ${restarted} instance(s) with new config`);
+  }
+
+  return { restarted, failed };
 }

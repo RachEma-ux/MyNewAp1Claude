@@ -57,8 +57,8 @@ export default function CodeStudioJobsPage() {
   const templatesQuery = trpc.codeStudio.templates.list.useQuery({});
   const templates = templatesQuery.data ?? [];
 
-  const providersQuery = trpc.providers.list.useQuery({ enabledOnly: true });
-  const workspacesQuery = trpc.workspaces.list.useQuery({});
+  const providersQuery = trpc.providers.list.useQuery({ enabledOnly: true }, { enabled: showModelConfig });
+  const workspacesQuery = trpc.workspaces.list.useQuery(undefined as any, { enabled: showModelConfig });
   const workspaces = workspacesQuery.data ?? [];
 
   // Build flat model options list from enabled providers
@@ -438,11 +438,15 @@ export default function CodeStudioJobsPage() {
               </div>
               <div className="flex items-center gap-2 mt-1.5 text-[9px] text-muted-foreground">
                 <span>#{j.id}</span>
-                {j.providerName && (
+                {j.providerName ? (
                   <Badge variant="outline" className="text-[8px] px-1 py-0 font-normal text-sky-400 border-sky-400/30">
                     {j.providerName}{j.modelId ? `/${j.modelId}` : ""}
                   </Badge>
-                )}
+                ) : j.requestedModel ? (
+                  <Badge variant="outline" className="text-[8px] px-1 py-0 font-normal text-muted-foreground border-muted-foreground/30">
+                    {j.requestedModel}
+                  </Badge>
+                ) : null}
                 {j.priority && <span className="uppercase">{j.priority}</span>}
                 {j.createdAt && <span>{new Date(j.createdAt).toLocaleDateString()}</span>}
               </div>

@@ -18,6 +18,7 @@ export async function createJob(data: {
   sourceModule?: string;
   sourceWorkflowId?: string;
   actorUserId?: number;
+  requestedModel?: string;
 }) {
   const db = getCodeDb();
   if (!db) throw new Error("CODEDB unavailable");
