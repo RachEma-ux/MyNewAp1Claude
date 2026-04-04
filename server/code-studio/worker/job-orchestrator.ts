@@ -485,19 +485,24 @@ function buildPhasePrompt(job: any, phase: string): string {
     ? `\nConstraints: ${JSON.stringify(job.constraints)}`
     : "";
 
+  // IMPORTANT: Prompts must NOT trigger tool use (file reads, bash, etc.)
+  // OpenCode (Bun inside proot) crashes under sustained tool-call I/O.
+  // All prompts ask for text-only analysis based on the objective description.
+  const noTools = "IMPORTANT: Respond with text only. Do NOT use any tools, do NOT read files, do NOT run commands. Base your response entirely on the objective description provided.";
+
   switch (phase) {
     case "planning":
-      return `You are the Planner agent for Code Studio Job #${job.id}.\n\nObjective: ${objective}${constraints}\n\nAnalyze the codebase and produce a detailed implementation plan. List files to modify, approach, risks, and validation steps.`;
+      return `You are the Planner agent for Code Studio Job #${job.id}.\n\n${noTools}\n\nObjective: ${objective}${constraints}\n\nProduce a detailed implementation plan. List likely files to modify, approach, risks, and validation steps. Respond in markdown.`;
     case "building":
-      return `You are the Builder agent for Code Studio Job #${job.id}.\n\nObjective: ${objective}${constraints}\n\nImplement the planned changes. Follow existing patterns and conventions.`;
+      return `You are the Builder agent for Code Studio Job #${job.id}.\n\n${noTools}\n\nObjective: ${objective}${constraints}\n\nDescribe what code changes would be needed to implement this. Include pseudo-code or code snippets where helpful. Respond in markdown.`;
     case "reviewing":
-      return `You are the Reviewer agent for Code Studio Job #${job.id}.\n\nObjective: ${objective}\n\nReview all changes for correctness, security, and adherence to project conventions. Report any issues.`;
+      return `You are the Reviewer agent for Code Studio Job #${job.id}.\n\n${noTools}\n\nObjective: ${objective}\n\nReview the implementation approach for correctness, security, and adherence to common conventions. List any potential issues. Respond in markdown.`;
     case "testing":
-      return `You are the Tester agent for Code Studio Job #${job.id}.\n\nObjective: ${objective}\n\nRun relevant tests and verify the implementation meets the objective. Report pass/fail status.`;
+      return `You are the Tester agent for Code Studio Job #${job.id}.\n\n${noTools}\n\nObjective: ${objective}\n\nDescribe how to test this implementation. List test cases for the critical path and edge cases. Respond in markdown.`;
     case "governance_check":
-      return `You are the Governance agent for Code Studio Job #${job.id}.\n\nObjective: ${objective}\n\nVerify changes comply with project policies, security requirements, and coding standards.`;
+      return `You are the Governance agent for Code Studio Job #${job.id}.\n\n${noTools}\n\nObjective: ${objective}\n\nCheck if this implementation approach complies with common project policies, security requirements, and coding standards. Respond in markdown.`;
     default:
-      return `Execute phase: ${phase}\n\nObjective: ${objective}`;
+      return `${noTools}\n\nExecute phase: ${phase}\n\nObjective: ${objective}`;
   }
 }
 
