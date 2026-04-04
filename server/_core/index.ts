@@ -767,8 +767,20 @@ async function startServer() {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
-  server.listen(port, () => {
+  server.listen(port, async () => {
     console.log(`Server running on http://localhost:${port}/`);
+
+    // Sync provider API keys to OpenCode auth.json
+    try {
+      const { syncProviderKeysToOpenCode } = await import("../code-studio/opencode/provider-sync");
+      const result = await syncProviderKeysToOpenCode();
+      if (result.synced.length > 0) {
+        console.log(`[OpenCode] Synced provider keys: ${result.synced.join(", ")}`);
+      }
+      if (result.errors.length > 0) {
+        console.log(`[OpenCode] Sync errors: ${result.errors.join(", ")}`);
+      }
+    } catch { /* non-fatal */ }
   });
 }
 

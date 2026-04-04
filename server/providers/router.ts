@@ -143,6 +143,12 @@ export const providerRouter = router({
         updatedAt: provider.updatedAt,
       });
 
+      // Sync provider keys to OpenCode auth.json
+      try {
+        const { syncProviderKeysToOpenCode } = await import("../code-studio/opencode/provider-sync");
+        await syncProviderKeysToOpenCode();
+      } catch { /* non-fatal */ }
+
       // Auto-discover models from the provider and persist them
       try {
         let discoveredModels: string[] = [];
@@ -209,6 +215,12 @@ export const providerRouter = router({
 
       // Update in database
       await providerDb.updateProvider(id, data);
+
+      // Sync provider keys to OpenCode auth.json
+      try {
+        const { syncProviderKeysToOpenCode } = await import("../code-studio/opencode/provider-sync");
+        await syncProviderKeysToOpenCode();
+      } catch { /* non-fatal */ }
 
       // Update in registry if config changed and provider is registered
       if (data.config) {
