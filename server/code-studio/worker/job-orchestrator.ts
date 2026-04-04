@@ -11,6 +11,7 @@ import { JOB_STATUS_TRANSITIONS, type JobStatus, type AgentRole } from "../share
 import * as repo from "../repository";
 import * as ocClient from "../opencode/client";
 import { prepareWorkspace, finalizeWorkspace, getWorkspaceByJobId } from "./workspace-manager";
+import { resolveModelForPhase, type JobModelContext, type ConfigurablePhase } from "./phase-model-resolver";
 
 export class JobOrchestrationError extends Error {
   constructor(message: string, public jobId: number, public phase?: string) {
@@ -598,6 +599,15 @@ export async function executeJob(jobId: number): Promise<void> {
       { stepName: "governance_check", jobStatus: "governance_check" },
     ];
 
+    // Build model resolution context from job config
+    const jobConstraints = (job.constraints || {}) as Record<string, any>;
+    const modelContext: JobModelContext = {
+      requestedModel: job.requestedModel || null,
+      phaseModels: jobConstraints.__phaseModels || null,
+      workspaceId: jobConstraints.__routingConfig?.workspaceId || null,
+      useWorkspaceRouting: jobConstraints.__routingConfig?.useWorkspaceRouting || false,
+    };
+
     for (const phase of phaseMap) {
       // Check if job was cancelled mid-execution
       const currentJob = await repo.getJobById(jobId);
@@ -612,25 +622,31 @@ export async function executeJob(jobId: number): Promise<void> {
         try {
           const prompt = buildPhasePrompt(job, phase.stepName);
 
+          // Resolve which model to use for this phase (4-tier fallback)
+          const resolved = await resolveModelForPhase(
+            phase.stepName as ConfigurablePhase,
+            modelContext,
+            prompt,
+          );
+
           // OpenCode blocks during LLM execution (single-threaded Bun server).
-          // Use synchronous send with 10-minute timeout. The server will be
-          // unresponsive to other requests until this completes.
+          // Use synchronous send with 10-minute timeout.
           const response = await ocClient.sendMessage(ocSessionId, prompt, {
-            model: job.requestedModel || undefined,
+            model: resolved.model,
           });
 
-          // Capture provider/model from the first response.
-          // Assistant messages have providerID/modelID flat on info,
-          // while user messages nest them under info.model.
+          // Capture actual provider/model from OpenCode response
           const modelInfo = response?.info?.model;
-          const providerID = modelInfo?.providerID || response?.info?.providerID;
-          const modelID = modelInfo?.modelID || response?.info?.modelID;
-          if (providerID || modelID) {
+          const actualProvider = modelInfo?.providerID || response?.info?.providerID;
+          const actualModel = modelInfo?.modelID || response?.info?.modelID;
+
+          // Update job-level provider/model on first response (backward compat)
+          if (actualProvider || actualModel) {
             const currentJobState = await repo.getJobById(jobId);
             if (currentJobState && !currentJobState.providerName) {
               await repo.updateJob(jobId, {
-                providerName: providerID || null,
-                modelId: modelID || null,
+                providerName: actualProvider || null,
+                modelId: actualModel || null,
               });
             }
           }
@@ -655,12 +671,17 @@ export async function executeJob(jobId: number): Promise<void> {
             return;
           }
 
-          // Extract output directly from the response (no race condition)
+          // Extract output and include model resolution metadata per step
           const stepOutput = extractOutputFromResponse(response);
           if (step) await repo.updateJobStep(step.id, {
             status: "completed",
             completedAt: new Date(),
-            output: stepOutput || { summary: "Phase completed via OpenCode", phase: phase.stepName },
+            output: {
+              ...(stepOutput || { summary: "Phase completed via OpenCode", phase: phase.stepName }),
+              resolvedModel: actualModel || resolved.model || null,
+              resolvedProvider: actualProvider || resolved.provider || null,
+              routingSource: resolved.source,
+            },
           });
         } catch (err: any) {
           // Phase send failed — fail the job

@@ -20,8 +20,11 @@ function getEncryptionKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY;
 
   if (!key) {
-    if (process.env.NODE_ENV === "production" && process.env.DEV_MODE !== "true") {
-      throw new Error("[Encryption] ENCRYPTION_KEY is required in production. Set it in your environment variables.");
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "[Encryption] FATAL: ENCRYPTION_KEY is required in production. " +
+        "Set it in your environment variables. Generate one with: openssl rand -hex 32"
+      );
     }
     // Dev fallback: use a deterministic key so encrypted data survives restarts.
     // The fixed salt is intentional here — this is dev-only and MUST NOT run in production.

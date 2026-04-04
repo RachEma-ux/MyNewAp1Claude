@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Plus, Workflow, Trash2, FileStack, ArrowLeft, ArrowRight, Eye } from "lucide-react";
+import { Loader2, Plus, Workflow, Trash2, FileStack, ArrowLeft, ArrowRight, Eye, Settings2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -41,12 +43,34 @@ export default function CodeStudioJobsPage() {
   const [generatedTitle, setGeneratedTitle] = useState("");
   const [generatedObjective, setGeneratedObjective] = useState("");
   const [generatedConstraints, setGeneratedConstraints] = useState<any>(undefined);
+  const [defaultModel, setDefaultModel] = useState("");
+  const [perPhaseEnabled, setPerPhaseEnabled] = useState(false);
+  const [phaseModels, setPhaseModels] = useState<Record<string, string>>({
+    planning: "", building: "", reviewing: "", testing: "", governance_check: "",
+  });
+  const [showModelConfig, setShowModelConfig] = useState(false);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | undefined>();
 
   const jobsQuery = trpc.codeStudio.jobs.list.useQuery({}, { refetchInterval: 5000 });
   const jobs = jobsQuery.data ?? [];
 
   const templatesQuery = trpc.codeStudio.templates.list.useQuery({});
   const templates = templatesQuery.data ?? [];
+
+  const providersQuery = trpc.providers.list.useQuery({ enabledOnly: true });
+  const workspacesQuery = trpc.workspaces.list.useQuery({});
+  const workspaces = workspacesQuery.data ?? [];
+
+  // Build flat model options list from enabled providers
+  const modelOptions: { value: string; label: string; provider: string }[] = [];
+  (providersQuery.data ?? []).forEach((p: any) => {
+    const models = p.supportedModels || p.capabilities?.supportedModels || [];
+    if (models.length > 0) {
+      models.forEach((m: string) => modelOptions.push({ value: m, label: m, provider: p.name }));
+    } else {
+      modelOptions.push({ value: `${p.name}/default`, label: `${p.name} (default)`, provider: p.name });
+    }
+  });
 
   const generateDraftQuery = trpc.codeStudio.templates.generateJobDraft.useQuery(
     { templateId: selectedTemplate?.id ?? 0, variables: variableValues },
@@ -78,6 +102,11 @@ export default function CodeStudioJobsPage() {
     setGeneratedTitle("");
     setGeneratedObjective("");
     setGeneratedConstraints(undefined);
+    setDefaultModel("");
+    setPerPhaseEnabled(false);
+    setPhaseModels({ planning: "", building: "", reviewing: "", testing: "", governance_check: "" });
+    setShowModelConfig(false);
+    setSelectedWorkspaceId(undefined);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -119,9 +148,21 @@ export default function CodeStudioJobsPage() {
   };
 
   const handleCreateBlank = () => {
+    // Build per-phase models payload (only non-empty entries)
+    let phaseModelsPayload: Record<string, { model: string }> | undefined;
+    if (perPhaseEnabled) {
+      const entries = Object.entries(phaseModels).filter(([, v]) => v);
+      if (entries.length > 0) {
+        phaseModelsPayload = {};
+        entries.forEach(([k, v]) => { phaseModelsPayload![k] = { model: v }; });
+      }
+    }
     createMutation.mutate({
       title: title.trim(),
       objective: objective.trim() || undefined,
+      model: defaultModel || undefined,
+      phaseModels: phaseModelsPayload,
+      workspaceId: selectedWorkspaceId,
     });
   };
 
@@ -181,6 +222,98 @@ export default function CodeStudioJobsPage() {
                 </Button>
                 <Input className="h-8 text-xs" placeholder="Job title..." value={title} onChange={(e) => setTitle(e.target.value)} />
                 <Textarea className="text-xs h-20 resize-none" placeholder="Coding objective..." value={objective} onChange={(e) => setObjective(e.target.value)} />
+
+                {/* Model Configuration (collapsible) */}
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowModelConfig(!showModelConfig)}
+                >
+                  <Settings2 className="h-3 w-3" />
+                  Model Configuration
+                  <span className="text-[9px]">{showModelConfig ? "▾" : "▸"}</span>
+                </button>
+
+                {showModelConfig && (
+                  <div className="space-y-2.5 border rounded-md p-2.5 bg-muted/30">
+                    {/* Default model */}
+                    <div>
+                      <Label className="text-[10px]">Default Model</Label>
+                      <Select value={defaultModel} onValueChange={setDefaultModel}>
+                        <SelectTrigger className="h-7 text-[10px]">
+                          <SelectValue placeholder="Auto (OpenCode default)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {modelOptions.map((o) => (
+                            <SelectItem key={o.value} value={o.value} className="text-[10px]">
+                              <span className="text-muted-foreground">{o.provider}/</span>{o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Per-phase toggle */}
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px]">Configure per phase</Label>
+                      <Switch checked={perPhaseEnabled} onCheckedChange={setPerPhaseEnabled} className="scale-75" />
+                    </div>
+
+                    {/* Per-phase selectors */}
+                    {perPhaseEnabled && (
+                      <div className="space-y-1.5">
+                        {(["planning", "building", "reviewing", "testing", "governance_check"] as const).map((phase) => (
+                          <div key={phase} className="flex items-center gap-2">
+                            <span className="text-[9px] text-muted-foreground w-24 shrink-0 capitalize">
+                              {phase.replace("_", " ")}
+                            </span>
+                            <Select
+                              value={phaseModels[phase]}
+                              onValueChange={(v) => setPhaseModels((prev) => ({ ...prev, [phase]: v }))}
+                            >
+                              <SelectTrigger className="h-6 text-[9px] flex-1">
+                                <SelectValue placeholder="Inherit default" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {modelOptions.map((o) => (
+                                  <SelectItem key={o.value} value={o.value} className="text-[10px]">
+                                    <span className="text-muted-foreground">{o.provider}/</span>{o.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Workspace routing */}
+                    {workspaces.length > 0 && (
+                      <div>
+                        <Label className="text-[10px]">Workspace Routing</Label>
+                        <Select
+                          value={selectedWorkspaceId?.toString() ?? ""}
+                          onValueChange={(v) => setSelectedWorkspaceId(v ? Number(v) : undefined)}
+                        >
+                          <SelectTrigger className="h-7 text-[10px]">
+                            <SelectValue placeholder="None (no routing)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {workspaces.map((w: any) => (
+                              <SelectItem key={w.id} value={w.id.toString()} className="text-[10px]">
+                                {w.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[8px] text-muted-foreground mt-0.5">
+                          Uses workspace routing profile (quality tier, pinned provider, fallback chain)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Button size="sm" className="w-full text-xs" disabled={!title.trim() || createMutation.isPending} onClick={handleCreateBlank}>
                   {createMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />} Create
                 </Button>

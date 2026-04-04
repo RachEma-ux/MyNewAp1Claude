@@ -464,6 +464,16 @@ export default function CodeStudioJobDetailPage() {
                     <span className="font-mono text-[10px] text-muted-foreground">{s.stepOrder}.</span>
                     <span className={`font-medium ${isActive ? "text-blue-400" : ""}`}>{s.stepName?.replace(/_/g, " ")}</span>
                     {s.agentRole && <Badge variant="secondary" className="text-[8px] px-1">{s.agentRole}</Badge>}
+                    {s.output?.resolvedModel && (
+                      <Badge variant="outline" className="text-[8px] px-1 py-0 font-normal text-sky-400 border-sky-400/30">
+                        {s.output.resolvedProvider ? `${s.output.resolvedProvider}/` : ""}{s.output.resolvedModel}
+                      </Badge>
+                    )}
+                    {s.output?.routingSource && s.output.routingSource !== "opencode_default" && (
+                      <Badge variant="secondary" className="text-[7px] px-0.5 text-muted-foreground">
+                        {s.output.routingSource === "per_phase" ? "phase" : s.output.routingSource === "job_level" ? "job" : "routed"}
+                      </Badge>
+                    )}
                   </div>
                   <Badge variant="outline" className={`text-[9px] capitalize ${isActive ? "border-blue-500/30 text-blue-400" : ""}`}>{s.status}</Badge>
                 </div>

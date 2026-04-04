@@ -8,6 +8,11 @@ export const byIdSchema = z.object({ id: z.number().int().positive() });
 
 // ── Job Schemas ──────────────────────────────────────────────────────────────
 
+const phaseModelSchema = z
+  .object({ model: z.string().max(200) })
+  .nullable()
+  .optional();
+
 export const createJobSchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().optional(),
@@ -16,6 +21,18 @@ export const createJobSchema = z.object({
   priority: z.enum(["low", "normal", "high", "critical"]).optional(),
   repoId: z.number().int().positive().optional(),
   model: z.string().max(200).optional(), // e.g. "openai/gpt-5.3-chat-latest" or "ollama/phi3:latest"
+  // Per-phase model override (optional — falls back to job-level model)
+  phaseModels: z
+    .object({
+      planning: phaseModelSchema,
+      building: phaseModelSchema,
+      reviewing: phaseModelSchema,
+      testing: phaseModelSchema,
+      governance_check: phaseModelSchema,
+    })
+    .optional(),
+  // Workspace ID for unified routing integration
+  workspaceId: z.number().int().positive().optional(),
 });
 
 export const updateJobSchema = z.object({

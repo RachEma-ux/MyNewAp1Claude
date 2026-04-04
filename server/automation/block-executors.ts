@@ -89,38 +89,38 @@ export async function executeHttpRequest(node: any, context: ExecutionContext): 
 
 /**
  * Database Query Action Executor
- * Only allows SELECT queries to prevent destructive operations.
- * Uses parameterized queries via Drizzle's sql template tag.
+ * Uses a structured query descriptor instead of raw SQL to prevent injection.
+ * Only whitelisted tables can be queried; all values are parameterized.
  */
-const ALLOWED_SQL_PATTERN = /^\s*SELECT\s/i;
-const FORBIDDEN_SQL_PATTERNS = [
-  /;\s*(DROP|DELETE|UPDATE|INSERT|ALTER|CREATE|TRUNCATE|EXEC|GRANT|REVOKE)/i,
-  /--/,           // SQL comments (used in injection)
-  /\/\*/,         // Block comments
-  /\bUNION\b/i,  // UNION-based injection
-  /\bINTO\s+OUTFILE\b/i,
-  /\bLOAD_FILE\b/i,
-];
+const IDENTIFIER_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+const ALLOWED_TABLES = new Set([
+  "agents",
+  "models",
+  "documents",
+  "workspaces",
+  "catalog_entries",
+  "workflows",
+  "workflow_executions",
+  "conversations",
+  "providers",
+]);
 
 export async function executeDatabaseQuery(node: any, context: ExecutionContext): Promise<any> {
   console.log(`[DatabaseQuery] Executing node ${node.id}`);
 
-  const { query, params = [] } = node.data || {};
+  const { table, columns, where, limit: queryLimit } = node.data || {};
 
-  if (!query) {
-    throw new Error("Database Query: SQL query is required");
+  if (!table) {
+    throw new Error("Database Query: 'table' is required (raw SQL queries are not supported)");
   }
 
-  // Only allow SELECT statements
-  if (!ALLOWED_SQL_PATTERN.test(query)) {
-    throw new Error("Database Query: Only SELECT queries are allowed");
-  }
-
-  // Check for injection patterns
-  for (const pattern of FORBIDDEN_SQL_PATTERNS) {
-    if (pattern.test(query)) {
-      throw new Error("Database Query: Query contains forbidden patterns");
-    }
+  const normalizedTable = String(table).toLowerCase().trim();
+  if (!ALLOWED_TABLES.has(normalizedTable)) {
+    throw new Error(
+      `Database Query: Table "${table}" is not allowed. ` +
+      `Allowed tables: ${[...ALLOWED_TABLES].join(", ")}`
+    );
   }
 
   const db = getDb();
@@ -129,12 +129,41 @@ export async function executeDatabaseQuery(node: any, context: ExecutionContext)
   }
 
   try {
-    // Use parameterized query — build sql template with user params
-    const paramArray = Array.isArray(params) ? params : [];
-    const statement = paramArray.length > 0
-      ? sql`SELECT * FROM (${sql.raw(query)}) AS subq LIMIT 1000`
-      : sql.raw(query + " LIMIT 1000");
+    // Build SELECT columns — only validated identifiers
+    let selectClause;
+    if (columns && Array.isArray(columns) && columns.length > 0) {
+      const validatedCols = columns.map((col: string) => {
+        if (!IDENTIFIER_PATTERN.test(col)) {
+          throw new Error(`Invalid column name: "${col}"`);
+        }
+        return sql.raw(`"${col}"`);
+      });
+      selectClause = validatedCols.reduce(
+        (acc: any, col: any, i: number) => (i === 0 ? col : sql`${acc}, ${col}`)
+      );
+    } else {
+      selectClause = sql.raw("*");
+    }
+
+    // Build WHERE clause — keys are validated identifiers, values are parameterized
+    let whereClause = sql`TRUE`;
+    if (where && typeof where === "object" && !Array.isArray(where)) {
+      const conditions = Object.entries(where).map(([key, value]) => {
+        if (!IDENTIFIER_PATTERN.test(key)) {
+          throw new Error(`Invalid column name in where: "${key}"`);
+        }
+        return sql`${sql.raw(`"${key}"`)} = ${value}`;
+      });
+      if (conditions.length > 0) {
+        whereClause = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
+      }
+    }
+
+    const rowLimit = Math.min(Math.max(1, Number(queryLimit) || 100), 1000);
+    const tableName = sql.raw(`"${normalizedTable}"`);
+    const statement = sql`SELECT ${selectClause} FROM ${tableName} WHERE ${whereClause} LIMIT ${rowLimit}`;
     const result: any = await db.execute(statement);
+
     return {
       rowCount: result[0]?.length || 0,
       rows: result[0] || [],

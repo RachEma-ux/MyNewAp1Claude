@@ -35,8 +35,11 @@ function getEncryptionKey(): string {
     return cachedEncryptionKey;
   }
   
-  if (process.env.NODE_ENV === "production" && process.env.DEV_MODE !== "true") {
-    throw new Error("[Secrets] FATAL: SECRETS_ENCRYPTION_KEY is required in production (min 32 chars). Set it in your environment variables.");
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[Secrets] FATAL: SECRETS_ENCRYPTION_KEY is required in production (min 32 chars). " +
+      "Set it in your environment variables. Generate one with: openssl rand -hex 32"
+    );
   }
   console.warn("[Secrets] WARNING: SECRETS_ENCRYPTION_KEY not set. Using dev fallback (NOT safe for production)");
   cachedEncryptionKey = "dev-secrets-fallback-key-00000000000000000000";

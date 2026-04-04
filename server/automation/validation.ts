@@ -167,6 +167,33 @@ export function validateWorkflow(
     });
   }
 
+  // Validation Rule 9: Reject unsafe raw SQL in database query nodes
+  nodes.forEach((node) => {
+    const blockType = node.data?.blockType || node.type;
+    if (
+      blockType === "databaseQuery" ||
+      blockType === "database_query" ||
+      blockType === "database-action"
+    ) {
+      if (node.data?.query) {
+        errors.push({
+          severity: "error",
+          code: "UNSAFE_RAW_QUERY",
+          message: `Node "${node.data.label || node.id}" uses raw SQL query format which is no longer supported. Use structured format: { table, columns, where, limit }.`,
+          location: { nodeId: node.id, field: "data.query" },
+        });
+      }
+      if (!node.data?.table) {
+        errors.push({
+          severity: "error",
+          code: "MISSING_TABLE",
+          message: `Database Query node "${node.data.label || node.id}" must specify a 'table' field.`,
+          location: { nodeId: node.id, field: "data.table" },
+        });
+      }
+    }
+  });
+
   return {
     valid: errors.length === 0,
     errors,

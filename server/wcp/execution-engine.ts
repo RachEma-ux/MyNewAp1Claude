@@ -159,34 +159,68 @@ async function executeInvokeAgent(
 
 /**
  * Database Query Block
- * Executes a SQL query against the database
+ * Uses a structured query descriptor instead of raw SQL to prevent injection.
+ * Only whitelisted tables can be queried; all values are parameterized.
  */
+const WCP_IDENTIFIER_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const WCP_ALLOWED_TABLES = new Set([
+  "agents",
+  "models",
+  "documents",
+  "workspaces",
+  "catalog_entries",
+  "workflows",
+  "workflow_executions",
+  "conversations",
+  "providers",
+]);
+
 async function executeDatabaseQuery(
   blockData: any,
   context: ExecutionContext
 ): Promise<any> {
   const config = blockData.config || {};
-  const query = config.query;
+  const { table, columns, where, limit: queryLimit } = config;
 
-  if (!query) {
-    throw new Error("SQL query is required");
+  if (!table) {
+    throw new Error("Database Query: 'table' is required (raw SQL queries are not supported)");
   }
 
-  // For safety, only allow SELECT queries in this demo
-  if (!query.trim().toLowerCase().startsWith("select")) {
-    throw new Error("Only SELECT queries are allowed for safety");
+  const normalizedTable = String(table).toLowerCase().trim();
+  if (!WCP_ALLOWED_TABLES.has(normalizedTable)) {
+    throw new Error(
+      `Database Query: Table "${table}" is not allowed. ` +
+      `Allowed tables: ${[...WCP_ALLOWED_TABLES].join(", ")}`
+    );
   }
 
   try {
     const db = getDb();
-    // Execute the query (this is a simplified version)
-    // In production, you'd want proper query validation and parameterization
-    const result = await db.execute(query);
-    
+
+    // Build WHERE clause — keys are validated identifiers, values are parameterized
+    let whereClause = sql`TRUE`;
+    if (where && typeof where === "object" && !Array.isArray(where)) {
+      const conditions = Object.entries(where).map(([key, value]) => {
+        if (!WCP_IDENTIFIER_PATTERN.test(key)) {
+          throw new Error(`Invalid column name in where: "${key}"`);
+        }
+        return sql`${sql.raw(`"${key}"`)} = ${value}`;
+      });
+      if (conditions.length > 0) {
+        whereClause = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
+      }
+    }
+
+    const rowLimit = Math.min(Math.max(1, Number(queryLimit) || 10), 1000);
+    const tableName = sql.raw(`"${normalizedTable}"`);
+    const result = await db.execute(
+      sql`SELECT * FROM ${tableName} WHERE ${whereClause} LIMIT ${rowLimit}`
+    );
+
     return {
-      query,
+      table: normalizedTable,
       rowCount: Array.isArray(result) ? result.length : 0,
-      rows: Array.isArray(result) ? result.slice(0, 10) : [], // Limit to 10 rows for display
+      rows: Array.isArray(result) ? result.slice(0, rowLimit) : [],
       timestamp: new Date().toISOString(),
     };
   } catch (error: any) {

@@ -67,9 +67,14 @@ const jobsRouter = router({
     return { ...job, steps, diffs, workspace, sessions };
   }),
   create: protectedProcedure.input(createJobSchema).mutation(async ({ input, ctx }) => {
-    const { model, ...rest } = input;
+    const { model, phaseModels, workspaceId, ...rest } = input;
+    // Pack per-phase models and routing config into constraints JSONB
+    const constraints: Record<string, any> = { ...(rest.constraints || {}) };
+    if (phaseModels) constraints.__phaseModels = phaseModels;
+    if (workspaceId) constraints.__routingConfig = { workspaceId, useWorkspaceRouting: true };
     const job = await repo.createJob({
       ...rest,
+      constraints: Object.keys(constraints).length > 0 ? constraints : rest.constraints,
       requestedModel: model || undefined,
       actorUserId: (ctx as any).user?.id,
     });
