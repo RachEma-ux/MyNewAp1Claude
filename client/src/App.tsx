@@ -169,6 +169,7 @@ const SimpleShellPage = lazy(() => import("@/pages/components/SimpleShellPage"))
 const DoubleShellPage = lazy(() => import("@/pages/components/DoubleShellPage"));
 const HomeTemplatePage = lazy(() => import("@/pages/components/HomeTemplatePage"));
 const AICatalogPage = lazy(() => import("@/pages/components/AICatalogPage"));
+const OpenCodeChatPage = lazy(() => import("@/pages/components/OpenCodeChatPage"));
 // Legacy shell preserved in codebase but no longer mounted as primary
 const WorkspaceExecutionShell = lazy(() => import("@/components/workspace-shell/WorkspaceExecutionShell"));
 const WSSandboxPage = lazy(() => import("@/pages/WSSandboxPage"));
@@ -412,6 +413,7 @@ function Router() {
       <Route path="/components/double-shell" component={() => <ProtectedRoute component={DoubleShellPage} />} />
       <Route path="/components/home-template" component={() => <ProtectedRoute component={HomeTemplatePage} />} />
       <Route path="/components/ai-catalog" component={() => <ProtectedRoute component={AICatalogPage} />} />
+      <Route path="/components/opencode-chat" component={() => <ProtectedRoute component={OpenCodeChatPage} />} />
       {/* PSM — Problem Solving Methods (detail routes must precede shell catch-all) */}
       <Route path="/psm/methods/:id" component={() => <ProtectedRoute component={PSMMethodDetailPage} />} />
       <Route path="/psm/cases/:id" component={() => <ProtectedRoute component={PSMCaseDetailPage} />} />

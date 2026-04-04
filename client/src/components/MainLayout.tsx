@@ -208,6 +208,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Double Shell", icon: <LayoutDashboard className="w-4 h-4" />, href: "/components/double-shell" },
         { label: "Home Template", icon: <LayoutDashboard className="w-4 h-4" />, href: "/components/home-template" },
         { label: "AI Catalog", icon: <Bot className="w-4 h-4" />, href: "/components/ai-catalog" },
+        { label: "OpenCode Chat", icon: <MessageSquare className="w-4 h-4" />, href: "/components/opencode-chat" },
       ],
     },
     {
