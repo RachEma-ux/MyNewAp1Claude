@@ -238,6 +238,7 @@ async function startOpenCodeWeb(
       "-b", `${process.env.HOME || "/data/data/com.termux/files/home"}:/home`,
       "-b", "/data/data/com.termux/files/usr/tmp:/tmp",
       "-b", "/data/data/com.termux/files/usr/tmp/oc-local:/data/data/com.termux/files/home/.local",
+      "-b", "/data/data/com.termux/files/usr/tmp/oc-config:/data/data/com.termux/files/home/.config",
       "-w", workspacePath,
       OPENCODE_BINARY_PATH,
       ...ocArgs,
