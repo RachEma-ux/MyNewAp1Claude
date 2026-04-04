@@ -607,14 +607,10 @@ export async function executeJob(jobId: number): Promise<void> {
         try {
           const prompt = buildPhasePrompt(job, phase.stepName);
 
-          // Get current message count before sending
-          const beforeMsgs = await ocClient.listMessages(ocSessionId);
-          const beforeCount = beforeMsgs.length;
-
-          // Send async (fire), then poll for the assistant response (up to 10 min)
-          await ocClient.sendMessageAsync(ocSessionId, prompt);
-          const lastMsg = await ocClient.waitForResponse(ocSessionId, beforeCount, 600000, 5000);
-          const response = lastMsg as any;
+          // OpenCode blocks during LLM execution (single-threaded Bun server).
+          // Use synchronous send with 10-minute timeout. The server will be
+          // unresponsive to other requests until this completes.
+          const response = await ocClient.sendMessage(ocSessionId, prompt);
 
           // Check for provider errors inside the response (HTTP 200 but no output)
           const providerError = response?.info?.error;
