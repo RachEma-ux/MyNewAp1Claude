@@ -615,7 +615,9 @@ export async function executeJob(jobId: number): Promise<void> {
           // OpenCode blocks during LLM execution (single-threaded Bun server).
           // Use synchronous send with 10-minute timeout. The server will be
           // unresponsive to other requests until this completes.
-          const response = await ocClient.sendMessage(ocSessionId, prompt);
+          const response = await ocClient.sendMessage(ocSessionId, prompt, {
+            model: job.requestedModel || undefined,
+          });
 
           // Capture provider/model from the first response.
           // Assistant messages have providerID/modelID flat on info,

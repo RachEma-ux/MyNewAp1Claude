@@ -83,6 +83,7 @@ export async function seedCodeDb() {
       source_module VARCHAR(50),
       source_workflow_id VARCHAR(100),
       actor_user_id INTEGER,
+      requested_model VARCHAR(200),
       provider_name VARCHAR(60),
       model_id VARCHAR(120),
       result_summary JSONB,
@@ -95,6 +96,7 @@ export async function seedCodeDb() {
     CREATE INDEX IF NOT EXISTS idx_code_jobs_status ON code_jobs(status);
     CREATE INDEX IF NOT EXISTS idx_code_jobs_actor ON code_jobs(actor_user_id);
     CREATE INDEX IF NOT EXISTS idx_code_jobs_repo ON code_jobs(repo_id);
+    ALTER TABLE code_jobs ADD COLUMN IF NOT EXISTS requested_model VARCHAR(200);
     ALTER TABLE code_jobs ADD COLUMN IF NOT EXISTS provider_name VARCHAR(60);
     ALTER TABLE code_jobs ADD COLUMN IF NOT EXISTS model_id VARCHAR(120);
 

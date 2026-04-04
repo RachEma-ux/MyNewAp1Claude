@@ -67,8 +67,10 @@ const jobsRouter = router({
     return { ...job, steps, diffs, workspace, sessions };
   }),
   create: protectedProcedure.input(createJobSchema).mutation(async ({ input, ctx }) => {
+    const { model, ...rest } = input;
     const job = await repo.createJob({
-      ...input,
+      ...rest,
+      requestedModel: model || undefined,
       actorUserId: (ctx as any).user?.id,
     });
     await repo.createAuditEvent({

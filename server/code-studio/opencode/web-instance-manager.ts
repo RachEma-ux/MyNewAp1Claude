@@ -58,6 +58,7 @@ const PROVIDER_ENV_MAP: Record<string, string> = {
   openai: "OPENAI_API_KEY",
   anthropic: "ANTHROPIC_API_KEY",
   google: "GOOGLE_API_KEY",
+  groq: "GROQ_API_KEY",
 };
 
 async function injectProviderKeys(env: Record<string, string>): Promise<void> {

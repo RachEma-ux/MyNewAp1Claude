@@ -67,17 +67,21 @@ export async function createWorkflow(data: {
   status?: string;
   tags?: string[];
   updatedAgo?: string;
+  nodes?: string;
+  edges?: string;
   steps?: { key: string; label: string; description?: string; status?: string }[];
 }) {
   const [wf] = await db()
     .insert(wfWorkflows)
     .values({
-      name: data.name,
-      description: data.description || "",
+      name: data.name.trim(),
+      description: (data.description || "").trim(),
       category: data.category,
       status: data.status || "draft",
       tags: data.tags || [],
       updatedAgo: data.updatedAgo || "",
+      nodes: data.nodes || "",
+      edges: data.edges || "",
     })
     .returning();
 
@@ -108,17 +112,40 @@ export async function updateWorkflow(
     status?: string;
     tags?: string[];
     updatedAgo?: string;
+    nodes?: string;
+    edges?: string;
+    steps?: { key: string; label: string; description?: string; status?: string }[];
   }
 ) {
   const updates: any = { updatedAt: new Date() };
-  if (data.name !== undefined) updates.name = data.name;
-  if (data.description !== undefined) updates.description = data.description;
+  if (data.name !== undefined) updates.name = data.name.trim();
+  if (data.description !== undefined) updates.description = data.description.trim();
   if (data.category !== undefined) updates.category = data.category;
   if (data.status !== undefined) updates.status = data.status;
   if (data.tags !== undefined) updates.tags = data.tags;
   if (data.updatedAgo !== undefined) updates.updatedAgo = data.updatedAgo;
+  if (data.nodes !== undefined) updates.nodes = data.nodes;
+  if (data.edges !== undefined) updates.edges = data.edges;
 
   await db().update(wfWorkflows).set(updates).where(eq(wfWorkflows.id, id));
+
+  // Sync steps if provided: delete old, insert new
+  if (data.steps && data.steps.length > 0) {
+    await db().delete(wfSteps).where(eq(wfSteps.workflowId, id));
+    await db()
+      .insert(wfSteps)
+      .values(
+        data.steps.map((s, i) => ({
+          workflowId: id,
+          key: s.key,
+          label: s.label,
+          description: s.description || "",
+          status: s.status || "pending",
+          sortOrder: i,
+        }))
+      );
+  }
+
   return getWorkflow(id);
 }
 

@@ -15,6 +15,7 @@ export const createJobSchema = z.object({
   constraints: z.record(z.any()).optional(),
   priority: z.enum(["low", "normal", "high", "critical"]).optional(),
   repoId: z.number().int().positive().optional(),
+  model: z.string().max(200).optional(), // e.g. "openai/gpt-5.3-chat-latest" or "ollama/phi3:latest"
 });
 
 export const updateJobSchema = z.object({

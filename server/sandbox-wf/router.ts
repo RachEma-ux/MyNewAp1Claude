@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure } from "../_core/trpc";
+import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
 import * as service from "./service";
 import { seedWfDb } from "./seed";
 
@@ -30,15 +30,17 @@ export const sandboxWfRouter = router({
         return service.getWorkflow(input.id);
       }),
 
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
-          name: z.string(),
+          name: z.string().trim().min(1),
           description: z.string().optional(),
-          category: z.string(),
-          status: z.string().optional(),
+          category: z.enum(["decision", "integration", "ai-intelligence", "governance", "offline-exec", "canvas-builder"]),
+          status: z.enum(["draft", "running", "completed", "failed"]).optional(),
           tags: z.array(z.string()).optional(),
           updatedAgo: z.string().optional(),
+          nodes: z.string().optional(),
+          edges: z.string().optional(),
           steps: z.array(
             z.object({
               key: z.string(),
@@ -53,16 +55,26 @@ export const sandboxWfRouter = router({
         return service.createWorkflow(input);
       }),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
-          name: z.string().optional(),
+          name: z.string().trim().min(1).optional(),
           description: z.string().optional(),
-          category: z.string().optional(),
-          status: z.string().optional(),
+          category: z.enum(["decision", "integration", "ai-intelligence", "governance", "offline-exec", "canvas-builder"]).optional(),
+          status: z.enum(["draft", "running", "completed", "failed"]).optional(),
           tags: z.array(z.string()).optional(),
           updatedAgo: z.string().optional(),
+          nodes: z.string().optional(),
+          edges: z.string().optional(),
+          steps: z.array(
+            z.object({
+              key: z.string(),
+              label: z.string(),
+              description: z.string().optional(),
+              status: z.string().optional(),
+            })
+          ).optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -70,7 +82,7 @@ export const sandboxWfRouter = router({
         return service.updateWorkflow(id, data);
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return service.deleteWorkflow(input.id);

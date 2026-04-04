@@ -25,6 +25,14 @@ const PROVIDER_MAP: Record<string, string> = {
   groq: "groq",
 };
 
+// Map provider types to the env vars OpenCode serve mode actually reads
+const PROVIDER_ENV_MAP: Record<string, string> = {
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+  google: "GOOGLE_API_KEY",
+  groq: "GROQ_API_KEY",
+};
+
 /**
  * Read provider API keys from the app DB and write them to
  * OpenCode's auth.json. Preserves existing credentials not
@@ -68,12 +76,26 @@ export async function syncProviderKeysToOpenCode(): Promise<{
       }
     }
 
-    // Write auth.json
+    // Write auth.json (used by CLI/TUI mode)
     const dir = path.dirname(AUTH_JSON_PATH);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(AUTH_JSON_PATH, JSON.stringify(auth, null, 2), "utf-8");
+
+    // Also set env vars on the current process so that any OpenCode serve
+    // instance spawned from here inherits the latest keys without restart.
+    for (const row of rows.rows || rows || []) {
+      const appType = row.type as string;
+      const envVar = PROVIDER_ENV_MAP[appType];
+      if (!envVar) continue;
+      try {
+        const config = typeof row.config === "string" ? JSON.parse(row.config) : row.config;
+        if (config?.apiKey) {
+          process.env[envVar] = config.apiKey;
+        }
+      } catch { /* skip */ }
+    }
 
   } catch (err: any) {
     errors.push(`DB access failed: ${err.message}`);
