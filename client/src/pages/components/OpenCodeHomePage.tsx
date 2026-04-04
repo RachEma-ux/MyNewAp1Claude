@@ -96,10 +96,17 @@ export default function OpenCodeHomePage() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [hoverProject, setHoverProject] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [lastPeekId, setLastPeekId] = useState<string | null>(null);
   const hoverTimeout = useRef<number | null>(null);
 
   const project = PROJECTS.find((p) => p.id === activeProject) || PROJECTS[0];
   const hovered = hoverProject ? PROJECTS.find((p) => p.id === hoverProject) : null;
+  const lastPeek = lastPeekId ? PROJECTS.find((p) => p.id === lastPeekId) : null;
+
+  // Track last peeked project so content persists during fade-out
+  useEffect(() => {
+    if (hovered) setLastPeekId(hovered.id);
+  }, [hovered]);
 
   const armClose = useCallback(() => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
@@ -154,7 +161,7 @@ export default function OpenCodeHomePage() {
         justifyContent: "center",
         cursor: "pointer",
         border: selected ? "2px solid rgba(255,255,255,0.5)" : onHover ? "1px solid #2a2a2a" : "2px solid transparent",
-        transition: "border-color 0.15s",
+        transition: "border-color 150ms, background-color 150ms",
         flexShrink: 0,
         position: "relative" as const,
       }}
@@ -456,37 +463,45 @@ export default function OpenCodeHomePage() {
                 </div>
               </div>
 
-              {/* Peek Panel (hover overlay) */}
-              {hovered && !sidebarExpanded && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    bottom: 56,
-                    left: 80,
-                    zIndex: 30,
-                    display: "flex",
-                    opacity: 1,
-                    transform: "translateX(0)",
-                    transition: "opacity 180ms ease-out, transform 180ms ease-out",
-                  }}
-                  onMouseEnter={disarmClose}
-                  onMouseLeave={armClose}
-                >
-                  <div style={{ width: 260, background: "#101318", border: "1px solid #2a2a2a", borderRadius: "0 0 12px 0", overflow: "hidden", boxShadow: "4px 0 24px rgba(0,0,0,0.4)" }}>
-                    <SidebarPanel p={hovered} />
-                  </div>
+              {/* Peek Panel (hover overlay) — always rendered, transition in/out */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 56,
+                  left: 80,
+                  zIndex: 30,
+                  display: "flex",
+                  opacity: hovered && !sidebarExpanded ? 1 : 0,
+                  transform: hovered && !sidebarExpanded ? "translateX(0)" : "translateX(-8px)",
+                  pointerEvents: hovered && !sidebarExpanded ? "auto" : "none",
+                  transition: hovered && !sidebarExpanded
+                    ? "opacity 180ms ease-out, transform 180ms ease-out"
+                    : "opacity 120ms ease-in, transform 120ms ease-in",
+                }}
+                onMouseEnter={disarmClose}
+                onMouseLeave={armClose}
+              >
+                <div style={{ width: 260, background: "#101318", border: "1px solid #2a2a2a", borderRadius: "0 0 12px 0", overflow: "hidden", boxShadow: "4px 0 24px rgba(0,0,0,0.4)" }}>
+                  {(hovered || lastPeek) && <SidebarPanel p={(hovered || lastPeek)!} />}
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Mobile Drawer Overlay */}
-            {drawerOpen && (
-              <div
-                style={{ position: "absolute", inset: 0, top: 56, zIndex: 40, background: "rgba(0,0,0,0.5)", transition: "opacity 200ms" }}
-                onClick={() => setDrawerOpen(false)}
-              />
-            )}
+            {/* Mobile Drawer Overlay — always rendered, opacity transition */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                top: 56,
+                zIndex: 40,
+                background: "rgba(0,0,0,0.5)",
+                opacity: drawerOpen ? 1 : 0,
+                pointerEvents: drawerOpen ? "auto" : "none",
+                transition: "opacity 200ms",
+              }}
+              onClick={() => setDrawerOpen(false)}
+            />
             {/* Mobile Drawer Nav */}
             <div
               style={{
@@ -537,7 +552,15 @@ export default function OpenCodeHomePage() {
         </div>
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            transition-duration: 0ms !important;
+            animation-duration: 0ms !important;
+          }
+        }
+      `}</style>
 
       {/* ─── Source Code ─── */}
       <div className="px-4 pb-12 mx-auto w-full" style={{ maxWidth: 900 }}>
