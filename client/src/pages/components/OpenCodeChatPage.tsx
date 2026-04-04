@@ -64,13 +64,24 @@ export default function OpenCodeChatPage() {
 
   return (
     <div
-      className="flex -mx-6 -mt-6 overflow-hidden justify-center"
-      style={{ height: "calc(100vh - 4rem)", background: "#0d0d0d" }}
+      className="flex flex-col -mx-6 -mt-6 overflow-y-auto"
+      style={{ height: "calc(100vh - 4rem)", background: "#111" }}
     >
+      {/* ─── Live Preview ─── */}
+      <div className="flex justify-center py-8 px-4 shrink-0">
+        <div
+          style={{
+            border: "2px solid #2a2a2a",
+            borderRadius: 24,
+            overflow: "hidden",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+          }}
+        >
       <div
         className="flex flex-col overflow-hidden w-full"
         style={{
           maxWidth: 430,
+          height: 780,
           fontFamily: "-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif",
           background: "#0d0d0d",
           color: "#e8e8e8",
@@ -410,10 +421,398 @@ export default function OpenCodeChatPage() {
         </div>
       </div>
 
-      {/* Spinner keyframe */}
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+        {/* Spinner keyframe */}
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
+        </div>
+      </div>
+
+      {/* ─── Source Code ─── */}
+      <div className="px-4 pb-12 mx-auto w-full" style={{ maxWidth: 900 }}>
+        <div style={{ borderTop: "1px solid #2a2a2a", paddingTop: 32 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "#e8e8e8", marginBottom: 4 }}>Source Code</h2>
+          <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>opencode-chat.html — Mobile chat session interface (430px viewport)</p>
+
+          <div style={{ background: "#0a0a0a", border: "1px solid #1e1e1e", borderRadius: 10, overflow: "hidden" }}>
+            {/* Header bar */}
+            <div className="flex items-center justify-between" style={{ padding: "8px 14px", borderBottom: "1px solid #1e1e1e" }}>
+              <div className="flex items-center gap-2">
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57" }} />
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#febc2e" }} />
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840" }} />
+              </div>
+              <span style={{ fontSize: 11, color: "#555" }}>OpenCodeChatPage.tsx</span>
+              <div style={{ width: 44 }} />
+            </div>
+
+            {/* Code content */}
+            <pre style={{
+              margin: 0,
+              padding: "16px 20px",
+              fontSize: 12,
+              lineHeight: 1.7,
+              fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+              color: "#a1a7b4",
+              overflowX: "auto",
+              tabSize: 2,
+            }}>{SOURCE_CODE}</pre>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+
+/* ─── Source code (the original HTML from the download file) ─── */
+const SOURCE_CODE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>OpenCode Chat</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0d0d0d;
+    --bg2: #151515;
+    --bg3: #1c1c1c;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --text-dim: #888;
+    --text-muted: #555;
+    --accent: #4caf50;
+    --p1: #e8e8e8;
+    --p2: #888;
+    --tab-active: #e8e8e8;
+    --tab-inactive: #666;
+    --radius: 8px;
+  }
+
+  body {
+    font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    max-width: 430px;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── Status Bar ── */
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px 6px;
+    font-size: 15px;
+    font-weight: 600;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+  .status-time { font-size: 15px; font-weight: 700;
+                  letter-spacing: -0.3px; }
+  .battery {
+    background: var(--text);
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #000;
+    min-width: 26px;
+    text-align: center;
+  }
+
+  /* ── Address Bar ── */
+  .address-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 12px 8px;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+  .addr-url {
+    flex: 1;
+    background: #1e1e1e;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* ── App Header ── */
+  .app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 14px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .hamburger {
+    width: 32px; height: 32px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px;
+  }
+  .hamburger span {
+    display: block;
+    height: 2px;
+    background: var(--text-dim);
+    border-radius: 2px;
+    width: 20px;
+  }
+
+  /* ── Tab Bar ── */
+  .tab-bar { display: flex; background: var(--bg); flex-shrink: 0; }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 10px 0;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--tab-inactive);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab.active {
+    color: var(--tab-active);
+    border-bottom-color: var(--tab-active);
+    font-weight: 600;
+  }
+
+  /* ── Session Content ── */
+  .session-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  .session-title {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--text-dim);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Task Items ── */
+  .task-item {
+    display: flex;
+    gap: 12px;
+    padding: 7px 0;
+    align-items: flex-start;
+  }
+  .task-num {
+    font-size: 14px;
+    color: var(--text-muted);
+    min-width: 20px;
+    text-align: right;
+  }
+  .task-label {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .badge.p1 { color: var(--p1); font-weight: 700; }
+  .badge.p2 { color: var(--p2); font-weight: 700; }
+
+  /* ── Clear Button ── */
+  .clear-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+
+  /* ── Composer ── */
+  .composer {
+    background: var(--bg);
+    padding: 8px 12px 12px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .composer-box {
+    background: #1a1a1a;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .composer-input {
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 15px;
+    resize: none;
+    width: 100%;
+    font-family: inherit;
+    line-height: 1.4;
+    min-height: 22px;
+  }
+  .send-btn {
+    width: 34px; height: 34px;
+    background: var(--text-dim);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Bottom Toolbar ── */
+  .tool-item {
+    padding: 4px 8px;
+    font-size: 13px;
+    color: var(--text-dim);
+    border-radius: 6px;
+  }
+  .model-icon {
+    width: 14px; height: 14px;
+    background: #e8d5b0;
+    border-radius: 3px;
+    font-size: 8px;
+    color: #5a3e00;
+    font-weight: 900;
+  }
+
+  /* ── Nav Bar ── */
+  .nav-bar {
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 24px 16px;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div class="status-time">11:31</div>
+    <div class="status-icons">...</div>
+  </div>
+
+  <!-- Address Bar -->
+  <div class="address-bar">
+    <div class="addr-home">🏠</div>
+    <div class="addr-url">ⓘ 127.0.0.1:4096/Lw/se</div>
+    <div class="addr-actions">+ [3] ⋮</div>
+  </div>
+
+  <!-- App Header -->
+  <div class="app-header">
+    <div class="hamburger">☰</div>
+    <div class="header-actions">[⊞•] [▶_]</div>
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <div class="tab active">Session</div>
+    <div class="tab">Changes</div>
+  </div>
+
+  <!-- Session Content -->
+  <div class="session-content">
+    <div class="session-title">
+      How to Analyze Data Using Python... ◌ ···
+    </div>
+    <div class="task-list">
+      <div class="task-item">
+        <div class="task-num">6.</div>
+        <div class="task-label">
+          <span class="badge p1">P1:</span>
+          Replace mock implementations with real enforcement
+        </div>
+      </div>
+      <div class="task-item">
+        <div class="task-num">7.</div>
+        <div class="task-label">
+          <span class="badge p1">P1:</span>
+          Remove hardcoded principals and encryption fallbacks
+        </div>
+      </div>
+      <div class="task-item">
+        <div class="task-num">8.</div>
+        <div class="task-label">
+          <span class="badge p2">P2:</span>
+          Expand OPA policies or update docs
+        </div>
+      </div>
+    </div>
+    <button class="clear-btn">Clear conversation</button>
+  </div>
+
+  <!-- Composer -->
+  <div class="composer">
+    <div class="composer-box">
+      <textarea class="composer-input"
+        placeholder="Ask anything..."></textarea>
+      <div class="composer-actions">
+        <div class="attach-btn">+</div>
+        <div class="send-btn">⬆</div>
+      </div>
+    </div>
+    <div class="bottom-toolbar">
+      Plan ▾ | [Z] Qwen3.6 Plus Free ▾ | Default ▾ 🛡
+    </div>
+  </div>
+
+  <!-- Nav Bar -->
+  <div class="nav-bar">→  □  ←</div>
+
+  <script>
+    function switchTab(el) {
+      document.querySelectorAll('.tab')
+        .forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function clearConversation() {
+      document.querySelector('.task-list').style.display = 'none';
+      document.querySelector('.clear-btn').style.display = 'none';
+      document.querySelector('.session-title').style.display = 'none';
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function sendMessage() {
+      const ta = document.querySelector('.composer-input');
+      const val = ta.value.trim();
+      if (!val) return;
+      ta.value = '';
+      ta.style.height = 'auto';
+    }
+  <\/script>
+</body>
+</html>`;
