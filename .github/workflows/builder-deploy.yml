@@ -591,6 +591,7 @@ jobs:
           DEV_MODE="${{ github.event.inputs.dev_mode }}" \
           ALLOW_DEV_MODE_IN_PROD=true \
           ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}" \
+          SECRETS_ENCRYPTION_KEY="${{ secrets.SECRETS_ENCRYPTION_KEY || secrets.ENCRYPTION_KEY }}" \
           OAUTH_SERVER_URL="${EFFECTIVE_OAUTH_SERVER}" \
           JWT_SECRET="${JWT_SECRET}" \
           COOKIE_SECRET="${COOKIE_SECRET:-$JWT_SECRET}" \
