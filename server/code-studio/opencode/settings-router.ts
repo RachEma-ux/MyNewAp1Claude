@@ -227,12 +227,10 @@ const applyRouter = router({
           const path = await import("path");
           const configPath = path.join(process.cwd(), "opencode.jsonc");
 
-          // Read existing config
+          // Read existing config (file is clean JSON from previous JSON.stringify writes)
           let existing: Record<string, any> = {};
           try {
-            const raw = fs.readFileSync(configPath, "utf-8");
-            const stripped = raw.replace(/\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1");
-            existing = JSON.parse(stripped);
+            existing = JSON.parse(fs.readFileSync(configPath, "utf-8"));
           } catch { /* no existing file or parse error — start fresh */ }
 
           // Merge: generated fields override existing, but preserve fields not in generated

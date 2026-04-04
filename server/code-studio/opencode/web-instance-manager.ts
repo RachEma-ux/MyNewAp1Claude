@@ -207,13 +207,13 @@ async function startOpenCodeWeb(
   // Inject provider API keys from the app DB so OpenCode can use them
   await injectProviderKeys(env);
 
-  // Inject current config so OpenCode reads settings from env (not stale file)
+  // Inject current config so OpenCode reads settings from env (not stale file).
+  // The file is written by settings-router as clean JSON (JSON.stringify), so
+  // pass it directly — do NOT strip with regex (breaks https:// URLs).
   try {
     const configPath = path.join(process.cwd(), "opencode.jsonc");
     if (fs.existsSync(configPath)) {
-      const raw = fs.readFileSync(configPath, "utf-8");
-      const stripped = raw.replace(/\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1");
-      env.OPENCODE_CONFIG_CONTENT = stripped;
+      env.OPENCODE_CONFIG_CONTENT = fs.readFileSync(configPath, "utf-8");
     }
   } catch { /* config read failed — OpenCode will use its defaults */ }
 
