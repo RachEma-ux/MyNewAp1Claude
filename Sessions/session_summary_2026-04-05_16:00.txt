@@ -1,0 +1,75 @@
+Session Summary — 2026-04-05 (day 2 marathon)
+
+OMNIRAG PROGRESS:
+- 151 Python files, 13,186 lines
+- All pushed to github.com/RachEma-ux/omnirag
+
+COMPLETED THIS SESSION:
+
+1. OmniRAG UI fixes:
+   - Tab renamed: GraphRAG → OmniGraph
+   - Intake Gate in RAG tab (source input, file picker, View Jobs)
+   - Browse files opens native file explorer (Android)
+   - Fetch URL button (browser-side download for CDN-blocked URLs)
+   - Interactive adapter cards (configure, test connections, status dots)
+   - Back arrows on all sub-pages (slim ◂)
+   - Removed "Connecting..." and "Intake Gate" labels
+   - Fixed JS template literal escaping (broke all tabs)
+   - Installed python-docx + lxml + pdfplumber for real file processing
+   - Tested: .docx upload works, PDF upload works
+
+2. Port Registry (8100–8199):
+   - omnirag/config/ports.py — centralized config
+   - docker/.env.example — complete template
+   - docs/PORT-REGISTRY.md — official spec
+   - GET /ports API endpoint
+   - All hardcoded ports removed from 7 service modules
+
+3. Analyzed 6 OmniGraph spec documents:
+   - Engineering Specification (14 features, 12 services)
+   - Technical Specification (architecture, contracts, API)
+   - Implementation Roadmap (24 weeks, 6 phases)
+   - Implementation Artifacts (Neo4j DDL, PostgreSQL DDL, protocols)
+   - README (Docker Compose, Makefile)
+   - Downloadable Files
+
+4. Created 3 planning documents:
+   - OMNIGRAPH-FEATURE-SPEC.md (14 features from deep research)
+   - OMNIGRAPH-IMPLEMENTATION-MAP.md (spec → code mapping)
+   - OMNIGRAPH-FULL-IMPLEMENTATION-PLAN.md (19 phases, nothing skipped)
+   - MICROSOFT-GRAPHRAG-INTEGRATION-PLAN.md (rejected — building dedicated)
+
+5. OmniGraph Implementation (G1–G7 of G19):
+   G1: Canonical data model — 10 new objects (Extraction, ResolutionCase,
+       QueryPlan, ContextBundle, Answer, AnswerTrace, CacheKey, MetricEvent,
+       AgentRun, EvaluationResult)
+   G2: 23 service contracts as Python ABC/Protocol
+   G3: LLM-powered extraction (4 modes: regex/llm/schema/hybrid)
+       with prompts.py (5 templates) and 3-tier fallback
+   G4: Entity resolution upgrade (blocking + LLM "Are these the same?")
+   G5: Multi-resolution Leiden (γ=0.5,1.0,2.0) + PageRank
+   G6: Context Builder (N-hop, verbalize, token budget 2048)
+   G7: Answer tracing (TraceRecorder, MetricEvent, PostgreSQL persistence)
+
+REMAINING (G8–G19):
+   G8:  Enhanced router (25 rules + 6 dynamic override conditions)
+   G9:  Cache key upgrade + report enrichment + embeddings
+   G10: PostgreSQL + Neo4j schema merge
+   G11: Schema-guided extraction (OpenSPG/KAG)
+   G12: Full observability (Prometheus + OpenTelemetry + Grafana)
+   G13: pgvector as vector store
+   G14: LangGraph + AutoGen workflows
+   G15: Next.js frontend
+   G16: Chainlit Ops UI
+   G17: MCP Tool Protocol
+   G18: LlamaIndex Property Graph
+   G19: Power BI + analytics
+
+DECISION: Build dedicated OmniGraph (not integrate Microsoft GraphRAG).
+Reason: Same quality via LLM prompts, full control, no 200MB dependency,
+keeps governance/ACL/backpressure intact.
+
+EVALUATION FRAMEWORK DEFINED:
+7 dimensions, weighted scoring, current estimate 56 → target 88 after G1–G19.
+
+ALL REPOS CLEAN AND PUSHED.
