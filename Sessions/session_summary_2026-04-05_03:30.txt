@@ -1,0 +1,73 @@
+Session Summary — 2026-04-04/05 (overnight marathon)
+
+REPOSITORIES CREATED:
+1. RachEma-ux/opencode-ui — Responsive shell audit/redesign for OpenCode
+2. RachEma-ux/Obsedian — Mirror of all 14 obsidianmd public repos
+3. RachEma-ux/omnirag — OmniRAG v4 RAG control plane (MAJOR BUILD)
+
+OMNIRAG — FULL PLATFORM BUILD (100+ files, ~10K lines):
+
+Intake Gate (Phase A–G, 33 files, 2,840 lines):
+- Universal intake: any source, any format, 12-state machine
+- 4 connectors: local, http, s3, github (7-method interface)
+- 4 extractors: text, pdf, docx, html
+- 8 materializers by semantic type
+- 8 type-aware chunkers
+- Backpressure: token bucket, admission controller, circuit breakers, dead-letter
+- ACL capture + propagation + lineage
+
+Output Layer (Phase H–O, 22 files, 1,990 lines):
+- Embedding pipeline (batch 256, retry, DLQ)
+- 3 index writers: vector (Qdrant), keyword (Elasticsearch), metadata (PostgreSQL)
+- Consistency coordinator (Redis index versioning)
+- Hybrid retrieval: vector + BM25 → RRF fusion → cross-encoder reranking
+- Generation: citation-aware prompt + extraction
+- Delivery: REST /v1/search, WebSocket /v1/stream, webhooks, export JSONL/CSV/Parquet
+- Security: JWT RS256, rate limiting, middleware
+- Observability: 15 Prometheus metrics
+
+GraphRAG (Phase P–V, 21 files, 1,831 lines):
+- Neo4j graph store (networkx fallback)
+- Entity extraction (spaCy + regex), resolution (HDBSCAN), relationships (weighted)
+- Leiden community detection, LLM community reports (3-tier fallback)
+- 3 query modes: Local, Global, DRIFT
+- 3-stage query router: rules → BERT → dynamic override
+- Redis caching with mode-specific TTL
+
+Weakness Fixes (W1–W7, 13 files, 1,473 lines):
+- PostgreSQL persistence hardening (migrations, transactions, retries)
+- Neo4j + Qdrant + ES integration tests
+- Entity extraction + resolution tests
+- BERT router training infrastructure (data gen + distilbert + ONNX)
+- Async embedding worker (background queue)
+- Resilient community reports (LLM → local → template)
+- Docker Compose (PostgreSQL + Neo4j + Qdrant + ES + Redis)
+
+UI (Frontend Shell):
+- OpenCode Home template applied to OmniRAG
+- 4-tab main area: RAG / GraphRAG / Graph / Chat
+- Chat tab: OpenCode chat template (user bubbles, assistant markdown, composer)
+- Intake Gate UI with file picker (native file explorer)
+- Interactive adapter cards (configure, test connections, status dots)
+- Dark-themed Swagger UI + ReDoc (embedded, matching app colors)
+- How To guide (8 steps + examples)
+- Sidebar: rail + panel + hover-peek + mobile drawer
+- Footer: version + health status
+
+92 integration tests across 8 files.
+
+OPENCODE-UI DELIVERABLES:
+- AUDIT.md — shell audit (14 findings)
+- REDESIGN.md — 3-tier responsive model
+- REPORT.md — implementation report
+- SHELL-WIREFRAMES.txt — ASCII wireframes (5 states)
+- OPENCODE-HOME-ARCHITECTURE.md — deep architecture (12 sections)
+- chat/ — exact replica of OpenCode chat interface + wireframes
+- responsive-shell.patch — applicable to RachEma-ux/opencode
+
+MYNEWAP1CLAUDE ADDITIONS:
+- OpenCode Chat page (App Components, /components/opencode-chat)
+- OpenCode Home page (App Components, /components/opencode-home)
+- Both with live preview + source code below
+
+ALL REPOS PUSHED TO GITHUB, CLEAN.
