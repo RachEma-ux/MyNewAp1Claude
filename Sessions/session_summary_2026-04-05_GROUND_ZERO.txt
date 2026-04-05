@@ -1,0 +1,82 @@
+═══════════════════════════════════════════════════════════════
+  OmniRAG v4.0.0 — GROUND ZERO REFERENCE
+  Tag: v4.0.0-ground-zero
+  Commit: a910e0bda3dbd092fd9bd3254bc271f71229892c
+  Date: 2026-04-05
+  Repo: github.com/RachEma-ux/omnirag
+═══════════════════════════════════════════════════════════════
+
+STATS:
+  Python files:    168
+  Python lines:    14,752
+  Total sources:   205
+  Tests:           92 across 8 files
+  Git tag:         v4.0.0-ground-zero
+
+PLATFORM LAYERS:
+  Intake Gate (A–G):       33 files,  2,840 lines
+  Output Layer (H–O):      22 files,  1,990 lines
+  Wiring:                  11 files,  1,018 lines
+  GraphRAG (P–V):          21 files,  1,831 lines
+  Weakness Fixes (W1–W7):  13 files,  1,473 lines
+  OmniGraph (G1–G19):      ~30 files, ~2,600 lines
+  Visualization (V1–V8):   ~6 files,  ~1,500 lines
+  UI/Frontend:             ~10 files, ~1,500 lines
+
+14/14 MANDATORY FEATURES:
+  1.  LLM entity extraction (4 modes: regex/llm/schema/hybrid)
+  2.  LLM relationship extraction
+  3.  Entity resolution (HDBSCAN + LLM verification)
+  4.  Hierarchical community detection (Louvain)
+  5.  LLM community reports (3-tier: LLM → local → template)
+  6.  5 query modes (Basic/Local/Global/DRIFT/Hybrid)
+  7.  3-stage query router (25 rules → BERT → dynamic override)
+  8.  Graph-aware context building (N-hop + verbalize + token budget)
+  9.  Multi-store (Neo4j/NetworkX + pgvector + Qdrant + ES + Redis)
+  10. ACL per node (capture → propagate → enforce)
+  11. Mode-specific caching (5 TTLs + versioned keys)
+  12. Observability (Prometheus + OpenTelemetry + structured logging)
+  13. Interactive graph visualization (V1–V8)
+  14. 4 extraction modes with domain schemas (default/legal/medical/financial)
+
+12/12 SERVICES:
+  Ingestion, Extraction, Entity Resolution, Graph Build,
+  Graph Intelligence, Community Reports, Query Router,
+  Retrieval, Context Builder, Authorization, Reasoning,
+  Workflow Runtime
+
+23/23 CONTRACTS: All Python ABC/Protocol defined
+
+UI (4 TABS):
+  RAG          — intake gate, pipelines, adapters (interactive)
+  OmniGraph    — 5 query modes, services grid, router info
+  Visualization — knowledge graph canvas (force/hierarchy/circular),
+                  filters, path finding, community coloring, export,
+                  expand/collapse, collaboration WS, comments
+  Chat         — OpenCode template (user bubbles, composer, toolbar)
+
+INTEGRATIONS:
+  LangGraph workflows + AutoGen agents
+  MCP Tool Protocol (5 tools)
+  LlamaIndex Property Graph bridge
+  Power BI analytics export
+  Chainlit Ops UI scaffold
+  Next.js frontend scaffold
+
+INFRASTRUCTURE:
+  Port registry: 8100–8199 (centralized, no hardcoded ports)
+  Docker Compose: PostgreSQL + Neo4j + Qdrant + ES + Redis + Ollama
+  JWT auth + rate limiting + security middleware
+  Backpressure: token bucket + admission + circuit breakers + dead-letter
+  PostgreSQL persistence (migrations, transactions, retries)
+  Async embedding worker (background queue)
+
+DEMO:
+  A Christmas Carol (Dickens) — full pipeline proven:
+  3,976 lines → 71 chunks → 71 embeddings → 142 entities →
+  1,981 relationships → 5+ communities → community reports →
+  interactive visualization
+
+REVIEWER + GOVERNANCE: PASS (all checks)
+
+THIS IS THE DEFINITIVE BASELINE. All future work builds from here.
