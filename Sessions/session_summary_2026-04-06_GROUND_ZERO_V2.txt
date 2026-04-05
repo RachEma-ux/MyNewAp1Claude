@@ -1,0 +1,146 @@
+═══════════════════════════════════════════════════════════════
+  GROUND ZERO V2 — Full Platform Baseline
+  Date: 2026-04-06
+  Device: Android phone (Termux, aarch64, 7GB RAM)
+  Repos: MyNewAp1Claude + omnirag + openllm + openllm-skills
+═══════════════════════════════════════════════════════════════
+
+TOTAL OUTPUT: ~17,000+ lines across 3 repos, 155 docs, from a phone.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. OMNIRAG v4.0.0 (github.com/RachEma-ux/omnirag)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Tag: v4.0.0-ground-zero
+  Python files: 168
+  Python lines: 14,752
+  Total sources: 205
+  Tests: 92 across 8 files
+
+  14/14 MANDATORY FEATURES:
+    - LLM entity extraction (4 modes: regex/llm/schema/hybrid)
+    - LLM relationship extraction
+    - Entity resolution (HDBSCAN + LLM verification)
+    - Hierarchical community detection (Louvain)
+    - LLM community reports (3-tier fallback)
+    - 5 query modes (Basic/Local/Global/DRIFT/Hybrid)
+    - 3-stage query router (25 rules → BERT → dynamic override)
+    - Graph-aware context building (N-hop + verbalize + token budget)
+    - Multi-store (Neo4j/NetworkX + pgvector + Qdrant + ES + Redis)
+    - ACL per node (capture → propagate → enforce)
+    - Mode-specific caching (5 TTLs + versioned keys)
+    - Observability (Prometheus + OpenTelemetry + structured logging)
+    - Interactive graph visualization (V1-V8)
+    - 4 extraction modes with domain schemas
+
+  12/12 SERVICES, 23/23 CONTRACTS
+  OmniGraph G1-G7 of G19 implemented
+  Demo: A Christmas Carol — full pipeline proven
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. OPENLLM (github.com/RachEma-ux/openllm)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Codebase: 47,181 lines TypeScript
+  What: Claude Code fork — multi-provider AI agent
+  Tools: 51 (36 core + 15 feature-gated)
+  Commands: 74 slash commands
+  Providers: 16 (Ollama, OpenAI, Gemini, Anthropic, DeepSeek, Groq, etc.)
+
+  BUILT THIS SESSION:
+
+  Web UI (node-server.ts + public/index.html):
+    - 16-provider registry with routing per message
+    - Auto-detect Ollama models (/api/ollama-models)
+    - WebSocket streaming chat (Home + Chat views)
+    - Auto-reconnect (2s retry)
+    - Provider validation (blocks send if no API key)
+    - System prompt for concise answers
+    - num_ctx/num_predict limits for fast local inference
+    - Conversation history cap (10 turns)
+    - Configurable HOST binding for tunnel deploy
+
+  Full Agent Deploy (builder-deploy.yml):
+    - node dist/cli.mjs serve → QueryEngine + 51 tools
+    - Ollama + llama3.2:3b on GitHub Actions (x86_64)
+    - Cloudflare tunnel → public URL
+    - Fallback to node-server.ts if agent fails
+    - All provider API keys from GitHub secrets
+    - VERIFIED WORKING: tunnel URL served real agent
+
+  Documentation (155 files):
+    - 44 individual tool reference docs
+    - 74 individual command reference docs
+    - HowTo-Create-Skills-Tools.md (29KB, full guide)
+    - SKELETON-Tool.md (universal 10-section pattern)
+    - TEMPLATE-NewTool.md (read-only + write flavors)
+    - TEMPLATE-NewCommand.md (3 command types)
+    - SkillsTools.md (master index)
+    - SkillManager-Setup.md (setup + mid-session usage)
+
+  Deep Analysis Findings:
+    - Every tool follows exact same 4-file / 10-section skeleton
+    - Input: z.strictObject(), Output: z.object(), both in lazySchema()
+    - 4 flavors: read-only, write, async/network, agent/task
+    - call() always returns { data: Output }
+    - mapToolResultToToolResultBlockParam always last
+    - satisfies ToolDef<InputSchema, Output> closes every tool
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. OPENLLM-SKILLS (github.com/RachEma-ux/openllm-skills)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  17 skills across 9 domain packs, zero code changes to OpenLLM.
+
+  Packs:
+    providers  (3): review-provider, test-connection, sync-keys
+    chat       (2): debug-stream, token-audit
+    agents     (1): review-pipeline
+    documents  (2): chunk-preview, embedding-inspect
+    automation (2): workflow-lint, trigger-test
+    governance (2): policy-check, secret-rotate
+    database   (2): schema-review, migration-check
+    frontend   (2): component-review, route-audit
+    general    (2): review-security, full-review
+
+  Skill Manager System:
+    /skill install/remove/list/profile/create — meta-command
+    /run-skill <name> [args] — execute any skill mid-session, no restart
+    /skills-list — see all available skills
+    /switch-profile <name> — change active skill set
+    9 profiles pre-configured
+    22 skills pre-installed in ~/.claude/commands/
+
+  Key Design: /run-skill reads .md file on demand → no restart needed
+  → session context preserved → provider config preserved
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. MYNEWAP1CLAUDE (github.com/RachEma-ux/MyNewAp1Claude)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Status: Unchanged this session (clean, main branch)
+  Last commit: 66d8f03 (docs: OmniRAG v4.0.0 Ground Zero reference)
+  Stack: React 19 + Express 4 + tRPC 11 + PostgreSQL (250 tables)
+  Verified: localhost:3000 + Cloudflare tunnel both working
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KEY LEARNINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  - OpenLLM is an AGENT, not a model (brain + hands, needs provider)
+  - The code is not an LLM — it calls LLMs via API
+  - Full QueryEngine needs Bun (can't run on Android/Termux)
+  - node-server.ts is dumb chat relay (no tools)
+  - dist/cli.mjs serve = full agent with tools (needs Bun build)
+  - On GitHub Actions: Bun available → full agent works
+  - On phone: Node only → chat relay only
+  - Skills (markdown) = 90% of extensibility, zero build step
+  - Tools (TypeScript) = 10% of cases, needs Bun build
+  - Workstation + 70B model + OpenLLM = Claude Code power, $0 cost
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FILES IN Download/openllm/ (155 total)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  6 guides (.md)
+  4 meta-commands
+  9 profiles
+  17 skill packs
+  44 tool docs
+  74 command docs
+
+THIS IS THE DEFINITIVE BASELINE V2. All future work builds from here.
