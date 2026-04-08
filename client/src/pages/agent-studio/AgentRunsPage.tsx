@@ -64,6 +64,24 @@ export default function AgentRunsPage({
     { enabled: selectedRunId !== null }
   );
 
+  // Phase 12: Pull the runtime config so the Output tab can honor the
+  // agent's outputStyle and the trace inspector can show a status line.
+  const runtimeConfigQuery = trpc.agentStudio.runtime.get.useQuery(
+    { agentId },
+    { enabled: agentId > 0 }
+  );
+  const outputStyle =
+    ((runtimeConfigQuery.data as any)?.outputStyle as string | null) ?? "plain";
+  const statusLineConfig =
+    ((runtimeConfigQuery.data as any)?.statusLineConfig as Record<
+      string,
+      unknown
+    >) ?? {};
+  const showModelInStatus = statusLineConfig.showModel !== false;
+  const showCostInStatus = statusLineConfig.showCost !== false;
+  const showTimeInStatus = statusLineConfig.showTime !== false;
+  const customStatusText = (statusLineConfig.customText as string) ?? "";
+
   // Phase 3: poll for pending permission requests while the run is live.
   // The simulation engine creates rows here when a permission rule says
   // "ask"; the resolver loop blocks the agent until we flip status.
@@ -348,6 +366,29 @@ export default function AgentRunsPage({
             <>
             {/* Phase 3: Pending permission request banner — only when the
                 run is live and has unresolved "ask" requests. */}
+            {/* Phase 12: status line — model · cost · time · custom */}
+            {(showModelInStatus || showCostInStatus || showTimeInStatus || customStatusText) && (
+              <div className="mb-2 px-2 py-1 rounded bg-muted/40 text-[10px] font-mono flex items-center gap-2 text-muted-foreground">
+                {showModelInStatus && runtimeConfigQuery.data && (
+                  <span>
+                    {((runtimeConfigQuery.data as any).providerConfig?.model as string) ?? "(no model)"}
+                  </span>
+                )}
+                {showCostInStatus && detailQuery.data?.run?.costMicrocents != null && (
+                  <span>
+                    · {formatCost(detailQuery.data.run.costMicrocents)}
+                  </span>
+                )}
+                {showTimeInStatus && detailQuery.data?.run?.durationMs != null && (
+                  <span>
+                    · {(detailQuery.data.run.durationMs / 1000).toFixed(1)}s
+                  </span>
+                )}
+                {customStatusText && (
+                  <span className="ml-auto opacity-70">{customStatusText}</span>
+                )}
+              </div>
+            )}
             {/* Phase 8: child subagent runs */}
             {treeQuery.data && treeQuery.data.children.length > 0 && (
               <div className="mb-3 rounded border border-blue-500/40 bg-blue-500/5 p-2 space-y-1.5">
@@ -450,9 +491,43 @@ export default function AgentRunsPage({
                 </pre>
               </TabsContent>
               <TabsContent value="output">
-                <pre className="text-[9px] font-mono bg-muted/30 p-2 rounded">
-                  {JSON.stringify(detailQuery.data?.run.outputPayload ?? {}, null, 2)}
-                </pre>
+                {/* Phase 12: render based on the agent's outputStyle.
+                    plain    → just the responsePreview text
+                    markdown → wrapped in a styled prose block (no
+                               external markdown lib — just whitespace
+                               preservation; full md rendering can be
+                               layered later)
+                    json     → JSON.stringify of the full payload */}
+                {(() => {
+                  const payload = (detailQuery.data?.run.outputPayload ??
+                    {}) as Record<string, unknown>;
+                  const responseText =
+                    typeof payload.responsePreview === "string"
+                      ? payload.responsePreview
+                      : "";
+                  if (outputStyle === "json") {
+                    return (
+                      <pre className="text-[9px] font-mono bg-muted/30 p-2 rounded">
+                        {JSON.stringify(payload, null, 2)}
+                      </pre>
+                    );
+                  }
+                  if (outputStyle === "markdown") {
+                    return (
+                      <div className="text-[11px] leading-relaxed bg-muted/30 p-3 rounded whitespace-pre-wrap">
+                        {responseText ||
+                          "(no responsePreview in outputPayload)"}
+                      </div>
+                    );
+                  }
+                  // plain (default)
+                  return (
+                    <pre className="text-[10px] font-mono bg-muted/30 p-2 rounded whitespace-pre-wrap">
+                      {responseText ||
+                        JSON.stringify(payload, null, 2)}
+                    </pre>
+                  );
+                })()}
               </TabsContent>
               <TabsContent value="tools">
                 {(detailQuery.data?.toolCalls?.length ?? 0) === 0 ? (

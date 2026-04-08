@@ -148,6 +148,11 @@ export async function cloneAgent(
     permissionMode: sourceDraft.permissionMode,
     workingDirectories: sourceDraft.workingDirectories,
     providerConfig: sourceDraft.providerConfig,
+    // Phase 10 + 12: scheduler + presentation columns
+    scheduleConfig: (sourceDraft as any).scheduleConfig,
+    outputStyle: (sourceDraft as any).outputStyle,
+    statusLineConfig: (sourceDraft as any).statusLineConfig,
+    theme: (sourceDraft as any).theme,
   });
 
   // ── 5. Tool bindings ───────────────────────────────────────────────────

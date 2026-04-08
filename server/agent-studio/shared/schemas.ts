@@ -547,4 +547,8 @@ export const updateRuntimeConfigSchema = z.object({
   permissionMode: z.enum(AGS_PERMISSION_MODES).nullable().optional(),
   workingDirectories: z.array(z.string()).optional(),
   providerConfig: z.record(z.any()).optional(),
+  // Phase 12: presentation
+  outputStyle: z.enum(["plain", "markdown", "json"]).nullable().optional(),
+  statusLineConfig: z.record(z.any()).optional(),
+  theme: z.enum(["dark", "light", "monokai"]).nullable().optional(),
 });

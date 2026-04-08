@@ -1861,6 +1861,13 @@ export async function getRuntimeConfig(agentId: number) {
     permissionMode: draft.permissionMode,
     workingDirectories: (draft.workingDirectories ?? []) as string[],
     providerConfig: (draft.providerConfig ?? {}) as Record<string, unknown>,
+    // Phase 12: presentation
+    outputStyle: (draft as any).outputStyle ?? null,
+    statusLineConfig: ((draft as any).statusLineConfig ?? {}) as Record<
+      string,
+      unknown
+    >,
+    theme: (draft as any).theme ?? null,
   };
 }
 
@@ -1875,6 +1882,10 @@ export async function updateRuntimeConfig(
     permissionMode?: string | null;
     workingDirectories?: string[];
     providerConfig?: Record<string, unknown>;
+    // Phase 12: presentation
+    outputStyle?: string | null;
+    statusLineConfig?: Record<string, unknown>;
+    theme?: string | null;
   }
 ) {
   const set: Record<string, unknown> = { updatedAt: new Date() };
@@ -1888,6 +1899,10 @@ export async function updateRuntimeConfig(
   if (patch.workingDirectories !== undefined)
     set.workingDirectories = patch.workingDirectories;
   if (patch.providerConfig !== undefined) set.providerConfig = patch.providerConfig;
+  if (patch.outputStyle !== undefined) set.outputStyle = patch.outputStyle;
+  if (patch.statusLineConfig !== undefined)
+    set.statusLineConfig = patch.statusLineConfig;
+  if (patch.theme !== undefined) set.theme = patch.theme;
 
   const draft = await getCurrentDraft(agentId);
   if (!draft) throw new Error(`No current draft for agent ${agentId}`);

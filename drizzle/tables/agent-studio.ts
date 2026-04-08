@@ -128,6 +128,18 @@ export const agsAgentDrafts = pgTable(
      *    the same minute when the scheduler ticks more than once
      */
     scheduleConfig: jsonb("schedule_config").$type<Record<string, unknown>>().default({}),
+    // Phase 12: Output styles / status line / themes.
+    /** plain | markdown | json — how the runs page renders the response text */
+    outputStyle: varchar("output_style", { length: 32 }),
+    /**
+     * Status line config — what to show in the runs page status strip
+     * when this agent is running. Shape:
+     *   { showModel, showCost, showTime, customText? }
+     * Each boolean field defaults to true when missing.
+     */
+    statusLineConfig: jsonb("status_line_config").$type<Record<string, unknown>>().default({}),
+    /** Per-agent theme: dark | light | monokai — UI hint only */
+    theme: varchar("theme", { length: 32 }),
 
     // Bookkeeping
     isCurrent: boolean("is_current").default(true),

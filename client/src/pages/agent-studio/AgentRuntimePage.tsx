@@ -93,6 +93,13 @@ export default function AgentRuntimePage({ agentId }: { agentId: number }) {
   const [model, setModel] = useState<string>("");
   const [apiKey, setApiKey] = useState<string>("");
   const [baseUrl, setBaseUrl] = useState<string>("");
+  // Phase 12: presentation
+  const [outputStyle, setOutputStyle] = useState<string>("");
+  const [theme, setTheme] = useState<string>("");
+  const [statusShowModel, setStatusShowModel] = useState<boolean>(true);
+  const [statusShowCost, setStatusShowCost] = useState<boolean>(true);
+  const [statusShowTime, setStatusShowTime] = useState<boolean>(true);
+  const [statusCustomText, setStatusCustomText] = useState<string>("");
 
   useEffect(() => {
     if (query.data) {
@@ -111,6 +118,14 @@ export default function AgentRuntimePage({ agentId }: { agentId: number }) {
       // The field stays empty unless the user types a new key.
       setApiKey("");
       setBaseUrl((pc.baseUrl as string) ?? "");
+      // Phase 12: presentation
+      setOutputStyle((d as any).outputStyle ?? "");
+      setTheme((d as any).theme ?? "");
+      const slc = ((d as any).statusLineConfig ?? {}) as Record<string, unknown>;
+      setStatusShowModel(slc.showModel !== false);
+      setStatusShowCost(slc.showCost !== false);
+      setStatusShowTime(slc.showTime !== false);
+      setStatusCustomText((slc.customText as string) ?? "");
     }
   }, [query.data]);
 
@@ -129,6 +144,14 @@ export default function AgentRuntimePage({ agentId }: { agentId: number }) {
     if (baseUrl) providerConfig.baseUrl = baseUrl;
     if (apiKey) providerConfig.apiKey = apiKey;
 
+    // Phase 12: build statusLineConfig from the toggles
+    const statusLineConfig: Record<string, unknown> = {
+      showModel: statusShowModel,
+      showCost: statusShowCost,
+      showTime: statusShowTime,
+    };
+    if (statusCustomText) statusLineConfig.customText = statusCustomText;
+
     updateMut.mutate({
       agentId,
       effort: effort || null,
@@ -139,6 +162,10 @@ export default function AgentRuntimePage({ agentId }: { agentId: number }) {
       permissionMode: (permissionMode || null) as any,
       workingDirectories,
       providerConfig,
+      // Phase 12: presentation
+      outputStyle: (outputStyle || null) as any,
+      statusLineConfig,
+      theme: (theme || null) as any,
     });
   };
 
@@ -327,6 +354,75 @@ export default function AgentRuntimePage({ agentId }: { agentId: number }) {
               Mirrors openllm-agent2's <code className="font-mono">criticalSystemReminder_EXPERIMENTAL</code> field.
             </p>
           </Field>
+        </CardContent>
+      </Card>
+
+      {/* Phase 12: Presentation — output style + status line + theme */}
+      <Card>
+        <CardContent className="p-3 space-y-3">
+          <SectionLabel icon={<Cpu className="h-3 w-3 text-cyan-500" />}>
+            Presentation — output style, status line, theme
+          </SectionLabel>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Field label="Output style">
+              <select
+                value={outputStyle}
+                onChange={(e) => setOutputStyle(e.target.value)}
+                className="h-7 px-2 rounded border bg-background text-xs w-full"
+              >
+                <option value="">(inherit / plain)</option>
+                <option value="plain">Plain text</option>
+                <option value="markdown">Markdown</option>
+                <option value="json">JSON</option>
+              </select>
+            </Field>
+            <Field label="Theme">
+              <select
+                value={theme}
+                onChange={(e) => setTheme(e.target.value)}
+                className="h-7 px-2 rounded border bg-background text-xs w-full"
+              >
+                <option value="">(inherit)</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+                <option value="monokai">Monokai</option>
+              </select>
+            </Field>
+            <Field label="Status custom text">
+              <Input
+                value={statusCustomText}
+                onChange={(e) => setStatusCustomText(e.target.value)}
+                placeholder="(optional suffix)"
+                className="h-7 text-xs"
+              />
+            </Field>
+          </div>
+          <div className="flex flex-wrap gap-3 text-[10px]">
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={statusShowModel}
+                onChange={(e) => setStatusShowModel(e.target.checked)}
+              />
+              Show model in status line
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={statusShowCost}
+                onChange={(e) => setStatusShowCost(e.target.checked)}
+              />
+              Show cost in status line
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={statusShowTime}
+                onChange={(e) => setStatusShowTime(e.target.checked)}
+              />
+              Show time in status line
+            </label>
+          </div>
         </CardContent>
       </Card>
 

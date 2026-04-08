@@ -1348,6 +1348,10 @@ const runtimeRouter = router({
         permissionMode: input.permissionMode,
         workingDirectories: input.workingDirectories,
         providerConfig: input.providerConfig,
+        // Phase 12: presentation
+        outputStyle: input.outputStyle,
+        statusLineConfig: input.statusLineConfig,
+        theme: input.theme,
       });
     }),
   // Phase 10: schedule CRUD. setSchedule writes the full config jsonb;
