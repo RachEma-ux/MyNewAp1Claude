@@ -62,22 +62,70 @@ let cached: SkillCatalog | null = null;
 
 /**
  * Resolve the absolute path of the vendored `skills/` directory.
- * Walks up from this file (server/agent-studio/adapters/...) to
- * server/agent-studio/skills/.
+ *
+ * This needs to work in both dev (tsx runs source files in-tree) and
+ * prod (esbuild bundles everything into dist/index.js, and the
+ * `server/agent-studio/skills/` source tree is still on disk but the
+ * file location no longer relates to its source path).
+ *
+ * Strategy: build a list of candidate paths and return the first one
+ * that exists. Order matters — most specific first.
+ *
+ * Candidates tried:
+ *   1. Dev / unbundled: walk up from import.meta.url
+ *      → .../server/agent-studio/skills
+ *   2. Prod with cwd at project root:
+ *      → <cwd>/server/agent-studio/skills
+ *   3. Prod with cwd at dist/:
+ *      → <cwd>/../server/agent-studio/skills
+ *   4. Override via env var:
+ *      → AGS_SKILLS_DIR (absolute path)
  */
 function resolveSkillsDir(): string {
-  // __dirname doesn't exist in ESM; derive from import.meta.url. The Node
-  // bundler used by this repo (esbuild) supports both.
-  let here: string;
+  // 0. Explicit override always wins
+  const envOverride = process.env.AGS_SKILLS_DIR;
+  if (envOverride && existsSync(envOverride)) return envOverride;
+
+  const candidates: string[] = [];
+
+  // 1. Walk up from this file (works in dev / tsx / unbundled)
   try {
-    here = fileURLToPath(import.meta.url);
+    const here = fileURLToPath(import.meta.url);
+    // here = .../server/agent-studio/adapters/skill-catalog-adapter.ts
+    // We want    .../server/agent-studio/skills/
+    candidates.push(join(here, "..", "..", "skills"));
   } catch {
-    // Fallback for non-ESM contexts
-    here = __filename;
+    // import.meta.url not available — skip this candidate
   }
-  // here = .../server/agent-studio/adapters/skill-catalog-adapter.ts
-  // We want    .../server/agent-studio/skills/
-  return join(here, "..", "..", "skills");
+
+  // 2. From the project root via cwd (works when cwd is the repo root)
+  candidates.push(join(process.cwd(), "server", "agent-studio", "skills"));
+
+  // 3. From dist/ via cwd (works when cwd is the dist directory itself)
+  candidates.push(
+    join(process.cwd(), "..", "server", "agent-studio", "skills")
+  );
+
+  // 4. Sibling to the bundle if the bundle ends up in dist/
+  try {
+    const here = fileURLToPath(import.meta.url);
+    candidates.push(
+      join(here, "..", "..", "server", "agent-studio", "skills")
+    );
+    candidates.push(
+      join(here, "..", "..", "..", "server", "agent-studio", "skills")
+    );
+  } catch {
+    /* ignore */
+  }
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+
+  // Nothing matched — return the first guess so the caller's
+  // existsSync() check fails cleanly with a stable path
+  return candidates[0] ?? join(process.cwd(), "server", "agent-studio", "skills");
 }
 
 // ── YAML frontmatter parser (minimal — only the keys we need) ───────────────
