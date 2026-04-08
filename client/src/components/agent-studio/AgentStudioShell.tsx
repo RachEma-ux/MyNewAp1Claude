@@ -52,6 +52,9 @@ const AgentRuntimePage = lazy(() => import("@/pages/agent-studio/AgentRuntimePag
 const AgentHooksPage = lazy(() => import("@/pages/agent-studio/AgentHooksPage"));
 const AgentMcpPage = lazy(() => import("@/pages/agent-studio/AgentMcpPage"));
 const AgentSubagentsPage = lazy(() => import("@/pages/agent-studio/AgentSubagentsPage"));
+// ── Phase 13e: Catalog (global pages, no agent context) ──
+const AgentSkillCatalogPage = lazy(() => import("@/pages/agent-studio/AgentSkillCatalogPage"));
+const AgentToolCatalogPage = lazy(() => import("@/pages/agent-studio/AgentToolCatalogPage"));
 
 interface ParsedRoute {
   agentId: number | null;
@@ -122,6 +125,17 @@ function parseRoute(path: string): ParsedRoute {
   }
   if (path.startsWith("/agent-studio/import")) {
     return { ...empty, homeMode: "import" };
+  }
+  // ── Phase 13e: Catalog (global, no agent context) ──
+  if (path.startsWith("/agent-studio/catalog/skills")) {
+    return { ...empty, view: "catalog-skills" as any, homeMode: null };
+  }
+  if (path.startsWith("/agent-studio/catalog/tools")) {
+    return { ...empty, view: "catalog-tools" as any, homeMode: null };
+  }
+  if (path.startsWith("/agent-studio/catalog")) {
+    // Bare /catalog → redirect to skills as the default landing
+    return { ...empty, view: "catalog-skills" as any, homeMode: null };
   }
 
   // /agent-studio/:id[/<section>[/<extra>]]
@@ -243,6 +257,18 @@ export default function AgentStudioShell() {
   // call publishVersion directly to avoid sending invalid versionId.
 
   const handleNavigate = (key: AgentStudioView) => {
+    // Phase 13e: catalog routes are global (no agent context). Always
+    // navigate to /agent-studio/catalog/* regardless of which view we
+    // were in before — clicking "Skills Catalog" from inside an agent
+    // detail page should still take you to the global catalog.
+    if (key === "catalog-skills") {
+      navigate("/agent-studio/catalog/skills");
+      return;
+    }
+    if (key === "catalog-tools") {
+      navigate("/agent-studio/catalog/tools");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -291,6 +317,11 @@ export default function AgentStudioShell() {
       switch (view) {
         case "new":
           return <AgentStudioNewPage />;
+        // ── Phase 13e: global catalog pages ──
+        case "catalog-skills" as any:
+          return <AgentSkillCatalogPage />;
+        case "catalog-tools" as any:
+          return <AgentToolCatalogPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }

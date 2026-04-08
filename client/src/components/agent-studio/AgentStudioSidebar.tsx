@@ -30,6 +30,7 @@ import {
   Webhook,
   Plug,
   Users,
+  Library,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -53,7 +54,10 @@ export type AgentStudioView =
   | "runtime"
   | "hooks"
   | "mcp"
-  | "subagents";
+  | "subagents"
+  // ── Phase 13e: Catalog (global, no agent context) ──
+  | "catalog-skills"
+  | "catalog-tools";
 
 interface SectionGroup {
   label: string;
@@ -66,6 +70,14 @@ const HOME_GROUPS: SectionGroup[] = [
     items: [
       { key: "home", label: "All Agents", icon: LayoutDashboard },
       { key: "new", label: "New Agent", icon: Bot },
+    ],
+  },
+  // ── Phase 13e: global catalog pages ──
+  {
+    label: "Catalog",
+    items: [
+      { key: "catalog-skills", label: "Skills Catalog", icon: Library },
+      { key: "catalog-tools", label: "Tools Catalog", icon: Wrench },
     ],
   },
 ];
