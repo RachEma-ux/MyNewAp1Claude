@@ -61,7 +61,7 @@ export const createFromTemplateSchema = z.object({
 export const importDefinitionSchema = z.object({
   name: z.string().min(1).max(200),
   internalKey: z.string().min(2).max(120),
-  definition: z.record(z.any()),
+  definition: z.record(z.string(), z.any()),
 });
 
 // Phase 2: clone-as-template — copies an existing agent's full state into
@@ -198,21 +198,21 @@ export const attachToolSchema = z.object({
   agentId: z.number().int().positive(),
   toolKey: z.string().min(1).max(120),
   toolName: z.string().min(1),
-  permissionMatrix: z.record(z.any()).optional(),
+  permissionMatrix: z.record(z.string(), z.any()).optional(),
   allowedActions: z.array(z.string()).optional(),
   blockedActions: z.array(z.string()).optional(),
   requiresApproval: z.boolean().optional(),
-  rateLimit: z.record(z.any()).optional(),
+  rateLimit: z.record(z.string(), z.any()).optional(),
   auditRequired: z.boolean().optional(),
 });
 
 export const updateToolBindingSchema = z.object({
   bindingId: z.number().int().positive(),
-  permissionMatrix: z.record(z.any()).optional(),
+  permissionMatrix: z.record(z.string(), z.any()).optional(),
   allowedActions: z.array(z.string()).optional(),
   blockedActions: z.array(z.string()).optional(),
   requiresApproval: z.boolean().optional(),
-  rateLimit: z.record(z.any()).optional(),
+  rateLimit: z.record(z.string(), z.any()).optional(),
   auditRequired: z.boolean().optional(),
 });
 
@@ -223,14 +223,14 @@ export const removeToolSchema = z.object({
 export const simulateToolCallSchema = z.object({
   agentId: z.number().int().positive(),
   toolKey: z.string().min(1),
-  payload: z.record(z.any()).default({}),
+  payload: z.record(z.string(), z.any()).default({}),
 });
 
 // ── Knowledge ───────────────────────────────────────────────────────────────
 
 export const updateKnowledgeConfigSchema = z.object({
   agentId: z.number().int().positive(),
-  config: z.record(z.any()),
+  config: z.record(z.string(), z.any()),
   bindings: z
     .array(
       z.object({
@@ -263,7 +263,7 @@ export const updateMemoryConfigSchema = z.object({
       readPermissions: z.array(z.string()).optional(),
       writePermissions: z.array(z.string()).optional(),
       deletionPolicy: z.string().optional(),
-      privacyRules: z.record(z.any()).optional(),
+      privacyRules: z.record(z.string(), z.any()).optional(),
     })
   ),
 });
@@ -272,14 +272,14 @@ export const updateMemoryConfigSchema = z.object({
 
 export const updateWorkflowConfigSchema = z.object({
   agentId: z.number().int().positive(),
-  config: z.record(z.any()),
+  config: z.record(z.string(), z.any()),
   nodes: z
     .array(
       z.object({
         nodeKey: z.string().min(1),
         nodeType: z.string().min(1),
         label: z.string().optional(),
-        config: z.record(z.any()).optional(),
+        config: z.record(z.string(), z.any()).optional(),
         positionX: z.number().int().optional(),
         positionY: z.number().int().optional(),
       })
@@ -291,7 +291,7 @@ export const updateWorkflowConfigSchema = z.object({
         fromNodeKey: z.string().min(1),
         toNodeKey: z.string().min(1),
         label: z.string().optional(),
-        condition: z.record(z.any()).optional(),
+        condition: z.record(z.string(), z.any()).optional(),
       })
     )
     .optional(),
@@ -301,7 +301,7 @@ export const updateWorkflowConfigSchema = z.object({
 
 export const updateGovernancePolicySchema = z.object({
   agentId: z.number().int().positive(),
-  policy: z.record(z.any()),
+  policy: z.record(z.string(), z.any()),
 });
 
 // ── Simulation ──────────────────────────────────────────────────────────────
@@ -311,14 +311,14 @@ export const saveSimulationScenarioSchema = z.object({
   scenarioId: z.number().int().positive().optional(),
   name: z.string().min(1).max(200),
   description: z.string().optional(),
-  inputPayload: z.record(z.any()).default({}),
-  toggles: z.record(z.any()).default({}),
+  inputPayload: z.record(z.string(), z.any()).default({}),
+  toggles: z.record(z.string(), z.any()).default({}),
 });
 
 export const runSimulationSchema = z.object({
   agentId: z.number().int().positive(),
   scenarioId: z.number().int().positive().optional(),
-  inputPayload: z.record(z.any()).optional(),
+  inputPayload: z.record(z.string(), z.any()).optional(),
   toggles: z
     .object({
       mockedTools: z.boolean().default(true),
@@ -363,8 +363,8 @@ export const saveTestCaseSchema = z.object({
   suiteId: z.number().int().positive(),
   caseId: z.number().int().positive().optional(),
   name: z.string().min(1).max(200),
-  inputPayload: z.record(z.any()).default({}),
-  expected: z.record(z.any()).optional(),
+  inputPayload: z.record(z.string(), z.any()).default({}),
+  expected: z.record(z.string(), z.any()).optional(),
   assertions: z.array(z.any()).optional(),
 });
 
@@ -460,7 +460,7 @@ export const saveMcpServerSchema = z.object({
   transport: z.enum(AGS_MCP_TRANSPORTS),
   command: z.string().nullable().optional(),
   args: z.array(z.string()).optional(),
-  env: z.record(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
   url: z.string().nullable().optional(),
   enabled: z.boolean().optional(),
 });
@@ -478,7 +478,7 @@ export const attachSkillSchema = z.object({
   allowedTools: z.array(z.string()).optional(),
   blockedTools: z.array(z.string()).optional(),
   requiresApproval: z.boolean().optional(),
-  argsSchema: z.record(z.any()).optional(),
+  argsSchema: z.record(z.string(), z.any()).optional(),
 });
 
 export const removeSkillSchema = z.object({
@@ -546,10 +546,8 @@ export const updateRuntimeConfigSchema = z.object({
   criticalSystemReminder: z.string().nullable().optional(),
   permissionMode: z.enum(AGS_PERMISSION_MODES).nullable().optional(),
   workingDirectories: z.array(z.string()).optional(),
-  providerConfig: z.record(z.any()).optional(),
-  // Phase 12: presentation. statusLineConfig uses the zod 4 two-arg form
-  // because it's a new schema; the existing pre-existing one-arg
-  // z.record calls (~20 of them) are out of scope for this phase.
+  providerConfig: z.record(z.string(), z.any()).optional(),
+  // Phase 12: presentation
   outputStyle: z.enum(["plain", "markdown", "json"]).nullable().optional(),
   statusLineConfig: z.record(z.string(), z.any()).optional(),
   theme: z.enum(["dark", "light", "monokai"]).nullable().optional(),
