@@ -84,6 +84,19 @@ export async function getAgentById(agentId: number) {
   return rows[0] ?? null;
 }
 
+/**
+ * Lookup an agent by its `internal_key`. Used by the openllm-agent2 seeder
+ * to make seeding idempotent.
+ */
+export async function getAgentByInternalKey(internalKey: string) {
+  const rows = await db()
+    .select()
+    .from(agsAgents)
+    .where(eq(agsAgents.internalKey, internalKey))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function createAgent(input: {
   name: string;
   internalKey: string;

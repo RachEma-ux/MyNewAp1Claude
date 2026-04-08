@@ -27,6 +27,7 @@ import * as toolCatalog from "../adapters/tool-catalog-adapter";
 import * as knowledgeAdapter from "../adapters/knowledge-adapter";
 import * as templateRegistry from "../adapters/template-registry";
 import * as skillCatalog from "../adapters/skill-catalog-adapter";
+import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import {
   agentIdSchema,
   archiveAgentSchema,
@@ -163,6 +164,25 @@ const creationRouter = router({
       return result!.agent;
     }),
   listTemplates: protectedProcedure.query(() => templateRegistry.listTemplates()),
+  /**
+   * Phase 1a: Idempotent openllm-agent2 seeder.
+   *
+   * Creates a canonical "openllm-agent2" agent row in Studio if it doesn't
+   * already exist. Safe to call repeatedly — re-clicks return the existing
+   * row with no modifications.
+   *
+   * Bypasses the normal lifecycle flow (new → draft → tested → published)
+   * because openllm-agent2 represents an external runtime, not a draft
+   * being designed in Studio. This is intentional and documented in the
+   * seeder file.
+   *
+   * Not `governedProcedure` because it's idempotent + creation-only +
+   * draft-based for the user. Same trust level as the other creation
+   * procedures (createBlankAgent, createFromTemplate, importDefinition).
+   */
+  seedOpenllmAgent2: protectedProcedure.mutation(async ({ ctx }) => {
+    return seedOpenllmAgent2({ ownerId: ctx.user.id });
+  }),
   importDefinition: protectedProcedure
     .input(importDefinitionSchema)
     .mutation(async ({ ctx, input }) => {

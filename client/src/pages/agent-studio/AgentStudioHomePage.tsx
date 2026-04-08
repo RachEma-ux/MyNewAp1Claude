@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import {
   Bot,
   Plus,
@@ -18,6 +19,8 @@ import {
   AlertTriangle,
   PauseCircle,
   Search as SearchIcon,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import {
   PageHeader,
@@ -35,6 +38,7 @@ export default function AgentStudioHomePage({
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<string | undefined>(undefined);
 
+  const utils = trpc.useUtils();
   const summaryQuery = trpc.agentStudio.home.getHomeSummary.useQuery();
   const agentsQuery = trpc.agentStudio.home.listAgents.useQuery({
     state: stateFilter as any,
@@ -47,6 +51,24 @@ export default function AgentStudioHomePage({
   const agents = agentsQuery.data ?? [];
   const reviewQueue = reviewQuery.data ?? [];
 
+  // Phase 1a: openllm-agent2 seeder — idempotent, navigates to the seeded
+  // agent's overview on success.
+  const seedOpenllmMut = trpc.agentStudio.creation.seedOpenllmAgent2.useMutation({
+    onSuccess: (result) => {
+      if (result.alreadyExisted) {
+        toast.info("OpenLLM Agent already exists — opening it");
+      } else {
+        toast.success(
+          `Seeded OpenLLM Agent — ${result.attachedTools} tools, ${result.attachedSkills} skills, ${result.permissionRules} rules`
+        );
+      }
+      utils.agentStudio.home.listAgents.invalidate();
+      utils.agentStudio.home.getHomeSummary.invalidate();
+      navigate(`/agent-studio/${result.agent.id}/overview`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   return (
     <div className="p-4 space-y-4">
       <PageHeader
@@ -54,9 +76,25 @@ export default function AgentStudioHomePage({
         subtitle="Standalone agent lifecycle module — design, simulate, govern, test, release"
         icon={<Bot className="h-4 w-4 text-blue-500" />}
         actions={
-          <Button size="sm" onClick={() => navigate("/agent-studio/new")}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> New Agent
-          </Button>
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => seedOpenllmMut.mutate()}
+              disabled={seedOpenllmMut.isPending}
+              title="Idempotent — re-clicks open the existing OpenLLM Agent row"
+            >
+              {seedOpenllmMut.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5 mr-1" />
+              )}
+              Seed OpenLLM Agent
+            </Button>
+            <Button size="sm" onClick={() => navigate("/agent-studio/new")}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> New Agent
+            </Button>
+          </>
         }
       />
 
