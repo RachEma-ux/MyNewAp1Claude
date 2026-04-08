@@ -229,6 +229,58 @@ export const removeCatalogToolSchema = z.object({
 
 export const validateCatalogToolSchema = createCatalogToolSchema;
 
+// ── Phase 14: Marketplace ───────────────────────────────────────────────────
+
+export const listMarketplaceItemsSchema = z
+  .object({
+    itemType: z
+      .enum(["skill", "skill_pack", "tool", "tool_pack", "bundle"])
+      .optional(),
+    author: z.string().max(120).optional(),
+    source: z.enum(["local", "imported", "published"]).optional(),
+    search: z.string().max(120).optional(),
+    limit: z.number().int().min(1).max(200).optional(),
+  })
+  .optional();
+
+export const getMarketplaceItemSchema = z.object({
+  itemKey: z.string().min(1).max(180),
+  version: z.string().max(32).optional(),
+});
+
+export const publishMarketplaceItemSchema = z.object({
+  itemKey: z.string().min(1).max(180),
+  itemType: z.enum(["skill", "skill_pack", "tool", "tool_pack", "bundle"]),
+  displayName: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  author: z.string().max(120).optional(),
+  version: z.string().min(1).max(32),
+  payload: z.record(z.string(), z.any()),
+  tags: z.array(z.string().max(64)).max(20).optional(),
+});
+
+export const unpublishMarketplaceItemSchema = z.object({
+  itemId: z.number().int().positive(),
+});
+
+export const installMarketplaceItemSchema = z.object({
+  itemId: z.number().int().positive(),
+  /** Optional — when set, install also attaches to this agent's draft */
+  agentId: z.number().int().positive().optional(),
+  /** Conflict resolution: skip | overwrite | rename */
+  onConflict: z.enum(["skip", "overwrite", "rename"]).default("skip"),
+});
+
+export const uninstallMarketplaceItemSchema = z.object({
+  installId: z.number().int().positive(),
+});
+
+export const refreshMarketplaceRegistrySchema = z
+  .object({
+    registryUrl: z.string().url().optional(),
+  })
+  .optional();
+
 // ── Phase 13d: Skill .md import ─────────────────────────────────────────────
 
 export const importSkillMarkdownSchema = z.object({

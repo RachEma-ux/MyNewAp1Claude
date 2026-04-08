@@ -49,6 +49,10 @@ import {
   // ── Phase 13: Catalog (user-authored tools + skills) ──
   agsCatalogTools,
   agsCatalogSkills,
+  // ── Phase 14: Marketplace ──
+  agsMarketplaceItems,
+  agsMarketplaceCollections,
+  agsMarketplaceInstalls,
 } from "../../drizzle/tables/agent-studio";
 
 function db() {
@@ -2280,4 +2284,205 @@ export async function updateCatalogTool(
 
 export async function removeCatalogTool(id: number) {
   await db().delete(agsCatalogTools).where(eq(agsCatalogTools.id, id));
+}
+
+// ── Phase 14: Marketplace ──────────────────────────────────────────────────
+
+export async function listMarketplaceItems(filter?: {
+  itemType?: string;
+  author?: string;
+  source?: string;
+  search?: string;
+  limit?: number;
+}) {
+  const conditions = [] as any[];
+  if (filter?.itemType)
+    conditions.push(eq(agsMarketplaceItems.itemType, filter.itemType));
+  if (filter?.author)
+    conditions.push(eq(agsMarketplaceItems.author, filter.author));
+  if (filter?.source)
+    conditions.push(eq(agsMarketplaceItems.source, filter.source));
+  if (filter?.search && filter.search.trim()) {
+    const needle = `%${filter.search.trim()}%`;
+    conditions.push(
+      or(
+        ilike(agsMarketplaceItems.itemKey, needle),
+        ilike(agsMarketplaceItems.displayName, needle),
+        ilike(agsMarketplaceItems.description, needle)
+      )!
+    );
+  }
+  let q = db().select().from(agsMarketplaceItems);
+  if (conditions.length > 0) q = q.where(and(...conditions)) as any;
+  q = q.orderBy(desc(agsMarketplaceItems.installCount), agsMarketplaceItems.itemKey) as any;
+  if (filter?.limit) q = q.limit(filter.limit) as any;
+  return q;
+}
+
+export async function getMarketplaceItemById(id: number) {
+  const rows = await db()
+    .select()
+    .from(agsMarketplaceItems)
+    .where(eq(agsMarketplaceItems.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getMarketplaceItemByKeyVersion(
+  itemKey: string,
+  version?: string
+) {
+  if (version) {
+    const rows = await db()
+      .select()
+      .from(agsMarketplaceItems)
+      .where(
+        and(
+          eq(agsMarketplaceItems.itemKey, itemKey),
+          eq(agsMarketplaceItems.version, version)
+        )
+      )
+      .limit(1);
+    return rows[0] ?? null;
+  }
+  // No version → most recent (orderBy desc on createdAt)
+  const rows = await db()
+    .select()
+    .from(agsMarketplaceItems)
+    .where(eq(agsMarketplaceItems.itemKey, itemKey))
+    .orderBy(desc(agsMarketplaceItems.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createMarketplaceItem(input: {
+  itemKey: string;
+  itemType: string;
+  displayName: string;
+  description?: string | null;
+  author?: string | null;
+  version: string;
+  payload: Record<string, unknown>;
+  tags?: string[];
+  contentHash?: string | null;
+  source?: string;
+  createdBy?: number | null;
+}) {
+  const [created] = await db()
+    .insert(agsMarketplaceItems)
+    .values({
+      itemKey: input.itemKey,
+      itemType: input.itemType,
+      displayName: input.displayName,
+      description: input.description ?? null,
+      author: input.author ?? null,
+      version: input.version,
+      payload: input.payload,
+      tags: input.tags ?? [],
+      contentHash: input.contentHash ?? null,
+      source: input.source ?? "local",
+      createdBy: input.createdBy ?? null,
+    })
+    .returning();
+  return created;
+}
+
+export async function removeMarketplaceItem(id: number) {
+  await db().delete(agsMarketplaceItems).where(eq(agsMarketplaceItems.id, id));
+}
+
+export async function bumpMarketplaceInstallCount(itemId: number) {
+  await db()
+    .update(agsMarketplaceItems)
+    .set({
+      installCount: sql`${agsMarketplaceItems.installCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(agsMarketplaceItems.id, itemId));
+}
+
+export async function decrementMarketplaceInstallCount(itemId: number) {
+  await db()
+    .update(agsMarketplaceItems)
+    .set({
+      installCount: sql`GREATEST(0, ${agsMarketplaceItems.installCount} - 1)`,
+      updatedAt: new Date(),
+    })
+    .where(eq(agsMarketplaceItems.id, itemId));
+}
+
+// ── Marketplace collections ────────────────────────────────────────────────
+
+export async function listMarketplaceCollections() {
+  return db()
+    .select()
+    .from(agsMarketplaceCollections)
+    .orderBy(desc(agsMarketplaceCollections.isOfficial), agsMarketplaceCollections.key);
+}
+
+export async function createMarketplaceCollection(input: {
+  key: string;
+  name: string;
+  description?: string | null;
+  itemKeys?: string[];
+  isOfficial?: boolean;
+  createdBy?: number | null;
+}) {
+  const [created] = await db()
+    .insert(agsMarketplaceCollections)
+    .values({
+      key: input.key,
+      name: input.name,
+      description: input.description ?? null,
+      itemKeys: input.itemKeys ?? [],
+      isOfficial: input.isOfficial ?? false,
+      createdBy: input.createdBy ?? null,
+    })
+    .returning();
+  return created;
+}
+
+// ── Marketplace installs (audit + uninstall) ───────────────────────────────
+
+export async function recordMarketplaceInstall(input: {
+  itemId: number;
+  agentId?: number | null;
+  createdSkillIds?: number[];
+  createdToolIds?: number[];
+  installedBy?: number | null;
+}) {
+  const [created] = await db()
+    .insert(agsMarketplaceInstalls)
+    .values({
+      itemId: input.itemId,
+      agentId: input.agentId ?? null,
+      createdSkillIds: input.createdSkillIds ?? [],
+      createdToolIds: input.createdToolIds ?? [],
+      installedBy: input.installedBy ?? null,
+    })
+    .returning();
+  return created;
+}
+
+export async function getMarketplaceInstallById(id: number) {
+  const rows = await db()
+    .select()
+    .from(agsMarketplaceInstalls)
+    .where(eq(agsMarketplaceInstalls.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listMarketplaceInstallsForItem(itemId: number) {
+  return db()
+    .select()
+    .from(agsMarketplaceInstalls)
+    .where(eq(agsMarketplaceInstalls.itemId, itemId))
+    .orderBy(desc(agsMarketplaceInstalls.installedAt));
+}
+
+export async function removeMarketplaceInstall(id: number) {
+  await db()
+    .delete(agsMarketplaceInstalls)
+    .where(eq(agsMarketplaceInstalls.id, id));
 }

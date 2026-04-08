@@ -30,6 +30,7 @@ import * as skillCatalog from "../adapters/skill-catalog-adapter";
 import * as catalogSkillsService from "../services/catalog-skills";
 import * as catalogToolsService from "../services/catalog-tools";
 import { cloneAgent } from "../services/cloning";
+import * as marketplaceService from "../services/marketplace";
 import { importFromMarkdown as importSkillsFromMarkdown } from "../services/skill-importer";
 // Phase 12.5: scheduler is now started explicitly via bootAgentStudio()
 // in server/agent-studio/boot.ts (called from _core/index.ts). The
@@ -60,6 +61,13 @@ import {
   updateCatalogSkillSchema,
   updateCatalogToolSchema,
   importSkillMarkdownSchema,
+  installMarketplaceItemSchema,
+  listMarketplaceItemsSchema,
+  getMarketplaceItemSchema,
+  publishMarketplaceItemSchema,
+  refreshMarketplaceRegistrySchema,
+  uninstallMarketplaceItemSchema,
+  unpublishMarketplaceItemSchema,
   validateCatalogSkillSchema,
   validateCatalogToolSchema,
   comparePromptPackSchema,
@@ -1633,6 +1641,76 @@ const catalogToolsRouter = router({
     }),
 });
 
+// ── Phase 14: Marketplace sub-router ────────────────────────────────────────
+
+/**
+ * Agent Studio's own marketplace. Local-first, ONE official registry
+ * URL hardcoded in the service. Per Decision #7, publishing to a remote
+ * registry is "file a PR" — there's no API for it.
+ *
+ * Trust levels:
+ *   - list / get / listCollections      → protectedProcedure (read-only)
+ *   - publish / unpublish                → protectedProcedure (local DB)
+ *   - refresh (network fetch of registry) → governedProcedure
+ *   - install / uninstall                 → protectedProcedure (Phase 14d)
+ */
+const marketplaceRouter = router({
+  list: protectedProcedure
+    .input(listMarketplaceItemsSchema)
+    .query(async ({ input }) => {
+      return marketplaceService.listMarketplaceItems(input);
+    }),
+  get: protectedProcedure
+    .input(getMarketplaceItemSchema)
+    .query(async ({ input }) => {
+      return marketplaceService.getMarketplaceItem(input.itemKey, input.version);
+    }),
+  publish: protectedProcedure
+    .input(publishMarketplaceItemSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await marketplaceService.publishToLocalMarketplace({
+          ...input,
+          payload: input.payload as any,
+          createdBy: ctx.user.id,
+        });
+      } catch (e) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+  unpublish: protectedProcedure
+    .input(unpublishMarketplaceItemSchema)
+    .mutation(async ({ input }) => {
+      const result = await marketplaceService.unpublishLocalItem(input.itemId);
+      if (!result.ok) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: result.error ?? "unpublish failed",
+        });
+      }
+      return { success: true };
+    }),
+  refresh: governedProcedure
+    .input(refreshMarketplaceRegistrySchema)
+    .mutation(async ({ input }) => {
+      try {
+        return await marketplaceService.refreshFromRegistry(input?.registryUrl);
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+  listCollections: protectedProcedure.query(async () => {
+    return marketplaceService.listCollections();
+  }),
+  // install / uninstall land in Phase 14d
+});
+
 // ── Compose ─────────────────────────────────────────────────────────────────
 
 export const agentStudioRouter = router({
@@ -1667,4 +1745,6 @@ export const agentStudioRouter = router({
   // Phase 13: Catalog (skills + tools)
   catalogSkills: catalogSkillsRouter,
   catalogTools: catalogToolsRouter,
+  // Phase 14: Marketplace
+  marketplace: marketplaceRouter,
 });

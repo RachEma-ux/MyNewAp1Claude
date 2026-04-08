@@ -984,3 +984,105 @@ export const agsCatalogSkills = pgTable(
     sourceIdx: index("idx_ags_catalog_skills_source").on(t.source),
   })
 );
+
+// ── Phase 14: Marketplace (Agent Studio's own — no external links) ──────────
+
+/**
+ * Phase 14: A marketplace item is a packaged unit of catalog content
+ * (skills, tools, hooks, MCP servers) that can be installed onto the
+ * local catalog and optionally onto a specific agent.
+ *
+ * Sources:
+ *   "local"      → created on this Studio instance (publish flow)
+ *   "imported"   → pulled from a remote registry
+ *   "published"  → created here AND submitted to a remote registry
+ *
+ * Content lives in `payload` as a strict-typed jsonb shape — see the
+ * Phase 14b service for the union of allowed shapes per `itemType`.
+ */
+export const agsMarketplaceItems = pgTable(
+  "ags_marketplace_items",
+  {
+    id: serial("id").primaryKey(),
+    /** "<author>/<itemKey>" — globally unique within (itemKey, version) */
+    itemKey: varchar("item_key", { length: 180 }).notNull(),
+    /** "skill" | "skill_pack" | "tool" | "tool_pack" | "bundle" */
+    itemType: varchar("item_type", { length: 32 }).notNull(),
+    displayName: text("display_name").notNull(),
+    description: text("description"),
+    author: varchar("author", { length: 120 }),
+    version: varchar("version", { length: 32 }).notNull(),
+    /** The full serialized payload — see services/marketplace.ts for shape */
+    payload: jsonb("payload")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    /** Tags for search */
+    tags: jsonb("tags").$type<string[]>().default([]),
+    /** SHA-256 of payload for integrity + dedupe */
+    contentHash: varchar("content_hash", { length: 64 }),
+    /** local | imported | published */
+    source: varchar("source", { length: 16 }).notNull().default("local"),
+    /** Bumped on install, NOT on view */
+    installCount: integer("install_count").default(0),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    keyVersionIdx: uniqueIndex("uniq_ags_marketplace_items_key_version").on(
+      t.itemKey,
+      t.version
+    ),
+    typeIdx: index("idx_ags_marketplace_items_type").on(t.itemType),
+    sourceIdx: index("idx_ags_marketplace_items_source").on(t.source),
+  })
+);
+
+/**
+ * Curated collections of marketplace items — used for the "Featured"
+ * section of the marketplace home page. The bundled official seed
+ * creates one collection per skill pack so the marketplace has a
+ * populated landing on day one.
+ */
+export const agsMarketplaceCollections = pgTable(
+  "ags_marketplace_collections",
+  {
+    id: serial("id").primaryKey(),
+    key: varchar("key", { length: 120 }).notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    /** Ordered list of itemKey strings */
+    itemKeys: jsonb("item_keys").$type<string[]>().default([]),
+    isOfficial: boolean("is_official").default(false),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    keyIdx: uniqueIndex("uniq_ags_marketplace_collections_key").on(t.key),
+  })
+);
+
+/**
+ * Audit + reversal record. Every install creates one of these so we
+ * can uninstall by reading createdSkillIds / createdToolIds and
+ * deleting them.
+ */
+export const agsMarketplaceInstalls = pgTable(
+  "ags_marketplace_installs",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id").notNull(),
+    /** Null when this is a global "install to catalog" (not per-agent) */
+    agentId: integer("agent_id"),
+    /** Catalog row ids the install created — used for uninstall */
+    createdSkillIds: jsonb("created_skill_ids").$type<number[]>().default([]),
+    createdToolIds: jsonb("created_tool_ids").$type<number[]>().default([]),
+    installedBy: integer("installed_by"),
+    installedAt: timestamp("installed_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    itemIdx: index("idx_ags_marketplace_installs_item").on(t.itemId),
+    agentIdx: index("idx_ags_marketplace_installs_agent").on(t.agentId),
+  })
+);
