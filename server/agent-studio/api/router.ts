@@ -30,6 +30,7 @@ import * as skillCatalog from "../adapters/skill-catalog-adapter";
 import * as catalogSkillsService from "../services/catalog-skills";
 import * as catalogToolsService from "../services/catalog-tools";
 import { cloneAgent } from "../services/cloning";
+import { importFromMarkdown as importSkillsFromMarkdown } from "../services/skill-importer";
 // Phase 12.5: scheduler is now started explicitly via bootAgentStudio()
 // in server/agent-studio/boot.ts (called from _core/index.ts). The
 // previous side-effect import here was fragile because it depended on
@@ -58,6 +59,7 @@ import {
   removeCatalogToolSchema,
   updateCatalogSkillSchema,
   updateCatalogToolSchema,
+  importSkillMarkdownSchema,
   validateCatalogSkillSchema,
   validateCatalogToolSchema,
   comparePromptPackSchema,
@@ -1536,6 +1538,20 @@ const catalogSkillsRouter = router({
     .input(validateCatalogSkillSchema)
     .mutation(async ({ input }) => {
       return catalogSkillsService.validateCatalogSkill(input);
+    }),
+  // Phase 13d: batch .md file import. The client uses a file picker
+  // (FileReader) to read each file, then POSTs an array of
+  // {fileName, content}. Per-file results are returned so the UI can
+  // render a table of imported / failed / overwritten outcomes.
+  importFromMarkdown: protectedProcedure
+    .input(importSkillMarkdownSchema)
+    .mutation(async ({ ctx, input }) => {
+      return importSkillsFromMarkdown({
+        files: input.files,
+        packKey: input.packKey,
+        overwrite: input.overwrite ?? false,
+        createdBy: ctx.user.id,
+      });
     }),
 });
 

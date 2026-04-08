@@ -229,6 +229,24 @@ export const removeCatalogToolSchema = z.object({
 
 export const validateCatalogToolSchema = createCatalogToolSchema;
 
+// ── Phase 13d: Skill .md import ─────────────────────────────────────────────
+
+export const importSkillMarkdownSchema = z.object({
+  files: z
+    .array(
+      z.object({
+        fileName: z.string().min(1).max(500),
+        // 200 KB cap per file — anything larger is almost certainly
+        // not a single skill
+        content: z.string().min(1).max(200_000),
+      })
+    )
+    .min(1)
+    .max(50), // batch cap — 50 .md files is generous for one operation
+  packKey: z.string().min(1).max(64).optional(),
+  overwrite: z.boolean().default(false),
+});
+
 // Phase 11: resume / compact prior runs.
 export const resumeRunSchema = z.object({
   sourceRunId: z.number().int().positive(),
