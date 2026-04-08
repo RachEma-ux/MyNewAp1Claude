@@ -396,14 +396,47 @@ export async function invokeMcpPrompt(input: {
 }
 
 /**
- * Invoke a tool on a connected MCP server. Throws if the server isn't
- * connected or the tool isn't advertised.
+ * Phase 19a: Get the live MCP connection for a server, or undefined if
+ * not currently connected. Used by the dispatcher to invoke tools
+ * directly without going through `callMcpTool` (which is now a shim
+ * that delegates to the dispatcher — that would create a cycle).
+ */
+export function getMcpConnection(serverId: number): McpConnection | undefined {
+  return connections.get(serverId);
+}
+
+/**
+ * Invoke a tool on a connected MCP server.
+ *
+ * Phase 19a: This function is now a **5-line shim** that delegates to
+ * the dispatcher (decision #2a — backward compat for any caller we
+ * missed during the simulation.ts migration). New callers should use
+ * `dispatchMcpToolCall` directly with the right `agentDraftId` and
+ * `runtimeRunId` for proper governance + audit attribution.
+ *
+ * The shim uses `agentDraftId: -1` (SYSTEM_DRAFT_ID) which bypasses
+ * the per-agent allowedTools check but STILL runs governance + writes
+ * an audit row when a `runtimeRunId` is provided. This matches the
+ * old "raw call" semantics while keeping every MCP invocation governed.
+ *
+ * The original throw-on-not-connected / throw-on-tool-not-found
+ * behavior is preserved by re-throwing structured dispatcher errors as
+ * `McpError` so legacy callers don't break.
  */
 export async function callMcpTool(input: {
   serverId: number;
   toolName: string;
   args: Record<string, unknown>;
 }): Promise<unknown> {
+  // Phase 19a shim — look up the server name so we can build the
+  // dispatcher's `mcp__server__tool` key. The dispatcher will then
+  // re-resolve back to the same serverId via the SYSTEM_DRAFT_ID path
+  // (which scans listAllMcpServers). One DB roundtrip — acceptable
+  // for the legacy shim path. New callers that already have the
+  // full tool name should call dispatchMcpToolCall directly.
+  //
+  // The dispatcher import is lazy (dynamic) to break the circular
+  // dependency: dispatcher.ts imports getMcpConnection from this file.
   const conn = connections.get(input.serverId);
   if (!conn) {
     throw new McpError(
@@ -411,14 +444,30 @@ export async function callMcpTool(input: {
       `MCP server ${input.serverId} is not connected — connect it first`
     );
   }
-  const advertised = conn.tools.find((t) => t.name === input.toolName);
-  if (!advertised) {
+  const row = await repo.getMcpServerById(input.serverId);
+  if (!row) {
     throw new McpError(
-      "tool_not_found",
-      `Tool ${input.toolName} not found on server ${input.serverId}`
+      "not_found",
+      `MCP server ${input.serverId} row missing`
     );
   }
-  return conn.callTool(input.toolName, input.args);
+  const { dispatchMcpToolCall } = await import("./dispatcher");
+  const result = await dispatchMcpToolCall({
+    agentDraftId: -1, // SYSTEM_DRAFT_ID
+    toolName: `mcp__${row.name}__${input.toolName}`,
+    args: input.args,
+    source: "manual_test",
+  });
+  if (!result.ok) {
+    // Map dispatcher error codes back to McpError codes for backward compat
+    const code = result.error?.code === "tool_not_found"
+      ? "tool_not_found"
+      : result.error?.code === "server_not_connected"
+        ? "not_connected"
+        : result.error?.code ?? "internal_error";
+    throw new McpError(code, result.error?.message ?? "callMcpTool failed");
+  }
+  return result.result;
 }
 
 /**

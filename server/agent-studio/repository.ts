@@ -209,6 +209,21 @@ export async function getCurrentDraft(agentId: number) {
   return rows[0] ?? null;
 }
 
+/**
+ * Phase 19a: Look up a draft by its primary id (not by agentId).
+ * The MCP dispatcher path holds a draftId from the upstream caller and
+ * needs to read the draft's `governancePolicy` blob without round-tripping
+ * through `getCurrentDraft(agentId)`.
+ */
+export async function getDraftById(draftId: number) {
+  const rows = await db()
+    .select()
+    .from(agsAgentDrafts)
+    .where(eq(agsAgentDrafts.id, draftId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function updateDraft(
   agentId: number,
   patch: Partial<typeof agsAgentDrafts.$inferInsert>

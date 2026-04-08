@@ -1,0 +1,515 @@
+/**
+ * AI Agent Studio — MCP Dispatcher (Phase 19a, the keystone)
+ *
+ * Single chokepoint for ALL MCP tool invocations in the codebase. After
+ * Phase 19a, every MCP `tools/call` goes through `dispatchMcpToolCall`.
+ * Direct `conn.callTool(...)` invocations are forbidden outside this
+ * file (the `mcpManager.callMcpTool` shim and the simulation engine
+ * both delegate here).
+ *
+ * Responsibilities:
+ *   1. Input validation
+ *   2. Tool name parsing (`mcp__server__tool`)
+ *   3. Server lookup + connection state check
+ *   4. Tool existence check on the connected server
+ *   5. Per-agent allowedTools authorization (from agsDraftPermissionRules)
+ *   6. Governance pre-invoke evaluation
+ *   7. Actual `conn.callTool()` invocation
+ *   8. Error normalization
+ *   9. Latency capture
+ *  10. Governance post-invoke evaluation
+ *  11. Audit row write to `agsRuntimePolicyEvents` (sync, decision #5a)
+ *  12. Structured result return
+ *
+ * The dispatcher is the SINGLE governance integration point for MCP
+ * calls. Today every MCP call is ungoverned; after Phase 19a every
+ * call is governed and audited through one well-typed function.
+ *
+ * Authorization order (decision #4a — fast check first):
+ *   1. allowedTools (in-memory rules table)
+ *   2. governance pre-invoke (may hit policy engine)
+ *
+ * "ask" rules → treated as deny (decision #3a). The async pending-
+ * request flow only exists in the simulation engine; the dispatcher
+ * is sync. TODO: revisit if/when async dispatch is needed.
+ */
+
+import * as repo from "../../repository";
+import { getMcpConnection } from "./mcp-manager";
+import {
+  evaluateMcpPreInvoke,
+  evaluateMcpPostInvoke,
+} from "../governance-adapter";
+import type {
+  DispatchMcpToolCallInput,
+  DispatchMcpToolCallResult,
+  DispatchErrorCode,
+  McpDispatchAuditPayload,
+} from "./dispatcher-types";
+
+// ── Constants ──────────────────────────────────────────────────────────────
+
+/** Synthetic agentDraftId for system/admin calls that bypass allowedTools */
+const SYSTEM_DRAFT_ID = -1;
+
+/** Max bytes of result preview written to the audit row payload */
+const RESULT_PREVIEW_MAX_BYTES = 4096;
+
+/**
+ * Field names whose values get redacted in the audit payload's
+ * argsPreview. Anything matching these (case-insensitive substring)
+ * is replaced with `"[REDACTED]"`. Compliance + security baseline.
+ */
+const REDACT_FIELD_PATTERNS = [
+  "apikey",
+  "api_key",
+  "password",
+  "secret",
+  "token",
+  "auth",
+  "credential",
+  "private_key",
+  "privatekey",
+];
+
+// ── Pure helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Parse `mcp__server__tool` into its components.
+ *
+ * Strict 3-component parser (R4 mitigation). The server name may NOT
+ * contain `__`. We split on the FIRST `__` after the prefix and treat
+ * everything after as the tool name. If the tool name itself contains
+ * `__` that is fine (some MCP servers do this).
+ */
+export function parseToolName(toolName: string): {
+  ok: boolean;
+  serverName?: string;
+  remoteToolName?: string;
+  error?: string;
+} {
+  if (typeof toolName !== "string" || toolName.length === 0) {
+    return { ok: false, error: "tool name is empty" };
+  }
+  if (!toolName.startsWith("mcp__")) {
+    return { ok: false, error: "tool name must start with mcp__" };
+  }
+  const rest = toolName.slice("mcp__".length);
+  const sepIdx = rest.indexOf("__");
+  if (sepIdx <= 0) {
+    return {
+      ok: false,
+      error: "tool name must be mcp__<server>__<tool> with both parts non-empty",
+    };
+  }
+  const serverName = rest.slice(0, sepIdx);
+  const remoteToolName = rest.slice(sepIdx + 2);
+  if (remoteToolName.length === 0) {
+    return { ok: false, error: "tool name component is empty" };
+  }
+  return { ok: true, serverName, remoteToolName };
+}
+
+/**
+ * Tool pattern matcher — duplicates `simulation.ts:matchesToolPattern`
+ * intentionally. The function is 16 lines, has zero deps, and lives
+ * in two places that have orthogonal lifecycles (the simulation engine
+ * is for the live-runtime permission resolver; the dispatcher is for
+ * MCP call authorization). A shared 1-function module is premature
+ * abstraction per project guidelines.
+ *
+ * Mirrors openllm-agent2's matcher semantics:
+ *  - exact match: "Bash" matches "Bash"
+ *  - parens form: "Bash(*)" matches "Bash" with any args
+ *  - wildcard:    "Web*" matches "WebFetch", "WebSearch"
+ *  - "*" matches anything
+ */
+function matchesToolPattern(toolName: string, pattern: string): boolean {
+  if (!toolName || !pattern) return false;
+  if (pattern === "*") return true;
+  if (pattern === toolName) return true;
+  const noParen = pattern.replace(/\s*\(\*\)\s*$/, "");
+  if (noParen === toolName) return true;
+  if (pattern.includes("*")) {
+    const regexBody = pattern
+      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*");
+    const re = new RegExp(`^${regexBody}$`);
+    if (re.test(toolName)) return true;
+  }
+  return false;
+}
+
+/**
+ * Sanitize args for the audit row. Redacts any field whose name
+ * matches REDACT_FIELD_PATTERNS. Recursive for nested objects.
+ *
+ * Returned object is a clone — never mutates the input.
+ */
+export function sanitizeArgsForAudit(
+  args: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(args)) {
+    const lk = key.toLowerCase();
+    const isSecret = REDACT_FIELD_PATTERNS.some((p) => lk.includes(p));
+    if (isSecret) {
+      out[key] = "[REDACTED]";
+      continue;
+    }
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      out[key] = sanitizeArgsForAudit(value as Record<string, unknown>);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/**
+ * Truncate the result preview written to the audit row payload.
+ * Bytes (not chars) — JSON-stringified, then sliced.
+ */
+function truncateResultPreview(result: unknown): unknown {
+  if (result == null) return null;
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(result);
+  } catch {
+    return "[unserializable result]";
+  }
+  if (serialized.length <= RESULT_PREVIEW_MAX_BYTES) {
+    // Re-parse to keep it as structured data when small
+    try {
+      return JSON.parse(serialized);
+    } catch {
+      return serialized;
+    }
+  }
+  return serialized.slice(0, RESULT_PREVIEW_MAX_BYTES) + "…[truncated]";
+}
+
+// ── Authorization ──────────────────────────────────────────────────────────
+
+/**
+ * Resolve the agent's allowedTools verdict for a given tool name.
+ *
+ * Returns:
+ *  - "allow"  → rule explicitly permits this tool
+ *  - "deny"   → rule explicitly denies, OR no matching rule (safe default)
+ *  - "ask"    → rule says ask. Dispatcher treats as "deny" (decision #3a)
+ *  - "skip"   → no rules at all → bypass (the draft hasn't configured
+ *               permissions yet, treat as wide open). This matches the
+ *               behavior simulation.ts has today for unconfigured drafts.
+ */
+async function checkAllowedTools(
+  agentDraftId: number,
+  fullToolName: string
+): Promise<"allow" | "deny" | "ask" | "skip"> {
+  // System calls bypass the allowedTools check entirely (decision #2a).
+  // Used by the legacy `mcpManager.callMcpTool` shim.
+  if (agentDraftId === SYSTEM_DRAFT_ID) return "skip";
+
+  let rules: Array<{
+    toolPattern: string;
+    ruleBehavior: string;
+    enabled: boolean | null;
+  }>;
+  try {
+    rules = await repo.listPermissionRules(agentDraftId);
+  } catch {
+    // DB read failed — fail closed
+    return "deny";
+  }
+  const enabled = rules.filter((r) => r.enabled !== false);
+  if (enabled.length === 0) return "skip";
+
+  for (const rule of enabled) {
+    if (matchesToolPattern(fullToolName, rule.toolPattern)) {
+      if (rule.ruleBehavior === "allow") return "allow";
+      if (rule.ruleBehavior === "ask") return "ask";
+      return "deny";
+    }
+  }
+  return "deny";
+}
+
+// ── Audit ──────────────────────────────────────────────────────────────────
+
+/**
+ * Write the audit row. Sync (decision #5a — correctness over latency).
+ * Returns the row id, or undefined if the runId is missing (ad-hoc calls
+ * that aren't tied to a runtime run can't write to agsRuntimePolicyEvents
+ * which has a non-null runId column).
+ */
+async function writeAuditRow(input: {
+  runtimeRunId?: number;
+  decision: "allow" | "deny" | "warn";
+  reason?: string;
+  payload: McpDispatchAuditPayload;
+}): Promise<number | undefined> {
+  if (input.runtimeRunId == null) return undefined;
+  try {
+    const row = await repo.appendRuntimePolicyEvent({
+      runId: input.runtimeRunId,
+      policyKey: "mcp_dispatch",
+      decision: input.decision,
+      reason: input.reason,
+      payload: input.payload as unknown as Record<string, unknown>,
+    });
+    return row.id;
+  } catch (e) {
+    // R5: audit insert failure is treated as fatal — the caller must
+    // see this and decide whether to retry. We re-throw so the
+    // dispatcher's outer try/catch turns it into `internal_error`.
+    throw new Error(
+      `Audit row write failed: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+}
+
+// ── Main entry point ───────────────────────────────────────────────────────
+
+/**
+ * Dispatch an MCP tool call through the full validate → authorize →
+ * govern → invoke → audit pipeline. Always returns a structured
+ * result; never throws (internal errors become `internal_error` results).
+ */
+export async function dispatchMcpToolCall(
+  input: DispatchMcpToolCallInput
+): Promise<DispatchMcpToolCallResult> {
+  const startMs = Date.now();
+
+  // Per-call audit accumulators — populated as we progress through
+  // the pipeline so the audit row reflects whatever happened, even
+  // on early returns.
+  const auditPayload: McpDispatchAuditPayload = {
+    serverId: null,
+    serverName: null,
+    remoteToolName: null,
+    source: input.source,
+    agentDraftId: input.agentDraftId,
+    argsPreview: sanitizeArgsForAudit(input.args ?? {}),
+    resultPreview: null,
+    errorCode: null,
+    errorMessage: null,
+    preVerdict: null,
+    postVerdict: null,
+    durationMs: 0,
+    cost: null,
+    caller: input.caller ?? null,
+  };
+
+  /** Helper to build a structured failure result + write the audit row */
+  const fail = async (
+    code: DispatchErrorCode,
+    message: string,
+    details?: Record<string, unknown>
+  ): Promise<DispatchMcpToolCallResult> => {
+    auditPayload.errorCode = code;
+    auditPayload.errorMessage = message;
+    auditPayload.durationMs = Date.now() - startMs;
+    let auditId: number | undefined;
+    try {
+      auditId = await writeAuditRow({
+        runtimeRunId: input.runtimeRunId,
+        decision: "deny",
+        reason: message,
+        payload: auditPayload,
+      });
+    } catch {
+      // Audit write failed during a fail() — return internal_error
+      return {
+        ok: false,
+        error: {
+          code: "internal_error",
+          message: `Audit write failed while reporting ${code}: ${message}`,
+        },
+        durationMs: Date.now() - startMs,
+      };
+    }
+    return {
+      ok: false,
+      error: { code, message, details },
+      durationMs: auditPayload.durationMs,
+      auditId,
+      governanceVerdict: auditPayload.preVerdict ?? undefined,
+    };
+  };
+
+  // ── 1. Parse the tool name ──
+  const parsed = parseToolName(input.toolName);
+  if (!parsed.ok) {
+    return fail("invalid_tool_name", parsed.error ?? "invalid tool name");
+  }
+  auditPayload.serverName = parsed.serverName ?? null;
+  auditPayload.remoteToolName = parsed.remoteToolName ?? null;
+
+  // ── 2. Look up the per-draft MCP server row by name ──
+  // For SYSTEM_DRAFT_ID, we have to scan ALL servers (no draft scope) —
+  // this matches the legacy `mcpManager.callMcpTool` semantics where
+  // callers pass a serverId directly.
+  let serverId: number | null = null;
+  try {
+    if (input.agentDraftId === SYSTEM_DRAFT_ID) {
+      const all = await repo.listAllMcpServers();
+      const match = all.find((s) => s.name === parsed.serverName);
+      serverId = match?.id ?? null;
+    } else {
+      const draftServers = await repo.listMcpServers(input.agentDraftId);
+      const match = draftServers.find((s) => s.name === parsed.serverName);
+      serverId = match?.id ?? null;
+    }
+  } catch (e) {
+    return fail(
+      "internal_error",
+      `Failed to look up MCP server: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+  if (serverId == null) {
+    return fail(
+      "server_not_found",
+      `MCP server "${parsed.serverName}" not found ${
+        input.agentDraftId === SYSTEM_DRAFT_ID
+          ? "across any draft"
+          : `attached to draft ${input.agentDraftId}`
+      }`
+    );
+  }
+  auditPayload.serverId = serverId;
+
+  // ── 3. Check the live connection ──
+  const conn = getMcpConnection(serverId);
+  if (!conn) {
+    return fail(
+      "server_not_connected",
+      `MCP server "${parsed.serverName}" (id=${serverId}) is not currently connected — call connectMcpServer first`
+    );
+  }
+
+  // ── 4. Check the tool exists on the connected server ──
+  const tool = conn.tools.find((t) => t.name === parsed.remoteToolName);
+  if (!tool) {
+    return fail(
+      "tool_not_found",
+      `Tool "${parsed.remoteToolName}" not advertised by server "${parsed.serverName}". Available: ${conn.tools.map((t) => t.name).join(", ") || "(none)"}`
+    );
+  }
+
+  // ── 5. allowedTools authorization (decision #4a — fast first) ──
+  const authVerdict = await checkAllowedTools(
+    input.agentDraftId,
+    input.toolName
+  );
+  if (authVerdict === "deny" || authVerdict === "ask") {
+    return fail(
+      "not_authorized",
+      authVerdict === "ask"
+        ? `Tool "${input.toolName}" requires human approval ("ask" rule). The dispatcher path is sync — use the simulation engine for the human-approval flow.`
+        : `Tool "${input.toolName}" denied by agent's permission rules`
+    );
+  }
+
+  // ── 6. Governance pre-invoke ──
+  let preVerdict: "allow" | "deny" | "warn";
+  let preReason: string | undefined;
+  try {
+    const pre = await evaluateMcpPreInvoke({
+      agentDraftId: input.agentDraftId,
+      toolName: input.toolName,
+      serverName: parsed.serverName!,
+      remoteToolName: parsed.remoteToolName!,
+      args: input.args,
+      source: input.source,
+    });
+    preVerdict = pre.verdict;
+    preReason = pre.reason;
+  } catch (e) {
+    return fail(
+      "internal_error",
+      `Governance pre-invoke threw: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+  auditPayload.preVerdict = preVerdict;
+
+  if (preVerdict === "deny") {
+    return fail(
+      "governance_blocked",
+      preReason ?? "Blocked by governance pre-invoke check"
+    );
+  }
+
+  // ── 7. Invoke the tool ──
+  let result: unknown;
+  let invokeError: { message: string; original: unknown } | null = null;
+  const invokeStartMs = Date.now();
+  try {
+    result = await conn.callTool(parsed.remoteToolName!, input.args ?? {});
+  } catch (e) {
+    invokeError = {
+      message: e instanceof Error ? e.message : String(e),
+      original: e,
+    };
+  }
+  const invokeDurationMs = Date.now() - invokeStartMs;
+
+  // ── 8. Governance post-invoke (always runs, even on invoke error) ──
+  let postVerdict: "allow" | "warn" | undefined;
+  try {
+    const post = await evaluateMcpPostInvoke({
+      agentDraftId: input.agentDraftId,
+      toolName: input.toolName,
+      serverName: parsed.serverName!,
+      remoteToolName: parsed.remoteToolName!,
+      durationMs: invokeDurationMs,
+      ok: invokeError == null,
+      result: invokeError == null ? result : undefined,
+      errorMessage: invokeError?.message,
+    });
+    postVerdict = post.verdict;
+  } catch {
+    // Post-invoke failure does not change the dispatch outcome — just
+    // log it via the audit row's postVerdict=undefined slot.
+  }
+  auditPayload.postVerdict = postVerdict ?? null;
+
+  // ── 9. Handle invoke failure ──
+  if (invokeError) {
+    return fail("tool_execution_failed", invokeError.message, {
+      original: String(invokeError.original),
+    });
+  }
+
+  // ── 10. Success — write the audit row + return ──
+  auditPayload.resultPreview = truncateResultPreview(result);
+  auditPayload.durationMs = Date.now() - startMs;
+
+  let auditId: number | undefined;
+  try {
+    auditId = await writeAuditRow({
+      runtimeRunId: input.runtimeRunId,
+      decision: postVerdict === "warn" ? "warn" : "allow",
+      reason: preReason,
+      payload: auditPayload,
+    });
+  } catch (e) {
+    // R5: audit write failure on a successful invoke is also fatal
+    return {
+      ok: false,
+      error: {
+        code: "internal_error",
+        message: `Audit row write failed after successful invoke: ${e instanceof Error ? e.message : String(e)}`,
+      },
+      durationMs: auditPayload.durationMs,
+      governanceVerdict: preVerdict,
+    };
+  }
+
+  return {
+    ok: true,
+    result,
+    durationMs: auditPayload.durationMs,
+    auditId,
+    governanceVerdict: preVerdict,
+  };
+}

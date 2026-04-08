@@ -161,3 +161,136 @@ function emptyPolicySummary(): PolicySummary {
     confidenceThreshold: null,
   };
 }
+
+// ── Phase 19a: per-call MCP governance ─────────────────────────────────────
+//
+// `evaluateGovernance` (above) is the static draft-readiness check fired
+// at publish time and from the studio UI. The two functions below are
+// the per-call MCP governance hooks called by the dispatcher around
+// every `tools/call` invocation. They are intentionally lightweight —
+// the dispatcher path runs on every MCP tool call so deep policy
+// evaluation lives elsewhere.
+//
+// The contract: pre-invoke can return `deny` to short-circuit the call,
+// post-invoke is informational (allow or warn — the call already ran).
+// Both consult the agent's `governancePolicy` blob from the draft.
+
+export interface EvaluateMcpPreInvokeInput {
+  agentDraftId: number;
+  toolName: string;        // "mcp__server__tool"
+  serverName: string;
+  remoteToolName: string;
+  args: Record<string, unknown>;
+  source: string;
+}
+
+export interface EvaluateMcpPreInvokeResult {
+  verdict: "allow" | "deny" | "warn";
+  reason?: string;
+}
+
+export interface EvaluateMcpPostInvokeInput {
+  agentDraftId: number;
+  toolName: string;
+  serverName: string;
+  remoteToolName: string;
+  durationMs: number;
+  ok: boolean;
+  result?: unknown;
+  errorMessage?: string;
+}
+
+export interface EvaluateMcpPostInvokeResult {
+  verdict: "allow" | "warn";
+  reason?: string;
+}
+
+/**
+ * Pre-invoke check. Called by the MCP dispatcher BEFORE `conn.callTool`.
+ * Reads the draft's `governancePolicy.blockedActions` list and returns
+ * `deny` if the toolName matches an entry. Otherwise `allow`.
+ *
+ * The matching is substring-based (case-insensitive) — `blockedActions`
+ * is a free-form string list configured by the user, not a regex grammar.
+ * If the user wants regex matching they can wrap the policy engine.
+ *
+ * SYSTEM_DRAFT_ID (-1) → always returns `allow` (system calls bypass
+ * governance, matching the legacy `mcpManager.callMcpTool` semantics).
+ */
+export async function evaluateMcpPreInvoke(
+  input: EvaluateMcpPreInvokeInput
+): Promise<EvaluateMcpPreInvokeResult> {
+  if (input.agentDraftId === -1) {
+    return { verdict: "allow" };
+  }
+
+  let draft;
+  try {
+    // Look up the draft directly by id rather than by agentId — the
+    // dispatcher already has the draftId so we don't need to round-trip.
+    draft = await repo.getDraftById(input.agentDraftId);
+  } catch (e) {
+    // DB read failure → fail closed
+    return {
+      verdict: "deny",
+      reason: `Failed to load governance policy: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+  if (!draft) {
+    return {
+      verdict: "deny",
+      reason: `Agent draft ${input.agentDraftId} not found`,
+    };
+  }
+
+  const policy = (draft.governancePolicy ?? {}) as Record<string, unknown>;
+  const blocked = Array.isArray(policy.blockedActions)
+    ? (policy.blockedActions as string[])
+    : [];
+  const lowerTool = input.toolName.toLowerCase();
+  const lowerRemote = input.remoteToolName.toLowerCase();
+  const hit = blocked.find((b) => {
+    const lb = b.toLowerCase();
+    return lowerTool.includes(lb) || lowerRemote.includes(lb);
+  });
+  if (hit) {
+    return {
+      verdict: "deny",
+      reason: `Blocked by governance policy: matches blockedActions entry "${hit}"`,
+    };
+  }
+
+  // Optional: warn if the policy requires audit but the dispatcher path
+  // is being used outside a runtime run (no audit row will be written).
+  // The dispatcher itself handles this cleanly; this is just a hint.
+  return { verdict: "allow" };
+}
+
+/**
+ * Post-invoke check. Called by the MCP dispatcher AFTER `conn.callTool`
+ * returns (success or failure). Today this is mostly informational —
+ * future work can layer per-call cost tracking, latency SLAs, etc.
+ *
+ * Returns `warn` for slow calls (>10s) so the audit row reflects them
+ * even when the call succeeded. Returns `allow` otherwise.
+ */
+export async function evaluateMcpPostInvoke(
+  input: EvaluateMcpPostInvokeInput
+): Promise<EvaluateMcpPostInvokeResult> {
+  if (input.agentDraftId === -1) {
+    return { verdict: "allow" };
+  }
+  if (input.durationMs > 10_000) {
+    return {
+      verdict: "warn",
+      reason: `Slow MCP call: ${input.durationMs}ms exceeds 10s threshold`,
+    };
+  }
+  if (!input.ok) {
+    return {
+      verdict: "warn",
+      reason: input.errorMessage ?? "MCP tool call failed",
+    };
+  }
+  return { verdict: "allow" };
+}
