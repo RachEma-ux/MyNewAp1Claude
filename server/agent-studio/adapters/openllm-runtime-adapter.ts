@@ -18,9 +18,14 @@
  *     { type: "permission_request", ... }  // server asks user to allow
  *     (other types ignored — heartbeats, etc.)
  *
- * Phase 1b decision: permission_request is **auto-denied** because there's
- * no user-in-the-loop UI yet. The denial is logged as a runtime policy
- * event. Phase 1c will add real interactive permission flow.
+ * Phase 1c: permission_request is resolved by a caller-supplied
+ * `permissionResolver` callback. The simulation engine builds the resolver
+ * from the agent's `agsDraftPermissionRules` table (allow/deny/ask), giving
+ * each draft its own per-tool permission policy. When no resolver is
+ * supplied, the adapter falls back to the Phase 1b "deny everything"
+ * default for safety. The "ask" rule behavior maps to "needs_human" — the
+ * adapter still denies (no interactive UI yet) but logs a policy event so
+ * the user can see which permissions are blocked on their attention.
  *
  * Local-first: defaults to ws://127.0.0.1:5000/ws when no endpoint is
  * provided. Tunnel URLs work too (just pass them in).
@@ -29,6 +34,31 @@
 import WebSocket from "ws";
 
 // ── Public types ────────────────────────────────────────────────────────────
+
+/**
+ * Phase 1c: Permission decision returned by a `permissionResolver`.
+ *  - "allow"  → respond { allowed: true } and let the agent loop continue
+ *  - "deny"   → respond { allowed: false } and let the agent see the denial
+ *  - "needs_human" → still respond { allowed: false } (no interactive UI yet)
+ *                    BUT log it as a needs-interactive-flow event so users
+ *                    can see which permissions are blocked on their attention
+ */
+export type PermissionDecision = "allow" | "deny" | "needs_human";
+
+/**
+ * Phase 1c: Resolver callback used by the adapter to decide each permission
+ * request. Called once per `{type:"permission_request"}` from openllm-agent2.
+ *
+ * The simulation engine builds this from the agent's `agsDraftPermissionRules`
+ * table. If the caller passes nothing (or omits the callback), the adapter
+ * falls back to "deny" for safety.
+ */
+export type PermissionResolver = (request: {
+  toolName?: string;
+  toolKey?: string;
+  description?: string;
+  rawPayload: Record<string, unknown>;
+}) => PermissionDecision | Promise<PermissionDecision>;
 
 export interface OpenllmRuntimeRequest {
   /** WebSocket URL pointing at openllm-agent2's /ws endpoint */
@@ -45,6 +75,11 @@ export interface OpenllmRuntimeRequest {
   timeoutMs?: number;
   /** AbortSignal — when aborted, sends {type:"cancel"} and closes the WS */
   signal?: AbortSignal;
+  /**
+   * Phase 1c: callback to decide each permission request. If omitted,
+   * the adapter denies every permission request (Phase 1b safety default).
+   */
+  permissionResolver?: PermissionResolver;
   /** Streaming callbacks (optional — caller can collect via the result) */
   onToken?: (chunk: string) => void;
   onPermissionRequest?: (payload: Record<string, unknown>) => void;
@@ -62,7 +97,14 @@ export interface OpenllmRuntimeResult {
   error?: string;
   /** True when the server emitted {type:"done"} normally */
   finalizedNormally: boolean;
-  /** Permission requests received during the run (auto-denied in Phase 1b) */
+  /**
+   * Permission requests received during the run. Each was resolved via
+   * the caller's `permissionResolver` (Phase 1c) — or auto-denied if no
+   * resolver was supplied. The result of each resolution is sent back to
+   * openllm-agent2 as a `permission_response` message; this array only
+   * records the *requests*, not the decisions. Decisions are tracked by
+   * the caller (see simulation.ts decisionLog).
+   */
   permissionEvents: Array<{ ts: number; payload: Record<string, unknown> }>;
   /** Other policy events received during the run */
   policyEvents: Array<{ ts: number; payload: Record<string, unknown> }>;
@@ -297,17 +339,56 @@ export async function runViaOpenllmAgent(
         case "permission_request": {
           permissionEvents.push({ ts: Date.now(), payload: msg });
           req.onPermissionRequest?.(msg);
-          // Phase 1b: auto-deny. Phase 1c will add interactive flow.
-          try {
-            ws.send(
-              JSON.stringify({
-                type: "permission_response",
-                allowed: false,
-              })
-            );
-          } catch {
-            /* ignore */
-          }
+          // Phase 1c: resolve via caller-supplied resolver (driven by the
+          // agent's agsDraftPermissionRules table). Falls back to "deny"
+          // when no resolver is supplied — matches Phase 1b safety default.
+          const resolverInput = {
+            toolName:
+              typeof msg.toolName === "string" ? msg.toolName : undefined,
+            toolKey: typeof msg.toolKey === "string" ? msg.toolKey : undefined,
+            description:
+              typeof msg.description === "string"
+                ? msg.description
+                : undefined,
+            rawPayload: msg,
+          };
+          const resolver = req.permissionResolver;
+          // Resolve asynchronously so the resolver can do DB lookups, then
+          // send the response. We don't await this in the switch — the
+          // adapter is callback-driven and the resolver is responsible for
+          // not throwing.
+          Promise.resolve(
+            resolver ? resolver(resolverInput) : ("deny" as PermissionDecision)
+          )
+            .catch(() => "deny" as PermissionDecision)
+            .then((decision) => {
+              const allowed = decision === "allow";
+              if (decision === "needs_human") {
+                // No interactive UI yet — record as a policy event so the
+                // run trace surfaces "this permission needs a human".
+                policyEvents.push({
+                  ts: Date.now(),
+                  payload: {
+                    type: "permission_needs_human",
+                    request: msg,
+                  },
+                });
+                req.onPolicyEvent?.({
+                  type: "permission_needs_human",
+                  request: msg,
+                });
+              }
+              try {
+                ws.send(
+                  JSON.stringify({
+                    type: "permission_response",
+                    allowed,
+                  })
+                );
+              } catch {
+                /* ignore — socket may have closed */
+              }
+            });
           break;
         }
         case "policy_event":

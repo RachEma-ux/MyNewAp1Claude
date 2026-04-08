@@ -25,7 +25,71 @@ import { previewRetrieval } from "../adapters/knowledge-adapter";
 import {
   resolveOpenllmEndpoint,
   runViaOpenllmAgent,
+  type PermissionDecision,
+  type PermissionResolver,
 } from "../adapters/openllm-runtime-adapter";
+
+/**
+ * Phase 1c: Match a tool name against a permission-rule tool pattern.
+ *
+ * Mirrors openllm-agent2's matcher semantics:
+ *  - exact match: "Bash" matches "Bash"
+ *  - parens form: "Bash(*)" matches "Bash" with any args
+ *  - wildcard:    "Web*" matches "WebFetch", "WebSearch"
+ *  - "*" matches anything
+ *
+ * Case-sensitive — openllm tool names are PascalCase by convention.
+ */
+function matchesToolPattern(toolName: string, pattern: string): boolean {
+  if (!toolName || !pattern) return false;
+  if (pattern === "*") return true;
+  if (pattern === toolName) return true;
+  // Strip the (*) suffix — openllm treats "Bash(*)" as "Bash with any args"
+  const noParen = pattern.replace(/\s*\(\*\)\s*$/, "");
+  if (noParen === toolName) return true;
+  if (pattern.includes("*")) {
+    // Convert glob to regex (escape regex specials except *)
+    const regexBody = pattern
+      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*");
+    const re = new RegExp(`^${regexBody}$`);
+    if (re.test(toolName)) return true;
+  }
+  return false;
+}
+
+/**
+ * Phase 1c: Build a permission resolver from a draft's permission rules.
+ *
+ * Semantics: first-match-wins firewall.
+ *  - rule.ruleBehavior "allow" → resolver returns "allow"
+ *  - rule.ruleBehavior "deny"  → resolver returns "deny"
+ *  - rule.ruleBehavior "ask"   → resolver returns "needs_human"
+ *  - no match                  → resolver returns "deny" (safe default)
+ *
+ * Disabled rules are skipped. Order is by toolPattern ASC (the order
+ * `listPermissionRules` returns them in).
+ */
+function buildPermissionResolver(
+  rules: Array<{
+    toolPattern: string;
+    ruleBehavior: string;
+    enabled: boolean | null;
+  }>
+): PermissionResolver {
+  const enabled = rules.filter((r) => r.enabled !== false);
+  return (request) => {
+    const toolName = request.toolName ?? request.toolKey ?? "";
+    for (const rule of enabled) {
+      if (matchesToolPattern(toolName, rule.toolPattern)) {
+        if (rule.ruleBehavior === "allow") return "allow" as PermissionDecision;
+        if (rule.ruleBehavior === "ask") return "needs_human" as PermissionDecision;
+        return "deny" as PermissionDecision;
+      }
+    }
+    return "deny" as PermissionDecision;
+  };
+}
 
 export interface SimulationToggles {
   mockedTools: boolean;
@@ -361,6 +425,23 @@ export async function runSimulation(input: {
             ? ((inputPayload as any).query as string)
             : JSON.stringify(inputPayload);
 
+      // Phase 1c: Pull the draft's permission rules and turn them into a
+      // resolver the adapter can call once per `permission_request`. This
+      // replaces the Phase 1b auto-deny default. Tracks per-request
+      // decisions so the trace below records what actually happened.
+      const permissionRules = await repo.listPermissionRules(draft.id);
+      const baseResolver = buildPermissionResolver(permissionRules);
+      const decisionLog: Array<{ ts: number; decision: PermissionDecision; toolName: string }> = [];
+      const trackingResolver: PermissionResolver = (request) => {
+        const decision = baseResolver(request);
+        decisionLog.push({
+          ts: Date.now(),
+          decision,
+          toolName: request.toolName ?? request.toolKey ?? "(unknown)",
+        });
+        return decision;
+      };
+
       const liveResult = await runViaOpenllmAgent({
         wsUrl: endpoint.wsUrl,
         message: inputText,
@@ -368,6 +449,7 @@ export async function runSimulation(input: {
         model: endpoint.model,
         apiKey: endpoint.apiKey,
         timeoutMs: 60_000,
+        permissionResolver: trackingResolver,
       });
 
       if (liveResult.ok) {
@@ -392,18 +474,40 @@ export async function runSimulation(input: {
         // Don't abort the simulation — record the failure but let the rest finish
       }
 
-      // Persist permission events from the live run as runtime policy events
-      // (Phase 1b auto-denies all permission requests). Surface the count
-      // in the trace so the user can see them in the runs page.
-      for (const ev of liveResult.permissionEvents) {
+      // Phase 1c: Persist permission events from the live run as runtime
+      // policy events. The decision recorded is the actual one returned by
+      // the resolver (allow/deny/needs_human → allow/deny/warn), not the
+      // Phase 1b blanket deny. Pair each event with the matching log entry
+      // by index — the adapter emits permission_request and resolver
+      // calls in lockstep.
+      for (let i = 0; i < liveResult.permissionEvents.length; i++) {
+        const ev = liveResult.permissionEvents[i];
+        const logged = decisionLog[i];
+        const decision: PermissionDecision = logged?.decision ?? "deny";
+        const persistedDecision =
+          decision === "allow"
+            ? "allow"
+            : decision === "needs_human"
+              ? "warn"
+              : "deny";
+        const reason =
+          decision === "allow"
+            ? `Allowed by permission rule for ${logged?.toolName ?? "(unknown tool)"}`
+            : decision === "needs_human"
+              ? `Rule says "ask" but no interactive UI yet — denied for safety, surfaced as needs-human (${logged?.toolName ?? "(unknown tool)"})`
+              : `Denied by permission rules (${logged?.toolName ?? "(unknown tool)"})`;
         await repo.appendRuntimePolicyEvent({
           runId: runtimeRun.id,
           policyKey: "openllm.permission_request",
-          decision: "deny",
-          reason: "Auto-denied — Phase 1b has no user-in-the-loop UI",
+          decision: persistedDecision,
+          reason,
           payload: ev.payload,
         });
       }
+      outputPayload.permissionDecisions = decisionLog.map((d) => ({
+        toolName: d.toolName,
+        decision: d.decision,
+      }));
       for (const ev of liveResult.policyEvents) {
         await repo.appendRuntimePolicyEvent({
           runId: runtimeRun.id,
