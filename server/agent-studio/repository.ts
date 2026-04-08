@@ -1481,7 +1481,21 @@ export async function removeMcpServer(serverId: number) {
  */
 export async function updateMcpServerStatus(
   serverId: number,
-  status: "pending" | "connected" | "disconnected" | "error"
+  // Phase 19b: widened to accept the FSM column projection. The
+  // pre-19b values ("pending" | "connected" | "disconnected" | "error")
+  // remain valid; "connecting" | "needs_auth" | "disabled" are
+  // additive new values written by `projectStateToColumn` in
+  // services/mcp/state-machine.ts. The column itself has no CHECK
+  // constraint (varchar(32) only), so the new values are accepted
+  // as-is at the DB level.
+  status:
+    | "pending"
+    | "connecting"
+    | "connected"
+    | "needs_auth"
+    | "disconnected"
+    | "error"
+    | "disabled"
 ) {
   await db()
     .update(agsDraftMcpServers)
