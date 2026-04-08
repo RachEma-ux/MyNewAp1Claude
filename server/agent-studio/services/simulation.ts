@@ -76,7 +76,7 @@ function buildPermissionResolver(
     ruleBehavior: string;
     enabled: boolean | null;
   }>
-): PermissionResolver {
+): (request: Parameters<PermissionResolver>[0]) => PermissionDecision {
   const enabled = rules.filter((r) => r.enabled !== false);
   return (request) => {
     const toolName = request.toolName ?? request.toolKey ?? "";
