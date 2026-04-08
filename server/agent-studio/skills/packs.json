@@ -1,0 +1,53 @@
+{
+  "$comment": "AI Agent Studio — local skill catalog index. Source: RachEma-ux/openllm-skills. Local-first: this file + the per-pack .md files are read at runtime via the skill-catalog-adapter. No network calls.",
+  "version": "1.0.0",
+  "syncedFrom": "RachEma-ux/openllm-skills",
+  "syncedAt": "2026-04-08",
+  "packs": [
+    {
+      "key": "agents",
+      "name": "Agents",
+      "description": "Agent lifecycle, pipeline review, and orchestration helpers"
+    },
+    {
+      "key": "automation",
+      "name": "Automation",
+      "description": "Workflow lint, trigger testing, and automation guardrails"
+    },
+    {
+      "key": "chat",
+      "name": "Chat",
+      "description": "Chat streaming debug and token usage audit"
+    },
+    {
+      "key": "database",
+      "name": "Database",
+      "description": "Schema review, migration check, and DB query helpers"
+    },
+    {
+      "key": "documents",
+      "name": "Documents",
+      "description": "Chunking preview and embedding inspection"
+    },
+    {
+      "key": "frontend",
+      "name": "Frontend",
+      "description": "Component review and route audit"
+    },
+    {
+      "key": "general",
+      "name": "General",
+      "description": "Cross-cutting reviews — security, full review, PR triage"
+    },
+    {
+      "key": "governance",
+      "name": "Governance",
+      "description": "Policy checks and secret rotation"
+    },
+    {
+      "key": "providers",
+      "name": "Providers",
+      "description": "LLM provider review, connection test, key sync"
+    }
+  ]
+}

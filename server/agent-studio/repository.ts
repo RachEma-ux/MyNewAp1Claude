@@ -28,8 +28,18 @@ import {
   agsTestRunResults,
   agsRuntimeRuns,
   agsRuntimeRunSteps,
+  agsRuntimeToolCalls,
+  agsRuntimeMemoryEvents,
+  agsRuntimePolicyEvents,
   agsPublishRequests,
   agsApprovalSteps,
+  // ── Phase 0a: openllm-agent2 native parity tables ──
+  agsDraftHooks,
+  agsDraftMcpServers,
+  agsDraftSkills,
+  agsDraftSubagents,
+  agsDraftPlugins,
+  agsDraftPermissionRules,
 } from "../../drizzle/tables/agent-studio";
 
 function db() {
@@ -1199,4 +1209,607 @@ export async function getReviewQueue() {
     )
     .orderBy(desc(agsAgents.updatedAt))
     .limit(50);
+}
+
+// ── Phase 0b: openllm-agent2 native parity functions ───────────────────────
+//
+// Each new draft-scoped table gets a list / save / remove / replace set,
+// following the same pattern as `saveTestSuite` (returning() → throw if not
+// found on update path → returning() on insert path).
+
+// ── Hooks ───────────────────────────────────────────────────────────────────
+
+export async function listHooks(draftId: number) {
+  return db()
+    .select()
+    .from(agsDraftHooks)
+    .where(eq(agsDraftHooks.draftId, draftId))
+    .orderBy(agsDraftHooks.eventName, agsDraftHooks.id);
+}
+
+export async function getHookById(hookId: number) {
+  const rows = await db()
+    .select()
+    .from(agsDraftHooks)
+    .where(eq(agsDraftHooks.id, hookId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function saveHook(input: {
+  hookId?: number;
+  draftId: number;
+  eventName: string;
+  matcher?: string | null;
+  command: string;
+  timeoutMs?: number | null;
+  requiresApproval?: boolean;
+  enabled?: boolean;
+}): Promise<typeof agsDraftHooks.$inferSelect> {
+  const conn = db();
+  if (input.hookId) {
+    const [updated] = await conn
+      .update(agsDraftHooks)
+      .set({
+        eventName: input.eventName,
+        matcher: input.matcher ?? null,
+        command: input.command,
+        timeoutMs: input.timeoutMs ?? null,
+        requiresApproval: input.requiresApproval,
+        enabled: input.enabled,
+        updatedAt: new Date(),
+      })
+      .where(eq(agsDraftHooks.id, input.hookId))
+      .returning();
+    if (!updated) throw new Error(`Hook ${input.hookId} not found`);
+    return updated;
+  }
+  const [created] = await conn
+    .insert(agsDraftHooks)
+    .values({
+      draftId: input.draftId,
+      eventName: input.eventName,
+      matcher: input.matcher ?? null,
+      command: input.command,
+      timeoutMs: input.timeoutMs ?? null,
+      requiresApproval: input.requiresApproval ?? false,
+      enabled: input.enabled ?? true,
+    })
+    .returning();
+  return created;
+}
+
+export async function removeHook(hookId: number) {
+  await db().delete(agsDraftHooks).where(eq(agsDraftHooks.id, hookId));
+}
+
+export async function replaceHooks(
+  draftId: number,
+  hooks: Array<{
+    eventName: string;
+    matcher?: string | null;
+    command: string;
+    timeoutMs?: number | null;
+    requiresApproval?: boolean;
+    enabled?: boolean;
+  }>
+) {
+  const conn = db();
+  await conn.delete(agsDraftHooks).where(eq(agsDraftHooks.draftId, draftId));
+  if (hooks.length === 0) return;
+  await conn.insert(agsDraftHooks).values(
+    hooks.map((h) => ({
+      draftId,
+      eventName: h.eventName,
+      matcher: h.matcher ?? null,
+      command: h.command,
+      timeoutMs: h.timeoutMs ?? null,
+      requiresApproval: h.requiresApproval ?? false,
+      enabled: h.enabled ?? true,
+    }))
+  );
+}
+
+// ── MCP servers ─────────────────────────────────────────────────────────────
+
+export async function listMcpServers(draftId: number) {
+  return db()
+    .select()
+    .from(agsDraftMcpServers)
+    .where(eq(agsDraftMcpServers.draftId, draftId))
+    .orderBy(agsDraftMcpServers.name);
+}
+
+export async function getMcpServerById(serverId: number) {
+  const rows = await db()
+    .select()
+    .from(agsDraftMcpServers)
+    .where(eq(agsDraftMcpServers.id, serverId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function saveMcpServer(input: {
+  serverId?: number;
+  draftId: number;
+  name: string;
+  transport: string;
+  command?: string | null;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string | null;
+  enabled?: boolean;
+}): Promise<typeof agsDraftMcpServers.$inferSelect> {
+  const conn = db();
+  if (input.serverId) {
+    const [updated] = await conn
+      .update(agsDraftMcpServers)
+      .set({
+        name: input.name,
+        transport: input.transport,
+        command: input.command ?? null,
+        args: input.args ?? [],
+        env: input.env ?? {},
+        url: input.url ?? null,
+        enabled: input.enabled,
+        updatedAt: new Date(),
+      })
+      .where(eq(agsDraftMcpServers.id, input.serverId))
+      .returning();
+    if (!updated) throw new Error(`MCP server ${input.serverId} not found`);
+    return updated;
+  }
+  const [created] = await conn
+    .insert(agsDraftMcpServers)
+    .values({
+      draftId: input.draftId,
+      name: input.name,
+      transport: input.transport,
+      command: input.command ?? null,
+      args: input.args ?? [],
+      env: input.env ?? {},
+      url: input.url ?? null,
+      status: "pending",
+      enabled: input.enabled ?? true,
+    })
+    .returning();
+  return created;
+}
+
+export async function removeMcpServer(serverId: number) {
+  await db().delete(agsDraftMcpServers).where(eq(agsDraftMcpServers.id, serverId));
+}
+
+export async function replaceMcpServers(
+  draftId: number,
+  servers: Array<{
+    name: string;
+    transport: string;
+    command?: string | null;
+    args?: string[];
+    env?: Record<string, string>;
+    url?: string | null;
+    enabled?: boolean;
+  }>
+) {
+  const conn = db();
+  await conn.delete(agsDraftMcpServers).where(eq(agsDraftMcpServers.draftId, draftId));
+  if (servers.length === 0) return;
+  await conn.insert(agsDraftMcpServers).values(
+    servers.map((s) => ({
+      draftId,
+      name: s.name,
+      transport: s.transport,
+      command: s.command ?? null,
+      args: s.args ?? [],
+      env: s.env ?? {},
+      url: s.url ?? null,
+      status: "pending",
+      enabled: s.enabled ?? true,
+    }))
+  );
+}
+
+// ── Skills (attached from local catalog) ────────────────────────────────────
+
+export async function listSkills(draftId: number) {
+  return db()
+    .select()
+    .from(agsDraftSkills)
+    .where(eq(agsDraftSkills.draftId, draftId))
+    .orderBy(agsDraftSkills.packKey, agsDraftSkills.skillKey);
+}
+
+export async function attachSkill(input: {
+  draftId: number;
+  packKey: string;
+  skillKey: string;
+  skillName: string;
+  allowedTools?: string[];
+  blockedTools?: string[];
+  requiresApproval?: boolean;
+  argsSchema?: Record<string, unknown>;
+}): Promise<typeof agsDraftSkills.$inferSelect> {
+  const [created] = await db()
+    .insert(agsDraftSkills)
+    .values({
+      draftId: input.draftId,
+      packKey: input.packKey,
+      skillKey: input.skillKey,
+      skillName: input.skillName,
+      allowedTools: input.allowedTools ?? [],
+      blockedTools: input.blockedTools ?? [],
+      requiresApproval: input.requiresApproval ?? false,
+      argsSchema: input.argsSchema ?? {},
+      enabled: true,
+    })
+    .returning();
+  return created;
+}
+
+export async function removeSkill(skillId: number) {
+  await db().delete(agsDraftSkills).where(eq(agsDraftSkills.id, skillId));
+}
+
+export async function replaceSkills(
+  draftId: number,
+  skills: Array<{
+    packKey: string;
+    skillKey: string;
+    skillName: string;
+    allowedTools?: string[];
+    blockedTools?: string[];
+    requiresApproval?: boolean;
+    argsSchema?: Record<string, unknown>;
+  }>
+) {
+  const conn = db();
+  await conn.delete(agsDraftSkills).where(eq(agsDraftSkills.draftId, draftId));
+  if (skills.length === 0) return;
+  await conn.insert(agsDraftSkills).values(
+    skills.map((s) => ({
+      draftId,
+      packKey: s.packKey,
+      skillKey: s.skillKey,
+      skillName: s.skillName,
+      allowedTools: s.allowedTools ?? [],
+      blockedTools: s.blockedTools ?? [],
+      requiresApproval: s.requiresApproval ?? false,
+      argsSchema: s.argsSchema ?? {},
+      enabled: true,
+    }))
+  );
+}
+
+// ── Subagents ───────────────────────────────────────────────────────────────
+
+export async function listSubagents(draftId: number) {
+  return db()
+    .select()
+    .from(agsDraftSubagents)
+    .where(eq(agsDraftSubagents.draftId, draftId))
+    .orderBy(agsDraftSubagents.name);
+}
+
+export async function getSubagentById(subagentId: number) {
+  const rows = await db()
+    .select()
+    .from(agsDraftSubagents)
+    .where(eq(agsDraftSubagents.id, subagentId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function saveSubagent(input: {
+  subagentId?: number;
+  draftId: number;
+  name: string;
+  description?: string | null;
+  prompt: string;
+  tools?: string[];
+  disallowedTools?: string[];
+  model?: string | null;
+  maxTurns?: number | null;
+  background?: boolean;
+  effort?: string | null;
+  permissionMode?: string | null;
+  memory?: string | null;
+  initialPrompt?: string | null;
+  criticalSystemReminder?: string | null;
+}): Promise<typeof agsDraftSubagents.$inferSelect> {
+  const conn = db();
+  if (input.subagentId) {
+    const [updated] = await conn
+      .update(agsDraftSubagents)
+      .set({
+        name: input.name,
+        description: input.description ?? null,
+        prompt: input.prompt,
+        tools: input.tools ?? [],
+        disallowedTools: input.disallowedTools ?? [],
+        model: input.model ?? null,
+        maxTurns: input.maxTurns ?? null,
+        background: input.background,
+        effort: input.effort ?? null,
+        permissionMode: input.permissionMode ?? null,
+        memory: input.memory ?? null,
+        initialPrompt: input.initialPrompt ?? null,
+        criticalSystemReminder: input.criticalSystemReminder ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(agsDraftSubagents.id, input.subagentId))
+      .returning();
+    if (!updated) throw new Error(`Subagent ${input.subagentId} not found`);
+    return updated;
+  }
+  const [created] = await conn
+    .insert(agsDraftSubagents)
+    .values({
+      draftId: input.draftId,
+      name: input.name,
+      description: input.description ?? null,
+      prompt: input.prompt,
+      tools: input.tools ?? [],
+      disallowedTools: input.disallowedTools ?? [],
+      model: input.model ?? null,
+      maxTurns: input.maxTurns ?? null,
+      background: input.background ?? false,
+      effort: input.effort ?? null,
+      permissionMode: input.permissionMode ?? null,
+      memory: input.memory ?? null,
+      initialPrompt: input.initialPrompt ?? null,
+      criticalSystemReminder: input.criticalSystemReminder ?? null,
+      enabled: true,
+    })
+    .returning();
+  return created;
+}
+
+export async function removeSubagent(subagentId: number) {
+  await db().delete(agsDraftSubagents).where(eq(agsDraftSubagents.id, subagentId));
+}
+
+export async function replaceSubagents(
+  draftId: number,
+  subagents: Array<{
+    name: string;
+    description?: string | null;
+    prompt: string;
+    tools?: string[];
+    disallowedTools?: string[];
+    model?: string | null;
+    maxTurns?: number | null;
+    background?: boolean;
+    effort?: string | null;
+    permissionMode?: string | null;
+    memory?: string | null;
+    initialPrompt?: string | null;
+    criticalSystemReminder?: string | null;
+  }>
+) {
+  const conn = db();
+  await conn.delete(agsDraftSubagents).where(eq(agsDraftSubagents.draftId, draftId));
+  if (subagents.length === 0) return;
+  await conn.insert(agsDraftSubagents).values(
+    subagents.map((s) => ({
+      draftId,
+      name: s.name,
+      description: s.description ?? null,
+      prompt: s.prompt,
+      tools: s.tools ?? [],
+      disallowedTools: s.disallowedTools ?? [],
+      model: s.model ?? null,
+      maxTurns: s.maxTurns ?? null,
+      background: s.background ?? false,
+      effort: s.effort ?? null,
+      permissionMode: s.permissionMode ?? null,
+      memory: s.memory ?? null,
+      initialPrompt: s.initialPrompt ?? null,
+      criticalSystemReminder: s.criticalSystemReminder ?? null,
+      enabled: true,
+    }))
+  );
+}
+
+// ── Plugins ─────────────────────────────────────────────────────────────────
+
+export async function listPlugins(draftId: number) {
+  return db()
+    .select()
+    .from(agsDraftPlugins)
+    .where(eq(agsDraftPlugins.draftId, draftId))
+    .orderBy(agsDraftPlugins.path);
+}
+
+export async function savePlugin(input: {
+  pluginId?: number;
+  draftId: number;
+  type?: string;
+  path: string;
+  enabled?: boolean;
+}): Promise<typeof agsDraftPlugins.$inferSelect> {
+  const conn = db();
+  if (input.pluginId) {
+    const [updated] = await conn
+      .update(agsDraftPlugins)
+      .set({
+        type: input.type ?? "local",
+        path: input.path,
+        enabled: input.enabled,
+      })
+      .where(eq(agsDraftPlugins.id, input.pluginId))
+      .returning();
+    if (!updated) throw new Error(`Plugin ${input.pluginId} not found`);
+    return updated;
+  }
+  const [created] = await conn
+    .insert(agsDraftPlugins)
+    .values({
+      draftId: input.draftId,
+      type: input.type ?? "local",
+      path: input.path,
+      enabled: input.enabled ?? true,
+    })
+    .returning();
+  return created;
+}
+
+export async function removePlugin(pluginId: number) {
+  await db().delete(agsDraftPlugins).where(eq(agsDraftPlugins.id, pluginId));
+}
+
+export async function replacePlugins(
+  draftId: number,
+  plugins: Array<{
+    type?: string;
+    path: string;
+    enabled?: boolean;
+  }>
+) {
+  const conn = db();
+  await conn.delete(agsDraftPlugins).where(eq(agsDraftPlugins.draftId, draftId));
+  if (plugins.length === 0) return;
+  await conn.insert(agsDraftPlugins).values(
+    plugins.map((p) => ({
+      draftId,
+      type: p.type ?? "local",
+      path: p.path,
+      enabled: p.enabled ?? true,
+    }))
+  );
+}
+
+// ── Permission rules ────────────────────────────────────────────────────────
+
+export async function listPermissionRules(draftId: number) {
+  return db()
+    .select()
+    .from(agsDraftPermissionRules)
+    .where(eq(agsDraftPermissionRules.draftId, draftId))
+    .orderBy(agsDraftPermissionRules.toolPattern);
+}
+
+export async function savePermissionRule(input: {
+  ruleId?: number;
+  draftId: number;
+  ruleSource: string;
+  ruleBehavior: string;
+  toolPattern: string;
+  contentPattern?: string | null;
+  description?: string | null;
+}): Promise<typeof agsDraftPermissionRules.$inferSelect> {
+  const conn = db();
+  if (input.ruleId) {
+    const [updated] = await conn
+      .update(agsDraftPermissionRules)
+      .set({
+        ruleSource: input.ruleSource,
+        ruleBehavior: input.ruleBehavior,
+        toolPattern: input.toolPattern,
+        contentPattern: input.contentPattern ?? null,
+        description: input.description ?? null,
+      })
+      .where(eq(agsDraftPermissionRules.id, input.ruleId))
+      .returning();
+    if (!updated) throw new Error(`Permission rule ${input.ruleId} not found`);
+    return updated;
+  }
+  const [created] = await conn
+    .insert(agsDraftPermissionRules)
+    .values({
+      draftId: input.draftId,
+      ruleSource: input.ruleSource,
+      ruleBehavior: input.ruleBehavior,
+      toolPattern: input.toolPattern,
+      contentPattern: input.contentPattern ?? null,
+      description: input.description ?? null,
+      enabled: true,
+    })
+    .returning();
+  return created;
+}
+
+export async function removePermissionRule(ruleId: number) {
+  await db()
+    .delete(agsDraftPermissionRules)
+    .where(eq(agsDraftPermissionRules.id, ruleId));
+}
+
+export async function replacePermissionRules(
+  draftId: number,
+  rules: Array<{
+    ruleSource: string;
+    ruleBehavior: string;
+    toolPattern: string;
+    contentPattern?: string | null;
+    description?: string | null;
+  }>
+) {
+  const conn = db();
+  await conn
+    .delete(agsDraftPermissionRules)
+    .where(eq(agsDraftPermissionRules.draftId, draftId));
+  if (rules.length === 0) return;
+  await conn.insert(agsDraftPermissionRules).values(
+    rules.map((r) => ({
+      draftId,
+      ruleSource: r.ruleSource,
+      ruleBehavior: r.ruleBehavior,
+      toolPattern: r.toolPattern,
+      contentPattern: r.contentPattern ?? null,
+      description: r.description ?? null,
+      enabled: true,
+    }))
+  );
+}
+
+// ── Runtime config (8 new draft columns surfaced via dedicated update) ─────
+
+export async function getRuntimeConfig(agentId: number) {
+  const draft = await getCurrentDraft(agentId);
+  if (!draft) return null;
+  return {
+    effort: draft.effort,
+    maxTurns: draft.maxTurns,
+    background: draft.background,
+    initialPrompt: draft.initialPrompt,
+    criticalSystemReminder: draft.criticalSystemReminder,
+    permissionMode: draft.permissionMode,
+    workingDirectories: (draft.workingDirectories ?? []) as string[],
+    providerConfig: (draft.providerConfig ?? {}) as Record<string, unknown>,
+  };
+}
+
+export async function updateRuntimeConfig(
+  agentId: number,
+  patch: {
+    effort?: string | null;
+    maxTurns?: number | null;
+    background?: boolean;
+    initialPrompt?: string | null;
+    criticalSystemReminder?: string | null;
+    permissionMode?: string | null;
+    workingDirectories?: string[];
+    providerConfig?: Record<string, unknown>;
+  }
+) {
+  const set: Record<string, unknown> = { updatedAt: new Date() };
+  if (patch.effort !== undefined) set.effort = patch.effort;
+  if (patch.maxTurns !== undefined) set.maxTurns = patch.maxTurns;
+  if (patch.background !== undefined) set.background = patch.background;
+  if (patch.initialPrompt !== undefined) set.initialPrompt = patch.initialPrompt;
+  if (patch.criticalSystemReminder !== undefined)
+    set.criticalSystemReminder = patch.criticalSystemReminder;
+  if (patch.permissionMode !== undefined) set.permissionMode = patch.permissionMode;
+  if (patch.workingDirectories !== undefined)
+    set.workingDirectories = patch.workingDirectories;
+  if (patch.providerConfig !== undefined) set.providerConfig = patch.providerConfig;
+
+  const draft = await getCurrentDraft(agentId);
+  if (!draft) throw new Error(`No current draft for agent ${agentId}`);
+  await db()
+    .update(agsAgentDrafts)
+    .set(set)
+    .where(eq(agsAgentDrafts.id, draft.id));
+  return getRuntimeConfig(agentId);
 }

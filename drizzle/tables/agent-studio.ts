@@ -99,6 +99,25 @@ export const agsAgentDrafts = pgTable(
     runtimeConfig: jsonb("runtime_config").$type<Record<string, unknown>>().default({}),
     // Simulation defaults
     simulationDefaults: jsonb("simulation_defaults").$type<Record<string, unknown>>().default({}),
+
+    // ── Phase 0a: openllm-agent2 native parity columns ──
+    /** Reasoning effort: low | medium | high | max | <integer string> */
+    effort: varchar("effort", { length: 32 }),
+    /** Maximum agentic round-trips before stopping */
+    maxTurns: integer("max_turns"),
+    /** Run as a background (fire-and-forget) task when invoked */
+    background: boolean("background").default(false),
+    /** Auto-submitted as the first user turn when this agent is the main thread */
+    initialPrompt: text("initial_prompt"),
+    /** Experimental: critical reminder added to the system prompt at runtime */
+    criticalSystemReminder: text("critical_system_reminder"),
+    /** Permission mode (default | acceptEdits | bypassPermissions | plan | dontAsk) */
+    permissionMode: varchar("permission_mode", { length: 32 }),
+    /** Working directories the agent is allowed to operate in (addDirectories permission) */
+    workingDirectories: jsonb("working_directories").$type<string[]>().default([]),
+    /** Provider/model/apiKey runtime config — apiKey is encrypted at rest by the platform encryption helpers */
+    providerConfig: jsonb("provider_config").$type<Record<string, unknown>>().default({}),
+
     // Bookkeeping
     isCurrent: boolean("is_current").default(true),
     createdBy: integer("created_by"),
@@ -526,5 +545,203 @@ export const agsReleaseAuditRefs = pgTable(
   },
   (t) => ({
     releaseIdx: index("idx_ags_audit_release").on(t.releaseId),
+  })
+);
+
+// ── Phase 0a: openllm-agent2 native parity tables ───────────────────────────
+//
+// 6 new tables that bring Studio to representational parity with
+// openllm-agent2's `AgentDefinition` schema. All draft-scoped (FK = draftId).
+// All additive — no impact on existing rows.
+
+/**
+ * Lifecycle hooks attached to a draft. One row per (event, matcher, command).
+ * Mirrors openllm-agent2's hook system (`coreSchemas.ts:355-505`) — 27
+ * possible event names enumerated in `AGS_HOOK_EVENTS`.
+ */
+export const agsDraftHooks = pgTable(
+  "ags_draft_hooks",
+  {
+    id: serial("id").primaryKey(),
+    draftId: integer("draft_id").notNull(),
+    eventName: varchar("event_name", { length: 64 }).notNull(),
+    /** For PreToolUse / PostToolUse: optional tool name pattern (glob or regex). */
+    matcher: text("matcher"),
+    /** Shell command or hook script to invoke when the event fires. */
+    command: text("command").notNull(),
+    timeoutMs: integer("timeout_ms"),
+    requiresApproval: boolean("requires_approval").default(false),
+    enabled: boolean("enabled").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    draftIdx: index("idx_ags_hooks_draft").on(t.draftId),
+    eventIdx: index("idx_ags_hooks_event").on(t.eventName),
+    // Prevent duplicate (event, matcher) entries on the same draft
+    uniq: uniqueIndex("uniq_ags_hooks_draft_event_matcher").on(
+      t.draftId,
+      t.eventName,
+      t.matcher
+    ),
+  })
+);
+
+/**
+ * MCP server bindings attached to a draft. Each row is one MCP server the
+ * agent can use. Mirrors `McpServerConfigForProcessTransportSchema` and
+ * supports the 4 transports (stdio | sse | http | sdk).
+ */
+export const agsDraftMcpServers = pgTable(
+  "ags_draft_mcp_servers",
+  {
+    id: serial("id").primaryKey(),
+    draftId: integer("draft_id").notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    transport: varchar("transport", { length: 32 }).notNull(),
+    /** Used for stdio + http transports */
+    command: text("command"),
+    args: jsonb("args").$type<string[]>().default([]),
+    env: jsonb("env").$type<Record<string, string>>().default({}),
+    /** Used for sse + http transports */
+    url: text("url"),
+    /** Last known connection status from the MCP runtime */
+    status: varchar("status", { length: 32 }).default("pending"),
+    enabled: boolean("enabled").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    draftIdx: index("idx_ags_mcp_draft").on(t.draftId),
+    // Prevent duplicate server names on the same draft
+    uniq: uniqueIndex("uniq_ags_mcp_draft_name").on(t.draftId, t.name),
+  })
+);
+
+/**
+ * Skills attached to a draft. Each row is one skill from a pack. The skill
+ * registry itself is local-first via the skill-catalog-adapter (Phase 0c).
+ * Mirrors openllm `AgentDefinition.skills` array.
+ */
+export const agsDraftSkills = pgTable(
+  "ags_draft_skills",
+  {
+    id: serial("id").primaryKey(),
+    draftId: integer("draft_id").notNull(),
+    /** The pack the skill came from (e.g. "agents", "automation", "database") */
+    packKey: varchar("pack_key", { length: 64 }).notNull(),
+    /** The skill identifier within the pack (e.g. "schema-review") */
+    skillKey: varchar("skill_key", { length: 120 }).notNull(),
+    /** Display name */
+    skillName: text("skill_name").notNull(),
+    /** Tools this skill is allowed to invoke (subset of agent's tools) */
+    allowedTools: jsonb("allowed_tools").$type<string[]>().default([]),
+    blockedTools: jsonb("blocked_tools").$type<string[]>().default([]),
+    requiresApproval: boolean("requires_approval").default(false),
+    /** Optional JSON Schema for skill arguments */
+    argsSchema: jsonb("args_schema").$type<Record<string, unknown>>().default({}),
+    enabled: boolean("enabled").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    draftIdx: index("idx_ags_skills_draft").on(t.draftId),
+    packIdx: index("idx_ags_skills_pack").on(t.packKey),
+    // Prevent attaching the same skill twice to the same draft
+    uniq: uniqueIndex("uniq_ags_skills_draft_pack_skill").on(
+      t.draftId,
+      t.packKey,
+      t.skillKey
+    ),
+  })
+);
+
+/**
+ * Subagent definitions attached to a draft. Each row is a custom subagent
+ * the parent agent can launch via the Agent tool.
+ * Mirrors openllm `AgentDefinitionSchema` exactly — same field shape.
+ */
+export const agsDraftSubagents = pgTable(
+  "ags_draft_subagents",
+  {
+    id: serial("id").primaryKey(),
+    draftId: integer("draft_id").notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    /** The subagent's system prompt (required by openllm) */
+    prompt: text("prompt").notNull(),
+    /** Tool allow-list. If empty, inherits all tools from the parent. */
+    tools: jsonb("tools").$type<string[]>().default([]),
+    disallowedTools: jsonb("disallowed_tools").$type<string[]>().default([]),
+    /** Model alias or full model ID. If null, inherits from parent. */
+    model: text("model"),
+    maxTurns: integer("max_turns"),
+    background: boolean("background").default(false),
+    /** Reasoning effort: low | medium | high | max | <integer string> */
+    effort: varchar("effort", { length: 32 }),
+    permissionMode: varchar("permission_mode", { length: 32 }),
+    /** Memory scope: user | project | local */
+    memory: varchar("memory", { length: 32 }),
+    initialPrompt: text("initial_prompt"),
+    /** Experimental: critical reminder for the subagent's system prompt */
+    criticalSystemReminder: text("critical_system_reminder"),
+    enabled: boolean("enabled").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    draftIdx: index("idx_ags_subagents_draft").on(t.draftId),
+    // Prevent duplicate subagent names on the same draft
+    uniq: uniqueIndex("uniq_ags_subagents_draft_name").on(t.draftId, t.name),
+  })
+);
+
+/**
+ * Plugin entries attached to a draft. Plugins are local directories that
+ * bundle skills/tools/commands together. Mirrors `SdkPluginConfigSchema`.
+ */
+export const agsDraftPlugins = pgTable(
+  "ags_draft_plugins",
+  {
+    id: serial("id").primaryKey(),
+    draftId: integer("draft_id").notNull(),
+    /** Currently only "local" is supported by openllm */
+    type: varchar("type", { length: 32 }).default("local"),
+    /** Absolute or relative path to the plugin directory */
+    path: text("path").notNull(),
+    enabled: boolean("enabled").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    draftIdx: index("idx_ags_plugins_draft").on(t.draftId),
+    // Prevent attaching the same plugin path twice
+    uniq: uniqueIndex("uniq_ags_plugins_draft_path").on(t.draftId, t.path),
+  })
+);
+
+/**
+ * Permission rules attached to a draft. Mirrors openllm's `PermissionRule`
+ * with source tracking and behavior (allow | deny | ask).
+ */
+export const agsDraftPermissionRules = pgTable(
+  "ags_draft_permission_rules",
+  {
+    id: serial("id").primaryKey(),
+    draftId: integer("draft_id").notNull(),
+    /** Where the rule originated: userSettings | projectSettings | localSettings | cliArg | session */
+    ruleSource: varchar("rule_source", { length: 32 }).notNull(),
+    /** allow | deny | ask */
+    ruleBehavior: varchar("rule_behavior", { length: 16 }).notNull(),
+    /** Tool name pattern this rule applies to (e.g. "Bash", "Bash(*)", "Read") */
+    toolPattern: text("tool_pattern").notNull(),
+    /** Optional content pattern for content-aware rules */
+    contentPattern: text("content_pattern"),
+    /** Optional human description of the rule */
+    description: text("description"),
+    enabled: boolean("enabled").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    draftIdx: index("idx_ags_permission_rules_draft").on(t.draftId),
+    behaviorIdx: index("idx_ags_permission_rules_behavior").on(t.ruleBehavior),
   })
 );

@@ -26,9 +26,11 @@ import * as versionSvc from "../services/versioning";
 import * as toolCatalog from "../adapters/tool-catalog-adapter";
 import * as knowledgeAdapter from "../adapters/knowledge-adapter";
 import * as templateRegistry from "../adapters/template-registry";
+import * as skillCatalog from "../adapters/skill-catalog-adapter";
 import {
   agentIdSchema,
   archiveAgentSchema,
+  attachSkillSchema,
   attachToolSchema,
   comparePromptPackSchema,
   compareSimulationRunsSchema,
@@ -45,12 +47,23 @@ import {
   previewRetrievalSchema,
   promoteSimulationToTestSchema,
   publishVersionSchema,
+  removeHookSchema,
+  removeMcpServerSchema,
+  removePermissionRuleSchema,
+  removePluginSchema,
+  removeSkillSchema,
+  removeSubagentSchema,
   removeTestCaseSchema,
   removeToolSchema,
   rollbackToVersionSchema,
   runSimulationSchema,
   runTestSuiteSchema,
+  saveHookSchema,
+  saveMcpServerSchema,
+  savePermissionRuleSchema,
+  savePluginSchema,
   saveSimulationScenarioSchema,
+  saveSubagentSchema,
   saveTestCaseSchema,
   saveTestSuiteSchema,
   simulateToolCallSchema,
@@ -61,6 +74,7 @@ import {
   updateKnowledgeConfigSchema,
   updateMemoryConfigSchema,
   updatePromptPackSchema,
+  updateRuntimeConfigSchema,
   updateToolBindingSchema,
   updateWorkflowConfigSchema,
   withdrawPublishRequestSchema,
@@ -921,6 +935,253 @@ const publishRouter = router({
     }),
 });
 
+// ── Phase 0b: openllm-agent2 native parity sub-routers ──────────────────────
+
+// ── Hooks (27 lifecycle events) ─────────────────────────────────────────────
+
+const hooksRouter = router({
+  list: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
+    const draft = await repo.getCurrentDraft(input.agentId);
+    if (!draft) return [];
+    return repo.listHooks(draft.id);
+  }),
+  save: protectedProcedure.input(saveHookSchema).mutation(async ({ input }) => {
+    const draft = await repo.getCurrentDraft(input.agentId);
+    if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+    return repo.saveHook({
+      hookId: input.hookId,
+      draftId: draft.id,
+      eventName: input.eventName,
+      matcher: input.matcher,
+      command: input.command,
+      timeoutMs: input.timeoutMs,
+      requiresApproval: input.requiresApproval,
+      enabled: input.enabled,
+    });
+  }),
+  remove: protectedProcedure.input(removeHookSchema).mutation(async ({ input }) => {
+    await repo.removeHook(input.hookId);
+    return { success: true };
+  }),
+});
+
+// ── MCP servers ─────────────────────────────────────────────────────────────
+
+const mcpRouter = router({
+  list: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
+    const draft = await repo.getCurrentDraft(input.agentId);
+    if (!draft) return [];
+    return repo.listMcpServers(draft.id);
+  }),
+  save: protectedProcedure.input(saveMcpServerSchema).mutation(async ({ input }) => {
+    const draft = await repo.getCurrentDraft(input.agentId);
+    if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+    return repo.saveMcpServer({
+      serverId: input.serverId,
+      draftId: draft.id,
+      name: input.name,
+      transport: input.transport,
+      command: input.command,
+      args: input.args,
+      env: input.env,
+      url: input.url,
+      enabled: input.enabled,
+    });
+  }),
+  remove: protectedProcedure
+    .input(removeMcpServerSchema)
+    .mutation(async ({ input }) => {
+      await repo.removeMcpServer(input.serverId);
+      return { success: true };
+    }),
+  // Stub: deterministic connection test (does NOT actually connect to the server)
+  testConnection: protectedProcedure
+    .input(z.object({ serverId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const server = await repo.getMcpServerById(input.serverId);
+      if (!server) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "MCP server not found" });
+      }
+      return {
+        ok: true,
+        serverId: server.id,
+        transport: server.transport,
+        message: `Connection test simulated for ${server.transport} server "${server.name}"`,
+      };
+    }),
+});
+
+// ── Skills (attached from local catalog — adapter comes in Phase 0c) ────────
+
+const skillsRouter = router({
+  // ── Catalog (read-only, sourced from local vendored .md files) ──
+  listCatalog: protectedProcedure.query(() => skillCatalog.listSkillCatalog()),
+  listPacks: protectedProcedure.query(() => skillCatalog.listSkillPacks()),
+  listSkillsInPack: protectedProcedure
+    .input(z.object({ packKey: z.string().min(1) }))
+    .query(({ input }) => skillCatalog.listSkillsInPack(input.packKey)),
+  // ── Per-agent attached skills ──
+  list: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
+    const draft = await repo.getCurrentDraft(input.agentId);
+    if (!draft) return [];
+    return repo.listSkills(draft.id);
+  }),
+  attach: protectedProcedure
+    .input(attachSkillSchema)
+    .mutation(async ({ input }) => {
+      const draft = await repo.getCurrentDraft(input.agentId);
+      if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+      return repo.attachSkill({
+        draftId: draft.id,
+        packKey: input.packKey,
+        skillKey: input.skillKey,
+        skillName: input.skillName,
+        allowedTools: input.allowedTools,
+        blockedTools: input.blockedTools,
+        requiresApproval: input.requiresApproval,
+        argsSchema: input.argsSchema,
+      });
+    }),
+  remove: protectedProcedure
+    .input(removeSkillSchema)
+    .mutation(async ({ input }) => {
+      await repo.removeSkill(input.skillId);
+      return { success: true };
+    }),
+});
+
+// ── Subagents ───────────────────────────────────────────────────────────────
+
+const subagentsRouter = router({
+  list: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
+    const draft = await repo.getCurrentDraft(input.agentId);
+    if (!draft) return [];
+    return repo.listSubagents(draft.id);
+  }),
+  save: protectedProcedure
+    .input(saveSubagentSchema)
+    .mutation(async ({ input }) => {
+      const draft = await repo.getCurrentDraft(input.agentId);
+      if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+      return repo.saveSubagent({
+        subagentId: input.subagentId,
+        draftId: draft.id,
+        name: input.name,
+        description: input.description,
+        prompt: input.prompt,
+        tools: input.tools,
+        disallowedTools: input.disallowedTools,
+        model: input.model,
+        maxTurns: input.maxTurns,
+        background: input.background,
+        effort: input.effort,
+        permissionMode: input.permissionMode,
+        memory: input.memory,
+        initialPrompt: input.initialPrompt,
+        criticalSystemReminder: input.criticalSystemReminder,
+      });
+    }),
+  remove: protectedProcedure
+    .input(removeSubagentSchema)
+    .mutation(async ({ input }) => {
+      await repo.removeSubagent(input.subagentId);
+      return { success: true };
+    }),
+});
+
+// ── Plugins ─────────────────────────────────────────────────────────────────
+
+const pluginsRouter = router({
+  list: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
+    const draft = await repo.getCurrentDraft(input.agentId);
+    if (!draft) return [];
+    return repo.listPlugins(draft.id);
+  }),
+  save: protectedProcedure.input(savePluginSchema).mutation(async ({ input }) => {
+    const draft = await repo.getCurrentDraft(input.agentId);
+    if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+    return repo.savePlugin({
+      pluginId: input.pluginId,
+      draftId: draft.id,
+      type: input.type,
+      path: input.path,
+      enabled: input.enabled,
+    });
+  }),
+  remove: protectedProcedure
+    .input(removePluginSchema)
+    .mutation(async ({ input }) => {
+      await repo.removePlugin(input.pluginId);
+      return { success: true };
+    }),
+});
+
+// ── Permission rules ────────────────────────────────────────────────────────
+
+const permissionRulesRouter = router({
+  list: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
+    const draft = await repo.getCurrentDraft(input.agentId);
+    if (!draft) return [];
+    return repo.listPermissionRules(draft.id);
+  }),
+  save: protectedProcedure
+    .input(savePermissionRuleSchema)
+    .mutation(async ({ input }) => {
+      const draft = await repo.getCurrentDraft(input.agentId);
+      if (!draft) throw new TRPCError({ code: "NOT_FOUND", message: "No draft" });
+      return repo.savePermissionRule({
+        ruleId: input.ruleId,
+        draftId: draft.id,
+        ruleSource: input.ruleSource,
+        ruleBehavior: input.ruleBehavior,
+        toolPattern: input.toolPattern,
+        contentPattern: input.contentPattern,
+        description: input.description,
+      });
+    }),
+  remove: protectedProcedure
+    .input(removePermissionRuleSchema)
+    .mutation(async ({ input }) => {
+      await repo.removePermissionRule(input.ruleId);
+      return { success: true };
+    }),
+});
+
+// ── Runtime config (the 8 new draft columns from Phase 0a) ─────────────────
+
+const runtimeRouter = router({
+  get: protectedProcedure.input(agentIdSchema).query(async ({ input }) => {
+    const config = await repo.getRuntimeConfig(input.agentId);
+    if (config === null) {
+      return {
+        effort: null,
+        maxTurns: null,
+        background: false,
+        initialPrompt: null,
+        criticalSystemReminder: null,
+        permissionMode: null,
+        workingDirectories: [],
+        providerConfig: {},
+      };
+    }
+    return config;
+  }),
+  update: protectedProcedure
+    .input(updateRuntimeConfigSchema)
+    .mutation(async ({ input }) => {
+      return repo.updateRuntimeConfig(input.agentId, {
+        effort: input.effort,
+        maxTurns: input.maxTurns,
+        background: input.background,
+        initialPrompt: input.initialPrompt,
+        criticalSystemReminder: input.criticalSystemReminder,
+        permissionMode: input.permissionMode,
+        workingDirectories: input.workingDirectories,
+        providerConfig: input.providerConfig,
+      });
+    }),
+});
+
 // ── Compose ─────────────────────────────────────────────────────────────────
 
 export const agentStudioRouter = router({
@@ -940,4 +1201,12 @@ export const agentStudioRouter = router({
   runs: runsRouter,
   versions: versionsRouter,
   publish: publishRouter,
+  // Phase 0b: openllm-agent2 native parity sub-routers
+  hooks: hooksRouter,
+  mcp: mcpRouter,
+  skills: skillsRouter,
+  subagents: subagentsRouter,
+  plugins: pluginsRouter,
+  permissionRules: permissionRulesRouter,
+  runtime: runtimeRouter,
 });

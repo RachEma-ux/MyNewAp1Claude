@@ -9,8 +9,15 @@ import {
   AGS_AGENT_CLASSES,
   AGS_AUTONOMY_LEVELS,
   AGS_ENVIRONMENTS,
+  AGS_HOOK_EVENTS,
   AGS_LIFECYCLE_STATES,
+  AGS_MCP_TRANSPORTS,
+  AGS_MEMORY_SCOPES,
   AGS_MEMORY_TYPES,
+  AGS_PERMISSION_BEHAVIORS,
+  AGS_PERMISSION_MODES,
+  AGS_PERMISSION_SOURCES,
+  AGS_PLUGIN_TYPES,
   AGS_VISIBILITIES,
 } from "./constants";
 
@@ -346,4 +353,119 @@ export const decideApprovalStepSchema = z.object({
 
 export const withdrawPublishRequestSchema = z.object({
   publishRequestId: z.number().int().positive(),
+});
+
+// ── Phase 0b: openllm-agent2 native parity schemas ──────────────────────────
+
+// Hooks (27 lifecycle events)
+export const saveHookSchema = z.object({
+  agentId: z.number().int().positive(),
+  hookId: z.number().int().positive().optional(),
+  eventName: z.enum(AGS_HOOK_EVENTS),
+  matcher: z.string().nullable().optional(),
+  command: z.string().min(1),
+  timeoutMs: z.number().int().positive().nullable().optional(),
+  requiresApproval: z.boolean().optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const removeHookSchema = z.object({
+  hookId: z.number().int().positive(),
+});
+
+// MCP servers
+export const saveMcpServerSchema = z.object({
+  agentId: z.number().int().positive(),
+  serverId: z.number().int().positive().optional(),
+  name: z.string().min(1).max(120),
+  transport: z.enum(AGS_MCP_TRANSPORTS),
+  command: z.string().nullable().optional(),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string()).optional(),
+  url: z.string().nullable().optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const removeMcpServerSchema = z.object({
+  serverId: z.number().int().positive(),
+});
+
+// Skills (attached from local catalog)
+export const attachSkillSchema = z.object({
+  agentId: z.number().int().positive(),
+  packKey: z.string().min(1),
+  skillKey: z.string().min(1),
+  skillName: z.string().min(1),
+  allowedTools: z.array(z.string()).optional(),
+  blockedTools: z.array(z.string()).optional(),
+  requiresApproval: z.boolean().optional(),
+  argsSchema: z.record(z.any()).optional(),
+});
+
+export const removeSkillSchema = z.object({
+  skillId: z.number().int().positive(),
+});
+
+// Subagents
+export const saveSubagentSchema = z.object({
+  agentId: z.number().int().positive(),
+  subagentId: z.number().int().positive().optional(),
+  name: z.string().min(1).max(120),
+  description: z.string().nullable().optional(),
+  prompt: z.string().min(1),
+  tools: z.array(z.string()).optional(),
+  disallowedTools: z.array(z.string()).optional(),
+  model: z.string().nullable().optional(),
+  maxTurns: z.number().int().positive().nullable().optional(),
+  background: z.boolean().optional(),
+  effort: z.string().nullable().optional(),
+  permissionMode: z.enum(AGS_PERMISSION_MODES).nullable().optional(),
+  memory: z.enum(AGS_MEMORY_SCOPES).nullable().optional(),
+  initialPrompt: z.string().nullable().optional(),
+  criticalSystemReminder: z.string().nullable().optional(),
+});
+
+export const removeSubagentSchema = z.object({
+  subagentId: z.number().int().positive(),
+});
+
+// Plugins
+export const savePluginSchema = z.object({
+  agentId: z.number().int().positive(),
+  pluginId: z.number().int().positive().optional(),
+  type: z.enum(AGS_PLUGIN_TYPES).default("local"),
+  path: z.string().min(1),
+  enabled: z.boolean().optional(),
+});
+
+export const removePluginSchema = z.object({
+  pluginId: z.number().int().positive(),
+});
+
+// Permission rules
+export const savePermissionRuleSchema = z.object({
+  agentId: z.number().int().positive(),
+  ruleId: z.number().int().positive().optional(),
+  ruleSource: z.enum(AGS_PERMISSION_SOURCES),
+  ruleBehavior: z.enum(AGS_PERMISSION_BEHAVIORS),
+  toolPattern: z.string().min(1),
+  contentPattern: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+});
+
+export const removePermissionRuleSchema = z.object({
+  ruleId: z.number().int().positive(),
+});
+
+// Runtime config (the 8 new draft columns surfaced via a single sub-router)
+export const updateRuntimeConfigSchema = z.object({
+  agentId: z.number().int().positive(),
+  effort: z.string().nullable().optional(),
+  maxTurns: z.number().int().positive().nullable().optional(),
+  background: z.boolean().optional(),
+  initialPrompt: z.string().nullable().optional(),
+  criticalSystemReminder: z.string().nullable().optional(),
+  permissionMode: z.enum(AGS_PERMISSION_MODES).nullable().optional(),
+  workingDirectories: z.array(z.string()).optional(),
+  providerConfig: z.record(z.any()).optional(),
 });
