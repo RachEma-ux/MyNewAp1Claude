@@ -1568,7 +1568,7 @@ const slashCommandsRouter = router({
  *
  * `validate` is a dry-run check the UI calls before save so the user
  * gets immediate feedback (e.g., "tool name 'BashTool' not found in
- * registry"). Stricter than upstream openclaude — see
+ * registry"). Stricter than the upstream coding-agent reference — see
  * services/catalog-skills.ts header.
  */
 const catalogSkillsRouter = router({

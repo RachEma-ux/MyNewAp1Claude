@@ -209,7 +209,7 @@ export async function listConnectedTools(
  *
  * Returns prompts exposed by connected MCP servers, formatted as
  * skill-shaped entries that the catalog skills merge can include with
- * source="mcp_prompt". This mirrors openclaude's `mcpSkillBuilders.ts`
+ * source="mcp_prompt". This mirrors the upstream `mcpSkillBuilders`
  * pattern.
  *
  * Phase 15e ships the bridge plumbing only — actual `prompts/list`

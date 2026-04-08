@@ -40,9 +40,9 @@ const PERMISSION_MODES = [
 
 const MEMORY_SCOPES = [
   { value: "", label: "(none)" },
-  { value: "user", label: "user (~/.claude/agent-memory)" },
-  { value: "project", label: "project (.claude/agent-memory)" },
-  { value: "local", label: "local (.claude/agent-memory-local)" },
+  { value: "user", label: "user (~/.agent-studio/memory)" },
+  { value: "project", label: "project (.agent-studio/memory)" },
+  { value: "local", label: "local (.agent-studio/memory-local)" },
 ];
 
 const EFFORT_LEVELS = [

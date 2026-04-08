@@ -210,7 +210,7 @@ export default function AgentRuntimePage({ agentId }: { agentId: number }) {
               <Input
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g. gpt-4o-mini, claude-sonnet-4-5, sonnet"
+                placeholder="e.g. gpt-4o-mini, llama3.2:3b, mistral-small"
                 className="h-8 text-xs font-mono"
               />
             </Field>

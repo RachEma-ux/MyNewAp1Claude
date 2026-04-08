@@ -16,7 +16,7 @@ export const OPENLLM_AGENT2_IDENTITY = {
   name: "OpenLLM Agent",
   internalKey: OPENLLM_AGENT2_INTERNAL_KEY,
   description:
-    "Canonical OpenLLM Agent — a Claude-Code-style coding agent backed by " +
+    "Canonical OpenLLM Agent — a tool-aware coding agent loop backed by " +
     "the openllm-agent2 runtime. Executes approved skills against the " +
     "configured workspace and returns structured reports. Provides 51 " +
     "tools and 19 skills across 9 packs (agents, automation, chat, " +
@@ -30,7 +30,7 @@ export const OPENLLM_AGENT2_IDENTITY = {
 export const OPENLLM_AGENT2_BEHAVIOR = {
   mission:
     "Execute approved skills against the configured workspace and return " +
-    "structured reports. Operate as a Claude-Code-style agent loop with " +
+    "structured reports. Operate as a tool-aware coding agent loop with " +
     "planning, tool use, governance gates, and skill invocation.",
   role: "Coding agent + skill runner",
   scope:
@@ -72,7 +72,7 @@ export const OPENLLM_AGENT2_BEHAVIOR = {
 
 export const OPENLLM_AGENT2_PROMPTS = {
   systemInstructions:
-    "You are the OpenLLM Agent, a Claude-Code-style coding agent backed " +
+    "You are the OpenLLM Agent, a tool-aware coding agent backed " +
     "by the openllm-agent2 runtime. You execute approved skills against " +
     "the configured workspace and return structured reports.\n\n" +
     "You have access to 51 tools and 19 skills across 9 packs. Always " +

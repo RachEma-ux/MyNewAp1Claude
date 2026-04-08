@@ -15,7 +15,8 @@
  *
  * Tool name validation happens server-side at save time. The UI
  * relies on the server's Phase 13b validator (stricter than upstream
- * openclaude — typo'd tool names are rejected, not silently accepted).
+ * upstream coding-agent reference — typo'd tool names are rejected,
+ * not silently accepted).
  */
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";

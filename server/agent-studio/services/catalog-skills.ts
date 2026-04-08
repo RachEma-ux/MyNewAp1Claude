@@ -5,13 +5,13 @@
  * on Phase 0c's vendored skill catalog (read-only .md files) by adding
  * a DB-backed authoring layer.
  *
- * Key design decision (stricter than upstream openclaude): tool names
- * in `allowedTools` are cross-validated against the live merged tool
- * registry at save time. Upstream silently accepts typos and they fail
- * at runtime as permission denials (we confirmed this from the deep
- * dive into openclaude/src/tools/SkillTool/SkillTool.ts and the
- * `alwaysAllowRules.command` permission gate). Our catalog UI saves
- * users from this footgun.
+ * Key design decision (stricter than the upstream coding-agent
+ * reference): tool names in `allowedTools` are cross-validated against
+ * the live merged tool registry at save time. The upstream reference
+ * silently accepts typos and they fail at runtime as permission
+ * denials (we confirmed this via the SkillTool source review and
+ * the `alwaysAllowRules.command` permission gate). Our catalog UI
+ * saves users from this footgun.
  *
  * Merge logic: listMerged() returns vendored .md catalog entries first,
  * then DB rows. Vendored entries are always read-only. DB entries can
@@ -101,7 +101,7 @@ async function findUnknownToolNames(allowedTools: string[]): Promise<string[]> {
 
 /**
  * Validate a CatalogSkillInput. Strict — more validation than upstream
- * openclaude does. Returns { ok, errors, warnings }.
+ * the upstream reference does. Returns { ok, errors, warnings }.
  *
  * Errors block save; warnings are surfaced to the user but allow save.
  */

@@ -155,7 +155,7 @@ export const AGS_PERMISSION_SOURCES = [
 export type AgsPermissionSource = (typeof AGS_PERMISSION_SOURCES)[number];
 
 /** MCP server transport types from openllm-agent2's `coreSchemas.ts:110-160`. */
-// Phase 15a: added "websocket" to match openclaude's full transport set
+// Phase 15a: added "websocket" to match the upstream MCP spec's full transport set
 export const AGS_MCP_TRANSPORTS = [
   "stdio",
   "sse",

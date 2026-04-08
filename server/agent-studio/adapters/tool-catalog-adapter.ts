@@ -258,7 +258,7 @@ const CATALOG: ToolCatalogEntry[] = [
   {
     key: "Config",
     name: "Config",
-    description: "Get or set Claude Code / OpenLLM configuration",
+    description: "Get or set OpenLLM Agent runtime configuration",
     category: "compute",
     destructive: true,
     defaultAllowedActions: ["get"],

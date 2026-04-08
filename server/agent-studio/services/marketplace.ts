@@ -2,7 +2,7 @@
  * AI Agent Studio — Marketplace Service
  *
  * Phase 14: Agent Studio's own marketplace. NO external links — no
- * Claude marketplace, no NPM registry, no openclaude plugin pulls.
+ * third-party marketplace, no NPM registry, no upstream plugin pulls.
  * Distribution is via:
  *   1. Local-only items (created on this Studio instance via Publish)
  *   2. Imported items (pulled from a remote registry — JSON file URL)
