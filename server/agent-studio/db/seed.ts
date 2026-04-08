@@ -29,6 +29,8 @@ interface SeedResult {
   created: number;
   skipped: number;
   failed: number;
+  /** Columns added to existing tables via ALTER TABLE (Phase 19c follow-up) */
+  altered: number;
   failures: Array<{ table: string; error: string }>;
 }
 
@@ -168,6 +170,7 @@ export async function seedAsDb(): Promise<SeedResult> {
     created: 0,
     skipped: 0,
     failed: 0,
+    altered: 0,
     failures: [],
   };
 
@@ -187,6 +190,50 @@ export async function seedAsDb(): Promise<SeedResult> {
         const createSql = buildCreateTableSql(value as PgTable);
         await client.query(createSql);
         result.created++;
+
+        // ── Phase 19c follow-up: detect & add missing columns ──
+        //
+        // CREATE TABLE IF NOT EXISTS only creates the table the FIRST time.
+        // When schema columns are added later (e.g., Phase 15b's
+        // oauth_config / oauth_state on ags_draft_mcp_servers), the seed
+        // would silently no-op and Drizzle's full-row SELECT would fail
+        // at runtime with "column does not exist".
+        //
+        // We compare the schema's expected column set against the live
+        // information_schema and emit ALTER TABLE ADD COLUMN for anything
+        // missing. Idempotent — uses ADD COLUMN IF NOT EXISTS so a
+        // race or repeat is harmless.
+        try {
+          const liveColsRes = await client.query(
+            `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
+            [tableName]
+          );
+          const liveCols = new Set<string>(
+            liveColsRes.rows.map((r: any) => r.column_name)
+          );
+          for (const col of config.columns) {
+            if (liveCols.has(col.name)) continue;
+            const fragment = columnToSqlFragment(col as PgColumn);
+            // Strip the leading "name" from the fragment because ALTER
+            // TABLE ADD COLUMN repeats the name in its own clause
+            const alterSql = `ALTER TABLE "${tableName}" ADD COLUMN IF NOT EXISTS ${fragment};`;
+            try {
+              await client.query(alterSql);
+              result.altered++;
+              console.log(
+                `[ASDB] altered ${tableName}: added column ${col.name}`
+              );
+            } catch (e) {
+              console.warn(
+                `[ASDB] ALTER TABLE failed for ${tableName}.${col.name}: ${e instanceof Error ? e.message : String(e)}`
+              );
+            }
+          }
+        } catch (e) {
+          console.warn(
+            `[ASDB] column-drift check failed for ${tableName}: ${e instanceof Error ? e.message : String(e)}`
+          );
+        }
 
         // Indexes — per-index failures logged but non-fatal
         for (const idxSql of buildIndexSql(value as PgTable)) {
@@ -212,7 +259,7 @@ export async function seedAsDb(): Promise<SeedResult> {
   }
 
   console.log(
-    `[ASDB] Seed complete — ${result.created} tables created/verified, ${result.failed} failed`
+    `[ASDB] Seed complete — ${result.created} tables created/verified, ${result.altered} columns added, ${result.failed} failed`
   );
   return result;
 }
