@@ -33,6 +33,10 @@ import { cloneAgent } from "../services/cloning";
 // agent-studio API hit. No edits to server/_core/index.ts needed.
 import "../services/scheduler";
 import * as mcpManager from "../services/mcp/mcp-manager";
+import {
+  loadPluginsForDraft,
+  validatePlugin,
+} from "../services/plugin-loader";
 import { compactRun, resumeRun } from "../services/run-snapshot";
 import { parseAndExecuteSlashCommand } from "../services/slash-commands";
 import { getRunTree, invokeSubagent } from "../services/subagent-runner";
@@ -96,6 +100,7 @@ import {
   updateRuntimeConfigSchema,
   updateToolBindingSchema,
   updateWorkflowConfigSchema,
+  validatePluginSchema,
   withdrawPublishRequestSchema,
 } from "../shared/schemas";
 
@@ -1255,6 +1260,29 @@ const pluginsRouter = router({
     .mutation(async ({ input }) => {
       await repo.removePlugin(input.pluginId);
       return { success: true };
+    }),
+  // Phase 9: validate a plugin path before enabling. Returns the parsed
+  // manifest on success or a structured error. governedProcedure because
+  // it reads arbitrary disk paths — same trust as MCP connect.
+  validate: governedProcedure
+    .input(validatePluginSchema)
+    .mutation(async ({ input }) => {
+      return validatePlugin({ agentId: input.agentId, path: input.path });
+    }),
+  // Load all enabled plugins for a draft + return merged contributions.
+  // Read-only — protectedProcedure is fine.
+  loadAll: protectedProcedure
+    .input(agentIdSchema)
+    .query(async ({ input }) => {
+      const draft = await repo.getCurrentDraft(input.agentId);
+      if (!draft) {
+        return {
+          loaded: [],
+          errors: [],
+          merged: { tools: [], hooks: [], mcpServers: [] },
+        };
+      }
+      return loadPluginsForDraft({ agentId: input.agentId, draftId: draft.id });
     }),
 });
 

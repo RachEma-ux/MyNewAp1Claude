@@ -136,6 +136,13 @@ export const getRunTreeSchema = z.object({
   runId: z.number().int().positive(),
 });
 
+// Phase 9: plugin loader — validate a plugin path before enabling, and
+// load the merged contributions for a draft.
+export const validatePluginSchema = z.object({
+  agentId: z.number().int().positive(),
+  path: z.string().min(1).max(500),
+});
+
 // ── Identity ────────────────────────────────────────────────────────────────
 
 export const updateIdentitySchema = z.object({

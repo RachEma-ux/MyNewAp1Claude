@@ -528,6 +528,23 @@ function PluginsTab({ agentId }: { agentId: number }) {
     },
     onError: (e) => toast.error(e.message),
   });
+  // Phase 9: validate a plugin path before adding it. Reads the manifest
+  // from disk via plugins.validate (governedProcedure — same trust as
+  // MCP connect because it touches arbitrary disk paths).
+  const [validateResult, setValidateResult] = useState<{
+    ok: boolean;
+    error?: string;
+    manifest?: any;
+    resolvedPath?: string;
+  } | null>(null);
+  const validateMut = trpc.agentStudio.plugins.validate.useMutation({
+    onSuccess: (r) => {
+      setValidateResult(r);
+      if (r.ok) toast.success(`Manifest valid — ${r.manifest?.name}`);
+      else toast.error(r.error ?? "Validation failed");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const [newPath, setNewPath] = useState("");
 
@@ -560,6 +577,19 @@ function PluginsTab({ agentId }: { agentId: number }) {
           />
           <Button
             size="sm"
+            variant="outline"
+            className="h-7"
+            disabled={!newPath || validateMut.isPending}
+            onClick={() => validateMut.mutate({ agentId, path: newPath })}
+            title="Validate — read plugin.json and verify the manifest before adding"
+          >
+            {validateMut.isPending && (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            )}
+            Validate
+          </Button>
+          <Button
+            size="sm"
             className="h-7"
             disabled={!newPath || saveMut.isPending}
             onClick={() =>
@@ -575,6 +605,43 @@ function PluginsTab({ agentId }: { agentId: number }) {
             <Plus className="h-3 w-3 mr-1" /> Add Plugin
           </Button>
         </div>
+
+        {/* Phase 9: validation result preview */}
+        {validateResult && (
+          <div
+            className={`rounded border p-2 text-[10px] ${
+              validateResult.ok
+                ? "border-emerald-500/40 bg-emerald-500/5"
+                : "border-red-500/40 bg-red-500/5"
+            }`}
+          >
+            {validateResult.ok ? (
+              <>
+                <div className="font-semibold text-emerald-300">
+                  ✓ {validateResult.manifest?.name} v
+                  {validateResult.manifest?.version}
+                </div>
+                {validateResult.manifest?.description && (
+                  <div className="text-muted-foreground">
+                    {validateResult.manifest.description}
+                  </div>
+                )}
+                <div className="font-mono opacity-70 mt-1">
+                  {validateResult.resolvedPath}
+                </div>
+                <div className="flex gap-3 mt-1">
+                  <span>tools: {validateResult.manifest?.tools?.length ?? 0}</span>
+                  <span>hooks: {validateResult.manifest?.hooks?.length ?? 0}</span>
+                  <span>
+                    mcp: {validateResult.manifest?.mcpServers?.length ?? 0}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="text-red-400">✗ {validateResult.error}</div>
+            )}
+          </div>
+        )}
 
         {plugins.length === 0 ? (
           <EmptyState
