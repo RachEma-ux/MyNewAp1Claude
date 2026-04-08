@@ -28,6 +28,7 @@ import * as knowledgeAdapter from "../adapters/knowledge-adapter";
 import * as templateRegistry from "../adapters/template-registry";
 import * as skillCatalog from "../adapters/skill-catalog-adapter";
 import * as catalogSkillsService from "../services/catalog-skills";
+import * as catalogToolsService from "../services/catalog-tools";
 import { cloneAgent } from "../services/cloning";
 // Phase 12.5: scheduler is now started explicitly via bootAgentStudio()
 // in server/agent-studio/boot.ts (called from _core/index.ts). The
@@ -50,10 +51,15 @@ import {
   cloneAgentSchema,
   compactRunSchema,
   createCatalogSkillSchema,
+  createCatalogToolSchema,
   listCatalogSkillsSchema,
+  listCatalogToolsSchema,
   removeCatalogSkillSchema,
+  removeCatalogToolSchema,
   updateCatalogSkillSchema,
+  updateCatalogToolSchema,
   validateCatalogSkillSchema,
+  validateCatalogToolSchema,
   comparePromptPackSchema,
   compareSimulationRunsSchema,
   compareVersionsSchema,
@@ -1533,6 +1539,84 @@ const catalogSkillsRouter = router({
     }),
 });
 
+// ── Phase 13c: Catalog tools sub-router ─────────────────────────────────────
+
+/**
+ * User-authored tools catalog. Merged with the static built-in 51 and
+ * MCP-discovered tools (when a draftId is supplied).
+ *
+ * Trust levels (per Decision #2):
+ *   - listMerged / get / validate → protectedProcedure (read or dry-run)
+ *   - create / update / remove   → governedProcedure (shell/http kinds
+ *                                   create executable command surfaces;
+ *                                   same sensitivity as MCP connect)
+ */
+const catalogToolsRouter = router({
+  listMerged: protectedProcedure
+    .input(listCatalogToolsSchema)
+    .query(async ({ input }) => {
+      return catalogToolsService.listMergedTools(input);
+    }),
+  get: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return repo.getCatalogToolById(input.id);
+    }),
+  create: governedProcedure
+    .input(createCatalogToolSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await catalogToolsService.createCatalogTool({
+          ...input,
+          createdBy: ctx.user.id,
+        });
+      } catch (e) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+  update: governedProcedure
+    .input(updateCatalogToolSchema)
+    .mutation(async ({ input }) => {
+      const { id, ...patch } = input;
+      try {
+        const updated = await catalogToolsService.updateCatalogTool(id, patch);
+        if (!updated) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: `catalog tool ${id} not found`,
+          });
+        }
+        return updated;
+      } catch (e) {
+        if (e instanceof TRPCError) throw e;
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+  remove: governedProcedure
+    .input(removeCatalogToolSchema)
+    .mutation(async ({ input }) => {
+      const result = await catalogToolsService.removeCatalogTool(input.id);
+      if (!result.ok) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: result.error ?? "remove failed",
+        });
+      }
+      return { success: true };
+    }),
+  validate: protectedProcedure
+    .input(validateCatalogToolSchema)
+    .mutation(async ({ input }) => {
+      return catalogToolsService.validateCatalogTool(input);
+    }),
+});
+
 // ── Compose ─────────────────────────────────────────────────────────────────
 
 export const agentStudioRouter = router({
@@ -1564,6 +1648,7 @@ export const agentStudioRouter = router({
   permissions: permissionsRouter,
   // Phase 6: slash command executor
   slashCommands: slashCommandsRouter,
-  // Phase 13: Catalog (skills + tools — tools added in 13c)
+  // Phase 13: Catalog (skills + tools)
   catalogSkills: catalogSkillsRouter,
+  catalogTools: catalogToolsRouter,
 });

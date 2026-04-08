@@ -160,6 +160,75 @@ export const removeCatalogSkillSchema = z.object({
 
 export const validateCatalogSkillSchema = createCatalogSkillSchema;
 
+// ── Phase 13c: Catalog tools ────────────────────────────────────────────────
+
+export const listCatalogToolsSchema = z
+  .object({
+    draftId: z.number().int().positive().optional(),
+    category: z.string().max(32).optional(),
+    search: z.string().max(120).optional(),
+  })
+  .optional();
+
+export const createCatalogToolSchema = z.object({
+  key: z.string().min(1).max(120),
+  name: z.string().min(1).max(200),
+  description: z.string().max(1000).optional().nullable(),
+  category: z
+    .enum([
+      "filesystem",
+      "compute",
+      "communication",
+      "network",
+      "search",
+      "custom",
+      "mcp",
+    ])
+    .optional()
+    .nullable(),
+  defaultAllowedActions: z.array(z.string().max(64)).max(40).optional(),
+  hardBlockedActions: z.array(z.string().max(64)).max(40).optional(),
+  defaultRequiresApproval: z.boolean().optional(),
+  destructive: z.boolean().optional(),
+  invocationKind: z.enum(["shell", "http", "mcp_ref", "builtin"]),
+  invocationConfig: z.record(z.string(), z.any()).optional(),
+  inputSchema: z.record(z.string(), z.any()).optional(),
+  version: z.string().max(32).optional().nullable(),
+});
+
+export const updateCatalogToolSchema = z.object({
+  id: z.number().int().positive(),
+  key: z.string().min(1).max(120).optional(),
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  category: z
+    .enum([
+      "filesystem",
+      "compute",
+      "communication",
+      "network",
+      "search",
+      "custom",
+      "mcp",
+    ])
+    .optional()
+    .nullable(),
+  defaultAllowedActions: z.array(z.string().max(64)).max(40).optional(),
+  hardBlockedActions: z.array(z.string().max(64)).max(40).optional(),
+  defaultRequiresApproval: z.boolean().optional(),
+  destructive: z.boolean().optional(),
+  invocationKind: z.enum(["shell", "http", "mcp_ref", "builtin"]).optional(),
+  invocationConfig: z.record(z.string(), z.any()).optional(),
+  inputSchema: z.record(z.string(), z.any()).optional(),
+  version: z.string().max(32).optional().nullable(),
+});
+
+export const removeCatalogToolSchema = z.object({
+  id: z.number().int().positive(),
+});
+
+export const validateCatalogToolSchema = createCatalogToolSchema;
+
 // Phase 11: resume / compact prior runs.
 export const resumeRunSchema = z.object({
   sourceRunId: z.number().int().positive(),
