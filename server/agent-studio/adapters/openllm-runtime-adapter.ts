@@ -10,12 +10,14 @@
  *     { type: "message", content, provider?, model?, apiKey? }
  *     { type: "cancel" }
  *     { type: "permission_response", allowed: boolean }
+ *     { type: "configure_session", mcpServers?, scope? }   ← Phase 18 (NEW)
  *
  *   server → client:
  *     { type: "token",  content }      // streamed text chunk
  *     { type: "done",   usage }        // generation finished
  *     { type: "error",  message }      // generation failed
  *     { type: "permission_request", ... }  // server asks user to allow
+ *     { type: "session_configured", mcpServerCount, mcpToolCount, errors? } ← Phase 18 (NEW)
  *     (other types ignored — heartbeats, etc.)
  *
  * Phase 1c: permission_request is resolved by a caller-supplied
@@ -26,6 +28,14 @@
  * default for safety. The "ask" rule behavior maps to "needs_human" — the
  * adapter still denies (no interactive UI yet) but logs a policy event so
  * the user can see which permissions are blocked on their attention.
+ *
+ * Phase 18: configure_session injects MCP servers into the live runtime so
+ * the agent's tool universe matches simulation mode. The send is gated by
+ * `mcpServers && mcpServers.length > 0` (decision #8b). Feature detection:
+ * we wait up to 2 seconds for a `session_configured` ack before sending the
+ * first `message`. If the ack never arrives (un-patched openllm-agent2 just
+ * silently ignores unknown message types), we fall through and proceed —
+ * the live run still works, just without MCP. Backward compatible by design.
  *
  * Local-first: defaults to ws://127.0.0.1:5000/ws when no endpoint is
  * provided. Tunnel URLs work too (just pass them in).
@@ -60,6 +70,64 @@ export type PermissionResolver = (request: {
   rawPayload: Record<string, unknown>;
 }) => PermissionDecision | Promise<PermissionDecision>;
 
+/**
+ * Phase 18: MCP server config sent to the openllm-agent2 bridge as part of
+ * `configure_session`. This is a discriminated union mirroring the upstream
+ * `McpServerConfig` shape (`src/services/mcp/types.ts` in openllm-agent2).
+ *
+ * We only emit the 5 transports our drafts use today; the upstream patch
+ * accepts the full 8-transport union (decision #12a) so future additions
+ * pass straight through without an adapter change.
+ *
+ * OAuth tokens are decrypted server-side BEFORE being put into this object
+ * (decision #9a). The adapter MUST NOT log the `headers` field — it may
+ * contain bearer tokens. The simulation caller is responsible for the
+ * decrypt step (it has the platform encryption helper import authorization).
+ */
+export type McpServerConfigForBridge =
+  | {
+      type: "stdio";
+      command: string;
+      args?: string[];
+      env?: Record<string, string>;
+    }
+  | {
+      type: "http";
+      url: string;
+      headers?: Record<string, string>;
+    }
+  | {
+      type: "sse";
+      url: string;
+      headers?: Record<string, string>;
+    }
+  | {
+      type: "websocket";
+      url: string;
+      headers?: Record<string, string>;
+    }
+  | {
+      type: "sdk";
+      /** in-process registry key, e.g. "studio.echo" */
+      serverName: string;
+    };
+
+/**
+ * Phase 18: result of the `configure_session` handshake. Populated when the
+ * upstream bridge replies with `{type:"session_configured"}` within the
+ * 2-second feature-detection window. When the field is null, either the
+ * caller didn't pass `mcpServers` or the upstream bridge is un-patched
+ * (older openllm-agent2 silently ignores unknown message types).
+ */
+export interface OpenllmSessionConfigResult {
+  /** Number of MCP servers the bridge accepted */
+  mcpServerCount: number;
+  /** Total tools discovered across all accepted servers */
+  mcpToolCount: number;
+  /** Per-server connect failures, if any (soft-fail per decision #4b) */
+  errors: Array<{ serverName: string; error: string }>;
+}
+
 export interface OpenllmRuntimeRequest {
   /** WebSocket URL pointing at openllm-agent2's /ws endpoint */
   wsUrl: string;
@@ -80,11 +148,39 @@ export interface OpenllmRuntimeRequest {
    * the adapter denies every permission request (Phase 1b safety default).
    */
   permissionResolver?: PermissionResolver;
+  /**
+   * Phase 18: MCP servers to inject into the live runtime via the new
+   * `configure_session` message. Empty / omitted → no `configure_session`
+   * is sent (decision #8b: minimize wire traffic when not needed).
+   *
+   * Tokens inside `headers` are expected to be PLAINTEXT — the caller is
+   * responsible for decrypting `oauthState.encryptedTokens` before
+   * populating this field (decision #9a). The adapter never reads from
+   * the platform encryption helper itself (no cross-module import).
+   */
+  mcpServers?: McpServerConfigForBridge[];
+  /**
+   * Phase 18: scope hint forwarded to openllm-agent2's MCP plugin
+   * attribution. Defaults to "managed" (Studio-owned) when omitted.
+   */
+  mcpScope?: "project" | "user" | "managed";
+  /**
+   * Phase 18: how long to wait for the bridge's `session_configured` ack
+   * before falling through and sending the first `message`. Default 2s.
+   * If the ack arrives later it is recorded silently (the run still
+   * continues with whatever the engine has).
+   */
+  sessionConfigureTimeoutMs?: number;
   /** Streaming callbacks (optional — caller can collect via the result) */
   onToken?: (chunk: string) => void;
   onPermissionRequest?: (payload: Record<string, unknown>) => void;
   onPolicyEvent?: (payload: Record<string, unknown>) => void;
   onError?: (message: string) => void;
+  /**
+   * Phase 18: fired once when `session_configured` arrives (or never, if
+   * the upstream is un-patched / no MCP servers were sent).
+   */
+  onSessionConfigured?: (result: OpenllmSessionConfigResult) => void;
 }
 
 /**
@@ -127,6 +223,16 @@ export interface OpenllmRuntimeResult {
   permissionEvents: Array<{ ts: number; payload: Record<string, unknown> }>;
   /** Other policy events received during the run */
   policyEvents: Array<{ ts: number; payload: Record<string, unknown> }>;
+  /**
+   * Phase 18: outcome of the `configure_session` handshake.
+   *  - null    → no `configure_session` was sent (no MCP servers attached)
+   *  - object  → upstream bridge replied; counts and per-server errors
+   *  - "no_ack"→ upstream is un-patched / silently dropped the message
+   *              (we waited the timeout window and gave up). Live runtime
+   *              proceeded WITHOUT MCP injection. Surface this in the
+   *              run trace so users see the upstream-patch gap.
+   */
+  sessionConfig: OpenllmSessionConfigResult | "no_ack" | null;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -323,6 +429,10 @@ export async function runViaOpenllmAgent(
   // permissive parser below. Stays undefined for runs that never
   // received a done message.
   let parsedUsage: OpenllmUsage | undefined;
+  // Phase 18: session_configured handshake state
+  let sessionConfigResult: OpenllmRuntimeResult["sessionConfig"] = null;
+  let sessionConfigAckTimer: NodeJS.Timeout | null = null;
+  let messageSent = false;
 
   return new Promise<OpenllmRuntimeResult>((resolve) => {
     const timeoutMs = req.timeoutMs ?? 60_000;
@@ -343,6 +453,7 @@ export async function runViaOpenllmAgent(
         finalizedNormally: false,
         permissionEvents: [],
         policyEvents: [],
+        sessionConfig: null,
       });
       return;
     }
@@ -351,6 +462,7 @@ export async function runViaOpenllmAgent(
       if (resolved) return;
       resolved = true;
       if (timeoutHandle) clearTimeout(timeoutHandle);
+      if (sessionConfigAckTimer) clearTimeout(sessionConfigAckTimer);
       try {
         ws.close();
       } catch {
@@ -366,6 +478,7 @@ export async function runViaOpenllmAgent(
         usage: parsedUsage,
         permissionEvents,
         policyEvents,
+        sessionConfig: sessionConfigResult,
       });
     };
 
@@ -390,7 +503,12 @@ export async function runViaOpenllmAgent(
       req.signal.addEventListener("abort", onAbort, { once: true });
     }
 
-    ws.on("open", () => {
+    // Phase 18: send the first `message` frame. Extracted so it can be
+    // called either immediately on `open` (no MCP servers) or after the
+    // configure_session ack (or its timeout fallback).
+    const sendMessageFrame = () => {
+      if (messageSent || resolved) return;
+      messageSent = true;
       const payload: Record<string, unknown> = {
         type: "message",
         content: req.message,
@@ -406,6 +524,46 @@ export async function runViaOpenllmAgent(
           `Failed to send message: ${e instanceof Error ? e.message : String(e)}`
         );
       }
+    };
+
+    ws.on("open", () => {
+      // Phase 18: when MCP servers are attached, send `configure_session`
+      // FIRST (decision #7a — strict ordering before any `message`). The
+      // upstream openllm-agent2 patch acks with `session_configured`. If
+      // the upstream is un-patched it silently ignores the unknown type;
+      // we wait `sessionConfigureTimeoutMs` (default 2s) before falling
+      // through and sending the message anyway. This makes the adapter
+      // backward-compatible with both patched and un-patched bridges.
+      const mcpServers = req.mcpServers ?? [];
+      if (mcpServers.length === 0) {
+        // No MCP servers — send the message immediately, classic behavior.
+        sendMessageFrame();
+        return;
+      }
+
+      const configurePayload = {
+        type: "configure_session" as const,
+        mcpServers,
+        scope: req.mcpScope ?? "managed",
+      };
+      try {
+        ws.send(JSON.stringify(configurePayload));
+      } catch {
+        // configure_session send failed — fall through to messaging anyway
+        sessionConfigResult = "no_ack";
+        sendMessageFrame();
+        return;
+      }
+
+      // Arm the feature-detection fallback. If session_configured doesn't
+      // arrive within the timeout window, mark sessionConfig="no_ack" and
+      // proceed with the message frame regardless.
+      const ackTimeoutMs = req.sessionConfigureTimeoutMs ?? 2_000;
+      sessionConfigAckTimer = setTimeout(() => {
+        if (messageSent || resolved) return;
+        sessionConfigResult = "no_ack";
+        sendMessageFrame();
+      }, ackTimeoutMs);
     });
 
     ws.on("message", (raw: Buffer | string) => {
@@ -501,6 +659,29 @@ export async function runViaOpenllmAgent(
         case "audit_event": {
           policyEvents.push({ ts: Date.now(), payload: msg });
           req.onPolicyEvent?.(msg);
+          break;
+        }
+        case "session_configured": {
+          // Phase 18: upstream patched bridge acked our configure_session.
+          // Cancel the no-ack fallback timer, record counts, then send
+          // the first `message` frame so the agent loop kicks off with
+          // the merged tool universe.
+          if (sessionConfigAckTimer) {
+            clearTimeout(sessionConfigAckTimer);
+            sessionConfigAckTimer = null;
+          }
+          const result: OpenllmSessionConfigResult = {
+            mcpServerCount:
+              typeof msg.mcpServerCount === "number" ? msg.mcpServerCount : 0,
+            mcpToolCount:
+              typeof msg.mcpToolCount === "number" ? msg.mcpToolCount : 0,
+            errors: Array.isArray(msg.errors)
+              ? (msg.errors as Array<{ serverName: string; error: string }>)
+              : [],
+          };
+          sessionConfigResult = result;
+          req.onSessionConfigured?.(result);
+          sendMessageFrame();
           break;
         }
         default: {

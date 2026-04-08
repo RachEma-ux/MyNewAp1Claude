@@ -29,6 +29,7 @@ import {
   runViaOpenllmAgent,
   type PermissionDecision,
   type PermissionResolver,
+  type McpServerConfigForBridge,
 } from "../adapters/openllm-runtime-adapter";
 
 /**
@@ -665,6 +666,119 @@ export async function runSimulation(input: {
         return finalDecision;
       };
 
+      // Phase 18: Build the MCP server list to inject into the live
+      // runtime via the new `configure_session` message. We only forward
+      // rows the MCP manager has actually connected (status='connected')
+      // — un-connected rows would just generate per-server errors on
+      // the upstream side and waste a roundtrip. OAuth tokens are
+      // decrypted SERVER-SIDE here (decision #9a) using the platform
+      // encryption helper. The cross-module import is the documented
+      // exception that the api/router.ts oauth-exchange path already
+      // uses for the same secret-storage purpose.
+      let bridgeMcpServers: McpServerConfigForBridge[] = [];
+      try {
+        const mcpRows = await repo.listMcpServers(draft.id);
+        const connectedRows = mcpRows.filter(
+          (r) => r.status === "connected" && r.enabled !== false
+        );
+        if (connectedRows.length > 0) {
+          // Lazy import — only pulled in when there are encrypted tokens
+          // to decrypt for an attached OAuth-flavored MCP server.
+          let decryptFn: ((s: string) => string) | null = null;
+          const ensureDecrypt = async () => {
+            if (decryptFn) return decryptFn;
+            const mod = await import("../../_core/encryption");
+            decryptFn = mod.decrypt;
+            return decryptFn;
+          };
+
+          const built: McpServerConfigForBridge[] = [];
+          for (const row of connectedRows) {
+            // OAuth → bearer token header (best effort, fail-soft)
+            let authHeaders: Record<string, string> | undefined;
+            const oauthState = (row.oauthState ?? null) as Record<
+              string,
+              unknown
+            > | null;
+            const encryptedTokens =
+              oauthState && typeof oauthState.encryptedTokens === "string"
+                ? (oauthState.encryptedTokens as string)
+                : undefined;
+            if (encryptedTokens) {
+              try {
+                const dec = await ensureDecrypt();
+                const tokens = JSON.parse(dec(encryptedTokens)) as {
+                  accessToken?: string;
+                };
+                if (tokens.accessToken) {
+                  authHeaders = {
+                    Authorization: `Bearer ${tokens.accessToken}`,
+                  };
+                }
+              } catch {
+                // Decryption / parse failure → skip auth headers, the
+                // server may still work for non-protected operations
+              }
+            }
+
+            switch (row.transport) {
+              case "stdio":
+                if (row.command) {
+                  built.push({
+                    type: "stdio",
+                    command: row.command,
+                    args: (row.args ?? []) as string[],
+                    env: (row.env ?? {}) as Record<string, string>,
+                  });
+                }
+                break;
+              case "http":
+                if (row.url) {
+                  built.push({
+                    type: "http",
+                    url: row.url,
+                    headers: authHeaders,
+                  });
+                }
+                break;
+              case "sse":
+                if (row.url) {
+                  built.push({
+                    type: "sse",
+                    url: row.url,
+                    headers: authHeaders,
+                  });
+                }
+                break;
+              case "websocket":
+                if (row.url) {
+                  built.push({
+                    type: "websocket",
+                    url: row.url,
+                    headers: authHeaders,
+                  });
+                }
+                break;
+              case "sdk":
+                if (row.command) {
+                  built.push({ type: "sdk", serverName: row.command });
+                }
+                break;
+              default:
+                // Unknown transport — skip silently, the upstream patch
+                // will reject anything outside its 8-transport union
+                break;
+            }
+          }
+          bridgeMcpServers = built;
+        }
+      } catch {
+        // Listing MCP rows failed — proceed without injection. The live
+        // run still works, just without MCP tools (same as the pre-Phase-18
+        // behavior). Don't fail the whole simulation over this.
+        bridgeMcpServers = [];
+      }
+
       // Phase 3: WS timeout must accommodate the worst case where the
       // agent issues a permission_request that goes to "ask" and a human
       // takes the full 5-minute permission poll window to respond. We use
@@ -677,6 +791,11 @@ export async function runSimulation(input: {
         apiKey: endpoint.apiKey,
         timeoutMs: 6 * 60 * 1000,
         permissionResolver: trackingResolver,
+        // Phase 18: inject MCP servers into the live runtime. When empty,
+        // the adapter sends no `configure_session` and behaves exactly as
+        // it did pre-Phase-18 (decision #8b).
+        mcpServers: bridgeMcpServers,
+        mcpScope: "managed",
       });
 
       if (liveResult.ok) {
@@ -690,6 +809,32 @@ export async function runSimulation(input: {
         outputPayload.tokenCount = liveResult.tokenCount;
         outputPayload.permissionRequestCount = liveResult.permissionEvents.length;
         outputPayload.policyEventCount = liveResult.policyEvents.length;
+        // Phase 18: surface the configure_session outcome so the runs page
+        // can show whether MCP injection actually took effect.
+        //  - null    → no MCP servers attached
+        //  - "no_ack"→ upstream is un-patched (live ran without MCP)
+        //  - object  → patched upstream confirmed N servers / M tools
+        outputPayload.mcpInjection = (() => {
+          if (liveResult.sessionConfig === null) {
+            return { sent: false, reason: "no_mcp_servers_attached" };
+          }
+          if (liveResult.sessionConfig === "no_ack") {
+            return {
+              sent: true,
+              acked: false,
+              reason:
+                "upstream openllm-agent2 did not ack within timeout — likely un-patched (Phase 18 fork not yet deployed)",
+              attemptedServerCount: bridgeMcpServers.length,
+            };
+          }
+          return {
+            sent: true,
+            acked: true,
+            mcpServerCount: liveResult.sessionConfig.mcpServerCount,
+            mcpToolCount: liveResult.sessionConfig.mcpToolCount,
+            errors: liveResult.sessionConfig.errors,
+          };
+        })();
         // Phase 5: surface usage in the output payload AND capture it for
         // the final updateRuntimeRun() write so the runs page header
         // shows tokens + cost without rummaging through the JSON blob.
