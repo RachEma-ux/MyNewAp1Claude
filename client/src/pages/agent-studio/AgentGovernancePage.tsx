@@ -13,13 +13,24 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
+import { Loader2, ShieldCheck, ShieldAlert, ShieldX, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   PageHeader,
   LoadingState,
   VerdictBadge,
+  EmptyState,
+  SectionLabel,
 } from "@/components/agent-studio/ui";
+
+const RULE_BEHAVIORS = ["allow", "deny", "ask"] as const;
+const RULE_SOURCES = [
+  "userSettings",
+  "projectSettings",
+  "localSettings",
+  "cliArg",
+  "session",
+] as const;
 
 export default function AgentGovernancePage({ agentId }: { agentId: number }) {
   const utils = trpc.useUtils();
@@ -211,8 +222,179 @@ export default function AgentGovernancePage({ agentId }: { agentId: number }) {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Phase 0d: Permission Rules — rule-based access matrix per openllm-agent2 */}
+      <Card className="lg:col-span-3">
+        <CardContent className="p-4 space-y-3">
+          <PermissionRulesSection agentId={agentId} />
+        </CardContent>
+      </Card>
       </div>
     </div>
+  );
+}
+
+/** Phase 0d: rule-based permission matrix (openllm-agent2 native parity) */
+function PermissionRulesSection({ agentId }: { agentId: number }) {
+  const utils = trpc.useUtils();
+  const rulesQuery = trpc.agentStudio.permissionRules.list.useQuery({ agentId });
+  const saveMut = trpc.agentStudio.permissionRules.save.useMutation({
+    onSuccess: () => {
+      toast.success("Rule saved");
+      utils.agentStudio.permissionRules.list.invalidate({ agentId });
+      setNewToolPattern("");
+      setNewDescription("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeMut = trpc.agentStudio.permissionRules.remove.useMutation({
+    onSuccess: () => {
+      toast.success("Rule removed");
+      utils.agentStudio.permissionRules.list.invalidate({ agentId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // New-rule form
+  const [newToolPattern, setNewToolPattern] = useState("");
+  const [newBehavior, setNewBehavior] = useState<typeof RULE_BEHAVIORS[number]>("ask");
+  const [newSource, setNewSource] = useState<typeof RULE_SOURCES[number]>("session");
+  const [newDescription, setNewDescription] = useState("");
+
+  const rules = rulesQuery.data ?? [];
+
+  const handleAdd = () => {
+    if (!newToolPattern) return;
+    saveMut.mutate({
+      agentId,
+      ruleSource: newSource,
+      ruleBehavior: newBehavior,
+      toolPattern: newToolPattern,
+      description: newDescription || undefined,
+    });
+  };
+
+  return (
+    <>
+      <SectionLabel icon={<ShieldCheck className="h-3 w-3" />}>
+        Permission Rules
+      </SectionLabel>
+      <p className="text-[10px] text-muted-foreground">
+        Rule-based access matrix matching openllm-agent2's PermissionRule model.
+        Rules are evaluated per tool invocation; first match wins.
+      </p>
+
+      {/* Add-rule form */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-2 mt-2">
+        <div className="md:col-span-2">
+          <Input
+            value={newToolPattern}
+            onChange={(e) => setNewToolPattern(e.target.value)}
+            placeholder="Tool pattern (e.g. Bash, Bash(*), Read)"
+            className="h-7 text-xs font-mono"
+          />
+        </div>
+        <select
+          value={newBehavior}
+          onChange={(e) =>
+            setNewBehavior(e.target.value as typeof RULE_BEHAVIORS[number])
+          }
+          className="h-7 px-2 rounded border bg-background text-xs"
+        >
+          {RULE_BEHAVIORS.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+        <select
+          value={newSource}
+          onChange={(e) =>
+            setNewSource(e.target.value as typeof RULE_SOURCES[number])
+          }
+          className="h-7 px-2 rounded border bg-background text-xs"
+        >
+          {RULE_SOURCES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <Button
+          size="sm"
+          className="h-7"
+          disabled={!newToolPattern || saveMut.isPending}
+          onClick={handleAdd}
+        >
+          <Plus className="h-3 w-3 mr-1" /> Add Rule
+        </Button>
+      </div>
+      <Input
+        value={newDescription}
+        onChange={(e) => setNewDescription(e.target.value)}
+        placeholder="Optional description"
+        className="h-7 text-xs"
+      />
+
+      {/* Rule list */}
+      {rules.length === 0 ? (
+        <EmptyState
+          compact
+          icon={<ShieldCheck className="h-6 w-6" />}
+          title="No permission rules yet"
+          description="Add a rule above to control which tools the agent can invoke."
+        />
+      ) : (
+        <table className="w-full text-xs mt-2">
+          <thead className="text-[10px] uppercase tracking-wider text-muted-foreground/70 border-b">
+            <tr>
+              <th className="text-left py-1.5">Tool Pattern</th>
+              <th className="text-left py-1.5">Behavior</th>
+              <th className="text-left py-1.5">Source</th>
+              <th className="text-left py-1.5">Description</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rules.map((r: any) => (
+              <tr key={r.id} className="border-t">
+                <td className="py-1.5 font-mono text-[10px]">{r.toolPattern}</td>
+                <td>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-[9px] uppercase",
+                      r.ruleBehavior === "allow" &&
+                        "border-emerald-500/40 text-emerald-400",
+                      r.ruleBehavior === "deny" &&
+                        "border-red-500/40 text-red-400",
+                      r.ruleBehavior === "ask" &&
+                        "border-yellow-500/40 text-yellow-400"
+                    )}
+                  >
+                    {r.ruleBehavior}
+                  </Badge>
+                </td>
+                <td className="text-[10px] text-muted-foreground">{r.ruleSource}</td>
+                <td className="text-[10px] text-muted-foreground">
+                  {r.description ?? "—"}
+                </td>
+                <td>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    onClick={() => removeMut.mutate({ ruleId: r.id })}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
   );
 }
 

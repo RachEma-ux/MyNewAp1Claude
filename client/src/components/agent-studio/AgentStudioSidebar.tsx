@@ -26,6 +26,10 @@ import {
   Rocket,
   FileStack,
   Bot,
+  Cpu,
+  Webhook,
+  Plug,
+  Users,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -44,7 +48,12 @@ export type AgentStudioView =
   | "simulation"
   | "testing"
   | "versions"
-  | "publish";
+  | "publish"
+  // ── Phase 0d-f: openllm-agent2 native parity views ──
+  | "runtime"
+  | "hooks"
+  | "mcp"
+  | "subagents";
 
 interface SectionGroup {
   label: string;
@@ -73,6 +82,12 @@ const AGENT_GROUPS: SectionGroup[] = [
       { key: "knowledge", label: "Knowledge", icon: BookOpen },
       { key: "memory", label: "Memory", icon: Database },
       { key: "workflows", label: "Workflows", icon: Workflow },
+      // Phase 0d: Runtime config (provider/model/effort/maxTurns/etc)
+      { key: "runtime", label: "Runtime", icon: Cpu },
+      // Phase 0e: Hooks / MCP / Subagents (pages land in 0e)
+      { key: "hooks", label: "Hooks", icon: Webhook },
+      { key: "mcp", label: "MCP Servers", icon: Plug },
+      { key: "subagents", label: "Subagents", icon: Users },
     ],
   },
   {
