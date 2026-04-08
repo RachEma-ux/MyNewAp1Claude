@@ -27,12 +27,14 @@ import * as toolCatalog from "../adapters/tool-catalog-adapter";
 import * as knowledgeAdapter from "../adapters/knowledge-adapter";
 import * as templateRegistry from "../adapters/template-registry";
 import * as skillCatalog from "../adapters/skill-catalog-adapter";
+import { cloneAgent } from "../services/cloning";
 import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import {
   agentIdSchema,
   archiveAgentSchema,
   attachSkillSchema,
   attachToolSchema,
+  cloneAgentSchema,
   comparePromptPackSchema,
   compareSimulationRunsSchema,
   compareVersionsSchema,
@@ -183,6 +185,37 @@ const creationRouter = router({
   seedOpenllmAgent2: protectedProcedure.mutation(async ({ ctx }) => {
     return seedOpenllmAgent2({ ownerId: ctx.user.id });
   }),
+  /**
+   * Phase 2: Clone an existing agent's full state into a brand-new draft.
+   *
+   * Copies the entire current draft (identity, behavior, prompts, governance,
+   * runtime, tools, knowledge, memory, workflow, hooks, MCP servers, skills,
+   * subagents, plugins, permission rules) into a new agent owned by the
+   * caller and forces lifecycle to "draft" — even if the source is published.
+   *
+   * Use case: take the canonical openllm-agent2 row and use it as a starting
+   * point for your own agent without touching the source. Caller picks the
+   * new name + internal key.
+   *
+   * Not `governedProcedure` — it's a creation-only mutation that produces
+   * a fresh draft owned by the user, same trust level as createBlankAgent
+   * and createFromTemplate.
+   */
+  cloneAgent: protectedProcedure
+    .input(cloneAgentSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await cloneAgent({
+          sourceAgentId: input.sourceAgentId,
+          name: input.name,
+          internalKey: input.internalKey,
+          description: input.description,
+          ownerId: ctx.user.id,
+        });
+      } catch (err) {
+        translateCreateError(err);
+      }
+    }),
   importDefinition: protectedProcedure
     .input(importDefinitionSchema)
     .mutation(async ({ ctx, input }) => {

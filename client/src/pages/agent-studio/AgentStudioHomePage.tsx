@@ -21,6 +21,7 @@ import {
   Search as SearchIcon,
   Sparkles,
   Loader2,
+  Copy,
 } from "lucide-react";
 import {
   PageHeader,
@@ -68,6 +69,53 @@ export default function AgentStudioHomePage({
     },
     onError: (e) => toast.error(e.message),
   });
+
+  // Phase 2: clone-as-template — copies a source agent's full state into
+  // a fresh draft owned by the caller. Navigates to the new agent on success.
+  const cloneAgentMut = trpc.agentStudio.creation.cloneAgent.useMutation({
+    onSuccess: (result) => {
+      if (!result) return;
+      const c = result.copied;
+      const total =
+        c.toolBindings +
+        c.knowledgeBindings +
+        c.memoryConfigs +
+        c.workflowNodes +
+        c.workflowEdges +
+        c.hooks +
+        c.mcpServers +
+        c.skills +
+        c.subagents +
+        c.plugins +
+        c.permissionRules;
+      toast.success(
+        `Cloned "${result.agent.name}" — ${c.toolBindings} tools, ${c.skills} skills, ${c.permissionRules} rules (${total} items copied)`
+      );
+      utils.agentStudio.home.listAgents.invalidate();
+      utils.agentStudio.home.getHomeSummary.invalidate();
+      navigate(`/agent-studio/${result.agent.id}/overview`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Prompt the user for a new name + internal key, derive a sane default
+  // key from the name, then fire the clone mutation.
+  function handleCloneAgent(source: { id: number; name: string; internalKey: string }) {
+    const defaultName = `Copy of ${source.name}`;
+    const newName = window.prompt("Name for the cloned agent?", defaultName);
+    if (!newName) return;
+    const derivedKey = `${source.internalKey}-copy-${Date.now().toString(36)}`;
+    const newKey = window.prompt(
+      "Internal key for the cloned agent? (lowercase, digits, _ or - only)",
+      derivedKey
+    );
+    if (!newKey) return;
+    cloneAgentMut.mutate({
+      sourceAgentId: source.id,
+      name: newName,
+      internalKey: newKey,
+    });
+  }
 
   return (
     <div className="p-4 space-y-4">
@@ -225,6 +273,7 @@ export default function AgentStudioHomePage({
                       <th className="text-left py-1.5 font-semibold">State</th>
                       <th className="text-left py-1.5 font-semibold">Env</th>
                       <th className="text-left py-1.5 font-semibold">Updated</th>
+                      <th className="text-right py-1.5 font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -253,6 +302,30 @@ export default function AgentStudioHomePage({
                         </td>
                         <td className="text-[10px] text-muted-foreground">
                           {a.updatedAt ? new Date(a.updatedAt).toLocaleDateString() : "—"}
+                        </td>
+                        <td className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-[10px]"
+                            disabled={cloneAgentMut.isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCloneAgent({
+                                id: a.id,
+                                name: a.name,
+                                internalKey: a.internalKey,
+                              });
+                            }}
+                            title="Clone this agent as a starting template — copies tools, skills, prompts, runtime, permissions, and more into a fresh draft you own"
+                          >
+                            {cloneAgentMut.isPending && cloneAgentMut.variables?.sourceAgentId === a.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Copy className="h-3 w-3 mr-1" />
+                            )}
+                            Clone
+                          </Button>
                         </td>
                       </tr>
                     ))}

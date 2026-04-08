@@ -64,6 +64,20 @@ export const importDefinitionSchema = z.object({
   definition: z.record(z.any()),
 });
 
+// Phase 2: clone-as-template — copies an existing agent's full state into
+// a brand-new draft agent. Internal key must be unique; name is the user's
+// label for the new agent.
+export const cloneAgentSchema = z.object({
+  sourceAgentId: z.number().int().positive(),
+  name: z.string().min(1).max(200),
+  internalKey: z
+    .string()
+    .min(2)
+    .max(120)
+    .regex(/^[a-z0-9_-]+$/, "internal key must be lowercase, digits, _ or -"),
+  description: z.string().optional(),
+});
+
 // ── Identity ────────────────────────────────────────────────────────────────
 
 export const updateIdentitySchema = z.object({
