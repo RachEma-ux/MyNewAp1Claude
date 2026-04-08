@@ -89,6 +89,14 @@ export const decidePermissionRequestSchema = z.object({
   reason: z.string().optional(),
 });
 
+// Phase 6: slash command execution against a live runtime run.
+export const executeSlashCommandSchema = z.object({
+  runtimeRunId: z.number().int().positive(),
+  // Limit raw input length to prevent abuse — long inputs aren't valid
+  // slash commands anyway.
+  rawInput: z.string().min(1).max(500),
+});
+
 // ── Identity ────────────────────────────────────────────────────────────────
 
 export const updateIdentitySchema = z.object({

@@ -28,6 +28,7 @@ import * as knowledgeAdapter from "../adapters/knowledge-adapter";
 import * as templateRegistry from "../adapters/template-registry";
 import * as skillCatalog from "../adapters/skill-catalog-adapter";
 import { cloneAgent } from "../services/cloning";
+import { parseAndExecuteSlashCommand } from "../services/slash-commands";
 import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import {
   agentIdSchema,
@@ -43,6 +44,7 @@ import {
   createVersionSchema,
   decideApprovalStepSchema,
   decidePermissionRequestSchema,
+  executeSlashCommandSchema,
   getRunDetailSchema,
   getSimulationRunSchema,
   importDefinitionSchema,
@@ -1273,6 +1275,37 @@ const permissionsRouter = router({
     }),
 });
 
+// ── Phase 6: Slash command executor ─────────────────────────────────────────
+
+/**
+ * Operator commands typed against a live runtime run. The parser is
+ * permissive — non-slash inputs return null and the procedure surfaces a
+ * structured "not a command" message so the UI can fall through.
+ *
+ * Most commands are read-only or scoped to the user's own run; the only
+ * destructive ones (`/cancel`, `/cwd`) write to the run/draft owned by
+ * the caller. `protectedProcedure` is the right gate — same trust level
+ * as the rest of the runtime CRUD.
+ */
+const slashCommandsRouter = router({
+  execute: protectedProcedure
+    .input(executeSlashCommandSchema)
+    .mutation(async ({ input }) => {
+      const result = await parseAndExecuteSlashCommand({
+        runtimeRunId: input.runtimeRunId,
+        rawInput: input.rawInput,
+      });
+      if (!result) {
+        return {
+          ok: false,
+          parsed: false as const,
+          message: `Not a slash command: ${input.rawInput}`,
+        };
+      }
+      return { parsed: true as const, ...result };
+    }),
+});
+
 // ── Compose ─────────────────────────────────────────────────────────────────
 
 export const agentStudioRouter = router({
@@ -1302,4 +1335,6 @@ export const agentStudioRouter = router({
   runtime: runtimeRouter,
   // Phase 3: interactive permission requests
   permissions: permissionsRouter,
+  // Phase 6: slash command executor
+  slashCommands: slashCommandsRouter,
 });

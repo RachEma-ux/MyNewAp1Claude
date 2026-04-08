@@ -11,8 +11,16 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Activity, ShieldQuestion, Check, X } from "lucide-react";
+import {
+  Loader2,
+  Activity,
+  ShieldQuestion,
+  Check,
+  X,
+  Terminal,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   PageHeader,
@@ -78,6 +86,38 @@ export default function AgentRunsPage({
   const pendingRequests = (pendingPermsQuery.data ?? []).filter(
     (r: any) => r.status === "pending"
   );
+
+  // Phase 6: slash command input + transcript. The transcript is local to
+  // the page (not persisted) — it's a scratchpad for the operator to see
+  // /help, /cost, etc. results inline without leaving the runs page.
+  const [slashInput, setSlashInput] = useState("");
+  const [slashTranscript, setSlashTranscript] = useState<
+    Array<{ ts: number; ok: boolean; raw: string; message: string }>
+  >([]);
+  const slashMut = trpc.agentStudio.slashCommands.execute.useMutation({
+    onSuccess: (result) => {
+      setSlashTranscript((prev) => [
+        ...prev,
+        {
+          ts: Date.now(),
+          ok: result.ok,
+          raw: slashInput,
+          message: result.message,
+        },
+      ]);
+      setSlashInput("");
+      // /cancel and /cwd both touch the run/draft — refetch the detail
+      utils.agentStudio.runs.getDetail.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  function submitSlashCommand() {
+    if (!slashInput.trim() || !selectedRunId) return;
+    slashMut.mutate({
+      runtimeRunId: selectedRunId,
+      rawInput: slashInput.trim(),
+    });
+  }
 
   if (runsQuery.isLoading) return <LoadingState label="Loading runs…" />;
 
@@ -360,6 +400,58 @@ export default function AgentRunsPage({
                 )}
               </TabsContent>
             </Tabs>
+            {/* Phase 6: slash command input — operator UI for /help /cost
+                /cancel /cwd /clear /compact. Transcript is local-only. */}
+            <div className="mt-3 border-t pt-2 space-y-1.5">
+              {slashTranscript.length > 0 && (
+                <ul className="space-y-1 max-h-32 overflow-auto">
+                  {slashTranscript.map((entry, i) => (
+                    <li
+                      key={i}
+                      className={`text-[10px] font-mono rounded p-1.5 ${
+                        entry.ok
+                          ? "bg-emerald-500/5 border border-emerald-500/20"
+                          : "bg-red-500/5 border border-red-500/20"
+                      }`}
+                    >
+                      <div className="text-muted-foreground">{entry.raw}</div>
+                      <div className="whitespace-pre-wrap">{entry.message}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex gap-1.5">
+                <div className="relative flex-1">
+                  <Terminal className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/60" />
+                  <Input
+                    placeholder="/help, /cost, /cancel, /cwd <path>…"
+                    value={slashInput}
+                    onChange={(e) => setSlashInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        submitSlashCommand();
+                      }
+                    }}
+                    className="h-7 text-[10px] pl-6 font-mono"
+                    disabled={slashMut.isPending}
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-[10px]"
+                  disabled={!slashInput.trim() || slashMut.isPending}
+                  onClick={submitSlashCommand}
+                >
+                  {slashMut.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    "Run"
+                  )}
+                </Button>
+              </div>
+            </div>
             </>
           )}
         </CardContent>
