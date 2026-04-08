@@ -29,6 +29,7 @@ import { connectStdio } from "./transports/stdio";
 import { connectHttp } from "./transports/http";
 import { connectSse } from "./transports/sse";
 import { connectSdk } from "./transports/sdk";
+import { connectWebSocket } from "./transports/websocket";
 
 const connections = new Map<number, McpConnection>();
 let exitHandlerRegistered = false;
@@ -105,6 +106,16 @@ export async function connectMcpServer(
           throw new McpError("config", "sse transport requires a url");
         }
         conn = await connectSse({
+          serverId: row.id,
+          url: row.url,
+        });
+        break;
+      // Phase 15a: Real WebSocket transport (replaces the previous scaffold)
+      case "websocket":
+        if (!row.url) {
+          throw new McpError("config", "websocket transport requires a url");
+        }
+        conn = await connectWebSocket({
           serverId: row.id,
           url: row.url,
         });

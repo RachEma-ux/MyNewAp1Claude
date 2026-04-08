@@ -33,8 +33,9 @@ import {
 
 const TRANSPORTS = [
   { value: "stdio", label: "stdio (subprocess)" },
-  { value: "sse", label: "sse (server-sent events)" },
   { value: "http", label: "http (HTTP transport)" },
+  { value: "websocket", label: "websocket (long-lived WS)" },
+  { value: "sse", label: "sse (server-sent events)" },
   { value: "sdk", label: "sdk (in-process)" },
 ] as const;
 
