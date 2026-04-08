@@ -64,7 +64,7 @@ const PROVIDER_ENV_MAP: Record<string, string> = {
 
 async function injectProviderKeys(env: Record<string, string>): Promise<void> {
   try {
-    const { getDb } = await import("../../_core/db");
+    const { getDb } = await import("../../db/connection");
     const db = getDb();
     const rows = await db.execute(
       `SELECT type, config::text FROM providers WHERE enabled = true`

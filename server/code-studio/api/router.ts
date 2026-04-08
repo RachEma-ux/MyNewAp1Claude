@@ -439,11 +439,21 @@ const templatesRouter = router({
   generateJobDraft: protectedProcedure.input(generateJobDraftSchema).query(async ({ input }) => {
     const template = await repo.getTemplateById(input.templateId);
     if (!template) throw new Error("Template not found");
-    const vars = input.variables;
+    // Normalize the variables map to Record<string, string>. zod 4
+    // typing leaves the values as `string | undefined` (partial record)
+    // even though the schema says z.string(), so we coerce here once
+    // and use the narrowed map everywhere downstream.
+    const vars: Record<string, string> = {};
+    for (const [k, v] of Object.entries(input.variables)) {
+      if (typeof v === "string") vars[k] = v;
+    }
     // Validate required variables
     const varDefs = (template.variableSchema as any[]) || [];
     const missing = varDefs
-      .filter((v: any) => v.required && (!vars[v.key] || !vars[v.key].trim()))
+      .filter((v: any) => {
+        const value = vars[v.key];
+        return v.required && (!value || !value.trim());
+      })
       .map((v: any) => v.label);
     if (missing.length > 0) {
       throw new Error(`Missing required fields: ${missing.join(", ")}`);

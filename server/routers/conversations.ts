@@ -85,7 +85,13 @@ export const conversationsRouter = router({
         } else {
           const target = await resolveCatalogAgentExecutionTarget(input.catalogEntryId);
           resolvedAgentId = target.sourceAgent.id;
-          resolvedWorkspaceId = resolvedWorkspaceId ?? target.sourceAgent.workspaceId;
+          // sourceAgent is typed as { id, name, [key:string]: unknown } in
+          // ai-types/execution.ts, so workspaceId is `unknown` here.
+          // Narrow to `number | undefined` before assigning.
+          const sourceWsId = target.sourceAgent.workspaceId;
+          resolvedWorkspaceId =
+            resolvedWorkspaceId ??
+            (typeof sourceWsId === "number" ? sourceWsId : undefined);
           derivedTitle = input.title || `${target.entry.displayName || target.entry.name} Run`;
         }
       }

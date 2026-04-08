@@ -14,7 +14,7 @@
 import type { GraphRagSourceAdapter, GraphRagDocument } from "../types";
 import { getDb } from "../../../db/connection";
 import { documents, documentChunks } from "../../../../drizzle/schema";
-import { eq, gt, asc } from "drizzle-orm";
+import { and, eq, gt, asc } from "drizzle-orm";
 
 export const documentsGraphRagAdapter: GraphRagSourceAdapter = {
   moduleSlug: "documents",
@@ -58,8 +58,11 @@ export const documentsGraphRagAdapter: GraphRagSourceAdapter = {
             createdAt: documents.createdAt,
           })
           .from(documents)
-          .where(eq(documents.status, "completed"))
-          .where(gt(documents.id, cursorId))
+          // Drizzle's PgSelect doesn't allow chaining two .where() calls;
+          // combine them with and() instead.
+          .where(
+            and(eq(documents.status, "completed"), gt(documents.id, cursorId))
+          )
           .orderBy(asc(documents.id))
           .limit(limit);
       }

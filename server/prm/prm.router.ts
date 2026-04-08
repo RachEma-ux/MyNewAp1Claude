@@ -325,14 +325,21 @@ const catalogRouter = router({
 
 const maturityRouter = router({
   runAssessment: protectedProcedure.input(runMaturitySchema).mutation(async ({ input, ctx }) => {
-    const scores = Object.values(input.dimensionScores);
+    // Normalize dimensionScores to Record<string, number>. zod 4 leaves
+    // record values as `number | undefined` (partial record); coerce
+    // once and use the narrowed shape downstream.
+    const dimensionScores: Record<string, number> = {};
+    for (const [k, v] of Object.entries(input.dimensionScores)) {
+      if (typeof v === "number") dimensionScores[k] = v;
+    }
+    const scores = Object.values(dimensionScores);
     const totalScore = scores.reduce((a, b) => a + b, 0);
     const avgScore = scores.length > 0 ? totalScore / scores.length : 0;
     const maturityLevel = Math.min(5, Math.max(1, Math.round(avgScore)));
 
     return repo.createMaturityRun({
       assessorUserId: (ctx as any).user?.id,
-      dimensionScores: input.dimensionScores,
+      dimensionScores,
       totalScore,
       maturityLevel,
       gapNotes: input.gapNotes,

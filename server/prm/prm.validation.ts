@@ -87,7 +87,7 @@ export const createMethodRunSchema = z.object({
 
 export const updateMethodRunSchema = z.object({
   id: z.number().int().positive(),
-  workspaceData: z.record(z.any()),
+  workspaceData: z.record(z.string(), z.any()),
   narrativeSummary: z.string().optional(),
 });
 
@@ -211,7 +211,7 @@ export const createPlaybookSchema = z.object({
   description: z.string().optional(),
   domain: z.enum(PRM_PLAYBOOK_DOMAINS).optional(),
   methodType: z.enum(PRM_METHOD_TYPES).optional(),
-  templateData: z.record(z.any()).optional(),
+  templateData: z.record(z.string(), z.any()).optional(),
   sourceLessonId: z.number().int().positive().optional(),
 });
 
@@ -220,7 +220,7 @@ export const updatePlaybookSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
   domain: z.enum(PRM_PLAYBOOK_DOMAINS).optional(),
-  templateData: z.record(z.any()).optional(),
+  templateData: z.record(z.string(), z.any()).optional(),
 });
 
 // ── External Refs ───────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ export const addExternalRefSchema = z.object({
 // ── Maturity ────────────────────────────────────────────────────────────────
 
 export const runMaturitySchema = z.object({
-  dimensionScores: z.record(z.number().min(1).max(5)),
+  dimensionScores: z.record(z.string(), z.number().min(1).max(5)),
   gapNotes: z.string().optional(),
   nextActions: z.string().optional(),
 });

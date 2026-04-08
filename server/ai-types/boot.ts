@@ -55,8 +55,55 @@ export function bootAiTypesModule() {
 
   const governancePort: ICatalogGovernancePort = {
     async evaluateStageReview(entryId, stage, context) {
+      // Bridge between the AI Types port shape and the governance
+      // module's actual signature. The port hands us an entry id +
+      // free-form context; the real evaluateStageReview takes a fully
+      // populated entry object and an actor object. We synthesize a
+      // minimal entry from the context (or fall back to id-only) and
+      // map the result shape from {stage, passed, items, score, ...}
+      // to {decision, findings}.
       const mod = await import("../governance/stage-review");
-      return mod.evaluateStageReview(entryId, stage, context);
+      const ctxEntry = (context?.entry as Record<string, unknown>) ?? {};
+      const entryShape = {
+        id: entryId,
+        name: typeof ctxEntry.name === "string" ? ctxEntry.name : `entry-${entryId}`,
+        entryType: typeof ctxEntry.entryType === "string" ? ctxEntry.entryType : "unknown",
+        tags: Array.isArray(ctxEntry.tags) ? (ctxEntry.tags as string[]) : [],
+        description: typeof ctxEntry.description === "string" ? ctxEntry.description : undefined,
+        config: ctxEntry.config,
+        reviewState: typeof ctxEntry.reviewState === "string" ? ctxEntry.reviewState : undefined,
+        status: typeof ctxEntry.status === "string" ? ctxEntry.status : undefined,
+        validationStatus: typeof ctxEntry.validationStatus === "string" ? ctxEntry.validationStatus : undefined,
+        capabilities: Array.isArray(ctxEntry.capabilities) ? (ctxEntry.capabilities as string[]) : undefined,
+        stageReviews: (ctxEntry.stageReviews as Record<string, string>) ?? undefined,
+        classifications: Array.isArray(ctxEntry.classifications) ? (ctxEntry.classifications as string[]) : undefined,
+      };
+      const ctxActor = (context?.actor as Record<string, unknown>) ?? {};
+      const actorShape = {
+        id: typeof ctxActor.id === "number" ? ctxActor.id : 0,
+        role: typeof ctxActor.role === "string" ? ctxActor.role : "system",
+      };
+      const raw = mod.evaluateStageReview(
+        entryShape,
+        stage as any, // LifecycleStage — caller is responsible
+        actorShape as any
+      );
+      // Map to the port's flat shape
+      const decision: "pass" | "block" | "warn" = raw.passed
+        ? "pass"
+        : raw.blockers.length > 0
+          ? "block"
+          : "warn";
+      // CheckResult shape: { itemId, name, passed, category, details, remediation? }
+      // Map to the port's { code, severity, message } finding shape.
+      const findings = raw.items
+        .filter((i) => !i.passed)
+        .map((i) => ({
+          code: i.itemId,
+          severity: raw.blockers.includes(i) ? "blocker" : "warning",
+          message: `${i.name}: ${i.details}`,
+        }));
+      return { decision, findings };
     },
   };
 

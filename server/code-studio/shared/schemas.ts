@@ -17,7 +17,7 @@ export const createJobSchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().optional(),
   objective: z.string().optional(),
-  constraints: z.record(z.any()).optional(),
+  constraints: z.record(z.string(), z.any()).optional(),
   priority: z.enum(["low", "normal", "high", "critical"]).optional(),
   repoId: z.number().int().positive().optional(),
   model: z.string().max(200).optional(), // e.g. "openai/gpt-5.3-chat-latest" or "ollama/phi3:latest"
@@ -41,7 +41,7 @@ export const updateJobSchema = z.object({
   description: z.string().optional(),
   objective: z.string().optional(),
   status: z.string().optional(),
-  constraints: z.record(z.any()).optional(),
+  constraints: z.record(z.string(), z.any()).optional(),
   priority: z.enum(["low", "normal", "high", "critical"]).optional(),
 });
 
@@ -95,7 +95,7 @@ export const inboundHandoffSchema = z.object({
   repoId: z.number().int().positive().optional(),
   baseBranchOrSha: z.string().optional(),
   objective: z.string().min(1),
-  constraints: z.record(z.any()).optional(),
+  constraints: z.record(z.string(), z.any()).optional(),
   priority: z.enum(["low", "normal", "high", "critical"]).optional(),
   actor: z.string().optional(),
   requestedArtifacts: z.array(z.string()).optional(),
@@ -117,7 +117,7 @@ export const listAuditSchema = z.object({
 export const createPolicySchema = z.object({
   name: z.string().min(1).max(200),
   repoId: z.number().int().positive().optional(),
-  rules: z.record(z.any()),
+  rules: z.record(z.string(), z.any()),
   isDefault: z.boolean().optional(),
 });
 
@@ -153,7 +153,7 @@ export const createTemplateSchema = z.object({
   titleTemplate: z.string().optional(),
   objectiveTemplate: z.string().optional(),
   defaultPriority: z.enum(["low", "normal", "high", "critical"]).optional(),
-  defaultConstraints: z.record(z.any()).optional(),
+  defaultConstraints: z.record(z.string(), z.any()).optional(),
   variableSchema: z.array(variableDefSchema).optional(),
 });
 
@@ -167,7 +167,7 @@ export const updateTemplateSchema = z.object({
   titleTemplate: z.string().optional(),
   objectiveTemplate: z.string().optional(),
   defaultPriority: z.enum(["low", "normal", "high", "critical"]).optional(),
-  defaultConstraints: z.record(z.any()).optional(),
+  defaultConstraints: z.record(z.string(), z.any()).optional(),
   variableSchema: z.array(variableDefSchema).optional(),
 });
 
@@ -176,23 +176,31 @@ export const listTemplatesSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+/**
+ * Single template definition shape used both inside `importTemplatesSchema`
+ * and by `template-import.ts` to validate parsed YAML/JSON files.
+ * Extracted so `template-import.ts` can import it directly without
+ * reaching into the wrapper schema.
+ */
+export const templateDefinitionSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  category: z.string().optional(),
+  templateType: z.string().optional(),
+  titleTemplate: z.string().optional(),
+  objectiveTemplate: z.string().optional(),
+  defaultPriority: z.enum(["low", "normal", "high", "critical"]).optional(),
+  defaultConstraints: z.record(z.string(), z.any()).optional(),
+  variableSchema: z.array(variableDefSchema).optional(),
+});
+
 export const importTemplatesSchema = z.object({
-  templates: z.array(z.object({
-    name: z.string().min(1),
-    description: z.string().optional(),
-    category: z.string().optional(),
-    templateType: z.string().optional(),
-    titleTemplate: z.string().optional(),
-    objectiveTemplate: z.string().optional(),
-    defaultPriority: z.enum(["low", "normal", "high", "critical"]).optional(),
-    defaultConstraints: z.record(z.any()).optional(),
-    variableSchema: z.array(variableDefSchema).optional(),
-  })).min(1),
+  templates: z.array(templateDefinitionSchema).min(1),
 });
 
 export const generateJobDraftSchema = z.object({
   templateId: z.number().int().positive(),
-  variables: z.record(z.string()),
+  variables: z.record(z.string(), z.string()),
 });
 
 // ── IDE Instances ─────────────────────────────────────────────────────────

@@ -219,11 +219,14 @@ async function executeCatalogAgent(config: StepConfig, ctx: ExecutionContext): P
       triggerSource: "wf_sandbox",
     })) {
       if (event.type === "complete") {
-        result = { status: "completed", response: (event as any).result || event };
+        // The complete event carries the full content; use it as the
+        // canonical response (overrides any accumulated tokens).
+        result = { status: "completed", response: event.content };
       } else if (event.type === "error") {
-        result = { status: "failed", error: (event as any).error };
-      } else if (event.type === "chunk") {
-        result.response = (result.response || "") + ((event as any).text || "");
+        result = { status: "failed", error: event.error };
+      } else if (event.type === "token") {
+        // Stream tokens into the response buffer
+        result.response = (result.response || "") + event.content;
       }
     }
     return {
