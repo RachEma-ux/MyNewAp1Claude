@@ -149,7 +149,10 @@ export async function runSimulation(input: {
     agentId: input.agentId,
     scenarioId: input.scenarioId,
     triggeredBy: input.triggeredBy,
-    toggles,
+    // SimulationToggles is a strict interface; createSimulationRun stores
+    // it as a generic jsonb Record. Spread into a fresh object to widen
+    // the type without adding an index signature to the interface itself.
+    toggles: { ...toggles } as Record<string, unknown>,
   });
 
   // Also create a runtime run row so the trace tabs in the runs page can
