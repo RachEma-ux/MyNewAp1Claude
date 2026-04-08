@@ -201,3 +201,53 @@ export type AgsMemoryScope = (typeof AGS_MEMORY_SCOPES)[number];
 /** Plugin loader type (per openllm `SdkPluginConfigSchema`). */
 export const AGS_PLUGIN_TYPES = ["local"] as const;
 export type AgsPluginType = (typeof AGS_PLUGIN_TYPES)[number];
+
+// ── Phase 13 — Catalog (user-authored tools + skills) ───────────────────────
+
+/**
+ * Tool invocation kinds for user-authored catalog tools.
+ *
+ *   "shell"   → spawn argv via child_process.spawn (sandboxed env, hard
+ *               timeout, refuses to run without a working directory)
+ *   "http"    → fetch POST/GET against a URL with headers from
+ *               invocationConfig
+ *   "mcp_ref" → proxy to an existing MCP-discovered tool (serverId +
+ *               toolName) — useful for renaming or wrapping an MCP tool
+ *               under a friendlier alias
+ *   "builtin" → reserved; refers to one of the static 51 — used by the
+ *               merged catalog adapter, not user-creatable via the API
+ */
+export const AGS_TOOL_INVOCATION_KINDS = [
+  "shell",
+  "http",
+  "mcp_ref",
+  "builtin",
+] as const;
+export type AgsToolInvocationKind = (typeof AGS_TOOL_INVOCATION_KINDS)[number];
+
+/**
+ * Where a catalog skill came from. Drives merge logic in
+ * skill-catalog-adapter.ts and the source-filter chip on the UI.
+ */
+export const AGS_SKILL_SOURCES = [
+  "db",
+  "imported",
+  "vendored",
+  "marketplace",
+  "mcp_prompt",
+] as const;
+export type AgsSkillSource = (typeof AGS_SKILL_SOURCES)[number];
+
+/**
+ * Categories for catalog tools — kept open-ended via "custom" so users
+ * can add new domains without a schema change.
+ */
+export const AGS_TOOL_CATEGORIES = [
+  "filesystem",
+  "compute",
+  "communication",
+  "network",
+  "search",
+  "custom",
+] as const;
+export type AgsToolCategory = (typeof AGS_TOOL_CATEGORIES)[number];

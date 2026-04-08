@@ -871,3 +871,116 @@ export const agsPendingPermissionRequests = pgTable(
     statusIdx: index("idx_ags_pending_perm_status").on(t.status),
   })
 );
+
+/**
+ * Phase 13 — Catalog: User-authored tools.
+ *
+ * Merged at runtime in tool-catalog-adapter.ts with the static 51
+ * built-in tools and any MCP-discovered tools. Cannot override a
+ * built-in (unique constraint on `key` ensures user keys don't collide
+ * with static keys).
+ *
+ * `invocationKind` determines what's runnable:
+ *   "shell"     → spawn a shell command with argv templated from input
+ *   "http"      → POST JSON to a URL with headers
+ *   "mcp_ref"   → proxy to an MCP server tool (serverId + toolName)
+ *   "builtin"   → reserved; not user-creatable, only used by static catalog
+ *
+ * `inputSchema` is JSON Schema (object form) for validating invocation
+ * arguments at runtime.
+ */
+export const agsCatalogTools = pgTable(
+  "ags_catalog_tools",
+  {
+    id: serial("id").primaryKey(),
+    /** PascalCase tool key, must NOT collide with built-in 51 */
+    key: varchar("key", { length: 120 }).notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    /** filesystem | compute | communication | network | search | custom */
+    category: varchar("category", { length: 32 }).default("custom"),
+    defaultAllowedActions: jsonb("default_allowed_actions")
+      .$type<string[]>()
+      .default([]),
+    hardBlockedActions: jsonb("hard_blocked_actions")
+      .$type<string[]>()
+      .default([]),
+    defaultRequiresApproval: boolean("default_requires_approval").default(false),
+    destructive: boolean("destructive").default(false),
+    /** shell | http | mcp_ref | builtin */
+    invocationKind: varchar("invocation_kind", { length: 32 }).notNull(),
+    invocationConfig: jsonb("invocation_config")
+      .$type<Record<string, unknown>>()
+      .default({}),
+    /** JSON Schema describing the tool's input arguments */
+    inputSchema: jsonb("input_schema")
+      .$type<Record<string, unknown>>()
+      .default({}),
+    version: varchar("version", { length: 32 }),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    keyIdx: uniqueIndex("uniq_ags_catalog_tools_key").on(t.key),
+    categoryIdx: index("idx_ags_catalog_tools_category").on(t.category),
+  })
+);
+
+/**
+ * Phase 13 — Catalog: User-authored skills.
+ *
+ * Merged at runtime in skill-catalog-adapter.ts with the 19 vendored
+ * skills and any MCP server prompts (Phase 15). Each row mirrors the
+ * .md frontmatter shape plus a `body` text column for the markdown
+ * prompt template.
+ *
+ * `source` distinguishes how the skill arrived:
+ *   "db"         → created in Catalog UI directly
+ *   "imported"   → imported via Phase 13d .md file picker
+ *   "vendored"   → shadow entry for the 19 read-only vendored skills
+ *                  (the file-system catalog is the source of truth, but
+ *                  a shadow row exists so the UI can list everything
+ *                  from one place)
+ *   "marketplace" → installed via Phase 14 marketplace
+ *   "mcp_prompt" → bridged from an MCP server's prompts/list (Phase 15)
+ */
+export const agsCatalogSkills = pgTable(
+  "ags_catalog_skills",
+  {
+    id: serial("id").primaryKey(),
+    packKey: varchar("pack_key", { length: 64 }).notNull(),
+    skillKey: varchar("skill_key", { length: 120 }).notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    /** inline | fork — execution context */
+    context: varchar("context", { length: 16 }).default("inline"),
+    /** Subagent type when context = fork (e.g., general-purpose) */
+    agent: varchar("agent", { length: 64 }),
+    /** Optional model override: sonnet | opus | haiku */
+    model: varchar("model", { length: 32 }),
+    /** Tool names the LLM is allowed to call from this skill */
+    allowedTools: jsonb("allowed_tools").$type<string[]>().default([]),
+    /** Named arguments parsed from $ARGUMENTS — for future use */
+    argNames: jsonb("arg_names").$type<string[]>().default([]),
+    /** high | medium | low — model effort hint */
+    effort: varchar("effort", { length: 16 }),
+    /** Markdown prompt body, includes $ARGUMENTS placeholder */
+    body: text("body").notNull(),
+    version: varchar("version", { length: 32 }),
+    /** db | imported | vendored | marketplace | mcp_prompt */
+    source: varchar("source", { length: 16 }).notNull().default("db"),
+    /** For imported / vendored skills, the original file path */
+    sourcePath: text("source_path"),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    packSkillIdx: uniqueIndex("uniq_ags_catalog_skills_pack_key").on(
+      t.packKey,
+      t.skillKey
+    ),
+    sourceIdx: index("idx_ags_catalog_skills_source").on(t.source),
+  })
+);
