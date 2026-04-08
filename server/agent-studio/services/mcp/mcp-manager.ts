@@ -24,62 +24,85 @@
  */
 
 import * as repo from "../../repository";
-import { McpError, type McpConnection, type McpTool } from "./types";
+import {
+  McpError,
+  type McpConnection,
+  type McpTool,
+  type ConnectionState,
+  type ConnectionEvent,
+} from "./types";
 import { connectStdio } from "./transports/stdio";
 import { connectHttp } from "./transports/http";
 import { connectSse } from "./transports/sse";
 import { connectSdk } from "./transports/sdk";
 import { connectWebSocket } from "./transports/websocket";
+import { applyTransition, projectStateToColumn } from "./state-machine";
+import { emitTransition } from "./connection-events";
 
 const connections = new Map<number, McpConnection>();
 let exitHandlerRegistered = false;
 
+// ── Phase 19b: in-memory FSM state map ─────────────────────────────────────
+//
+// The connection state machine lives in-process. Each serverId maps to a
+// rich `ConnectionState` discriminated union. The `agsDraftMcpServers
+// .status` column is a string projection (see projectStateToColumn).
+//
+// Source of truth: this map. The DB column is for UI / cross-process
+// reads. After this commit, every status change goes through `applyEvent`
+// instead of being scattered across connect/disconnect/reconnect handlers.
+const states = new Map<number, ConnectionState>();
+
 // ── Phase 17e: auto-reconnect ──────────────────────────────────────────────
 
 const RECONNECT_CHECK_INTERVAL_MS = 60_000;
-const RECONNECT_MAX_BACKOFF_MS = 5 * 60 * 1000; // 5 min cap
-const reconnectAttempts = new Map<number, { count: number; nextAt: number }>();
 let reconnectTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Start the periodic reconnect checker. Walks every server row whose
- * status is "error" or "disconnected" and tries to reconnect them.
- * Idempotent — multiple calls are no-ops after the first.
+ * status is "error" and tries to reconnect them, respecting the FSM
+ * state's `nextRetryAt` backoff. Idempotent — multiple calls are
+ * no-ops after the first.
  *
- * Backoff: per-server attempt counter; exponential up to 5 min.
+ * Phase 19b: backoff state lives in the FSM (`failed.attemptCount` +
+ * `failed.nextRetryAt`), not in a separate `reconnectAttempts` map.
+ * The pre-19b map has been deleted; the FSM is the single source of
+ * truth for retry timing.
+ *
+ * Process restart: the FSM map is empty, so rows in `status="error"`
+ * have no in-memory state. We treat them as fresh attempts and let
+ * the next failure populate the FSM with proper backoff data.
  */
 function ensureReconnectLoopStarted() {
   if (reconnectTimer) return;
   reconnectTimer = setInterval(async () => {
     try {
-      // Walk every connected server row across all drafts
-      // (the MCP manager is process-wide, not per-draft).
+      // Walk every server row across all drafts (manager is process-wide).
       const allRows = await repo.listAllMcpServers();
       const now = Date.now();
       for (const row of allRows) {
-        // Skip rows we already have a connection for
+        // Skip rows we already have a live connection for
         if (connections.has(row.id)) continue;
-        // Skip rows in error state if we're in backoff
-        const attempt = reconnectAttempts.get(row.id);
-        if (attempt && now < attempt.nextAt) continue;
         // Only reconnect rows that were previously connected
-        // (status === error means we tried before; pending = never tried)
+        // (column "error" projects from FSM `failed`; "pending" means
+        // never tried).
         if (row.status !== "error") continue;
-        // Try to reconnect
+        // FSM-aware backoff: if the in-memory state is `failed` and
+        // `nextRetryAt` is in the future, skip this tick.
+        const inMemState = states.get(row.id);
+        if (
+          inMemState?.kind === "failed" &&
+          inMemState.nextRetryAt != null &&
+          now < inMemState.nextRetryAt
+        ) {
+          continue;
+        }
+        // Try to reconnect — connectMcpServer drives the FSM transitions
+        // and updates backoff data on failure automatically.
         try {
           await connectMcpServer({ serverId: row.id });
-          reconnectAttempts.delete(row.id);
         } catch {
-          // Bump backoff
-          const next = attempt ? attempt.count + 1 : 1;
-          const backoffMs = Math.min(
-            1000 * Math.pow(2, next),
-            RECONNECT_MAX_BACKOFF_MS
-          );
-          reconnectAttempts.set(row.id, {
-            count: next,
-            nextAt: now + backoffMs,
-          });
+          // connectMcpServer already handled the FSM transition + persistence
         }
       }
     } catch {
@@ -89,6 +112,78 @@ function ensureReconnectLoopStarted() {
   if (reconnectTimer && typeof reconnectTimer.unref === "function") {
     reconnectTimer.unref();
   }
+}
+
+// ── Phase 19b: FSM dispatch helper ─────────────────────────────────────────
+
+/**
+ * Apply a connection event to a server's FSM. Reads current state,
+ * runs the transition, updates the in-memory map, persists the
+ * projection to the DB column, and emits a transition event for
+ * subscribers.
+ *
+ * Decision #6: illegal transitions throw in dev (catches FSM bugs)
+ * and log + stay-at-current-state in prod (never crashes).
+ *
+ * Decision #9b: emitTransition fires async via setImmediate so a
+ * slow listener can't block the FSM critical path.
+ */
+async function applyEvent(
+  serverId: number,
+  event: ConnectionEvent
+): Promise<ConnectionState> {
+  const current: ConnectionState = states.get(serverId) ?? { kind: "pending" };
+  let next: ConnectionState;
+  try {
+    next = applyTransition(current, event);
+  } catch (e) {
+    // Dev-mode illegal transition — re-throw with context
+    throw new Error(
+      `MCP FSM error for server ${serverId}: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+  // Update in-memory state FIRST, then persist + emit. This guarantees
+  // the in-memory map is always up-to-date even if the DB write fails.
+  states.set(serverId, next);
+  // Persist the column projection (best-effort — never fails the event)
+  try {
+    await repo.updateMcpServerStatus(serverId, projectStateToColumn(next));
+  } catch {
+    // Row might be deleted; ignore
+  }
+  // Async event emission (decision #9b)
+  emitTransition({
+    serverId,
+    from: current,
+    to: next,
+    event,
+    ts: Date.now(),
+  });
+  return next;
+}
+
+/**
+ * Phase 19b: Read the current FSM state for a server. Returns the
+ * default `{kind: "pending"}` for unknown serverIds. Used by the
+ * tRPC `getServerState` query and tests.
+ */
+export function getConnectionState(serverId: number): ConnectionState {
+  return states.get(serverId) ?? { kind: "pending" };
+}
+
+/**
+ * Phase 19b: Snapshot all known FSM states. Used by the runs page
+ * and admin dashboards. Returns one entry per serverId with state
+ * in the in-memory map (excludes never-touched servers).
+ */
+export function getAllConnectionStates(): Array<{
+  serverId: number;
+  state: ConnectionState;
+}> {
+  return Array.from(states.entries()).map(([serverId, state]) => ({
+    serverId,
+    state,
+  }));
 }
 
 function registerExitHandler() {
@@ -135,6 +230,11 @@ export async function connectMcpServer(
   if (!row) {
     throw new McpError("not_found", `MCP server ${input.serverId} not found`);
   }
+
+  // Phase 19b: drive the FSM through `connect_requested`. The transition
+  // moves us into `connecting`, which then resolves to either
+  // `connected` (on success) or `failed` (on transport error).
+  await applyEvent(input.serverId, { type: "connect_requested" });
 
   let conn: McpConnection;
   try {
@@ -195,12 +295,15 @@ export async function connectMcpServer(
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    // Persist the error state on the row so the UI shows it
-    try {
-      await repo.updateMcpServerStatus(row.id, "error");
-    } catch {
-      /* ignore */
-    }
+    // Phase 19b: drive the FSM through `connect_failed`. The transition
+    // moves us from `connecting` to `failed` with backoff data
+    // (attemptCount + nextRetryAt). The persistence projection writes
+    // "error" to the column for backward compat with the auto-reconnect
+    // loop. Decision #4b — soft fail, return the error to the caller.
+    await applyEvent(input.serverId, {
+      type: "connect_failed",
+      reason: message,
+    });
     return {
       serverId: input.serverId,
       status: "error",
@@ -210,7 +313,15 @@ export async function connectMcpServer(
   }
 
   connections.set(input.serverId, conn);
-  await repo.updateMcpServerStatus(row.id, "connected");
+  // Phase 19b: drive the FSM through `connect_succeeded`. Carries the
+  // counts from the live connection so the UI banner can render
+  // toolCount/promptCount/resourceCount without a separate fetch.
+  await applyEvent(input.serverId, {
+    type: "connect_succeeded",
+    toolCount: conn.tools.length,
+    promptCount: conn.prompts.length,
+    resourceCount: conn.resources.length,
+  });
   return {
     serverId: input.serverId,
     status: "connected",
@@ -230,8 +341,13 @@ export async function disconnectMcpServer(
     }
     connections.delete(serverId);
   }
+  // Phase 19b: drive the FSM through `disconnect_requested`. Maps to
+  // `pending` (not `disabled` — disable is a separate user action).
+  // The "disconnected" status string in the response is preserved for
+  // backward compat with existing tRPC consumers, but the FSM state
+  // and column projection are now `pending`.
   try {
-    await repo.updateMcpServerStatus(serverId, "disconnected");
+    await applyEvent(serverId, { type: "disconnect_requested" });
   } catch {
     /* ignore — row might be deleted */
   }

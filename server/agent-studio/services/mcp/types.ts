@@ -83,6 +83,58 @@ export interface McpConnection {
   readResource?: (uri: string) => Promise<unknown>;
 }
 
+// ── Phase 19b: Connection state machine types ──────────────────────────────
+//
+// Discriminated union of MCP connection states. Lives in the in-memory
+// states map owned by mcp-manager.ts. The DB column is just a string
+// projection — see `projectStateToColumn` in state-machine.ts.
+
+export type ConnectionState =
+  | { kind: "pending" }
+  | { kind: "connecting"; startedAt: number; attemptCount: number }
+  | {
+      kind: "connected";
+      connectedAt: number;
+      toolCount: number;
+      promptCount: number;
+      resourceCount: number;
+    }
+  | {
+      kind: "needs_auth";
+      reason: string;
+      authUrl?: string;
+      challengeReceivedAt: number;
+    }
+  | {
+      kind: "failed";
+      reason: string;
+      lastAttemptAt: number;
+      attemptCount: number;
+      nextRetryAt?: number;
+    }
+  | { kind: "disabled"; disabledAt: number };
+
+/**
+ * Events the FSM consumes. The mcp-manager dispatches these as users
+ * click buttons (connect_requested, disconnect_requested, etc.) and as
+ * transports report results (connect_succeeded, connect_failed, etc.).
+ */
+export type ConnectionEvent =
+  | { type: "connect_requested" }
+  | {
+      type: "connect_succeeded";
+      toolCount: number;
+      promptCount: number;
+      resourceCount: number;
+    }
+  | { type: "connect_failed"; reason: string }
+  | { type: "auth_required"; reason: string; authUrl?: string }
+  | { type: "auth_provided" }
+  | { type: "disconnect_requested" }
+  | { type: "mid_session_disconnect"; reason: string }
+  | { type: "disable_requested" }
+  | { type: "enable_requested" };
+
 /**
  * Errors thrown during connect/disconnect/callTool. Wrapped so the
  * caller can distinguish manager-level errors from arbitrary throws.
