@@ -8,7 +8,10 @@
  */
 
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
-import { getDb } from "../db/connection";
+// Phase 12.5: Agent Studio operates against its own dedicated PostgreSQL
+// database (`asdb`), separate from the main mynewap1claude app DB.
+// Mirrors the wfdb/prmdb/psmdb/codedb pattern.
+import { getAsDb } from "./db/connection";
 import {
   agsAgents,
   agsAgentDrafts,
@@ -46,8 +49,8 @@ import {
 } from "../../drizzle/tables/agent-studio";
 
 function db() {
-  const conn = getDb();
-  if (!conn) throw new Error("[AgentStudio] Database not available");
+  const conn = getAsDb();
+  if (!conn) throw new Error("[AgentStudio] ASDB not available");
   return conn;
 }
 
@@ -59,7 +62,7 @@ export async function listAgents(filters: {
   search?: string;
   limit?: number;
 }) {
-  const conn = getDb();
+  const conn = getAsDb();
   if (!conn) return [];
   const conditions = [];
   if (filters.state) conditions.push(eq(agsAgents.lifecycleState, filters.state));
@@ -1224,7 +1227,7 @@ export async function listRuntimeHookExecutions(runId: number) {
 // ── Home / Aggregates ───────────────────────────────────────────────────────
 
 export async function getHomeSummary() {
-  const conn = getDb();
+  const conn = getAsDb();
   if (!conn) {
     return {
       totalAgents: 0,
@@ -1269,7 +1272,7 @@ export async function getHomeSummary() {
 }
 
 export async function getReviewQueue() {
-  const conn = getDb();
+  const conn = getAsDb();
   if (!conn) return [];
   return conn
     .select()
@@ -1974,7 +1977,7 @@ export async function updateScheduleConfigByDraftId(
 export async function listScheduledAgents(): Promise<
   Array<{ agentId: number; draftId: number; config: Record<string, unknown> }>
 > {
-  const conn = getDb();
+  const conn = getAsDb();
   if (!conn) return [];
   // Use a raw filter on the jsonb column. drizzle's sql tag handles
   // parameterization safely — `enabled` is a constant string here.

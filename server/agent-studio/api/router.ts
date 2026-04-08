@@ -28,10 +28,10 @@ import * as knowledgeAdapter from "../adapters/knowledge-adapter";
 import * as templateRegistry from "../adapters/template-registry";
 import * as skillCatalog from "../adapters/skill-catalog-adapter";
 import { cloneAgent } from "../services/cloning";
-// Phase 10: Side-effect import — the scheduler module self-starts when
-// loaded, so importing it here ensures the 60s tick begins on the first
-// agent-studio API hit. No edits to server/_core/index.ts needed.
-import "../services/scheduler";
+// Phase 12.5: scheduler is now started explicitly via bootAgentStudio()
+// in server/agent-studio/boot.ts (called from _core/index.ts). The
+// previous side-effect import here was fragile because it depended on
+// import order — boot.ts gives us a deterministic start.
 import * as mcpManager from "../services/mcp/mcp-manager";
 import {
   loadPluginsForDraft,

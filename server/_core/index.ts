@@ -297,6 +297,9 @@ async function startServer() {
     console.warn(`[CODEDB] Seed skipped — ${error.message}`);
   }
 
+  // Boot Agent Studio (ASDB seed + scheduler — self-contained, idempotent)
+  await (await import("../agent-studio/boot")).bootAgentStudio();
+
   // Initialize Governance Engine (CGT v2)
   initializeGovernance();
 

@@ -238,5 +238,7 @@ export function ensureSchedulerStarted(): void {
   console.log("[ags-scheduler] started — 60s tick");
 }
 
-// Self-start on first import
-ensureSchedulerStarted();
+// Phase 12.5: removed the side-effect self-start. The scheduler is now
+// started explicitly via bootAgentStudio() in server/agent-studio/boot.ts
+// (called from _core/index.ts). This is more deterministic — the previous
+// import-order-driven start was hard to audit.
