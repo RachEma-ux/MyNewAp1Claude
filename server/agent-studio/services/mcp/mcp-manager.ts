@@ -121,7 +121,13 @@ export async function connectMcpServer(
         });
         break;
       case "sdk":
-        conn = await connectSdk({ serverId: row.id });
+        // Phase 15c: real in-process registry. We pass row.command as
+        // the registry lookup key (a small convention so we don't need
+        // a new column). Examples: "studio.echo", "studio.knowledge".
+        conn = await connectSdk({
+          serverId: row.id,
+          serverName: row.command ?? undefined,
+        });
         break;
       default:
         throw new McpError(
@@ -192,6 +198,61 @@ export async function listConnectedTools(
         ...tool,
         serverId: s.id,
         serverName: s.name,
+      });
+    }
+  }
+  return result;
+}
+
+/**
+ * Phase 15e: MCP-as-skill bridge.
+ *
+ * Returns prompts exposed by connected MCP servers, formatted as
+ * skill-shaped entries that the catalog skills merge can include with
+ * source="mcp_prompt". This mirrors openclaude's `mcpSkillBuilders.ts`
+ * pattern.
+ *
+ * Phase 15e ships the bridge plumbing only — actual `prompts/list`
+ * RPC support is a per-transport extension that would need to land in
+ * stdio.ts / http.ts / websocket.ts. Without that, this returns an
+ * empty array. Once a transport populates `connection.prompts`, this
+ * function flattens them automatically.
+ */
+export interface McpPromptEntry {
+  serverId: number;
+  serverName: string;
+  promptName: string;
+  description?: string;
+  /** Argument schema as JSON Schema */
+  argumentsSchema?: Record<string, unknown>;
+}
+
+export async function listConnectedPrompts(
+  draftId: number
+): Promise<McpPromptEntry[]> {
+  const servers = await repo.listMcpServers(draftId);
+  const result: McpPromptEntry[] = [];
+  for (const s of servers) {
+    const conn = connections.get(s.id);
+    if (!conn) continue;
+    // The McpConnection type may not have `prompts` yet — the field is
+    // optional and transports can populate it during their
+    // initialization. We read defensively.
+    const prompts = (conn as any).prompts as
+      | Array<{
+          name: string;
+          description?: string;
+          arguments?: Record<string, unknown>;
+        }>
+      | undefined;
+    if (!Array.isArray(prompts)) continue;
+    for (const p of prompts) {
+      result.push({
+        serverId: s.id,
+        serverName: s.name,
+        promptName: p.name,
+        description: p.description,
+        argumentsSchema: p.arguments,
       });
     }
   }

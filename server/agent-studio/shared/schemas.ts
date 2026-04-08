@@ -120,6 +120,8 @@ export const listCatalogSkillsSchema = z
     packKey: z.string().max(64).optional(),
     source: z.string().max(32).optional(),
     search: z.string().max(120).optional(),
+    /** Phase 15e: include MCP-discovered prompts for this draft */
+    draftId: z.number().int().positive().optional(),
   })
   .optional();
 
@@ -280,6 +282,26 @@ export const refreshMarketplaceRegistrySchema = z
     registryUrl: z.string().url().optional(),
   })
   .optional();
+
+// ── Phase 15b: MCP OAuth flow ───────────────────────────────────────────────
+
+export const initiateMcpOAuthSchema = z.object({
+  serverId: z.number().int().positive(),
+  config: z.object({
+    authorizationUrl: z.string().url(),
+    tokenUrl: z.string().url(),
+    clientId: z.string().min(1).max(200),
+    clientSecret: z.string().max(500).optional(),
+    scopes: z.array(z.string().max(120)).max(20).optional(),
+    redirectUri: z.string().url().optional(),
+  }),
+});
+
+export const exchangeMcpOAuthSchema = z.object({
+  serverId: z.number().int().positive(),
+  code: z.string().min(1).max(2000),
+  state: z.string().min(1).max(200),
+});
 
 // ── Phase 13d: Skill .md import ─────────────────────────────────────────────
 

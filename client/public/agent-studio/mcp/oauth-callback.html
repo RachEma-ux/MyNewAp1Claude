@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Agent Studio — MCP OAuth Callback</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: #0f1117;
+      color: #d4d4d8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 1rem;
+    }
+    .card {
+      max-width: 480px;
+      padding: 2rem;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      background: #18181b;
+      text-align: center;
+    }
+    h1 { font-size: 1.125rem; margin: 0 0 0.5rem; }
+    p { font-size: 0.875rem; color: #a1a1aa; margin: 0.25rem 0; }
+    .ok { color: #34d399; }
+    .err { color: #f87171; }
+    code { font-family: ui-monospace, monospace; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 id="title">Processing MCP authorization…</h1>
+    <p id="status">Reading the authorization code from the redirect URL.</p>
+    <p id="detail"></p>
+  </div>
+  <script>
+    /**
+     * Phase 15b — MCP OAuth callback page.
+     *
+     * This page is the redirect_uri the OAuth provider sends the user
+     * back to after authorization. It does NOT call any server endpoint
+     * itself — it uses window.opener.postMessage to hand the
+     * (code, state) pair back to the Agent Studio tab that originated
+     * the flow. That tab then calls mcp.oauth.exchange() via the
+     * tRPC client to complete the exchange.
+     *
+     * Why postMessage instead of a server callback route:
+     *  - A server route would require editing server/_core/index.ts
+     *    which violates the standalone-module constraint
+     *  - postMessage is the standard browser pattern for this case
+     *  - The opener tab origin-checks the message, so this is safe
+     */
+    (function() {
+      const title = document.getElementById("title");
+      const status = document.getElementById("status");
+      const detail = document.getElementById("detail");
+
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const state = params.get("state");
+      const error = params.get("error");
+      const errorDescription = params.get("error_description");
+
+      if (error) {
+        title.textContent = "Authorization failed";
+        title.className = "err";
+        status.textContent = error;
+        if (errorDescription) {
+          detail.textContent = errorDescription;
+        }
+        return;
+      }
+
+      if (!code || !state) {
+        title.textContent = "Invalid callback";
+        title.className = "err";
+        status.textContent =
+          "Missing 'code' or 'state' parameter. The provider didn't return a complete authorization response.";
+        return;
+      }
+
+      // Hand the code + state back to the opener via postMessage.
+      // The opener (the Agent Studio tab) listens for this message
+      // and calls mcp.oauth.exchange via the tRPC client.
+      if (!window.opener) {
+        title.textContent = "No opener window";
+        title.className = "err";
+        status.textContent =
+          "This page must be opened from the Agent Studio MCP page so the authorization code can be returned to the original tab.";
+        detail.innerHTML =
+          'Code: <code>' + code.substring(0, 12) + "…</code>";
+        return;
+      }
+
+      try {
+        window.opener.postMessage(
+          {
+            source: "agent-studio-mcp-oauth",
+            code: code,
+            state: state,
+          },
+          window.location.origin
+        );
+        title.textContent = "Authorization complete";
+        title.className = "ok";
+        status.textContent =
+          "You can close this window and return to Agent Studio.";
+        // Auto-close after a moment
+        setTimeout(function() {
+          window.close();
+        }, 2000);
+      } catch (e) {
+        title.textContent = "Failed to notify opener";
+        title.className = "err";
+        status.textContent = String(e);
+      }
+    })();
+  </script>
+</body>
+</html>

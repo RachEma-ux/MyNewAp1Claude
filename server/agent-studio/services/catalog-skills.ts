@@ -21,6 +21,7 @@
 import * as repo from "../repository";
 import * as skillCatalog from "../adapters/skill-catalog-adapter";
 import { getToolCatalogEntry } from "../adapters/tool-catalog-adapter";
+import * as mcpManager from "./mcp/mcp-manager";
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -314,13 +315,18 @@ export async function listMergedSkills(filter?: {
   packKey?: string;
   source?: string;
   search?: string;
+  /** Phase 15e: when supplied, MCP-discovered prompts for this draft
+   *  are included as source="mcp_prompt" entries in the merged set. */
+  draftId?: number;
 }): Promise<{
   vendored: MergedSkillEntry[];
   db: MergedSkillEntry[];
+  mcpPrompts: MergedSkillEntry[];
   all: MergedSkillEntry[];
 }> {
   const vendored: MergedSkillEntry[] = [];
   const dbEntries: MergedSkillEntry[] = [];
+  const mcpPrompts: MergedSkillEntry[] = [];
 
   // Vendored — read from the existing Phase 0c adapter
   const vendoredCatalog = await skillCatalog.listSkillCatalog();
@@ -378,9 +384,31 @@ export async function listMergedSkills(filter?: {
     );
   }
 
+  // Phase 15e: bridge MCP server prompts as read-only skills with
+  // source="mcp_prompt". Only included when a draftId is supplied.
+  if (filter?.draftId) {
+    try {
+      const prompts = await mcpManager.listConnectedPrompts(filter.draftId);
+      for (const p of prompts) {
+        mcpPrompts.push({
+          packKey: `mcp_${p.serverName}`,
+          skillKey: p.promptName,
+          name: p.promptName,
+          description: p.description ?? "",
+          allowedTools: [],
+          source: "mcp_prompt",
+          sourcePath: `mcp://${p.serverName}/${p.promptName}`,
+        });
+      }
+    } catch {
+      // MCP manager unavailable or no connections — silent
+    }
+  }
+
   return {
     vendored: filteredVendored,
     db: dbEntries,
-    all: [...filteredVendored, ...dbEntries],
+    mcpPrompts,
+    all: [...filteredVendored, ...dbEntries, ...mcpPrompts],
   };
 }

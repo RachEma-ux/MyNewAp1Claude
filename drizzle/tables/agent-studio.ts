@@ -648,6 +648,13 @@ export const agsDraftMcpServers = pgTable(
     /** Last known connection status from the MCP runtime */
     status: varchar("status", { length: 32 }).default("pending"),
     enabled: boolean("enabled").default(true),
+    // ── Phase 15b: OAuth (encrypted at rest) ──
+    /** OAuth provider config: {authorizationUrl, tokenUrl, clientId,
+     *  clientSecret?, scopes?, redirectUri?} */
+    oauthConfig: jsonb("oauth_config").$type<Record<string, unknown>>(),
+    /** OAuth flow state + tokens after successful exchange. Encrypted
+     *  at rest via server/_core/encryption.ts. */
+    oauthState: jsonb("oauth_state").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

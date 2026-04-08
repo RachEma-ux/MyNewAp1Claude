@@ -58,6 +58,8 @@ import {
   compactRunSchema,
   createCatalogSkillSchema,
   createCatalogToolSchema,
+  exchangeMcpOAuthSchema,
+  initiateMcpOAuthSchema,
   listCatalogSkillsSchema,
   listCatalogToolsSchema,
   removeCatalogSkillSchema,
@@ -1182,6 +1184,89 @@ const mcpRouter = router({
   listConnections: protectedProcedure.query(() => {
     return mcpManager.listConnections();
   }),
+  // ── Phase 15b: OAuth flow ──────────────────────────────────────────────
+  // governedProcedure for both because token storage is sensitive
+  oauthInitiate: governedProcedure
+    .input(initiateMcpOAuthSchema)
+    .mutation(async ({ input }) => {
+      const { buildAuthorizationUrl } = await import("../services/mcp/auth");
+      const result = buildAuthorizationUrl(input.config);
+      // Persist config + state on the MCP server row so the exchange
+      // procedure can find them by serverId. Encryption-at-rest TODO:
+      // wire encryptString/decryptString here when we ship secrets to
+      // production deployments.
+      const server = await repo.getMcpServerById(input.serverId);
+      if (!server) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `MCP server ${input.serverId} not found`,
+        });
+      }
+      await repo.updateMcpServerOAuth(input.serverId, {
+        oauthConfig: input.config as Record<string, unknown>,
+        oauthState: result.state as unknown as Record<string, unknown>,
+      });
+      return {
+        authorizationUrl: result.authorizationUrl,
+        state: result.state.state,
+      };
+    }),
+  oauthExchange: governedProcedure
+    .input(exchangeMcpOAuthSchema)
+    .mutation(async ({ input }) => {
+      const { exchangeCodeForTokens } = await import("../services/mcp/auth");
+      const server = await repo.getMcpServerById(input.serverId);
+      if (!server) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `MCP server ${input.serverId} not found`,
+        });
+      }
+      const config = (server as any).oauthConfig as
+        | Record<string, unknown>
+        | null;
+      const state = (server as any).oauthState as
+        | Record<string, unknown>
+        | null;
+      if (!config || !state) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "OAuth flow not initiated for this server — call oauthInitiate first",
+        });
+      }
+      // Defeat CSRF: the state from the provider must match what we
+      // generated at initiate time.
+      if (input.state !== (state as any).state) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "OAuth state mismatch — possible CSRF attempt",
+        });
+      }
+      let tokens;
+      try {
+        tokens = await exchangeCodeForTokens({
+          config: config as any,
+          code: input.code,
+          codeVerifier: (state as any).codeVerifier,
+        });
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+      // Persist tokens encrypted at rest (placeholder — wire
+      // encryptString/decryptString in a follow-up commit when we ship
+      // production secrets).
+      await repo.updateMcpServerOAuth(input.serverId, {
+        oauthState: {
+          ...(state as Record<string, unknown>),
+          tokens,
+        },
+      });
+      return { ok: true, expiresAt: tokens.expiresAt ?? null };
+    }),
 });
 
 // ── Skills (attached from local catalog — adapter comes in Phase 0c) ────────

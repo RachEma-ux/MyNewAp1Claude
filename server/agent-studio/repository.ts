@@ -1474,6 +1474,27 @@ export async function updateMcpServerStatus(
     .where(eq(agsDraftMcpServers.id, serverId));
 }
 
+/**
+ * Phase 15b: Update OAuth config and/or state on an MCP server row.
+ * Either field can be patched independently. Tokens stored inside
+ * oauthState should be encrypted by the caller before passing them in.
+ */
+export async function updateMcpServerOAuth(
+  serverId: number,
+  patch: {
+    oauthConfig?: Record<string, unknown>;
+    oauthState?: Record<string, unknown>;
+  }
+) {
+  const set: Record<string, unknown> = { updatedAt: new Date() };
+  if (patch.oauthConfig !== undefined) set.oauthConfig = patch.oauthConfig;
+  if (patch.oauthState !== undefined) set.oauthState = patch.oauthState;
+  await db()
+    .update(agsDraftMcpServers)
+    .set(set)
+    .where(eq(agsDraftMcpServers.id, serverId));
+}
+
 export async function replaceMcpServers(
   draftId: number,
   servers: Array<{
