@@ -31,6 +31,7 @@ import {
   agsRuntimeToolCalls,
   agsRuntimeMemoryEvents,
   agsRuntimePolicyEvents,
+  agsRuntimeHookExecutions,
   agsPublishRequests,
   agsApprovalSteps,
   // ── Phase 0a: openllm-agent2 native parity tables ──
@@ -1164,6 +1165,48 @@ export async function appendRuntimePolicyEvent(input: {
     })
     .returning();
   return created;
+}
+
+// ── Phase 4: Runtime hook executions ───────────────────────────────────────
+
+export async function appendRuntimeHookExecution(input: {
+  runId: number;
+  hookId?: number | null;
+  eventName: string;
+  matcher?: string | null;
+  command: string;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+  timedOut: boolean;
+  error?: string | null;
+}) {
+  const [created] = await db()
+    .insert(agsRuntimeHookExecutions)
+    .values({
+      runId: input.runId,
+      hookId: input.hookId ?? null,
+      eventName: input.eventName,
+      matcher: input.matcher ?? null,
+      command: input.command,
+      exitCode: input.exitCode,
+      stdout: input.stdout,
+      stderr: input.stderr,
+      durationMs: input.durationMs,
+      timedOut: input.timedOut,
+      error: input.error ?? null,
+    })
+    .returning();
+  return created;
+}
+
+export async function listRuntimeHookExecutions(runId: number) {
+  return db()
+    .select()
+    .from(agsRuntimeHookExecutions)
+    .where(eq(agsRuntimeHookExecutions.runId, runId))
+    .orderBy(agsRuntimeHookExecutions.id);
 }
 
 // ── Home / Aggregates ───────────────────────────────────────────────────────

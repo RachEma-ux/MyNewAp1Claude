@@ -20,6 +20,7 @@
 
 import * as repo from "../repository";
 import { evaluateGovernance } from "./governance-adapter";
+import { fireHooksForEvent } from "./hook-runner";
 import { getToolCatalogEntry } from "../adapters/tool-catalog-adapter";
 import { previewRetrieval } from "../adapters/knowledge-adapter";
 import {
@@ -313,6 +314,10 @@ export async function runSimulation(input: {
   }
 
   // ── Step 4: Tool calls — uses catalog adapter for kind-aware checks ──
+  // Phase 4: PreToolUse and PostToolUse hooks fire around each tool call.
+  // The hook runner spawns user-supplied commands as child processes and
+  // persists results into agsRuntimeHookExecutions for the runs page tab.
+  const draftWorkingDir = ((draft.workingDirectories ?? []) as string[])[0] ?? null;
   if (!aborted) {
     for (const t of tools.slice(0, 3)) {
       const catalogEntry = await getToolCatalogEntry(t.toolKey);
@@ -329,6 +334,23 @@ export async function runSimulation(input: {
         risk += 30;
         if (toggles.strictPolicy) aborted = true;
       }
+
+      // Phase 4: PreToolUse hook
+      await fireHooksForEvent({
+        runId: runtimeRun.id,
+        agentId: input.agentId,
+        draftId: draft.id,
+        eventName: "PreToolUse",
+        toolName: t.toolName,
+        payload: {
+          toolKey: t.toolKey,
+          kind: catalogEntry?.category ?? "unknown",
+          mocked: toggles.mockedTools,
+          destructive: isDestructive,
+        },
+        workingDirectory: draftWorkingDir,
+      });
+
       steps.push({
         index: stepIdx++,
         type: "tool_call",
@@ -356,6 +378,24 @@ export async function runSimulation(input: {
         verdict,
         durationMs: 30,
       });
+
+      // Phase 4: PostToolUse hook (fires even on blocked verdict — the
+      // hook gets to see what happened)
+      await fireHooksForEvent({
+        runId: runtimeRun.id,
+        agentId: input.agentId,
+        draftId: draft.id,
+        eventName: "PostToolUse",
+        toolName: t.toolName,
+        payload: {
+          toolKey: t.toolKey,
+          verdict,
+          destructive: isDestructive,
+          aborted,
+        },
+        workingDirectory: draftWorkingDir,
+      });
+
       if (aborted) break;
     }
   }
@@ -688,6 +728,26 @@ export async function runSimulation(input: {
     output: { steps: steps.length, aborted },
     finishedAt: new Date(),
   });
+  // Phase 4: fire Stop hook at end of run (success or failure). Best-effort
+  // — failures don't poison the finalize path.
+  try {
+    await fireHooksForEvent({
+      runId: runtimeRun.id,
+      agentId: input.agentId,
+      draftId: draft.id,
+      eventName: "Stop",
+      payload: {
+        verdict,
+        aborted,
+        durationMs,
+        stepCount: steps.length,
+      },
+      workingDirectory: draftWorkingDir,
+    });
+  } catch {
+    /* ignore — Stop hook failure must not break the run finalize */
+  }
+
   // Finalize the runtime run too — same status, summary, output
   // Phase 5: persist usage columns so the runs page header can show them
   // without parsing the output JSON blob.

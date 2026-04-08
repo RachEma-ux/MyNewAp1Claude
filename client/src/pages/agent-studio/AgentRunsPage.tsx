@@ -297,6 +297,7 @@ export default function AgentRunsPage({
                 <TabsTrigger value="tools">Tools</TabsTrigger>
                 <TabsTrigger value="memory">Memory</TabsTrigger>
                 <TabsTrigger value="policy">Policy</TabsTrigger>
+                <TabsTrigger value="hooks">Hooks</TabsTrigger>
                 <TabsTrigger value="steps">Steps</TabsTrigger>
               </TabsList>
               <TabsContent value="input">
@@ -376,6 +377,68 @@ export default function AgentRunsPage({
                           </Badge>
                         </div>
                         {p.reason && <div className="opacity-80 mt-0.5">{p.reason}</div>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </TabsContent>
+              <TabsContent value="hooks">
+                {(detailQuery.data?.hookExecutions?.length ?? 0) === 0 ? (
+                  <p className="text-[10px] text-muted-foreground">
+                    No hook executions. Add hooks on the Hooks page and run a
+                    simulation that triggers the matching event.
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {detailQuery.data?.hookExecutions.map((h: any) => (
+                      <li key={h.id} className="border rounded p-1.5 text-[10px]">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-mono">
+                            {h.eventName}
+                            {h.matcher && (
+                              <span className="text-muted-foreground/70">
+                                {" "}({h.matcher})
+                              </span>
+                            )}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] ${
+                              h.timedOut
+                                ? "border-red-500/40 text-red-400"
+                                : h.error
+                                  ? "border-red-500/40 text-red-400"
+                                  : h.exitCode === 0
+                                    ? "border-emerald-500/40 text-emerald-400"
+                                    : "border-yellow-500/40 text-yellow-400"
+                            }`}
+                          >
+                            {h.timedOut
+                              ? "timeout"
+                              : h.error
+                                ? "error"
+                                : `exit ${h.exitCode ?? "?"}`}
+                          </Badge>
+                        </div>
+                        <div className="font-mono text-[9px] opacity-70 mt-0.5">
+                          {h.command}
+                        </div>
+                        {h.error && (
+                          <div className="text-red-400 mt-0.5">{h.error}</div>
+                        )}
+                        {h.stdout && (
+                          <pre className="font-mono text-[9px] opacity-70 mt-1 whitespace-pre-wrap break-all bg-muted/30 p-1 rounded">
+                            {h.stdout.slice(0, 240)}
+                          </pre>
+                        )}
+                        {h.stderr && (
+                          <pre className="font-mono text-[9px] text-red-400/80 mt-1 whitespace-pre-wrap break-all">
+                            {h.stderr.slice(0, 240)}
+                          </pre>
+                        )}
+                        <div className="text-[9px] text-muted-foreground/70 mt-0.5">
+                          {h.durationMs}ms
+                        </div>
                       </li>
                     ))}
                   </ul>

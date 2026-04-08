@@ -755,6 +755,50 @@ export const agsDraftPermissionRules = pgTable(
 );
 
 /**
+ * Phase 4 — Runtime hook executions.
+ *
+ * Each row records a single execution of an `agsDraftHooks` row against a
+ * runtime event during a live or simulated run. The simulation engine
+ * (and the live runtime path) look up matching hooks at every relevant
+ * lifecycle event (PreToolUse, PostToolUse, etc.), spawn the hook's
+ * command as a child process, and write the result here.
+ *
+ * Surfaced in the runs page Hooks tab.
+ */
+export const agsRuntimeHookExecutions = pgTable(
+  "ags_runtime_hook_executions",
+  {
+    id: serial("id").primaryKey(),
+    runId: integer("run_id").notNull(),
+    /** Source hook row id (nullable — hook might be deleted after the run) */
+    hookId: integer("hook_id"),
+    /** The 27 lifecycle event names from AGS_HOOK_EVENTS */
+    eventName: varchar("event_name", { length: 64 }).notNull(),
+    /** The matcher (tool name pattern) when the event was tool-scoped */
+    matcher: text("matcher"),
+    /** Command that was executed */
+    command: text("command").notNull(),
+    /** Process exit code — null if the spawn itself failed */
+    exitCode: integer("exit_code"),
+    /** Captured stdout (truncated to 4 KiB) */
+    stdout: text("stdout"),
+    /** Captured stderr (truncated to 4 KiB) */
+    stderr: text("stderr"),
+    /** Wall-clock duration in ms */
+    durationMs: integer("duration_ms"),
+    /** Set when the hook was killed by the timeout */
+    timedOut: boolean("timed_out").default(false),
+    /** Spawn-level error (e.g., "ENOENT") — separate from process stderr */
+    error: text("error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    runIdx: index("idx_ags_runtime_hook_run").on(t.runId),
+    eventIdx: index("idx_ags_runtime_hook_event").on(t.eventName),
+  })
+);
+
+/**
  * Phase 3 — Interactive permission requests.
  *
  * When the live runtime adapter receives a `permission_request` from

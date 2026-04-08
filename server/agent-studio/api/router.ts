@@ -747,13 +747,16 @@ const runsRouter = router({
   getDetail: protectedProcedure.input(getRunDetailSchema).query(async ({ input }) => {
     const run = await repo.getRuntimeRunById(input.runId);
     if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Runtime run not found" });
-    const [steps, toolCalls, memoryEvents, policyEvents] = await Promise.all([
-      repo.listRuntimeRunSteps(input.runId),
-      repo.listRuntimeToolCalls(input.runId),
-      repo.listRuntimeMemoryEvents(input.runId),
-      repo.listRuntimePolicyEvents(input.runId),
-    ]);
-    return { run, steps, toolCalls, memoryEvents, policyEvents };
+    // Phase 4: include hook executions in the trace
+    const [steps, toolCalls, memoryEvents, policyEvents, hookExecutions] =
+      await Promise.all([
+        repo.listRuntimeRunSteps(input.runId),
+        repo.listRuntimeToolCalls(input.runId),
+        repo.listRuntimeMemoryEvents(input.runId),
+        repo.listRuntimePolicyEvents(input.runId),
+        repo.listRuntimeHookExecutions(input.runId),
+      ]);
+    return { run, steps, toolCalls, memoryEvents, policyEvents, hookExecutions };
   }),
 });
 
