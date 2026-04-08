@@ -463,6 +463,7 @@ function Router() {
       <Route path="/agent-studio/import" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
       <Route path="/agent-studio/catalog/:section" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
       <Route path="/agent-studio/catalog" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
+      <Route path="/agent-studio/marketplace" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
       {/* Deeper sub-routes (3 segments) must come before generic :section catch */}
       <Route path="/agent-studio/:agentId/runs/:runId" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
       <Route path="/agent-studio/:agentId/versions/compare" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />

@@ -31,6 +31,10 @@ import * as catalogSkillsService from "../services/catalog-skills";
 import * as catalogToolsService from "../services/catalog-tools";
 import { cloneAgent } from "../services/cloning";
 import * as marketplaceService from "../services/marketplace";
+import {
+  installMarketplaceItem,
+  uninstallMarketplaceItem,
+} from "../services/marketplace-installer";
 import { importFromMarkdown as importSkillsFromMarkdown } from "../services/skill-importer";
 // Phase 12.5: scheduler is now started explicitly via bootAgentStudio()
 // in server/agent-studio/boot.ts (called from _core/index.ts). The
@@ -1708,7 +1712,37 @@ const marketplaceRouter = router({
   listCollections: protectedProcedure.query(async () => {
     return marketplaceService.listCollections();
   }),
-  // install / uninstall land in Phase 14d
+  // Phase 14d: install/uninstall — materializes payload into catalog
+  // tables and records the install for later reversal.
+  install: protectedProcedure
+    .input(installMarketplaceItemSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await installMarketplaceItem({
+          itemId: input.itemId,
+          agentId: input.agentId,
+          onConflict: input.onConflict,
+          installedBy: ctx.user.id,
+        });
+      } catch (e) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+  uninstall: protectedProcedure
+    .input(uninstallMarketplaceItemSchema)
+    .mutation(async ({ input }) => {
+      try {
+        return await uninstallMarketplaceItem(input.installId);
+      } catch (e) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
 });
 
 // ── Compose ─────────────────────────────────────────────────────────────────

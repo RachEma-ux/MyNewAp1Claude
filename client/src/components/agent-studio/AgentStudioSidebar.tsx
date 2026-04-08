@@ -31,6 +31,7 @@ import {
   Plug,
   Users,
   Library,
+  Store,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -57,7 +58,9 @@ export type AgentStudioView =
   | "subagents"
   // ── Phase 13e: Catalog (global, no agent context) ──
   | "catalog-skills"
-  | "catalog-tools";
+  | "catalog-tools"
+  // ── Phase 14c: Marketplace (global, no agent context) ──
+  | "marketplace";
 
 interface SectionGroup {
   label: string;
@@ -78,6 +81,13 @@ const HOME_GROUPS: SectionGroup[] = [
     items: [
       { key: "catalog-skills", label: "Skills Catalog", icon: Library },
       { key: "catalog-tools", label: "Tools Catalog", icon: Wrench },
+    ],
+  },
+  // ── Phase 14c: global marketplace ──
+  {
+    label: "Marketplace",
+    items: [
+      { key: "marketplace", label: "Browse / Install", icon: Store },
     ],
   },
 ];

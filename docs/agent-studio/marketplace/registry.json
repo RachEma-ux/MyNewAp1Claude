@@ -1,0 +1,133 @@
+{
+  "version": "1.0",
+  "name": "Agent Studio Official",
+  "description": "Curated skills and tools for Agent Studio. Pulled by the Marketplace page's Refresh button.",
+  "updatedAt": "2026-04-08T22:00:00Z",
+  "items": [
+    {
+      "itemKey": "agent-studio/providers-pack",
+      "itemType": "skill_pack",
+      "displayName": "Provider Review Pack",
+      "description": "3 skills for auditing LLM provider configurations: review providers, sync API keys, test connections.",
+      "author": "agent-studio",
+      "version": "1.0.0",
+      "tags": ["providers", "audit", "ops"],
+      "payload": {
+        "kind": "skill_pack",
+        "packKey": "providers",
+        "packName": "Providers",
+        "skills": [
+          {
+            "packKey": "providers",
+            "skillKey": "review-provider",
+            "name": "Review Provider",
+            "description": "Audit a single provider configuration for security + correctness.",
+            "context": "fork",
+            "agent": "general-purpose",
+            "allowedTools": ["Read", "Grep", "Glob"],
+            "body": "You are a provider config reviewer.\n\nFocus: $ARGUMENTS\n\nTasks:\n1. Read the provider's config file\n2. Check API key handling (env var? hardcoded?)\n3. Verify rate limits + retry logic\n4. Verify error handling\n\nReport: name | secure | rate-limited | recommendations",
+            "version": "1.0.0"
+          },
+          {
+            "packKey": "providers",
+            "skillKey": "sync-keys",
+            "name": "Sync Keys",
+            "description": "Audit and sync API keys across provider configurations.",
+            "context": "fork",
+            "agent": "general-purpose",
+            "allowedTools": ["Read", "Grep", "Glob"],
+            "body": "You are a security-aware API key auditor.\n\nFocus: $ARGUMENTS\n\nTasks:\n1. Grep for API key references: API_KEY, apiKey, SECRET, TOKEN\n2. For each: where defined, secure, in .gitignore?\n3. Verify .env.example documents required keys\n\nReport: key | source | secure | in .gitignore | in .env.example",
+            "version": "1.0.0"
+          },
+          {
+            "packKey": "providers",
+            "skillKey": "test-connection",
+            "name": "Test Connection",
+            "description": "Test live connectivity to a provider with a minimal request.",
+            "context": "fork",
+            "agent": "general-purpose",
+            "allowedTools": ["Read", "Bash"],
+            "body": "You are a provider connectivity tester.\n\nFocus: $ARGUMENTS\n\nTasks:\n1. Read the provider config\n2. Construct a minimal test request\n3. Execute and capture response\n4. Verify auth, rate limit headers, response shape\n\nReport: status | latency | warnings",
+            "version": "1.0.0"
+          }
+        ]
+      }
+    },
+    {
+      "itemKey": "agent-studio/database-pack",
+      "itemType": "skill_pack",
+      "displayName": "Database Review Pack",
+      "description": "2 skills for auditing database schemas and migrations.",
+      "author": "agent-studio",
+      "version": "1.0.0",
+      "tags": ["database", "schema", "audit"],
+      "payload": {
+        "kind": "skill_pack",
+        "packKey": "database",
+        "packName": "Database",
+        "skills": [
+          {
+            "packKey": "database",
+            "skillKey": "schema-review",
+            "name": "Schema Review",
+            "description": "Review database schema for normalization, indexes, constraints.",
+            "context": "fork",
+            "agent": "general-purpose",
+            "allowedTools": ["Read", "Grep", "Glob"],
+            "body": "You are a database schema reviewer.\n\nFocus: $ARGUMENTS\n\nTasks:\n1. Read the schema definition files\n2. Check normalization (3NF or higher)\n3. Verify indexes on FK columns\n4. Check constraints (NOT NULL, UNIQUE)\n5. Check timestamp columns\n\nReport: tables | issues | recommendations",
+            "version": "1.0.0"
+          },
+          {
+            "packKey": "database",
+            "skillKey": "migration-check",
+            "name": "Migration Check",
+            "description": "Validate migration files for safety and idempotency.",
+            "context": "fork",
+            "agent": "general-purpose",
+            "allowedTools": ["Read", "Grep", "Glob"],
+            "body": "You are a migration safety checker.\n\nFocus: $ARGUMENTS\n\nTasks:\n1. List migration files in order\n2. For each: idempotent? reversible? data loss risk?\n3. Check for ALTER TABLE without DEFAULT on NOT NULL\n4. Check for missing transactions\n\nReport: migration | risks | rollback plan",
+            "version": "1.0.0"
+          }
+        ]
+      }
+    },
+    {
+      "itemKey": "agent-studio/governance-pack",
+      "itemType": "skill_pack",
+      "displayName": "Governance & Security Pack",
+      "description": "2 skills for governance policy and security auditing.",
+      "author": "agent-studio",
+      "version": "1.0.0",
+      "tags": ["governance", "security", "audit"],
+      "payload": {
+        "kind": "skill_pack",
+        "packKey": "governance",
+        "packName": "Governance",
+        "skills": [
+          {
+            "packKey": "governance",
+            "skillKey": "policy-check",
+            "name": "Policy Check",
+            "description": "Check governance policies and security controls.",
+            "context": "fork",
+            "agent": "general-purpose",
+            "allowedTools": ["Read", "Grep", "Glob"],
+            "body": "You are a governance policy auditor.\n\nFocus: $ARGUMENTS\n\nTasks:\n1. Read policy definitions and scoring rules\n2. Check secret management\n3. Verify ENCRYPTION_KEY is required in production\n4. Check auth model: which endpoints are unprotected?\n5. Grep for auth bypass patterns\n\nReport: policies | secret mgmt | auth gaps | CRITICAL issues",
+            "version": "1.0.0"
+          },
+          {
+            "packKey": "governance",
+            "skillKey": "secret-rotate",
+            "name": "Secret Rotate",
+            "description": "Plan a secret rotation across all configurations.",
+            "context": "fork",
+            "agent": "general-purpose",
+            "allowedTools": ["Read", "Grep", "Glob"],
+            "body": "You are a secret rotation planner.\n\nFocus: $ARGUMENTS\n\nTasks:\n1. List all secrets in use\n2. Identify which can be rotated zero-downtime\n3. Plan the rotation order\n4. Document rollback steps\n\nReport: secret | rotation method | downtime risk | rollback",
+            "version": "1.0.0"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -55,6 +55,8 @@ const AgentSubagentsPage = lazy(() => import("@/pages/agent-studio/AgentSubagent
 // ── Phase 13e: Catalog (global pages, no agent context) ──
 const AgentSkillCatalogPage = lazy(() => import("@/pages/agent-studio/AgentSkillCatalogPage"));
 const AgentToolCatalogPage = lazy(() => import("@/pages/agent-studio/AgentToolCatalogPage"));
+// ── Phase 14c: Marketplace (global page, no agent context) ──
+const AgentMarketplacePage = lazy(() => import("@/pages/agent-studio/AgentMarketplacePage"));
 
 interface ParsedRoute {
   agentId: number | null;
@@ -136,6 +138,10 @@ function parseRoute(path: string): ParsedRoute {
   if (path.startsWith("/agent-studio/catalog")) {
     // Bare /catalog → redirect to skills as the default landing
     return { ...empty, view: "catalog-skills" as any, homeMode: null };
+  }
+  // ── Phase 14c: Marketplace (global, no agent context) ──
+  if (path.startsWith("/agent-studio/marketplace")) {
+    return { ...empty, view: "marketplace" as any, homeMode: null };
   }
 
   // /agent-studio/:id[/<section>[/<extra>]]
@@ -269,6 +275,10 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/catalog/tools");
       return;
     }
+    if (key === "marketplace") {
+      navigate("/agent-studio/marketplace");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -322,6 +332,9 @@ export default function AgentStudioShell() {
           return <AgentSkillCatalogPage />;
         case "catalog-tools" as any:
           return <AgentToolCatalogPage />;
+        // ── Phase 14c: marketplace (global) ──
+        case "marketplace" as any:
+          return <AgentMarketplacePage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }
