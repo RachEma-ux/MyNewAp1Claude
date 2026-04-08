@@ -63,64 +63,68 @@ export default function AgentStudioStatusBar({
     );
 
   return (
-    <div className="border-t bg-background/80 backdrop-blur-sm shrink-0 px-3 py-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-      <StatusItem>
-        <Save className="h-2.5 w-2.5" />
-        <span>{lastSaved ? `Saved ${formatTime(lastSaved)}` : "Never saved"}</span>
-      </StatusItem>
+    <div className="border-t bg-background/80 backdrop-blur-sm shrink-0 px-3 py-1 flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+      {/* Row 1: persistence + evaluation state */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <StatusItem>
+          <Save className="h-2.5 w-2.5" />
+          <span>{lastSaved ? `Saved ${formatTime(lastSaved)}` : "Never saved"}</span>
+        </StatusItem>
 
-      <Divider />
+        <Divider />
 
-      <StatusItem>
-        <Circle
-          className={cn(
-            "h-2 w-2 fill-current",
-            validationState === "ok" && "text-emerald-500",
-            validationState === "warning" && "text-yellow-500",
-            validationState === "error" && "text-red-500",
-            validationState === "unknown" && "text-muted-foreground/40"
-          )}
-        />
-        <span className="capitalize">Validation {validationState}</span>
-      </StatusItem>
+        <StatusItem>
+          <Circle
+            className={cn(
+              "h-2 w-2 fill-current",
+              validationState === "ok" && "text-emerald-500",
+              validationState === "warning" && "text-yellow-500",
+              validationState === "error" && "text-red-500",
+              validationState === "unknown" && "text-muted-foreground/40"
+            )}
+          />
+          <span className="capitalize">Validation {validationState}</span>
+        </StatusItem>
 
-      <Divider />
+        <Divider />
 
-      <StatusItem>
-        <span className="text-muted-foreground/60">Sim:</span>
-        <span className="text-foreground/80">{simulationState}</span>
-      </StatusItem>
+        <StatusItem>
+          <span className="text-muted-foreground/60">Sim:</span>
+          <span className="text-foreground/80">{simulationState}</span>
+        </StatusItem>
 
-      <Divider />
+        {unsavedChanges && (
+          <>
+            <Divider />
+            <StatusItem className="text-yellow-400">
+              <AlertCircle className="h-2.5 w-2.5" />
+              <span>Unsaved changes</span>
+            </StatusItem>
+          </>
+        )}
+      </div>
 
-      <StatusItem>
-        <span className="text-muted-foreground/60">Version:</span>
-        <span className="text-foreground/80 font-mono">{version}</span>
-      </StatusItem>
+      {/* Row 2: release context — version / env / policy */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <StatusItem>
+          <span className="text-muted-foreground/60">Version:</span>
+          <span className="text-foreground/80 font-mono">{version}</span>
+        </StatusItem>
 
-      <Divider />
+        <Divider />
 
-      <StatusItem>
-        <span className="text-muted-foreground/60">Env:</span>
-        <span className="uppercase text-foreground/80 font-mono">{environment}</span>
-      </StatusItem>
+        <StatusItem>
+          <span className="text-muted-foreground/60">Env:</span>
+          <span className="uppercase text-foreground/80 font-mono">{environment}</span>
+        </StatusItem>
 
-      <Divider />
+        <Divider />
 
-      <StatusItem>
-        {policyIcon}
-        <span className="capitalize">Policy {policyState}</span>
-      </StatusItem>
-
-      {unsavedChanges && (
-        <>
-          <Divider />
-          <StatusItem className="text-yellow-400">
-            <AlertCircle className="h-2.5 w-2.5" />
-            <span>Unsaved changes</span>
-          </StatusItem>
-        </>
-      )}
+        <StatusItem>
+          {policyIcon}
+          <span className="capitalize">Policy {policyState}</span>
+        </StatusItem>
+      </div>
     </div>
   );
 }

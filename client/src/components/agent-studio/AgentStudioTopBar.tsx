@@ -59,11 +59,11 @@ export default function AgentStudioTopBar({
   onPublish,
 }: AgentStudioTopBarProps) {
   return (
-    <div className="flex items-center gap-3 px-3 py-2 border-b bg-background/80 backdrop-blur-sm shrink-0">
-      {/* Identity cluster */}
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+    <div className="flex flex-col px-3 py-1.5 border-b bg-background/80 backdrop-blur-sm shrink-0 gap-1.5">
+      {/* Row 1: Identity cluster */}
+      <div className="flex items-center gap-2 min-w-0 flex-wrap">
         <span
-          className="text-sm font-semibold tracking-tight truncate"
+          className="text-sm font-semibold tracking-tight truncate max-w-[60%]"
           title={agentName}
         >
           {agentName}
@@ -83,8 +83,8 @@ export default function AgentStudioTopBar({
         </Badge>
       </div>
 
-      {/* Action clusters with visual grouping */}
-      <div className="flex items-center gap-0.5">
+      {/* Row 2: Action clusters with visual grouping */}
+      <div className="flex items-center gap-0.5 flex-wrap">
         {/* Persistence */}
         <Button
           size="sm"
