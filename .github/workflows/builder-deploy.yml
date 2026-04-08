@@ -567,9 +567,10 @@ jobs:
           echo "  JWT_SECRET: ${JWT_SECRET:+(configured)}"
           echo "  APP_ID: ${VITE_APP_ID:-(not set)}"
 
-          # Create dedicated module databases (CODEDB, PRMDB, PSMDB, WFDB)
+          # Create dedicated module databases (CODEDB, PRMDB, PSMDB, WFDB, ASDB)
+          # Phase 12.5: ASDB is the Agent Studio dedicated database
           echo "🗄️ Creating dedicated module databases..."
-          for DBNAME in codedb prmdb psmdb wfdb; do
+          for DBNAME in codedb prmdb psmdb wfdb asdb; do
             PGPASSWORD=app psql -h localhost -U app -d mynewapp -tc "SELECT 1 FROM pg_database WHERE datname='$DBNAME'" | grep -q 1 \
               || PGPASSWORD=app createdb -h localhost -U app "$DBNAME"
             echo "  ✅ $DBNAME ready"
