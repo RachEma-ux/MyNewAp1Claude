@@ -113,6 +113,16 @@ export const setScheduleConfigSchema = z.object({
   payload: z.record(z.any()).optional(),
 });
 
+// Phase 11: resume / compact prior runs.
+export const resumeRunSchema = z.object({
+  sourceRunId: z.number().int().positive(),
+  newInput: z.string().min(1).max(10_000),
+});
+
+export const compactRunSchema = z.object({
+  sourceRunId: z.number().int().positive(),
+});
+
 // ── Identity ────────────────────────────────────────────────────────────────
 
 export const updateIdentitySchema = z.object({

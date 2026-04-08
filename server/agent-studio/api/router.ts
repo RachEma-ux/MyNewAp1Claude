@@ -32,6 +32,7 @@ import { cloneAgent } from "../services/cloning";
 // loaded, so importing it here ensures the 60s tick begins on the first
 // agent-studio API hit. No edits to server/_core/index.ts needed.
 import "../services/scheduler";
+import { compactRun, resumeRun } from "../services/run-snapshot";
 import { parseAndExecuteSlashCommand } from "../services/slash-commands";
 import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import {
@@ -40,6 +41,7 @@ import {
   attachSkillSchema,
   attachToolSchema,
   cloneAgentSchema,
+  compactRunSchema,
   comparePromptPackSchema,
   compareSimulationRunsSchema,
   compareVersionsSchema,
@@ -66,6 +68,7 @@ import {
   removeSubagentSchema,
   removeTestCaseSchema,
   removeToolSchema,
+  resumeRunSchema,
   rollbackToVersionSchema,
   runSimulationSchema,
   runTestSuiteSchema,
@@ -763,6 +766,27 @@ const runsRouter = router({
       ]);
     return { run, steps, toolCalls, memoryEvents, policyEvents, hookExecutions };
   }),
+  // Phase 11: resume / compact prior runs. Both create a new runtime run
+  // that uses the source run as preamble (resume) or summary (compact).
+  // Lineage is recorded via resumedFromRunId / compactedFromRunId on the
+  // new row. protectedProcedure — same trust as runSimulation itself.
+  resume: protectedProcedure
+    .input(resumeRunSchema)
+    .mutation(async ({ ctx, input }) => {
+      return resumeRun({
+        sourceRunId: input.sourceRunId,
+        newInput: input.newInput,
+        triggeredBy: ctx.user.id,
+      });
+    }),
+  compact: protectedProcedure
+    .input(compactRunSchema)
+    .mutation(async ({ ctx, input }) => {
+      return compactRun({
+        sourceRunId: input.sourceRunId,
+        triggeredBy: ctx.user.id,
+      });
+    }),
 });
 
 // ── Versions ────────────────────────────────────────────────────────────────

@@ -119,6 +119,47 @@ export default function AgentRunsPage({
     });
   }
 
+  // Phase 11: resume / compact mutations. Resume needs new input from
+  // the user via window.prompt; compact takes nothing extra.
+  const resumeMut = trpc.agentStudio.runs.resume.useMutation({
+    onSuccess: (result) => {
+      toast.success(
+        `Resumed → new run #${result.newRunId} (${result.preambleChars} chars preamble)`
+      );
+      utils.agentStudio.runs.list.invalidate();
+      selectRun(result.newRunId);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const compactMut = trpc.agentStudio.runs.compact.useMutation({
+    onSuccess: (result) => {
+      toast.success(
+        `Compacted → new run #${result.newRunId} (${result.preambleChars} chars summary)`
+      );
+      utils.agentStudio.runs.list.invalidate();
+      selectRun(result.newRunId);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  function handleResume() {
+    if (!selectedRunId) return;
+    const newInput = window.prompt(
+      "New input to continue with (the prior run's output will be included as context):"
+    );
+    if (!newInput) return;
+    resumeMut.mutate({ sourceRunId: selectedRunId, newInput });
+  }
+  function handleCompact() {
+    if (!selectedRunId) return;
+    if (
+      !window.confirm(
+        "Compact this run? A new run will start with a summary of this one as context."
+      )
+    )
+      return;
+    compactMut.mutate({ sourceRunId: selectedRunId });
+  }
+
   if (runsQuery.isLoading) return <LoadingState label="Loading runs…" />;
 
   const runs = runsQuery.data ?? [];
@@ -192,23 +233,52 @@ export default function AgentRunsPage({
       {/* Trace inspector */}
       <Card className="lg:col-span-2">
         <CardContent className="p-3">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 gap-2">
             <h3 className="text-sm font-semibold">Trace Inspector</h3>
-            {/* Phase 5: usage strip in the inspector header */}
-            {detailQuery.data?.run &&
-              (detailQuery.data.run.totalTokens != null ||
-                detailQuery.data.run.costMicrocents != null) && (
-                <div className="text-[10px] font-mono text-muted-foreground">
-                  {detailQuery.data.run.inputTokens != null &&
-                    `${formatTokens(detailQuery.data.run.inputTokens)} in`}
-                  {detailQuery.data.run.outputTokens != null &&
-                    ` · ${formatTokens(detailQuery.data.run.outputTokens)} out`}
-                  {detailQuery.data.run.totalTokens != null &&
-                    ` · ${formatTokens(detailQuery.data.run.totalTokens)} total`}
-                  {detailQuery.data.run.costMicrocents != null &&
-                    ` · ${formatCost(detailQuery.data.run.costMicrocents)}`}
-                </div>
-              )}
+            <div className="flex items-center gap-2">
+              {/* Phase 5: usage strip */}
+              {detailQuery.data?.run &&
+                (detailQuery.data.run.totalTokens != null ||
+                  detailQuery.data.run.costMicrocents != null) && (
+                  <div className="text-[10px] font-mono text-muted-foreground">
+                    {detailQuery.data.run.inputTokens != null &&
+                      `${formatTokens(detailQuery.data.run.inputTokens)} in`}
+                    {detailQuery.data.run.outputTokens != null &&
+                      ` · ${formatTokens(detailQuery.data.run.outputTokens)} out`}
+                    {detailQuery.data.run.totalTokens != null &&
+                      ` · ${formatTokens(detailQuery.data.run.totalTokens)} total`}
+                    {detailQuery.data.run.costMicrocents != null &&
+                      ` · ${formatCost(detailQuery.data.run.costMicrocents)}`}
+                  </div>
+                )}
+              {/* Phase 11: resume / compact — only when run is terminal */}
+              {detailQuery.data?.run &&
+                (detailQuery.data.run.status === "completed" ||
+                  detailQuery.data.run.status === "failed") && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 px-2 text-[10px]"
+                      disabled={resumeMut.isPending}
+                      onClick={handleResume}
+                      title="Resume — start a new run with this run's history as context"
+                    >
+                      Resume
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 px-2 text-[10px]"
+                      disabled={compactMut.isPending}
+                      onClick={handleCompact}
+                      title="Compact — start a new run with a summary of this one as context"
+                    >
+                      Compact
+                    </Button>
+                  </>
+                )}
+            </div>
           </div>
           {!selectedRunId ? (
             <EmptyState

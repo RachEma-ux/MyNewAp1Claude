@@ -436,6 +436,11 @@ export const agsRuntimeRuns = pgTable(
     totalTokens: integer("total_tokens"),
     /** USD as numeric microcents (1_000_000 = $1.00) — int avoids float drift */
     costMicrocents: integer("cost_microcents"),
+    // Phase 11: Lineage. When a run was created by /resume, this points
+    // at the source run we replayed history from. When created by
+    // /compact, this points at the source run we summarized.
+    resumedFromRunId: integer("resumed_from_run_id"),
+    compactedFromRunId: integer("compacted_from_run_id"),
     startedAt: timestamp("started_at"),
     finishedAt: timestamp("finished_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
