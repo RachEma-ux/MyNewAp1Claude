@@ -113,6 +113,53 @@ export const setScheduleConfigSchema = z.object({
   payload: z.record(z.string(), z.any()).optional(),
 });
 
+// ── Phase 13: Catalog (skills + tools) ──────────────────────────────────────
+
+export const listCatalogSkillsSchema = z
+  .object({
+    packKey: z.string().max(64).optional(),
+    source: z.string().max(32).optional(),
+    search: z.string().max(120).optional(),
+  })
+  .optional();
+
+export const createCatalogSkillSchema = z.object({
+  packKey: z.string().min(1).max(64),
+  skillKey: z.string().min(1).max(120),
+  name: z.string().min(1).max(200),
+  description: z.string().max(1000).optional().nullable(),
+  context: z.enum(["inline", "fork"]).optional().nullable(),
+  agent: z.string().max(64).optional().nullable(),
+  model: z.enum(["sonnet", "opus", "haiku"]).optional().nullable(),
+  allowedTools: z.array(z.string().max(120)).max(60).optional(),
+  argNames: z.array(z.string().max(64)).max(20).optional(),
+  effort: z.enum(["low", "medium", "high"]).optional().nullable(),
+  body: z.string().min(1).max(60_000),
+  version: z.string().max(32).optional().nullable(),
+});
+
+export const updateCatalogSkillSchema = z.object({
+  id: z.number().int().positive(),
+  packKey: z.string().min(1).max(64).optional(),
+  skillKey: z.string().min(1).max(120).optional(),
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  context: z.enum(["inline", "fork"]).optional().nullable(),
+  agent: z.string().max(64).optional().nullable(),
+  model: z.enum(["sonnet", "opus", "haiku"]).optional().nullable(),
+  allowedTools: z.array(z.string().max(120)).max(60).optional(),
+  argNames: z.array(z.string().max(64)).max(20).optional(),
+  effort: z.enum(["low", "medium", "high"]).optional().nullable(),
+  body: z.string().min(1).max(60_000).optional(),
+  version: z.string().max(32).optional().nullable(),
+});
+
+export const removeCatalogSkillSchema = z.object({
+  id: z.number().int().positive(),
+});
+
+export const validateCatalogSkillSchema = createCatalogSkillSchema;
+
 // Phase 11: resume / compact prior runs.
 export const resumeRunSchema = z.object({
   sourceRunId: z.number().int().positive(),

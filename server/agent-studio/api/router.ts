@@ -27,6 +27,7 @@ import * as toolCatalog from "../adapters/tool-catalog-adapter";
 import * as knowledgeAdapter from "../adapters/knowledge-adapter";
 import * as templateRegistry from "../adapters/template-registry";
 import * as skillCatalog from "../adapters/skill-catalog-adapter";
+import * as catalogSkillsService from "../services/catalog-skills";
 import { cloneAgent } from "../services/cloning";
 // Phase 12.5: scheduler is now started explicitly via bootAgentStudio()
 // in server/agent-studio/boot.ts (called from _core/index.ts). The
@@ -48,6 +49,11 @@ import {
   attachToolSchema,
   cloneAgentSchema,
   compactRunSchema,
+  createCatalogSkillSchema,
+  listCatalogSkillsSchema,
+  removeCatalogSkillSchema,
+  updateCatalogSkillSchema,
+  validateCatalogSkillSchema,
   comparePromptPackSchema,
   compareSimulationRunsSchema,
   compareVersionsSchema,
@@ -1449,6 +1455,84 @@ const slashCommandsRouter = router({
     }),
 });
 
+// ── Phase 13: Catalog (skills + tools) ──────────────────────────────────────
+
+/**
+ * User-authored skills catalog. Vendored .md skills (the 19 from
+ * Phase 0c) and DB-backed user creations are merged in listMerged().
+ *
+ * `validate` is a dry-run check the UI calls before save so the user
+ * gets immediate feedback (e.g., "tool name 'BashTool' not found in
+ * registry"). Stricter than upstream openclaude — see
+ * services/catalog-skills.ts header.
+ */
+const catalogSkillsRouter = router({
+  listMerged: protectedProcedure
+    .input(listCatalogSkillsSchema)
+    .query(async ({ input }) => {
+      return catalogSkillsService.listMergedSkills(input);
+    }),
+  get: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return repo.getCatalogSkillById(input.id);
+    }),
+  create: protectedProcedure
+    .input(createCatalogSkillSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await catalogSkillsService.createCatalogSkill({
+          ...input,
+          createdBy: ctx.user.id,
+          source: "db",
+        });
+      } catch (e) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+  update: protectedProcedure
+    .input(updateCatalogSkillSchema)
+    .mutation(async ({ input }) => {
+      const { id, ...patch } = input;
+      try {
+        const updated = await catalogSkillsService.updateCatalogSkill(id, patch);
+        if (!updated) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: `catalog skill ${id} not found`,
+          });
+        }
+        return updated;
+      } catch (e) {
+        if (e instanceof TRPCError) throw e;
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+  remove: protectedProcedure
+    .input(removeCatalogSkillSchema)
+    .mutation(async ({ input }) => {
+      const result = await catalogSkillsService.removeCatalogSkill(input.id);
+      if (!result.ok) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: result.error ?? "remove failed",
+        });
+      }
+      return { success: true };
+    }),
+  validate: protectedProcedure
+    .input(validateCatalogSkillSchema)
+    .mutation(async ({ input }) => {
+      return catalogSkillsService.validateCatalogSkill(input);
+    }),
+});
+
 // ── Compose ─────────────────────────────────────────────────────────────────
 
 export const agentStudioRouter = router({
@@ -1480,4 +1564,6 @@ export const agentStudioRouter = router({
   permissions: permissionsRouter,
   // Phase 6: slash command executor
   slashCommands: slashCommandsRouter,
+  // Phase 13: Catalog (skills + tools — tools added in 13c)
+  catalogSkills: catalogSkillsRouter,
 });

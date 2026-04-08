@@ -46,6 +46,9 @@ import {
   agsDraftPermissionRules,
   // ── Phase 3: Interactive permission requests ──
   agsPendingPermissionRequests,
+  // ── Phase 13: Catalog (user-authored tools + skills) ──
+  agsCatalogTools,
+  agsCatalogSkills,
 } from "../../drizzle/tables/agent-studio";
 
 function db() {
@@ -2080,4 +2083,201 @@ export async function decidePendingPermissionRequest(input: {
   if (updated) return updated;
   // Already decided — return current row so caller sees terminal state
   return getPendingPermissionRequestById(input.requestId);
+}
+
+// ── Phase 13: Catalog skills (user-authored) ───────────────────────────────
+
+export async function listCatalogSkills(filter?: {
+  packKey?: string;
+  source?: string;
+  search?: string;
+}) {
+  const conditions = [] as any[];
+  if (filter?.packKey) conditions.push(eq(agsCatalogSkills.packKey, filter.packKey));
+  if (filter?.source) conditions.push(eq(agsCatalogSkills.source, filter.source));
+  if (filter?.search && filter.search.trim()) {
+    const needle = `%${filter.search.trim()}%`;
+    conditions.push(
+      or(
+        ilike(agsCatalogSkills.skillKey, needle),
+        ilike(agsCatalogSkills.name, needle),
+        ilike(agsCatalogSkills.description, needle)
+      )!
+    );
+  }
+  let q = db().select().from(agsCatalogSkills);
+  if (conditions.length > 0) q = q.where(and(...conditions)) as any;
+  return q.orderBy(agsCatalogSkills.packKey, agsCatalogSkills.skillKey);
+}
+
+export async function getCatalogSkillById(id: number) {
+  const rows = await db()
+    .select()
+    .from(agsCatalogSkills)
+    .where(eq(agsCatalogSkills.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getCatalogSkillByKey(packKey: string, skillKey: string) {
+  const rows = await db()
+    .select()
+    .from(agsCatalogSkills)
+    .where(
+      and(
+        eq(agsCatalogSkills.packKey, packKey),
+        eq(agsCatalogSkills.skillKey, skillKey)
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createCatalogSkill(input: {
+  packKey: string;
+  skillKey: string;
+  name: string;
+  description?: string | null;
+  context?: string | null;
+  agent?: string | null;
+  model?: string | null;
+  allowedTools?: string[];
+  argNames?: string[];
+  effort?: string | null;
+  body: string;
+  version?: string | null;
+  source?: string;
+  sourcePath?: string | null;
+  createdBy?: number | null;
+}) {
+  const [created] = await db()
+    .insert(agsCatalogSkills)
+    .values({
+      packKey: input.packKey,
+      skillKey: input.skillKey,
+      name: input.name,
+      description: input.description ?? null,
+      context: input.context ?? "inline",
+      agent: input.agent ?? null,
+      model: input.model ?? null,
+      allowedTools: input.allowedTools ?? [],
+      argNames: input.argNames ?? [],
+      effort: input.effort ?? null,
+      body: input.body,
+      version: input.version ?? null,
+      source: input.source ?? "db",
+      sourcePath: input.sourcePath ?? null,
+      createdBy: input.createdBy ?? null,
+    })
+    .returning();
+  return created;
+}
+
+export async function updateCatalogSkill(
+  id: number,
+  patch: Partial<typeof agsCatalogSkills.$inferInsert>
+) {
+  const [updated] = await db()
+    .update(agsCatalogSkills)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(agsCatalogSkills.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+export async function removeCatalogSkill(id: number) {
+  await db().delete(agsCatalogSkills).where(eq(agsCatalogSkills.id, id));
+}
+
+// ── Phase 13: Catalog tools (user-authored) ────────────────────────────────
+
+export async function listCatalogTools(filter?: {
+  category?: string;
+  search?: string;
+}) {
+  const conditions = [] as any[];
+  if (filter?.category) conditions.push(eq(agsCatalogTools.category, filter.category));
+  if (filter?.search && filter.search.trim()) {
+    const needle = `%${filter.search.trim()}%`;
+    conditions.push(
+      or(
+        ilike(agsCatalogTools.key, needle),
+        ilike(agsCatalogTools.name, needle),
+        ilike(agsCatalogTools.description, needle)
+      )!
+    );
+  }
+  let q = db().select().from(agsCatalogTools);
+  if (conditions.length > 0) q = q.where(and(...conditions)) as any;
+  return q.orderBy(agsCatalogTools.key);
+}
+
+export async function getCatalogToolById(id: number) {
+  const rows = await db()
+    .select()
+    .from(agsCatalogTools)
+    .where(eq(agsCatalogTools.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getCatalogToolByKey(key: string) {
+  const rows = await db()
+    .select()
+    .from(agsCatalogTools)
+    .where(eq(agsCatalogTools.key, key))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createCatalogTool(input: {
+  key: string;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  defaultAllowedActions?: string[];
+  hardBlockedActions?: string[];
+  defaultRequiresApproval?: boolean;
+  destructive?: boolean;
+  invocationKind: string;
+  invocationConfig?: Record<string, unknown>;
+  inputSchema?: Record<string, unknown>;
+  version?: string | null;
+  createdBy?: number | null;
+}) {
+  const [created] = await db()
+    .insert(agsCatalogTools)
+    .values({
+      key: input.key,
+      name: input.name,
+      description: input.description ?? null,
+      category: input.category ?? "custom",
+      defaultAllowedActions: input.defaultAllowedActions ?? [],
+      hardBlockedActions: input.hardBlockedActions ?? [],
+      defaultRequiresApproval: input.defaultRequiresApproval ?? false,
+      destructive: input.destructive ?? false,
+      invocationKind: input.invocationKind,
+      invocationConfig: input.invocationConfig ?? {},
+      inputSchema: input.inputSchema ?? {},
+      version: input.version ?? null,
+      createdBy: input.createdBy ?? null,
+    })
+    .returning();
+  return created;
+}
+
+export async function updateCatalogTool(
+  id: number,
+  patch: Partial<typeof agsCatalogTools.$inferInsert>
+) {
+  const [updated] = await db()
+    .update(agsCatalogTools)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(agsCatalogTools.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+export async function removeCatalogTool(id: number) {
+  await db().delete(agsCatalogTools).where(eq(agsCatalogTools.id, id));
 }
