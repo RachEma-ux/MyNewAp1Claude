@@ -48,6 +48,10 @@ const AgentVersionsPage = lazy(() => import("@/pages/agent-studio/AgentVersionsP
 const AgentPublishPage = lazy(() => import("@/pages/agent-studio/AgentPublishPage"));
 // Phase 0d: openllm-agent2 native parity pages
 const AgentRuntimePage = lazy(() => import("@/pages/agent-studio/AgentRuntimePage"));
+// Phase 0e: openllm-agent2 native parity pages
+const AgentHooksPage = lazy(() => import("@/pages/agent-studio/AgentHooksPage"));
+const AgentMcpPage = lazy(() => import("@/pages/agent-studio/AgentMcpPage"));
+const AgentSubagentsPage = lazy(() => import("@/pages/agent-studio/AgentSubagentsPage"));
 
 interface ParsedRoute {
   agentId: number | null;
@@ -328,18 +332,13 @@ export default function AgentStudioShell() {
       // ── Phase 0d: Runtime config page ──
       case "runtime":
         return <AgentRuntimePage agentId={agentId!} />;
-      // ── Phase 0e: Hooks / MCP / Subagents — pages land in 0e ──
+      // ── Phase 0e: Hooks / MCP / Subagents pages ──
       case "hooks":
+        return <AgentHooksPage agentId={agentId!} />;
       case "mcp":
+        return <AgentMcpPage agentId={agentId!} />;
       case "subagents":
-        return (
-          <div className="p-12 text-center">
-            <h2 className="text-base font-semibold mb-2 capitalize">{view}</h2>
-            <p className="text-xs text-muted-foreground">
-              Backend ready · UI lands in Phase 0e
-            </p>
-          </div>
-        );
+        return <AgentSubagentsPage agentId={agentId!} />;
       default:
         return <AgentOverviewPage agentId={agentId!} />;
     }
