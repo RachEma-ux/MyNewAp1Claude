@@ -110,7 +110,7 @@ export const setScheduleConfigSchema = z.object({
       message: "cron expression must be 5 fields",
     }),
   timezone: z.string().max(64).default("UTC"),
-  payload: z.record(z.any()).optional(),
+  payload: z.record(z.string(), z.any()).optional(),
 });
 
 // Phase 11: resume / compact prior runs.
@@ -547,8 +547,10 @@ export const updateRuntimeConfigSchema = z.object({
   permissionMode: z.enum(AGS_PERMISSION_MODES).nullable().optional(),
   workingDirectories: z.array(z.string()).optional(),
   providerConfig: z.record(z.any()).optional(),
-  // Phase 12: presentation
+  // Phase 12: presentation. statusLineConfig uses the zod 4 two-arg form
+  // because it's a new schema; the existing pre-existing one-arg
+  // z.record calls (~20 of them) are out of scope for this phase.
   outputStyle: z.enum(["plain", "markdown", "json"]).nullable().optional(),
-  statusLineConfig: z.record(z.any()).optional(),
+  statusLineConfig: z.record(z.string(), z.any()).optional(),
   theme: z.enum(["dark", "light", "monokai"]).nullable().optional(),
 });

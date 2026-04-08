@@ -163,18 +163,25 @@ export async function invokeSubagent(
 }
 
 /**
+ * Recursive run tree node. Declared as a named interface so the
+ * recursive `children: RunTreeNode[]` reference type-checks (an inline
+ * `Awaited<ReturnType<typeof getRunTree>>` self-reference is illegal).
+ */
+export interface RunTreeNode {
+  run: NonNullable<Awaited<ReturnType<typeof repo.getRuntimeRunById>>>;
+  children: RunTreeNode[];
+}
+
+/**
  * Build a hierarchical run tree starting from a root run. Each entry has
  * its direct children attached. Used by the runs page to render nested
  * subagent invocations under their parent.
  */
-export async function getRunTree(runId: number): Promise<{
-  run: Awaited<ReturnType<typeof repo.getRuntimeRunById>>;
-  children: Awaited<ReturnType<typeof getRunTree>>[];
-} | null> {
+export async function getRunTree(runId: number): Promise<RunTreeNode | null> {
   const run = await repo.getRuntimeRunById(runId);
   if (!run) return null;
   const children = await repo.listChildRuntimeRuns(runId);
-  const childTrees = [] as Awaited<ReturnType<typeof getRunTree>>[];
+  const childTrees: RunTreeNode[] = [];
   for (const child of children) {
     const tree = await getRunTree(child.id);
     if (tree) childTrees.push(tree);
