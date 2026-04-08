@@ -42,10 +42,12 @@ import {
   createFromTemplateSchema,
   createVersionSchema,
   decideApprovalStepSchema,
+  decidePermissionRequestSchema,
   getRunDetailSchema,
   getSimulationRunSchema,
   importDefinitionSchema,
   listAgentsSchema,
+  listPendingPermissionRequestsSchema,
   listRunsSchema,
   previewRetrievalSchema,
   promoteSimulationToTestSchema,
@@ -1235,6 +1237,42 @@ const runtimeRouter = router({
     }),
 });
 
+// ── Phase 3: Interactive permission requests ────────────────────────────────
+
+/**
+ * Surfaces pending permission requests created by the simulation engine
+ * when a permission rule resolves to "ask". The runs page polls
+ * `listPending` while a run is live and fires `decide` when a human
+ * clicks Allow / Deny.
+ *
+ * Mutations are `protectedProcedure` (not governed) — the rule itself is
+ * the governance gate; the human is just answering it.
+ */
+const permissionsRouter = router({
+  listPending: protectedProcedure
+    .input(listPendingPermissionRequestsSchema)
+    .query(async ({ input }) => {
+      return repo.listPendingPermissionRequests(input.runtimeRunId);
+    }),
+  decide: protectedProcedure
+    .input(decidePermissionRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      const updated = await repo.decidePendingPermissionRequest({
+        requestId: input.requestId,
+        status: input.allowed ? "allowed" : "denied",
+        decidedBy: ctx.user.id,
+        reason: input.reason,
+      });
+      if (!updated) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Permission request ${input.requestId} not found`,
+        });
+      }
+      return updated;
+    }),
+});
+
 // ── Compose ─────────────────────────────────────────────────────────────────
 
 export const agentStudioRouter = router({
@@ -1262,4 +1300,6 @@ export const agentStudioRouter = router({
   plugins: pluginsRouter,
   permissionRules: permissionRulesRouter,
   runtime: runtimeRouter,
+  // Phase 3: interactive permission requests
+  permissions: permissionsRouter,
 });

@@ -40,6 +40,8 @@ import {
   agsDraftSubagents,
   agsDraftPlugins,
   agsDraftPermissionRules,
+  // ── Phase 3: Interactive permission requests ──
+  agsPendingPermissionRequests,
 } from "../../drizzle/tables/agent-studio";
 
 function db() {
@@ -1825,4 +1827,85 @@ export async function updateRuntimeConfig(
     .set(set)
     .where(eq(agsAgentDrafts.id, draft.id));
   return getRuntimeConfig(agentId);
+}
+
+// ── Phase 3: Pending permission requests ───────────────────────────────────
+
+/**
+ * Insert a new pending permission request. Used by the simulation engine
+ * when a permission rule resolves to "ask" — the request blocks until a
+ * human flips the row's status (or it times out).
+ */
+export async function createPendingPermissionRequest(input: {
+  runtimeRunId: number;
+  toolName: string;
+  description?: string | null;
+  rawPayload?: Record<string, unknown>;
+}): Promise<typeof agsPendingPermissionRequests.$inferSelect> {
+  const [created] = await db()
+    .insert(agsPendingPermissionRequests)
+    .values({
+      runtimeRunId: input.runtimeRunId,
+      toolName: input.toolName,
+      description: input.description ?? null,
+      rawPayload: input.rawPayload ?? {},
+      status: "pending",
+    })
+    .returning();
+  return created;
+}
+
+export async function getPendingPermissionRequestById(requestId: number) {
+  const rows = await db()
+    .select()
+    .from(agsPendingPermissionRequests)
+    .where(eq(agsPendingPermissionRequests.id, requestId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * List all pending requests for a runtime run, newest first. Used by the
+ * runs page banner to surface what's blocking and by the simulation poll
+ * loop (only the rows it created itself).
+ */
+export async function listPendingPermissionRequests(runtimeRunId: number) {
+  return db()
+    .select()
+    .from(agsPendingPermissionRequests)
+    .where(eq(agsPendingPermissionRequests.runtimeRunId, runtimeRunId))
+    .orderBy(desc(agsPendingPermissionRequests.createdAt));
+}
+
+/**
+ * Decide a pending request — flips status, records the decider, and
+ * stamps `decidedAt`. Idempotent: re-deciding a non-pending request is a
+ * no-op so concurrent UI clicks don't fight.
+ */
+export async function decidePendingPermissionRequest(input: {
+  requestId: number;
+  status: "allowed" | "denied" | "timed_out";
+  decidedBy?: number | null;
+  reason?: string | null;
+}): Promise<typeof agsPendingPermissionRequests.$inferSelect | null> {
+  const conn = db();
+  // Only update if still pending — prevents races
+  const [updated] = await conn
+    .update(agsPendingPermissionRequests)
+    .set({
+      status: input.status,
+      decidedBy: input.decidedBy ?? null,
+      decidedAt: new Date(),
+      reason: input.reason ?? null,
+    })
+    .where(
+      and(
+        eq(agsPendingPermissionRequests.id, input.requestId),
+        eq(agsPendingPermissionRequests.status, "pending")
+      )
+    )
+    .returning();
+  if (updated) return updated;
+  // Already decided — return current row so caller sees terminal state
+  return getPendingPermissionRequestById(input.requestId);
 }

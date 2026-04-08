@@ -425,30 +425,95 @@ export async function runSimulation(input: {
             ? ((inputPayload as any).query as string)
             : JSON.stringify(inputPayload);
 
-      // Phase 1c: Pull the draft's permission rules and turn them into a
-      // resolver the adapter can call once per `permission_request`. This
-      // replaces the Phase 1b auto-deny default. Tracks per-request
-      // decisions so the trace below records what actually happened.
+      // Phase 1c + Phase 3: Pull the draft's permission rules and turn them
+      // into a resolver the adapter can call once per `permission_request`.
+      //  - allow / deny rules → resolved synchronously from the rules table
+      //  - "ask" rules → insert a pending row and BLOCK the run by polling
+      //    until a human flips it (or the timeout elapses, recorded as denied)
+      // Tracks per-request decisions so the trace records what actually
+      // happened.
       const permissionRules = await repo.listPermissionRules(draft.id);
       const baseResolver = buildPermissionResolver(permissionRules);
-      const decisionLog: Array<{ ts: number; decision: PermissionDecision; toolName: string }> = [];
-      const trackingResolver: PermissionResolver = (request) => {
-        const decision = baseResolver(request);
+      const decisionLog: Array<{
+        ts: number;
+        decision: PermissionDecision;
+        toolName: string;
+        humanDecided: boolean;
+        pendingRequestId?: number;
+      }> = [];
+      const trackingResolver: PermissionResolver = async (request) => {
+        const toolName = request.toolName ?? request.toolKey ?? "(unknown)";
+        const ruleDecision = baseResolver(request);
+
+        // Allow / Deny — resolved by rules alone, no human needed
+        if (ruleDecision === "allow" || ruleDecision === "deny") {
+          decisionLog.push({
+            ts: Date.now(),
+            decision: ruleDecision,
+            toolName,
+            humanDecided: false,
+          });
+          return ruleDecision;
+        }
+
+        // needs_human (rule was "ask" or unmatched) — Phase 3 flow:
+        // create a pending request and poll until decided.
+        const pending = await repo.createPendingPermissionRequest({
+          runtimeRunId: runtimeRun.id,
+          toolName,
+          description: request.description,
+          rawPayload: request.rawPayload,
+        });
+        const pollIntervalMs = 1500;
+        const pollTimeoutMs = 5 * 60 * 1000; // 5 min hard cap
+        const deadline = Date.now() + pollTimeoutMs;
+        let finalDecision: PermissionDecision = "deny";
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, pollIntervalMs));
+          const row = await repo.getPendingPermissionRequestById(pending.id);
+          if (!row) break;
+          if (row.status === "allowed") {
+            finalDecision = "allow";
+            break;
+          }
+          if (row.status === "denied" || row.status === "timed_out") {
+            finalDecision = "deny";
+            break;
+          }
+          // still pending — keep polling
+        }
+        // If we exited the loop because of the deadline (still pending),
+        // flip the row to timed_out so the UI reflects reality.
+        const finalRow = await repo.getPendingPermissionRequestById(pending.id);
+        if (finalRow && finalRow.status === "pending") {
+          await repo.decidePendingPermissionRequest({
+            requestId: pending.id,
+            status: "timed_out",
+            reason: `No human response within ${pollTimeoutMs / 1000}s`,
+          });
+          finalDecision = "deny";
+        }
         decisionLog.push({
           ts: Date.now(),
-          decision,
-          toolName: request.toolName ?? request.toolKey ?? "(unknown)",
+          decision: finalDecision,
+          toolName,
+          humanDecided: true,
+          pendingRequestId: pending.id,
         });
-        return decision;
+        return finalDecision;
       };
 
+      // Phase 3: WS timeout must accommodate the worst case where the
+      // agent issues a permission_request that goes to "ask" and a human
+      // takes the full 5-minute permission poll window to respond. We use
+      // 6 minutes here to give 1 minute of slack for the rest of the run.
       const liveResult = await runViaOpenllmAgent({
         wsUrl: endpoint.wsUrl,
         message: inputText,
         provider: endpoint.provider,
         model: endpoint.model,
         apiKey: endpoint.apiKey,
-        timeoutMs: 60_000,
+        timeoutMs: 6 * 60 * 1000,
         permissionResolver: trackingResolver,
       });
 
@@ -474,28 +539,31 @@ export async function runSimulation(input: {
         // Don't abort the simulation — record the failure but let the rest finish
       }
 
-      // Phase 1c: Persist permission events from the live run as runtime
-      // policy events. The decision recorded is the actual one returned by
-      // the resolver (allow/deny/needs_human → allow/deny/warn), not the
-      // Phase 1b blanket deny. Pair each event with the matching log entry
-      // by index — the adapter emits permission_request and resolver
-      // calls in lockstep.
+      // Phase 1c + Phase 3: Persist permission events from the live run as
+      // runtime policy events. The decision recorded is the actual one
+      // returned by the resolver (rule-based or human-decided). Pair each
+      // event with the matching log entry by index — the adapter emits
+      // permission_request and resolver calls in lockstep.
       for (let i = 0; i < liveResult.permissionEvents.length; i++) {
         const ev = liveResult.permissionEvents[i];
         const logged = decisionLog[i];
         const decision: PermissionDecision = logged?.decision ?? "deny";
-        const persistedDecision =
-          decision === "allow"
-            ? "allow"
-            : decision === "needs_human"
-              ? "warn"
-              : "deny";
-        const reason =
-          decision === "allow"
-            ? `Allowed by permission rule for ${logged?.toolName ?? "(unknown tool)"}`
-            : decision === "needs_human"
-              ? `Rule says "ask" but no interactive UI yet — denied for safety, surfaced as needs-human (${logged?.toolName ?? "(unknown tool)"})`
-              : `Denied by permission rules (${logged?.toolName ?? "(unknown tool)"})`;
+        const persistedDecision = decision === "allow" ? "allow" : "deny";
+        const toolName = logged?.toolName ?? "(unknown tool)";
+        let reason: string;
+        if (logged?.humanDecided) {
+          // Phase 3: human responded (or timeout fired)
+          reason =
+            decision === "allow"
+              ? `Allowed by human via permission request #${logged.pendingRequestId} (${toolName})`
+              : `Denied by human or timed out via permission request #${logged.pendingRequestId} (${toolName})`;
+        } else {
+          // Phase 1c: rule-based
+          reason =
+            decision === "allow"
+              ? `Allowed by permission rule for ${toolName}`
+              : `Denied by permission rules (${toolName})`;
+        }
         await repo.appendRuntimePolicyEvent({
           runId: runtimeRun.id,
           policyKey: "openllm.permission_request",
@@ -507,6 +575,8 @@ export async function runSimulation(input: {
       outputPayload.permissionDecisions = decisionLog.map((d) => ({
         toolName: d.toolName,
         decision: d.decision,
+        humanDecided: d.humanDecided,
+        pendingRequestId: d.pendingRequestId,
       }));
       for (const ev of liveResult.policyEvents) {
         await repo.appendRuntimePolicyEvent({

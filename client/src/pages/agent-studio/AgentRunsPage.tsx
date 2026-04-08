@@ -10,8 +10,10 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Activity } from "lucide-react";
+import { Loader2, Activity, ShieldQuestion, Check, X } from "lucide-react";
+import { toast } from "sonner";
 import {
   PageHeader,
   EmptyState,
@@ -52,6 +54,29 @@ export default function AgentRunsPage({
   const detailQuery = trpc.agentStudio.runs.getDetail.useQuery(
     { runId: selectedRunId ?? 0 },
     { enabled: selectedRunId !== null }
+  );
+
+  // Phase 3: poll for pending permission requests while the run is live.
+  // The simulation engine creates rows here when a permission rule says
+  // "ask"; the resolver loop blocks the agent until we flip status.
+  const isRunLive = detailQuery.data?.run?.status === "running";
+  const utils = trpc.useUtils();
+  const pendingPermsQuery = trpc.agentStudio.permissions.listPending.useQuery(
+    { runtimeRunId: selectedRunId ?? 0 },
+    {
+      enabled: selectedRunId !== null && isRunLive,
+      refetchInterval: 2000, // 2s poll while live
+    }
+  );
+  const decidePermMut = trpc.agentStudio.permissions.decide.useMutation({
+    onSuccess: () => {
+      utils.agentStudio.permissions.listPending.invalidate();
+      utils.agentStudio.runs.getDetail.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const pendingRequests = (pendingPermsQuery.data ?? []).filter(
+    (r: any) => r.status === "pending"
   );
 
   if (runsQuery.isLoading) return <LoadingState label="Loading runs…" />;
@@ -136,6 +161,70 @@ export default function AgentRunsPage({
           ) : !detailQuery.data ? (
             <EmptyState compact title="Run not found" />
           ) : (
+            <>
+            {/* Phase 3: Pending permission request banner — only when the
+                run is live and has unresolved "ask" requests. */}
+            {pendingRequests.length > 0 && (
+              <div className="mb-3 rounded border border-yellow-500/40 bg-yellow-500/5 p-2.5 space-y-2">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-yellow-300">
+                  <ShieldQuestion className="h-3.5 w-3.5" />
+                  Permission required ({pendingRequests.length})
+                </div>
+                <ul className="space-y-1.5">
+                  {pendingRequests.map((r: any) => (
+                    <li
+                      key={r.id}
+                      className="flex items-start justify-between gap-2 rounded bg-background/60 p-1.5"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px] font-mono">{r.toolName}</div>
+                        {r.description && (
+                          <div className="text-[10px] text-muted-foreground truncate">
+                            {r.description}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 px-2 text-[10px] border-emerald-500/40 hover:bg-emerald-500/10"
+                          disabled={decidePermMut.isPending}
+                          onClick={() =>
+                            decidePermMut.mutate({
+                              requestId: r.id,
+                              allowed: true,
+                            })
+                          }
+                          title="Allow this tool call to proceed"
+                        >
+                          <Check className="h-3 w-3 mr-1" /> Allow
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 px-2 text-[10px] border-red-500/40 hover:bg-red-500/10"
+                          disabled={decidePermMut.isPending}
+                          onClick={() =>
+                            decidePermMut.mutate({
+                              requestId: r.id,
+                              allowed: false,
+                              reason: "Denied by user from runs page",
+                            })
+                          }
+                          title="Deny this tool call"
+                        >
+                          <X className="h-3 w-3 mr-1" /> Deny
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="text-[9px] text-muted-foreground">
+                  The agent loop is blocked until you decide. Auto-times out after 5 minutes.
+                </div>
+              </div>
+            )}
             <Tabs defaultValue="input">
               <TabsList>
                 <TabsTrigger value="input">Input</TabsTrigger>
@@ -246,6 +335,7 @@ export default function AgentRunsPage({
                 )}
               </TabsContent>
             </Tabs>
+            </>
           )}
         </CardContent>
       </Card>

@@ -78,6 +78,17 @@ export const cloneAgentSchema = z.object({
   description: z.string().optional(),
 });
 
+// Phase 3: interactive permission requests — list pending and decide.
+export const listPendingPermissionRequestsSchema = z.object({
+  runtimeRunId: z.number().int().positive(),
+});
+
+export const decidePermissionRequestSchema = z.object({
+  requestId: z.number().int().positive(),
+  allowed: z.boolean(),
+  reason: z.string().optional(),
+});
+
 // ── Identity ────────────────────────────────────────────────────────────────
 
 export const updateIdentitySchema = z.object({

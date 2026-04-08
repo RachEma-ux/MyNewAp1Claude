@@ -745,3 +745,45 @@ export const agsDraftPermissionRules = pgTable(
     behaviorIdx: index("idx_ags_permission_rules_behavior").on(t.ruleBehavior),
   })
 );
+
+/**
+ * Phase 3 — Interactive permission requests.
+ *
+ * When the live runtime adapter receives a `permission_request` from
+ * openllm-agent2 and the matching `agsDraftPermissionRules` row resolves
+ * to "ask", the simulation service inserts a row here and BLOCKS the run
+ * by polling until status flips. The runs page surfaces pending rows in
+ * a banner with Allow / Deny buttons that fire the
+ * `permissions.decide` mutation.
+ *
+ * status flow:
+ *   pending → allowed | denied | timed_out
+ *
+ * Timeouts are written by the same simulation poll loop when the
+ * configured timeout elapses (default 5 min).
+ */
+export const agsPendingPermissionRequests = pgTable(
+  "ags_pending_permission_requests",
+  {
+    id: serial("id").primaryKey(),
+    runtimeRunId: integer("runtime_run_id").notNull(),
+    /** Tool the agent wants to invoke (best-effort — comes from the request payload) */
+    toolName: text("tool_name").notNull(),
+    /** Optional human description of the operation */
+    description: text("description"),
+    /** Full request payload from openllm-agent2 for forensic / UI display */
+    rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().default({}),
+    /** pending | allowed | denied | timed_out */
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    /** User who decided (null while pending or for timeouts) */
+    decidedBy: integer("decided_by"),
+    decidedAt: timestamp("decided_at"),
+    /** Reason — typically populated for denials and timeouts */
+    reason: text("reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    runIdx: index("idx_ags_pending_perm_run").on(t.runtimeRunId),
+    statusIdx: index("idx_ags_pending_perm_status").on(t.status),
+  })
+);
