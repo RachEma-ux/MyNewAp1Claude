@@ -21,7 +21,7 @@ import {
 import {
   isCatalogEntryAvailableForAppUse,
   CATALOG_AVAILABILITY_FILTERS,
-} from "../../../server/catalog/availability";
+} from "../../../server/ai-types/availability";
 
 describe.runIf(hasDb)("Scenario 6 — Selector Integrity", () => {
   afterEach(async () => {

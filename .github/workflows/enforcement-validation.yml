@@ -22,6 +22,16 @@ on:
   pull_request:
     branches: [main]
 
+# Phase 19c CI fix: the "Comment validation results on PR" step calls
+# github.rest.issues.createComment which requires `issues: write` and
+# `pull-requests: write` permissions. Without these, the GITHUB_TOKEN
+# defaults to read-only on `pull_request` events and the comment step
+# fails with HTTP 403 — even though the validation logic itself passed.
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   enforcement-validation:
     name: Governance Enforcement Harness

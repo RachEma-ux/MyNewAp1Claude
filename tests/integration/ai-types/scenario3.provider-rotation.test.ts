@@ -24,7 +24,7 @@ import {
 import {
   isCatalogEntryAvailableForAppUse,
   CATALOG_AVAILABILITY_FILTERS,
-} from "../../../server/catalog/availability";
+} from "../../../server/ai-types/availability";
 
 describe.runIf(hasDb)("Scenario 3 — Provider Rotation", () => {
   afterEach(async () => {

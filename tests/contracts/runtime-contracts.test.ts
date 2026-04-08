@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../server/catalog/availability";
+import { isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../server/ai-types/availability";
 import { getCatalogState } from "../../shared/catalog-state";
 import { isCatalogExecutionEligible } from "../../shared/catalog-execution";
 

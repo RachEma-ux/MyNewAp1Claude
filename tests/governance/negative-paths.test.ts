@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { checkCatalogAvailability, isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../server/catalog/availability";
+import { checkCatalogAvailability, isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../server/ai-types/availability";
 import { getCatalogState } from "../../shared/catalog-state";
 import { isCatalogExecutionEligible, hasPublishedCatalogTag, isCatalogEntryCallable } from "../../shared/catalog-execution";
 import { isDeployable as isModelDeployable } from "../../server/db/models";

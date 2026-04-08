@@ -4,7 +4,7 @@
  * Proves the full system works end-to-end:
  *   Domain → Catalog import → Candidate → Approval → Publish → Activate → Runtime
  *
- * Tests use the real availability authority (server/catalog/availability.ts)
+ * Tests use the real availability authority (server/ai-types/availability.ts)
  * and real governance logic (stage-review, lifecycle-guard, publication-gate).
  * No governance logic is mocked.
  */
@@ -14,7 +14,7 @@ import {
   checkCatalogAvailability,
   isCatalogEntryAvailableForAppUse,
   CATALOG_AVAILABILITY_FILTERS,
-} from "../../../server/catalog/availability";
+} from "../../../server/ai-types/availability";
 
 // ============================================================================
 // Helpers — simulated catalog entries for each lifecycle state

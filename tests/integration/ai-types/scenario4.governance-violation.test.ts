@@ -24,7 +24,7 @@ import {
   isCatalogEntryAvailableForAppUse,
   checkCatalogAvailability,
   CATALOG_AVAILABILITY_FILTERS,
-} from "../../../server/catalog/availability";
+} from "../../../server/ai-types/availability";
 
 describe.runIf(hasDb)("Scenario 4 — Governance Violation Detection", () => {
   afterEach(async () => {

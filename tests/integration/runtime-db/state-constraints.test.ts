@@ -16,7 +16,7 @@ import {
   getCatalogEntryById,
   updateCatalogEntry,
 } from "../../../server/db/catalog";
-import { isCatalogEntryAvailableForAppUse } from "../../../server/catalog/availability";
+import { isCatalogEntryAvailableForAppUse } from "../../../server/ai-types/availability";
 import { getCatalogState } from "../../../shared/catalog-state";
 
 describe.runIf(hasDb)("State Constraints — DB Level", () => {

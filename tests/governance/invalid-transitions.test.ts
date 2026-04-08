@@ -17,7 +17,7 @@ import {
   updateCatalogEntry,
   deleteCatalogEntry,
 } from "../../server/db/catalog";
-import { isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../server/catalog/availability";
+import { isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../server/ai-types/availability";
 import { getCatalogState } from "../../shared/catalog-state";
 import { getCatalogEntries } from "../../server/db/catalog";
 

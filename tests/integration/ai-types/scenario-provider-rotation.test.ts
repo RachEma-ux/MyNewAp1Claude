@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import { getCatalogState } from "../../../shared/catalog-state";
-import { checkCatalogAvailability, isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../../server/catalog/availability";
+import { checkCatalogAvailability, isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../../server/ai-types/availability";
 
 describe("Scenario 3 — Provider Rotation / Infra Upgrade", () => {
 

@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from "vitest";
 import path from "path";
-import { CATALOG_AVAILABILITY_FILTERS, isCatalogEntryAvailableForAppUse } from "../../../server/catalog/availability";
+import { CATALOG_AVAILABILITY_FILTERS, isCatalogEntryAvailableForAppUse } from "../../../server/ai-types/availability";
 
 // ============================================================================
 // Catalog selector component exports

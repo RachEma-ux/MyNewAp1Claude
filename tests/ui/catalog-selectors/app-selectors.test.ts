@@ -20,7 +20,7 @@ import {
 import {
   isCatalogEntryAvailableForAppUse,
   CATALOG_AVAILABILITY_FILTERS,
-} from "../../../server/catalog/availability";
+} from "../../../server/ai-types/availability";
 
 describe.runIf(hasDb)("App Selectors — Catalog-Backed", () => {
   afterEach(async () => {
