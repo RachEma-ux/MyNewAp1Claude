@@ -22,6 +22,7 @@ import {
   sanitizeArgsForAudit,
   dispatchMcpToolCall,
 } from "../dispatcher";
+import * as registry from "../registry";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 //
@@ -84,6 +85,20 @@ function makeConn(toolNames: string[] = ["create_issue", "list_issues"]) {
   };
 }
 
+/**
+ * Phase 19c: the dispatcher reads tool existence from the registry,
+ * not from `conn.tools` directly. Test setup publishes a snapshot to
+ * mirror what `connectMcpServer` would do in production.
+ */
+function publishConnSnapshot(serverId: number, conn: ReturnType<typeof makeConn>) {
+  registry.publishSnapshot({
+    serverId,
+    tools: conn.tools as any,
+    prompts: conn.prompts as any,
+    resources: conn.resources as any,
+  });
+}
+
 function expectAuditCalled(decision: "allow" | "deny" | "warn") {
   expect(repo.appendRuntimePolicyEvent).toHaveBeenCalled();
   const call = (repo.appendRuntimePolicyEvent as any).mock.calls[0][0];
@@ -94,6 +109,9 @@ function expectAuditCalled(decision: "allow" | "deny" | "warn") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Phase 19c: clear the registry between tests so a previous test's
+  // snapshot doesn't leak into the next.
+  registry.__clearAllSnapshotsForTests();
   // Default: allowed by everything
   (repo.listMcpServers as any).mockResolvedValue([makeServerRow()]);
   (repo.listAllMcpServers as any).mockResolvedValue([makeServerRow()]);
@@ -105,7 +123,10 @@ beforeEach(() => {
     id: 100,
     governancePolicy: {},
   });
-  (getMcpConnection as any).mockReturnValue(makeConn());
+  // Default conn + matching registry snapshot
+  const defaultConn = makeConn();
+  (getMcpConnection as any).mockReturnValue(defaultConn);
+  publishConnSnapshot(1, defaultConn);
   (evaluateMcpPreInvoke as any).mockResolvedValue({ verdict: "allow" });
   (evaluateMcpPostInvoke as any).mockResolvedValue({ verdict: "allow" });
 });
@@ -235,8 +256,13 @@ describe("dispatchMcpToolCall", () => {
   });
 
   // ── 5. Tool not on server ──
-  it("returns tool_not_found when the tool isn't in conn.tools", async () => {
-    (getMcpConnection as any).mockReturnValue(makeConn(["other_tool"]));
+  it("returns tool_not_found when the tool isn't in the registry snapshot", async () => {
+    // Phase 19c: dispatcher reads from registry, not conn.tools.
+    // Both conn AND snapshot need updating.
+    const conn = makeConn(["other_tool"]);
+    (getMcpConnection as any).mockReturnValue(conn);
+    registry.__clearAllSnapshotsForTests();
+    publishConnSnapshot(1, conn);
     const result = await dispatchMcpToolCall({
       agentDraftId: 100,
       runtimeRunId: 5,

@@ -36,6 +36,7 @@
 
 import * as repo from "../../repository";
 import { getMcpConnection } from "./mcp-manager";
+import * as registry from "./registry";
 import {
   evaluateMcpPreInvoke,
   evaluateMcpPostInvoke,
@@ -388,11 +389,19 @@ export async function dispatchMcpToolCall(
   }
 
   // ── 4. Check the tool exists on the connected server ──
-  const tool = conn.tools.find((t) => t.name === parsed.remoteToolName);
+  // Phase 19c: read via the versioned registry instead of conn.tools
+  // directly. The snapshot is frozen so we can't see torn writes if
+  // a future tools/list_changed handler is mid-republish.
+  const tool = registry.findToolForServer(serverId, parsed.remoteToolName!);
   if (!tool) {
+    const snap = registry.getSnapshot(serverId);
+    const available =
+      snap && snap.tools.length > 0
+        ? snap.tools.map((t) => t.name).join(", ")
+        : "(none)";
     return fail(
       "tool_not_found",
-      `Tool "${parsed.remoteToolName}" not advertised by server "${parsed.serverName}". Available: ${conn.tools.map((t) => t.name).join(", ") || "(none)"}`
+      `Tool "${parsed.remoteToolName}" not advertised by server "${parsed.serverName}". Available: ${available}`
     );
   }
 

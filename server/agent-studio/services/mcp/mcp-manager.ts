@@ -38,6 +38,7 @@ import { connectSdk } from "./transports/sdk";
 import { connectWebSocket } from "./transports/websocket";
 import { applyTransition, projectStateToColumn } from "./state-machine";
 import { emitTransition } from "./connection-events";
+import * as registry from "./registry";
 
 const connections = new Map<number, McpConnection>();
 let exitHandlerRegistered = false;
@@ -295,6 +296,11 @@ export async function connectMcpServer(
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    // Phase 19c: clean up any stale snapshot for this server before
+    // we hand control back. A previous successful connect that later
+    // failed mid-session would have left a snapshot behind; the new
+    // failed attempt invalidates it.
+    registry.removeServer(input.serverId);
     // Phase 19b: drive the FSM through `connect_failed`. The transition
     // moves us from `connecting` to `failed` with backoff data
     // (attemptCount + nextRetryAt). The persistence projection writes
@@ -313,6 +319,17 @@ export async function connectMcpServer(
   }
 
   connections.set(input.serverId, conn);
+  // Phase 19c: publish the discovery snapshot to the registry as the
+  // LAST step of the connect flow (R7 mitigation — readers see a
+  // non-undefined snapshot the moment connectMcpServer returns
+  // success). The dispatcher and listConnectedTools/Prompts/Resources
+  // read from the registry, not from `conn.tools` directly.
+  registry.publishSnapshot({
+    serverId: input.serverId,
+    tools: conn.tools,
+    prompts: conn.prompts,
+    resources: conn.resources,
+  });
   // Phase 19b: drive the FSM through `connect_succeeded`. Carries the
   // counts from the live connection so the UI banner can render
   // toolCount/promptCount/resourceCount without a separate fetch.
@@ -341,6 +358,10 @@ export async function disconnectMcpServer(
     }
     connections.delete(serverId);
   }
+  // Phase 19c: remove the server's snapshot from the registry. Decision
+  // #7a — immediate removal, no grace period. In-flight calls don't
+  // survive the disconnect anyway.
+  registry.removeServer(serverId);
   // Phase 19b: drive the FSM through `disconnect_requested`. Maps to
   // `pending` (not `disabled` — disable is a separate user action).
   // The "disconnected" status string in the response is preserved for
@@ -358,6 +379,12 @@ export async function disconnectMcpServer(
  * Flatten the tool inventory from all servers attached to a draft.
  * Used by the simulation engine to merge MCP tools with the draft's
  * static tool bindings before passing them to the live runtime.
+ *
+ * Phase 19c: reads from the versioned registry instead of walking
+ * `connections.get(...).tools` directly. The registry's snapshot is
+ * frozen so callers can't see torn writes if a future republish is
+ * mid-flight, and stale snapshots from disconnected servers are
+ * already removed (decision #7a).
  */
 export async function listConnectedTools(
   draftId: number
@@ -365,9 +392,9 @@ export async function listConnectedTools(
   const servers = await repo.listMcpServers(draftId);
   const result: Array<McpTool & { serverId: number; serverName: string }> = [];
   for (const s of servers) {
-    const conn = connections.get(s.id);
-    if (!conn) continue;
-    for (const tool of conn.tools) {
+    const snap = registry.getSnapshot(s.id);
+    if (!snap) continue;
+    for (const tool of snap.tools) {
       result.push({
         ...tool,
         serverId: s.id,
@@ -404,15 +431,14 @@ export interface McpPromptEntry {
 export async function listConnectedPrompts(
   draftId: number
 ): Promise<McpPromptEntry[]> {
+  // Phase 19c: reads from the versioned registry. Same rationale as
+  // listConnectedTools — frozen snapshot, no torn reads.
   const servers = await repo.listMcpServers(draftId);
   const result: McpPromptEntry[] = [];
   for (const s of servers) {
-    const conn = connections.get(s.id);
-    if (!conn) continue;
-    // Phase 17b: prompts is now a required field on McpConnection
-    // populated by stdio/http/websocket transports at connect time
-    // (each calls prompts/list as part of the handshake).
-    for (const p of conn.prompts) {
+    const snap = registry.getSnapshot(s.id);
+    if (!snap) continue;
+    for (const p of snap.prompts) {
       result.push({
         serverId: s.id,
         serverName: s.name,
@@ -445,12 +471,13 @@ export interface McpResourceEntry {
 export async function listConnectedResources(
   draftId: number
 ): Promise<McpResourceEntry[]> {
+  // Phase 19c: reads from the versioned registry.
   const servers = await repo.listMcpServers(draftId);
   const result: McpResourceEntry[] = [];
   for (const s of servers) {
-    const conn = connections.get(s.id);
-    if (!conn) continue;
-    for (const r of conn.resources) {
+    const snap = registry.getSnapshot(s.id);
+    if (!snap) continue;
+    for (const r of snap.resources) {
       result.push({
         serverId: s.id,
         serverName: s.name,
