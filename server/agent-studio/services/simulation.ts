@@ -22,6 +22,10 @@ import * as repo from "../repository";
 import { evaluateGovernance } from "./governance-adapter";
 import { getToolCatalogEntry } from "../adapters/tool-catalog-adapter";
 import { previewRetrieval } from "../adapters/knowledge-adapter";
+import {
+  resolveOpenllmEndpoint,
+  runViaOpenllmAgent,
+} from "../adapters/openllm-runtime-adapter";
 
 export interface SimulationToggles {
   mockedTools: boolean;
@@ -332,19 +336,100 @@ export async function runSimulation(input: {
   }
 
   // ── Step 7: Output ──
+  // Phase 1b: when mockedTools=false AND the agent has a configured runtime
+  // endpoint (providerConfig.baseUrl OR provider+model with default fallback),
+  // route the output step through the openllm-agent2 WebSocket runtime
+  // adapter and use its real response. Otherwise stay deterministic.
   if (!aborted) {
+    const providerConfig = (draft.providerConfig ?? {}) as Record<string, unknown>;
+    const endpoint = resolveOpenllmEndpoint(providerConfig);
+    const useLiveRuntime = !toggles.mockedTools && endpoint !== null;
+
+    let responsePreview: string;
+    let outputDurationMs = 18;
+    const outputPayload: Record<string, unknown> = {
+      contract: draft.outputContract ?? "(no contract defined)",
+      refusalBehavior: draft.refusalBehavior ?? null,
+    };
+
+    if (useLiveRuntime && endpoint) {
+      // Build the user message from the input payload
+      const inputText =
+        typeof (inputPayload as any).prompt === "string"
+          ? ((inputPayload as any).prompt as string)
+          : typeof (inputPayload as any).query === "string"
+            ? ((inputPayload as any).query as string)
+            : JSON.stringify(inputPayload);
+
+      const liveResult = await runViaOpenllmAgent({
+        wsUrl: endpoint.wsUrl,
+        message: inputText,
+        provider: endpoint.provider,
+        model: endpoint.model,
+        apiKey: endpoint.apiKey,
+        timeoutMs: 60_000,
+      });
+
+      if (liveResult.ok) {
+        responsePreview = liveResult.text || "(empty response)";
+        outputDurationMs = liveResult.durationMs;
+        outputPayload.live = true;
+        outputPayload.runtimeSource = endpoint.source;
+        outputPayload.wsUrl = endpoint.wsUrl;
+        outputPayload.provider = endpoint.provider ?? null;
+        outputPayload.model = endpoint.model ?? null;
+        outputPayload.tokenCount = liveResult.tokenCount;
+        outputPayload.permissionRequestCount = liveResult.permissionEvents.length;
+        outputPayload.policyEventCount = liveResult.policyEvents.length;
+      } else {
+        responsePreview = `[live run failed: ${liveResult.error}]`;
+        outputDurationMs = liveResult.durationMs;
+        outputPayload.live = true;
+        outputPayload.failed = true;
+        outputPayload.error = liveResult.error;
+        outputPayload.runtimeSource = endpoint.source;
+        outputPayload.wsUrl = endpoint.wsUrl;
+        // Don't abort the simulation — record the failure but let the rest finish
+      }
+
+      // Persist permission events from the live run as runtime policy events
+      // (Phase 1b auto-denies all permission requests). Surface the count
+      // in the trace so the user can see them in the runs page.
+      for (const ev of liveResult.permissionEvents) {
+        await repo.appendRuntimePolicyEvent({
+          runId: runtimeRun.id,
+          policyKey: "openllm.permission_request",
+          decision: "deny",
+          reason: "Auto-denied — Phase 1b has no user-in-the-loop UI",
+          payload: ev.payload,
+        });
+      }
+      for (const ev of liveResult.policyEvents) {
+        await repo.appendRuntimePolicyEvent({
+          runId: runtimeRun.id,
+          policyKey: "openllm.policy_event",
+          decision: "info",
+          reason: typeof ev.payload.message === "string" ? ev.payload.message : undefined,
+          payload: ev.payload,
+        });
+      }
+    } else {
+      // Deterministic fallback (Phase 0c behavior preserved)
+      responsePreview =
+        "[simulated response — set providerConfig.baseUrl AND mockedTools=false to call openllm-agent2]";
+    }
+
+    outputPayload.responsePreview = responsePreview;
+
     steps.push({
       index: stepIdx++,
       type: "output",
-      label: "Compose response per output contract",
-      payload: {
-        contract: draft.outputContract ?? "(no contract defined)",
-        refusalBehavior: draft.refusalBehavior ?? null,
-        responsePreview:
-          "[simulated response — replace with real LLM call in production]",
-      },
+      label: useLiveRuntime
+        ? "Live response from openllm-agent2"
+        : "Compose response per output contract",
+      payload: outputPayload,
       verdict: draft.outputContract ? "pass" : "warning",
-      durationMs: 18,
+      durationMs: outputDurationMs,
     });
   }
 
