@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { isDeployable as isBotDeployable, getBlockingReasons as getBotBlockingReasons } from "../../../server/db/bots";
 import { getCatalogState } from "../../../shared/catalog-state";
-import { checkCatalogAvailability } from "../../../server/catalog/availability";
+import { checkCatalogAvailability } from "../../../server/ai-types/availability";
 
 describe("Scenario 4 — Bot Governance Failure", () => {
 

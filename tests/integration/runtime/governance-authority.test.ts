@@ -16,7 +16,7 @@ import {
   CATALOG_AVAILABILITY_FILTERS,
   type CatalogAvailabilityInput,
   type CatalogAvailabilityResult,
-} from "../../../server/catalog/availability";
+} from "../../../server/ai-types/availability";
 
 // ============================================================================
 // Authority Consistency

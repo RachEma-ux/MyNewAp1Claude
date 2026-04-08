@@ -25,7 +25,7 @@ import {
 import {
   isCatalogEntryAvailableForAppUse,
   CATALOG_AVAILABILITY_FILTERS,
-} from "../../server/catalog/availability";
+} from "../../server/ai-types/availability";
 import { getCatalogState } from "../../shared/catalog-state";
 
 describe.runIf(hasDb)("Runtime Contract — I4, I5", () => {

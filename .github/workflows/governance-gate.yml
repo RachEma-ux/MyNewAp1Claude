@@ -22,6 +22,19 @@ on:
   push:
     branches: [main]
 
+# Phase 19c CI fix: the "Comment scorecard on PR" step calls
+# github.rest.issues.createComment which requires `issues: write` and
+# `pull-requests: write` permissions. Without these, the GITHUB_TOKEN
+# defaults to read-only on `pull_request` from-fork events and the
+# comment step fails with HTTP 403 "Resource not accessible by
+# integration" — even though the gate logic itself passed. The
+# additive permissions block fixes the comment write without
+# weakening anything else (default `contents: read` is preserved).
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   governance-checks:
     name: Governance Compliance Checks

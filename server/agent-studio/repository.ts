@@ -209,6 +209,21 @@ export async function getCurrentDraft(agentId: number) {
   return rows[0] ?? null;
 }
 
+/**
+ * Phase 19a: Look up a draft by its primary id (not by agentId).
+ * The MCP dispatcher path holds a draftId from the upstream caller and
+ * needs to read the draft's `governancePolicy` blob without round-tripping
+ * through `getCurrentDraft(agentId)`.
+ */
+export async function getDraftById(draftId: number) {
+  const rows = await db()
+    .select()
+    .from(agsAgentDrafts)
+    .where(eq(agsAgentDrafts.id, draftId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function updateDraft(
   agentId: number,
   patch: Partial<typeof agsAgentDrafts.$inferInsert>
@@ -1466,7 +1481,21 @@ export async function removeMcpServer(serverId: number) {
  */
 export async function updateMcpServerStatus(
   serverId: number,
-  status: "pending" | "connected" | "disconnected" | "error"
+  // Phase 19b: widened to accept the FSM column projection. The
+  // pre-19b values ("pending" | "connected" | "disconnected" | "error")
+  // remain valid; "connecting" | "needs_auth" | "disabled" are
+  // additive new values written by `projectStateToColumn` in
+  // services/mcp/state-machine.ts. The column itself has no CHECK
+  // constraint (varchar(32) only), so the new values are accepted
+  // as-is at the DB level.
+  status:
+    | "pending"
+    | "connecting"
+    | "connected"
+    | "needs_auth"
+    | "disconnected"
+    | "error"
+    | "disabled"
 ) {
   await db()
     .update(agsDraftMcpServers)

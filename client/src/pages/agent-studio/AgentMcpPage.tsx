@@ -39,11 +39,19 @@ const TRANSPORTS = [
   { value: "sdk", label: "sdk (in-process)" },
 ] as const;
 
+// Phase 19b: status column now projects from the rich FSM state. The
+// new kinds (connecting, needs_auth, disabled) project to additive
+// column values; the existing kinds (pending, connected, error) keep
+// their backward-compatible strings (failed → "error" to avoid
+// breaking the auto-reconnect loop check at mcp-manager.ts:67).
 const STATUS_COLORS: Record<string, string> = {
   pending: "border-zinc-500/40 text-zinc-400",
+  connecting: "border-blue-500/40 text-blue-400",
   connected: "border-emerald-500/40 text-emerald-400",
+  needs_auth: "border-amber-500/40 text-amber-400",
   disconnected: "border-yellow-500/40 text-yellow-400",
   error: "border-red-500/40 text-red-400",
+  disabled: "border-zinc-700/40 text-zinc-600",
 };
 
 export default function AgentMcpPage({ agentId }: { agentId: number }) {

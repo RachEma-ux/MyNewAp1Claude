@@ -1184,6 +1184,22 @@ const mcpRouter = router({
   listConnections: protectedProcedure.query(() => {
     return mcpManager.listConnections();
   }),
+  // Phase 19b: rich connection state from the FSM. Returns the
+  // discriminated union (pending/connecting/connected/needs_auth/
+  // failed/disabled) instead of the plain status string. The UI
+  // uses this to render in-flight indicators (connecting spinner,
+  // failed retry countdown, needs_auth banner with OAuth button).
+  getServerState: protectedProcedure
+    .input(z.object({ serverId: z.number().int().positive() }))
+    .query(({ input }) => {
+      return {
+        serverId: input.serverId,
+        state: mcpManager.getConnectionState(input.serverId),
+      };
+    }),
+  getAllServerStates: protectedProcedure.query(() => {
+    return mcpManager.getAllConnectionStates();
+  }),
   // ── Phase 15b: OAuth flow ──────────────────────────────────────────────
   // governedProcedure for both because token storage is sensitive
   oauthInitiate: governedProcedure

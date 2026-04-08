@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 import { isDeployable as isModelDeployable, getBlockingReasons as getModelBlockingReasons } from "../../../server/db/models";
 import { isDeployable as isBotDeployable, getBlockingReasons as getBotBlockingReasons } from "../../../server/db/bots";
 import { getCatalogState } from "../../../shared/catalog-state";
-import { checkCatalogAvailability, isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../../server/catalog/availability";
+import { checkCatalogAvailability, isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../../server/ai-types/availability";
 import { isCatalogExecutionEligible, hasPublishedCatalogTag, isCatalogEntryCallable } from "../../../shared/catalog-execution";
 
 describe("Scenario 1 — Customer Support Bot Launch", () => {

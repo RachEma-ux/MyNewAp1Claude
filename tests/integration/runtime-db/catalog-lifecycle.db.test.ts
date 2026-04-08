@@ -10,7 +10,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { hasDb, cleanup, createTestEntry, createTestBundle, makeEntryAvailable } from "./helpers/db-harness";
 import { getCatalogEntries, getCatalogEntryById, updateCatalogEntry, approveCatalogEntry, getActiveBundleForEntry } from "../../../server/db/catalog";
-import { checkCatalogAvailability, isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../../server/catalog/availability";
+import { checkCatalogAvailability, isCatalogEntryAvailableForAppUse, CATALOG_AVAILABILITY_FILTERS } from "../../../server/ai-types/availability";
 import { getCatalogState } from "../../../shared/catalog-state";
 
 describe.runIf(hasDb)("Catalog Lifecycle — Real DB", () => {

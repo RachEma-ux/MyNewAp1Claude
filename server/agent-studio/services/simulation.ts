@@ -22,6 +22,7 @@ import * as repo from "../repository";
 import { evaluateGovernance } from "./governance-adapter";
 import { fireHooksForEvent } from "./hook-runner";
 import * as mcpManager from "./mcp/mcp-manager";
+import { dispatchMcpToolCall } from "./mcp/dispatcher";
 import { getToolCatalogEntry } from "../adapters/tool-catalog-adapter";
 import { previewRetrieval } from "../adapters/knowledge-adapter";
 import {
@@ -405,38 +406,23 @@ export async function runSimulation(input: {
           verdict = "warning";
         }
       } else if (isMcpTool && !toggles.mockedTools) {
-        // Decode "mcp__<serverName>__<toolName>" — server name may
-        // contain underscores so we split on the FIRST "__" only.
-        const rest = t.toolKey.slice("mcp__".length);
-        const sepIdx = rest.indexOf("__");
-        if (sepIdx > 0) {
-          const serverName = rest.slice(0, sepIdx);
-          const remoteToolName = rest.slice(sepIdx + 2);
-          // Look up the per-draft MCP server with this name to get its id
-          const draftServers = await repo.listMcpServers(draft.id);
-          const targetServer = draftServers.find(
-            (s) => s.name === serverName
-          );
-          if (!targetServer) {
-            mcpError = `MCP server "${serverName}" not attached to this draft`;
-            verdict = "warning";
-          } else {
-            const mcpStart = Date.now();
-            try {
-              mcpResult = await mcpManager.callMcpTool({
-                serverId: targetServer.id,
-                toolName: remoteToolName,
-                args: {},
-              });
-              mcpDurationMs = Date.now() - mcpStart;
-            } catch (e) {
-              mcpError = e instanceof Error ? e.message : String(e);
-              mcpDurationMs = Date.now() - mcpStart;
-              verdict = "warning";
-            }
-          }
+        // Phase 19a: Route through the dispatcher (the single chokepoint
+        // for ALL MCP tool invocations). The dispatcher does parsing,
+        // server lookup, allowedTools check, governance pre/post-invoke,
+        // and writes the audit row to agsRuntimePolicyEvents itself.
+        // We just collect the result + error for the trace event below.
+        const dispatchResult = await dispatchMcpToolCall({
+          agentDraftId: draft.id,
+          runtimeRunId: runtimeRun.id,
+          toolName: t.toolKey,
+          args: {},
+          source: "simulation",
+        });
+        mcpDurationMs = dispatchResult.durationMs;
+        if (dispatchResult.ok) {
+          mcpResult = dispatchResult.result;
         } else {
-          mcpError = `Malformed MCP tool key: ${t.toolKey}`;
+          mcpError = dispatchResult.error?.message ?? "MCP dispatch failed";
           verdict = "warning";
         }
       }

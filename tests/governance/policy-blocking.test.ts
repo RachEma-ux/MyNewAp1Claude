@@ -18,7 +18,7 @@ import {
   updateCatalogEntry,
   approveCatalogEntry,
 } from "../../server/db/catalog";
-import { isCatalogEntryAvailableForAppUse, checkCatalogAvailability } from "../../server/catalog/availability";
+import { isCatalogEntryAvailableForAppUse, checkCatalogAvailability } from "../../server/ai-types/availability";
 import { getCatalogState } from "../../shared/catalog-state";
 
 describe.runIf(hasDb)("Policy Blocking — Governance", () => {

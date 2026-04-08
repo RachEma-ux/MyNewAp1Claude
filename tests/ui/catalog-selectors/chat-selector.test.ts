@@ -19,7 +19,7 @@ import {
 } from "../../../server/db/catalog";
 import {
   CATALOG_AVAILABILITY_FILTERS,
-} from "../../../server/catalog/availability";
+} from "../../../server/ai-types/availability";
 
 describe.runIf(hasDb)("Chat Selector — LLM/Model Availability", () => {
   afterEach(async () => {
