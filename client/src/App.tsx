@@ -206,6 +206,8 @@ const MethodesPage = lazy(() => import("@/pages/pm-central/MethodesPage"));
 const ShellClonePage = lazy(() => import("@/pages/pm-central/ShellClonePage"));
 const AgentRunDetailPanel = lazy(() => import("@/pages/pm-central/AgentRunDetailPanel"));
 const IdeaBuilderWizard = lazy(() => import("@/pages/pm-central/IdeaBuilderWizard"));
+// AI Agent Studio — Standalone agent lifecycle module
+const AgentStudioShellPage = lazy(() => import("@/pages/agent-studio/AgentStudioShellPage"));
 // Data Analysis — GraphRAG
 const GraphRAGPage = lazy(() => import("@/pages/data-analysis/GraphRAGPage"));
 // Data Analysis — Data Warehouse
@@ -336,7 +338,7 @@ const HrRoleDefinitionCompareGated = hrGated(HRRoleDefinitionComparePage, "hr.ro
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={() => <ProtectedRoute component={Home} />} />
+      <Route path="/" component={() => <ProtectedRoute component={OpenCodeChatPage} />} />
       {/* Workspaces — workspace management surfaces */}
       <Route path="/ws/dashboard" component={() => <ProtectedRoute component={WSDashboardPage} />} />
       <Route path="/ws/control-panel" component={() => <ProtectedRoute component={WSControlPanelPage} />} />
@@ -454,6 +456,17 @@ function Router() {
       <Route path="/code-studio/opencode-settings" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio/how-to" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
       <Route path="/code-studio" component={() => <ProtectedRoute component={CodeStudioShellPage} />} />
+      {/* AI Agent Studio — Standalone agent lifecycle module (shell handles internal routing) */}
+      {/* Order matters in wouter — literal sub-routes must precede :agentId patterns */}
+      <Route path="/agent-studio/new" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
+      <Route path="/agent-studio/templates" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
+      <Route path="/agent-studio/import" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
+      {/* Deeper sub-routes (3 segments) must come before generic :section catch */}
+      <Route path="/agent-studio/:agentId/runs/:runId" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
+      <Route path="/agent-studio/:agentId/versions/compare" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
+      <Route path="/agent-studio/:agentId/:section" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
+      <Route path="/agent-studio/:agentId" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
+      <Route path="/agent-studio" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
       {/* Projects System — Ideation detail routes (must precede shell catch-all) */}
       <Route path="/ps/ideation/:id/convert" component={() => <ProtectedRoute component={PSIdeationConvertPage} />} />
       <Route path="/ps/ideation/:id" component={() => <ProtectedRoute component={PSIdeationDetailPage} />} />

@@ -135,6 +135,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const navItems: NavItem[] = [
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/" },
     {
+      label: "AI Agent Studio",
+      icon: <Bot className="w-5 h-5" />,
+      href: "/agent-studio",
+    },
+    {
       label: "AI Types",
       icon: <Database className="w-5 h-5" />,
       children: [
