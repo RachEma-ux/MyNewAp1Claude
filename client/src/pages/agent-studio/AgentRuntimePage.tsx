@@ -17,7 +17,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Cpu, Plus, X, ShieldCheck, KeyRound } from "lucide-react";
+import {
+  Loader2,
+  Cpu,
+  Plus,
+  X,
+  ShieldCheck,
+  KeyRound,
+  CalendarClock,
+} from "lucide-react";
 import {
   PageHeader,
   LoadingState,
@@ -330,7 +338,121 @@ export default function AgentRuntimePage({ agentId }: { agentId: number }) {
           Save Runtime Config
         </Button>
       </div>
+
+      {/* Phase 10: Schedule section */}
+      <ScheduleSection agentId={agentId} />
     </div>
+  );
+}
+
+/**
+ * Phase 10: Cron schedule editor. Independent of the main runtime form
+ * because it has its own save flow (separate setSchedule mutation) and
+ * its own loading lifecycle.
+ */
+function ScheduleSection({ agentId }: { agentId: number }) {
+  const utils = trpc.useUtils();
+  const scheduleQuery = trpc.agentStudio.runtime.getSchedule.useQuery({ agentId });
+  const setScheduleMut = trpc.agentStudio.runtime.setSchedule.useMutation({
+    onSuccess: () => {
+      toast.success("Schedule saved");
+      utils.agentStudio.runtime.getSchedule.invalidate({ agentId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const [enabled, setEnabled] = useState<boolean>(false);
+  const [cron, setCron] = useState<string>("");
+  const [timezone, setTimezone] = useState<string>("UTC");
+  const [payloadStr, setPayloadStr] = useState<string>("{}");
+
+  useEffect(() => {
+    if (scheduleQuery.data) {
+      const d = scheduleQuery.data as any;
+      setEnabled(d.enabled === true);
+      setCron(typeof d.cron === "string" ? d.cron : "");
+      setTimezone(typeof d.timezone === "string" ? d.timezone : "UTC");
+      setPayloadStr(
+        d.payload && typeof d.payload === "object"
+          ? JSON.stringify(d.payload, null, 2)
+          : "{}"
+      );
+    }
+  }, [scheduleQuery.data]);
+
+  function handleSaveSchedule() {
+    let payload: Record<string, unknown> = {};
+    try {
+      payload = JSON.parse(payloadStr || "{}");
+    } catch (e) {
+      toast.error("Payload must be valid JSON");
+      return;
+    }
+    setScheduleMut.mutate({
+      agentId,
+      enabled,
+      cron: cron.trim(),
+      timezone: timezone.trim() || "UTC",
+      payload,
+    });
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-3 space-y-3">
+        <SectionLabel icon={<CalendarClock className="h-3 w-3 text-cyan-500" />}>
+          Schedule — fires this agent on a cron schedule (60s tick)
+        </SectionLabel>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Field label="Enabled">
+            <select
+              value={enabled ? "1" : "0"}
+              onChange={(e) => setEnabled(e.target.value === "1")}
+              className="h-7 px-2 rounded border bg-background text-xs w-full"
+            >
+              <option value="0">Disabled</option>
+              <option value="1">Enabled</option>
+            </select>
+          </Field>
+          <Field label="Cron expression (UTC)">
+            <Input
+              placeholder="*/5 * * * *  (every 5 min)"
+              value={cron}
+              onChange={(e) => setCron(e.target.value)}
+              className="h-7 text-xs font-mono"
+            />
+          </Field>
+          <Field label="Timezone (display only)">
+            <Input
+              placeholder="UTC"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className="h-7 text-xs"
+            />
+          </Field>
+        </div>
+        <Field label="Payload (JSON, passed to runSimulation)">
+          <Textarea
+            value={payloadStr}
+            onChange={(e) => setPayloadStr(e.target.value)}
+            className="text-[10px] font-mono min-h-[60px]"
+            placeholder='{ "prompt": "Hello" }'
+          />
+        </Field>
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            onClick={handleSaveSchedule}
+            disabled={setScheduleMut.isPending}
+          >
+            {setScheduleMut.isPending && (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            )}
+            Save Schedule
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

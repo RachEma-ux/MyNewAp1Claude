@@ -97,6 +97,22 @@ export const executeSlashCommandSchema = z.object({
   rawInput: z.string().min(1).max(500),
 });
 
+// Phase 10: schedule config CRUD. The scheduler ticks every minute and
+// fires runSimulation when the cron matches.
+export const setScheduleConfigSchema = z.object({
+  agentId: z.number().int().positive(),
+  enabled: z.boolean(),
+  cron: z
+    .string()
+    .min(1)
+    .max(120)
+    .refine((s) => s.trim().split(/\s+/).length === 5, {
+      message: "cron expression must be 5 fields",
+    }),
+  timezone: z.string().max(64).default("UTC"),
+  payload: z.record(z.any()).optional(),
+});
+
 // ── Identity ────────────────────────────────────────────────────────────────
 
 export const updateIdentitySchema = z.object({

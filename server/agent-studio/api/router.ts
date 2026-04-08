@@ -28,6 +28,10 @@ import * as knowledgeAdapter from "../adapters/knowledge-adapter";
 import * as templateRegistry from "../adapters/template-registry";
 import * as skillCatalog from "../adapters/skill-catalog-adapter";
 import { cloneAgent } from "../services/cloning";
+// Phase 10: Side-effect import — the scheduler module self-starts when
+// loaded, so importing it here ensures the 60s tick begins on the first
+// agent-studio API hit. No edits to server/_core/index.ts needed.
+import "../services/scheduler";
 import { parseAndExecuteSlashCommand } from "../services/slash-commands";
 import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import {
@@ -73,6 +77,7 @@ import {
   saveSubagentSchema,
   saveTestCaseSchema,
   saveTestSuiteSchema,
+  setScheduleConfigSchema,
   simulateToolCallSchema,
   submitForReviewSchema,
   updateBehaviorSchema,
@@ -1238,6 +1243,32 @@ const runtimeRouter = router({
         permissionMode: input.permissionMode,
         workingDirectories: input.workingDirectories,
         providerConfig: input.providerConfig,
+      });
+    }),
+  // Phase 10: schedule CRUD. setSchedule writes the full config jsonb;
+  // getSchedule reads it. The 60s scheduler tick picks up changes on its
+  // next iteration.
+  getSchedule: protectedProcedure
+    .input(agentIdSchema)
+    .query(async ({ input }) => {
+      const config = await repo.getScheduleConfig(input.agentId);
+      return (
+        config ?? {
+          enabled: false,
+          cron: "",
+          timezone: "UTC",
+          payload: {},
+        }
+      );
+    }),
+  setSchedule: protectedProcedure
+    .input(setScheduleConfigSchema)
+    .mutation(async ({ input }) => {
+      return repo.updateScheduleConfig(input.agentId, {
+        enabled: input.enabled,
+        cron: input.cron,
+        timezone: input.timezone,
+        payload: input.payload ?? {},
       });
     }),
 });

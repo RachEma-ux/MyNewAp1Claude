@@ -1872,6 +1872,91 @@ export async function updateRuntimeConfig(
   return getRuntimeConfig(agentId);
 }
 
+// ── Phase 10: Scheduled agent execution ────────────────────────────────────
+
+/**
+ * Read scheduleConfig for a draft via the agent id. Returns null when no
+ * draft exists or no config has been set.
+ */
+export async function getScheduleConfig(
+  agentId: number
+): Promise<Record<string, unknown> | null> {
+  const draft = await getCurrentDraft(agentId);
+  if (!draft) return null;
+  const cfg = (draft as any).scheduleConfig;
+  if (!cfg || typeof cfg !== "object") return null;
+  return cfg as Record<string, unknown>;
+}
+
+/**
+ * Patch the scheduleConfig of an agent's current draft. The full new
+ * config is written (no field merge) — callers are responsible for
+ * preserving fields they want to keep.
+ */
+export async function updateScheduleConfig(
+  agentId: number,
+  config: Record<string, unknown>
+) {
+  const draft = await getCurrentDraft(agentId);
+  if (!draft) throw new Error(`No current draft for agent ${agentId}`);
+  await db()
+    .update(agsAgentDrafts)
+    .set({
+      scheduleConfig: config,
+      updatedAt: new Date(),
+    })
+    .where(eq(agsAgentDrafts.id, draft.id));
+  return getScheduleConfig(agentId);
+}
+
+/**
+ * Variant of updateScheduleConfig that targets a draft id directly. Used
+ * by the scheduler tick which already has the draftId in hand.
+ */
+export async function updateScheduleConfigByDraftId(
+  draftId: number,
+  config: Record<string, unknown>
+) {
+  await db()
+    .update(agsAgentDrafts)
+    .set({
+      scheduleConfig: config,
+      updatedAt: new Date(),
+    })
+    .where(eq(agsAgentDrafts.id, draftId));
+}
+
+/**
+ * List all agents whose current draft has scheduleConfig.enabled = true.
+ * Returns a flattened shape ready for the scheduler tick.
+ */
+export async function listScheduledAgents(): Promise<
+  Array<{ agentId: number; draftId: number; config: Record<string, unknown> }>
+> {
+  const conn = getDb();
+  if (!conn) return [];
+  // Use a raw filter on the jsonb column. drizzle's sql tag handles
+  // parameterization safely — `enabled` is a constant string here.
+  const rows = await conn
+    .select({
+      agentId: agsAgentDrafts.agentId,
+      draftId: agsAgentDrafts.id,
+      scheduleConfig: agsAgentDrafts.scheduleConfig,
+    })
+    .from(agsAgentDrafts)
+    .where(
+      and(
+        eq(agsAgentDrafts.isCurrent, true),
+        sql`(${agsAgentDrafts.scheduleConfig}->>'enabled')::boolean = true`
+      )
+    );
+  return rows.map((r) => ({
+    agentId: r.agentId,
+    draftId: r.draftId,
+    config: (r.scheduleConfig ?? {}) as Record<string, unknown>,
+  }));
+}
+
 // ── Phase 3: Pending permission requests ───────────────────────────────────
 
 /**

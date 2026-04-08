@@ -117,6 +117,17 @@ export const agsAgentDrafts = pgTable(
     workingDirectories: jsonb("working_directories").$type<string[]>().default([]),
     /** Provider/model/apiKey runtime config — apiKey is encrypted at rest by the platform encryption helpers */
     providerConfig: jsonb("provider_config").$type<Record<string, unknown>>().default({}),
+    /**
+     * Phase 10: Scheduled execution config.
+     * Shape: { enabled, cron, timezone, payload, lastRunAt? }
+     *  - enabled: when false the scheduler skips this draft
+     *  - cron: 5-field cron expression ("M H DOM MON DOW")
+     *  - timezone: IANA name; defaults to UTC
+     *  - payload: input passed to runSimulation()
+     *  - lastRunAt: ISO timestamp of the last fire — used to dedupe within
+     *    the same minute when the scheduler ticks more than once
+     */
+    scheduleConfig: jsonb("schedule_config").$type<Record<string, unknown>>().default({}),
 
     // Bookkeeping
     isCurrent: boolean("is_current").default(true),
