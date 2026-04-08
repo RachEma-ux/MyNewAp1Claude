@@ -21,9 +21,8 @@
  * which is invoked from server/_core/index.ts.
  */
 
-import { sql } from "drizzle-orm";
+import pg from "pg";
 import { getTableConfig, type PgColumn, type PgTable } from "drizzle-orm/pg-core";
-import { getAsDb } from "./connection";
 import * as agsSchema from "../../../drizzle/tables/agent-studio";
 
 interface SeedResult {
@@ -127,6 +126,21 @@ function buildIndexSql(table: PgTable): string[] {
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /**
+ * Resolve the asdb connection string from the same fallback chain as
+ * the connection module. We connect with a fresh pg client (NOT through
+ * drizzle) because drizzle's `sql.raw()` + `db.execute()` path mangles
+ * raw DDL — every CREATE TABLE silently fails. Using the bare pg client
+ * is the same approach the local debug script used successfully.
+ */
+function resolveAsdbUrl(): string {
+  if (process.env.DATABASE_URL_ASDB) return process.env.DATABASE_URL_ASDB;
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL.replace(/\/[^/]+$/, "/asdb");
+  }
+  return "postgresql://localhost:5432/asdb";
+}
+
+/**
  * Idempotent: provisions every ags_* table + index in asdb. Safe to
  * call on every boot. Returns counts so the caller can log a summary.
  *
@@ -134,9 +148,20 @@ function buildIndexSql(table: PgTable): string[] {
  * per-table failures are collected and logged but don't abort the seed.
  */
 export async function seedAsDb(): Promise<SeedResult> {
-  const db = getAsDb();
-  if (!db) {
-    throw new Error("[ASDB] Cannot connect to asdb");
+  const url = resolveAsdbUrl();
+
+  // Connect with a bare pg client. We bypass the drizzle wrapper for
+  // DDL because `db.execute(sql.raw(...))` silently fails on raw
+  // CREATE TABLE statements (the failure shows up only as "Failed
+  // query: ..." with no underlying PG error). The bare client.query
+  // approach was verified to work in the local debug script.
+  const client = new pg.Client({ connectionString: url });
+  try {
+    await client.connect();
+  } catch (e) {
+    throw new Error(
+      `[ASDB] Cannot connect to ${url.replace(/:([^:@]+)@/, ":****@")}: ${e instanceof Error ? e.message : String(e)}`
+    );
   }
 
   const result: SeedResult = {
@@ -146,41 +171,44 @@ export async function seedAsDb(): Promise<SeedResult> {
     failures: [],
   };
 
-  // Iterate every exported pgTable in the schema barrel.
-  // Each entry that has a getTableConfig-compatible shape is an ags_* table.
-  for (const [exportName, value] of Object.entries(agsSchema)) {
-    if (!exportName.startsWith("ags") || !value || typeof value !== "object") {
-      continue;
-    }
-    let config;
-    try {
-      config = getTableConfig(value as PgTable);
-    } catch {
-      // Not a pgTable export — skip silently
-      continue;
-    }
-    const tableName = config.name;
-    try {
-      const createSql = buildCreateTableSql(value as PgTable);
-      await db.execute(sql.raw(createSql));
-      result.created++;
-
-      // Indexes — failures here are logged but not fatal
-      for (const idxSql of buildIndexSql(value as PgTable)) {
-        try {
-          await db.execute(sql.raw(idxSql));
-        } catch (e) {
-          console.warn(
-            `[ASDB] index error on ${tableName}: ${e instanceof Error ? e.message : String(e)}`
-          );
-        }
+  try {
+    for (const [exportName, value] of Object.entries(agsSchema)) {
+      if (!exportName.startsWith("ags") || !value || typeof value !== "object") {
+        continue;
       }
-    } catch (e) {
-      result.failed++;
-      const message = e instanceof Error ? e.message : String(e);
-      result.failures.push({ table: tableName, error: message });
-      console.error(`[ASDB] CREATE TABLE failed for ${tableName}: ${message}`);
+      let config;
+      try {
+        config = getTableConfig(value as PgTable);
+      } catch {
+        continue;
+      }
+      const tableName = config.name;
+      try {
+        const createSql = buildCreateTableSql(value as PgTable);
+        await client.query(createSql);
+        result.created++;
+
+        // Indexes — per-index failures logged but non-fatal
+        for (const idxSql of buildIndexSql(value as PgTable)) {
+          try {
+            await client.query(idxSql);
+          } catch (e) {
+            console.warn(
+              `[ASDB] index error on ${tableName}: ${e instanceof Error ? e.message : String(e)}`
+            );
+          }
+        }
+      } catch (e) {
+        result.failed++;
+        const message = e instanceof Error ? e.message : String(e);
+        result.failures.push({ table: tableName, error: message });
+        console.error(`[ASDB] CREATE TABLE failed for ${tableName}: ${message}`);
+      }
     }
+  } finally {
+    await client.end().catch(() => {
+      /* ignore — client may already be closed on error */
+    });
   }
 
   console.log(
