@@ -1003,6 +1003,18 @@ export async function listRuntimeRuns(agentId: number, limit = 50) {
     .limit(limit);
 }
 
+/**
+ * Phase 8: Direct children of a runtime run — used to render nested
+ * subagent invocations under their parent.
+ */
+export async function listChildRuntimeRuns(parentRunId: number) {
+  return db()
+    .select()
+    .from(agsRuntimeRuns)
+    .where(eq(agsRuntimeRuns.parentRunId, parentRunId))
+    .orderBy(agsRuntimeRuns.createdAt);
+}
+
 export async function getRuntimeRunById(runId: number) {
   const rows = await db()
     .select()

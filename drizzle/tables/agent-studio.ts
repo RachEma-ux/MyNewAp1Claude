@@ -441,6 +441,10 @@ export const agsRuntimeRuns = pgTable(
     // /compact, this points at the source run we summarized.
     resumedFromRunId: integer("resumed_from_run_id"),
     compactedFromRunId: integer("compacted_from_run_id"),
+    // Phase 8: Subagent hierarchy. When a run was invoked by a parent
+    // agent's loop (subagent_invoke message), this points at the parent
+    // run. The runs page renders children nested under their parent.
+    parentRunId: integer("parent_run_id"),
     startedAt: timestamp("started_at"),
     finishedAt: timestamp("finished_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

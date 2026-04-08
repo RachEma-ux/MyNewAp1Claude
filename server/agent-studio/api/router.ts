@@ -35,6 +35,7 @@ import "../services/scheduler";
 import * as mcpManager from "../services/mcp/mcp-manager";
 import { compactRun, resumeRun } from "../services/run-snapshot";
 import { parseAndExecuteSlashCommand } from "../services/slash-commands";
+import { getRunTree, invokeSubagent } from "../services/subagent-runner";
 import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
 import {
   agentIdSchema,
@@ -53,8 +54,10 @@ import {
   decidePermissionRequestSchema,
   executeSlashCommandSchema,
   getRunDetailSchema,
+  getRunTreeSchema,
   getSimulationRunSchema,
   importDefinitionSchema,
+  invokeSubagentSchema,
   listAgentsSchema,
   listPendingPermissionRequestsSchema,
   listRunsSchema,
@@ -787,6 +790,30 @@ const runsRouter = router({
         sourceRunId: input.sourceRunId,
         triggeredBy: ctx.user.id,
       });
+    }),
+  // Phase 8: subagent invocation. Spawns a child run from a parent run
+  // by name. The subagent's prompt is composed as preamble.
+  // protectedProcedure — same trust as runSimulation.
+  invokeSubagent: protectedProcedure
+    .input(invokeSubagentSchema)
+    .mutation(async ({ ctx, input }) => {
+      return invokeSubagent({
+        parentRunId: input.parentRunId,
+        subagentName: input.subagentName,
+        input: input.input,
+        triggeredBy: ctx.user.id,
+      });
+    }),
+  // Phase 8: hierarchical tree view of a run + all its subagent
+  // descendants. Used by the runs page to render nesting.
+  getTree: protectedProcedure
+    .input(getRunTreeSchema)
+    .query(async ({ input }) => {
+      const tree = await getRunTree(input.runId);
+      if (!tree) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+      }
+      return tree;
     }),
 });
 

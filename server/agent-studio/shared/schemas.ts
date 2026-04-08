@@ -123,6 +123,19 @@ export const compactRunSchema = z.object({
   sourceRunId: z.number().int().positive(),
 });
 
+// Phase 8: subagent invocation. The runs page surfaces a "spawn child"
+// button on a parent run for manual testing; the live runtime path will
+// also call this when the agent loop emits a Task tool call.
+export const invokeSubagentSchema = z.object({
+  parentRunId: z.number().int().positive(),
+  subagentName: z.string().min(1).max(200),
+  input: z.string().min(1).max(10_000),
+});
+
+export const getRunTreeSchema = z.object({
+  runId: z.number().int().positive(),
+});
+
 // ── Identity ────────────────────────────────────────────────────────────────
 
 export const updateIdentitySchema = z.object({

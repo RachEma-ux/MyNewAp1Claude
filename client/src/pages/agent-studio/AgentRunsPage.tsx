@@ -141,6 +141,42 @@ export default function AgentRunsPage({
     },
     onError: (e) => toast.error(e.message),
   });
+
+  // Phase 8: subagent invocation. Hits the runs sub-router which spawns
+  // a child run with parentRunId set, then we navigate to the child.
+  const invokeSubagentMut = trpc.agentStudio.runs.invokeSubagent.useMutation({
+    onSuccess: (result) => {
+      if (!result.ok) {
+        toast.error(result.error ?? "Subagent invocation failed");
+        return;
+      }
+      toast.success(`Subagent spawned → run #${result.childRunId}`);
+      utils.agentStudio.runs.list.invalidate();
+      utils.agentStudio.runs.getTree.invalidate();
+      if (result.childRunId) selectRun(result.childRunId);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  function handleInvokeSubagent() {
+    if (!selectedRunId) return;
+    const subagentName = window.prompt("Subagent name to invoke?");
+    if (!subagentName) return;
+    const subagentInput = window.prompt(
+      `Input to pass to subagent "${subagentName}"?`
+    );
+    if (!subagentInput) return;
+    invokeSubagentMut.mutate({
+      parentRunId: selectedRunId,
+      subagentName,
+      input: subagentInput,
+    });
+  }
+  // Tree query — fetched whenever a run is selected so we can show
+  // child runs nested under their parent in the trace inspector.
+  const treeQuery = trpc.agentStudio.runs.getTree.useQuery(
+    { runId: selectedRunId ?? 0 },
+    { enabled: selectedRunId !== null }
+  );
   function handleResume() {
     if (!selectedRunId) return;
     const newInput = window.prompt(
@@ -278,6 +314,19 @@ export default function AgentRunsPage({
                     </Button>
                   </>
                 )}
+              {/* Phase 8: spawn child subagent — available on any run */}
+              {detailQuery.data?.run && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[10px]"
+                  disabled={invokeSubagentMut.isPending}
+                  onClick={handleInvokeSubagent}
+                  title="Spawn child — invoke a subagent as a child run of this one"
+                >
+                  Spawn Child
+                </Button>
+              )}
             </div>
           </div>
           {!selectedRunId ? (
@@ -299,6 +348,31 @@ export default function AgentRunsPage({
             <>
             {/* Phase 3: Pending permission request banner — only when the
                 run is live and has unresolved "ask" requests. */}
+            {/* Phase 8: child subagent runs */}
+            {treeQuery.data && treeQuery.data.children.length > 0 && (
+              <div className="mb-3 rounded border border-blue-500/40 bg-blue-500/5 p-2 space-y-1.5">
+                <div className="text-[10px] font-semibold text-blue-300 uppercase tracking-wider">
+                  Child runs ({treeQuery.data.children.length})
+                </div>
+                <ul className="space-y-1">
+                  {treeQuery.data.children.map((child: any) => (
+                    <li
+                      key={child.run.id}
+                      className="text-[10px] flex items-center justify-between gap-2 rounded bg-background/60 p-1.5 cursor-pointer hover:bg-background"
+                      onClick={() => selectRun(child.run.id)}
+                    >
+                      <span className="font-mono">↳ #{child.run.id}</span>
+                      <Badge variant="outline" className="text-[9px]">
+                        {child.run.status}
+                      </Badge>
+                      <span className="text-muted-foreground/70 truncate flex-1">
+                        {child.run.summary ?? ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {pendingRequests.length > 0 && (
               <div className="mb-3 rounded border border-yellow-500/40 bg-yellow-500/5 p-2.5 space-y-2">
                 <div className="flex items-center gap-1.5 text-[11px] font-semibold text-yellow-300">
