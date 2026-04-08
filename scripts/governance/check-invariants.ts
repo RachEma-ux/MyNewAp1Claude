@@ -86,12 +86,20 @@ for (const relPath of DOMAIN_ROUTERS) {
 //
 // We scan for patterns like `status === "active"` combined with
 // `reviewState === "approved"` in the same file outside of:
-//   - server/catalog/availability.ts (where the rule IS defined)
+//   - server/ai-types/availability.ts (where the rule IS defined —
+//     relocated from server/catalog/availability.ts per the AI Types
+//     Standalone Roadmap)
+//   - shared/catalog-* helpers (where state/lifecycle is canonically
+//     derived)
+//   - server/ai-types/validation/router.ts (legitimate validation
+//     router that touches the canonical fields directly to enforce
+//     the rule for its callers — not an inlined bypass)
 //   - test files
 //   - docs/scripts
 
 const AVAILABILITY_EXEMPT = [
-  "server/catalog/availability.ts",
+  "server/ai-types/availability.ts",
+  "server/ai-types/validation/router.ts",
   "shared/catalog-state.ts",
   "shared/catalog-execution.ts",
   "shared/catalog-lifecycle.ts",
@@ -142,7 +150,7 @@ function scanForInlinedAvailability(dir: string) {
       violations.push({
         file: relPath,
         line: statusLine,
-        rule: "INV-4/INV-5: Inlined availability check — use server/catalog/availability.ts helpers instead",
+        rule: "INV-4/INV-5: Inlined availability check — use server/ai-types/availability.ts helpers instead",
         text: `Found status==="active" (line ${statusLine}) and reviewState==="approved" (line ${reviewLine}) in same file`,
       });
     }
