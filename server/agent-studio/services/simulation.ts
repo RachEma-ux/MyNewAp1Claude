@@ -355,19 +355,55 @@ export async function runSimulation(input: {
         workingDirectory: draftWorkingDir,
       });
 
-      // Phase 17a: MCP tool execution.
-      // If the tool key matches the mcp__<server>__<tool> pattern AND
-      // mockedTools is false, route the call through the MCP manager.
-      // The connected MCP server actually executes the tool and returns
-      // a result, which we record in the trace exactly like a normal
-      // tool call. This is the simulation-mode unlock — the live
-      // openllm-agent2 path is upstream-blocked because its WS bridge
-      // hardcodes mcpClients: [] in headless-engine.ts:419.
+      // Phase 17a/d: MCP tool execution.
+      // Three possible MCP-related tool kinds:
+      //   1. mcp__<server>__<tool> — proxied call to a remote MCP tool
+      //   2. ListMcpResources       — flatten resources across all servers
+      //   3. ReadMcpResource         — read one resource by uri
+      // All other tool keys fall through to mock/static execution.
+      // The live openllm-agent2 path is upstream-blocked because its WS
+      // bridge hardcodes mcpClients: [] in headless-engine.ts:419.
       let mcpResult: unknown = null;
       let mcpError: string | null = null;
       let mcpDurationMs = 30;
       const isMcpTool = t.toolKey.startsWith("mcp__");
-      if (isMcpTool && !toggles.mockedTools) {
+      const isMcpListResources = t.toolKey === "ListMcpResources";
+      const isMcpReadResource = t.toolKey === "ReadMcpResource";
+
+      if ((isMcpListResources || isMcpReadResource) && !toggles.mockedTools) {
+        const mcpStart = Date.now();
+        try {
+          if (isMcpListResources) {
+            // Phase 17d: aggregate resources across every connected MCP
+            // server attached to this draft.
+            mcpResult = await mcpManager.listConnectedResources(draft.id);
+          } else {
+            // Phase 17d: ReadMcpResource expects a uri in the args. We
+            // can't extract args from a static catalog tool call (the
+            // simulation engine doesn't have a real LLM picking
+            // arguments yet), so we read the FIRST resource on the
+            // FIRST connected server as a smoke test. The live runtime
+            // would pass real args.
+            const all = await mcpManager.listConnectedResources(draft.id);
+            if (all.length === 0) {
+              mcpError =
+                "no MCP resources discovered — connect a server that exposes resources/list";
+              verdict = "warning";
+            } else {
+              const first = all[0];
+              mcpResult = await mcpManager.readMcpResource({
+                serverId: first.serverId,
+                uri: first.uri,
+              });
+            }
+          }
+          mcpDurationMs = Date.now() - mcpStart;
+        } catch (e) {
+          mcpError = e instanceof Error ? e.message : String(e);
+          mcpDurationMs = Date.now() - mcpStart;
+          verdict = "warning";
+        }
+      } else if (isMcpTool && !toggles.mockedTools) {
         // Decode "mcp__<serverName>__<toolName>" — server name may
         // contain underscores so we split on the FIRST "__" only.
         const rest = t.toolKey.slice("mcp__".length);
@@ -404,21 +440,22 @@ export async function runSimulation(input: {
         }
       }
 
+      const usedMcp = isMcpTool || isMcpListResources || isMcpReadResource;
       steps.push({
         index: stepIdx++,
         type: "tool_call",
-        label: isMcpTool
+        label: usedMcp
           ? `${toggles.mockedTools ? "Mock" : "MCP"} call: ${t.toolName}`
           : `${toggles.mockedTools ? "Mock" : "Live"} call: ${t.toolName}`,
         payload: {
           toolKey: t.toolKey,
-          kind: catalogEntry?.category ?? (isMcpTool ? "mcp" : "unknown"),
+          kind: catalogEntry?.category ?? (usedMcp ? "mcp" : "unknown"),
           mocked: toggles.mockedTools,
           approvalRequired: t.requiresApproval,
           destructive: isDestructive,
           result: mcpError
             ? { ok: false, error: mcpError, source: "mcp" }
-            : isMcpTool && !toggles.mockedTools
+            : usedMcp && !toggles.mockedTools
               ? { ok: true, source: "mcp", data: mcpResult }
               : toggles.mockedTools
                 ? { ok: true, mock: true }
@@ -435,11 +472,18 @@ export async function runSimulation(input: {
         requestPayload: {
           mocked: toggles.mockedTools,
           kind: catalogEntry?.category,
-          isMcp: isMcpTool,
+          isMcp: usedMcp,
+          mcpKind: isMcpListResources
+            ? "list_resources"
+            : isMcpReadResource
+              ? "read_resource"
+              : isMcpTool
+                ? "tool_call"
+                : null,
         },
         responsePayload: mcpError
           ? { verdict, destructive: isDestructive, mcpError }
-          : isMcpTool && !toggles.mockedTools
+          : usedMcp && !toggles.mockedTools
             ? { verdict, destructive: isDestructive, mcpResult }
             : { verdict, destructive: isDestructive },
         verdict,

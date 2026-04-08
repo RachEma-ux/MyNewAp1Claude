@@ -245,7 +245,7 @@ export default function AgentMcpPage({ agentId }: { agentId: number }) {
     <div className="p-4 space-y-4">
       <PageHeader
         title="MCP Servers"
-        subtitle="Model Context Protocol server bindings — 4 transports (stdio · sse · http · sdk)"
+        subtitle="Model Context Protocol server bindings — 5 transports (stdio · http · websocket · sdk · sse). Phase 17 fully unlocked."
         icon={<Plug className="h-4 w-4" />}
         badges={
           <Badge variant="outline" className="text-[9px] uppercase tracking-wider ml-2">
@@ -253,6 +253,43 @@ export default function AgentMcpPage({ agentId }: { agentId: number }) {
           </Badge>
         }
       />
+
+      {/* Phase 17 — runtime mode banner */}
+      <Card className="border-blue-500/30 bg-blue-500/5">
+        <CardContent className="p-3 text-[10px] text-muted-foreground space-y-1">
+          <div className="font-semibold text-blue-300">
+            MCP execution status (Phase 17)
+          </div>
+          <ul className="list-disc list-inside space-y-0.5">
+            <li>
+              <strong className="text-emerald-400">Simulation runs:</strong>{" "}
+              MCP tools, prompts, and resources are FULLY executable.
+              When the agent loop fires <code className="font-mono">mcp__server__tool</code>,{" "}
+              <code className="font-mono">ListMcpResources</code>, or{" "}
+              <code className="font-mono">ReadMcpResource</code>, the
+              call goes to a real connected MCP server and the response
+              appears in the trace.
+            </li>
+            <li>
+              <strong className="text-amber-400">Live runtime (openllm-agent2):</strong>{" "}
+              MCP routing is upstream-blocked — the openllm-agent2 WS bridge
+              accepts only <code className="font-mono">{"{ message }"}</code>{" "}
+              with no tool injection field, and its headless engine
+              hardcodes <code className="font-mono">mcpClients: []</code>.
+              Configure MCP servers in openllm-agent2's own settings.json
+              for live runtime use, OR run in simulation mode.
+            </li>
+            <li>
+              <strong>Auto-reconnect:</strong> servers in error state are
+              retried every 60s with exponential backoff up to 5 min.
+            </li>
+            <li>
+              <strong>OAuth tokens:</strong> stored encrypted at rest via
+              the platform encryption helpers.
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Add Server form */}
