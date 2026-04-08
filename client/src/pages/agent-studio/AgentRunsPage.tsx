@@ -134,6 +134,14 @@ export default function AgentRunsPage({
                   <div className="text-[10px] text-muted-foreground">
                     {r.environment} · {r.createdAt ? new Date(r.createdAt).toLocaleString() : ""}
                   </div>
+                  {/* Phase 5: tokens + cost when usage was captured */}
+                  {(r.totalTokens != null || r.costMicrocents != null) && (
+                    <div className="text-[9px] text-muted-foreground/80 font-mono mt-0.5">
+                      {r.totalTokens != null && `${formatTokens(r.totalTokens)} tok`}
+                      {r.totalTokens != null && r.costMicrocents != null && " · "}
+                      {r.costMicrocents != null && formatCost(r.costMicrocents)}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -144,7 +152,24 @@ export default function AgentRunsPage({
       {/* Trace inspector */}
       <Card className="lg:col-span-2">
         <CardContent className="p-3">
-          <h3 className="text-sm font-semibold mb-2">Trace Inspector</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold">Trace Inspector</h3>
+            {/* Phase 5: usage strip in the inspector header */}
+            {detailQuery.data?.run &&
+              (detailQuery.data.run.totalTokens != null ||
+                detailQuery.data.run.costMicrocents != null) && (
+                <div className="text-[10px] font-mono text-muted-foreground">
+                  {detailQuery.data.run.inputTokens != null &&
+                    `${formatTokens(detailQuery.data.run.inputTokens)} in`}
+                  {detailQuery.data.run.outputTokens != null &&
+                    ` · ${formatTokens(detailQuery.data.run.outputTokens)} out`}
+                  {detailQuery.data.run.totalTokens != null &&
+                    ` · ${formatTokens(detailQuery.data.run.totalTokens)} total`}
+                  {detailQuery.data.run.costMicrocents != null &&
+                    ` · ${formatCost(detailQuery.data.run.costMicrocents)}`}
+                </div>
+              )}
+          </div>
           {!selectedRunId ? (
             <EmptyState
               compact
@@ -342,4 +367,20 @@ export default function AgentRunsPage({
       </div>
     </div>
   );
+}
+
+// Phase 5: tiny formatters for token counts and microcent costs.
+
+/** "1234" → "1.2k", "1234567" → "1.2M". Plain integer below 1k. */
+function formatTokens(n: number): string {
+  if (n < 1_000) return String(n);
+  if (n < 1_000_000) return `${(n / 1_000).toFixed(1)}k`;
+  return `${(n / 1_000_000).toFixed(2)}M`;
+}
+
+/** microcents → "$1.23". Sub-cent values show 4 decimals. */
+function formatCost(microcents: number): string {
+  const dollars = microcents / 1_000_000;
+  if (dollars < 0.01) return `$${dollars.toFixed(4)}`;
+  return `$${dollars.toFixed(2)}`;
 }

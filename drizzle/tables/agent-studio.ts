@@ -417,6 +417,14 @@ export const agsRuntimeRuns = pgTable(
     outputPayload: jsonb("output_payload").$type<Record<string, unknown>>().default({}),
     summary: text("summary"),
     durationMs: integer("duration_ms"),
+    // Phase 5: Cost / token tracking — populated from openllm-agent2's
+    // {type:"done", usage} message when a live runtime run completes.
+    // All nullable so existing rows + simulation-only runs work fine.
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    totalTokens: integer("total_tokens"),
+    /** USD as numeric microcents (1_000_000 = $1.00) — int avoids float drift */
+    costMicrocents: integer("cost_microcents"),
     startedAt: timestamp("started_at"),
     finishedAt: timestamp("finished_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

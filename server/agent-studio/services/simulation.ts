@@ -168,6 +168,17 @@ export async function runSimulation(input: {
   let risk = 0;
   let cost = 0;
   let aborted = false;
+  // Phase 5: hoisted so the final updateRuntimeRun() can persist usage.
+  // Stays undefined for non-live runs and runs whose provider didn't
+  // forward usage data.
+  let liveUsage:
+    | {
+        inputTokens?: number;
+        outputTokens?: number;
+        totalTokens?: number;
+        costMicrocents?: number;
+      }
+    | undefined;
 
   // Pull all the draft state we'll reference in the steps below so the
   // simulation reflects real configuration honestly.
@@ -528,6 +539,29 @@ export async function runSimulation(input: {
         outputPayload.tokenCount = liveResult.tokenCount;
         outputPayload.permissionRequestCount = liveResult.permissionEvents.length;
         outputPayload.policyEventCount = liveResult.policyEvents.length;
+        // Phase 5: surface usage in the output payload AND capture it for
+        // the final updateRuntimeRun() write so the runs page header
+        // shows tokens + cost without rummaging through the JSON blob.
+        if (liveResult.usage) {
+          liveUsage = {
+            inputTokens: liveResult.usage.inputTokens,
+            outputTokens: liveResult.usage.outputTokens,
+            totalTokens: liveResult.usage.totalTokens,
+            costMicrocents: liveResult.usage.costMicrocents,
+          };
+          outputPayload.usage = {
+            inputTokens: liveResult.usage.inputTokens ?? null,
+            outputTokens: liveResult.usage.outputTokens ?? null,
+            totalTokens: liveResult.usage.totalTokens ?? null,
+            costMicrocents: liveResult.usage.costMicrocents ?? null,
+          };
+          // Roll the cost into the simulation's existing cost counter so
+          // the simulation_runs row reflects real spend (cost is already
+          // in cents-ish units; we convert microcents → cents for parity).
+          if (liveResult.usage.costMicrocents != null) {
+            cost += Math.round(liveResult.usage.costMicrocents / 10_000);
+          }
+        }
       } else {
         responsePreview = `[live run failed: ${liveResult.error}]`;
         outputDurationMs = liveResult.durationMs;
@@ -655,12 +689,18 @@ export async function runSimulation(input: {
     finishedAt: new Date(),
   });
   // Finalize the runtime run too — same status, summary, output
+  // Phase 5: persist usage columns so the runs page header can show them
+  // without parsing the output JSON blob.
   await repo.updateRuntimeRun(runtimeRun.id, {
     status: aborted ? "failed" : "completed",
     summary,
     durationMs,
     finishedAt: new Date(),
     outputPayload: { simulationRunId: run.id, verdict, aborted },
+    inputTokens: liveUsage?.inputTokens,
+    outputTokens: liveUsage?.outputTokens,
+    totalTokens: liveUsage?.totalTokens,
+    costMicrocents: liveUsage?.costMicrocents,
   });
 
   return {

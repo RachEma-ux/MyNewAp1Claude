@@ -87,6 +87,23 @@ export interface OpenllmRuntimeRequest {
   onError?: (message: string) => void;
 }
 
+/**
+ * Phase 5: Token + cost usage parsed from the `{type:"done", usage}`
+ * message. All fields are optional because the shape varies by provider —
+ * Anthropic returns `input_tokens`/`output_tokens`, OpenAI returns
+ * `prompt_tokens`/`completion_tokens`, etc. The adapter normalizes them
+ * here so the simulation engine can persist a single shape.
+ */
+export interface OpenllmUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  /** USD * 1_000_000 (microcents) — int math, no float drift */
+  costMicrocents?: number;
+  /** Original payload as received, for forensic display */
+  raw?: Record<string, unknown>;
+}
+
 export interface OpenllmRuntimeResult {
   ok: boolean;
   /** Concatenated token stream — the agent's actual response text */
@@ -97,6 +114,8 @@ export interface OpenllmRuntimeResult {
   error?: string;
   /** True when the server emitted {type:"done"} normally */
   finalizedNormally: boolean;
+  /** Phase 5: usage from the done message (provider-normalized) */
+  usage?: OpenllmUsage;
   /**
    * Permission requests received during the run. Each was resolved via
    * the caller's `permissionResolver` (Phase 1c) — or auto-denied if no
@@ -202,6 +221,86 @@ export function resolveOpenllmEndpoint(
   return null;
 }
 
+/**
+ * Phase 5: Provider-tolerant usage parser. openllm-agent2 forwards the
+ * provider's raw usage block on the done message; the shape varies:
+ *
+ *   Anthropic:  { input_tokens, output_tokens }
+ *   OpenAI:     { prompt_tokens, completion_tokens, total_tokens }
+ *   Gemini:     { promptTokenCount, candidatesTokenCount, totalTokenCount }
+ *   Ollama:     { prompt_eval_count, eval_count }
+ *   (others)    arbitrary
+ *
+ * We try a few aliases for each field and fall back to undefined when no
+ * field matches. Cost may or may not be present; when missing it stays
+ * undefined and the UI shows just tokens.
+ */
+function parseUsage(raw: unknown): OpenllmUsage | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const u = raw as Record<string, unknown>;
+
+  const num = (...keys: string[]): number | undefined => {
+    for (const k of keys) {
+      const v = u[k];
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+    }
+    return undefined;
+  };
+
+  const inputTokens = num(
+    "input_tokens",
+    "inputTokens",
+    "prompt_tokens",
+    "promptTokens",
+    "promptTokenCount",
+    "prompt_eval_count"
+  );
+  const outputTokens = num(
+    "output_tokens",
+    "outputTokens",
+    "completion_tokens",
+    "completionTokens",
+    "candidatesTokenCount",
+    "eval_count"
+  );
+  const explicitTotal = num("total_tokens", "totalTokens", "totalTokenCount");
+  const totalTokens =
+    explicitTotal ??
+    (inputTokens != null && outputTokens != null
+      ? inputTokens + outputTokens
+      : undefined);
+
+  // Cost — try common shapes. Convert dollars to microcents to keep
+  // everything in int math downstream.
+  let costMicrocents: number | undefined;
+  const costUsd = num("cost_usd", "costUsd", "cost", "total_cost", "totalCost");
+  if (costUsd != null) {
+    costMicrocents = Math.round(costUsd * 1_000_000);
+  } else {
+    const microcents = num("cost_microcents", "costMicrocents");
+    if (microcents != null) costMicrocents = Math.round(microcents);
+  }
+
+  // Bail entirely if nothing useful was found — cleaner than returning
+  // an empty object that fakes "we got usage but it's all undefined".
+  if (
+    inputTokens == null &&
+    outputTokens == null &&
+    totalTokens == null &&
+    costMicrocents == null
+  ) {
+    return undefined;
+  }
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    costMicrocents,
+    raw: u,
+  };
+}
+
 // ── Main entry point ────────────────────────────────────────────────────────
 
 /**
@@ -220,6 +319,10 @@ export async function runViaOpenllmAgent(
   const policyEvents: OpenllmRuntimeResult["policyEvents"] = [];
   let finalizedNormally = false;
   let runtimeError: string | undefined;
+  // Phase 5: usage payload from the done message — populated by the
+  // permissive parser below. Stays undefined for runs that never
+  // received a done message.
+  let parsedUsage: OpenllmUsage | undefined;
 
   return new Promise<OpenllmRuntimeResult>((resolve) => {
     const timeoutMs = req.timeoutMs ?? 60_000;
@@ -260,6 +363,7 @@ export async function runViaOpenllmAgent(
         durationMs: Date.now() - startMs,
         error: errMsg ?? runtimeError,
         finalizedNormally,
+        usage: parsedUsage,
         permissionEvents,
         policyEvents,
       });
@@ -325,6 +429,8 @@ export async function runViaOpenllmAgent(
         }
         case "done": {
           finalizedNormally = true;
+          // Phase 5: parse usage if present (provider-tolerant)
+          parsedUsage = parseUsage(msg.usage);
           finalize(true);
           break;
         }
