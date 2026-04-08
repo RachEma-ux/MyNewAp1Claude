@@ -19,12 +19,14 @@
  *    scheduler skips it — protects against duplicate fires across server
  *    restarts within the same minute.
  *  - No external cron parser dependency. Supports the common subset:
- *      *               every value
+ *      star            every value
  *      N               literal
- *      */N             every Nth value (step from 0)
+ *      star/N          every Nth value (step from 0)
  *      A,B,C           list
  *      A-B             range (no step)
  *    Field order: minute hour day-of-month month day-of-week.
+ *    (We say "star" instead of the asterisk character above because
+ *    inside a JSDoc comment, "asterisk-slash" would close the comment.)
  *  - Shutdown: process.on('exit') clears the interval, so the scheduler
  *    doesn't outlive the dev server.
  *
