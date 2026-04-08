@@ -14,7 +14,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Plug, Zap, Server } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  Trash2,
+  Plug,
+  Zap,
+  Server,
+  Power,
+  PowerOff,
+} from "lucide-react";
 import {
   PageHeader,
   EmptyState,
@@ -65,6 +74,29 @@ export default function AgentMcpPage({ agentId }: { agentId: number }) {
 
   const testMut = trpc.agentStudio.mcp.testConnection.useMutation({
     onSuccess: (r) => toast.success(r.message),
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Phase 7: real connect / disconnect mutations. The server spawns the
+  // child process / opens the HTTP client and stores the connection in
+  // a per-process map. Status flips on the row are reflected here on
+  // success via list invalidation.
+  const connectMut = trpc.agentStudio.mcp.connect.useMutation({
+    onSuccess: (r) => {
+      if (r.status === "connected") {
+        toast.success(`Connected — ${r.toolCount} tools discovered`);
+      } else {
+        toast.error(`Connection failed: ${r.error ?? "unknown"}`);
+      }
+      utils.agentStudio.mcp.list.invalidate({ agentId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const disconnectMut = trpc.agentStudio.mcp.disconnect.useMutation({
+    onSuccess: () => {
+      toast.success("Disconnected");
+      utils.agentStudio.mcp.list.invalidate({ agentId });
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -281,11 +313,49 @@ export default function AgentMcpPage({ agentId }: { agentId: number }) {
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        {/* Phase 7: Connect / Disconnect */}
+                        {s.status !== "connected" ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-emerald-400"
+                            title="Connect — spawn the process / open the socket"
+                            onClick={() =>
+                              connectMut.mutate({ serverId: s.id })
+                            }
+                            disabled={connectMut.isPending}
+                          >
+                            {connectMut.isPending &&
+                            connectMut.variables?.serverId === s.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Power className="h-3 w-3" />
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-red-400"
+                            title="Disconnect — kill the process / close the socket"
+                            onClick={() =>
+                              disconnectMut.mutate({ serverId: s.id })
+                            }
+                            disabled={disconnectMut.isPending}
+                          >
+                            {disconnectMut.isPending &&
+                            disconnectMut.variables?.serverId === s.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <PowerOff className="h-3 w-3" />
+                            )}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-6 w-6 p-0"
-                          title="Test connection"
+                          title="Test connection (deterministic stub)"
                           onClick={() => testMut.mutate({ serverId: s.id })}
                           disabled={testMut.isPending}
                         >

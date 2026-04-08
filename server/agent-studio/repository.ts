@@ -1438,6 +1438,20 @@ export async function removeMcpServer(serverId: number) {
   await db().delete(agsDraftMcpServers).where(eq(agsDraftMcpServers.id, serverId));
 }
 
+/**
+ * Phase 7: Update only the `status` column of an MCP server row. Used by
+ * the MCP manager to flip pending → connected → disconnected → error.
+ */
+export async function updateMcpServerStatus(
+  serverId: number,
+  status: "pending" | "connected" | "disconnected" | "error"
+) {
+  await db()
+    .update(agsDraftMcpServers)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(agsDraftMcpServers.id, serverId));
+}
+
 export async function replaceMcpServers(
   draftId: number,
   servers: Array<{

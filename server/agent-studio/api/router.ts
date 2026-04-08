@@ -32,6 +32,7 @@ import { cloneAgent } from "../services/cloning";
 // loaded, so importing it here ensures the 60s tick begins on the first
 // agent-studio API hit. No edits to server/_core/index.ts needed.
 import "../services/scheduler";
+import * as mcpManager from "../services/mcp/mcp-manager";
 import { compactRun, resumeRun } from "../services/run-snapshot";
 import { parseAndExecuteSlashCommand } from "../services/slash-commands";
 import { seedOpenllmAgent2 } from "../seeds/openllm-agent2-seed";
@@ -1098,6 +1099,31 @@ const mcpRouter = router({
         message: `Connection test simulated for ${server.transport} server "${server.name}"`,
       };
     }),
+  // Phase 7: Real connect / disconnect / list. Spawns the child process
+  // (stdio) or opens an HTTP client and stores the live connection in
+  // a per-process map. governedProcedure on connect because spawning
+  // child processes / opening sockets is sensitive — same trust level
+  // as publish/archive.
+  connect: governedProcedure
+    .input(z.object({ serverId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      return mcpManager.connectMcpServer({ serverId: input.serverId });
+    }),
+  disconnect: governedProcedure
+    .input(z.object({ serverId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      return mcpManager.disconnectMcpServer(input.serverId);
+    }),
+  listConnectedTools: protectedProcedure
+    .input(agentIdSchema)
+    .query(async ({ input }) => {
+      const draft = await repo.getCurrentDraft(input.agentId);
+      if (!draft) return [];
+      return mcpManager.listConnectedTools(draft.id);
+    }),
+  listConnections: protectedProcedure.query(() => {
+    return mcpManager.listConnections();
+  }),
 });
 
 // ── Skills (attached from local catalog — adapter comes in Phase 0c) ────────
