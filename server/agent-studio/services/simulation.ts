@@ -21,6 +21,7 @@
 import * as repo from "../repository";
 import { evaluateGovernance } from "./governance-adapter";
 import { fireHooksForEvent } from "./hook-runner";
+import * as mcpManager from "./mcp/mcp-manager";
 import { getToolCatalogEntry } from "../adapters/tool-catalog-adapter";
 import { previewRetrieval } from "../adapters/knowledge-adapter";
 import {
@@ -354,32 +355,95 @@ export async function runSimulation(input: {
         workingDirectory: draftWorkingDir,
       });
 
+      // Phase 17a: MCP tool execution.
+      // If the tool key matches the mcp__<server>__<tool> pattern AND
+      // mockedTools is false, route the call through the MCP manager.
+      // The connected MCP server actually executes the tool and returns
+      // a result, which we record in the trace exactly like a normal
+      // tool call. This is the simulation-mode unlock — the live
+      // openllm-agent2 path is upstream-blocked because its WS bridge
+      // hardcodes mcpClients: [] in headless-engine.ts:419.
+      let mcpResult: unknown = null;
+      let mcpError: string | null = null;
+      let mcpDurationMs = 30;
+      const isMcpTool = t.toolKey.startsWith("mcp__");
+      if (isMcpTool && !toggles.mockedTools) {
+        // Decode "mcp__<serverName>__<toolName>" — server name may
+        // contain underscores so we split on the FIRST "__" only.
+        const rest = t.toolKey.slice("mcp__".length);
+        const sepIdx = rest.indexOf("__");
+        if (sepIdx > 0) {
+          const serverName = rest.slice(0, sepIdx);
+          const remoteToolName = rest.slice(sepIdx + 2);
+          // Look up the per-draft MCP server with this name to get its id
+          const draftServers = await repo.listMcpServers(draft.id);
+          const targetServer = draftServers.find(
+            (s) => s.name === serverName
+          );
+          if (!targetServer) {
+            mcpError = `MCP server "${serverName}" not attached to this draft`;
+            verdict = "warning";
+          } else {
+            const mcpStart = Date.now();
+            try {
+              mcpResult = await mcpManager.callMcpTool({
+                serverId: targetServer.id,
+                toolName: remoteToolName,
+                args: {},
+              });
+              mcpDurationMs = Date.now() - mcpStart;
+            } catch (e) {
+              mcpError = e instanceof Error ? e.message : String(e);
+              mcpDurationMs = Date.now() - mcpStart;
+              verdict = "warning";
+            }
+          }
+        } else {
+          mcpError = `Malformed MCP tool key: ${t.toolKey}`;
+          verdict = "warning";
+        }
+      }
+
       steps.push({
         index: stepIdx++,
         type: "tool_call",
-        label: `${toggles.mockedTools ? "Mock" : "Live"} call: ${t.toolName}`,
+        label: isMcpTool
+          ? `${toggles.mockedTools ? "Mock" : "MCP"} call: ${t.toolName}`
+          : `${toggles.mockedTools ? "Mock" : "Live"} call: ${t.toolName}`,
         payload: {
           toolKey: t.toolKey,
-          kind: catalogEntry?.category ?? "unknown",
+          kind: catalogEntry?.category ?? (isMcpTool ? "mcp" : "unknown"),
           mocked: toggles.mockedTools,
           approvalRequired: t.requiresApproval,
           destructive: isDestructive,
-          result: toggles.mockedTools
-            ? { ok: true, mock: true }
-            : { ok: true, executed: true },
+          result: mcpError
+            ? { ok: false, error: mcpError, source: "mcp" }
+            : isMcpTool && !toggles.mockedTools
+              ? { ok: true, source: "mcp", data: mcpResult }
+              : toggles.mockedTools
+                ? { ok: true, mock: true }
+                : { ok: true, executed: true },
         },
         verdict,
-        durationMs: 30,
+        durationMs: mcpDurationMs,
       });
       cost += 10;
       // Trace event so the runs page Tools tab has data
       await repo.appendRuntimeToolCall({
         runId: runtimeRun.id,
         toolKey: t.toolKey,
-        requestPayload: { mocked: toggles.mockedTools, kind: catalogEntry?.category },
-        responsePayload: { verdict, destructive: isDestructive },
+        requestPayload: {
+          mocked: toggles.mockedTools,
+          kind: catalogEntry?.category,
+          isMcp: isMcpTool,
+        },
+        responsePayload: mcpError
+          ? { verdict, destructive: isDestructive, mcpError }
+          : isMcpTool && !toggles.mockedTools
+            ? { verdict, destructive: isDestructive, mcpResult }
+            : { verdict, destructive: isDestructive },
         verdict,
-        durationMs: 30,
+        durationMs: mcpDurationMs,
       });
 
       // Phase 4: PostToolUse hook (fires even on blocked verdict — the

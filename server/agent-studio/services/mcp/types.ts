@@ -16,16 +16,47 @@ export interface McpTool {
 }
 
 /**
+ * Phase 17b: A prompt advertised by an MCP server via prompts/list.
+ * Bridged to a skill in the catalog by Phase 15e's mcp_prompt source.
+ */
+export interface McpPrompt {
+  name: string;
+  description?: string;
+  /** Argument list — each entry is { name, description?, required? } */
+  arguments?: Array<{
+    name: string;
+    description?: string;
+    required?: boolean;
+  }>;
+}
+
+/**
+ * Phase 17d: A resource advertised by an MCP server via resources/list.
+ * Used by ListMcpResourcesTool / ReadMcpResourceTool.
+ */
+export interface McpResource {
+  uri: string;
+  name?: string;
+  description?: string;
+  mimeType?: string;
+}
+
+/**
  * A live MCP connection. Each transport produces one of these. The
  * manager stores them in an in-memory map keyed by serverId.
  */
 export interface McpConnection {
   /** The agsDraftMcpServers row id */
   serverId: number;
-  /** Transport name: stdio | sse | http | sdk */
+  /** Transport name: stdio | sse | http | sdk | websocket */
   transport: string;
   /** The tools the server advertised on initialize */
   tools: McpTool[];
+  /** Phase 17b: prompts the server advertised, if any. Empty array
+   *  when the server doesn't implement prompts/list. */
+  prompts: McpPrompt[];
+  /** Phase 17d: resources the server advertised, if any */
+  resources: McpResource[];
   /** Disconnect — kills the process / closes the socket */
   close: () => Promise<void>;
   /**
@@ -37,6 +68,19 @@ export interface McpConnection {
     name: string,
     args: Record<string, unknown>
   ) => Promise<unknown>;
+  /**
+   * Phase 17b: invoke a prompt by name. Returns the prompt's expanded
+   * messages (the MCP prompts/get response). Optional — connections
+   * from servers that don't support prompts return a rejected promise.
+   */
+  getPrompt?: (
+    name: string,
+    args?: Record<string, string>
+  ) => Promise<unknown>;
+  /**
+   * Phase 17d: read a resource by URI. Returns the contents.
+   */
+  readResource?: (uri: string) => Promise<unknown>;
 }
 
 /**

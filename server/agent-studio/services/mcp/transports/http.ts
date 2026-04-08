@@ -12,6 +12,8 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpConnection,
+  McpPrompt,
+  McpResource,
   McpTool,
 } from "../types";
 import { McpError } from "../types";
@@ -104,15 +106,42 @@ export async function connectHttp(
     tools = [];
   }
 
+  // Phase 17b/d: discover prompts + resources (non-fatal)
+  let prompts: McpPrompt[] = [];
+  try {
+    const result = await sendRpc<{ prompts?: McpPrompt[] }>("prompts/list");
+    if (result && Array.isArray(result.prompts)) prompts = result.prompts;
+  } catch {
+    prompts = [];
+  }
+  let resources: McpResource[] = [];
+  try {
+    const result = await sendRpc<{ resources?: McpResource[] }>(
+      "resources/list"
+    );
+    if (result && Array.isArray(result.resources))
+      resources = result.resources;
+  } catch {
+    resources = [];
+  }
+
   return {
     serverId: input.serverId,
     transport: "http",
     tools,
+    prompts,
+    resources,
     close: async () => {
       // Stateless — nothing to close
     },
     callTool: async (name: string, args: Record<string, unknown>) => {
       return sendRpc("tools/call", { name, arguments: args });
+    },
+    getPrompt: async (name: string, args?: Record<string, string>) => {
+      return sendRpc("prompts/get", { name, arguments: args ?? {} });
+    },
+    readResource: async (uri: string) => {
+      return sendRpc("resources/read", { uri });
     },
   };
 }

@@ -153,6 +153,10 @@ export async function connectSdk(input: SdkConnectInput): Promise<McpConnection>
     serverId: input.serverId,
     transport: "sdk",
     tools: server.tools,
+    // SDK servers can implement prompts + resources via their own
+    // SdkMcpServer interface — for now studio.echo doesn't, so empty
+    prompts: [],
+    resources: [],
     close: async () => {
       // In-process — nothing to close. The registry stays alive for the
       // process lifetime. We could add per-connection cleanup hooks

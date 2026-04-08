@@ -19,6 +19,8 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpConnection,
+  McpPrompt,
+  McpResource,
   McpTool,
 } from "../types";
 import { McpError } from "../types";
@@ -215,10 +217,44 @@ export async function connectStdio(
     tools = [];
   }
 
+  // ── Phase 17b: Discover prompts (non-fatal) ──
+  let prompts: McpPrompt[] = [];
+  try {
+    const promptsResult = await sendRpc<{ prompts?: McpPrompt[] }>(
+      "prompts/list",
+      undefined,
+      TOOLS_LIST_TIMEOUT_MS
+    );
+    if (promptsResult && Array.isArray(promptsResult.prompts)) {
+      prompts = promptsResult.prompts;
+    }
+  } catch {
+    // Non-fatal — most MCP servers don't implement prompts
+    prompts = [];
+  }
+
+  // ── Phase 17d: Discover resources (non-fatal) ──
+  let resources: McpResource[] = [];
+  try {
+    const resourcesResult = await sendRpc<{ resources?: McpResource[] }>(
+      "resources/list",
+      undefined,
+      TOOLS_LIST_TIMEOUT_MS
+    );
+    if (resourcesResult && Array.isArray(resourcesResult.resources)) {
+      resources = resourcesResult.resources;
+    }
+  } catch {
+    // Non-fatal
+    resources = [];
+  }
+
   return {
     serverId: input.serverId,
     transport: "stdio",
     tools,
+    prompts,
+    resources,
     close: async () => {
       closed = true;
       try {
@@ -233,6 +269,16 @@ export async function connectStdio(
         { name, arguments: args },
         30_000
       );
+    },
+    getPrompt: async (name: string, args?: Record<string, string>) => {
+      return sendRpc(
+        "prompts/get",
+        { name, arguments: args ?? {} },
+        TOOLS_LIST_TIMEOUT_MS
+      );
+    },
+    readResource: async (uri: string) => {
+      return sendRpc("resources/read", { uri }, TOOLS_LIST_TIMEOUT_MS);
     },
   };
 }

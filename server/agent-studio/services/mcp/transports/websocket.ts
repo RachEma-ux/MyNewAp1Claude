@@ -27,6 +27,8 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   McpConnection,
+  McpPrompt,
+  McpResource,
   McpTool,
 } from "../types";
 import { McpError } from "../types";
@@ -244,10 +246,37 @@ export async function connectWebSocket(
     tools = [];
   }
 
+  // Phase 17b/d: discover prompts + resources (non-fatal)
+  let prompts: McpPrompt[] = [];
+  try {
+    const result = await sendRpc<{ prompts?: McpPrompt[] }>(
+      "prompts/list",
+      undefined,
+      TOOLS_LIST_TIMEOUT_MS
+    );
+    if (result && Array.isArray(result.prompts)) prompts = result.prompts;
+  } catch {
+    prompts = [];
+  }
+  let resources: McpResource[] = [];
+  try {
+    const result = await sendRpc<{ resources?: McpResource[] }>(
+      "resources/list",
+      undefined,
+      TOOLS_LIST_TIMEOUT_MS
+    );
+    if (result && Array.isArray(result.resources))
+      resources = result.resources;
+  } catch {
+    resources = [];
+  }
+
   return {
     serverId: input.serverId,
     transport: "websocket",
     tools,
+    prompts,
+    resources,
     close: async () => {
       closed = true;
       try {
@@ -258,6 +287,16 @@ export async function connectWebSocket(
     },
     callTool: async (name: string, args: Record<string, unknown>) => {
       return sendRpc("tools/call", { name, arguments: args }, 30_000);
+    },
+    getPrompt: async (name: string, args?: Record<string, string>) => {
+      return sendRpc(
+        "prompts/get",
+        { name, arguments: args ?? {} },
+        TOOLS_LIST_TIMEOUT_MS
+      );
+    },
+    readResource: async (uri: string) => {
+      return sendRpc("resources/read", { uri }, TOOLS_LIST_TIMEOUT_MS);
     },
   };
 }

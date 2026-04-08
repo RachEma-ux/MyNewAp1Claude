@@ -1475,6 +1475,18 @@ export async function updateMcpServerStatus(
 }
 
 /**
+ * Phase 17e: List EVERY MCP server across all drafts. Used by the
+ * auto-reconnect loop in the MCP manager which needs to walk all
+ * known servers (the manager is process-wide, not per-draft).
+ */
+export async function listAllMcpServers() {
+  return db()
+    .select()
+    .from(agsDraftMcpServers)
+    .where(eq(agsDraftMcpServers.enabled, true));
+}
+
+/**
  * Phase 15b: Update OAuth config and/or state on an MCP server row.
  * Either field can be patched independently. Tokens stored inside
  * oauthState should be encrypted by the caller before passing them in.

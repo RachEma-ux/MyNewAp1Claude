@@ -5,7 +5,7 @@
  * 4 transport types (stdio | sse | http | sdk). Each server provides tools
  * and resources to the agent at runtime.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -100,6 +100,93 @@ export default function AgentMcpPage({ agentId }: { agentId: number }) {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  // ── Phase 17c: OAuth connect flow ──
+  // The user clicks "OAuth" on a server row → fills in authUrl/tokenUrl/
+  // clientId/scopes → we call oauthInitiate which returns the
+  // authorization URL → we open it in a new window → the static HTML
+  // callback uses postMessage to send the code+state back to this tab
+  // → we call oauthExchange which encrypts and stores the tokens.
+  const [oauthModal, setOauthModal] = useState<{
+    serverId: number;
+    serverName: string;
+  } | null>(null);
+  const [oauthForm, setOauthForm] = useState({
+    authorizationUrl: "",
+    tokenUrl: "",
+    clientId: "",
+    clientSecret: "",
+    scopes: "",
+  });
+  const oauthInitiateMut = trpc.agentStudio.mcp.oauthInitiate.useMutation({
+    onSuccess: (r) => {
+      // Open the provider's authorization URL in a new window. The
+      // window will redirect to our static HTML callback which fires
+      // postMessage back to this tab.
+      window.open(r.authorizationUrl, "_blank", "width=600,height=700");
+      toast.success("Authorization window opened — complete sign-in there");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const oauthExchangeMut = trpc.agentStudio.mcp.oauthExchange.useMutation({
+    onSuccess: () => {
+      toast.success("OAuth tokens stored — ready to connect");
+      setOauthModal(null);
+      utils.agentStudio.mcp.list.invalidate({ agentId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Listen for postMessage from the static OAuth callback page
+  useEffect(() => {
+    function onMessage(ev: MessageEvent) {
+      if (ev.origin !== window.location.origin) return;
+      const data = ev.data as { source?: string; code?: string; state?: string };
+      if (data?.source !== "agent-studio-mcp-oauth") return;
+      if (!data.code || !data.state || !oauthModal) return;
+      oauthExchangeMut.mutate({
+        serverId: oauthModal.serverId,
+        code: data.code,
+        state: data.state,
+      });
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [oauthModal, oauthExchangeMut]);
+
+  function openOAuthModal(server: any) {
+    setOauthModal({ serverId: server.id, serverName: server.name });
+    setOauthForm({
+      authorizationUrl: "",
+      tokenUrl: "",
+      clientId: "",
+      clientSecret: "",
+      scopes: "",
+    });
+  }
+  function handleOAuthInitiate() {
+    if (!oauthModal) return;
+    if (
+      !oauthForm.authorizationUrl ||
+      !oauthForm.tokenUrl ||
+      !oauthForm.clientId
+    ) {
+      toast.error("authorizationUrl, tokenUrl, and clientId are required");
+      return;
+    }
+    oauthInitiateMut.mutate({
+      serverId: oauthModal.serverId,
+      config: {
+        authorizationUrl: oauthForm.authorizationUrl,
+        tokenUrl: oauthForm.tokenUrl,
+        clientId: oauthForm.clientId,
+        clientSecret: oauthForm.clientSecret || undefined,
+        scopes: oauthForm.scopes
+          ? oauthForm.scopes.split(/\s+/).filter(Boolean)
+          : undefined,
+      },
+    });
+  }
 
   // Form state
   const [newName, setNewName] = useState("");
@@ -355,6 +442,15 @@ export default function AgentMcpPage({ agentId }: { agentId: number }) {
                         <Button
                           size="sm"
                           variant="ghost"
+                          className="h-6 px-1.5 text-[9px]"
+                          title="Connect with OAuth (Phase 17c)"
+                          onClick={() => openOAuthModal(s)}
+                        >
+                          OAuth
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className="h-6 w-6 p-0"
                           title="Test connection (deterministic stub)"
                           onClick={() => testMut.mutate({ serverId: s.id })}
@@ -379,6 +475,102 @@ export default function AgentMcpPage({ agentId }: { agentId: number }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Phase 17c: OAuth modal */}
+      {oauthModal && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-xl">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">
+                  OAuth · {oauthModal.serverName}
+                </h3>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-[10px]"
+                  onClick={() => setOauthModal(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Generic OAuth 2.0 + PKCE. After clicking "Open Sign-in",
+                a new window opens to the provider. Once you authorize,
+                the static callback page sends the code back to this tab
+                and the tokens are stored encrypted.
+              </p>
+              <Field label="Authorization URL">
+                <Input
+                  value={oauthForm.authorizationUrl}
+                  onChange={(e) =>
+                    setOauthForm({ ...oauthForm, authorizationUrl: e.target.value })
+                  }
+                  placeholder="https://provider.com/oauth/authorize"
+                  className="h-7 text-xs font-mono"
+                />
+              </Field>
+              <Field label="Token URL">
+                <Input
+                  value={oauthForm.tokenUrl}
+                  onChange={(e) =>
+                    setOauthForm({ ...oauthForm, tokenUrl: e.target.value })
+                  }
+                  placeholder="https://provider.com/oauth/token"
+                  className="h-7 text-xs font-mono"
+                />
+              </Field>
+              <Field label="Client ID">
+                <Input
+                  value={oauthForm.clientId}
+                  onChange={(e) =>
+                    setOauthForm({ ...oauthForm, clientId: e.target.value })
+                  }
+                  className="h-7 text-xs font-mono"
+                />
+              </Field>
+              <Field label="Client Secret (optional for public clients)">
+                <Input
+                  type="password"
+                  value={oauthForm.clientSecret}
+                  onChange={(e) =>
+                    setOauthForm({ ...oauthForm, clientSecret: e.target.value })
+                  }
+                  className="h-7 text-xs font-mono"
+                />
+              </Field>
+              <Field label="Scopes (space-separated)">
+                <Input
+                  value={oauthForm.scopes}
+                  onChange={(e) =>
+                    setOauthForm({ ...oauthForm, scopes: e.target.value })
+                  }
+                  placeholder="read:repo write:user"
+                  className="h-7 text-xs font-mono"
+                />
+              </Field>
+              <div className="flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleOAuthInitiate}
+                  disabled={oauthInitiateMut.isPending || oauthExchangeMut.isPending}
+                >
+                  {oauthInitiateMut.isPending && (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  )}
+                  Open Sign-in
+                </Button>
+              </div>
+              {oauthExchangeMut.isPending && (
+                <div className="text-[10px] text-emerald-400 flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Exchanging code for tokens…
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

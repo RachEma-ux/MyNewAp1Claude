@@ -1256,13 +1256,20 @@ const mcpRouter = router({
           message: e instanceof Error ? e.message : String(e),
         });
       }
-      // Persist tokens encrypted at rest (placeholder — wire
-      // encryptString/decryptString in a follow-up commit when we ship
-      // production secrets).
+      // Phase 17c: encrypt tokens at rest using the platform helper.
+      // This is the documented cross-module import exception (the plan
+      // explicitly authorizes use of server/_core/encryption.ts for
+      // secret storage). The tokens object is JSON-stringified, then
+      // encrypted, then stored as a single ciphertext string in
+      // oauthState.encryptedTokens. The plain `tokens` field is NOT
+      // persisted.
+      const { encrypt } = await import("../../_core/encryption");
+      const encryptedTokens = encrypt(JSON.stringify(tokens));
       await repo.updateMcpServerOAuth(input.serverId, {
         oauthState: {
           ...(state as Record<string, unknown>),
-          tokens,
+          encryptedTokens,
+          tokenExpiresAt: tokens.expiresAt ?? null,
         },
       });
       return { ok: true, expiresAt: tokens.expiresAt ?? null };

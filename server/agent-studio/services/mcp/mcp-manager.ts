@@ -34,6 +34,63 @@ import { connectWebSocket } from "./transports/websocket";
 const connections = new Map<number, McpConnection>();
 let exitHandlerRegistered = false;
 
+// ── Phase 17e: auto-reconnect ──────────────────────────────────────────────
+
+const RECONNECT_CHECK_INTERVAL_MS = 60_000;
+const RECONNECT_MAX_BACKOFF_MS = 5 * 60 * 1000; // 5 min cap
+const reconnectAttempts = new Map<number, { count: number; nextAt: number }>();
+let reconnectTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Start the periodic reconnect checker. Walks every server row whose
+ * status is "error" or "disconnected" and tries to reconnect them.
+ * Idempotent — multiple calls are no-ops after the first.
+ *
+ * Backoff: per-server attempt counter; exponential up to 5 min.
+ */
+function ensureReconnectLoopStarted() {
+  if (reconnectTimer) return;
+  reconnectTimer = setInterval(async () => {
+    try {
+      // Walk every connected server row across all drafts
+      // (the MCP manager is process-wide, not per-draft).
+      const allRows = await repo.listAllMcpServers();
+      const now = Date.now();
+      for (const row of allRows) {
+        // Skip rows we already have a connection for
+        if (connections.has(row.id)) continue;
+        // Skip rows in error state if we're in backoff
+        const attempt = reconnectAttempts.get(row.id);
+        if (attempt && now < attempt.nextAt) continue;
+        // Only reconnect rows that were previously connected
+        // (status === error means we tried before; pending = never tried)
+        if (row.status !== "error") continue;
+        // Try to reconnect
+        try {
+          await connectMcpServer({ serverId: row.id });
+          reconnectAttempts.delete(row.id);
+        } catch {
+          // Bump backoff
+          const next = attempt ? attempt.count + 1 : 1;
+          const backoffMs = Math.min(
+            1000 * Math.pow(2, next),
+            RECONNECT_MAX_BACKOFF_MS
+          );
+          reconnectAttempts.set(row.id, {
+            count: next,
+            nextAt: now + backoffMs,
+          });
+        }
+      }
+    } catch {
+      // Silent — the loop must keep running
+    }
+  }, RECONNECT_CHECK_INTERVAL_MS);
+  if (reconnectTimer && typeof reconnectTimer.unref === "function") {
+    reconnectTimer.unref();
+  }
+}
+
 function registerExitHandler() {
   if (exitHandlerRegistered) return;
   exitHandlerRegistered = true;
@@ -63,6 +120,7 @@ export async function connectMcpServer(
   error?: string;
 }> {
   registerExitHandler();
+  ensureReconnectLoopStarted();
   // Double-connect → reuse existing
   if (connections.has(input.serverId)) {
     const existing = connections.get(input.serverId)!;
@@ -235,28 +293,106 @@ export async function listConnectedPrompts(
   for (const s of servers) {
     const conn = connections.get(s.id);
     if (!conn) continue;
-    // The McpConnection type may not have `prompts` yet — the field is
-    // optional and transports can populate it during their
-    // initialization. We read defensively.
-    const prompts = (conn as any).prompts as
-      | Array<{
-          name: string;
-          description?: string;
-          arguments?: Record<string, unknown>;
-        }>
-      | undefined;
-    if (!Array.isArray(prompts)) continue;
-    for (const p of prompts) {
+    // Phase 17b: prompts is now a required field on McpConnection
+    // populated by stdio/http/websocket transports at connect time
+    // (each calls prompts/list as part of the handshake).
+    for (const p of conn.prompts) {
       result.push({
         serverId: s.id,
         serverName: s.name,
         promptName: p.name,
         description: p.description,
-        argumentsSchema: p.arguments,
+        argumentsSchema: p.arguments
+          ? Object.fromEntries(
+              p.arguments.map((a) => [a.name, a])
+            )
+          : undefined,
       });
     }
   }
   return result;
+}
+
+/**
+ * Phase 17d: Resources advertised by connected MCP servers, flattened.
+ * Used by the ListMcpResourcesTool implementation.
+ */
+export interface McpResourceEntry {
+  serverId: number;
+  serverName: string;
+  uri: string;
+  name?: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export async function listConnectedResources(
+  draftId: number
+): Promise<McpResourceEntry[]> {
+  const servers = await repo.listMcpServers(draftId);
+  const result: McpResourceEntry[] = [];
+  for (const s of servers) {
+    const conn = connections.get(s.id);
+    if (!conn) continue;
+    for (const r of conn.resources) {
+      result.push({
+        serverId: s.id,
+        serverName: s.name,
+        uri: r.uri,
+        name: r.name,
+        description: r.description,
+        mimeType: r.mimeType,
+      });
+    }
+  }
+  return result;
+}
+
+/**
+ * Phase 17d: Read a resource by URI from a connected server.
+ */
+export async function readMcpResource(input: {
+  serverId: number;
+  uri: string;
+}): Promise<unknown> {
+  const conn = connections.get(input.serverId);
+  if (!conn) {
+    throw new McpError(
+      "not_connected",
+      `MCP server ${input.serverId} is not connected`
+    );
+  }
+  if (!conn.readResource) {
+    throw new McpError(
+      "not_supported",
+      `Transport ${conn.transport} does not implement readResource`
+    );
+  }
+  return conn.readResource(input.uri);
+}
+
+/**
+ * Phase 17b: Invoke a prompt by name on a connected server.
+ */
+export async function invokeMcpPrompt(input: {
+  serverId: number;
+  promptName: string;
+  args?: Record<string, string>;
+}): Promise<unknown> {
+  const conn = connections.get(input.serverId);
+  if (!conn) {
+    throw new McpError(
+      "not_connected",
+      `MCP server ${input.serverId} is not connected`
+    );
+  }
+  if (!conn.getPrompt) {
+    throw new McpError(
+      "not_supported",
+      `Transport ${conn.transport} does not implement getPrompt`
+    );
+  }
+  return conn.getPrompt(input.promptName, input.args);
 }
 
 /**
