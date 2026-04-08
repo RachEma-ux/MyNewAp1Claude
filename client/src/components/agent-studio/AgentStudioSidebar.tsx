@@ -32,6 +32,7 @@ import {
   Users,
   Library,
   Store,
+  Network,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -60,7 +61,9 @@ export type AgentStudioView =
   | "catalog-skills"
   | "catalog-tools"
   // ── Phase 14c: Marketplace (global, no agent context) ──
-  | "marketplace";
+  | "marketplace"
+  // ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
+  | "mcp-manager";
 
 interface SectionGroup {
   label: string;
@@ -88,6 +91,15 @@ const HOME_GROUPS: SectionGroup[] = [
     label: "Marketplace",
     items: [
       { key: "marketplace", label: "Browse / Install", icon: Store },
+    ],
+  },
+  // ── Phase 19 follow-up: Global MCP Manager — cross-draft FSM /
+  // registry visibility surfaced from the dispatcher / FSM / registry
+  // chokepoint architecture shipped in Phase 19a/b/c.
+  {
+    label: "MCP",
+    items: [
+      { key: "mcp-manager", label: "MCP Manager", icon: Network },
     ],
   },
 ];

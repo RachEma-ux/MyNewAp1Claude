@@ -1200,6 +1200,47 @@ const mcpRouter = router({
   getAllServerStates: protectedProcedure.query(() => {
     return mcpManager.getAllConnectionStates();
   }),
+  // Phase 19 follow-up: global MCP Manager snapshot. Joins every
+  // ags_draft_mcp_servers row with its in-memory FSM state + connection
+  // metadata into a single response. Used by the global "MCP Manager"
+  // page in the Agent Studio home sidebar — gives ops visibility into
+  // every attached server across every draft without having to navigate
+  // into each agent individually.
+  getManagerSnapshot: protectedProcedure.query(async () => {
+    const rows = await repo.listAllMcpServers();
+    const states = new Map(
+      mcpManager.getAllConnectionStates().map((s) => [s.serverId, s.state])
+    );
+    const liveConns = new Map(
+      mcpManager.listConnections().map((c) => [c.serverId, c])
+    );
+    return {
+      generatedAt: Date.now(),
+      totalServers: rows.length,
+      totalConnected: liveConns.size,
+      servers: rows.map((row) => {
+        const state = states.get(row.id) ?? { kind: "pending" as const };
+        const live = liveConns.get(row.id);
+        return {
+          id: row.id,
+          draftId: row.draftId,
+          name: row.name,
+          transport: row.transport,
+          command: row.command,
+          url: row.url,
+          enabled: row.enabled,
+          columnStatus: row.status,
+          state,
+          live: live
+            ? {
+                transport: live.transport,
+                toolCount: live.toolCount,
+              }
+            : null,
+        };
+      }),
+    };
+  }),
   // ── Phase 15b: OAuth flow ──────────────────────────────────────────────
   // governedProcedure for both because token storage is sensitive
   oauthInitiate: governedProcedure

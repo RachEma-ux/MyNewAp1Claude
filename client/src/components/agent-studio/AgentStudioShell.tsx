@@ -57,6 +57,8 @@ const AgentSkillCatalogPage = lazy(() => import("@/pages/agent-studio/AgentSkill
 const AgentToolCatalogPage = lazy(() => import("@/pages/agent-studio/AgentToolCatalogPage"));
 // ── Phase 14c: Marketplace (global page, no agent context) ──
 const AgentMarketplacePage = lazy(() => import("@/pages/agent-studio/AgentMarketplacePage"));
+// ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
+const AgentMcpManagerPage = lazy(() => import("@/pages/agent-studio/AgentMcpManagerPage"));
 
 interface ParsedRoute {
   agentId: number | null;
@@ -142,6 +144,10 @@ function parseRoute(path: string): ParsedRoute {
   // ── Phase 14c: Marketplace (global, no agent context) ──
   if (path.startsWith("/agent-studio/marketplace")) {
     return { ...empty, view: "marketplace" as any, homeMode: null };
+  }
+  // ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
+  if (path.startsWith("/agent-studio/mcp-manager")) {
+    return { ...empty, view: "mcp-manager" as any, homeMode: null };
   }
 
   // /agent-studio/:id[/<section>[/<extra>]]
@@ -279,6 +285,10 @@ export default function AgentStudioShell() {
       navigate("/agent-studio/marketplace");
       return;
     }
+    if (key === "mcp-manager") {
+      navigate("/agent-studio/mcp-manager");
+      return;
+    }
     if (!agentContext) {
       // Home-context nav
       if (key === "home") navigate("/agent-studio");
@@ -335,6 +345,9 @@ export default function AgentStudioShell() {
         // ── Phase 14c: marketplace (global) ──
         case "marketplace" as any:
           return <AgentMarketplacePage />;
+        // ── Phase 19 follow-up: MCP Manager (global) ──
+        case "mcp-manager" as any:
+          return <AgentMcpManagerPage />;
         default:
           return <AgentStudioHomePage homeMode={homeMode ?? "list"} />;
       }
