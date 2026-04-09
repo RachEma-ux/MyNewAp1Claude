@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react";
 import { useHrRole } from "@/hooks/useHrRole";
 import { trpc } from "@/lib/trpc";
 import { PMCentralChatWindow } from "./components/pm/PMCentralChatWindow";
+import { AgentStudioChatWindow } from "./components/agent-studio/AgentStudioChatWindow";
 
 // Lazy-loaded page components (code splitting)
 const Home = lazy(() => import("./pages/Home"));
@@ -702,6 +703,14 @@ function PMCentralChatFAB() {
   return <PMCentralChatWindow catalogImports={catalogImports} />;
 }
 
+/** Studio Chat FAB — lives at App level so it persists across all /agent-studio/* routes */
+function AgentStudioChatFAB() {
+  const [location] = useLocation();
+  const isAgentStudio = location.startsWith("/agent-studio");
+  if (!isAgentStudio) return null;
+  return <AgentStudioChatWindow />;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -714,6 +723,7 @@ function App() {
               <Router />
             </Suspense>
             <PMCentralChatFAB />
+            <AgentStudioChatFAB />
           </TooltipProvider>
         </ThemeProvider>
       </WouterRouter>
