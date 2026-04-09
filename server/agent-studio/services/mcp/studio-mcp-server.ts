@@ -384,6 +384,251 @@ const STUDIO_TOOLS: StudioMcpTool[] = [
     },
   },
 
+  {
+    name: "studio.list_directory",
+    description:
+      "List the entries in a directory at the given absolute path. Returns name, kind (file|dir|symlink|other), and size for each entry. Use this to explore the repo before calling read_file on a specific file. Allowed paths: same whitelist as read_file. Entries inside deny-listed subpaths (.git, .env, node_modules, dist, etc.) are filtered out of the result.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Absolute directory path to list.",
+        },
+        maxEntries: {
+          type: "number",
+          description: "Maximum entries to return (default 200)",
+        },
+        recursive: {
+          type: "boolean",
+          description:
+            "If true, walk subdirectories. Default false — prefer false for broad paths, set true only for small scoped subtrees.",
+        },
+        extension: {
+          type: "string",
+          description:
+            "Optional filename extension filter, e.g. '.ts' or '.tsx'. Applied to file entries only.",
+        },
+      },
+      required: ["path"],
+    },
+    handler: async (args) => {
+      const targetPath = args.path;
+      const maxEntries =
+        typeof args.maxEntries === "number" ? args.maxEntries : 200;
+      const recursive = args.recursive === true;
+      const extension =
+        typeof args.extension === "string" ? args.extension : undefined;
+      if (typeof targetPath !== "string") {
+        throw new Error("'path' must be a string");
+      }
+      const resolved = ensureWithinPrefixes(
+        targetPath,
+        FS_ALLOWED_READ_PREFIXES
+      );
+      const stat = await fs.stat(resolved);
+      if (!stat.isDirectory()) {
+        throw new Error(`Not a directory: ${resolved}`);
+      }
+
+      // Walker. Breadth-first so shallow results come first when the
+      // user hits maxEntries mid-walk.
+      const entries: Array<{
+        name: string;
+        path: string;
+        kind: "file" | "dir" | "symlink" | "other";
+        size?: number;
+      }> = [];
+      const queue: string[] = [resolved];
+      const walked = new Set<string>();
+
+      while (queue.length > 0 && entries.length < maxEntries) {
+        const current = queue.shift()!;
+        if (walked.has(current)) continue;
+        walked.add(current);
+
+        let dirents;
+        try {
+          dirents = await fs.readdir(current, { withFileTypes: true });
+        } catch {
+          continue; // permission error, skip
+        }
+        dirents.sort((a, b) => a.name.localeCompare(b.name));
+
+        for (const d of dirents) {
+          if (entries.length >= maxEntries) break;
+          const full = path.join(current, d.name);
+
+          // Skip deny-listed paths silently — this is the whole point
+          // of hiding .git, node_modules, etc. from the agent
+          const denied = FS_DENIED_PREFIXES.some(
+            (p) => full === p.replace(/\/$/, "") || full.startsWith(p)
+          );
+          if (denied) continue;
+
+          let kind: "file" | "dir" | "symlink" | "other" = "other";
+          if (d.isFile()) kind = "file";
+          else if (d.isDirectory()) kind = "dir";
+          else if (d.isSymbolicLink()) kind = "symlink";
+
+          // Apply extension filter (file entries only)
+          if (extension && kind === "file" && !d.name.endsWith(extension)) {
+            continue;
+          }
+
+          let size: number | undefined;
+          if (kind === "file") {
+            try {
+              const s = await fs.stat(full);
+              size = s.size;
+            } catch {
+              /* ignore */
+            }
+          }
+
+          entries.push({ name: d.name, path: full, kind, size });
+
+          if (recursive && kind === "dir") {
+            queue.push(full);
+          }
+        }
+      }
+
+      const capped = entries.length >= maxEntries;
+      const summary = {
+        path: resolved,
+        recursive,
+        extensionFilter: extension ?? null,
+        count: entries.length,
+        capped,
+        entries,
+      };
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              (capped ? `[capped at ${maxEntries} entries] ` : "") +
+              JSON.stringify(summary, null, 2),
+          },
+        ],
+      };
+    },
+  },
+
+  {
+    name: "studio.find_files",
+    description:
+      "Find files by filename substring under an allowed root directory. Useful for locating a file when you only remember part of its name. Returns matching paths. Searches recursively by default. Deny-listed subpaths are skipped.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "Filename substring to match (case-insensitive). Matches anywhere in the filename.",
+        },
+        root: {
+          type: "string",
+          description:
+            "Root directory to search from. Must be under an allowed prefix. Defaults to the MyNewAp1Claude repo root.",
+        },
+        extension: {
+          type: "string",
+          description: "Optional extension filter like '.ts' or '.tsx'",
+        },
+        maxResults: {
+          type: "number",
+          description: "Maximum matches to return (default 50)",
+        },
+      },
+      required: ["query"],
+    },
+    handler: async (args) => {
+      const query = args.query;
+      const rootInput =
+        typeof args.root === "string" ? args.root : REPO_ROOT;
+      const extension =
+        typeof args.extension === "string" ? args.extension : undefined;
+      const maxResults =
+        typeof args.maxResults === "number" ? args.maxResults : 50;
+      if (typeof query !== "string" || query.length === 0) {
+        throw new Error("'query' must be a non-empty string");
+      }
+      const resolvedRoot = ensureWithinPrefixes(
+        rootInput,
+        FS_ALLOWED_READ_PREFIXES
+      );
+      const stat = await fs.stat(resolvedRoot);
+      if (!stat.isDirectory()) {
+        throw new Error(`root is not a directory: ${resolvedRoot}`);
+      }
+
+      const lowerQuery = query.toLowerCase();
+      const matches: Array<{ path: string; size: number }> = [];
+      const queue: string[] = [resolvedRoot];
+      const walked = new Set<string>();
+
+      while (queue.length > 0 && matches.length < maxResults) {
+        const current = queue.shift()!;
+        if (walked.has(current)) continue;
+        walked.add(current);
+
+        let dirents;
+        try {
+          dirents = await fs.readdir(current, { withFileTypes: true });
+        } catch {
+          continue;
+        }
+
+        for (const d of dirents) {
+          if (matches.length >= maxResults) break;
+          const full = path.join(current, d.name);
+          const denied = FS_DENIED_PREFIXES.some(
+            (p) => full === p.replace(/\/$/, "") || full.startsWith(p)
+          );
+          if (denied) continue;
+
+          if (d.isDirectory()) {
+            queue.push(full);
+            continue;
+          }
+          if (!d.isFile()) continue;
+
+          if (extension && !d.name.endsWith(extension)) continue;
+          if (!d.name.toLowerCase().includes(lowerQuery)) continue;
+
+          try {
+            const s = await fs.stat(full);
+            matches.push({ path: full, size: s.size });
+          } catch {
+            matches.push({ path: full, size: 0 });
+          }
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                query,
+                extensionFilter: extension ?? null,
+                root: resolvedRoot,
+                count: matches.length,
+                capped: matches.length >= maxResults,
+                matches,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    },
+  },
+
   // ── Studio mutation tools ────────────────────────────────────────────
   //
   // These turn the OpenLLM Agent into a Studio self-editor: it can
