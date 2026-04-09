@@ -16,7 +16,7 @@ import type {
   McpResource,
   McpTool,
 } from "../types";
-import { McpError } from "../types";
+import { McpError, McpAuthRequiredError } from "../types";
 
 const PROTOCOL_VERSION = "2024-11-05";
 
@@ -56,6 +56,26 @@ export async function connectHttp(
       );
     }
     if (!res.ok) {
+      // Phase 19 follow-up: detect auth challenges and throw the
+      // distinct McpAuthRequiredError so the manager can drive the
+      // FSM into `needs_auth` instead of `failed`. Triggers on:
+      //  - HTTP 401 Unauthorized
+      //  - HTTP 403 Forbidden + WWW-Authenticate header
+      //    (some MCP servers respond with 403 when scope is wrong)
+      const wwwAuth = res.headers.get("www-authenticate") ?? undefined;
+      if (res.status === 401 || (res.status === 403 && wwwAuth)) {
+        // Best-effort extract of an OAuth start URL from the
+        // WWW-Authenticate header (Bearer realm="...", as_uri="...")
+        let authUrl: string | undefined;
+        if (wwwAuth) {
+          const m = wwwAuth.match(/(?:as_uri|authorization_uri)="([^"]+)"/i);
+          if (m) authUrl = m[1];
+        }
+        throw new McpAuthRequiredError(
+          `HTTP ${res.status} ${res.statusText}${wwwAuth ? ` (${wwwAuth})` : ""}`,
+          authUrl
+        );
+      }
       throw new McpError(
         "http_error",
         `HTTP ${res.status} ${res.statusText}`

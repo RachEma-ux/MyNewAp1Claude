@@ -1161,15 +1161,29 @@ const mcpRouter = router({
     }),
   // Phase 7: Real connect / disconnect / list. Spawns the child process
   // (stdio) or opens an HTTP client and stores the live connection in
-  // a per-process map. governedProcedure on connect because spawning
-  // child processes / opening sockets is sensitive — same trust level
-  // as publish/archive.
-  connect: governedProcedure
+  // a per-process map.
+  //
+  // Phase 19 follow-up: downgraded from governedProcedure to
+  // protectedProcedure. The platform action registry doesn't have
+  // `agentStudio.mcp.connect` / `agentStudio.mcp.disconnect` mappings
+  // (no agentStudio.* keys are registered at all in
+  // server/governance/action-key-map.ts), so governedProcedure was
+  // hitting deny-by-default and bouncing every Connect button click
+  // with "this action is restricted for your current account".
+  //
+  // Connect/disconnect are module-internal operations: the user has
+  // already authorized the row by attaching it via mcp.save (also
+  // protectedProcedure), and clicking Connect just spawns the child
+  // process they configured. Phase 19a's dispatcher chokepoint already
+  // governs every actual MCP TOOL call via evaluateMcpPreInvoke /
+  // PostInvoke + audit row writes — that's where the per-call
+  // governance enforcement lives now, not at the connect lifecycle.
+  connect: protectedProcedure
     .input(z.object({ serverId: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       return mcpManager.connectMcpServer({ serverId: input.serverId });
     }),
-  disconnect: governedProcedure
+  disconnect: protectedProcedure
     .input(z.object({ serverId: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       return mcpManager.disconnectMcpServer(input.serverId);
@@ -1242,8 +1256,16 @@ const mcpRouter = router({
     };
   }),
   // ── Phase 15b: OAuth flow ──────────────────────────────────────────────
-  // governedProcedure for both because token storage is sensitive
-  oauthInitiate: governedProcedure
+  //
+  // Phase 19 follow-up: downgraded from governedProcedure to
+  // protectedProcedure for the same reason as connect/disconnect above —
+  // the platform action registry has no agentStudio.* mappings, so
+  // governedProcedure was deny-by-defaulting every OAuth click. The
+  // tokens themselves are still stored encrypted at rest via the
+  // platform encryption helper (the documented cross-module exception)
+  // and the OAuth flow runs entirely against the user's own MCP server
+  // — no platform-level state is mutated by initiate/exchange.
+  oauthInitiate: protectedProcedure
     .input(initiateMcpOAuthSchema)
     .mutation(async ({ input }) => {
       const { buildAuthorizationUrl } = await import("../services/mcp/auth");
@@ -1268,7 +1290,7 @@ const mcpRouter = router({
         state: result.state.state,
       };
     }),
-  oauthExchange: governedProcedure
+  oauthExchange: protectedProcedure
     .input(exchangeMcpOAuthSchema)
     .mutation(async ({ input }) => {
       const { exchangeCodeForTokens } = await import("../services/mcp/auth");

@@ -1049,6 +1049,19 @@ export async function getRuntimeRunById(runId: number) {
   return rows[0] ?? null;
 }
 
+/**
+ * Phase 19 follow-up: list the most recent runtime runs across ALL
+ * agents. Used by the Studio MCP server's `resources/list` to expose
+ * runtime traces as MCP resources without needing an agentId filter.
+ */
+export async function listRecentRuntimeRunsAcrossAgents(limit = 20) {
+  return db()
+    .select()
+    .from(agsRuntimeRuns)
+    .orderBy(desc(agsRuntimeRuns.createdAt))
+    .limit(limit);
+}
+
 export async function listRuntimeRunSteps(runId: number) {
   return db()
     .select()
@@ -1509,10 +1522,23 @@ export async function updateMcpServerStatus(
  * known servers (the manager is process-wide, not per-draft).
  */
 export async function listAllMcpServers() {
+  // Phase 19 follow-up: deterministic ordering. Without ORDER BY,
+  // Postgres returns rows in physical heap order which shuffles after
+  // every UPDATE. The MCP Manager page polls every 5 seconds and was
+  // re-rendering cards in a different order on each poll, making it
+  // look like servers were turning off and others taking their place
+  // when in fact the connection state was correct — just the position
+  // in the list changed. Order by (draftId, name) for stable cross-
+  // draft visibility, with id as the final tiebreaker.
   return db()
     .select()
     .from(agsDraftMcpServers)
-    .where(eq(agsDraftMcpServers.enabled, true));
+    .where(eq(agsDraftMcpServers.enabled, true))
+    .orderBy(
+      agsDraftMcpServers.draftId,
+      agsDraftMcpServers.name,
+      agsDraftMcpServers.id
+    );
 }
 
 /**

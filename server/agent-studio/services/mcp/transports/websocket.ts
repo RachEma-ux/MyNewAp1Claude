@@ -31,7 +31,7 @@ import type {
   McpResource,
   McpTool,
 } from "../types";
-import { McpError } from "../types";
+import { McpError, McpAuthRequiredError } from "../types";
 
 const PROTOCOL_VERSION = "2024-11-05";
 const HANDSHAKE_TIMEOUT_MS = 10_000;
@@ -79,15 +79,60 @@ export async function connectWebSocket(
     const onOpen = () => {
       clearTimeout(timer);
       ws.removeListener("error", onError);
+      ws.removeListener("unexpected-response", onUnexpectedResponse);
       resolve();
     };
     const onError = (err: Error) => {
       clearTimeout(timer);
       ws.removeListener("open", onOpen);
+      ws.removeListener("unexpected-response", onUnexpectedResponse);
+      // The `ws` package surfaces auth challenges as "Unexpected server
+      // response: 401" — fall through to McpError unless the
+      // unexpected-response handler already rejected with the
+      // McpAuthRequiredError variant.
       reject(new McpError("open_error", err.message));
+    };
+    // Phase 19 follow-up: the `ws` package emits `unexpected-response`
+    // BEFORE `error` when the WebSocket upgrade gets a non-101 status.
+    // This is the only place we can read the HTTP response status +
+    // headers (including WWW-Authenticate), so we hook it to detect
+    // auth challenges and emit McpAuthRequiredError instead of the
+    // generic open_error. If we don't handle this event, the manager
+    // would see a transient connect_failed and bounce the row through
+    // the failed-retry backoff loop instead of flipping to needs_auth.
+    const onUnexpectedResponse = (
+      _req: unknown,
+      res: { statusCode?: number; headers?: Record<string, string | string[] | undefined> }
+    ) => {
+      const status = res.statusCode ?? 0;
+      const wwwAuthRaw = res.headers?.["www-authenticate"];
+      const wwwAuth = Array.isArray(wwwAuthRaw) ? wwwAuthRaw[0] : wwwAuthRaw;
+      if (status === 401 || (status === 403 && wwwAuth)) {
+        clearTimeout(timer);
+        ws.removeListener("open", onOpen);
+        ws.removeListener("error", onError);
+        try {
+          ws.close();
+        } catch {
+          /* ignore */
+        }
+        let authUrl: string | undefined;
+        if (wwwAuth) {
+          const m = wwwAuth.match(/(?:as_uri|authorization_uri)="([^"]+)"/i);
+          if (m) authUrl = m[1];
+        }
+        reject(
+          new McpAuthRequiredError(
+            `WebSocket upgrade rejected: HTTP ${status}${wwwAuth ? ` (${wwwAuth})` : ""}`,
+            authUrl
+          )
+        );
+      }
+      // Other non-101 responses fall through to the `error` event handler
     };
     ws.once("open", onOpen);
     ws.once("error", onError);
+    ws.once("unexpected-response", onUnexpectedResponse);
   });
 
   // Per-RPC id → resolver registry

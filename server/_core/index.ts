@@ -542,6 +542,29 @@ async function startServer() {
   app.use("/api", uploadRouter);
   // Chat streaming endpoint
   app.post("/api/chat/stream", handleChatStream);
+  // Phase 19 follow-up: Studio-as-MCP-server. Exposes the platform's
+  // own catalog tools, skill prompts, and runtime traces via JSON-RPC
+  // 2.0 so any MCP client (including our own http transport) can
+  // attach to it. Mounted on the existing Express app — no new
+  // process, no new port. Lazy-imported to keep startup time
+  // unaffected when the endpoint isn't used.
+  app.post("/api/mcp", async (req, res) => {
+    try {
+      const { handleStudioMcpRequest } = await import(
+        "../agent-studio/services/mcp/studio-mcp-server"
+      );
+      await handleStudioMcpRequest(req, res);
+    } catch (e) {
+      res.status(500).json({
+        jsonrpc: "2.0",
+        id: null,
+        error: {
+          code: -32603,
+          message: e instanceof Error ? e.message : String(e),
+        },
+      });
+    }
+  });
   // Agent chat streaming endpoint
   app.get("/api/agents/:agentId/chat/stream", handleAgentChatStream);
   // Catalog-authoritative agent chat streaming endpoint

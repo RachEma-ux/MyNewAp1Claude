@@ -26,6 +26,7 @@
 import * as repo from "../../repository";
 import {
   McpError,
+  McpAuthRequiredError,
   type McpConnection,
   type McpTool,
   type ConnectionState,
@@ -301,6 +302,29 @@ export async function connectMcpServer(
     // failed mid-session would have left a snapshot behind; the new
     // failed attempt invalidates it.
     registry.removeServer(input.serverId);
+
+    // ── Phase 19 follow-up: detect auth challenges ──
+    //
+    // If the transport threw `McpAuthRequiredError`, the server
+    // returned an HTTP 401 / WWW-Authenticate / MCP auth_required
+    // notification rather than a generic transport failure. Drive
+    // the FSM into `needs_auth` so the UI can surface an OAuth
+    // banner instead of bouncing the row through the failed-retry
+    // backoff loop forever.
+    if (e instanceof McpAuthRequiredError) {
+      await applyEvent(input.serverId, {
+        type: "auth_required",
+        reason: e.reason,
+        authUrl: e.authUrl,
+      });
+      return {
+        serverId: input.serverId,
+        status: "error",
+        toolCount: 0,
+        error: e.reason,
+      };
+    }
+
     // Phase 19b: drive the FSM through `connect_failed`. The transition
     // moves us from `connecting` to `failed` with backoff data
     // (attemptCount + nextRetryAt). The persistence projection writes

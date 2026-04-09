@@ -150,6 +150,35 @@ export class McpError extends Error {
 }
 
 /**
+ * Phase 19 follow-up: thrown by transports when the MCP server returns
+ * an authentication challenge (HTTP 401, WWW-Authenticate header,
+ * MCP-spec auth_required notification, etc.) instead of a generic
+ * fetch / RPC error.
+ *
+ * `mcp-manager.connectMcpServer` catches this specific class and emits
+ * the FSM `auth_required` event to drive the connection into the
+ * `needs_auth` state — which the UI then surfaces as an OAuth-needed
+ * banner with the `authUrl` (when the server provides one) so the
+ * user can complete the OAuth flow without losing the row.
+ *
+ * Distinct from `McpError` so the manager doesn't accidentally treat
+ * auth challenges as transient connect failures (which would just
+ * trigger the failed → retry backoff loop without ever flipping
+ * the FSM into `needs_auth`).
+ */
+export class McpAuthRequiredError extends Error {
+  constructor(
+    /** Human-readable reason — flowed into FSM state for the UI banner */
+    public reason: string,
+    /** Optional WWW-Authenticate URL or OAuth start URL */
+    public authUrl?: string
+  ) {
+    super(`MCP auth required: ${reason}`);
+    this.name = "McpAuthRequiredError";
+  }
+}
+
+/**
  * Minimal JSON-RPC 2.0 request shape used by all transports.
  */
 export interface JsonRpcRequest {
