@@ -422,30 +422,123 @@ const STUDIO_TOOLS: StudioMcpTool[] = [
   {
     name: "studio.update_draft",
     description:
-      "Patch fields on an agent's current draft. Supported fields: mission, role, scope, systemInstructions, roleInstructions, policyInstructions, outputContract, providerConfig (jsonb), allowedTasks (jsonb array), blockedTasks (jsonb array), autonomyLevel, interventionTriggers (jsonb array).",
+      "Patch fields on an agent's current draft. Pass the fields you want to change as TOP-LEVEL parameters — do NOT wrap them in a 'patch' object. Only the whitelisted fields below are accepted; any other field is silently dropped. Call this multiple times to update different field groups if needed.",
     inputSchema: {
       type: "object",
       properties: {
-        agentId: { type: "number" },
+        agentId: {
+          type: "number",
+          description: "The agent whose current draft you want to update",
+        },
+        // ── Text fields — pass any subset you want to change ─────────
+        mission: {
+          type: "string",
+          description:
+            "One-paragraph description of what the agent is for. Sets `mission` on the current draft.",
+        },
+        role: {
+          type: "string",
+          description:
+            "Short role label (e.g., 'Principal End-to-End Full-Stack Engineering Specialist').",
+        },
+        scope: {
+          type: "string",
+          description:
+            "What the agent is allowed to work on (domains, layers, systems).",
+        },
+        systemInstructions: {
+          type: "string",
+          description:
+            "Full system prompt / persona text — this is what the model sees at the top of every conversation.",
+        },
+        roleInstructions: {
+          type: "string",
+          description:
+            "Role-specific operating instructions (tone, conventions, do/don't rules).",
+        },
+        policyInstructions: {
+          type: "string",
+          description:
+            "Policy and governance instructions the agent must follow (escalation, approval, refusal rules).",
+        },
+        outputContract: {
+          type: "string",
+          description:
+            "Expected output format — markdown sections, JSON schema, or freeform prose.",
+        },
+        successCriteria: {
+          type: "string",
+          description: "What 'done' means for work handled by this agent.",
+        },
+        escalationRules: {
+          type: "string",
+          description:
+            "When and how the agent should escalate instead of acting.",
+        },
+        fallbackBehavior: {
+          type: "string",
+          description: "What to do when primary path fails.",
+        },
+        refusalBehavior: {
+          type: "string",
+          description:
+            "What to do when asked for something out of scope or forbidden.",
+        },
+        autonomyLevel: {
+          type: "string",
+          description:
+            "supervised | semi_autonomous | autonomous — defaults to supervised if omitted.",
+        },
+        // ── Structured fields ────────────────────────────────────────
+        allowedTasks: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Task keys the agent is explicitly authorized to perform.",
+        },
+        blockedTasks: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Task keys the agent must refuse even if asked directly.",
+        },
+        interventionTriggers: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Conditions that should cause the agent to pause for human intervention.",
+        },
+        providerConfig: {
+          type: "object",
+          description:
+            "LLM provider config. Common shape: {provider: 'openai', model: 'gpt-4o-mini', temperature: 0.2, maxTokens: 4000, apiKeyEnvVar: 'OPENAI_API_KEY'}",
+          properties: {
+            provider: { type: "string" },
+            model: { type: "string" },
+            temperature: { type: "number" },
+            maxTokens: { type: "number" },
+            apiKeyEnvVar: { type: "string" },
+            baseUrl: { type: "string" },
+          },
+        },
+        // ── Back-compat escape hatch ─────────────────────────────────
         patch: {
           type: "object",
-          description: "Object of draft fields to update",
+          description:
+            "Deprecated shape — same fields as top-level parameters but nested inside this object. Kept for back-compat; prefer top-level parameters.",
         },
       },
-      required: ["agentId", "patch"],
+      required: ["agentId"],
     },
     handler: async (args) => {
       const agentId = args.agentId;
-      const patch = args.patch;
       if (typeof agentId !== "number") {
         throw new Error("'agentId' must be a number");
       }
-      if (!patch || typeof patch !== "object") {
-        throw new Error("'patch' must be an object");
-      }
-      // Whitelist the fields the agent can touch to avoid accidental
-      // writes to columns like currentDraftId, isCurrent, createdBy.
-      const allowed: Array<keyof typeof patch> = [
+      // Whitelist of writable draft fields. Anything not in this list
+      // is ignored so the LLM can't scribble on currentDraftId,
+      // isCurrent, createdBy, version timestamps, etc.
+      const ALLOWED_KEYS = [
         "mission",
         "role",
         "scope",
@@ -462,16 +555,30 @@ const STUDIO_TOOLS: StudioMcpTool[] = [
         "escalationRules",
         "fallbackBehavior",
         "refusalBehavior",
-      ];
+      ] as const;
+
+      // Accept BOTH shapes:
+      //   1. Top-level fields: { agentId, mission: "...", role: "...", ... }
+      //   2. Nested `patch` object: { agentId, patch: { mission, role } }
+      // If both are present, top-level values take precedence.
       const filtered: Record<string, unknown> = {};
-      for (const key of allowed) {
-        if (key in (patch as Record<string, unknown>)) {
-          filtered[key as string] = (patch as Record<string, unknown>)[key as string];
+      const nested =
+        args.patch && typeof args.patch === "object"
+          ? (args.patch as Record<string, unknown>)
+          : {};
+      for (const key of ALLOWED_KEYS) {
+        if (key in (args as Record<string, unknown>)) {
+          const v = (args as Record<string, unknown>)[key];
+          if (v !== undefined) filtered[key] = v;
+        } else if (key in nested) {
+          const v = nested[key];
+          if (v !== undefined) filtered[key] = v;
         }
       }
+
       if (Object.keys(filtered).length === 0) {
         throw new Error(
-          `No recognized fields in patch. Allowed: ${allowed.join(", ")}`
+          `No fields to update. Pass one or more top-level parameters. Allowed: ${ALLOWED_KEYS.join(", ")}`
         );
       }
       const updated = await repo.updateDraft(agentId, filtered);
