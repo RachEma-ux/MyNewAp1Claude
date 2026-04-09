@@ -40,9 +40,46 @@
  */
 
 import type { Request, Response } from "express";
+import { promises as fs } from "fs";
+import * as path from "path";
 import * as repo from "../../repository";
 import * as catalogTools from "../catalog-tools";
 import * as catalogSkills from "../catalog-skills";
+
+// ── Filesystem scope for studio.write_file / studio.read_file ─────────────
+//
+// The agent has FULL-ACCESS write tools via studio.write_file, but only
+// under paths that are explicitly safe to mutate from an LLM. Extending
+// this whitelist is a conscious trust decision — do not add $HOME or
+// the repo working directory, because the agent would then be able to
+// overwrite its own source code, git history, or CLAUDE.md.
+//
+// Paths are normalized via path.resolve before the check, so `..`
+// traversal attempts are rejected by prefix-match.
+const FS_ALLOWED_WRITE_PREFIXES: string[] = [
+  "/storage/emulated/0/Download/", // Termux-visible Android Downloads
+  "/storage/emulated/0/Documents/", // Termux-visible Android Documents
+  "/data/data/com.termux/files/usr/tmp/", // Termux scratch
+];
+
+// Reads get a broader whitelist — reading isn't destructive, but we
+// still exclude credential stores and the termux secrets dir.
+const FS_ALLOWED_READ_PREFIXES: string[] = [
+  ...FS_ALLOWED_WRITE_PREFIXES,
+  "/data/data/com.termux/files/home/MyNewAp1Claude/docs/",
+  "/data/data/com.termux/files/home/MyNewAp1Claude/README.md",
+];
+
+function ensureWithinPrefixes(targetPath: string, prefixes: string[]): string {
+  const resolved = path.resolve(targetPath);
+  const ok = prefixes.some((p) => resolved === p.replace(/\/$/, "") || resolved.startsWith(p));
+  if (!ok) {
+    throw new Error(
+      `Path not allowed: ${resolved}. Allowed prefixes: ${prefixes.join(", ")}`
+    );
+  }
+  return resolved;
+}
 
 // ── JSON-RPC envelope ──────────────────────────────────────────────────────
 
@@ -208,6 +245,415 @@ const STUDIO_TOOLS: StudioMcpTool[] = [
       return {
         content: [
           { type: "text", text: JSON.stringify(run, null, 2) },
+        ],
+      };
+    },
+  },
+
+  // ── Filesystem tools ─────────────────────────────────────────────────
+  //
+  // Scoped write/read. See FS_ALLOWED_*_PREFIXES at the top of this file
+  // for the whitelist. The agent can freely create, overwrite, or read
+  // files inside those paths — anywhere else is a hard error.
+
+  {
+    name: "studio.write_file",
+    description:
+      "Create or overwrite a file at the given absolute path. Allowed paths: /storage/emulated/0/Download/, /storage/emulated/0/Documents/, /data/data/com.termux/files/usr/tmp/. Paths outside this whitelist are rejected.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description:
+            "Absolute filesystem path. Must start with an allowed prefix.",
+        },
+        content: {
+          type: "string",
+          description:
+            "File content to write. Pass an empty string to create an empty file.",
+        },
+        createParents: {
+          type: "boolean",
+          description:
+            "If true, create missing parent directories (default: true)",
+        },
+      },
+      required: ["path", "content"],
+    },
+    handler: async (args) => {
+      const targetPath = args.path;
+      const content = args.content;
+      const createParents = args.createParents !== false; // default true
+      if (typeof targetPath !== "string") {
+        throw new Error("'path' must be a string");
+      }
+      if (typeof content !== "string") {
+        throw new Error("'content' must be a string");
+      }
+      const resolved = ensureWithinPrefixes(targetPath, FS_ALLOWED_WRITE_PREFIXES);
+      if (createParents) {
+        await fs.mkdir(path.dirname(resolved), { recursive: true });
+      }
+      await fs.writeFile(resolved, content, "utf-8");
+      const stat = await fs.stat(resolved);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Wrote ${stat.size} bytes to ${resolved}`,
+          },
+        ],
+      };
+    },
+  },
+
+  {
+    name: "studio.read_file",
+    description:
+      "Read a file at the given absolute path. Allowed paths: the write whitelist plus docs/ and README.md under the repo.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Absolute filesystem path.",
+        },
+        maxBytes: {
+          type: "number",
+          description: "Max bytes to return (default 65536)",
+        },
+      },
+      required: ["path"],
+    },
+    handler: async (args) => {
+      const targetPath = args.path;
+      const maxBytes =
+        typeof args.maxBytes === "number" ? args.maxBytes : 65536;
+      if (typeof targetPath !== "string") {
+        throw new Error("'path' must be a string");
+      }
+      const resolved = ensureWithinPrefixes(targetPath, FS_ALLOWED_READ_PREFIXES);
+      const raw = await fs.readFile(resolved);
+      const truncated = raw.length > maxBytes;
+      const text = raw.slice(0, maxBytes).toString("utf-8");
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              (truncated ? `[truncated at ${maxBytes} bytes] ` : "") + text,
+          },
+        ],
+      };
+    },
+  },
+
+  // ── Studio mutation tools ────────────────────────────────────────────
+  //
+  // These turn the OpenLLM Agent into a Studio self-editor: it can
+  // create new agents, patch drafts, manage permission rules, attach
+  // MCP servers, and submit for review. Every mutation writes through
+  // the existing repo layer so the same invariants the UI relies on
+  // (internal_key uniqueness, draft isCurrent, etc.) are preserved.
+
+  {
+    name: "studio.create_agent",
+    description:
+      "Create a new agent with an initial draft. Returns the new agent id + draft id. internal_key must be unique across the Studio.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Human-readable agent name" },
+        internalKey: {
+          type: "string",
+          description:
+            "Unique slug-style key (lowercase, hyphens ok). Used as the permanent handle for the agent.",
+        },
+        description: { type: "string" },
+        agentClass: {
+          type: "string",
+          description:
+            "assistant | orchestrator | analyst | custom (default: assistant)",
+        },
+        visibility: {
+          type: "string",
+          description: "private | workspace | org (default: private)",
+        },
+      },
+      required: ["name", "internalKey"],
+    },
+    handler: async (args) => {
+      const name = args.name;
+      const internalKey = args.internalKey;
+      if (typeof name !== "string" || name.length === 0) {
+        throw new Error("'name' must be a non-empty string");
+      }
+      if (typeof internalKey !== "string" || internalKey.length === 0) {
+        throw new Error("'internalKey' must be a non-empty string");
+      }
+      const existing = await repo.getAgentByInternalKey(internalKey);
+      if (existing) {
+        throw new Error(
+          `Agent with internalKey='${internalKey}' already exists (id=${existing.id})`
+        );
+      }
+      const result = await repo.createAgent({
+        name,
+        internalKey,
+        description:
+          typeof args.description === "string" ? args.description : undefined,
+        agentClass:
+          typeof args.agentClass === "string" ? args.agentClass : undefined,
+        visibility:
+          typeof args.visibility === "string" ? args.visibility : undefined,
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Created agent id=${result.agent.id} (draft id=${result.draft.id}, internalKey='${internalKey}')`,
+          },
+        ],
+      };
+    },
+  },
+
+  {
+    name: "studio.update_draft",
+    description:
+      "Patch fields on an agent's current draft. Supported fields: mission, role, scope, systemInstructions, roleInstructions, policyInstructions, outputContract, providerConfig (jsonb), allowedTasks (jsonb array), blockedTasks (jsonb array), autonomyLevel, interventionTriggers (jsonb array).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agentId: { type: "number" },
+        patch: {
+          type: "object",
+          description: "Object of draft fields to update",
+        },
+      },
+      required: ["agentId", "patch"],
+    },
+    handler: async (args) => {
+      const agentId = args.agentId;
+      const patch = args.patch;
+      if (typeof agentId !== "number") {
+        throw new Error("'agentId' must be a number");
+      }
+      if (!patch || typeof patch !== "object") {
+        throw new Error("'patch' must be an object");
+      }
+      // Whitelist the fields the agent can touch to avoid accidental
+      // writes to columns like currentDraftId, isCurrent, createdBy.
+      const allowed: Array<keyof typeof patch> = [
+        "mission",
+        "role",
+        "scope",
+        "systemInstructions",
+        "roleInstructions",
+        "policyInstructions",
+        "outputContract",
+        "providerConfig",
+        "allowedTasks",
+        "blockedTasks",
+        "autonomyLevel",
+        "interventionTriggers",
+        "successCriteria",
+        "escalationRules",
+        "fallbackBehavior",
+        "refusalBehavior",
+      ];
+      const filtered: Record<string, unknown> = {};
+      for (const key of allowed) {
+        if (key in (patch as Record<string, unknown>)) {
+          filtered[key as string] = (patch as Record<string, unknown>)[key as string];
+        }
+      }
+      if (Object.keys(filtered).length === 0) {
+        throw new Error(
+          `No recognized fields in patch. Allowed: ${allowed.join(", ")}`
+        );
+      }
+      const updated = await repo.updateDraft(agentId, filtered);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Draft updated for agent ${agentId}. Changed: ${Object.keys(filtered).join(", ")}. New draft id=${(updated as any)?.id}`,
+          },
+        ],
+      };
+    },
+  },
+
+  {
+    name: "studio.add_permission_rule",
+    description:
+      "Add a permission rule to an agent's current draft. Rules are evaluated first-match-wins in alphabetical toolPattern order. Behavior must be one of allow, deny, ask.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agentId: { type: "number" },
+        toolPattern: {
+          type: "string",
+          description:
+            "Tool pattern (e.g. 'Bash', 'Bash(*)', 'Write(/storage/*)', 'Read')",
+        },
+        behavior: {
+          type: "string",
+          description: "allow | deny | ask",
+        },
+        source: {
+          type: "string",
+          description:
+            "userSettings | projectSettings | localSettings | cliArg | session (default: session)",
+        },
+        description: { type: "string" },
+      },
+      required: ["agentId", "toolPattern", "behavior"],
+    },
+    handler: async (args) => {
+      const agentId = args.agentId;
+      const toolPattern = args.toolPattern;
+      const behavior = args.behavior;
+      if (typeof agentId !== "number") {
+        throw new Error("'agentId' must be a number");
+      }
+      if (typeof toolPattern !== "string" || toolPattern.length === 0) {
+        throw new Error("'toolPattern' must be a non-empty string");
+      }
+      if (behavior !== "allow" && behavior !== "deny" && behavior !== "ask") {
+        throw new Error("'behavior' must be one of: allow, deny, ask");
+      }
+      const draft = await repo.getCurrentDraft(agentId);
+      if (!draft) throw new Error(`No current draft for agent ${agentId}`);
+      const rule = await repo.savePermissionRule({
+        draftId: draft.id,
+        ruleSource: typeof args.source === "string" ? args.source : "session",
+        ruleBehavior: behavior,
+        toolPattern,
+        description:
+          typeof args.description === "string" ? args.description : null,
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Added rule id=${rule.id}: ${behavior.toUpperCase()} ${toolPattern}`,
+          },
+        ],
+      };
+    },
+  },
+
+  {
+    name: "studio.attach_mcp_server",
+    description:
+      "Attach an MCP server to an agent's current draft. transport must be one of: sdk, stdio, http, sse, websocket. For http/sse transports pass url; for stdio pass command + args.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agentId: { type: "number" },
+        name: { type: "string" },
+        transport: { type: "string" },
+        url: { type: "string" },
+        command: { type: "string" },
+        args: { type: "array", items: { type: "string" } },
+        env: { type: "object" },
+        enabled: { type: "boolean" },
+      },
+      required: ["agentId", "name", "transport"],
+    },
+    handler: async (args) => {
+      const agentId = args.agentId;
+      const name = args.name;
+      const transport = args.transport;
+      if (typeof agentId !== "number") {
+        throw new Error("'agentId' must be a number");
+      }
+      if (typeof name !== "string" || name.length === 0) {
+        throw new Error("'name' must be a non-empty string");
+      }
+      if (typeof transport !== "string" || transport.length === 0) {
+        throw new Error("'transport' must be a non-empty string");
+      }
+      const draft = await repo.getCurrentDraft(agentId);
+      if (!draft) throw new Error(`No current draft for agent ${agentId}`);
+      const saved = await repo.saveMcpServer({
+        draftId: draft.id,
+        name,
+        transport,
+        url: typeof args.url === "string" ? args.url : null,
+        command: typeof args.command === "string" ? args.command : null,
+        args: Array.isArray(args.args) ? (args.args as string[]) : [],
+        env:
+          args.env && typeof args.env === "object"
+            ? (args.env as Record<string, string>)
+            : {},
+        enabled: args.enabled !== false,
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Attached MCP server id=${saved.id} name='${name}' transport='${transport}' to agent ${agentId}. Call agentStudio.mcp.connect via tRPC or restart the dev server to connect it.`,
+          },
+        ],
+      };
+    },
+  },
+
+  {
+    name: "studio.submit_for_review",
+    description:
+      "Submit an agent for publish review. Creates a publish request + an initial owner approval step and moves the agent lifecycle to review_required.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agentId: { type: "number" },
+        versionId: {
+          type: "number",
+          description: "Optional target version id. Omit for draft review.",
+        },
+        targetEnvironment: {
+          type: "string",
+          description: "sandbox | staging | production",
+        },
+        notes: { type: "string" },
+      },
+      required: ["agentId", "targetEnvironment"],
+    },
+    handler: async (args) => {
+      const agentId = args.agentId;
+      const targetEnvironment = args.targetEnvironment;
+      if (typeof agentId !== "number") {
+        throw new Error("'agentId' must be a number");
+      }
+      if (typeof targetEnvironment !== "string") {
+        throw new Error("'targetEnvironment' must be a string");
+      }
+      const created = await repo.createPublishRequest({
+        agentId,
+        versionId:
+          typeof args.versionId === "number" ? args.versionId : undefined,
+        targetEnvironment,
+        notes: typeof args.notes === "string" ? args.notes : undefined,
+        preflight: {},
+        requestedBy: 1, // dev-mode default actor
+      });
+      await repo.createApprovalStep({
+        publishRequestId: created.id,
+        stepOrder: 1,
+        approverRole: "owner",
+        state: "pending",
+      });
+      await repo.updateAgentLifecycleState(agentId, "review_required");
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Submitted for review: request id=${created.id}, agent ${agentId} moved to review_required. Target env='${targetEnvironment}'. Approve it in the Publish page or via studio.decide_approval (not yet implemented).`,
+          },
         ],
       };
     },
