@@ -348,9 +348,9 @@ async function handleResourcesRead(params: Record<string, unknown> | undefined) 
     );
   }
   const runId = parseInt(m[1], 10);
-  const run = await repo.getRuntimeRun(runId);
+  const run = await repo.getRuntimeRunById(runId);
   if (!run) {
-    throw makeRpcError(ERR_METHOD_NOT_FOUND, `Run ${runId} not found`);
+    throw makeRpcError(ERR_INVALID_PARAMS, `Run ${runId} not found`);
   }
   return {
     contents: [
