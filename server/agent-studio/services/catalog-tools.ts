@@ -28,6 +28,7 @@
 import * as repo from "../repository";
 import * as toolCatalog from "../adapters/tool-catalog-adapter";
 import * as mcpManager from "./mcp/mcp-manager";
+import * as registry from "./mcp/registry";
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -261,9 +262,18 @@ export async function removeCatalogTool(id: number) {
  * Return the unified tool catalog from up to 3 sources:
  *   1. Static built-in 51 from tool-catalog-adapter
  *   2. DB rows from agsCatalogTools
- *   3. MCP-discovered tools — only included when `draftId` is provided
- *      (otherwise we have no way to know which MCP servers are connected
- *      for which agent)
+ *   3. MCP-discovered tools — from EVERY connected server across every
+ *      draft when no `draftId` is provided (via Phase 19c's versioned
+ *      registry), OR scoped to the draft's attached servers when
+ *      `draftId` is passed (used by the per-agent Tools page to show
+ *      only tools the draft can actually use).
+ *
+ * Phase 19 follow-up: pre-19 the MCP source was gated on draftId
+ * because there was no way to enumerate connected servers without a
+ * per-draft filter. The versioned registry built in Phase 19c changed
+ * that — it holds frozen snapshots of every connected server's tools
+ * indexed by serverId, so the global Tools Catalog page can now flatten
+ * them across all drafts.
  */
 export async function listMergedTools(opts?: {
   draftId?: number;
@@ -308,10 +318,18 @@ export async function listMergedTools(opts?: {
     source: "db",
   }));
 
-  // MCP — only if draftId provided
+  // MCP — Phase 19 follow-up: include MCP tools in BOTH modes:
+  //   - With draftId  → only tools from servers attached to that draft
+  //                     (existing per-agent Tools page behavior)
+  //   - Without draftId → every tool from every connected server across
+  //                       every draft (global Tools Catalog page). The
+  //                       Phase 19c registry holds frozen snapshots keyed
+  //                       by serverId, which we join with the row data
+  //                       (for serverName) via repo.listAllMcpServers.
   let mcpEntries: MergedToolEntry[] = [];
-  if (opts?.draftId) {
-    try {
+  try {
+    if (opts?.draftId) {
+      // Draft-scoped — existing path
       const mcpTools = await mcpManager.listConnectedTools(opts.draftId);
       mcpEntries = mcpTools.map((t) => ({
         key: `mcp__${t.serverName}__${t.name}`,
@@ -330,9 +348,59 @@ export async function listMergedTools(opts?: {
           toolName: t.name,
         },
       }));
-    } catch {
-      // MCP manager not initialized or no connections — silent
+    } else {
+      // Global — walk every connected server via the registry. One
+      // repo call to resolve serverId → serverName, one walk of the
+      // connected states map.
+      const allRows = await repo.listAllMcpServers();
+      const nameBySid = new Map<number, string>();
+      for (const r of allRows) nameBySid.set(r.id, r.name);
+      const states = mcpManager.getAllConnectionStates();
+      for (const { serverId, state } of states) {
+        if (state.kind !== "connected") continue;
+        const snapshot = registry.getSnapshot(serverId);
+        if (!snapshot) continue;
+        const serverName = nameBySid.get(serverId) ?? `server-${serverId}`;
+        for (const tool of snapshot.tools) {
+          mcpEntries.push({
+            key: `mcp__${serverName}__${tool.name}`,
+            name: tool.name,
+            description: tool.description ?? "",
+            category: "mcp",
+            defaultAllowedActions: [],
+            hardBlockedActions: [],
+            defaultRequiresApproval: false,
+            destructive: false,
+            invocationKind: "mcp_ref",
+            source: "mcp",
+            mcpInfo: {
+              serverId,
+              serverName,
+              toolName: tool.name,
+            },
+          });
+        }
+      }
     }
+  } catch {
+    // MCP manager not initialized, registry empty, or repo failure —
+    // silent. The catalog page still renders with builtin + db sources.
+  }
+
+  // Apply filters to MCP entries too (the builtin filter is below; DB
+  // filter happens in the repo layer). Without this, search/category
+  // filters would leak every MCP tool through unchanged.
+  if (opts?.category) {
+    mcpEntries = mcpEntries.filter((t) => t.category === opts.category);
+  }
+  if (opts?.search && opts.search.trim()) {
+    const needle = opts.search.trim().toLowerCase();
+    mcpEntries = mcpEntries.filter(
+      (t) =>
+        t.key.toLowerCase().includes(needle) ||
+        t.name.toLowerCase().includes(needle) ||
+        t.description.toLowerCase().includes(needle)
+    );
   }
 
   // Apply filters to builtin (DB filter happens in repo)
