@@ -48,35 +48,70 @@ import * as catalogSkills from "../catalog-skills";
 
 // ── Filesystem scope for studio.write_file / studio.read_file ─────────────
 //
-// The agent has FULL-ACCESS write tools via studio.write_file, but only
-// under paths that are explicitly safe to mutate from an LLM. Extending
-// this whitelist is a conscious trust decision — do not add $HOME or
-// the repo working directory, because the agent would then be able to
-// overwrite its own source code, git history, or CLAUDE.md.
+// The agent has FULL-ACCESS write tools via studio.write_file, bounded
+// by this whitelist. Extending it is a conscious trust decision. The
+// MyNewAp1Claude repo root is in the WRITE whitelist so coding agents
+// (e.g. "AI Coding Expert Plus") can actually edit source files, but
+// the DENY prefixes below carve out sensitive subpaths — git history,
+// secrets, dependency caches, build artifacts, Claude's own session
+// data — that must stay off-limits even for a trusted agent.
+//
+// Per-agent enforcement still runs via the draft's permission rules
+// (ags_draft_permission_rules). An agent without a matching
+// `mcp__studio-self__*` allow rule can't call these tools at all,
+// regardless of what's in the whitelist.
 //
 // Paths are normalized via path.resolve before the check, so `..`
 // traversal attempts are rejected by prefix-match.
+
+const REPO_ROOT = "/data/data/com.termux/files/home/MyNewAp1Claude/";
+
 const FS_ALLOWED_WRITE_PREFIXES: string[] = [
   "/storage/emulated/0/Download/", // Termux-visible Android Downloads
   "/storage/emulated/0/Documents/", // Termux-visible Android Documents
   "/data/data/com.termux/files/usr/tmp/", // Termux scratch
+  REPO_ROOT, // MyNewAp1Claude repo — for coding agents
 ];
 
-// Reads get a broader whitelist — reading isn't destructive, but we
-// still exclude credential stores and the termux secrets dir.
+// Subpaths that are DENIED even inside an allowed prefix. Checked
+// after the allow-prefix match. Ordered most-specific first so
+// `path.startsWith` scans are cheap.
+const FS_DENIED_PREFIXES: string[] = [
+  `${REPO_ROOT}.git/`, // git history — no rewriting history
+  `${REPO_ROOT}.git`, // catches the `.git` file itself (worktrees)
+  `${REPO_ROOT}.env`, // literal .env file (and .env.*)
+  `${REPO_ROOT}node_modules/`, // dependency cache, don't touch
+  `${REPO_ROOT}.claude/`, // Claude Code session/memory data
+  `${REPO_ROOT}.claude-flow/`, // alternative Claude dir
+  `${REPO_ROOT}dist/`, // build output — regenerate, don't edit
+  `${REPO_ROOT}.vite/`, // vite cache
+  "/data/data/com.termux/files/home/.ssh/", // never
+  "/data/data/com.termux/files/home/.github_pat", // PAT file
+];
+
+// Reads get a broader whitelist (the repo path was already there
+// from the initial commit). Same deny list applies.
 const FS_ALLOWED_READ_PREFIXES: string[] = [
   ...FS_ALLOWED_WRITE_PREFIXES,
-  "/data/data/com.termux/files/home/MyNewAp1Claude/docs/",
-  "/data/data/com.termux/files/home/MyNewAp1Claude/README.md",
 ];
 
 function ensureWithinPrefixes(targetPath: string, prefixes: string[]): string {
   const resolved = path.resolve(targetPath);
-  const ok = prefixes.some((p) => resolved === p.replace(/\/$/, "") || resolved.startsWith(p));
+  const ok = prefixes.some(
+    (p) => resolved === p.replace(/\/$/, "") || resolved.startsWith(p)
+  );
   if (!ok) {
     throw new Error(
       `Path not allowed: ${resolved}. Allowed prefixes: ${prefixes.join(", ")}`
     );
+  }
+  // Deny-list pass — check even if the path is under an allowed prefix
+  for (const denied of FS_DENIED_PREFIXES) {
+    if (resolved === denied.replace(/\/$/, "") || resolved.startsWith(denied)) {
+      throw new Error(
+        `Path is in deny list: ${resolved}. Sensitive subpaths (.git, .env, node_modules, .claude, dist, secrets) are off-limits even inside the repo.`
+      );
+    }
   }
   return resolved;
 }
