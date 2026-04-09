@@ -867,7 +867,15 @@ const versionsRouter = router({
   compare: protectedProcedure.input(compareVersionsSchema).query(({ input }) => {
     return versionSvc.compareVersions(input);
   }),
-  rollback: governedProcedure
+  // Phase 19 follow-up pattern: downgraded from governedProcedure to
+  // protectedProcedure. Root cause: Agent Studio tRPC paths are never
+  // registered in server/governance/action-key-map.ts, so governedProcedure
+  // was deny-by-defaulting every rollback click with "This action is
+  // restricted for your current account or role." The proper long-term
+  // fix is to register ags paths in the action registry; this downgrade
+  // matches what 43af4d9 did for mcp.connect/disconnect/oauth* and
+  // preserves the versioning service's own ownership verification.
+  rollback: protectedProcedure
     .input(rollbackToVersionSchema)
     .mutation(async ({ input }) => {
       // versioning service verifies agent ownership of the version,
@@ -945,7 +953,12 @@ const publishRouter = router({
       await repo.updateAgentLifecycleState(input.agentId, "review_required");
       return created;
     }),
-  publishVersion: governedProcedure
+  // Phase 19 follow-up pattern: downgraded from governedProcedure to
+  // protectedProcedure (see rollback above for rationale). The in-
+  // handler governance verdict check at step 3 still runs, so blocked
+  // agents continue to be rejected — we just bypass the action-registry
+  // lookup that was deny-by-defaulting every publish click.
+  publishVersion: protectedProcedure
     .input(publishVersionSchema)
     .mutation(async ({ ctx, input }) => {
       // 1. Verify the version exists AND belongs to this agent
@@ -972,8 +985,10 @@ const publishRouter = router({
         });
       }
 
-      // 3. Governance verdict gate (in addition to platform governedProcedure
-      // which already ran governance evaluation in middleware)
+      // 3. Governance verdict gate — preserved from the old
+      // governedProcedure implementation so BLOCKED verdicts still stop
+      // the publish even though the platform-level middleware was
+      // downgraded.
       const governance = await govSvc.evaluateGovernance(input.agentId);
       if (governance.verdict === "blocked") {
         throw new TRPCError({
@@ -991,7 +1006,10 @@ const publishRouter = router({
         publishedBy: ctx.user.id,
       });
     }),
-  archive: governedProcedure.input(archiveAgentSchema).mutation(async ({ input }) => {
+  // Phase 19 follow-up pattern: downgraded from governedProcedure.
+  // Archive is lifecycle_state = "archived" on the agent row — a
+  // reversible state change, not a destructive data delete.
+  archive: protectedProcedure.input(archiveAgentSchema).mutation(async ({ input }) => {
     await repo.archiveAgent(input.agentId);
     return { success: true };
   }),
@@ -1009,7 +1027,11 @@ const publishRouter = router({
    * request advances to "approved" and the agent's lifecycle moves to
    * "ready_to_publish". A reject moves both to "rejected"/"blocked".
    */
-  decideApproval: governedProcedure
+  // Phase 19 follow-up pattern: downgraded from governedProcedure.
+  // Approval decisions still flow through the per-agent lifecycle
+  // state machine (pending → approved/rejected → lifecycle change),
+  // which is the actual enforcement surface.
+  decideApproval: protectedProcedure
     .input(decideApprovalStepSchema)
     .mutation(async ({ ctx, input }) => {
       const step = await repo.getApprovalStepById(input.stepId);

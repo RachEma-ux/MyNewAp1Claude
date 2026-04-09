@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, Rocket, Send, Archive } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Rocket, Send, Archive, AlertCircle, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   PageHeader,
@@ -93,6 +93,20 @@ export default function AgentPublishPage({ agentId }: { agentId: number }) {
     onError: (e) => toast.error(e.message),
   });
 
+  // Inline "create version" — so users don't have to navigate away
+  // to the top-bar Version button when they land on the Publish page
+  // with zero versions and find the Publish button disabled.
+  const createVersionMut = trpc.agentStudio.versions.create.useMutation({
+    onSuccess: (v: any) => {
+      toast.success(`Version v${v?.versionNumber ?? ""} created`);
+      utils.agentStudio.versions.list.invalidate({ agentId });
+      // Auto-select the freshly created version so the Publish
+      // button becomes enabled without a second click.
+      if (v?.id) setVersionId(v.id);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   if (preflightQuery.isLoading) return <LoadingState label="Loading preflight…" />;
 
   const preflight = preflightQuery.data!;
@@ -153,18 +167,54 @@ export default function AgentPublishPage({ agentId }: { agentId: number }) {
         <CardContent className="p-4 space-y-3">
           <h3 className="text-base font-semibold">Release Package</h3>
           <Field label="Version">
-            <select
-              value={versionId ?? ""}
-              onChange={(e) => setVersionId(e.target.value ? parseInt(e.target.value, 10) : null)}
-              className="h-8 px-2 rounded border bg-background text-xs w-full"
-            >
-              <option value="">Select version…</option>
-              {versionsQuery.data?.map((v: any) => (
-                <option key={v.id} value={v.id}>
-                  v{v.versionNumber} — {v.label}
-                </option>
-              ))}
-            </select>
+            {(versionsQuery.data?.length ?? 0) === 0 ? (
+              // No versions exist → don't show an empty dropdown that
+              // leaves the user guessing. Show an inline CTA that
+              // snapshots the current draft and auto-selects it.
+              <div className="rounded border border-yellow-500/30 bg-yellow-500/5 p-2 space-y-2">
+                <div className="flex items-start gap-2 text-[11px] text-yellow-300">
+                  <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    This agent has no versions yet. Publishing requires a
+                    snapshot of the current draft.
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs w-full"
+                  disabled={createVersionMut.isPending}
+                  onClick={() => {
+                    const label = window.prompt(
+                      "Version label (e.g. v1.0 or initial snapshot):",
+                      "initial snapshot"
+                    );
+                    if (!label) return;
+                    createVersionMut.mutate({ agentId, label });
+                  }}
+                >
+                  {createVersionMut.isPending ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <GitBranch className="h-3 w-3 mr-1" />
+                  )}
+                  Snapshot current draft as new version
+                </Button>
+              </div>
+            ) : (
+              <select
+                value={versionId ?? ""}
+                onChange={(e) => setVersionId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                className="h-8 px-2 rounded border bg-background text-xs w-full"
+              >
+                <option value="">Select version…</option>
+                {versionsQuery.data?.map((v: any) => (
+                  <option key={v.id} value={v.id}>
+                    v{v.versionNumber} — {v.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </Field>
           <Field label="Target Environment">
             <select
@@ -185,6 +235,24 @@ export default function AgentPublishPage({ agentId }: { agentId: number }) {
             />
           </Field>
 
+          {/* Disabled-reason hint — explains why the Publish button
+              is greyed out so users don't click and get nothing. */}
+          {(() => {
+            const reasons: string[] = [];
+            if (!versionId) reasons.push("select or create a version above");
+            if (!preflight.publishReady) reasons.push("readiness checklist is not green");
+            if (reasons.length > 0) {
+              return (
+                <div className="flex items-start gap-2 text-[10px] text-muted-foreground rounded border border-dashed border-border/60 px-2 py-1.5">
+                  <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span>
+                    Publish is disabled — to enable it, {reasons.join(" and ")}.
+                  </span>
+                </div>
+              );
+            }
+            return null;
+          })()}
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -210,6 +278,13 @@ export default function AgentPublishPage({ agentId }: { agentId: number }) {
                   targetEnvironment: targetEnv as any,
                   releaseNotes,
                 })
+              }
+              title={
+                !versionId
+                  ? "Select or create a version first"
+                  : !preflight.publishReady
+                  ? "Readiness checklist is not green"
+                  : "Publish this version to the target environment"
               }
             >
               {publishMut.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
