@@ -32,7 +32,10 @@ export default function AgentSimulationPage({ agentId }: { agentId: number }) {
   const scenariosQuery = trpc.agentStudio.simulation.listScenarios.useQuery({ agentId });
 
   const [scenarioName, setScenarioName] = useState("");
-  const [inputJson, setInputJson] = useState('{"prompt":"Hello"}');
+  // Phase 19 follow-up: defaults to empty so the textarea shows its
+  // placeholder (which explains "plain text OR JSON"). Users no longer
+  // have to delete the pre-filled {"prompt":"Hello"} before typing.
+  const [inputJson, setInputJson] = useState("");
   const [toggles, setToggles] = useState({
     mockedTools: true,
     sandboxMemory: true,
@@ -57,29 +60,64 @@ export default function AgentSimulationPage({ agentId }: { agentId: number }) {
     onError: (e) => toast.error(e.message),
   });
 
+  /**
+   * Parse the Scenario textarea transparently:
+   *  - If the text parses as JSON, use it as-is (advanced users can
+   *    still pass full {"prompt": "...", "context": {...}} payloads)
+   *  - If it doesn't parse AND doesn't obviously look like JSON (no
+   *    leading `{` or `[`), wrap it as a plain prompt: {"prompt": <text>}
+   *  - If it starts with `{` or `[` but fails to parse, surface the
+   *    actual JSON parse error (position + reason) so the user can fix it
+   *
+   * This makes "paste a prompt with real newlines" just work — users
+   * don't need to escape \n inside JSON strings. The JSON path is still
+   * there for power users who want structured input.
+   */
+  const parseScenarioInput = (): {
+    ok: boolean;
+    payload?: Record<string, any>;
+    error?: string;
+  } => {
+    const text = inputJson.trim();
+    if (text === "") {
+      return { ok: true, payload: { prompt: "" } };
+    }
+    // Heuristic: if it starts with { or [, user intended JSON → strict parse
+    const looksLikeJson = text.startsWith("{") || text.startsWith("[");
+    if (looksLikeJson) {
+      try {
+        const parsed = JSON.parse(text);
+        return { ok: true, payload: parsed };
+      } catch (e) {
+        return {
+          ok: false,
+          error: `Invalid JSON: ${e instanceof Error ? e.message : String(e)}. Tip: newlines inside JSON strings need to be escaped as \\n, or just type plain text — we'll wrap it as {"prompt": "..."} automatically.`,
+        };
+      }
+    }
+    // Plain text — wrap it
+    return { ok: true, payload: { prompt: text } };
+  };
+
   const handleRun = () => {
-    let payload: Record<string, any> = {};
-    try {
-      payload = JSON.parse(inputJson);
-    } catch {
-      toast.error("Invalid JSON");
+    const parsed = parseScenarioInput();
+    if (!parsed.ok) {
+      toast.error(parsed.error ?? "Invalid scenario input");
       return;
     }
-    runMut.mutate({ agentId, inputPayload: payload, toggles });
+    runMut.mutate({ agentId, inputPayload: parsed.payload!, toggles });
   };
 
   const handleSaveScenario = () => {
-    let payload: Record<string, any> = {};
-    try {
-      payload = JSON.parse(inputJson);
-    } catch {
-      toast.error("Invalid JSON");
+    const parsed = parseScenarioInput();
+    if (!parsed.ok) {
+      toast.error(parsed.error ?? "Invalid scenario input");
       return;
     }
     saveScenarioMut.mutate({
       agentId,
       name: scenarioName,
-      inputPayload: payload,
+      inputPayload: parsed.payload!,
       toggles,
     });
   };
@@ -115,7 +153,13 @@ export default function AgentSimulationPage({ agentId }: { agentId: number }) {
             <Textarea
               value={inputJson}
               onChange={(e) => setInputJson(e.target.value)}
-              placeholder='{"prompt": "Describe what the agent should do..."}'
+              placeholder={`Describe what the agent should do, e.g.:
+
+Monitor Postgres slow queries and summarize them daily.
+
+— or for advanced control —
+
+{"prompt": "...", "context": {"...": "..."}}`}
               className="text-[10px] font-mono min-h-[120px]"
             />
           </Field>
