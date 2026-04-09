@@ -21,10 +21,51 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!--
+      Service worker registration is intentionally REPLACED with an
+      unregister-all step. Background:
+
+        - Previous SW versions (v1, v2 in client/public/sw.js)
+          cached index.html and Vite dev assets, which made old
+          bundles persist across hard refreshes on Android Chrome.
+        - client/public/sw.js is now a v3 kill switch that
+          unregisters itself on install. But we ALSO need to tell
+          the browser not to register a new SW for clients that
+          previously had one — because once a SW is registered,
+          subsequent navigations hit it before hitting this script,
+          and the kill-switch install only runs once on the next
+          browser-initiated update check (which can take 24h).
+
+      The block below runs on every page load and does two things:
+        1. For any already-registered SW: force an update check
+           (which will pick up the kill-switch v3 on first load
+           after deploy) and then unregister it explicitly.
+        2. Never register a NEW SW. If you want PWA behavior back,
+           re-enable registration here AND move back to hashed
+           asset URLs and production-only scope.
+    -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.getRegistrations().then((regs) => {
+            for (const reg of regs) {
+              // Trigger update check so the kill-switch v3 installs
+              // if it hasn't yet, then unregister the old one.
+              try { reg.update(); } catch (_) {}
+              try { reg.unregister(); } catch (_) {}
+            }
+          }).catch(() => {});
+          // If the SW somehow still holds this page, reload once
+          // the controller changes (kill-switch claims the client)
+          // so the user sees fresh content without a manual reload.
+          if (navigator.serviceWorker.controller) {
+            let reloaded = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              if (reloaded) return;
+              reloaded = true;
+              window.location.reload();
+            });
+          }
         });
       }
     </script>
