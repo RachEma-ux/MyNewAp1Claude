@@ -176,6 +176,14 @@ export async function runSimulation(input: {
   let risk = 0;
   let cost = 0;
   let aborted = false;
+  // Phase 19 follow-up: hoisted so the final return statement can
+  // surface the actual LLM response + metadata in `result.output`.
+  // Previously this was declared inside the `if (!aborted)` block at
+  // the Step 7 (Output) scope and the return hardcoded a minimal
+  // `{aborted, runtimeRunId}` — throwing away responsePreview,
+  // tokenCount, usage, and the live-run metadata that the UI's
+  // "Logs & Output" panel needs to show the real answer.
+  let finalOutputPayload: Record<string, unknown> = {};
   // Phase 5: hoisted so the final updateRuntimeRun() can persist usage.
   // Stays undefined for non-live runs and runs whose provider didn't
   // forward usage data.
@@ -967,6 +975,15 @@ export async function runSimulation(input: {
       verdict: draft.outputContract ? "pass" : "warning",
       durationMs: outputDurationMs,
     });
+
+    // Phase 19 follow-up: capture the full outputPayload into the
+    // function-scoped variable so the return statement can surface
+    // responsePreview + live run metadata in result.output. Without
+    // this capture, the UI's "Logs & Output" panel only sees the
+    // hardcoded { aborted, runtimeRunId } minimal object and the
+    // actual LLM response is invisible (it still exists in
+    // steps[output].payload but users look at the panel first).
+    finalOutputPayload = { ...outputPayload };
   }
 
   const durationMs = Date.now() - start;
@@ -1060,7 +1077,17 @@ export async function runSimulation(input: {
     costEstimate: cost,
     durationMs,
     steps,
-    output: { aborted, runtimeRunId: runtimeRun.id },
+    // Phase 19 follow-up: surface the full output payload (includes
+    // responsePreview, tokenCount, usage, runtimeSource, error, etc.)
+    // plus the bookkeeping fields. The UI's "Logs & Output" panel
+    // reads this to show the actual LLM response — without the merge
+    // it only sees { aborted, runtimeRunId } and users couldn't tell
+    // what the agent actually said.
+    output: {
+      ...finalOutputPayload,
+      aborted,
+      runtimeRunId: runtimeRun.id,
+    },
   };
 }
 
