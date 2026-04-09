@@ -196,6 +196,7 @@ const AITypesShell = lazy(() => import("@/pages/ai-types/AITypesShell"));
 const DigitalHQPage = lazy(() => import("@/pages/DigitalHQPage"));
 const GovernanceCenterPage = lazy(() => import("@/pages/GovernanceCenterPage"));
 const RunConsolePage = lazy(() => import("@/pages/RunConsolePage"));
+const WorkConsoleShellPage = lazy(() => import("@/pages/work-console/WorkConsoleShellPage"));
 const CollaborationPage = lazy(() => import("@/pages/CollaborationPage"));
 const PMCentralPage = lazy(() => import("@/pages/PMCentralPage"));
 const PMCentralShellPage = lazy(() => import("@/pages/pm-central/PMCentralShellPage"));
@@ -625,6 +626,13 @@ function Router() {
       <Route path="/governance/:item" component={() => <ProtectedRoute component={GovernanceCenterPage} />} />
       {/* Operator Runtime — Multi-Operator Autonomous Platform */}
       <Route path="/run-console" component={() => <ProtectedRoute component={RunConsolePage} />} />
+      {/* AI Work Console — unified command-center. Single shell route
+          handles sub-routes via internal URL parsing so sidebar/status
+          bar stay persistent across tab transitions. */}
+      <Route path="/work-console/:id/:tab" component={() => <ProtectedRoute component={WorkConsoleShellPage} />} />
+      <Route path="/work-console/:id" component={() => <ProtectedRoute component={WorkConsoleShellPage} />} />
+      <Route path="/work-console/new" component={() => <ProtectedRoute component={WorkConsoleShellPage} />} />
+      <Route path="/work-console" component={() => <ProtectedRoute component={WorkConsoleShellPage} />} />
       {/* Collaboration */}
       <Route path="/collaboration" component={() => <ProtectedRoute component={CollaborationPage} />} />
       {/* PM Central — Dedicated sub-routes (must be before shell catch-all) */}

@@ -84,6 +84,7 @@ import {
   Layers,
   Wrench,
   Code2,
+  Rocket,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -409,6 +410,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
       ],
     },
     { label: "Resources", icon: <Activity className="w-5 h-5" />, href: "/resources" },
+    {
+      label: "AI Work Console",
+      icon: <Rocket className="w-5 h-5" />,
+      href: "/work-console",
+    },
     {
       label: "Run Console",
       icon: <Terminal className="w-5 h-5" />,
