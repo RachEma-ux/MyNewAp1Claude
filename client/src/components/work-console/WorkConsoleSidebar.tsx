@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import {
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   LayoutDashboard,
   History,
   Plus,
@@ -51,6 +53,10 @@ interface Props {
   onNavigate: (key: WorkConsoleView) => void;
   collapsed: boolean;
   onToggle: () => void;
+  /** S2 rail (Task & Controls) collapse state — toggle lives at the
+      bottom of S1, matching CodeStudioSidebar's OpenCode Rail toggle. */
+  railCollapsed: boolean;
+  onRailToggle: () => void;
 }
 
 export default function WorkConsoleSidebar({
@@ -58,6 +64,8 @@ export default function WorkConsoleSidebar({
   onNavigate,
   collapsed,
   onToggle,
+  railCollapsed,
+  onRailToggle,
 }: Props) {
   const handleClick = (item: NavItem) => {
     if (item.key === "deep-code-studio") {
@@ -132,6 +140,41 @@ export default function WorkConsoleSidebar({
             </button>
           );
         })}
+      </div>
+
+      {/* S2 rail toggle — pinned at bottom, hides Task & Controls
+          rail fully behind S1 when collapsed. Same pattern as
+          CodeStudioSidebar's OpenCode Rail toggle. */}
+      <div
+        className={cn(
+          "border-t",
+          collapsed ? "flex justify-center py-1.5" : "px-2 py-1.5"
+        )}
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "shrink-0",
+            collapsed
+              ? "h-7 w-7 p-0"
+              : "h-7 w-full justify-start gap-2 px-2 text-xs text-muted-foreground hover:text-foreground"
+          )}
+          onClick={onRailToggle}
+          title={railCollapsed ? "Show Task & Controls" : "Hide Task & Controls"}
+        >
+          {railCollapsed ? (
+            <>
+              <PanelRightOpen className="h-3.5 w-3.5 shrink-0" />
+              {!collapsed && <span className="truncate">Show Task &amp; Controls</span>}
+            </>
+          ) : (
+            <>
+              <PanelRightClose className="h-3.5 w-3.5 shrink-0" />
+              {!collapsed && <span className="truncate">Hide Task &amp; Controls</span>}
+            </>
+          )}
+        </Button>
       </div>
     </div>
   );

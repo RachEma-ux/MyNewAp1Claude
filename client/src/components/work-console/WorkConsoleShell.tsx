@@ -1,11 +1,13 @@
 /**
  * AI Work Console — Shell
  *
- * Layout: IBM-style 3-panel enterprise console, cloned from the
- * Code Studio Double IBM Shell pattern.
+ * Layout: IBM-style Double Shell, matching the Code Studio pattern.
+ * S1 = module sidebar, S2 = Task & Controls rail. When S2 is
+ * collapsed via the toggle at the bottom of S1 it is fully hidden
+ * behind S1 so only the single sidebar bar is visible.
  *
  *   ┌─────────┬──────────────┬────────────────────┬─────────┐
- *   │   S1    │  Left Rail   │  Center Workspace  │  Right  │
+ *   │   S1    │   S2 Rail    │  Center Workspace  │  Right  │
  *   │ Sidebar │  Task+Ctrls  │  Tabs: Plan/Live/  │  Gov    │
  *   │  (nav)  │  + History   │  Diffs/Results/... │  Rail   │
  *   └─────────┴──────────────┴────────────────────┴─────────┘
@@ -74,6 +76,11 @@ function parseRoute(path: string): ParsedRoute {
 export default function WorkConsoleShell() {
   const [location, navigate] = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // S2 rail (Task & Controls) collapse state. Matches Code Studio's
+  // Double IBM Shell: when railCollapsed = true, the left rail is
+  // fully hidden behind S1 (single bar visible). Defaults to visible
+  // so first-run users immediately see the task form.
+  const [railCollapsed, setRailCollapsed] = useState(false);
 
   const parsed = useMemo(() => parseRoute(location), [location]);
   const { view, jobId, tab } = parsed;
@@ -113,20 +120,24 @@ export default function WorkConsoleShell() {
 
   return (
     <>
-      {/* S1 — Module sidebar */}
+      {/* S1 — Module sidebar (hosts the S2 rail toggle at the bottom) */}
       <WorkConsoleSidebar
         active={view}
         onNavigate={handleNavigate}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        railCollapsed={railCollapsed}
+        onRailToggle={() => setRailCollapsed(!railCollapsed)}
       />
 
-      {/* Left rail — Task & Controls (always visible except in home-only
-          minimal mode; for v1 always visible on every view) */}
-      <WorkConsoleLeftRail
-        activeJobId={jobId}
-        onJobSelected={handleJobSelected}
-      />
+      {/* S2 — Task & Controls rail (fully hidden when railCollapsed —
+          collapses behind S1 so only the single bar is visible) */}
+      {!railCollapsed && (
+        <WorkConsoleLeftRail
+          activeJobId={jobId}
+          onJobSelected={handleJobSelected}
+        />
+      )}
 
       {/* Center workspace — Home or Detail */}
       {view === "detail" && jobId ? (

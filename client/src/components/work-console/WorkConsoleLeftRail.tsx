@@ -1,11 +1,17 @@
 /**
- * AI Work Console — Left Rail: Task & Controls
+ * AI Work Console — S2 Rail: Task & Controls
+ *
+ * S2 in the Double IBM Shell pattern — sits between the S1 module
+ * sidebar and the center workspace. Collapse toggle lives at the
+ * bottom of S1 (WorkConsoleSidebar); when collapsed this component
+ * is fully unmounted so only S1 remains visible, matching
+ * CodeStudioShell's OpenCodeSettingsRail behavior.
  *
  * Contains the task submission form: description textarea, mode
  * selector, autonomy level control, operator override, runtime
  * selector, quick actions, and the submit button. Also renders a
  * compact recent-history list below the form so the user can jump
- * between jobs without leaving the left rail.
+ * between jobs without leaving the rail.
  *
  * Backend: `trpc.orchestrator.submit` (existing, from
  * server/orchestrator/router.ts:23). NO new backend code.
@@ -13,7 +19,7 @@
  * Behavior logic ported from client/src/pages/RunConsolePage.tsx
  * lines 65-208 (submit form + history list). Reused as-is because
  * the repo convention is clone-only, but the JSX here is adapted
- * for the 3-panel console layout (narrower width, compact controls).
+ * for the narrower S2 rail layout and compact controls.
  */
 import { useState } from "react";
 import { useLocation } from "wouter";
