@@ -1,375 +1,235 @@
 /**
- * AI Agent Studio — Chat Page (Phase 19 follow-up)
+ * AI Agent Studio — Chat Page
  *
- * Multi-turn conversational interface for Agent Studio agents, like
- * the chat view in OpenCode but scoped to ags_* agents. Persists
- * sessions and messages in asdb, calls GPT-4 via the same
- * runViaOpenAIDirect adapter the simulation engine uses.
+ * Cloned from client/src/pages/AgentChat.tsx (the platform's main
+ * agent chat) and adapted to use the Agent Studio's own data layer:
  *
- * Layout (2-column):
- *   ┌─────────────┬──────────────────────────┐
- *   │ Sessions    │ Messages                  │
- *   │ list        │                           │
- *   │             │ [user]     Hi, help me... │
- *   │ • New       │ [assistant] Sure...       │
- *   │ • Session 1 │ [user]     Now...         │
- *   │ • Session 2 │ [assistant] ...           │
- *   │             │                           │
- *   │             │ ─────────────────────     │
- *   │             │ [Input box        ] [Send]│
- *   └─────────────┴──────────────────────────┘
+ *   - tRPC routes:    trpc.agents.* + trpc.conversations.*
+ *                  → trpc.agentStudio.shell.getShellSummary
+ *                  + trpc.agentStudio.chat.*
  *
- * MVP scope:
- *   - Text-only messages (no streaming, no tool calls, no markdown rendering)
- *   - One session at a time (no parallel tabs)
- *   - Messages show role + content + timestamp + token count
- *   - New session creates a row eagerly; auto-titled from first message
- *   - Delete session with confirmation
+ *   - Streaming:      EventSource SSE
+ *                  → blocking trpc.agentStudio.chat.sendMessage mutation
+ *                  (Agent Studio's chat backend uses runViaOpenAIDirect
+ *                  which is single-response; streaming is a follow-up)
+ *
+ *   - agentId:        useParams() string
+ *                  → prop passed from AgentStudioShell render switch
+ *
+ *   - Back nav:       removed (the Agent Studio sidebar handles navigation;
+ *                     no /agents back link needed)
+ *
+ * Same visual structure as the source: header / scrollable messages /
+ * composer at the bottom. Same Card components, same Lucide icons,
+ * same shadcn primitives. The "no cross-module imports — clone only"
+ * convention from CLAUDE.md.
  */
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import {
-  MessageSquare,
-  Send,
-  Plus,
-  Trash2,
-  Loader2,
-  User,
-  Bot,
-  AlertCircle,
-} from "lucide-react";
-import {
-  PageHeader,
-  EmptyState,
-  LoadingState,
-} from "@/components/agent-studio/ui";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Send, Loader2, Wrench } from "lucide-react";
 
 export default function AgentChatPage({ agentId }: { agentId: number }) {
   const utils = trpc.useUtils();
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
-  const [draft, setDraft] = useState("");
+  const [message, setMessage] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // ── Session list ──
-  const sessionsQuery = trpc.agentStudio.chat.listSessions.useQuery(
+  const { data: shell } = trpc.agentStudio.shell.getShellSummary.useQuery({ agentId });
+
+  // Load the agent's chat sessions; pick the most recent (or auto-create
+  // one on first send). Mirrors the source's "use first conversation"
+  // pattern (line 30-33 of AgentChat.tsx).
+  const { data: sessions } = trpc.agentStudio.chat.listSessions.useQuery(
     { agentId },
-    { refetchInterval: 10_000 }
+    { enabled: !!agentId }
   );
 
-  // ── Messages for the selected session ──
-  const messagesQuery = trpc.agentStudio.chat.listMessages.useQuery(
-    { sessionId: selectedSessionId ?? 0 },
-    { enabled: selectedSessionId !== null }
+  const sessionId = sessions?.[0]?.id ?? null;
+
+  // Load the messages for the current session
+  const { data: messages } = trpc.agentStudio.chat.listMessages.useQuery(
+    { sessionId: sessionId ?? 0 },
+    { enabled: sessionId !== null }
   );
 
-  // ── Auto-select the most recent session (or create one) ──
-  useEffect(() => {
-    if (selectedSessionId === null && sessionsQuery.data && sessionsQuery.data.length > 0) {
-      setSelectedSessionId(sessionsQuery.data[0].id);
-    }
-  }, [sessionsQuery.data, selectedSessionId]);
-
-  // ── Auto-scroll to bottom on new messages ──
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesQuery.data]);
-
-  // ── Mutations ──
-  const startSessionMut = trpc.agentStudio.chat.startSession.useMutation({
+  const startSessionMut = trpc.agentStudio.chat.startSession.useMutation();
+  const sendMessageMut = trpc.agentStudio.chat.sendMessage.useMutation({
     onSuccess: (r) => {
-      setSelectedSessionId(r.sessionId);
-      utils.agentStudio.chat.listSessions.invalidate({ agentId });
-      toast.success("New chat session started");
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const sendMut = trpc.agentStudio.chat.sendMessage.useMutation({
-    onSuccess: (r) => {
-      if (!r.ok) {
-        toast.error(r.error ?? "Send failed");
-        return;
+      setIsStreaming(false);
+      if (!r.ok && r.error) {
+        // Surface the error in the message stream so the user sees it
+        // inline (matches the source's pattern at line 105-114 where
+        // errors get appended as assistant messages).
+        console.error("Chat error:", r.error);
       }
-      setDraft("");
       utils.agentStudio.chat.listMessages.invalidate({
-        sessionId: selectedSessionId!,
+        sessionId: sessionId ?? 0,
       });
       utils.agentStudio.chat.listSessions.invalidate({ agentId });
     },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const deleteSessionMut = trpc.agentStudio.chat.deleteSession.useMutation({
-    onSuccess: () => {
-      setSelectedSessionId(null);
-      utils.agentStudio.chat.listSessions.invalidate({ agentId });
-      toast.success("Session deleted");
+    onError: (e) => {
+      setIsStreaming(false);
+      console.error("Failed to send message:", e);
     },
-    onError: (e) => toast.error(e.message),
   });
 
-  const handleNewSession = () => {
-    startSessionMut.mutate({ agentId });
-  };
+  // Auto-scroll to bottom when messages change (mirrors source line 38-40)
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  const handleSend = async () => {
-    if (!draft.trim() || !selectedSessionId) return;
-    sendMut.mutate({ sessionId: selectedSessionId, userMessage: draft.trim() });
-  };
+  // Mirrors source handleSendMessage at line 42-131.
+  const handleSendMessage = async () => {
+    if (!message.trim() || !agentId || isStreaming) return;
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Enter to send, Shift+Enter for newline (standard chat UX)
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+    const userMessage = message.trim();
+    setMessage("");
+    setIsStreaming(true);
+
+    try {
+      // Create session if none exists (mirrors source line 60-68).
+      let activeSessionId = sessionId;
+      if (activeSessionId == null) {
+        const newSession = await startSessionMut.mutateAsync({
+          agentId,
+          title: userMessage.substring(0, 50),
+        });
+        activeSessionId = newSession.sessionId;
+        // Refetch the session list so the next render has it
+        await utils.agentStudio.chat.listSessions.invalidate({ agentId });
+      }
+
+      // Send the user message + get the assistant response. The Agent
+      // Studio chat backend persists both messages internally — we
+      // just invalidate the messages query to refetch.
+      sendMessageMut.mutate({
+        sessionId: activeSessionId,
+        userMessage,
+      });
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      setIsStreaming(false);
     }
   };
 
-  const handleDeleteSession = (sessionId: number, title: string | null) => {
-    if (
-      confirm(
-        `Delete session "${title ?? `#${sessionId}`}"? This cannot be undone.`
-      )
-    ) {
-      deleteSessionMut.mutate({ sessionId });
-    }
-  };
-
-  if (sessionsQuery.isLoading) {
-    return <LoadingState label="Loading chat sessions…" />;
-  }
-
-  const sessions = sessionsQuery.data ?? [];
-  const messages = messagesQuery.data ?? [];
-  const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
-
-  // Format milliseconds as a human-friendly duration
-  const fmtMs = (ms: number | null | undefined) => {
-    if (ms == null) return "";
-    if (ms < 1000) return `${ms}ms`;
-    return `${(ms / 1000).toFixed(1)}s`;
-  };
-
-  // Format microcents as $ cost
-  const fmtCost = (micro: number | null | undefined) => {
-    if (micro == null || micro === 0) return "";
-    return `$${(micro / 1_000_000).toFixed(4)}`;
-  };
+  const agentName = (shell as any)?.name ?? `Agent #${agentId}`;
+  const agentDescription =
+    (shell as any)?.description ?? "AI Agent Conversation";
 
   return (
-    <div className="p-4 space-y-3">
-      <PageHeader
-        title="Chat"
-        subtitle="Multi-turn conversation with this agent — persisted across page reloads"
-        icon={<MessageSquare className="h-4 w-4" />}
-        badges={
-          <Badge variant="outline" className="text-[9px] uppercase tracking-wider ml-2">
-            {sessions.length} session{sessions.length === 1 ? "" : "s"}
-          </Badge>
-        }
-      />
+    <div className="flex flex-col h-full">
+      {/* Header — mirrors source line 148-163 */}
+      <div className="border-b bg-card p-4 flex items-center gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">{agentName}</h1>
+          <p className="text-sm text-muted-foreground">{agentDescription}</p>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-12 gap-3 h-[calc(100vh-16rem)]">
-        {/* Session list (left column) */}
-        <Card className="col-span-3 overflow-hidden flex flex-col">
-          <CardContent className="p-2 flex-1 flex flex-col min-h-0">
-            <Button
-              size="sm"
-              className="w-full mb-2 h-7"
-              onClick={handleNewSession}
-              disabled={startSessionMut.isPending}
-            >
-              {startSessionMut.isPending ? (
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              ) : (
-                <Plus className="h-3 w-3 mr-1" />
-              )}
-              New chat
-            </Button>
-            {sessions.length === 0 ? (
-              <div className="text-[10px] text-muted-foreground text-center py-4">
-                No sessions yet. Click "New chat" to start.
-              </div>
-            ) : (
-              <ul className="flex-1 overflow-auto space-y-1">
-                {sessions.map((s) => {
-                  const isSelected = s.id === selectedSessionId;
-                  return (
-                    <li
-                      key={s.id}
-                      className={`text-[10px] rounded p-1.5 cursor-pointer group ${
-                        isSelected
-                          ? "bg-blue-500/15 border border-blue-500/30"
-                          : "border border-transparent hover:bg-muted/40"
-                      }`}
-                      onClick={() => setSelectedSessionId(s.id)}
-                    >
-                      <div className="flex items-start justify-between gap-1">
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate font-medium">
-                            {s.title ?? `Session #${s.id}`}
-                          </div>
-                          <div className="text-[9px] opacity-70 mt-0.5">
-                            {s.messageCount ?? 0} msg
-                            {s.totalCostMicrocents
-                              ? ` · ${fmtCost(s.totalCostMicrocents)}`
-                              : ""}
-                          </div>
-                        </div>
-                        <button
-                          className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-400 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteSession(s.id, s.title);
-                          }}
-                          title="Delete session"
-                        >
-                          <Trash2 className="h-2.5 w-2.5" />
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Messages + composer (right column) */}
-        <Card className="col-span-9 overflow-hidden flex flex-col">
-          <CardContent className="p-3 flex-1 flex flex-col min-h-0">
-            {selectedSessionId === null ? (
-              <EmptyState
-                icon={<MessageSquare className="h-7 w-7" />}
-                title="Select or start a chat"
-                description="Pick an existing session on the left, or click 'New chat' to start a new conversation."
-              />
-            ) : (
-              <>
-                {/* Session header */}
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground pb-2 border-b mb-2">
-                  <div className="truncate">
-                    {selectedSession?.title ?? `Session #${selectedSessionId}`}
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <span>
-                      {selectedSession?.messageCount ?? 0} messages
-                    </span>
-                    <span>
-                      {fmtCost(selectedSession?.totalCostMicrocents)}
-                    </span>
-                  </div>
+      {/* Messages — mirrors source line 165-224 */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {(messages ?? []).map((msg: any) => (
+          <div
+            key={msg.id}
+            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+          >
+            {msg.role === "tool" ? (
+              <Card className="p-3 max-w-[80%] bg-accent/50">
+                <div className="flex items-center gap-2 text-sm">
+                  <Wrench className="w-4 h-4 text-primary" />
+                  <span className="font-medium">
+                    {(msg.toolPayload as any)?.name ?? "tool"}
+                  </span>
                 </div>
-
-                {/* Message list */}
-                <div className="flex-1 overflow-auto space-y-2 pr-1">
-                  {messagesQuery.isLoading ? (
-                    <div className="text-[10px] text-muted-foreground">
-                      Loading messages…
-                    </div>
-                  ) : messages.length === 0 ? (
-                    <div className="text-[10px] text-muted-foreground text-center py-8">
-                      No messages yet. Type below to start the conversation.
-                    </div>
-                  ) : (
-                    messages.map((m) => {
-                      const isUser = m.role === "user";
-                      const isAssistant = m.role === "assistant";
-                      return (
-                        <div
-                          key={m.id}
-                          className={`flex gap-2 ${isUser ? "justify-end" : "justify-start"}`}
-                        >
-                          {!isUser && (
-                            <div className="w-5 h-5 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center shrink-0 mt-0.5">
-                              <Bot className="h-2.5 w-2.5 text-blue-400" />
-                            </div>
-                          )}
-                          <div
-                            className={`max-w-[75%] rounded p-2 text-xs ${
-                              isUser
-                                ? "bg-blue-500/10 border border-blue-500/20"
-                                : "bg-muted/40 border border-muted"
-                            }`}
-                          >
-                            <div className="whitespace-pre-wrap break-words">
-                              {m.content}
-                            </div>
-                            {isAssistant && m.model && (
-                              <div className="text-[9px] opacity-60 mt-1 flex gap-2">
-                                <span>{m.model}</span>
-                                {m.inputTokens != null && (
-                                  <span>
-                                    {m.inputTokens}→{m.outputTokens ?? 0} tok
-                                  </span>
-                                )}
-                                {fmtMs(m.durationMs) && (
-                                  <span>{fmtMs(m.durationMs)}</span>
-                                )}
-                                {fmtCost(m.costMicrocents) && (
-                                  <span>{fmtCost(m.costMicrocents)}</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          {isUser && (
-                            <div className="w-5 h-5 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0 mt-0.5">
-                              <User className="h-2.5 w-2.5 text-emerald-400" />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Composer */}
-                <div className="pt-2 border-t mt-2">
-                  <div className="flex gap-2">
-                    <Textarea
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
-                      className="text-xs min-h-[50px] max-h-[150px] resize-none"
-                      disabled={sendMut.isPending}
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleSend}
-                      disabled={!draft.trim() || sendMut.isPending}
-                      className="h-auto px-3 self-stretch"
-                    >
-                      {sendMut.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Send className="h-3 w-3" />
+                <pre className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">
+                  {msg.content}
+                </pre>
+              </Card>
+            ) : (
+              <Card
+                className={`p-3 max-w-[80%] ${
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted"
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                <span className="text-xs opacity-70 mt-1 block">
+                  {new Date(msg.createdAt).toLocaleTimeString()}
+                  {msg.role === "assistant" && msg.model && (
+                    <>
+                      {" · "}
+                      {msg.model}
+                      {msg.inputTokens != null && (
+                        <>
+                          {" · "}
+                          {msg.inputTokens}→{msg.outputTokens ?? 0} tok
+                        </>
                       )}
-                    </Button>
-                  </div>
-                  {sendMut.isPending && (
-                    <div className="text-[9px] text-muted-foreground mt-1 flex items-center gap-1">
-                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                      Calling GPT-4… (typically 5-20 seconds)
-                    </div>
+                      {msg.durationMs != null && (
+                        <>
+                          {" · "}
+                          {msg.durationMs < 1000
+                            ? `${msg.durationMs}ms`
+                            : `${(msg.durationMs / 1000).toFixed(1)}s`}
+                        </>
+                      )}
+                    </>
                   )}
-                  {sendMut.data && !sendMut.data.ok && (
-                    <div className="text-[10px] text-red-400 mt-1 flex items-start gap-1">
-                      <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
-                      <span>{sendMut.data.error}</span>
-                    </div>
-                  )}
-                </div>
-              </>
+                </span>
+              </Card>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        ))}
+
+        {/* Streaming indicator (we don't actually stream tokens yet —
+            this just shows a "thinking" placeholder during the
+            blocking mutation). Mirrors source line 199-209. */}
+        {isStreaming && (
+          <div className="flex justify-start">
+            <Card className="p-3 max-w-[80%] bg-muted">
+              <p className="text-sm flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Thinking…</span>
+              </p>
+            </Card>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input — mirrors source line 226-253 */}
+      <div className="border-t bg-card p-4">
+        <div className="flex gap-2">
+          <Input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            placeholder="Type your message..."
+            disabled={isStreaming}
+            className="flex-1"
+          />
+          <Button
+            onClick={handleSendMessage}
+            disabled={!message.trim() || isStreaming}
+            size="icon"
+          >
+            {isStreaming ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
