@@ -26,8 +26,19 @@ import type {
 import { McpError } from "../types";
 
 const PROTOCOL_VERSION = "2024-11-05";
-const HANDSHAKE_TIMEOUT_MS = 10_000;
-const TOOLS_LIST_TIMEOUT_MS = 5_000;
+// Phase 19 follow-up: bumped from 10s → 30s. The most common stdio
+// MCP servers in the ecosystem are launched via `npx <package>` which
+// downloads the package on first use. On slow connections (Termux on
+// metered data, CI runners with cold caches) the npm package fetch +
+// install can easily take 15-25 seconds before the server emits its
+// first JSON-RPC frame. The pre-19 10s ceiling killed every npx-based
+// server before it could finish initializing, surfacing as "MCP server
+// process closed" with no useful diagnostic.
+const HANDSHAKE_TIMEOUT_MS = 30_000;
+const TOOLS_LIST_TIMEOUT_MS = 10_000;
+// Phase 19 follow-up: cap stderr capture so a chatty server can't
+// blow up memory. We only need the last few KB for diagnostics.
+const STDERR_CAPTURE_MAX_BYTES = 8_192;
 
 export interface StdioConnectInput {
   serverId: number;
@@ -63,6 +74,13 @@ export async function connectStdio(
 
   // Buffer for partial line assembly on stdout
   let stdoutBuf = "";
+  // Phase 19 follow-up: capture stderr so close-during-handshake errors
+  // include the actual subprocess output instead of just "process closed".
+  // Bounded to STDERR_CAPTURE_MAX_BYTES to prevent memory blowup if the
+  // server is chatty.
+  let stderrBuf = "";
+  let exitCode: number | null = null;
+  let exitSignal: NodeJS.Signals | null = null;
   // RPC id → resolver map
   const pending = new Map<
     number,
@@ -70,6 +88,16 @@ export async function connectStdio(
   >();
   let nextId = 1;
   let closed = false;
+
+  child.stderr?.on("data", (chunk: Buffer) => {
+    const text = chunk.toString("utf-8");
+    stderrBuf += text;
+    if (stderrBuf.length > STDERR_CAPTURE_MAX_BYTES) {
+      // Keep the tail — when servers crash, the last lines are usually
+      // the most informative
+      stderrBuf = stderrBuf.slice(-STDERR_CAPTURE_MAX_BYTES);
+    }
+  });
 
   child.stdout?.on("data", (chunk: Buffer) => {
     stdoutBuf += chunk.toString("utf-8");
@@ -111,10 +139,26 @@ export async function connectStdio(
     }
     pending.clear();
   });
-  child.on("close", () => {
+  child.on("close", (code, signal) => {
     closed = true;
+    exitCode = code;
+    exitSignal = signal;
+    // Phase 19 follow-up: build a diagnostic message that tells the
+    // user WHY the process died. The pre-19 "MCP server process closed"
+    // was useless. Now we include exit code, signal, and the tail of
+    // stderr so the user can see the real error (e.g., "command not
+    // found", "module not installed", "permission denied").
+    const stderrTail = stderrBuf.trim().slice(-1024);
+    const reasonParts: string[] = [];
+    if (exitCode !== null) reasonParts.push(`exit code ${exitCode}`);
+    if (exitSignal) reasonParts.push(`signal ${exitSignal}`);
+    if (reasonParts.length === 0) reasonParts.push("unknown reason");
+    const reason = reasonParts.join(", ");
+    const message = stderrTail
+      ? `MCP server process closed (${reason})\nstderr:\n${stderrTail}`
+      : `MCP server process closed (${reason}, no stderr captured — server may have died before writing anything)`;
     for (const [, handler] of pending) {
-      handler.reject(new McpError("process_closed", "MCP server process closed"));
+      handler.reject(new McpError("process_closed", message));
     }
     pending.clear();
   });
