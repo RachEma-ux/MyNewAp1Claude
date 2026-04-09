@@ -186,6 +186,11 @@ export function AgentStudioChatWindow() {
   // `done` we clear this and invalidate the message list so the
   // persisted row replaces the synthetic bubble.
   const [streamingText, setStreamingText] = useState("");
+  // Tool activity buffer — rendered as tiny inline chips while the
+  // streaming tool loop runs, cleared on `done`.
+  const [activeTools, setActiveTools] = useState<
+    Array<{ name: string; status: "running" | "ok" | "error"; durationMs?: number }>
+  >([]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   // Auto-scroll on new messages — mirrors source line 99-103
@@ -258,9 +263,30 @@ export function AgentStudioChatWindow() {
           const data = JSON.parse(event.data);
           if (data.type === "token") {
             setStreamingText((prev) => prev + (data.content ?? ""));
+          } else if (data.type === "tool_start") {
+            setActiveTools((prev) => [
+              ...prev,
+              { name: data.toolName, status: "running" },
+            ]);
+          } else if (data.type === "tool_end") {
+            setActiveTools((prev) => {
+              // Mark the first still-running entry with this name as done
+              const idx = prev.findIndex(
+                (t) => t.name === data.toolName && t.status === "running"
+              );
+              if (idx < 0) return prev;
+              const next = prev.slice();
+              next[idx] = {
+                name: data.toolName,
+                status: data.ok ? "ok" : "error",
+                durationMs: data.durationMs,
+              };
+              return next;
+            });
           } else if (data.type === "done") {
             setIsStreaming(false);
             setStreamingText("");
+            setActiveTools([]);
             es.close();
             eventSourceRef.current = null;
             utils.agentStudio.chat.listMessages.invalidate({
@@ -270,6 +296,7 @@ export function AgentStudioChatWindow() {
           } else if (data.type === "error") {
             setIsStreaming(false);
             setStreamingText("");
+            setActiveTools([]);
             es.close();
             eventSourceRef.current = null;
             toast.error(data.error ?? "Studio Chat error");
@@ -288,6 +315,7 @@ export function AgentStudioChatWindow() {
       es.onerror = () => {
         setIsStreaming(false);
         setStreamingText("");
+        setActiveTools([]);
         try {
           es.close();
         } catch {
@@ -299,6 +327,7 @@ export function AgentStudioChatWindow() {
       toast.error(`Studio Chat error: ${err.message}`);
       setIsStreaming(false);
       setStreamingText("");
+      setActiveTools([]);
     }
   };
 
@@ -751,8 +780,44 @@ export function AgentStudioChatWindow() {
           </div>
         )}
 
+        {/* Active tool chips — shown when the streaming loop is
+            dispatching MCP tool calls between model turns. Chips
+            switch from spinner → check/x as tool_end events arrive. */}
+        {isStreaming && activeTools.length > 0 && (
+          <div className="flex gap-1 flex-wrap pl-8">
+            {activeTools.map((t, i) => (
+              <span
+                key={`${t.name}-${i}`}
+                className={cn(
+                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] border",
+                  t.status === "running"
+                    ? "bg-muted/50 border-muted-foreground/20 text-muted-foreground"
+                    : t.status === "ok"
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                    : "bg-destructive/10 border-destructive/30 text-destructive"
+                )}
+                title={
+                  t.durationMs != null
+                    ? `${t.name} · ${t.durationMs}ms`
+                    : t.name
+                }
+              >
+                {t.status === "running" ? (
+                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                ) : t.status === "ok" ? (
+                  <Check className="h-2.5 w-2.5" />
+                ) : (
+                  <X className="h-2.5 w-2.5" />
+                )}
+                <Wrench className="h-2.5 w-2.5" />
+                <span>{t.name}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Thinking indicator — shown until the first token arrives */}
-        {isStreaming && streamingText.length === 0 && (
+        {isStreaming && streamingText.length === 0 && activeTools.length === 0 && (
           <div className="flex gap-2 items-center">
             <span
               className={cn(

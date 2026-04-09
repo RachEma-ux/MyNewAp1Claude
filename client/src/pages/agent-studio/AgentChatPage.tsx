@@ -29,27 +29,46 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Send, Loader2, Wrench } from "lucide-react";
+import { Send, Loader2, Wrench, Check, X, Plus, Trash2, Pencil, ChevronDown, ChevronUp } from "lucide-react";
 
 export default function AgentChatPage({ agentId }: { agentId: number }) {
   const utils = trpc.useUtils();
   const [message, setMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [activeTools, setActiveTools] = useState<
+    Array<{ name: string; status: "running" | "ok" | "error"; durationMs?: number }>
+  >([]);
+  // Task #7 — session list state. Identical semantics to the FAB so
+  // the user can switch sessions, rename, delete, and start new ones
+  // without opening the floating widget.
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [pendingNewSession, setPendingNewSession] = useState(false);
+  const [renamingSessionId, setRenamingSessionId] = useState<number | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [sessionsExpanded, setSessionsExpanded] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: shell } = trpc.agentStudio.shell.getShellSummary.useQuery({ agentId });
 
-  // Load the agent's chat sessions; pick the most recent (or auto-create
-  // one on first send). Mirrors the source's "use first conversation"
-  // pattern (line 30-33 of AgentChat.tsx).
+  // Load every session for the agent; user can jump between them
   const { data: sessions } = trpc.agentStudio.chat.listSessions.useQuery(
     { agentId },
     { enabled: !!agentId }
   );
+  const sessionList = (sessions ?? []) as any[];
 
-  const sessionId = sessions?.[0]?.id ?? null;
+  // Reset session state on agent change
+  useEffect(() => {
+    setSelectedSessionId(null);
+    setPendingNewSession(false);
+  }, [agentId]);
+
+  // Effective session id: explicit selection wins, otherwise most recent
+  const sessionId = pendingNewSession
+    ? null
+    : selectedSessionId ?? sessionList[0]?.id ?? null;
 
   // Load the messages for the current session
   const { data: messages } = trpc.agentStudio.chat.listMessages.useQuery(
@@ -58,6 +77,57 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
   );
 
   const startSessionMut = trpc.agentStudio.chat.startSession.useMutation();
+  const deleteSessionMut = trpc.agentStudio.chat.deleteSession.useMutation({
+    onSuccess: (_, vars) => {
+      utils.agentStudio.chat.listSessions.invalidate({ agentId });
+      if (vars.sessionId === sessionId) {
+        setSelectedSessionId(null);
+      }
+    },
+    onError: (e) => console.error("Delete failed:", e),
+  });
+  const renameSessionMut = trpc.agentStudio.chat.renameSession.useMutation({
+    onSuccess: () => {
+      utils.agentStudio.chat.listSessions.invalidate({ agentId });
+      setRenamingSessionId(null);
+      setRenameDraft("");
+    },
+    onError: (e) => console.error("Rename failed:", e),
+  });
+
+  const handleNewSession = () => {
+    setPendingNewSession(true);
+    setSelectedSessionId(null);
+    setSessionsExpanded(false);
+  };
+
+  const handlePickSession = (sid: number) => {
+    setSelectedSessionId(sid);
+    setPendingNewSession(false);
+    setSessionsExpanded(false);
+  };
+
+  const handleStartRename = (sid: number, currentTitle: string | null) => {
+    setRenamingSessionId(sid);
+    setRenameDraft(currentTitle ?? "");
+  };
+
+  const handleCommitRename = () => {
+    if (renamingSessionId == null) return;
+    const title = renameDraft.trim();
+    if (!title) {
+      setRenamingSessionId(null);
+      setRenameDraft("");
+      return;
+    }
+    renameSessionMut.mutate({ sessionId: renamingSessionId, title });
+  };
+
+  const handleDeleteSession = (sid: number, title: string | null) => {
+    const label = title ?? `Session #${sid}`;
+    if (!window.confirm(`Delete "${label}" and all its messages?`)) return;
+    deleteSessionMut.mutate({ sessionId: sid });
+  };
 
   // Auto-scroll to bottom when messages change (mirrors source line 38-40)
   useEffect(() => {
@@ -90,7 +160,7 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
     setStreamingText("");
 
     try {
-      // Create session if none exists (mirrors source line 60-68).
+      // Create session if none exists (first send or pending-new-session)
       let activeSessionId = sessionId;
       if (activeSessionId == null) {
         const newSession = await startSessionMut.mutateAsync({
@@ -98,6 +168,8 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
           title: userMessage.substring(0, 50),
         });
         activeSessionId = newSession.sessionId;
+        setPendingNewSession(false);
+        setSelectedSessionId(activeSessionId);
         await utils.agentStudio.chat.listSessions.invalidate({ agentId });
       }
 
@@ -115,9 +187,29 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
           const data = JSON.parse(event.data);
           if (data.type === "token") {
             setStreamingText((prev) => prev + (data.content ?? ""));
+          } else if (data.type === "tool_start") {
+            setActiveTools((prev) => [
+              ...prev,
+              { name: data.toolName, status: "running" },
+            ]);
+          } else if (data.type === "tool_end") {
+            setActiveTools((prev) => {
+              const idx = prev.findIndex(
+                (t) => t.name === data.toolName && t.status === "running"
+              );
+              if (idx < 0) return prev;
+              const next = prev.slice();
+              next[idx] = {
+                name: data.toolName,
+                status: data.ok ? "ok" : "error",
+                durationMs: data.durationMs,
+              };
+              return next;
+            });
           } else if (data.type === "done") {
             setIsStreaming(false);
             setStreamingText("");
+            setActiveTools([]);
             es.close();
             eventSourceRef.current = null;
             utils.agentStudio.chat.listMessages.invalidate({
@@ -127,6 +219,7 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
           } else if (data.type === "error") {
             setIsStreaming(false);
             setStreamingText("");
+            setActiveTools([]);
             es.close();
             eventSourceRef.current = null;
             console.error("Chat stream error:", data.error);
@@ -142,6 +235,7 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
       es.onerror = () => {
         setIsStreaming(false);
         setStreamingText("");
+        setActiveTools([]);
         try {
           es.close();
         } catch {
@@ -153,6 +247,7 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
       console.error("Failed to send message:", error);
       setIsStreaming(false);
       setStreamingText("");
+      setActiveTools([]);
     }
   };
 
@@ -164,10 +259,142 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
     <div className="flex flex-col h-full">
       {/* Header — mirrors source line 148-163 */}
       <div className="border-b bg-card p-4 flex items-center gap-4">
-        <div>
-          <h1 className="text-xl font-semibold">{agentName}</h1>
-          <p className="text-sm text-muted-foreground">{agentDescription}</p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-semibold truncate">{agentName}</h1>
+          <p className="text-sm text-muted-foreground truncate">{agentDescription}</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleNewSession}
+          disabled={pendingNewSession}
+          title="Start a new session"
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          New
+        </Button>
+      </div>
+
+      {/* Session bar — collapsible list of all sessions for this agent,
+          with rename + delete affordances. Task #7 (parity with FAB). */}
+      <div className="border-b bg-card px-4 py-2">
+        <button
+          onClick={() => setSessionsExpanded((v) => !v)}
+          disabled={sessionList.length === 0 && !pendingNewSession}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+          title="Toggle session list"
+        >
+          {sessionsExpanded ? (
+            <ChevronUp className="h-3 w-3 shrink-0" />
+          ) : (
+            <ChevronDown className="h-3 w-3 shrink-0" />
+          )}
+          <span className="font-semibold uppercase tracking-wider shrink-0">
+            Session
+          </span>
+          <span className="truncate opacity-80 flex-1 text-left">
+            {pendingNewSession
+              ? "New…"
+              : sessionId != null
+              ? sessionList.find((s) => s.id === sessionId)?.title ??
+                `#${sessionId}`
+              : "none"}
+          </span>
+          <span className="shrink-0 opacity-60">
+            {sessionList.length} total
+          </span>
+        </button>
+        {sessionsExpanded && sessionList.length > 0 && (
+          <div className="mt-2 max-h-48 overflow-y-auto flex flex-col gap-1">
+            {sessionList.map((s: any) => {
+              const active = s.id === sessionId;
+              const editing = renamingSessionId === s.id;
+              return (
+                <div
+                  key={s.id}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-all group ${
+                    active
+                      ? "bg-primary/10 border-primary/30 text-primary"
+                      : "bg-muted/30 border-transparent text-muted-foreground hover:border-muted-foreground/30"
+                  }`}
+                >
+                  {editing ? (
+                    <>
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleCommitRename();
+                          } else if (e.key === "Escape") {
+                            setRenamingSessionId(null);
+                            setRenameDraft("");
+                          }
+                        }}
+                        className="flex-1 min-w-0 text-xs bg-background border rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                        maxLength={120}
+                      />
+                      <button
+                        onClick={handleCommitRename}
+                        className="shrink-0 h-5 w-5 flex items-center justify-center rounded hover:bg-primary/20"
+                        title="Save"
+                        disabled={renameSessionMut.isPending}
+                      >
+                        <Check className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRenamingSessionId(null);
+                          setRenameDraft("");
+                        }}
+                        className="shrink-0 h-5 w-5 flex items-center justify-center rounded hover:bg-muted"
+                        title="Cancel"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handlePickSession(s.id)}
+                        className="flex-1 min-w-0 text-left truncate"
+                        title={s.title ?? `Session #${s.id}`}
+                      >
+                        {s.title ?? `Session #${s.id}`}
+                      </button>
+                      <span className="shrink-0 opacity-60">
+                        {s.messageCount ?? 0} msgs
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartRename(s.id, s.title);
+                        }}
+                        className="shrink-0 h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:bg-primary/20"
+                        title="Rename"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSession(s.id, s.title);
+                        }}
+                        className="shrink-0 h-5 w-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:bg-destructive/20 hover:text-destructive"
+                        title="Delete"
+                        disabled={deleteSessionMut.isPending}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Messages — mirrors source line 165-224 */}
@@ -235,8 +462,39 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
           </div>
         )}
 
+        {/* Active tool chips during the streaming tool loop */}
+        {isStreaming && activeTools.length > 0 && (
+          <div className="flex gap-1 flex-wrap">
+            {activeTools.map((t, i) => (
+              <span
+                key={`${t.name}-${i}`}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
+                  t.status === "running"
+                    ? "bg-muted/50 border-muted-foreground/20 text-muted-foreground"
+                    : t.status === "ok"
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                    : "bg-destructive/10 border-destructive/30 text-destructive"
+                }`}
+                title={
+                  t.durationMs != null ? `${t.name} · ${t.durationMs}ms` : t.name
+                }
+              >
+                {t.status === "running" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : t.status === "ok" ? (
+                  <Check className="h-3 w-3" />
+                ) : (
+                  <X className="h-3 w-3" />
+                )}
+                <Wrench className="h-3 w-3" />
+                <span>{t.name}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Thinking placeholder — shown until the first token arrives */}
-        {isStreaming && streamingText.length === 0 && (
+        {isStreaming && streamingText.length === 0 && activeTools.length === 0 && (
           <div className="flex justify-start">
             <Card className="p-3 max-w-[80%] bg-muted">
               <p className="text-sm flex items-center gap-2">
