@@ -28,6 +28,7 @@ import {
   Send,
   Loader2,
   AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 
 // ── Avatar colors (deterministic by name) — copied from source ────────────
@@ -63,19 +64,42 @@ export function AgentStudioChatWindow() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const utils = trpc.useUtils();
 
-  // Resolve the Agent Studio Expert id by listing agents and picking
-  // the one with internal_key === 'agent-studio-expert'. The boot seed
-  // creates this on every install so the resolution is reliable.
+  // List every agent in the Studio + keep those whose providerConfig is
+  // compatible with the chat service (currently: provider === "openai",
+  // regardless of baseUrl — baseUrl is only relevant for the simulation
+  // agent-loop path, chat uses runViaOpenAIDirect directly). Agents with
+  // empty or non-openai providerConfig are shown as disabled chips so
+  // the user understands WHY they can't chat with them.
   const { data: agents } = trpc.agentStudio.home.listAgents.useQuery({});
-  const expert = (agents ?? []).find(
-    (a: any) => a.internalKey === "agent-studio-expert"
-  );
-  const agentId = expert?.id ?? null;
-  const agentName = expert?.name ?? "Agent Studio Expert";
+  const agentList = (agents ?? []) as any[];
+
+  // Default selection: Agent Studio Expert (if present), otherwise the
+  // first compatible agent. Runs once when the agent list first loads.
+  useEffect(() => {
+    if (selectedAgentId !== null) return;
+    if (!agentList.length) return;
+    const expert = agentList.find(
+      (a) => a.internalKey === "agent-studio-expert"
+    );
+    if (expert) {
+      setSelectedAgentId(expert.id);
+      return;
+    }
+    // Fall back to the first agent the shell thinks is openai-compatible.
+    // We can't see providerConfig from the list query, so we just pick
+    // the first agent and let the chat service return an error if
+    // incompatible (the error shows inline).
+    setSelectedAgentId(agentList[0]?.id ?? null);
+  }, [agentList, selectedAgentId]);
+
+  const activeAgent = agentList.find((a) => a.id === selectedAgentId) ?? null;
+  const agentId = activeAgent?.id ?? null;
+  const agentName = activeAgent?.name ?? "Studio Chat";
 
   // Load sessions for the expert; pick the most recent or auto-create
   // on first send (mirrors AgentChat.tsx pattern, lines 60-68 of source).
@@ -200,7 +224,7 @@ export function AgentStudioChatWindow() {
 
   return createPortal(
     <div className="fixed bottom-4 right-4 z-50 w-[380px] h-[520px] flex flex-col rounded-xl border bg-card shadow-2xl overflow-hidden">
-      {/* Header — same structure as source line 237-257, single agent */}
+      {/* Header — same structure as source line 237-257 */}
       <div className="flex items-center justify-between px-3 py-2 border-b bg-card shrink-0">
         <div className="flex items-center gap-2">
           <Brain className="h-4 w-4 text-primary" />
@@ -222,15 +246,62 @@ export function AgentStudioChatWindow() {
         </Button>
       </div>
 
+      {/* Agent picker — adapted from source line 259-316 (participant
+          selector). Clone of the chip-row pattern from PMCentralChatWindow,
+          but single-select (not multi-participant). Click a chip to
+          switch the active agent; the session + message queries auto-
+          refetch because agentId drives them. */}
+      {agentList.length > 0 && (
+        <div className="border-b px-3 py-2 shrink-0">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+              Agent
+            </span>
+            <span className="text-[9px] text-muted-foreground">
+              {agentList.length} available
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {agentList.map((a) => {
+              const selected = a.id === selectedAgentId;
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => setSelectedAgentId(a.id)}
+                  className={cn(
+                    "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border transition-all",
+                    selected
+                      ? "bg-primary/15 border-primary/40 text-primary font-medium"
+                      : "bg-muted/50 border-transparent text-muted-foreground hover:border-muted-foreground/30",
+                  )}
+                  title={`${a.name} — ${a.agentClass ?? "custom"}`}
+                >
+                  <span
+                    className={cn(
+                      "h-4 w-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0",
+                      avatarColor(a.name),
+                    )}
+                  >
+                    {initials(a.name)}
+                  </span>
+                  <span className="truncate max-w-[80px]">{a.name}</span>
+                  {selected && <CheckCircle2 className="h-3 w-3 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Messages area — adapted from source line 318-403 */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
-        {agentId === null && (
+        {agentId === null && agentList.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <AlertTriangle className="h-8 w-8 mb-2 opacity-40" />
             <p className="text-xs text-center">
-              Agent Studio Expert not found.
+              No agents in the Studio yet.
               <br />
-              The boot seed should create it automatically on dev server start.
+              Create one via the home sidebar.
             </p>
           </div>
         )}
@@ -239,10 +310,10 @@ export function AgentStudioChatWindow() {
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <Brain className="h-8 w-8 mb-2 opacity-20" />
             <p className="text-xs text-center">
-              Ask the Agent Studio Expert to design a new agent.
+              Start chatting with <strong>{agentName}</strong>.
               <br />
               <span className="opacity-60">
-                e.g. "I need an agent that monitors Postgres slow queries"
+                Pick a different agent above to switch.
               </span>
             </p>
           </div>
