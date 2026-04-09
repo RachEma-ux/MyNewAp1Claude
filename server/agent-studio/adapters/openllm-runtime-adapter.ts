@@ -276,6 +276,63 @@ export function deriveOpenllmWsUrl(baseUrl: string): string {
  * into live execution. Use this to decide whether to call the runtime
  * adapter at all.
  */
+/**
+ * Phase 19 follow-up: map provider name → the canonical env var the
+ * platform reads the API key from. Mirrors the pattern used everywhere
+ * else in server/ (embeddings/service.ts, documents/processor.ts,
+ * operators/provider-hub.ts, code-studio/opencode/*, _core/llm.ts).
+ * In production these env vars are injected from GitHub Secrets by
+ * builder-deploy.yml (lines 476/487/600). Locally users set them
+ * via .env or shell export.
+ */
+const PROVIDER_ENV_VAR: Record<string, string> = {
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+  google: "GOOGLE_API_KEY",
+  groq: "GROQ_API_KEY",
+  mistral: "MISTRAL_API_KEY",
+  deepseek: "DEEPSEEK_API_KEY",
+};
+
+/**
+ * Resolve the API key for a provider config with fallback chain:
+ *   1. providerConfig.apiKey (literal — legacy + per-agent overrides)
+ *   2. providerConfig.apiKeyEnvVar (explicit env var name override)
+ *   3. process.env[PROVIDER_ENV_VAR[provider]] (convention)
+ *
+ * Returns undefined only when NONE of the three are set — the caller
+ * decides how to handle that (simulation mode proceeds deterministically,
+ * live runtime returns an error at invocation time).
+ *
+ * Storing the literal key in providerConfig is discouraged. Prefer
+ * letting the fallback chain resolve from env vars so GitHub Secrets
+ * (or local .env) remain the single source of truth.
+ */
+export function resolveProviderApiKey(
+  providerConfig: Record<string, unknown> | null | undefined
+): string | undefined {
+  const pc = (providerConfig ?? {}) as Record<string, unknown>;
+  // 1. Literal apiKey on the provider config
+  if (typeof pc.apiKey === "string" && pc.apiKey.length > 0) {
+    return pc.apiKey;
+  }
+  // 2. Explicit env var name override
+  if (typeof pc.apiKeyEnvVar === "string" && pc.apiKeyEnvVar.length > 0) {
+    const v = process.env[pc.apiKeyEnvVar];
+    if (v && v.length > 0) return v;
+  }
+  // 3. Convention: map provider → canonical env var
+  const provider = typeof pc.provider === "string" ? pc.provider : undefined;
+  if (provider) {
+    const envVar = PROVIDER_ENV_VAR[provider.toLowerCase()];
+    if (envVar) {
+      const v = process.env[envVar];
+      if (v && v.length > 0) return v;
+    }
+  }
+  return undefined;
+}
+
 export function resolveOpenllmEndpoint(
   providerConfig: Record<string, unknown> | null | undefined
 ): {
@@ -288,7 +345,11 @@ export function resolveOpenllmEndpoint(
   const pc = (providerConfig ?? {}) as Record<string, unknown>;
   const provider = typeof pc.provider === "string" ? pc.provider : undefined;
   const model = typeof pc.model === "string" ? pc.model : undefined;
-  const apiKey = typeof pc.apiKey === "string" ? pc.apiKey : undefined;
+  // Phase 19 follow-up: use the full fallback chain, not just pc.apiKey.
+  // This lets agents omit the literal key from their providerConfig and
+  // rely on GitHub Secrets → env var injection at runtime (the platform
+  // convention used by embeddings, documents, operators, and opencode).
+  const apiKey = resolveProviderApiKey(providerConfig);
 
   if (typeof pc.baseUrl === "string" && pc.baseUrl) {
     return {
