@@ -109,13 +109,18 @@ export async function sendChatMessage(
     content: input.userMessage,
   });
 
-  // 3. Resolve the provider config — prefer the session's snapshot
-  //    over the draft's current config (reproducibility). Falls back
-  //    to draft.providerConfig if snapshot is empty.
-  const providerConfig = ((session.providerSnapshot &&
-    Object.keys(session.providerSnapshot).length > 0
-      ? session.providerSnapshot
-      : draft.providerConfig) ?? {}) as Record<string, unknown>;
+  // 3. Resolve the provider config — always read from the LIVE draft,
+  //    not the session's frozen snapshot.
+  //
+  //    Earlier revision preferred the session snapshot for "reproduci-
+  //    bility," but that caused a real bug: changing the draft's model
+  //    or temperature had no effect on ongoing sessions because they
+  //    were locked to whatever was captured at session-start time.
+  //    Users expect edits to the agent config to apply immediately.
+  //    The session.providerSnapshot column stays around for forensic
+  //    audit (you can see what the config WAS when the session started)
+  //    but the runtime always uses the current draft.
+  const providerConfig = (draft.providerConfig ?? {}) as Record<string, unknown>;
 
   const provider = typeof providerConfig.provider === "string"
     ? providerConfig.provider
