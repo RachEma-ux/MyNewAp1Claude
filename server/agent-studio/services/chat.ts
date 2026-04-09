@@ -446,7 +446,7 @@ export async function sendChatMessage(
   if (!model) {
     return {
       ok: false,
-      error: "Agent's providerConfig is missing `model` (e.g., 'gpt-4').",
+      error: "Agent's providerConfig is missing `model` (e.g., 'gpt-4o-mini').",
     };
   }
 

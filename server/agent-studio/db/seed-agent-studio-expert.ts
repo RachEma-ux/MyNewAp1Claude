@@ -205,12 +205,7 @@ export async function seedAgentStudioExpert(): Promise<{
         "If the Studio API is down or the MCP introspection tools are unreachable, fall back to the seed guide at docs/agent-studio/seed-new-agent-guide.md and generate a best-effort design from memory. Flag the fallback clearly in your response so the user knows to verify against the current schema.",
       providerConfig: {
         provider: "openai",
-        // gpt-4o-mini chosen for reliable tool-calling + fast + cheap.
-        // Verified working end-to-end with the Phase 19 streaming tool
-        // loop (session 9 smoke test: studio.ping dispatched in 14ms).
-        // Earlier seed baseline was "gpt-4" which also works but is
-        // ~20x the cost and ~3x the latency for the same task.
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         temperature: 0.2,
         maxTokens: 4000,
         apiKeyEnvVar: "OPENAI_API_KEY",

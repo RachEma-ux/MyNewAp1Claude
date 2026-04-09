@@ -82,4 +82,65 @@ export async function bootAgentStudio(): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[ags-scheduler] start skipped — ${message}`);
   }
+
+}
+
+/**
+ * Post-listen boot steps — MCP server auto-reconnect.
+ *
+ * Called from server/_core/index.ts AFTER `server.listen()` resolves,
+ * because some MCP servers (notably `studio-self`) are http transports
+ * that point at the Studio's own `/api/mcp` endpoint. If we auto-
+ * connect before the listener is ready, those self-loop servers
+ * fail with "fetch failed".
+ *
+ * Root cause this fixes: the MCP manager keeps connection state in a
+ * process-local `connections` map and the registry keeps tool
+ * snapshots in another process-local `snapshots` map. Both are reset
+ * on every dev-server restart and on every HMR reload of the
+ * mcp-manager module. The DB rows still read status="connected" from
+ * the previous process lifetime, which is stale and misleading.
+ *
+ * Symptom users hit without this fix: chat with an agent whose draft
+ * has MCP tools → chat-stream.ts buildToolsForDraft calls getSnapshot
+ * → returns undefined → tools list passed to OpenAI is empty → the
+ * model free-associates a tool call in prose instead of emitting a
+ * structured tool_calls delta → output looks garbled/broken.
+ */
+export async function bootAgentStudioPostListen(): Promise<void> {
+  try {
+    const repo = await import("./repository");
+    const { connectMcpServer } = await import("./services/mcp/mcp-manager");
+    const servers = await repo.listAllMcpServers();
+    let connected = 0;
+    let failed = 0;
+    for (const server of servers) {
+      if (!server.enabled) continue;
+      try {
+        const result = await connectMcpServer({ serverId: server.id });
+        if (result.status === "connected") {
+          connected++;
+        } else {
+          failed++;
+          console.warn(
+            `[ags-mcp] auto-connect failed for #${server.id} ${server.name}: ${result.error ?? "unknown"}`
+          );
+        }
+      } catch (e) {
+        failed++;
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn(
+          `[ags-mcp] auto-connect exception for #${server.id} ${server.name}: ${msg}`
+        );
+      }
+    }
+    if (connected > 0 || failed > 0) {
+      console.log(
+        `[ags-mcp] auto-connect: ${connected} connected, ${failed} failed`
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-mcp] auto-connect skipped — ${message}`);
+  }
 }

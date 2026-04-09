@@ -810,6 +810,15 @@ async function startServer() {
         console.log(`[OpenCode] Sync errors: ${result.errors.join(", ")}`);
       }
     } catch { /* non-fatal */ }
+
+    // Agent Studio post-listen boot: MCP server auto-reconnect.
+    // Must run AFTER server.listen resolves so studio-self (http
+    // transport targeting /api/mcp on this very process) can
+    // successfully connect.
+    try {
+      const { bootAgentStudioPostListen } = await import("../agent-studio/boot");
+      await bootAgentStudioPostListen();
+    } catch { /* non-fatal */ }
   });
 }
 
