@@ -32,6 +32,7 @@ import {
   type PermissionResolver,
   type McpServerConfigForBridge,
 } from "../adapters/openllm-runtime-adapter";
+import { runViaOpenAIDirect } from "../adapters/openai-direct-adapter";
 
 /**
  * Phase 1c: Match a tool name against a permission-rule tool pattern.
@@ -765,24 +766,69 @@ export async function runSimulation(input: {
         bridgeMcpServers = [];
       }
 
+      // Phase 19 follow-up: pick the runtime adapter based on the
+      // endpoint source + provider:
+      //
+      //   - Direct OpenAI (no external process required):
+      //       provider === "openai" AND source === "default"
+      //       (meaning the user has NOT set a baseUrl or
+      //        OPENLLM_AGENT_URL, so they're not pointing at
+      //        openllm-agent2). This gives "it just works" simulation
+      //        for the common case — set OPENAI_API_KEY in env and Run.
+      //
+      //   - openllm-agent2 WebSocket:
+      //       any other case — either provider is not openai, or the
+      //       user explicitly configured a baseUrl / env override
+      //       pointing at an openllm-agent2 instance. This path
+      //       supports the full agent loop (MCP tools, permission
+      //       requests, governance events, etc.).
+      //
+      // Both paths return the same OpenllmRuntimeResult shape so the
+      // downstream handling (usage rollup, output payload, timeline)
+      // is identical.
+      const useDirectOpenai =
+        endpoint.provider === "openai" &&
+        endpoint.source === "default" &&
+        typeof endpoint.apiKey === "string" &&
+        endpoint.apiKey.length > 0;
+
       // Phase 3: WS timeout must accommodate the worst case where the
       // agent issues a permission_request that goes to "ask" and a human
       // takes the full 5-minute permission poll window to respond. We use
       // 6 minutes here to give 1 minute of slack for the rest of the run.
-      const liveResult = await runViaOpenllmAgent({
-        wsUrl: endpoint.wsUrl,
-        message: inputText,
-        provider: endpoint.provider,
-        model: endpoint.model,
-        apiKey: endpoint.apiKey,
-        timeoutMs: 6 * 60 * 1000,
-        permissionResolver: trackingResolver,
-        // Phase 18: inject MCP servers into the live runtime. When empty,
-        // the adapter sends no `configure_session` and behaves exactly as
-        // it did pre-Phase-18 (decision #8b).
-        mcpServers: bridgeMcpServers,
-        mcpScope: "managed",
-      });
+      const liveResult = useDirectOpenai
+        ? await runViaOpenAIDirect({
+            apiKey: endpoint.apiKey!,
+            model: endpoint.model!,
+            systemPrompt:
+              [draft.systemInstructions, draft.roleInstructions]
+                .filter((s) => typeof s === "string" && s.length > 0)
+                .join("\n\n") || "You are a helpful assistant.",
+            userMessage: inputText,
+            temperature:
+              typeof (providerConfig as any).temperature === "number"
+                ? (providerConfig as any).temperature
+                : 0.2,
+            maxTokens:
+              typeof (providerConfig as any).maxTokens === "number"
+                ? (providerConfig as any).maxTokens
+                : undefined,
+            timeoutMs: 6 * 60 * 1000,
+          })
+        : await runViaOpenllmAgent({
+            wsUrl: endpoint.wsUrl,
+            message: inputText,
+            provider: endpoint.provider,
+            model: endpoint.model,
+            apiKey: endpoint.apiKey,
+            timeoutMs: 6 * 60 * 1000,
+            permissionResolver: trackingResolver,
+            // Phase 18: inject MCP servers into the live runtime.
+            // When empty, the adapter sends no `configure_session`
+            // and behaves exactly as it did pre-Phase-18 (decision #8b).
+            mcpServers: bridgeMcpServers,
+            mcpScope: "managed",
+          });
 
       if (liveResult.ok) {
         responsePreview = liveResult.text || "(empty response)";
