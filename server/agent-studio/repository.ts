@@ -53,6 +53,8 @@ import {
   agsMarketplaceItems,
   agsMarketplaceCollections,
   agsMarketplaceInstalls,
+  agsChatSessions,
+  agsChatMessages,
 } from "../../drizzle/tables/agent-studio";
 
 function db() {
@@ -2573,4 +2575,119 @@ export async function removeMarketplaceInstall(id: number) {
   await db()
     .delete(agsMarketplaceInstalls)
     .where(eq(agsMarketplaceInstalls.id, id));
+}
+
+// ── Phase 19 follow-up: Chat sessions + messages ───────────────────────────
+
+/**
+ * List all chat sessions for an agent, most-recent first. Includes
+ * the session totals (token counts, cost, message count) so the UI
+ * can render a session list without additional queries.
+ */
+export async function listChatSessions(agentId: number) {
+  return db()
+    .select()
+    .from(agsChatSessions)
+    .where(eq(agsChatSessions.agentId, agentId))
+    .orderBy(desc(agsChatSessions.updatedAt));
+}
+
+export async function getChatSessionById(sessionId: number) {
+  const rows = await db()
+    .select()
+    .from(agsChatSessions)
+    .where(eq(agsChatSessions.id, sessionId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createChatSession(input: {
+  agentId: number;
+  title?: string;
+  userId?: number;
+  providerSnapshot?: Record<string, unknown>;
+}) {
+  const [created] = await db()
+    .insert(agsChatSessions)
+    .values({
+      agentId: input.agentId,
+      title: input.title ?? null,
+      userId: input.userId ?? null,
+      providerSnapshot: input.providerSnapshot ?? {},
+    })
+    .returning();
+  return created;
+}
+
+/**
+ * Update session totals after a new assistant message is added.
+ * Increments token + cost counters and bumps updatedAt.
+ */
+export async function bumpChatSessionTotals(input: {
+  sessionId: number;
+  addInputTokens?: number;
+  addOutputTokens?: number;
+  addCostMicrocents?: number;
+  addMessages?: number;
+  title?: string;
+}) {
+  // Fetch current totals
+  const current = await getChatSessionById(input.sessionId);
+  if (!current) return null;
+  const [updated] = await db()
+    .update(agsChatSessions)
+    .set({
+      totalInputTokens: (current.totalInputTokens ?? 0) + (input.addInputTokens ?? 0),
+      totalOutputTokens: (current.totalOutputTokens ?? 0) + (input.addOutputTokens ?? 0),
+      totalCostMicrocents:
+        (current.totalCostMicrocents ?? 0) + (input.addCostMicrocents ?? 0),
+      messageCount: (current.messageCount ?? 0) + (input.addMessages ?? 0),
+      title: input.title ?? current.title,
+      updatedAt: new Date(),
+    })
+    .where(eq(agsChatSessions.id, input.sessionId))
+    .returning();
+  return updated;
+}
+
+export async function deleteChatSession(sessionId: number) {
+  // Delete messages first (no ON DELETE CASCADE per clone-safe convention)
+  await db().delete(agsChatMessages).where(eq(agsChatMessages.sessionId, sessionId));
+  await db().delete(agsChatSessions).where(eq(agsChatSessions.id, sessionId));
+}
+
+export async function listChatMessages(sessionId: number) {
+  return db()
+    .select()
+    .from(agsChatMessages)
+    .where(eq(agsChatMessages.sessionId, sessionId))
+    .orderBy(agsChatMessages.createdAt, agsChatMessages.id);
+}
+
+export async function appendChatMessage(input: {
+  sessionId: number;
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  toolPayload?: Record<string, unknown>;
+  inputTokens?: number;
+  outputTokens?: number;
+  costMicrocents?: number;
+  model?: string;
+  durationMs?: number;
+}) {
+  const [created] = await db()
+    .insert(agsChatMessages)
+    .values({
+      sessionId: input.sessionId,
+      role: input.role,
+      content: input.content,
+      toolPayload: input.toolPayload,
+      inputTokens: input.inputTokens,
+      outputTokens: input.outputTokens,
+      costMicrocents: input.costMicrocents,
+      model: input.model,
+      durationMs: input.durationMs,
+    })
+    .returning();
+  return created;
 }

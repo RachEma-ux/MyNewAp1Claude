@@ -33,6 +33,7 @@ import {
   Library,
   Store,
   Network,
+  MessageSquare,
 } from "lucide-react";
 
 export type AgentStudioView =
@@ -48,6 +49,7 @@ export type AgentStudioView =
   | "workflows"
   | "governance"
   | "runs"
+  | "chat"
   | "simulation"
   | "testing"
   | "versions"
@@ -129,6 +131,15 @@ const AGENT_GROUPS: SectionGroup[] = [
     items: [
       { key: "governance", label: "Governance", icon: ShieldCheck },
       { key: "runs", label: "Runs / Traces", icon: Activity },
+    ],
+  },
+  {
+    label: "Interact",
+    items: [
+      // Phase 19 follow-up: multi-turn chat with the agent, like the
+      // OpenCode chat view. Uses the same direct OpenAI adapter as
+      // Simulation but accumulates message history in asdb.
+      { key: "chat", label: "Chat", icon: MessageSquare },
     ],
   },
   {

@@ -1093,3 +1093,76 @@ export const agsMarketplaceInstalls = pgTable(
     agentIdx: index("idx_ags_marketplace_installs_agent").on(t.agentId),
   })
 );
+
+/**
+ * Phase 19 follow-up: Chat sessions for the Agent Studio.
+ *
+ * A chat session is a persistent multi-turn conversation with an agent.
+ * Unlike simulation runs (one-shot, dry-run behavior analysis), chat
+ * sessions accumulate message history and support ongoing dialogue.
+ *
+ * Scope: one agent per session. A user can have multiple parallel
+ * sessions with the same agent (e.g., one for design, one for Q&A).
+ *
+ * Messages live in `agsChatMessages`, joined by `sessionId`.
+ */
+export const agsChatSessions = pgTable(
+  "ags_chat_sessions",
+  {
+    id: serial("id").primaryKey(),
+    /** Agent this session is attached to (ags_agents.id) */
+    agentId: integer("agent_id").notNull(),
+    /** Human-readable title, auto-generated from the first message */
+    title: text("title"),
+    /** Optional user id (for multi-tenant — nullable for single-user) */
+    userId: integer("user_id"),
+    /** Provider snapshot at session creation (for reproducibility) */
+    providerSnapshot: jsonb("provider_snapshot").$type<Record<string, unknown>>().default({}),
+    /** Accumulated totals across all messages in the session */
+    totalInputTokens: integer("total_input_tokens").default(0),
+    totalOutputTokens: integer("total_output_tokens").default(0),
+    totalCostMicrocents: integer("total_cost_microcents").default(0),
+    messageCount: integer("message_count").default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    agentIdx: index("idx_ags_chat_sessions_agent").on(t.agentId),
+    updatedIdx: index("idx_ags_chat_sessions_updated").on(t.updatedAt),
+  })
+);
+
+/**
+ * Phase 19 follow-up: Individual messages in a chat session.
+ *
+ * Each row is one message (user or assistant). Tool calls and tool
+ * results can be stored as role="tool" with payload containing the
+ * call/result (future extension — MVP stores user+assistant only).
+ */
+export const agsChatMessages = pgTable(
+  "ags_chat_messages",
+  {
+    id: serial("id").primaryKey(),
+    sessionId: integer("session_id").notNull(),
+    /** "user" | "assistant" | "system" | "tool" */
+    role: varchar("role", { length: 16 }).notNull(),
+    /** Message text (or JSON stringified tool call/result) */
+    content: text("content").notNull(),
+    /** Optional tool metadata (name, input, output) for role=tool */
+    toolPayload: jsonb("tool_payload").$type<Record<string, unknown>>(),
+    /** Token counts for this message (assistant messages only) */
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    /** Cost in microcents ($0.000001 units) for this message */
+    costMicrocents: integer("cost_microcents"),
+    /** Model used for this message (assistant only) — e.g., "gpt-4" */
+    model: varchar("model", { length: 64 }),
+    /** Wall-clock latency for the LLM call (assistant only) */
+    durationMs: integer("duration_ms"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    sessionIdx: index("idx_ags_chat_messages_session").on(t.sessionId),
+    createdIdx: index("idx_ags_chat_messages_created").on(t.createdAt),
+  })
+);

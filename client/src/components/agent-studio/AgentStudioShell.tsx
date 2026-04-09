@@ -59,6 +59,8 @@ const AgentToolCatalogPage = lazy(() => import("@/pages/agent-studio/AgentToolCa
 const AgentMarketplacePage = lazy(() => import("@/pages/agent-studio/AgentMarketplacePage"));
 // ── Phase 19 follow-up: Global MCP Manager (no agent context) ──
 const AgentMcpManagerPage = lazy(() => import("@/pages/agent-studio/AgentMcpManagerPage"));
+// ── Phase 19 follow-up: Multi-turn Chat (per-agent) ──
+const AgentChatPage = lazy(() => import("@/pages/agent-studio/AgentChatPage"));
 
 interface ParsedRoute {
   agentId: number | null;
@@ -371,6 +373,8 @@ export default function AgentStudioShell() {
         return <AgentWorkflowsPage agentId={agentId!} />;
       case "governance":
         return <AgentGovernancePage agentId={agentId!} />;
+      case "chat":
+        return <AgentChatPage agentId={agentId!} />;
       case "simulation":
         return <AgentSimulationPage agentId={agentId!} />;
       case "testing":

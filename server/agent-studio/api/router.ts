@@ -1829,6 +1829,64 @@ const catalogToolsRouter = router({
  *   - refresh (network fetch of registry) → governedProcedure
  *   - install / uninstall                 → protectedProcedure (Phase 14d)
  */
+
+// ── Phase 19 follow-up: Chat ──────────────────────────────────────────────
+//
+// Dedicated multi-turn chat interface for Agent Studio agents, like
+// OpenCode's chat view but scoped to ags_* agents. Persists sessions
+// and messages in asdb, calls GPT-4 via runViaOpenAIDirect (the same
+// adapter the simulation engine uses — no openllm-agent2 required).
+//
+// Trust level: protectedProcedure for everything (chat is a local
+// interaction, not a governed mutation — the per-call governance
+// chokepoint lives inside the dispatcher which the chat service
+// bypasses for the MVP since there are no tool calls yet).
+const chatRouter = router({
+  listSessions: protectedProcedure
+    .input(z.object({ agentId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return repo.listChatSessions(input.agentId);
+    }),
+  getSession: protectedProcedure
+    .input(z.object({ sessionId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return repo.getChatSessionById(input.sessionId);
+    }),
+  listMessages: protectedProcedure
+    .input(z.object({ sessionId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      return repo.listChatMessages(input.sessionId);
+    }),
+  startSession: protectedProcedure
+    .input(
+      z.object({
+        agentId: z.number().int().positive(),
+        title: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { startChatSession } = await import("../services/chat");
+      return startChatSession(input);
+    }),
+  sendMessage: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.number().int().positive(),
+        userMessage: z.string().min(1),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { sendChatMessage } = await import("../services/chat");
+      return sendChatMessage(input);
+    }),
+  deleteSession: protectedProcedure
+    .input(z.object({ sessionId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      await repo.deleteChatSession(input.sessionId);
+      return { ok: true };
+    }),
+});
+
 const marketplaceRouter = router({
   list: protectedProcedure
     .input(listMarketplaceItemsSchema)
@@ -1952,4 +2010,6 @@ export const agentStudioRouter = router({
   catalogTools: catalogToolsRouter,
   // Phase 14: Marketplace
   marketplace: marketplaceRouter,
+  // Phase 19 follow-up: Multi-turn chat
+  chat: chatRouter,
 });
