@@ -33,7 +33,6 @@ import {
   Library,
   Store,
   Network,
-  MessageSquare,
 } from "lucide-react";
 
 export type AgentStudioView =
