@@ -1885,6 +1885,17 @@ const chatRouter = router({
       await repo.deleteChatSession(input.sessionId);
       return { ok: true };
     }),
+  renameSession: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.number().int().positive(),
+        title: z.string().min(1).max(120),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const updated = await repo.renameChatSession(input);
+      return { ok: true, session: updated };
+    }),
 });
 
 const marketplaceRouter = router({

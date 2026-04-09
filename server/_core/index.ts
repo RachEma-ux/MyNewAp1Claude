@@ -11,6 +11,7 @@ import { serveStatic, setupVite } from "./vite";
 import { initializeProviders } from "../providers/init";
 import { handleChatStream } from "../chat/stream";
 import { handleAgentChatStream, handleCatalogAgentChatStream } from "../agents/stream";
+import { handleAgentStudioChatStream } from "../agent-studio/chat-stream";
 import { catalogExecutionQuerySchema } from "../ai-types/execution";
 import { invokeCatalogEntry } from "../ai-types/invoke";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -569,6 +570,8 @@ async function startServer() {
   app.get("/api/agents/:agentId/chat/stream", handleAgentChatStream);
   // Catalog-authoritative agent chat streaming endpoint
   app.get("/api/catalog/agents/:catalogEntryId/chat/stream", handleCatalogAgentChatStream);
+  // Agent Studio chat streaming endpoint (Phase 19 follow-up, Task #4)
+  app.get("/api/agent-studio/chat/stream", handleAgentStudioChatStream);
   // Universal catalog invoke streaming endpoint
   // All catalog agent execution goes through invokeCatalogEntry() which
   // resolves the runtime kind and dispatches to the correct adapter.

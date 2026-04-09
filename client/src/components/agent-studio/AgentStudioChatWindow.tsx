@@ -29,6 +29,13 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle2,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  Pencil,
+  Check,
+  Wrench,
 } from "lucide-react";
 
 // ── Avatar colors (deterministic by name) — copied from source ────────────
@@ -65,35 +72,56 @@ export function AgentStudioChatWindow() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
+  // Session selection — null means "auto-pick most recent", otherwise the
+  // user has either clicked a session in the list or created a new one.
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(
+    null
+  );
+  // "New session" pending state: user clicked + but hasn't sent the first
+  // message yet. In this state we force an empty message list and create
+  // the session on first send.
+  const [pendingNewSession, setPendingNewSession] = useState(false);
+  const [sessionsExpanded, setSessionsExpanded] = useState(false);
+  // Inline rename state: when set, that session id is in edit mode and
+  // renameDraft holds the draft title. Null = no rename in progress.
+  const [renamingSessionId, setRenamingSessionId] = useState<number | null>(
+    null
+  );
+  const [renameDraft, setRenameDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const utils = trpc.useUtils();
 
-  // List every agent in the Studio + keep those whose providerConfig is
-  // compatible with the chat service (currently: provider === "openai",
-  // regardless of baseUrl — baseUrl is only relevant for the simulation
-  // agent-loop path, chat uses runViaOpenAIDirect directly). Agents with
-  // empty or non-openai providerConfig are shown as disabled chips so
-  // the user understands WHY they can't chat with them.
+  // List every agent in the Studio. `providerConfig` is now included on
+  // each agent (sourced from its current draft) so we can mark non-openai
+  // agents as incompatible. Chat only supports provider === "openai" for
+  // now; everything else gets a disabled chip + tooltip.
   const { data: agents } = trpc.agentStudio.home.listAgents.useQuery({});
   const agentList = (agents ?? []) as any[];
 
-  // Default selection: Agent Studio Expert (if present), otherwise the
-  // first compatible agent. Runs once when the agent list first loads.
+  const isChatCompatible = (a: any): boolean => {
+    const cfg = a?.providerConfig ?? null;
+    return !!cfg && typeof cfg === "object" && cfg.provider === "openai";
+  };
+
+  // Default selection: Agent Studio Expert if present and compatible,
+  // otherwise the first compatible agent. Falls back to any first agent
+  // only if none are compatible (so the empty state still renders).
   useEffect(() => {
     if (selectedAgentId !== null) return;
     if (!agentList.length) return;
     const expert = agentList.find(
-      (a) => a.internalKey === "agent-studio-expert"
+      (a) => a.internalKey === "agent-studio-expert" && isChatCompatible(a)
     );
     if (expert) {
       setSelectedAgentId(expert.id);
       return;
     }
-    // Fall back to the first agent the shell thinks is openai-compatible.
-    // We can't see providerConfig from the list query, so we just pick
-    // the first agent and let the chat service return an error if
-    // incompatible (the error shows inline).
+    const firstCompatible = agentList.find(isChatCompatible);
+    if (firstCompatible) {
+      setSelectedAgentId(firstCompatible.id);
+      return;
+    }
     setSelectedAgentId(agentList[0]?.id ?? null);
   }, [agentList, selectedAgentId]);
 
@@ -101,13 +129,28 @@ export function AgentStudioChatWindow() {
   const agentId = activeAgent?.id ?? null;
   const agentName = activeAgent?.name ?? "Studio Chat";
 
-  // Load sessions for the expert; pick the most recent or auto-create
-  // on first send (mirrors AgentChat.tsx pattern, lines 60-68 of source).
+  // Load all sessions for the selected agent. The user can click any row
+  // in the session list to jump to it, click "+ New" to clear the active
+  // session (so the next send creates a fresh one), or rely on the
+  // default behavior which picks the most recent.
   const { data: sessions } = trpc.agentStudio.chat.listSessions.useQuery(
     { agentId: agentId ?? 0 },
     { enabled: agentId !== null }
   );
-  const sessionId = sessions?.[0]?.id ?? null;
+  const sessionList = (sessions ?? []) as any[];
+
+  // Reset session state when the user switches agents so we don't show
+  // an unrelated agent's session id against the new agent's message list.
+  useEffect(() => {
+    setSelectedSessionId(null);
+    setPendingNewSession(false);
+  }, [selectedAgentId]);
+
+  // Effective session id: explicit selection wins, otherwise most recent,
+  // unless the user is in pendingNewSession state (then null = empty).
+  const sessionId = pendingNewSession
+    ? null
+    : selectedSessionId ?? sessionList[0]?.id ?? null;
 
   // Load messages for the active session
   const { data: messages } = trpc.agentStudio.chat.listMessages.useQuery(
@@ -116,24 +159,34 @@ export function AgentStudioChatWindow() {
   );
 
   const startSessionMut = trpc.agentStudio.chat.startSession.useMutation();
-  const sendMessageMut = trpc.agentStudio.chat.sendMessage.useMutation({
-    onSuccess: (r) => {
-      setIsStreaming(false);
-      if (!r.ok && r.error) {
-        toast.error(r.error);
+  const deleteSessionMut = trpc.agentStudio.chat.deleteSession.useMutation({
+    onSuccess: (_, vars) => {
+      utils.agentStudio.chat.listSessions.invalidate({ agentId: agentId ?? 0 });
+      // If the user deleted the currently-active session, clear the
+      // selection so the next render falls back to the most recent
+      // remaining session (or shows the empty state).
+      if (vars.sessionId === sessionId) {
+        setSelectedSessionId(null);
       }
-      utils.agentStudio.chat.listMessages.invalidate({
-        sessionId: sessionId ?? 0,
-      });
-      utils.agentStudio.chat.listSessions.invalidate({
-        agentId: agentId ?? 0,
-      });
     },
-    onError: (e) => {
-      setIsStreaming(false);
-      toast.error(`Studio Chat error: ${e.message}`);
-    },
+    onError: (e) => toast.error(`Delete failed: ${e.message}`),
   });
+  const renameSessionMut = trpc.agentStudio.chat.renameSession.useMutation({
+    onSuccess: () => {
+      utils.agentStudio.chat.listSessions.invalidate({ agentId: agentId ?? 0 });
+      setRenamingSessionId(null);
+      setRenameDraft("");
+    },
+    onError: (e) => toast.error(`Rename failed: ${e.message}`),
+  });
+
+  // Live streaming-delta buffer. While an EventSource is open we
+  // accumulate tokens here and render them as a synthetic assistant
+  // bubble so the user sees the response grow token-by-token. On
+  // `done` we clear this and invalidate the message list so the
+  // persisted row replaces the synthetic bubble.
+  const [streamingText, setStreamingText] = useState("");
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   // Auto-scroll on new messages — mirrors source line 99-103
   useEffect(() => {
@@ -169,7 +222,7 @@ export function AgentStudioChatWindow() {
     setIsStreaming(true);
 
     try {
-      // Create session if none exists
+      // Create session if none exists (first send, or user clicked "+ New")
       let activeSessionId = sessionId;
       if (activeSessionId == null) {
         const newSession = await startSessionMut.mutateAsync({
@@ -177,17 +230,125 @@ export function AgentStudioChatWindow() {
           title: text.substring(0, 50),
         });
         activeSessionId = newSession.sessionId;
+        // Clear the pending flag + select the new session so the UI
+        // starts polling its messages immediately
+        setPendingNewSession(false);
+        setSelectedSessionId(activeSessionId);
         await utils.agentStudio.chat.listSessions.invalidate({ agentId });
       }
 
-      sendMessageMut.mutate({
-        sessionId: activeSessionId,
-        userMessage: text,
-      });
+      // Open an SSE stream to /api/agent-studio/chat/stream. The
+      // endpoint persists the user message, streams the assistant
+      // response, and persists the final assistant row. The UI
+      // renders `streamingText` as a synthetic bubble while the
+      // stream is open; on `done` we clear it and refetch the
+      // persisted message list.
+      setStreamingText("");
+      const url =
+        "/api/agent-studio/chat/stream?" +
+        new URLSearchParams({
+          sessionId: activeSessionId.toString(),
+          message: text,
+        });
+      const es = new EventSource(url);
+      eventSourceRef.current = es;
+
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "token") {
+            setStreamingText((prev) => prev + (data.content ?? ""));
+          } else if (data.type === "done") {
+            setIsStreaming(false);
+            setStreamingText("");
+            es.close();
+            eventSourceRef.current = null;
+            utils.agentStudio.chat.listMessages.invalidate({
+              sessionId: activeSessionId,
+            });
+            utils.agentStudio.chat.listSessions.invalidate({ agentId });
+          } else if (data.type === "error") {
+            setIsStreaming(false);
+            setStreamingText("");
+            es.close();
+            eventSourceRef.current = null;
+            toast.error(data.error ?? "Studio Chat error");
+            // Refresh the message list anyway — the user message
+            // was persisted even though the stream failed.
+            utils.agentStudio.chat.listMessages.invalidate({
+              sessionId: activeSessionId,
+            });
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error("[StudioChat] malformed SSE event:", event.data, err);
+        }
+      };
+
+      es.onerror = () => {
+        setIsStreaming(false);
+        setStreamingText("");
+        try {
+          es.close();
+        } catch {
+          /* ignore */
+        }
+        eventSourceRef.current = null;
+      };
     } catch (err: any) {
       toast.error(`Studio Chat error: ${err.message}`);
       setIsStreaming(false);
+      setStreamingText("");
     }
+  };
+
+  // Clean up any dangling EventSource when the component unmounts or
+  // the user switches agents
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        try {
+          eventSourceRef.current.close();
+        } catch {
+          /* ignore */
+        }
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleNewSession = () => {
+    setPendingNewSession(true);
+    setSelectedSessionId(null);
+    setSessionsExpanded(false);
+  };
+
+  const handlePickSession = (sid: number) => {
+    setSelectedSessionId(sid);
+    setPendingNewSession(false);
+    setSessionsExpanded(false);
+  };
+
+  const handleStartRename = (sid: number, currentTitle: string | null) => {
+    setRenamingSessionId(sid);
+    setRenameDraft(currentTitle ?? "");
+  };
+
+  const handleCommitRename = () => {
+    if (renamingSessionId == null) return;
+    const title = renameDraft.trim();
+    if (!title) {
+      setRenamingSessionId(null);
+      setRenameDraft("");
+      return;
+    }
+    renameSessionMut.mutate({ sessionId: renamingSessionId, title });
+  };
+
+  const handleDeleteSession = (sid: number, title: string | null) => {
+    const label = title ?? `Session #${sid}`;
+    if (!window.confirm(`Delete "${label}" and all its messages?`)) return;
+    deleteSessionMut.mutate({ sessionId: sid });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -264,32 +425,180 @@ export function AgentStudioChatWindow() {
           <div className="flex flex-wrap gap-1">
             {agentList.map((a) => {
               const selected = a.id === selectedAgentId;
+              const compatible = isChatCompatible(a);
+              const provider =
+                (a?.providerConfig?.provider as string | undefined) ?? "(none)";
+              const tooltip = compatible
+                ? `${a.name} — ${a.agentClass ?? "custom"}`
+                : `${a.name} — chat not available (provider=${provider}, needs openai)`;
               return (
                 <button
                   key={a.id}
-                  onClick={() => setSelectedAgentId(a.id)}
+                  onClick={() => {
+                    if (compatible) setSelectedAgentId(a.id);
+                  }}
+                  disabled={!compatible}
                   className={cn(
                     "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border transition-all",
-                    selected
+                    selected && compatible
                       ? "bg-primary/15 border-primary/40 text-primary font-medium"
-                      : "bg-muted/50 border-transparent text-muted-foreground hover:border-muted-foreground/30",
+                      : compatible
+                      ? "bg-muted/50 border-transparent text-muted-foreground hover:border-muted-foreground/30"
+                      : "bg-muted/20 border-transparent text-muted-foreground/40 cursor-not-allowed line-through",
                   )}
-                  title={`${a.name} — ${a.agentClass ?? "custom"}`}
+                  title={tooltip}
                 >
                   <span
                     className={cn(
                       "h-4 w-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0",
-                      avatarColor(a.name),
+                      compatible ? avatarColor(a.name) : "bg-muted-foreground/30",
                     )}
                   >
                     {initials(a.name)}
                   </span>
                   <span className="truncate max-w-[80px]">{a.name}</span>
-                  {selected && <CheckCircle2 className="h-3 w-3 shrink-0" />}
+                  {selected && compatible && <CheckCircle2 className="h-3 w-3 shrink-0" />}
                 </button>
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Session bar — shows the current session title + a collapsible
+          list of all sessions for the active agent, plus a "+ New"
+          button that clears the current session so the next send
+          creates a fresh one. Task #2. */}
+      {agentId !== null && (
+        <div className="border-b px-3 py-1.5 shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={() => setSessionsExpanded((v) => !v)}
+              disabled={sessionList.length === 0 && !pendingNewSession}
+              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-1 min-w-0 text-left"
+              title="Toggle session list"
+            >
+              {sessionsExpanded ? (
+                <ChevronUp className="h-3 w-3 shrink-0" />
+              ) : (
+                <ChevronDown className="h-3 w-3 shrink-0" />
+              )}
+              <span className="font-semibold uppercase tracking-wider shrink-0">
+                Session
+              </span>
+              <span className="truncate opacity-80">
+                {pendingNewSession
+                  ? "New…"
+                  : sessionId != null
+                  ? sessionList.find((s) => s.id === sessionId)?.title ??
+                    `#${sessionId}`
+                  : "none"}
+              </span>
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 px-1.5 text-[10px]"
+              onClick={handleNewSession}
+              title="Start a new session"
+              disabled={pendingNewSession}
+            >
+              <Plus className="h-3 w-3 mr-0.5" />
+              New
+            </Button>
+          </div>
+          {sessionsExpanded && sessionList.length > 0 && (
+            <div className="mt-1.5 max-h-32 overflow-y-auto flex flex-col gap-0.5">
+              {sessionList.map((s: any) => {
+                const active = s.id === sessionId;
+                const editing = renamingSessionId === s.id;
+                return (
+                  <div
+                    key={s.id}
+                    className={cn(
+                      "flex items-center gap-1 px-2 py-1 rounded text-[10px] border transition-all group",
+                      active
+                        ? "bg-primary/10 border-primary/30 text-primary"
+                        : "bg-muted/30 border-transparent text-muted-foreground hover:border-muted-foreground/30"
+                    )}
+                    title={s.title ?? `Session #${s.id}`}
+                  >
+                    {editing ? (
+                      <>
+                        <input
+                          autoFocus
+                          value={renameDraft}
+                          onChange={(e) => setRenameDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleCommitRename();
+                            } else if (e.key === "Escape") {
+                              setRenamingSessionId(null);
+                              setRenameDraft("");
+                            }
+                          }}
+                          className="flex-1 min-w-0 text-[10px] bg-background border rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                          maxLength={120}
+                        />
+                        <button
+                          onClick={handleCommitRename}
+                          className="shrink-0 h-4 w-4 flex items-center justify-center rounded hover:bg-primary/20"
+                          title="Save"
+                          disabled={renameSessionMut.isPending}
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setRenamingSessionId(null);
+                            setRenameDraft("");
+                          }}
+                          className="shrink-0 h-4 w-4 flex items-center justify-center rounded hover:bg-muted"
+                          title="Cancel"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handlePickSession(s.id)}
+                          className="flex-1 min-w-0 text-left truncate"
+                        >
+                          {s.title ?? `Session #${s.id}`}
+                        </button>
+                        <span className="opacity-60 shrink-0 text-[9px]">
+                          {s.messageCount ?? 0}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartRename(s.id, s.title);
+                          }}
+                          className="shrink-0 h-4 w-4 flex items-center justify-center rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:bg-primary/20"
+                          title="Rename"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSession(s.id, s.title);
+                          }}
+                          className="shrink-0 h-4 w-4 flex items-center justify-center rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:bg-destructive/20 hover:text-destructive"
+                          title="Delete"
+                          disabled={deleteSessionMut.isPending}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -337,6 +646,51 @@ export function AgentStudioChatWindow() {
             );
           }
 
+          if (msg.role === "tool") {
+            // Tool result bubble — compact format showing tool name + result
+            const toolName =
+              (msg.toolPayload as any)?.name ?? "tool";
+            return (
+              <div key={msg.id} className="flex gap-2 items-start">
+                <span className="h-6 w-6 rounded-full flex items-center justify-center bg-accent shrink-0 mt-0.5">
+                  <Wrench className="h-3 w-3 text-primary" />
+                </span>
+                <div className="max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-2 bg-accent/40">
+                  <p className="text-[10px] font-semibold mb-1">{toolName}</p>
+                  <pre className="text-[10px] whitespace-pre-wrap text-muted-foreground max-h-32 overflow-y-auto">
+                    {msg.content}
+                  </pre>
+                </div>
+              </div>
+            );
+          }
+
+          // Skip empty assistant turns (the tool-calling placeholder
+          // before a tool call has content="" + toolPayload.toolCalls).
+          if (
+            msg.role === "assistant" &&
+            (!msg.content || msg.content.length === 0)
+          ) {
+            const tc = (msg.toolPayload as any)?.toolCalls;
+            if (Array.isArray(tc) && tc.length > 0) {
+              return (
+                <div key={msg.id} className="flex gap-2 items-center">
+                  <span
+                    className={cn(
+                      "h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0",
+                      avatarColor(agentName),
+                    )}
+                  >
+                    {initials(agentName)}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground italic">
+                    calling {tc.length} tool{tc.length > 1 ? "s" : ""}…
+                  </span>
+                </div>
+              );
+            }
+          }
+
           // Assistant message — copied from source line 346-383
           return (
             <div key={msg.id} className="flex gap-2 items-start">
@@ -372,8 +726,33 @@ export function AgentStudioChatWindow() {
           );
         })}
 
-        {/* Streaming indicator — adapted from source line 387-402 */}
-        {isStreaming && (
+        {/* Streaming bubble — shows the delta-accumulated assistant
+            response while the SSE stream is open. Once `done` arrives
+            we clear streamingText and the real message list refetch
+            replaces this bubble with the persisted row. */}
+        {isStreaming && streamingText.length > 0 && (
+          <div className="flex gap-2 items-start">
+            <span
+              className={cn(
+                "h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 mt-0.5",
+                avatarColor(agentName),
+              )}
+            >
+              {initials(agentName)}
+            </span>
+            <div className="max-w-[85%]">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="text-[10px] font-semibold">{agentName}</span>
+              </div>
+              <div className="rounded-2xl rounded-tl-sm px-3 py-2 bg-muted">
+                <p className="text-xs whitespace-pre-wrap">{streamingText}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Thinking indicator — shown until the first token arrives */}
+        {isStreaming && streamingText.length === 0 && (
           <div className="flex gap-2 items-center">
             <span
               className={cn(

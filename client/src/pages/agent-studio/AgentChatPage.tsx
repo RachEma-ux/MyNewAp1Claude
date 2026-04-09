@@ -35,6 +35,8 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
   const utils = trpc.useUtils();
   const [message, setMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const eventSourceRef = useRef<EventSource | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: shell } = trpc.agentStudio.shell.getShellSummary.useQuery({ agentId });
@@ -56,38 +58,36 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
   );
 
   const startSessionMut = trpc.agentStudio.chat.startSession.useMutation();
-  const sendMessageMut = trpc.agentStudio.chat.sendMessage.useMutation({
-    onSuccess: (r) => {
-      setIsStreaming(false);
-      if (!r.ok && r.error) {
-        // Surface the error in the message stream so the user sees it
-        // inline (matches the source's pattern at line 105-114 where
-        // errors get appended as assistant messages).
-        console.error("Chat error:", r.error);
-      }
-      utils.agentStudio.chat.listMessages.invalidate({
-        sessionId: sessionId ?? 0,
-      });
-      utils.agentStudio.chat.listSessions.invalidate({ agentId });
-    },
-    onError: (e) => {
-      setIsStreaming(false);
-      console.error("Failed to send message:", e);
-    },
-  });
 
   // Auto-scroll to bottom when messages change (mirrors source line 38-40)
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, streamingText]);
 
-  // Mirrors source handleSendMessage at line 42-131.
+  // Clean up the EventSource on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        try {
+          eventSourceRef.current.close();
+        } catch {
+          /* ignore */
+        }
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
+
+  // Phase 19 follow-up Task #4: EventSource-based streaming. Replaces
+  // the blocking sendMessage mutation with an SSE connection to
+  // /api/agent-studio/chat/stream so tokens render as they arrive.
   const handleSendMessage = async () => {
     if (!message.trim() || !agentId || isStreaming) return;
 
     const userMessage = message.trim();
     setMessage("");
     setIsStreaming(true);
+    setStreamingText("");
 
     try {
       // Create session if none exists (mirrors source line 60-68).
@@ -98,20 +98,61 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
           title: userMessage.substring(0, 50),
         });
         activeSessionId = newSession.sessionId;
-        // Refetch the session list so the next render has it
         await utils.agentStudio.chat.listSessions.invalidate({ agentId });
       }
 
-      // Send the user message + get the assistant response. The Agent
-      // Studio chat backend persists both messages internally — we
-      // just invalidate the messages query to refetch.
-      sendMessageMut.mutate({
-        sessionId: activeSessionId,
-        userMessage,
-      });
+      const url =
+        "/api/agent-studio/chat/stream?" +
+        new URLSearchParams({
+          sessionId: activeSessionId.toString(),
+          message: userMessage,
+        });
+      const es = new EventSource(url);
+      eventSourceRef.current = es;
+
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "token") {
+            setStreamingText((prev) => prev + (data.content ?? ""));
+          } else if (data.type === "done") {
+            setIsStreaming(false);
+            setStreamingText("");
+            es.close();
+            eventSourceRef.current = null;
+            utils.agentStudio.chat.listMessages.invalidate({
+              sessionId: activeSessionId!,
+            });
+            utils.agentStudio.chat.listSessions.invalidate({ agentId });
+          } else if (data.type === "error") {
+            setIsStreaming(false);
+            setStreamingText("");
+            es.close();
+            eventSourceRef.current = null;
+            console.error("Chat stream error:", data.error);
+            utils.agentStudio.chat.listMessages.invalidate({
+              sessionId: activeSessionId!,
+            });
+          }
+        } catch (err) {
+          console.error("Malformed SSE event:", event.data, err);
+        }
+      };
+
+      es.onerror = () => {
+        setIsStreaming(false);
+        setStreamingText("");
+        try {
+          es.close();
+        } catch {
+          /* ignore */
+        }
+        eventSourceRef.current = null;
+      };
     } catch (error) {
       console.error("Failed to send message:", error);
       setIsStreaming(false);
+      setStreamingText("");
     }
   };
 
@@ -185,10 +226,17 @@ export default function AgentChatPage({ agentId }: { agentId: number }) {
           </div>
         ))}
 
-        {/* Streaming indicator (we don't actually stream tokens yet —
-            this just shows a "thinking" placeholder during the
-            blocking mutation). Mirrors source line 199-209. */}
-        {isStreaming && (
+        {/* Streaming assistant bubble — grows as SSE tokens arrive */}
+        {isStreaming && streamingText.length > 0 && (
+          <div className="flex justify-start">
+            <Card className="p-3 max-w-[80%] bg-muted">
+              <p className="text-sm whitespace-pre-wrap">{streamingText}</p>
+            </Card>
+          </div>
+        )}
+
+        {/* Thinking placeholder — shown until the first token arrives */}
+        {isStreaming && streamingText.length === 0 && (
           <div className="flex justify-start">
             <Card className="p-3 max-w-[80%] bg-muted">
               <p className="text-sm flex items-center gap-2">

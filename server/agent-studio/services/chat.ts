@@ -32,9 +32,11 @@
  * the same runViaOpenAIDirect call with an onToken callback.
  */
 
+import OpenAI from "openai";
 import * as repo from "../repository";
-import { runViaOpenAIDirect } from "../adapters/openai-direct-adapter";
 import { resolveProviderApiKey } from "../adapters/openllm-runtime-adapter";
+import { dispatchMcpToolCall } from "./mcp/dispatcher";
+import { getSnapshot } from "./mcp/registry";
 import type { Message } from "../../providers/types";
 
 export interface SendChatMessageInput {
@@ -54,6 +56,297 @@ export interface SendChatMessageResult {
     model: string;
   };
   error?: string;
+}
+
+// ── Tool-call helpers (Phase 19 follow-up Task #5) ───────────────────────────
+
+/**
+ * OpenAI function tool names must match ^[a-zA-Z0-9_-]{1,64}$. MCP tool
+ * names routinely contain dots (e.g. `studio.echo`, `fs.read_file`) and
+ * our dispatcher key format `mcp__server__tool` contains double-
+ * underscores. We build a Map from OpenAI-safe name → dispatch key so
+ * we don't have to reverse-parse on callback.
+ */
+function sanitizeOpenAIToolName(raw: string): string {
+  // Allowed: a-z A-Z 0-9 _ -
+  // Replace anything else with _. If the result starts with a digit,
+  // prepend `t_`. Clamp to 64 chars.
+  let out = raw.replace(/[^a-zA-Z0-9_-]/g, "_");
+  if (/^[0-9]/.test(out)) out = "t_" + out;
+  if (out.length > 64) out = out.slice(0, 64);
+  return out;
+}
+
+interface ChatToolSpec {
+  /** Name passed to OpenAI */
+  openaiName: string;
+  /** Dispatcher key `mcp__<serverName>__<remoteToolName>` */
+  dispatchKey: string;
+  /** OpenAI tool schema */
+  schema: {
+    type: "function";
+    function: {
+      name: string;
+      description?: string;
+      parameters: Record<string, unknown>;
+    };
+  };
+}
+
+/**
+ * Build OpenAI function tool schemas from every MCP server attached to
+ * the draft, gated by the registry (only CONNECTED servers publish
+ * snapshots). Returns an empty array when no tools are available; the
+ * caller then runs a no-tools completion.
+ */
+async function buildToolsForDraft(draftId: number): Promise<ChatToolSpec[]> {
+  const servers = await repo.listMcpServers(draftId);
+  const specs: ChatToolSpec[] = [];
+  const takenNames = new Set<string>();
+  for (const server of servers) {
+    if (!server.enabled) continue;
+    const snap = getSnapshot(server.id);
+    if (!snap) continue; // server not connected yet
+    for (const tool of snap.tools) {
+      const dispatchKey = `mcp__${server.name}__${tool.name}`;
+      let openaiName = sanitizeOpenAIToolName(`${server.name}__${tool.name}`);
+      // Handle collisions on the sanitized name
+      let suffix = 1;
+      const base = openaiName;
+      while (takenNames.has(openaiName)) {
+        openaiName = `${base}_${suffix++}`.slice(0, 64);
+      }
+      takenNames.add(openaiName);
+      // Default parameters schema if the tool doesn't publish one
+      const parameters =
+        (tool.inputSchema && typeof tool.inputSchema === "object")
+          ? (tool.inputSchema as Record<string, unknown>)
+          : { type: "object", properties: {} };
+      specs.push({
+        openaiName,
+        dispatchKey,
+        schema: {
+          type: "function",
+          function: {
+            name: openaiName,
+            description: tool.description,
+            parameters,
+          },
+        },
+      });
+    }
+  }
+  return specs;
+}
+
+/**
+ * Maximum number of tool-call turns before we force-stop the loop and
+ * ask the model to finalize. Prevents infinite loops when the model
+ * keeps calling tools instead of answering.
+ */
+const MAX_TOOL_TURNS = 6;
+
+/**
+ * Tool-call loop: runs an OpenAI chat completion with tools wired, and
+ * whenever the response contains tool_calls, dispatches each through
+ * the MCP dispatcher, persists the tool result as a role=tool message,
+ * and re-calls the model. Terminates on either a final assistant
+ * message with content OR MAX_TOOL_TURNS iterations.
+ *
+ * Returns the final assistant row + cumulative usage + duration so
+ * the caller can bump session totals the same way the no-tool path
+ * does.
+ */
+async function runChatWithTools(input: {
+  sessionId: number;
+  draftId: number;
+  apiKey: string;
+  model: string;
+  temperature: number;
+  maxTokens?: number;
+  systemPrompt: string;
+  tools: ChatToolSpec[];
+}) {
+  const client = new OpenAI({ apiKey: input.apiKey });
+  const dispatchKeyByOpenaiName = new Map<string, string>(
+    input.tools.map((t) => [t.openaiName, t.dispatchKey])
+  );
+  const toolSchemas = input.tools.map((t) => t.schema);
+
+  // Rebuild the messages array on every turn by reloading history
+  // from the DB. This ensures previously-persisted tool messages and
+  // assistant tool_calls are visible to the next completion.
+  const startMs = Date.now();
+  let cumulativeInputTokens = 0;
+  let cumulativeOutputTokens = 0;
+  let cumulativeCostMicrocents = 0;
+
+  // Cost estimate (same rates as chat-stream.ts — gpt-4o mid-tier)
+  const INPUT_COST_PER_1M = 5;
+  const OUTPUT_COST_PER_1M = 15;
+
+  for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+    // Build the messages array from current history
+    const history = await repo.listChatMessages(input.sessionId);
+    const messagesForApi: any[] = [
+      { role: "system", content: input.systemPrompt },
+    ];
+    for (const m of history) {
+      if (m.role === "user") {
+        messagesForApi.push({ role: "user", content: m.content });
+      } else if (m.role === "assistant") {
+        // If this assistant turn was a tool-calling turn, its
+        // toolPayload contains the tool_calls array we need to
+        // re-emit so the model has matching tool responses.
+        const tp = (m.toolPayload ?? null) as any;
+        if (tp?.toolCalls && Array.isArray(tp.toolCalls)) {
+          messagesForApi.push({
+            role: "assistant",
+            content: m.content || null,
+            tool_calls: tp.toolCalls,
+          });
+        } else {
+          messagesForApi.push({ role: "assistant", content: m.content });
+        }
+      } else if (m.role === "tool") {
+        const tp = (m.toolPayload ?? null) as any;
+        messagesForApi.push({
+          role: "tool",
+          tool_call_id: tp?.toolCallId ?? "",
+          content: m.content,
+        });
+      }
+    }
+
+    const response = await client.chat.completions.create({
+      model: input.model,
+      messages: messagesForApi,
+      temperature: input.temperature,
+      ...(input.maxTokens != null ? { max_completion_tokens: input.maxTokens } : {}),
+      tools: toolSchemas,
+      tool_choice: "auto",
+    });
+
+    const choice = response.choices[0];
+    if (!choice) throw new Error("OpenAI returned no choices");
+
+    // Accumulate usage
+    const usage = response.usage;
+    if (usage) {
+      cumulativeInputTokens += usage.prompt_tokens ?? 0;
+      cumulativeOutputTokens += usage.completion_tokens ?? 0;
+      const turnCost =
+        ((usage.prompt_tokens ?? 0) / 1_000_000) * INPUT_COST_PER_1M +
+        ((usage.completion_tokens ?? 0) / 1_000_000) * OUTPUT_COST_PER_1M;
+      cumulativeCostMicrocents += Math.round(turnCost * 1_000_000);
+    }
+
+    const msg = choice.message;
+    const toolCalls = (msg as any).tool_calls as any[] | undefined;
+
+    if (toolCalls && toolCalls.length > 0) {
+      // Persist the assistant turn that carries the tool_calls (no
+      // content yet). Store tool_calls in toolPayload so the next
+      // turn's history rebuild can re-emit them.
+      await repo.appendChatMessage({
+        sessionId: input.sessionId,
+        role: "assistant",
+        content: msg.content ?? "",
+        toolPayload: { toolCalls },
+        model: input.model,
+      });
+
+      // Dispatch each tool call and persist results as role=tool
+      for (const call of toolCalls) {
+        const openaiName: string = call.function?.name ?? "";
+        const rawArgs: string = call.function?.arguments ?? "{}";
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(rawArgs);
+        } catch {
+          args = {};
+        }
+        const dispatchKey = dispatchKeyByOpenaiName.get(openaiName);
+        if (!dispatchKey) {
+          await repo.appendChatMessage({
+            sessionId: input.sessionId,
+            role: "tool",
+            content: JSON.stringify({
+              error: `unknown tool: ${openaiName}`,
+            }),
+            toolPayload: { toolCallId: call.id, name: openaiName },
+          });
+          continue;
+        }
+        const dispatchResult = await dispatchMcpToolCall({
+          agentDraftId: input.draftId,
+          toolName: dispatchKey,
+          args,
+          source: "live_runtime",
+        });
+        const toolContent = dispatchResult.ok
+          ? JSON.stringify(dispatchResult.result ?? null)
+          : JSON.stringify({
+              error: dispatchResult.error?.message ?? "dispatch failed",
+              code: dispatchResult.error?.code,
+            });
+        await repo.appendChatMessage({
+          sessionId: input.sessionId,
+          role: "tool",
+          content: toolContent,
+          toolPayload: { toolCallId: call.id, name: openaiName },
+        });
+      }
+      // Loop again — the next iteration rebuilds history and calls
+      // the model with the tool outputs now in context.
+      continue;
+    }
+
+    // No tool calls — this is the final assistant response
+    const finalContent = msg.content ?? "";
+    const durationMs = Date.now() - startMs;
+    const assistantRow = await repo.appendChatMessage({
+      sessionId: input.sessionId,
+      role: "assistant",
+      content: finalContent,
+      inputTokens: cumulativeInputTokens,
+      outputTokens: cumulativeOutputTokens,
+      costMicrocents: cumulativeCostMicrocents,
+      model: input.model,
+      durationMs,
+    });
+    return {
+      assistantRow,
+      inputTokens: cumulativeInputTokens,
+      outputTokens: cumulativeOutputTokens,
+      costMicrocents: cumulativeCostMicrocents,
+      durationMs,
+      content: finalContent,
+    };
+  }
+
+  // Loop hit MAX_TOOL_TURNS without terminating — write a synthetic
+  // assistant message noting this and return.
+  const durationMs = Date.now() - startMs;
+  const capMsg = `(Tool loop stopped after ${MAX_TOOL_TURNS} turns without a final answer.)`;
+  const assistantRow = await repo.appendChatMessage({
+    sessionId: input.sessionId,
+    role: "assistant",
+    content: capMsg,
+    inputTokens: cumulativeInputTokens,
+    outputTokens: cumulativeOutputTokens,
+    costMicrocents: cumulativeCostMicrocents,
+    model: input.model,
+    durationMs,
+  });
+  return {
+    assistantRow,
+    inputTokens: cumulativeInputTokens,
+    outputTokens: cumulativeOutputTokens,
+    costMicrocents: cumulativeCostMicrocents,
+    durationMs,
+    content: capMsg,
+  };
 }
 
 /**
@@ -157,21 +450,78 @@ export async function sendChatMessage(
     };
   }
 
-  // 4. Load the full message history (AFTER persisting the new user
-  //    message, so the history includes it — though we'll build the
-  //    messages array manually to control the system prompt slot)
-  const history = await repo.listChatMessages(input.sessionId);
-
-  // 5. Build the OpenAI messages array:
-  //    - system: draft.systemInstructions + draft.roleInstructions
-  //    - history: every user/assistant message in order
-  //    - (new user message is already in `history` since we persisted
-  //       it above — no need to append again)
+  // 4. Build the system prompt from the draft's instructions
   const systemPrompt =
     [draft.systemInstructions, draft.roleInstructions]
       .filter((s): s is string => typeof s === "string" && s.length > 0)
       .join("\n\n") || "You are a helpful assistant.";
 
+  // 5. Decide tool-call vs. no-tools path. If the draft has any
+  //    CONNECTED MCP servers (registry snapshot present), we run the
+  //    tool-call loop which dispatches every invocation through the
+  //    Phase 19a dispatcher (governance + audit). Otherwise we fall
+  //    through to the simple no-tools path via OpenAIProvider.
+  const toolSpecs = await buildToolsForDraft(draft.id);
+  if (toolSpecs.length > 0) {
+    // Snapshot the message count BEFORE the loop so we can compute
+    // how many new rows (tool calls + tool results + final assistant)
+    // the loop actually wrote and bump `messageCount` by that delta.
+    // The user message was already persisted in step 2, so we count
+    // it here so it's included in the delta below.
+    const preLoopHistory = await repo.listChatMessages(input.sessionId);
+    const preLoopCount = preLoopHistory.length;
+    try {
+      const loopResult = await runChatWithTools({
+        sessionId: input.sessionId,
+        draftId: draft.id,
+        apiKey,
+        model,
+        temperature,
+        maxTokens,
+        systemPrompt,
+        tools: toolSpecs,
+      });
+      // Delta = every message written by the loop. Plus 1 for the
+      // user message we pre-persisted in step 2 (which is already in
+      // preLoopCount), so we just add (postCount - preLoopCount) + 1.
+      const postHistory = await repo.listChatMessages(input.sessionId);
+      const deltaFromLoop = postHistory.length - preLoopCount;
+      const addedMessages = 1 + deltaFromLoop; // +1 for the user turn
+      const autoTitle =
+        !session.title && input.userMessage
+          ? input.userMessage.slice(0, 60).trim()
+          : undefined;
+      await repo.bumpChatSessionTotals({
+        sessionId: input.sessionId,
+        addInputTokens: loopResult.inputTokens,
+        addOutputTokens: loopResult.outputTokens,
+        addCostMicrocents: loopResult.costMicrocents,
+        addMessages: addedMessages,
+        title: autoTitle,
+      });
+      return {
+        ok: true,
+        assistantMessage: {
+          id: loopResult.assistantRow.id,
+          content: loopResult.content,
+          inputTokens: loopResult.inputTokens,
+          outputTokens: loopResult.outputTokens,
+          costMicrocents: loopResult.costMicrocents,
+          durationMs: loopResult.durationMs,
+          model,
+        },
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
+  }
+
+  // 6. No-tools path — build plain messages array and call the
+  //    OpenAIProvider (which returns a full result with usage + cost)
+  const history = await repo.listChatMessages(input.sessionId);
   const messages: Message[] = [
     { role: "system", content: systemPrompt },
     ...history
@@ -184,12 +534,6 @@ export async function sendChatMessage(
       ),
   ];
 
-  // 6. Call the direct OpenAI adapter. We pass userMessage="" because
-  //    runViaOpenAIDirect's signature expects a single userMessage; we
-  //    instead pass the full history through systemPrompt concatenation.
-  //    Actually, we need a version that takes the full messages array.
-  //    For the MVP, I'll use the OpenAIProvider directly here to avoid
-  //    threading a new signature through the adapter.
   const { OpenAIProvider } = await import("../../providers/openai");
   const providerInstance = new OpenAIProvider({
     id: "agent-studio-chat",

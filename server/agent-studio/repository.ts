@@ -7,7 +7,7 @@
  * No cross-module imports — this module is fully independent.
  */
 
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 // Phase 12.5: Agent Studio operates against its own dedicated PostgreSQL
 // database (`asdb`), separate from the main mynewap1claude app DB.
 // Mirrors the wfdb/prmdb/psmdb/codedb pattern.
@@ -85,13 +85,37 @@ export async function listAgents(filters: {
     );
     if (searchClause) conditions.push(searchClause);
   }
-  const query = conn
+  const rows = await conn
     .select()
     .from(agsAgents)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(agsAgents.updatedAt))
     .limit(filters.limit ?? 100);
-  return query;
+
+  // Enrich each agent with its current draft's providerConfig so the
+  // UI can show chat compatibility without a second round trip. Used
+  // by the Studio Chat FAB agent picker to disable non-openai agents.
+  // One batch query — O(1) extra SQL regardless of page size.
+  const draftIds = rows
+    .map((a) => a.currentDraftId)
+    .filter((x): x is number => x != null);
+  const draftRows = draftIds.length > 0
+    ? await conn
+        .select({
+          id: agsAgentDrafts.id,
+          providerConfig: agsAgentDrafts.providerConfig,
+        })
+        .from(agsAgentDrafts)
+        .where(inArray(agsAgentDrafts.id, draftIds))
+    : [];
+  const configByDraftId = new Map<number, unknown>(
+    draftRows.map((d) => [d.id, d.providerConfig])
+  );
+  return rows.map((a) => ({
+    ...a,
+    providerConfig:
+      a.currentDraftId != null ? configByDraftId.get(a.currentDraftId) ?? null : null,
+  }));
 }
 
 export async function getAgentById(agentId: number) {
@@ -2654,6 +2678,23 @@ export async function deleteChatSession(sessionId: number) {
   // Delete messages first (no ON DELETE CASCADE per clone-safe convention)
   await db().delete(agsChatMessages).where(eq(agsChatMessages.sessionId, sessionId));
   await db().delete(agsChatSessions).where(eq(agsChatSessions.id, sessionId));
+}
+
+/**
+ * Rename a chat session. Updates the title and bumps updatedAt so the
+ * session list reorders correctly. Used by the Studio Chat UI rename
+ * button + inline edit.
+ */
+export async function renameChatSession(input: {
+  sessionId: number;
+  title: string;
+}) {
+  const [updated] = await db()
+    .update(agsChatSessions)
+    .set({ title: input.title, updatedAt: new Date() })
+    .where(eq(agsChatSessions.id, input.sessionId))
+    .returning();
+  return updated;
 }
 
 export async function listChatMessages(sessionId: number) {
