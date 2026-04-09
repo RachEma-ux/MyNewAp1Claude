@@ -103,11 +103,21 @@ export default function AgentSimulationPage({ agentId }: { agentId: number }) {
       <Card className="lg:col-span-3">
         <CardContent className="p-3 space-y-2">
           <h3 className="text-sm font-semibold">Scenario Builder</h3>
-          <Field label="Scenario Name">
-            <Input value={scenarioName} onChange={(e) => setScenarioName(e.target.value)} className="h-7 text-xs" />
+          <Field label="Name">
+            <Input
+              value={scenarioName}
+              onChange={(e) => setScenarioName(e.target.value)}
+              placeholder="Short label for saving this scenario"
+              className="h-7 text-xs"
+            />
           </Field>
-          <Field label="Input Payload (JSON)">
-            <Textarea value={inputJson} onChange={(e) => setInputJson(e.target.value)} className="text-[10px] font-mono min-h-[120px]" />
+          <Field label="Scenario">
+            <Textarea
+              value={inputJson}
+              onChange={(e) => setInputJson(e.target.value)}
+              placeholder='{"prompt": "Describe what the agent should do..."}'
+              className="text-[10px] font-mono min-h-[120px]"
+            />
           </Field>
           <div className="text-[10px] uppercase text-muted-foreground/70 font-semibold mt-2">
             Toggles
