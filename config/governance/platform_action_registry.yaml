@@ -2592,6 +2592,65 @@ actions:
     evidence: { required: true, types: [reason] }
 
   # ═══════════════════════════════════════════════════════════════════════════
+  # OPENROUTER — UNIFIED MODEL GATEWAY
+  # ═══════════════════════════════════════════════════════════════════════════
+  openRouter.config.save:
+    domain: openRouter
+    risk: R3
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: true, types: [reason] }
+
+  openRouter.sync.run:
+    domain: openRouter
+    risk: R2
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  openRouter.routing.setDefault:
+    domain: openRouter
+    risk: R2
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  openRouter.routing.create:
+    domain: openRouter
+    risk: R2
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  openRouter.routing.update:
+    domain: openRouter
+    risk: R2
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  openRouter.routing.delete:
+    domain: openRouter
+    risk: R3
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  openRouter.playground.execute:
+    domain: openRouter
+    risk: R2
+    capability: openRouter.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
   # KGIA — KNOWLEDGE GRAPH INTERPRETATION AGENT
   # ═══════════════════════════════════════════════════════════════════════════
   kgia.source.create:

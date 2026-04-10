@@ -46,3 +46,4 @@ export * from './tables/ai-types';
 export * from './tables/data-warehouse';
 export * from './tables/agent-studio';
 export * from '../server/modules/kgia/schema';
+export * from '../server/openrouter/schema';

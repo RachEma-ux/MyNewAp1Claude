@@ -417,6 +417,17 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "modules.kgia.benchmarks.createCase": "kgia.benchmark.createCase",
   "modules.kgia.benchmarks.runCase": "kgia.benchmark.runCase",
 
+  // ── OpenRouter — Unified Model Gateway ──────────────────────────────────
+  "openRouter.config.save": "openRouter.config.save",
+  "openRouter.sync.run": "openRouter.sync.run",
+  "openRouter.routing.setDefault": "openRouter.routing.setDefault",
+  "openRouter.routing.create": "openRouter.routing.create",
+  "openRouter.routing.update": "openRouter.routing.update",
+  "openRouter.routing.delete": "openRouter.routing.delete",
+  "openRouter.playground.chat": "openRouter.playground.execute",
+  "openRouter.playground.embedding": "openRouter.playground.execute",
+  "openRouter.playground.structured": "openRouter.playground.execute",
+
   // ── Modules (Engine Binding) ─────────────────────────────────────────────
   "modules.manage.setEnabled": "module.setEnabled",
   "modules.manage.seed": "module.seed",

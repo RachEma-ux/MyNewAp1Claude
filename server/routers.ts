@@ -55,6 +55,7 @@ import { prmRouter } from "./prm/prm.router";
 import { psmRouter } from "./psm/psm.router";
 import { codeStudioRouter } from "./code-studio/api/router";
 import { agentStudioRouter } from "./agent-studio/api/router";
+import { openRouterRouter } from "./openrouter/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -109,6 +110,7 @@ export const appRouter = router({
   sandboxWf: sandboxWfRouter, // Sandbox WF — dedicated wfdb workflows, steps, executions, triggers
   codeStudio: codeStudioRouter, // Code Studio — standalone coding module (dedicated codedb, OpenCode runtime)
   agentStudio: agentStudioRouter, // AI Agent Studio — standalone agent lifecycle module (ags_* tables)
+  openRouter: openRouterRouter, // OpenRouter — unified model gateway (control plane + runtime)
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
