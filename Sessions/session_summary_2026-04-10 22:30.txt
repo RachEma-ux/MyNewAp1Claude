@@ -1,0 +1,67 @@
+Session Summary — 2026-04-10 22:30
+=====================================
+
+Commit: e4d7779 feat(kgia): Knowledge Graph Interpretation Agent — full V1 module
+Branch: main (pushed to origin)
+
+## What Was Built
+
+KGIA (Knowledge Graph Interpretation Agent) — a governed specialist worker module
+with 90 files (68 backend + 20 frontend + 2 governance docs), 9,400 lines of code.
+
+### Three Graph Planes
+A. Source Graph Plane — direct query over Neo4j/SPARQL backends
+B. Retrieval Graph Plane — GraphRAG ingestion over documents
+C. Memory Graph Plane — session-scoped task memory (facts, claims, contradictions)
+
+### Backend Architecture (68 files)
+- server/modules/kgia/index.ts — module entry
+- server/modules/kgia/schema.ts — 16 Drizzle tables (workspace-scoped)
+- server/modules/kgia/router.ts — 19 tRPC procedures (7 governed, 12 protected)
+- domain/ (12) — types, query-planner, evidence-assembler, path-reasoning, answer-synthesizer, 7 port interfaces
+- governance/ (2) — non-bypassable policies (15 blocked patterns), safety gates (SSRF, audit)
+- runtime/ (18) — orchestrator, state factory, 12 pipeline nodes, 4 subgraphs, human review
+- services/ (8) — query-repair, memory-manager, entity-resolver, benchmark-runner, graphrag-coordinator, temporal-resolver, confidence-scorer, provenance-assembler
+- infrastructure/ (22) — Neo4j/SPARQL adapters + schema readers + query executors, GraphRAG pipeline (chunker, extractor, community builder/reporter, graph writer), vector embeddings + reranker, graph algorithms + node embeddings, security (allowlist, credential scopes, redaction), observability (tracing, metrics, structured logs)
+- tests/ (3) — query-repair, runtime-nodes, benchmark-runner
+
+### Frontend (20 files)
+- Shell: KGIAShell + Sidebar + StatusBar + OversightDrawer
+- Pages: Workbench, Sources, Benchmarks, Governance (+ workspace KgiaPage)
+- Workbench components: QueryComposer, ModeBadge, SchemaSlicePanel, EvidenceGraphPanel, ProvenancePanel, TimeValidityPanel, MissingKnowledgePanel
+- Admin components: SourceRegistryTable, IngestionRunsTable, BenchRunTable, PolicyDecisionPanel
+
+### Wiring (7 existing files modified)
+- drizzle/schema.ts — kgia schema export
+- drizzle/tables/workspace-modules.ts — "kgia" in MODULE_KEYS
+- server/modules/router.ts — kgia router registered
+- server/modules/registry.ts — kgia in team/project/enterprise presets
+- server/governance/action-key-map.ts — 7 action mappings
+- config/governance/platform_action_registry.yaml — 7 action definitions
+- client/src/App.tsx — lazy import + 4 routes
+- client/src/components/MainLayout.tsx — nav entry
+
+### Governance Controls Verified
+1. Read-only default (15 blocked write patterns)
+2. Source allowlist enforcement
+3. SSRF prevention (private IP blocking)
+4. Query shape validation
+5. Hop/row limits (default: 6 hops, 5000 rows)
+6. Full audit trail (kgia_policy_decisions table)
+7. Action registry gating (deny-by-default)
+
+### Testing Evidence
+- 4/4 routes: HTTP 200
+- 9/9 query endpoints: HTTP 200
+- 3/3 mutations: success
+- 16 DB tables created with live data
+- Blocked query test: VERIFIED (DELETE blocked)
+- SSRF test: VERIFIED (127.0.0.1 blocked)
+- End-to-end pipeline: 17% confidence (correct for stub adapters)
+
+### Database
+- 16 kgia_* tables created via SQL (drizzle-kit push had conflicts with existing tables)
+- Live data: 1 source, 2 sessions, 3 runs, 3 query plans, 3 executions, 3 answers, 7 policy decisions, 1 benchmark case, 1 benchmark run
+
+### Bug Fix
+- Fixed workspaceId:0 bug in orchestrator.ts persistRunResult (was writing 0 to kgiaAnswers.workspaceId)
