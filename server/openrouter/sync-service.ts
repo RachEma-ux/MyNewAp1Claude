@@ -67,8 +67,10 @@ export async function syncModels(): Promise<{
     let added = 0, updated = 0;
 
     for (const raw of models) {
+      if (!raw.id) continue;
       const capabilities = inferCapabilities(raw);
-      const providerSlug = raw.id.split("/")[0] ?? "unknown";
+      const providerSlug = raw.id.includes("/") ? raw.id.split("/")[0] : ((raw as any).owned_by ?? "unknown");
+      const modelName = raw.name || raw.id;
 
       const existing = await db
         .select()
@@ -80,7 +82,7 @@ export async function syncModels(): Promise<{
         await db
           .update(openrouterModels)
           .set({
-            name: raw.name,
+            name: modelName,
             description: raw.description ?? null,
             contextLength: raw.context_length ?? null,
             promptPricing: raw.pricing?.prompt ? parseFloat(raw.pricing.prompt) * 1_000_000 : null,
@@ -97,7 +99,7 @@ export async function syncModels(): Promise<{
       } else {
         await db.insert(openrouterModels).values({
           modelId: raw.id,
-          name: raw.name,
+          name: modelName,
           description: raw.description ?? null,
           contextLength: raw.context_length ?? null,
           promptPricing: raw.pricing?.prompt ? parseFloat(raw.pricing.prompt) * 1_000_000 : null,

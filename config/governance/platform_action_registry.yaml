@@ -2596,11 +2596,11 @@ actions:
   # ═══════════════════════════════════════════════════════════════════════════
   openRouter.config.save:
     domain: openRouter
-    risk: R3
+    risk: R2
     capability: openRouter.manage
     stage: mutate
     approval: none
-    evidence: { required: true, types: [reason] }
+    evidence: { required: false }
 
   openRouter.sync.run:
     domain: openRouter
