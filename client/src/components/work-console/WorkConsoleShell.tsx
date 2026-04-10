@@ -29,6 +29,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useIsMobile } from "@/hooks/useMobile";
 import WorkConsoleSidebar, { type WorkConsoleView } from "./WorkConsoleSidebar";
 import WorkConsoleLeftRail from "./WorkConsoleLeftRail";
 import WorkConsoleGovernanceRail from "./WorkConsoleGovernanceRail";
@@ -75,12 +76,13 @@ function parseRoute(path: string): ParsedRoute {
 
 export default function WorkConsoleShell() {
   const [location, navigate] = useLocation();
+  const isMobile = useIsMobile();
+  // On mobile: sidebar always collapsed, rails always hidden.
+  // Same pattern as AgentStudioShell: collapsed={isMobile || sidebarCollapsed}
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  // S2 rail (Task & Controls) collapse state. Matches Code Studio's
-  // Double IBM Shell: when railCollapsed = true, the left rail is
-  // fully hidden behind S1 (single bar visible). Defaults to visible
-  // so first-run users immediately see the task form.
   const [railCollapsed, setRailCollapsed] = useState(false);
+  const effectiveSidebarCollapsed = isMobile || sidebarCollapsed;
+  const effectiveRailHidden = isMobile || railCollapsed;
 
   const parsed = useMemo(() => parseRoute(location), [location]);
   const { view, jobId, tab } = parsed;
@@ -120,26 +122,27 @@ export default function WorkConsoleShell() {
 
   return (
     <>
-      {/* S1 — Module sidebar (hosts the S2 rail toggle at the bottom) */}
+      {/* S1 — Module sidebar. On mobile: always collapsed (w-12). */}
       <WorkConsoleSidebar
         active={view}
         onNavigate={handleNavigate}
-        collapsed={sidebarCollapsed}
+        collapsed={effectiveSidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        railCollapsed={railCollapsed}
+        railCollapsed={effectiveRailHidden}
         onRailToggle={() => setRailCollapsed(!railCollapsed)}
       />
 
-      {/* S2 — Task & Controls rail (fully hidden when railCollapsed —
-          collapses behind S1 so only the single bar is visible) */}
-      {!railCollapsed && (
+      {/* S2 — Task & Controls rail. Hidden on mobile — the task form
+          is inlined in the center workspace instead. */}
+      {!effectiveRailHidden && (
         <WorkConsoleLeftRail
           activeJobId={jobId}
           onJobSelected={handleJobSelected}
         />
       )}
 
-      {/* Center workspace — Home or Detail */}
+      {/* Center workspace — Home or Detail. On mobile this takes full
+          width because both rails are hidden. */}
       {view === "detail" && jobId ? (
         <WorkConsoleDetailPage
           jobId={jobId}
@@ -151,8 +154,8 @@ export default function WorkConsoleShell() {
         <WorkConsoleHomePage />
       )}
 
-      {/* Right rail — Governance (always visible) */}
-      <WorkConsoleGovernanceRail jobId={jobId} job={job} />
+      {/* Right rail — Governance. Hidden on mobile. */}
+      {!isMobile && <WorkConsoleGovernanceRail jobId={jobId} job={job} />}
     </>
   );
 }

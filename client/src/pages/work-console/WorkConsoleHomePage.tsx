@@ -2,15 +2,20 @@
  * AI Work Console — Home Page
  *
  * Landing view when no job is active. Shows a quick-hit summary of
- * recent intents grouped by status, plus a big call-to-action to
- * describe a new task. The left rail still has the full intent form,
- * so this page focuses on the "at-a-glance" view.
+ * recent intents grouped by status. On desktop the S2 left rail has
+ * the full intent form; on MOBILE the rails are hidden so this page
+ * includes a compact inline submit form at the top.
  */
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
+import { useIsMobile } from "@/hooks/useMobile";
+import { useToast } from "@/hooks/use-toast";
 import {
   Rocket,
   CheckCircle2,
@@ -18,6 +23,7 @@ import {
   Clock,
   XCircle,
   Activity,
+  Play,
   Hammer,
   Eye,
   Shield,
@@ -35,8 +41,19 @@ const OPERATOR_ICONS: Record<OperatorName, typeof Hammer> = {
 
 export default function WorkConsoleHomePage() {
   const [, navigate] = useLocation();
+  const isMobile = useIsMobile();
+  const { toast } = useToast();
+  const [mobileDesc, setMobileDesc] = useState("");
   const jobsQuery = trpc.orchestrator.listJobs.useQuery({ limit: 50 });
   const jobs = (jobsQuery.data || []) as any[];
+  const submitMut = trpc.orchestrator.submit.useMutation({
+    onSuccess: (job: any) => {
+      toast({ title: "Submitted", description: `Job ${job.jobId} → ${job.operator}` });
+      jobsQuery.refetch();
+      navigate(`/work-console/${encodeURIComponent(job.jobId)}`);
+    },
+    onError: (e) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
 
   // Counters per status
   const counts = {
@@ -66,8 +83,39 @@ export default function WorkConsoleHomePage() {
           </p>
         </div>
 
+        {/* Mobile inline submit — replaces S2 rail which is hidden on
+            small screens. Only renders when isMobile. */}
+        {isMobile && (
+          <Card>
+            <CardContent className="p-3 space-y-2">
+              <Textarea
+                placeholder="Describe a task…"
+                value={mobileDesc}
+                onChange={(e) => setMobileDesc(e.target.value)}
+                rows={3}
+                className="text-sm resize-none"
+              />
+              <Button
+                size="sm"
+                className="w-full"
+                disabled={!mobileDesc.trim() || submitMut.isPending}
+                onClick={() => {
+                  submitMut.mutate({
+                    description: mobileDesc.trim(),
+                    autonomyLevel: 0,
+                  });
+                  setMobileDesc("");
+                }}
+              >
+                <Play className="h-3 w-3 mr-1" />
+                {submitMut.isPending ? "Submitting…" : "Run (Plan Only)"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Counters */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
           <Card>
             <CardContent className="p-3 text-center">
               <p className="text-2xl font-bold">{counts.total}</p>
