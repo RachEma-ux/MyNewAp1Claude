@@ -179,7 +179,7 @@ const routingRouter = router({
     .input(z.object({
       name: z.string().min(1).max(255),
       description: z.string().optional(),
-      config: z.record(z.unknown()),
+      config: z.object({}).passthrough(),
     }))
     .mutation(async ({ ctx, input }) => {
       return createProfile({ ...input, actorId: ctx.user.id });
@@ -190,7 +190,7 @@ const routingRouter = router({
       id: z.number(),
       name: z.string().optional(),
       description: z.string().optional(),
-      config: z.record(z.unknown()).optional(),
+      config: z.object({}).passthrough().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...updates } = input;
@@ -320,7 +320,7 @@ const playgroundRouter = router({
     .input(z.object({
       model: z.string(),
       messages: z.array(z.object({ role: z.enum(["system", "user", "assistant"]), content: z.string() })),
-      schema: z.record(z.unknown()),
+      schema: z.object({}).passthrough(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();

@@ -204,9 +204,12 @@ export async function executeChat(request: ChatRequest): Promise<ChatResponse> {
   if (request.stream) body.stream = true;
   if (request.responseFormat) body.response_format = request.responseFormat;
   if (request.tools) body.tools = request.tools;
-  if (request.routingProfile) {
-    if (request.routingProfile.order) body.provider = { order: request.routingProfile.order };
-    if (request.routingProfile.allowFallbacks !== undefined) body.provider = { ...body.provider as any, allow_fallbacks: request.routingProfile.allowFallbacks };
+  // Only send provider routing params to OpenRouter endpoints (not OpenAI-direct)
+  if (request.routingProfile && endpoint.includes("openrouter.ai")) {
+    const providerParam: Record<string, unknown> = {};
+    if (request.routingProfile.order) providerParam.order = request.routingProfile.order;
+    if (request.routingProfile.allowFallbacks !== undefined) providerParam.allow_fallbacks = request.routingProfile.allowFallbacks;
+    if (Object.keys(providerParam).length > 0) body.provider = providerParam;
   }
 
   const headers: Record<string, string> = {
