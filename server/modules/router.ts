@@ -23,6 +23,7 @@ import { agentOrchRouter } from "./agents/router";
 import { collaborationRouter } from "./collaboration/router";
 import { reportingRouter } from "./reporting/router";
 import { hrModuleRouter } from "./hr/router";
+import { kgiaRouter } from "./kgia/router";
 
 // Module management sub-router
 const moduleManageRouter = router({
@@ -85,4 +86,5 @@ export const modulesRouter = router({
   collaboration: collaborationRouter,
   reporting: reportingRouter,
   hr: hrModuleRouter,
+  kgia: kgiaRouter,
 });

@@ -31,6 +31,7 @@ import {
   BarChart3,
   Users,
   Shield,
+  Network,
   Clock,
   ArrowRight,
   CheckCircle2,
@@ -261,6 +262,14 @@ export function WorkspaceMainFrame({ shell, basePath }: MainFrameProps) {
               icon={<BarChart3 className="h-4 w-4" />}
               label="Reports"
               summary="View dashboard"
+            />
+          )}
+          {shell.enabledModules.includes("kgia") && (
+            <ToolCard
+              href={`${basePath}/kgia`}
+              icon={<Network className="h-4 w-4" />}
+              label="Knowledge Graph"
+              summary="Query & interpret graphs"
             />
           )}
           <ToolCard

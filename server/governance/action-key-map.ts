@@ -408,6 +408,15 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "ps.ideation.contextTranslator.translateFallback": "ps.ideation.contextTranslator.translateFallback",
   "ps.ideation.contextTranslator.applyToIdeation": "ps.ideation.contextTranslator.apply",
 
+  // ── KGIA — Knowledge Graph Interpretation Agent ──────────────────────────
+  "modules.kgia.sources.create": "kgia.source.create",
+  "modules.kgia.sources.update": "kgia.source.update",
+  "modules.kgia.sources.delete": "kgia.source.delete",
+  "modules.kgia.sessions.create": "kgia.session.create",
+  "modules.kgia.runs.execute": "kgia.run.execute",
+  "modules.kgia.benchmarks.createCase": "kgia.benchmark.createCase",
+  "modules.kgia.benchmarks.runCase": "kgia.benchmark.runCase",
+
   // ── Modules (Engine Binding) ─────────────────────────────────────────────
   "modules.manage.setEnabled": "module.setEnabled",
   "modules.manage.seed": "module.seed",

@@ -266,6 +266,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
       ],
     },
     {
+      label: "KGIA",
+      icon: <BrainCircuit className="w-5 h-5" />,
+      children: [
+        { label: "Workbench", icon: <BrainCircuit className="w-4 h-4" />, href: "/kgia" },
+        { label: "Sources", icon: <Database className="w-4 h-4" />, href: "/kgia/sources" },
+        { label: "Benchmarks", icon: <BarChart3 className="w-4 h-4" />, href: "/kgia/benchmarks" },
+        { label: "Governance", icon: <ShieldCheck className="w-4 h-4" />, href: "/kgia/governance" },
+      ],
+    },
+    {
       label: "Digital HQ",
       icon: <Building2 className="w-5 h-5" />,
       children: [

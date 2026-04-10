@@ -6,6 +6,7 @@ export { PMTProjectDetailPage } from "./PMTProjectDetailPage";
 export { KnowledgeDocsPage } from "./KnowledgeDocsPage";
 export { KnowledgeDecisionsPage } from "./KnowledgeDecisionsPage";
 export { KnowledgeSearchPage } from "./KnowledgeSearchPage";
+export { KgiaPage } from "./KgiaPage";
 export { AgentsRosterPage } from "./AgentsRosterPage";
 export { AgentRunsPage } from "./AgentRunsPage";
 export { AgentRunDetailPage } from "./AgentRunDetailPage";

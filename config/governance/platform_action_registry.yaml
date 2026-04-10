@@ -2592,6 +2592,65 @@ actions:
     evidence: { required: true, types: [reason] }
 
   # ═══════════════════════════════════════════════════════════════════════════
+  # KGIA — KNOWLEDGE GRAPH INTERPRETATION AGENT
+  # ═══════════════════════════════════════════════════════════════════════════
+  kgia.source.create:
+    domain: kgia
+    risk: R3
+    capability: kgia.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  kgia.source.update:
+    domain: kgia
+    risk: R2
+    capability: kgia.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  kgia.source.delete:
+    domain: kgia
+    risk: R3
+    capability: kgia.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  kgia.session.create:
+    domain: kgia
+    risk: R1
+    capability: kgia.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  kgia.run.execute:
+    domain: kgia
+    risk: R2
+    capability: kgia.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  kgia.benchmark.createCase:
+    domain: kgia
+    risk: R2
+    capability: kgia.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  kgia.benchmark.runCase:
+    domain: kgia
+    risk: R2
+    capability: kgia.use
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
   # MODULES (ENGINE BINDING)
   # ═══════════════════════════════════════════════════════════════════════════
   module.setEnabled:

@@ -210,6 +210,8 @@ const AgentRunDetailPanel = lazy(() => import("@/pages/pm-central/AgentRunDetail
 const IdeaBuilderWizard = lazy(() => import("@/pages/pm-central/IdeaBuilderWizard"));
 // AI Agent Studio — Standalone agent lifecycle module
 const AgentStudioShellPage = lazy(() => import("@/pages/agent-studio/AgentStudioShellPage"));
+// KGIA — Knowledge Graph Interpretation Agent
+const KGIAShellPage = lazy(() => import("@/pages/kgia/KGIAShellPage"));
 // Data Analysis — GraphRAG
 const GraphRAGPage = lazy(() => import("@/pages/data-analysis/GraphRAGPage"));
 // Data Analysis — Data Warehouse
@@ -483,6 +485,11 @@ function Router() {
       <Route path="/ps/list" component={() => <ProtectedRoute component={PSShellPage} />} />
       <Route path="/ps/ai-catalog" component={() => <ProtectedRoute component={PSShellPage} />} />
       <Route path="/ps" component={() => <ProtectedRoute component={PSShellPage} />} />
+      {/* KGIA — Knowledge Graph Interpretation Agent (shell handles internal routing) */}
+      <Route path="/kgia/sources" component={() => <ProtectedRoute component={KGIAShellPage} />} />
+      <Route path="/kgia/benchmarks" component={() => <ProtectedRoute component={KGIAShellPage} />} />
+      <Route path="/kgia/governance" component={() => <ProtectedRoute component={KGIAShellPage} />} />
+      <Route path="/kgia" component={() => <ProtectedRoute component={KGIAShellPage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
       <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />

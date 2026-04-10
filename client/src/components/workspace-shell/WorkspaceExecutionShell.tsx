@@ -61,6 +61,7 @@ import { PMTWebhooksPage } from "@/pages/workspace/PMTWebhooksPage";
 import { PMTCustomActionsPage } from "@/pages/workspace/PMTCustomActionsPage";
 import { PMTNotificationsPage } from "@/pages/workspace/PMTNotificationsPage";
 import { PMTAIServicesPage } from "@/pages/workspace/PMTAIServicesPage";
+import { KgiaPage } from "@/pages/workspace/KgiaPage";
 import { KnowledgeDocsPage } from "@/pages/workspace/KnowledgeDocsPage";
 import { KnowledgeDecisionsPage } from "@/pages/workspace/KnowledgeDecisionsPage";
 import { KnowledgeSearchPage } from "@/pages/workspace/KnowledgeSearchPage";
@@ -277,6 +278,9 @@ export default function WorkspaceExecutionShell() {
             <Route path={`${basePath}/knowledge/decisions`}><ModuleGate moduleKey="knowledge" moduleName="Knowledge"><KnowledgeDecisionsPage workspaceId={workspaceId} /></ModuleGate></Route>
             <Route path={`${basePath}/knowledge/search`}><ModuleGate moduleKey="knowledge" moduleName="Knowledge"><KnowledgeSearchPage workspaceId={workspaceId} /></ModuleGate></Route>
             <Route path={`${basePath}/knowledge`}><ModuleGate moduleKey="knowledge" moduleName="Knowledge"><KnowledgeDocsPage workspaceId={workspaceId} /></ModuleGate></Route>
+
+            {/* ─── KGIA — Knowledge Graph Interpretation ─── */}
+            <Route path={`${basePath}/kgia`}><ModuleGate moduleKey="kgia" moduleName="Knowledge Graph Interpreter"><KgiaPage workspaceId={workspaceId} /></ModuleGate></Route>
 
             {/* ─── Agents ─── */}
             <Route path={`${basePath}/agents/runs/:runId`}><ModuleGate moduleKey="agents" moduleName="Agent Orchestration"><AgentRunDetailPage workspaceId={workspaceId} /></ModuleGate></Route>

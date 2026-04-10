@@ -45,3 +45,4 @@ export * from './tables/graphrag';
 export * from './tables/ai-types';
 export * from './tables/data-warehouse';
 export * from './tables/agent-studio';
+export * from '../server/modules/kgia/schema';
