@@ -489,6 +489,7 @@ function Router() {
       <Route path="/kgia/sources" component={() => <ProtectedRoute component={KGIAShellPage} />} />
       <Route path="/kgia/benchmarks" component={() => <ProtectedRoute component={KGIAShellPage} />} />
       <Route path="/kgia/governance" component={() => <ProtectedRoute component={KGIAShellPage} />} />
+      <Route path="/kgia/oversight" component={() => <ProtectedRoute component={KGIAShellPage} />} />
       <Route path="/kgia" component={() => <ProtectedRoute component={KGIAShellPage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />

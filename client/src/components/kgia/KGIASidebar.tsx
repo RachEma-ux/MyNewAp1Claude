@@ -9,9 +9,10 @@ import {
   ChevronLeft,
   ChevronRight,
   BrainCircuit,
+  Eye,
 } from "lucide-react";
 
-export type KGIAView = "workbench" | "sources" | "benchmarks" | "governance";
+export type KGIAView = "workbench" | "sources" | "benchmarks" | "governance" | "oversight";
 
 interface KGIASidebarProps {
   collapsed: boolean;
@@ -32,6 +33,12 @@ const navGroups = [
     items: [
       { view: "benchmarks" as const, label: "Benchmarks", icon: FlaskConical, href: "/kgia/benchmarks" },
       { view: "governance" as const, label: "Governance", icon: ShieldCheck, href: "/kgia/governance" },
+    ],
+  },
+  {
+    label: "Insight",
+    items: [
+      { view: "oversight" as const, label: "Oversight", icon: Eye, href: "/kgia/oversight" },
     ],
   },
 ];

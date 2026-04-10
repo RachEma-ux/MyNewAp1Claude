@@ -1,10 +1,8 @@
 import { lazy, Suspense, useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Loader2, PanelRightOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import KGIASidebar, { type KGIAView } from "./KGIASidebar";
 import KGIAStatusBar from "./KGIAStatusBar";
-import KGIAOversightDrawer from "./KGIAOversightDrawer";
 import { trpc } from "@/lib/trpc";
 
 // Lazy-loaded pages
@@ -12,27 +10,36 @@ const KGIAWorkbenchPage = lazy(() => import("@/pages/kgia/KGIAWorkbenchPage"));
 const KGIASourcesPage = lazy(() => import("@/pages/kgia/KGIASourcesPage"));
 const KGIABenchmarksPage = lazy(() => import("@/pages/kgia/KGIABenchmarksPage"));
 const KGIAGovernancePage = lazy(() => import("@/pages/kgia/KGIAGovernancePage"));
+const KGIAOversightPage = lazy(() => import("@/pages/kgia/KGIAOversightPage"));
 
 function parseRoute(location: string): KGIAView {
   if (location.startsWith("/kgia/sources")) return "sources";
   if (location.startsWith("/kgia/benchmarks")) return "benchmarks";
   if (location.startsWith("/kgia/governance")) return "governance";
+  if (location.startsWith("/kgia/oversight")) return "oversight";
   return "workbench";
 }
+
+const VIEW_TITLES: Record<KGIAView, string> = {
+  workbench: "Knowledge Graph Workbench",
+  sources: "Sources",
+  benchmarks: "Benchmarks",
+  governance: "Governance",
+  oversight: "Oversight",
+};
 
 export default function KGIAShell() {
   const [location] = useLocation();
   const view = parseRoute(location);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Shell-level state shared across pages
   const [lastEnvelope, setLastEnvelope] = useState<any>(null);
   const [lastQueryPlan, setLastQueryPlan] = useState<any>(null);
   const [lastDurationMs, setLastDurationMs] = useState<number | undefined>();
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
-  const [workspaceId] = useState(1); // Default workspace for top-level module
+  const [workspaceId] = useState(1);
 
   // Source count for status bar
   const sourcesQuery = trpc.modules.kgia.sources.list.useQuery(
@@ -45,7 +52,6 @@ export default function KGIAShell() {
     if (result?.envelope) {
       setLastEnvelope(result.envelope);
       setLastDurationMs(result.envelope.durationMs);
-      setDrawerOpen(true);
     }
   }, []);
 
@@ -67,6 +73,14 @@ export default function KGIAShell() {
         return <KGIABenchmarksPage workspaceId={workspaceId} />;
       case "governance":
         return <KGIAGovernancePage workspaceId={workspaceId} />;
+      case "oversight":
+        return (
+          <KGIAOversightPage
+            workspaceId={workspaceId}
+            envelope={lastEnvelope}
+            queryPlan={lastQueryPlan}
+          />
+        );
     }
   };
 
@@ -84,19 +98,8 @@ export default function KGIAShell() {
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 h-12 border-b border-border shrink-0">
-          <h2 className="text-sm font-semibold capitalize">
-            {view === "workbench" ? "Knowledge Graph Workbench" : view}
-          </h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setDrawerOpen(!drawerOpen)}
-            title="Toggle oversight drawer"
-          >
-            <PanelRightOpen className="w-4 h-4" />
-          </Button>
+        <div className="flex items-center px-4 h-12 border-b border-border shrink-0">
+          <h2 className="text-sm font-semibold">{VIEW_TITLES[view]}</h2>
         </div>
 
         {/* Page content */}
@@ -121,14 +124,6 @@ export default function KGIAShell() {
           sessionTitle={activeSessionId ? `Session #${activeSessionId}` : undefined}
         />
       </div>
-
-      {/* Oversight drawer */}
-      <KGIAOversightDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        envelope={lastEnvelope}
-        queryPlan={lastQueryPlan}
-      />
     </div>
   );
 }
