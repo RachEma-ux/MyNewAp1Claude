@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cache Nuke</title>
+<style>
+  body { background: #0a0a0a; color: #e5e5e5; font-family: monospace; padding: 2rem; }
+  .done { color: #4ade80; }
+  .step { margin: 0.5rem 0; }
+</style>
+</head>
+<body>
+<h1>Nuking all caches...</h1>
+<div id="log"></div>
+<script>
+const log = document.getElementById('log');
+function msg(text, cls) {
+  const d = document.createElement('div');
+  d.className = 'step' + (cls ? ' ' + cls : '');
+  d.textContent = text;
+  log.appendChild(d);
+}
+
+async function nuke() {
+  // 1. Delete all Cache Storage entries
+  try {
+    const keys = await caches.keys();
+    for (const k of keys) {
+      await caches.delete(k);
+      msg('Deleted cache: ' + k, 'done');
+    }
+    if (keys.length === 0) msg('No Cache Storage entries found.');
+  } catch (e) {
+    msg('Cache Storage error: ' + e.message);
+  }
+
+  // 2. Unregister ALL service workers
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const reg of regs) {
+      await reg.unregister();
+      msg('Unregistered SW: ' + reg.scope, 'done');
+    }
+    if (regs.length === 0) msg('No service workers found.');
+  } catch (e) {
+    msg('SW unregister error: ' + e.message);
+  }
+
+  // 3. Clear sessionStorage + localStorage for this origin
+  try {
+    sessionStorage.clear();
+    localStorage.clear();
+    msg('Cleared sessionStorage + localStorage', 'done');
+  } catch (e) {
+    msg('Storage clear error: ' + e.message);
+  }
+
+  msg('');
+  msg('All caches nuked. Redirecting to /work-console in 3 seconds...', 'done');
+
+  setTimeout(() => {
+    window.location.replace('/work-console');
+  }, 3000);
+}
+
+nuke();
+</script>
+</body>
+</html>
