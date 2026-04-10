@@ -64,7 +64,9 @@ export default function OpenRouterConnectPage() {
     <div className="p-6 space-y-4 max-w-2xl">
       <div>
         <h3 className="text-lg font-semibold">Connect to OpenRouter</h3>
-        <p className="text-sm text-muted-foreground">Configure your API key and connection settings. Keys are stored encrypted server-side only.</p>
+        <p className="text-sm text-muted-foreground">
+          Configure your API key and connection. Keys are AES-256-GCM encrypted and stored server-side only — never exposed to the browser.
+        </p>
       </div>
 
       {/* Current status */}

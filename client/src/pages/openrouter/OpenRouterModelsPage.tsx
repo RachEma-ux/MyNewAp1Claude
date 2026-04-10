@@ -27,8 +27,16 @@ export default function OpenRouterModelsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Model Catalog</h3>
-          <p className="text-sm text-muted-foreground">{data?.total ?? 0} models available via OpenRouter</p>
+          <p className="text-sm text-muted-foreground">
+            {data?.total ?? 0} models synced
+            {search || provider || capability ? ` (filtered from ${data?.total ?? 0})` : ""}
+          </p>
         </div>
+        {data?.total === 0 && (
+          <Badge variant="outline" className="text-[10px] text-orange-500 border-orange-500">
+            Sync models from Connect page
+          </Badge>
+        )}
       </div>
 
       {/* Filters */}

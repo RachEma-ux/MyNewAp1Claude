@@ -28,7 +28,8 @@ export default function OpenRouterHealthPage() {
     { label: "Enabled", ok: !!cfg?.enabled, detail: cfg?.enabled ? "Active" : "Disabled" },
     { label: "Connection", ok: h?.status === "healthy", detail: h ? `${h.status} (${h.latencyMs}ms)` : "Unknown" },
     { label: "Model Catalog", ok: !!cfg?.lastSyncAt, detail: cfg?.lastSyncAt ? `Synced ${new Date(cfg.lastSyncAt).toLocaleString()}` : "Never synced" },
-    { label: "Governance", ok: true, detail: "Action registry configured (11 actions)" },
+    { label: "Execution Path", ok: h?.status === "healthy" || h?.status === "unconfigured", detail: h?.status === "healthy" ? "Ready — server-side execution active" : "Not ready — check connection" },
+    { label: "Governance", ok: true, detail: "Action registry configured (11 governed procedures, deny-by-default)" },
   ];
 
   return (

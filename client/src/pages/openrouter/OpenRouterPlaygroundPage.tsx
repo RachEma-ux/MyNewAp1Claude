@@ -12,8 +12,11 @@ import { toast } from "sonner";
 export default function OpenRouterPlaygroundPage() {
   return (
     <div className="p-6 max-w-4xl">
-      <h3 className="text-lg font-semibold mb-1">Playground</h3>
-      <p className="text-sm text-muted-foreground mb-4">Test models with real requests. All calls go through platform governance.</p>
+      <div className="flex items-center gap-2 mb-1">
+        <h3 className="text-lg font-semibold">Playground</h3>
+        <Badge variant="outline" className="text-[9px] text-green-500 border-green-500">Governed</Badge>
+      </div>
+      <p className="text-sm text-muted-foreground mb-4">Test models with real requests. All calls pass through platform governance before execution.</p>
 
       <Tabs defaultValue="chat">
         <TabsList>
@@ -170,16 +173,28 @@ function ResponseCard({ result }: { result: any }) {
   const choice = result.choices?.[0];
   return (
     <Card>
-      <CardContent className="pt-3 pb-3 space-y-2">
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          <Badge variant="outline">{result.model}</Badge>
+      <CardContent className="pt-3 pb-3 space-y-3">
+        {/* Metadata bar */}
+        <div className="flex items-center gap-2 flex-wrap text-xs border-b border-border pb-2">
+          <Badge variant="outline" className="text-[10px]">{result.model}</Badge>
           {result.provider && <Badge variant="secondary" className="text-[9px]">{result.provider}</Badge>}
-          <div className="flex items-center gap-1 text-muted-foreground"><Clock className="w-3 h-3" />{result.latencyMs}ms</div>
-          {result.usage && <div className="flex items-center gap-1 text-muted-foreground"><MessageSquare className="w-3 h-3" />{result.usage.total_tokens} tok</div>}
+          <div className="flex items-center gap-3 ml-auto text-muted-foreground">
+            <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{result.latencyMs}ms</span>
+            {result.usage && (
+              <>
+                <span>{result.usage.prompt_tokens}→{result.usage.completion_tokens} tok</span>
+                <span className="font-medium text-foreground">{result.usage.total_tokens} total</span>
+              </>
+            )}
+          </div>
         </div>
-        <div className="text-sm whitespace-pre-wrap">{choice?.message?.content ?? "No response"}</div>
+        {/* Response content */}
+        <div className="text-sm whitespace-pre-wrap leading-relaxed">{choice?.message?.content ?? "No response"}</div>
+        {/* Footer */}
         {choice?.finish_reason && choice.finish_reason !== "stop" && (
-          <Badge variant="secondary" className="text-[9px]">finish: {choice.finish_reason}</Badge>
+          <div className="pt-1 border-t border-border">
+            <Badge variant="secondary" className="text-[9px]">finish: {choice.finish_reason}</Badge>
+          </div>
         )}
       </CardContent>
     </Card>
