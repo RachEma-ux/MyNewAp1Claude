@@ -56,6 +56,7 @@ import { psmRouter } from "./psm/psm.router";
 import { codeStudioRouter } from "./code-studio/api/router";
 import { agentStudioRouter } from "./agent-studio/api/router";
 import { openRouterRouter } from "./openrouter/router";
+import { kgraAgentRouter } from "./kgra-agent/router";
 
 export const appRouter = router({
   system: systemRouter,
@@ -111,6 +112,7 @@ export const appRouter = router({
   codeStudio: codeStudioRouter, // Code Studio — standalone coding module (dedicated codedb, OpenCode runtime)
   agentStudio: agentStudioRouter, // AI Agent Studio — standalone agent lifecycle module (ags_* tables)
   openRouter: openRouterRouter, // OpenRouter — unified model gateway (control plane + runtime)
+  kgraAgent: kgraAgentRouter, // KGRA — Knowledge Graph Reasoning Agent (proxy to Python service)
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

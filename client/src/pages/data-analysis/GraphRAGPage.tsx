@@ -19,6 +19,7 @@ import {
   GitFork,
   FileText,
   Settings,
+  BrainCircuit,
 } from "lucide-react";
 import { GraphRAGOverview } from "./GraphRAGOverview";
 import { GraphRAGDatasets } from "./GraphRAGDatasets";
@@ -29,6 +30,7 @@ import { GraphRAGQueryLab } from "./GraphRAGQueryLab";
 import { GraphRAGGraphExplorer } from "./GraphRAGGraphExplorer";
 import { GraphRAGCommunityReports } from "./GraphRAGCommunityReports";
 import { GraphRAGSettings } from "./GraphRAGSettings";
+import { KGRAQueryLab } from "./KGRAQueryLab";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -40,6 +42,7 @@ const tabs = [
   { id: "graph-explorer", label: "Graph Explorer", icon: GitFork },
   { id: "community-reports", label: "Community Reports", icon: FileText },
   { id: "settings", label: "Settings", icon: Settings },
+  { id: "kgra", label: "KGRA Agent", icon: BrainCircuit },
 ] as const;
 
 export default function GraphRAGPage() {
@@ -101,6 +104,9 @@ export default function GraphRAGPage() {
         </TabsContent>
         <TabsContent value="settings">
           <GraphRAGSettings />
+        </TabsContent>
+        <TabsContent value="kgra">
+          <KGRAQueryLab />
         </TabsContent>
       </Tabs>
     </div>
