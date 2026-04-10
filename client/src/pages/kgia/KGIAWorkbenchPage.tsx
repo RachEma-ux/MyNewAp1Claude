@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Send, Eye, FileSearch, Clock, AlertTriangle, History } from "lucide-react";
+import { Loader2, Send, Eye, FileSearch, Clock, AlertTriangle, History, Network } from "lucide-react";
 import { toast } from "sonner";
+import KnowledgeGraphView from "@/components/kgia/workbench/KnowledgeGraphView";
 
 interface WorkbenchProps {
   workspaceId: number;
@@ -149,8 +150,11 @@ export default function KGIAWorkbenchPage({
               </CardContent>
             </Card>
 
-            <Tabs defaultValue="evidence" className="w-full">
+            <Tabs defaultValue="graph" className="w-full">
               <TabsList className="h-8">
+                <TabsTrigger value="graph" className="text-xs h-6">
+                  <Network className="w-3 h-3 mr-1" /> Graph
+                </TabsTrigger>
                 <TabsTrigger value="evidence" className="text-xs h-6">
                   <Eye className="w-3 h-3 mr-1" /> Evidence ({runData.evidenceNodes?.length ?? 0})
                 </TabsTrigger>
@@ -164,6 +168,15 @@ export default function KGIAWorkbenchPage({
                   <AlertTriangle className="w-3 h-3 mr-1" /> Gaps
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="graph" className="mt-2">
+                <div className="h-[400px] border border-border rounded-lg overflow-hidden">
+                  <KnowledgeGraphView
+                    nodes={runData.evidenceNodes ?? []}
+                    edges={runData.evidenceEdges ?? []}
+                  />
+                </div>
+              </TabsContent>
 
               <TabsContent value="evidence" className="mt-2">
                 {runData.evidenceNodes && runData.evidenceNodes.length > 0 ? (
