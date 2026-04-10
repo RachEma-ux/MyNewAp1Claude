@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kgra
+  labels:
+    app: kgra
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kgra
+  template:
+    metadata:
+      labels:
+        app: kgra
+    spec:
+      containers:
+        - name: kgra
+          image: kgra:2.0.0
+          ports:
+            - containerPort: 8000
+              name: api
+            - containerPort: 8001
+              name: mcp
+          env:
+            - name: KGRA_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kgra-secrets
+                  key: postgres-password
+            - name: KGRA_NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kgra-secrets
+                  key: neo4j-password
+            - name: KGRA_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kgra-secrets
+                  key: redis-password
+            - name: KGRA_LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kgra-secrets
+                  key: llm-api-key
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /app/kgra/config.yaml
+              subPath: config.yaml
+      volumes:
+        - name: config
+          configMap:
+            name: kgra-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kgra
+spec:
+  selector:
+    app: kgra
+  ports:
+    - name: api
+      port: 8000
+      targetPort: 8000
+    - name: mcp
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kgra
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  rules:
+    - host: kgra.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kgra
+                port:
+                  number: 8000

@@ -1,0 +1,73 @@
+# KGRA Configuration
+# Secrets come from environment variables — never store keys here.
+
+source_graph:
+  uri: bolt://localhost:7687
+  user: neo4j
+  database: neo4j
+  read_only: true
+
+learning_graph:
+  uri: bolt://localhost:7687
+  user: neo4j
+  database: kgra_learning
+  read_only: false
+
+postgres:
+  host: localhost
+  port: 5432
+  database: kgra
+  user: kgra
+
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  session_ttl_seconds: 3600
+
+vector_store:
+  provider: pgvector
+  dimension: 1536
+  index_name: kgra_embeddings
+
+llm:
+  provider: openai
+  model: gpt-4o
+  embedding_model: text-embedding-3-small
+  max_input_tokens: 8000
+  max_output_tokens: 1000
+  temperature: 0.1
+
+limits:
+  max_rows: 1000
+  max_hops: 5
+  max_graphrag_depth: 3
+  timeout_per_tool_seconds: 5
+  llm_input_budget: 4000
+  llm_output_budget: 1000
+  graph_read_timeout_seconds: 10
+  max_vector_queries: 5
+  max_mcp_calls_per_run: 10
+  max_bundle_documents: 100
+  max_bundle_size_mb: 10
+  max_concurrent_runs: 10
+  ontology_proposals_per_day: 100
+  reasoning_path_min_steps: 3
+  self_learning_batch_seconds: 30
+
+governance:
+  read_only_default: true
+  require_human_approval_ontology: false
+  require_human_approval_cross_workspace: true
+  pii_redaction_enabled: true
+  audit_retention_days_hot: 90
+  audit_retention_days_cold: 365
+  workspace_allowlists: {}
+
+mcp:
+  registry: []
+  server_port: 8001
+  server_api_key_env: KGRA_MCP_SERVER_KEY
+
+api_port: 8000
+log_level: INFO
