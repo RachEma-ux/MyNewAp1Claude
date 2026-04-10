@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { eq, desc, and, like, sql } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../_core/trpc";
 import { getDb } from "../db/connection";
@@ -65,10 +65,16 @@ const configRouter = router({
       return getClientSafeConfig();
     }),
 
-  testConnection: protectedProcedure
+  testConnection: governedProcedure
     .input(z.object({ apiKey: z.string().optional() }))
-    .mutation(async ({ input }) => {
-      return testConnection(input.apiKey);
+    .mutation(async ({ ctx, input }) => {
+      const result = await testConnection(input.apiKey);
+      await logActivity(
+        "connection.test",
+        ctx.user.id,
+        result.connected ? `Connected (${result.latencyMs}ms, ${result.modelsAvailable} models)` : `Failed: ${result.error}`,
+      );
+      return result;
     }),
 
   health: protectedProcedure.query(async () => {
@@ -317,13 +323,47 @@ const playgroundRouter = router({
       schema: z.record(z.unknown()),
     }))
     .mutation(async ({ ctx, input }) => {
+      const db = getDb();
       const startMs = Date.now();
-      const response = await executeChat({
-        model: input.model,
-        messages: input.messages,
-        responseFormat: { type: "json_object" },
-      });
-      return { ...response, latencyMs: Date.now() - startMs };
+
+      try {
+        const response = await executeChat({
+          model: input.model,
+          messages: input.messages,
+          responseFormat: { type: "json_object" },
+        });
+
+        const latencyMs = Date.now() - startMs;
+
+        if (db) {
+          await db.insert(openrouterExecutions).values({
+            modelId: input.model,
+            status: "success",
+            requestType: "structured",
+            promptTokens: response.usage?.prompt_tokens,
+            completionTokens: response.usage?.completion_tokens,
+            totalTokens: response.usage?.total_tokens,
+            latencyMs,
+            providerUsed: response.provider,
+            governanceVerdict: "allow",
+          });
+        }
+
+        return { ...response, latencyMs };
+      } catch (err) {
+        const latencyMs = Date.now() - startMs;
+        if (db) {
+          await db.insert(openrouterExecutions).values({
+            modelId: input.model,
+            status: "error",
+            requestType: "structured",
+            latencyMs,
+            errorMessage: (err as Error).message,
+            governanceVerdict: "allow",
+          });
+        }
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: (err as Error).message });
+      }
     }),
 });
 

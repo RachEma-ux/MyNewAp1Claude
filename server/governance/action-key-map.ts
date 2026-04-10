@@ -419,6 +419,7 @@ export const ACTION_KEY_MAP: Record<string, string> = {
 
   // ── OpenRouter — Unified Model Gateway ──────────────────────────────────
   "openRouter.config.save": "openRouter.config.save",
+  "openRouter.config.testConnection": "openRouter.config.testConnection",
   "openRouter.sync.run": "openRouter.sync.run",
   "openRouter.routing.setDefault": "openRouter.routing.setDefault",
   "openRouter.routing.create": "openRouter.routing.create",

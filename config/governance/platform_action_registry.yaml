@@ -2602,6 +2602,14 @@ actions:
     approval: none
     evidence: { required: false }
 
+  openRouter.config.testConnection:
+    domain: openRouter
+    risk: R2
+    capability: openRouter.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
   openRouter.sync.run:
     domain: openRouter
     risk: R2
