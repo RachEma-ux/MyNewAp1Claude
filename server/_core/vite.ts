@@ -39,7 +39,22 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx?v=${nanoid()}"`
       );
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      // No-store on the dev SPA root. Without this header, Chrome
+      // applies its heuristic freshness cache to the root HTML,
+      // which caused a persistent "old UI after hard refresh" bug
+      // where the browser kept serving an index.html that still
+      // registered the old service worker. In dev we want every
+      // navigation to hit fresh HTML; Vite owns all actual
+      // freshness via HMR anyway.
+      res
+        .status(200)
+        .set({
+          "Content-Type": "text/html",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        })
+        .end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
