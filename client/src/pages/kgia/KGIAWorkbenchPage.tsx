@@ -32,10 +32,10 @@ export default function KGIAWorkbenchPage({
   const sourcesQuery = trpc.modules.kgia.sources.list.useQuery({ workspaceId });
   const [selectedSourceIds, setSelectedSourceIds] = useState<number[]>([]);
 
-  // Run history
+  // Run history — always load (show all workspace runs, filter by session if active)
   const runsQuery = trpc.modules.kgia.runs.list.useQuery(
-    { workspaceId, sessionId: activeSessionId ?? undefined, limit: 20 },
-    { enabled: !!activeSessionId, refetchInterval: 5000 }
+    { workspaceId, sessionId: activeSessionId ?? undefined, limit: 50 },
+    { refetchInterval: 5000 }
   );
 
   // Selected run details
