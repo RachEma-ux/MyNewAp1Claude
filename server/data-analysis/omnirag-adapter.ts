@@ -240,14 +240,22 @@ export async function invokeQuery(input: {
   try {
     const body: Record<string, unknown> = {
       query: input.question,
-      question: input.question, // OmniRAG accepts both
     };
-    if (input.pipeline) body.pipeline = input.pipeline;
     if (input.context) body.context = input.context;
+
+    // Route selection:
+    //   - Named pipeline → POST /pipelines/{name}/invoke
+    //   - No pipeline → POST /v1/search (general search endpoint)
+    // OmniRAG's /invoke endpoint doesn't exist at the root — the
+    // actual API surface uses /v1/search for general queries and
+    // /pipelines/{name}/invoke for pipeline-specific invocations.
+    const invokeUrl = input.pipeline
+      ? `${OMNIRAG_BASE_URL}/pipelines/${encodeURIComponent(input.pipeline)}/invoke`
+      : `${OMNIRAG_BASE_URL}/v1/search`;
 
     const res = await withRetry(() =>
       fetchWithTimeout(
-        `${OMNIRAG_BASE_URL}/invoke`,
+        invokeUrl,
         {
           method: "POST",
           headers: authHeaders(),
@@ -448,6 +456,10 @@ function normalizeInvokeResponse(
   }
   if (data?.details && typeof data.details === "object") {
     Object.assign(context, data.details);
+  }
+  // OmniRAG /v1/search returns { citations: [...] } — include them
+  if (Array.isArray(data?.citations)) {
+    context.citations = data.citations;
   }
   // Inject latency into context for the trace panel
   if (latencyMs != null) {
