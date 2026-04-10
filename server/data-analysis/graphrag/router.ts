@@ -212,4 +212,68 @@ export const graphRagRouter = router({
   workerStatus: protectedProcedure.query(async () => {
     return service.getWorkerStatus();
   }),
+
+  // ── OmniRAG Phase-1 — Query Lab advanced mode (Option C) ────────────
+  //
+  // These routes are gated by the OMNIRAG_ENABLED feature flag. When the
+  // flag is falsy, each route returns a { enabled: false } stub so the
+  // frontend can hide the mode switch without a separate config endpoint.
+  //
+  // Only Query Lab calls these routes in phase 1. All other GraphRAG
+  // tabs remain bound to the current worker path. Indexing stays on the
+  // current worker path — OmniRAG indexing is deferred to phase 2.
+  //
+  // The adapter at server/data-analysis/omnirag-adapter.ts normalizes
+  // every OmniRAG response into the canonical OmniRagQueryResult shape
+  // so the frontend never depends on OmniRAG-native payloads.
+
+  omniragHealth: protectedProcedure.query(async () => {
+    const { isOmniRagEnabled, checkHealth } = await import(
+      "../omnirag-adapter"
+    );
+    if (!isOmniRagEnabled()) {
+      return { enabled: false, healthy: false, lastSuccessAt: null, error: null };
+    }
+    const health = await checkHealth();
+    return { enabled: true, ...health };
+  }),
+
+  omniragPipelines: protectedProcedure.query(async () => {
+    const { isOmniRagEnabled, listPipelines } = await import(
+      "../omnirag-adapter"
+    );
+    if (!isOmniRagEnabled()) {
+      return { enabled: false, pipelines: [] };
+    }
+    const pipelines = await listPipelines();
+    return { enabled: true, pipelines };
+  }),
+
+  omniragQuery: protectedProcedure
+    .input(
+      z.object({
+        question: z.string().min(1).max(5000),
+        pipeline: z.string().optional(),
+        context: z.record(z.string(), z.unknown()).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { isOmniRagEnabled, invokeQuery } = await import(
+        "../omnirag-adapter"
+      );
+      if (!isOmniRagEnabled()) {
+        return {
+          success: false,
+          status: "offline" as const,
+          answer: "",
+          context: {},
+          confidence: null,
+          traceId: null,
+          pipelineName: null,
+          runId: null,
+          error: "OmniRAG is not enabled. Set OMNIRAG_ENABLED=true in the server environment.",
+        };
+      }
+      return invokeQuery(input);
+    }),
 });
