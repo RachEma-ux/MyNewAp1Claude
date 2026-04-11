@@ -1851,11 +1851,17 @@ async function loadGraphData() {
     buildFilterUI();
     if (graphViz.nodes.length > 0) {
       // Switch layout if mode specifies one
+      let targetLayout = graphViz.layout || 'force';
       if (activeModeData && activeModeData.default_view_layout) {
+        targetLayout = activeModeData.default_view_layout;
         const layoutSel = document.getElementById('layout-select');
-        if (layoutSel) layoutSel.value = activeModeData.default_view_layout;
+        if (layoutSel) layoutSel.value = targetLayout;
       }
-      runForceLayoutAnimated();
+      // Reset viewport for fresh layout
+      graphViz.offsetX = 0;
+      graphViz.offsetY = 0;
+      graphViz.scale = 1;
+      switchLayout(targetLayout);
     } else {
       drawGraph();
     }
@@ -2005,7 +2011,11 @@ function toggleFilterPanel() {
 
 function switchLayout(layout) {
   graphViz.layout = layout;
-  if (layout === 'force') runForceLayout(150);
+  // Reset viewport to center
+  graphViz.offsetX = 0;
+  graphViz.offsetY = 0;
+  graphViz.scale = 1;
+  if (layout === 'force') runForceLayoutAnimated();
   else if (layout === 'hierarchy') runHierarchyLayout();
   else if (layout === 'circular') runCircularLayout();
 }
@@ -2013,28 +2023,52 @@ function switchLayout(layout) {
 function runHierarchyLayout() {
   const {nodes, edges} = graphViz;
   if (!nodes.length) return;
+  const nodeMap = graphViz._nodeMap || new Map(nodes.map(n => [n.id, n]));
   // Sort by connection count (most connected at top)
   const conns = {};
   edges.forEach(e => { conns[e.source] = (conns[e.source]||0)+1; conns[e.target] = (conns[e.target]||0)+1; });
   const sorted = [...nodes].sort((a,b) => (conns[b.id]||0) - (conns[a.id]||0));
   const cols = Math.ceil(Math.sqrt(sorted.length));
+  const spacing = Math.max(60, 400 / Math.sqrt(sorted.length));
   sorted.forEach((n, i) => {
-    n.x = (i % cols - cols/2) * 100;
-    n.y = (Math.floor(i / cols) - Math.floor(sorted.length/cols)/2) * 80;
+    n.x = (i % cols - cols/2) * spacing;
+    n.y = (Math.floor(i / cols) - Math.floor(sorted.length/cols)/2) * spacing * 0.8;
   });
+  // Auto-fit: scale to fit all nodes
+  autoFitViewport();
   drawGraph();
 }
 
 function runCircularLayout() {
   const {nodes} = graphViz;
   if (!nodes.length) return;
-  const radius = Math.max(100, nodes.length * 15);
+  const radius = Math.max(150, nodes.length * 8);
   nodes.forEach((n, i) => {
     const angle = (2 * Math.PI * i) / nodes.length;
     n.x = Math.cos(angle) * radius;
     n.y = Math.sin(angle) * radius;
   });
+  autoFitViewport();
   drawGraph();
+}
+
+function autoFitViewport() {
+  const {nodes} = graphViz;
+  if (!nodes.length) return;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const n of nodes) {
+    if (n.x < minX) minX = n.x;
+    if (n.x > maxX) maxX = n.x;
+    if (n.y < minY) minY = n.y;
+    if (n.y > maxY) maxY = n.y;
+  }
+  const graphW = maxX - minX || 1;
+  const graphH = maxY - minY || 1;
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  graphViz.offsetX = -centerX;
+  graphViz.offsetY = -centerY;
+  graphViz.scale = Math.min(1.5, Math.min(graphViz.width / (graphW + 100), graphViz.height / (graphH + 100)));
 }
 
 // ─── V2: Filters ───
