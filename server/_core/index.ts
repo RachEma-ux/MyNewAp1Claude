@@ -298,6 +298,15 @@ async function startServer() {
     console.warn(`[CODEDB] Seed skipped — ${error.message}`);
   }
 
+  // Seed RAGDB (dedicated RAG Knowledge Graph database — idempotent)
+  try {
+    const { seedRagDb, migrateJsonBlobToRagDb } = await import("../rag/seed");
+    await seedRagDb();
+    await migrateJsonBlobToRagDb();
+  } catch (error: any) {
+    console.warn(`[RAGDB] Seed skipped — ${error.message}`);
+  }
+
   // Boot Agent Studio (ASDB seed + scheduler — self-contained, idempotent)
   await (await import("../agent-studio/boot")).bootAgentStudio();
 
@@ -602,31 +611,23 @@ async function startServer() {
     }
   });
 
-  // Graph data for visualization tab
+  // Graph data for visualization tab — reads from ragdb
   app.get("/api/kgra-proxy/graph/data", async (_req, res) => {
     try {
-      const { getDb } = await import("../db/connection");
-      const db = getDb();
-      if (!db) return res.json({ nodes: [], edges: [] });
-      const row = ((await db.execute(sql`SELECT "settingValue" FROM system_settings WHERE "settingKey" = 'kgra_graph_data'`)) as any).rows?.[0];
-      if (!row?.settingValue) return res.json({ nodes: [], edges: [] });
-      const graph = typeof row.settingValue === "string" ? JSON.parse(row.settingValue) : row.settingValue;
-      // Convert to visualization format
-      const nodes = (graph.entities || []).map((e: any, i: number) => ({
-        id: e.name,
-        label: e.name.split("/").pop() || e.name,
-        type: e.type,
-        mentions: e.mentions,
-        x: 0, y: 0,
-      }));
-      const edges = (graph.relationships || []).map((r: any, i: number) => ({
-        id: `e${i}`,
-        source: r.from,
-        target: r.to,
-        type: r.type,
-        weight: 1,
-      }));
-      res.json({ nodes, edges });
+      const { getRagDb } = await import("../rag/connection");
+      const ragDb = getRagDb();
+      if (!ragDb) return res.json({ nodes: [], edges: [] });
+      const entities = ((await ragDb.execute(sql`SELECT id, name, short_name, entity_type, mentions FROM kgra_entities`)) as any).rows || [];
+      const rels = ((await ragDb.execute(sql`
+        SELECT src.name as source, tgt.name as target, r.relationship_type as type
+        FROM kgra_relationships r
+        JOIN kgra_entities src ON src.id = r.source_entity_id
+        JOIN kgra_entities tgt ON tgt.id = r.target_entity_id
+      `)) as any).rows || [];
+      res.json({
+        nodes: entities.map((e: any) => ({ id: e.name, label: e.short_name || e.name.split("/").pop() || e.name, type: e.entity_type, mentions: e.mentions, x: 0, y: 0 })),
+        edges: rels.map((r: any, i: number) => ({ id: `e${i}`, source: r.source, target: r.target, type: r.type, weight: 1 })),
+      });
     } catch {
       res.json({ nodes: [], edges: [] });
     }
@@ -663,44 +664,93 @@ async function startServer() {
     }
   });
 
-  // Analytics entities — for the Visualization tab
-  app.get("/api/kgra-proxy/v1/analytics/entities", async (_req, res) => {
+  // Analytics entities — for the Visualization tab (reads from ragdb, server-side hub+neighbor filtering)
+  app.get("/api/kgra-proxy/v1/analytics/entities", async (req, res) => {
     try {
-      const { getDb } = await import("../db/connection");
-      const db = getDb();
-      if (!db) return res.json([]);
-      const row = ((await db.execute(sql`SELECT "settingValue" FROM system_settings WHERE "settingKey" = 'kgra_graph_data'`)) as any).rows?.[0];
-      if (!row?.settingValue) return res.json([]);
-      const graph = typeof row.settingValue === "string" ? JSON.parse(row.settingValue) : row.settingValue;
-      const entities = (graph.entities || []).map((e: any, i: number) => ({
-        id: e.name,
-        name: e.name.split("/").pop() || e.name,
-        type: e.type?.toUpperCase() || "ENTITY",
-        connections: e.mentions || 1,
-        community: e.type || "default",
-      }));
-      res.json(entities);
-    } catch { res.json([]); }
+      const { getRagDb } = await import("../rag/connection");
+      const ragDb = getRagDb();
+      if (!ragDb) return res.json([]);
+
+      const hubCount = Math.min(50, Math.max(5, parseInt(req.query.hub_count as string) || 10));
+      const maxNodes = 300;
+
+      // Get all entities with connection degree (in+out)
+      const allEntities = ((await ragDb.execute(sql`
+        SELECT e.id, e.name, e.short_name, e.entity_type, e.mentions,
+          (SELECT COUNT(*) FROM kgra_relationships r WHERE r.source_entity_id = e.id OR r.target_entity_id = e.id) as connections
+        FROM kgra_entities e
+        ORDER BY connections DESC
+      `)) as any).rows || [];
+
+      if (allEntities.length === 0) return res.json([]);
+
+      // If small graph, return all
+      if (allEntities.length <= maxNodes) {
+        return res.json(allEntities.map((e: any) => ({
+          id: e.name, name: e.short_name || e.name.split("/").pop() || e.name,
+          type: (e.entity_type || "entity").toUpperCase(), connections: Number(e.connections) || e.mentions || 1,
+          community: e.entity_type || "default",
+        })));
+      }
+
+      // Hub+neighbor strategy
+      const hubIds = new Set(allEntities.slice(0, hubCount).map((e: any) => e.id));
+      const hubIdList = sql.join([...hubIds].map(id => sql`${id}`), sql`, `);
+
+      const neighborRows = ((await ragDb.execute(sql`
+        SELECT DISTINCT
+          CASE WHEN r.source_entity_id IN (${hubIdList}) THEN r.target_entity_id ELSE r.source_entity_id END as neighbor_id
+        FROM kgra_relationships r
+        WHERE r.source_entity_id IN (${hubIdList}) OR r.target_entity_id IN (${hubIdList})
+      `)) as any).rows || [];
+
+      const visibleIds = new Set([...hubIds, ...neighborRows.map((r: any) => r.neighbor_id)]);
+
+      // Cap if too many neighbors
+      let finalIds: Set<number>;
+      if (visibleIds.size > maxNodes) {
+        const ranked = allEntities.filter((e: any) => visibleIds.has(e.id));
+        ranked.sort((a: any, b: any) => Number(b.connections) - Number(a.connections));
+        finalIds = new Set(ranked.slice(0, maxNodes).map((e: any) => e.id));
+        for (const h of hubIds) finalIds.add(h);
+      } else {
+        finalIds = visibleIds;
+      }
+
+      const result = allEntities
+        .filter((e: any) => finalIds.has(e.id))
+        .map((e: any) => ({
+          id: e.name, name: e.short_name || e.name.split("/").pop() || e.name,
+          type: (e.entity_type || "entity").toUpperCase(), connections: Number(e.connections) || e.mentions || 1,
+          community: e.entity_type || "default",
+        }));
+
+      res.json(result);
+    } catch (err) { console.error("analytics/entities:", err); res.json([]); }
   });
 
-  // Analytics relationships — for the Visualization tab
+  // Analytics relationships — for the Visualization tab (reads from ragdb)
   app.get("/api/kgra-proxy/v1/analytics/relationships", async (_req, res) => {
     try {
-      const { getDb } = await import("../db/connection");
-      const db = getDb();
-      if (!db) return res.json([]);
-      const row = ((await db.execute(sql`SELECT "settingValue" FROM system_settings WHERE "settingKey" = 'kgra_graph_data'`)) as any).rows?.[0];
-      if (!row?.settingValue) return res.json([]);
-      const graph = typeof row.settingValue === "string" ? JSON.parse(row.settingValue) : row.settingValue;
-      const rels = (graph.relationships || []).map((r: any) => ({
-        source_id: r.from,
-        target_id: r.to,
-        source_name: (r.from || "").split("/").pop() || r.from,
-        target_name: (r.to || "").split("/").pop() || r.to,
-        type: r.type?.toUpperCase() || "RELATED_TO",
-        weight: 1,
-      }));
-      res.json(rels);
+      const { getRagDb } = await import("../rag/connection");
+      const ragDb = getRagDb();
+      if (!ragDb) return res.json([]);
+      const rels = ((await ragDb.execute(sql`
+        SELECT src.name as source_name, tgt.name as target_name,
+               src.short_name as source_short, tgt.short_name as target_short,
+               r.relationship_type, r.weight
+        FROM kgra_relationships r
+        JOIN kgra_entities src ON src.id = r.source_entity_id
+        JOIN kgra_entities tgt ON tgt.id = r.target_entity_id
+      `)) as any).rows || [];
+      res.json(rels.map((r: any) => ({
+        source_id: r.source_name,
+        target_id: r.target_name,
+        source_name: r.source_short || (r.source_name || "").split("/").pop() || r.source_name,
+        target_name: r.target_short || (r.target_name || "").split("/").pop() || r.target_name,
+        type: (r.relationship_type || "RELATED_TO").toUpperCase(),
+        weight: r.weight || 1,
+      })));
     } catch { res.json([]); }
   });
 

@@ -221,11 +221,11 @@ All routes are defined in `server/_core/index.ts` (lines 544-746).
 | `/api/kgra-proxy/run` | POST | Execute KGRA query. Body: `{query, mode?}`. Returns `KGRAAnswer`. |
 | `/api/kgra-proxy/graphrag/stats` | GET | Graph statistics via `getGraphStats()` |
 | `/api/kgra-proxy/graphrag/query/:mode` | POST | GraphRAG query in specific mode (local/global/drift/hybrid) |
-| `/api/kgra-proxy/graph/data` | GET | Raw graph nodes/edges from `kgra_graph_data` |
+| `/api/kgra-proxy/graph/data` | GET | Raw graph nodes/edges from `ragdb` |
 | `/api/kgra-proxy/pipelines/` | GET | Returns hardcoded pipeline definition |
 | `/api/kgra-proxy/intake` | POST | Ingest files via `ingestProject()` |
-| `/api/kgra-proxy/v1/analytics/entities` | GET | All entities for Visualization (from `kgra_graph_data`) |
-| `/api/kgra-proxy/v1/analytics/relationships` | GET | All relationships for Visualization |
+| `/api/kgra-proxy/v1/analytics/entities?hub_count=N` | GET | Server-filtered entities from `ragdb` (hub+neighbor, default 10 hubs, max 300 nodes) |
+| `/api/kgra-proxy/v1/analytics/relationships` | GET | All relationships from `ragdb` |
 | `/api/kgra-proxy/v1/analytics/summary` | GET | Summary stats for OmniGraph panel |
 | `/api/kgra-proxy/v1/mcp/tools` | GET | 5 MCP tools: query_kgra, get_reasoning_path, etc. |
 | `/api/kgra-proxy/v1/workflows` | GET | Available workflows list |
@@ -234,27 +234,26 @@ All routes are defined in `server/_core/index.ts` (lines 544-746).
 
 ### Analytics Endpoint Detail
 
-**`/v1/analytics/entities`** (line 667):
+**`/v1/analytics/entities?hub_count=N`**:
 ```
-Reads: system_settings WHERE settingKey = 'kgra_graph_data'
-Maps each entity to:
-  { id: entity.name,
-    name: entity.name.split("/").pop(),
-    type: entity.type.toUpperCase(),
-    connections: entity.mentions || 1,
-    community: entity.type || "default" }
+Database: ragdb (dedicated RAG Knowledge Graph DB)
+Tables: kgra_entities + kgra_relationships
+
+1. Query all entities with connection degree (in+out from kgra_relationships)
+2. If total <= 300: return all
+3. Otherwise: hub+neighbor strategy:
+   - Pick top N hubs by connection count (default N=10, range 5-50)
+   - Find all neighbors of hubs via kgra_relationships
+   - If neighbors > 300: trim by connection count, keep hubs
+4. Returns: { id: name, name: shortName, type, connections, community }
 ```
 
-**`/v1/analytics/relationships`** (line 687):
+**`/v1/analytics/relationships`**:
 ```
-Reads: same kgra_graph_data
-Maps each relationship to:
-  { source_id: rel.from,
-    target_id: rel.to,
-    source_name: rel.from.split("/").pop(),
-    target_name: rel.to.split("/").pop(),
-    type: rel.type.toUpperCase(),
-    weight: 1 }
+Database: ragdb
+SELECT from kgra_relationships JOIN kgra_entities (source + target)
+Returns: { source_id, target_id, source_name, target_name, type, weight }
+Client filters to only edges where both endpoints are in the visible entity set.
 ```
 
 ---
@@ -374,19 +373,16 @@ Auto-chains: if ingest detected + query contains "graph/rag/knowledge", adds `"b
    - `path="/route"` --> `routes_to` relationship
    - `trpc.router.method` --> `calls_api` relationship
    - `export function name` --> `exports` relationship
-4. Stores in `system_settings` as key `'kgra_graph_data'`:
-   ```json
-   {
-     "entities": [{"name": "...", "type": "page", "mentions": 1, "dir": "..."}],
-     "relationships": [{"from": "...", "to": "...", "type": "imports"}],
-     "builtAt": "2026-04-11T...",
-     "chunkCount": 1512
-   }
-   ```
+4. Writes to `ragdb` (dedicated RAG database):
+   - DELETE old data from `kgra_relationships`, `kgra_entities`, `kgra_build_runs`
+   - Batch INSERT entities (500/batch) into `kgra_entities`
+   - Build name-to-id map from RETURNING clause
+   - Batch INSERT relationships into `kgra_relationships`
+   - INSERT build metadata into `kgra_build_runs`
 
 ### `getGraphStats()` (line 349)
 
-Reads `kgra_graph_data`, returns entity/relationship counts + type breakdown.
+Queries `kgra_build_runs` in ragdb (latest build), returns entity/relationship counts + type breakdown.
 
 ---
 
@@ -409,17 +405,68 @@ All procedures require authentication (`protectedProcedure`).
 
 ## 8. Database Schema
 
-### `system_settings` table
+### Database Architecture
+
+```
+mynewap1claude (main DB)          ragdb (dedicated RAG DB)
+├── documents                     ├── kgra_entities
+├── document_chunks               ├── kgra_relationships
+├── system_settings               └── kgra_build_runs
+└── 248 other app tables
+
+Flow: ingestProject() writes to main DB (documents, chunks)
+      buildKnowledgeGraph() reads chunks from main DB, writes graph to ragdb
+      Visualization reads from ragdb via /v1/analytics/* endpoints
+```
+
+**Connection:** `server/rag/connection.ts` exports `getRagDb()` (lazy Drizzle instance)
+**Seed:** `server/rag/seed.ts` creates tables + migrates JSON blob on first run
+**Schema:** `drizzle/tables/ragdb.ts` defines table types
+
+### `kgra_entities` table (ragdb)
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | serial PK | Auto-increment |
-| settingKey | varchar UNIQUE | `'kgra_graph_data'` |
-| settingValue | text | JSON string (1.7MB for full codebase) |
-| settingType | varchar | `'json'` |
-| updatedAt | timestamp | Last update time |
+| name | text | Full entity name (e.g., `"server/chat/page.tsx"`) |
+| short_name | varchar(500) | Display label (e.g., `"page.tsx"`) |
+| entity_type | varchar(50) | `"page"`, `"component"`, `"hook"`, `"route"`, `"db_table"`, `"file"`, etc. |
+| mentions | integer | Mention count |
+| directory | varchar(500) | Directory grouping |
+| source_doc_id | integer | Reference to documents.id in main DB (not a FK) |
+| build_id | varchar(100) | Groups rows by build run |
+| created_at | timestamp | Creation time |
 
-### `documents` table
+Indexes: `name`, `entity_type`, `build_id`
+
+### `kgra_relationships` table (ragdb)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | serial PK | Auto-increment |
+| source_entity_id | integer FK | References kgra_entities.id (CASCADE delete) |
+| target_entity_id | integer FK | References kgra_entities.id (CASCADE delete) |
+| relationship_type | varchar(50) | `"imports"`, `"renders"`, `"defines"`, `"routes_to"`, etc. |
+| weight | integer | Edge weight (default 1) |
+| build_id | varchar(100) | Groups rows by build run |
+| created_at | timestamp | Creation time |
+
+Indexes: `source_entity_id`, `target_entity_id`, `relationship_type`, `build_id`
+
+### `kgra_build_runs` table (ragdb)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | serial PK | Auto-increment |
+| build_id | varchar(100) UNIQUE | Build timestamp |
+| entity_count | integer | Total entities in this build |
+| relationship_count | integer | Total relationships |
+| chunk_count | integer | Chunks processed |
+| type_counts | jsonb | Entity type breakdown |
+| status | varchar(50) | `"completed"` |
+| built_at | timestamp | Build time |
+
+### `documents` table (main DB)
 
 | Column | Type | Description |
 |--------|------|-------------|

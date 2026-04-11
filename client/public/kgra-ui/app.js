@@ -12,6 +12,7 @@ let activeMainTab = 'rag';
 let chatMessages = [];
 let healthData = null;
 let lastIngestResultHTML = null; // persist auto-ingest result across tab switches
+let hubCount = 10; // default hub count for visualization
 
 // ─── Colors for pipeline avatars ───
 const COLORS = ['#6b1f4a','#1a5f4a','#3b2f80','#7c4a1e','#1a4a6b','#6b1a2f','#2f6b1a','#4a1a6b'];
@@ -1066,6 +1067,13 @@ function renderGraphTab() {
         <input class="input" id="entity-search" placeholder="Search entity..." style="flex:1; min-width:120px; font-size:12px; padding:5px 8px;" />
         <button class="btn btn-primary" onclick="searchAndFocusEntity()" style="font-size:11px; padding:4px 10px;">Search</button>
         <button class="btn" onclick="loadGraphData()" style="font-size:11px; padding:4px 10px;">Reload</button>
+        <div style="display:flex; align-items:center; gap:3px;">
+          <label style="font-size:10px; color:var(--text-dim); white-space:nowrap;">Hubs:</label>
+          <input type="range" id="hub-count-slider" min="5" max="50" step="1" value="${hubCount}"
+                 style="width:70px; accent-color:#6366f1;"
+                 oninput="updateHubCount(this.value)" />
+          <span id="hub-count-display" style="font-size:11px; color:var(--text); min-width:18px; text-align:center;">${hubCount}</span>
+        </div>
         <button class="btn btn-primary" onclick="loadDemo()" style="font-size:11px; padding:4px 10px;">Demo</button>
         <button class="btn" id="filter-toggle-btn" onclick="toggleFilterPanel()" style="font-size:11px; padding:4px 10px;">☰ Filter</button>
         <select id="layout-select" onchange="switchLayout(this.value)" class="input" style="width:auto; font-size:11px; padding:4px 6px;">
@@ -1460,33 +1468,35 @@ function runForceLayout(iterations = 100) {
   drawGraph();
 }
 
+function updateHubCount(value) {
+  hubCount = parseInt(value) || 10;
+  const display = document.getElementById('hub-count-display');
+  if (display) display.textContent = hubCount;
+  clearTimeout(window._hubCountDebounce);
+  window._hubCountDebounce = setTimeout(() => loadGraphData(), 300);
+}
+
 async function loadGraphData() {
-  const MAX_VIS_NODES = 200; // cap for interactive performance
   const stats = document.getElementById('graph-canvas-stats');
   if (stats) stats.textContent = 'Loading graph data...';
   try {
-    const data = await fetch(`${API}/graphrag/stats`).then(r => r.json());
-    const entities = await fetch(`${API}/v1/analytics/entities`).then(r => r.json()).catch(() => []);
+    // Server does hub+neighbor filtering — just pass hub_count
+    const entities = await fetch(`${API}/v1/analytics/entities?hub_count=${hubCount}`).then(r => r.json()).catch(() => []);
     const rels = await fetch(`${API}/v1/analytics/relationships`).then(r => r.json()).catch(() => []);
 
-    // If too many entities, keep only the top N by connection count
-    let topEntities = entities;
-    let trimmed = false;
-    if (entities.length > MAX_VIS_NODES) {
-      topEntities = entities.slice().sort((a, b) => (b.connections || 0) - (a.connections || 0)).slice(0, MAX_VIS_NODES);
-      trimmed = true;
-    }
-    const nodeIdSet = new Set(topEntities.map(e => e.id));
+    const nodeIdSet = new Set(entities.map(e => e.id));
 
-    graphViz.nodes = topEntities.map(e => ({
+    // Scale radius: hubs get bigger, leaf nodes stay small
+    const maxConn = Math.max(1, ...entities.map(e => e.connections || 1));
+    graphViz.nodes = entities.map(e => ({
       id: e.id, label: e.name, type: e.type || 'ENTITY',
       aliases: [], connections: e.connections || 0,
       community: e.community || '',
-      x: (Math.random() - 0.5) * 600, y: (Math.random() - 0.5) * 600,
-      radius: Math.max(10, Math.min(22, 10 + (e.connections || 0) * 0.5)),
+      x: (Math.random() - 0.5) * 800, y: (Math.random() - 0.5) * 800,
+      radius: Math.max(6, Math.min(28, 6 + Math.sqrt((e.connections || 1) / maxConn) * 22)),
     }));
 
-    // Only keep edges where both endpoints are in the visible set
+    // Keep edges where both endpoints are in the visible set
     graphViz.edges = rels
       .filter(r => nodeIdSet.has(r.source_id) && nodeIdSet.has(r.target_id))
       .map(r => ({
@@ -1495,11 +1505,10 @@ async function loadGraphData() {
         type: r.type || 'RELATED_TO', weight: r.weight || 1,
       }));
 
-    // Build lookup map for fast edge→node resolution
     graphViz._nodeMap = new Map(graphViz.nodes.map(n => [n.id, n]));
 
-    if (trimmed && stats) {
-      stats.textContent = `Showing top ${MAX_VIS_NODES} of ${entities.length} entities (${graphViz.edges.length} edges)`;
+    if (stats) {
+      stats.textContent = `${graphViz.nodes.length} nodes · ${graphViz.edges.length} edges (top ${hubCount} hubs)`;
     }
 
     buildFilterUI();

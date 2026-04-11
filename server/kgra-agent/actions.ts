@@ -315,29 +315,68 @@ export async function buildKnowledgeGraph(): Promise<ActionResult> {
       return { from, to, type };
     });
 
-    const graphData = {
-      entities: Array.from(entities.entries()).map(([name, info]) => ({ name, ...info })),
-      relationships: uniqueRels,
-      builtAt: new Date().toISOString(),
-      chunkCount: chunkRows.length,
-    };
+    // ── Write to ragdb (dedicated RAG database) ──────────────────
+    const { getRagDb } = await import("../rag/connection");
+    const ragDb = getRagDb();
+    if (!ragDb) return { action: "build_graph", success: false, summary: "RAGDB unavailable", data: {} };
 
-    await db.execute(sql`
-      INSERT INTO system_settings ("settingKey", "settingValue", "settingType", "updatedAt")
-      VALUES ('kgra_graph_data', ${JSON.stringify(graphData)}, 'json', NOW())
-      ON CONFLICT ("settingKey") DO UPDATE SET "settingValue" = ${JSON.stringify(graphData)}, "updatedAt" = NOW()
-    `);
+    const buildId = new Date().toISOString();
+    const BATCH = 500;
 
+    // Clear previous build (CASCADE deletes relationships)
+    await ragDb.execute(sql`DELETE FROM kgra_relationships`);
+    await ragDb.execute(sql`DELETE FROM kgra_entities`);
+    await ragDb.execute(sql`DELETE FROM kgra_build_runs`);
+
+    // Batch insert entities, build name→id map
+    const entityList = Array.from(entities.entries());
+    const nameToId = new Map<string, number>();
+
+    for (let i = 0; i < entityList.length; i += BATCH) {
+      const batch = entityList.slice(i, i + BATCH);
+      const values = batch.map(([name, info]) =>
+        sql`(${name}, ${name.split("/").pop() || name}, ${info.type}, ${info.mentions}, ${info.dir || null}, ${null}, ${buildId})`
+      );
+      const inserted = (await ragDb.execute(sql`
+        INSERT INTO kgra_entities (name, short_name, entity_type, mentions, directory, source_doc_id, build_id)
+        VALUES ${sql.join(values, sql`, `)}
+        RETURNING id, name
+      `)) as any;
+      for (const r of inserted.rows || []) {
+        nameToId.set(r.name, r.id);
+      }
+    }
+
+    // Batch insert relationships (only where both endpoints exist)
+    const validRels = uniqueRels.filter(r => nameToId.has(r.from) && nameToId.has(r.to));
+    for (let i = 0; i < validRels.length; i += BATCH) {
+      const batch = validRels.slice(i, i + BATCH);
+      const values = batch.map(r =>
+        sql`(${nameToId.get(r.from)!}, ${nameToId.get(r.to)!}, ${r.type}, ${1}, ${buildId})`
+      );
+      await ragDb.execute(sql`
+        INSERT INTO kgra_relationships (source_entity_id, target_entity_id, relationship_type, weight, build_id)
+        VALUES ${sql.join(values, sql`, `)}
+      `);
+    }
+
+    // Type counts
     const typeCounts: Record<string, number> = {};
     for (const [, info] of entities) {
       typeCounts[info.type] = (typeCounts[info.type] || 0) + 1;
     }
 
+    // Record build metadata
+    await ragDb.execute(sql`
+      INSERT INTO kgra_build_runs (build_id, entity_count, relationship_count, chunk_count, type_counts, built_at)
+      VALUES (${buildId}, ${entities.size}, ${validRels.length}, ${chunkRows.length}, ${JSON.stringify(typeCounts)}::jsonb, NOW())
+    `);
+
     return {
       action: "build_graph",
       success: true,
-      summary: `Built knowledge graph: ${entities.size} entities (${typeCounts.page || 0} pages, ${typeCounts.component || 0} components, ${typeCounts.hook || 0} hooks, ${typeCounts.route || 0} routes, ${typeCounts.db_table || 0} tables), ${uniqueRels.length} relationships from ${chunkRows.length} chunks`,
-      data: { entityCount: entities.size, relationshipCount: uniqueRels.length, typeCounts, chunkCount: chunkRows.length },
+      summary: `Built knowledge graph: ${entities.size} entities (${typeCounts.page || 0} pages, ${typeCounts.component || 0} components, ${typeCounts.hook || 0} hooks, ${typeCounts.route || 0} routes, ${typeCounts.db_table || 0} tables), ${validRels.length} relationships from ${chunkRows.length} chunks`,
+      data: { entityCount: entities.size, relationshipCount: validRels.length, typeCounts, chunkCount: chunkRows.length },
     };
   } catch (err) {
     return { action: "build_graph", success: false, summary: `Graph build failed: ${(err as Error).message}`, data: {} };
@@ -348,34 +387,30 @@ export async function buildKnowledgeGraph(): Promise<ActionResult> {
 
 export async function getGraphStats(): Promise<ActionResult> {
   try {
-    const { getDb } = await import("../db/connection");
-    const db = getDb();
-    if (!db) return { action: "graph_stats", success: false, summary: "Database unavailable", data: {} };
+    const { getRagDb } = await import("../rag/connection");
+    const ragDb = getRagDb();
+    if (!ragDb) return { action: "graph_stats", success: false, summary: "RAGDB unavailable", data: {} };
 
-    const row = (await db.execute(sql`
-      SELECT "settingValue" FROM system_settings WHERE "settingKey" = 'kgra_graph_data'
-    `) as any).rows?.[0];
+    const buildRow = ((await ragDb.execute(sql`
+      SELECT * FROM kgra_build_runs ORDER BY built_at DESC LIMIT 1
+    `)) as any).rows?.[0];
 
-    if (!row?.settingValue) {
+    if (!buildRow) {
       return { action: "graph_stats", success: false, summary: "No knowledge graph built yet. Ask me to create a RAG first.", data: {} };
     }
 
-    const graph = typeof row.settingValue === "string" ? JSON.parse(row.settingValue) : row.settingValue;
-    const typeCounts: Record<string, number> = {};
-    for (const e of graph.entities || []) {
-      typeCounts[e.type] = (typeCounts[e.type] || 0) + 1;
-    }
+    const typeCounts = buildRow.type_counts || {};
 
     return {
       action: "graph_stats",
       success: true,
-      summary: `Knowledge graph: ${graph.entities?.length || 0} entities, ${graph.relationships?.length || 0} relationships`,
+      summary: `Knowledge graph: ${buildRow.entity_count} entities, ${buildRow.relationship_count} relationships`,
       data: {
-        entityCount: graph.entities?.length || 0,
-        relationshipCount: graph.relationships?.length || 0,
+        entityCount: buildRow.entity_count,
+        relationshipCount: buildRow.relationship_count,
         typeCounts,
-        builtAt: graph.builtAt,
-        chunkCount: graph.chunkCount,
+        builtAt: buildRow.built_at,
+        chunkCount: buildRow.chunk_count,
       },
     };
   } catch (err) {
