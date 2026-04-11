@@ -17,13 +17,13 @@ export function registerSnapshotRoutes(app: Express) {
       const at = req.query.at as string;
       if (!at) return res.status(400).json({ error: "at parameter required (ISO timestamp)" });
 
-      const nodes = ((await ragDb.execute(sql`
-        SELECT id, name, short_name, entity_type, mentions, created_at
-        FROM kgra_entities WHERE created_at <= ${at}
-        UNION ALL
-        SELECT id, name, short_name, family as entity_type, mentions, created_at
-        FROM kgra_manual_nodes WHERE status = 'active' AND created_at <= ${at}
+      const autoNodes = ((await ragDb.execute(sql`
+        SELECT id, name, short_name, entity_type, mentions, created_at FROM kgra_entities WHERE created_at <= ${at}
       `)) as any).rows || [];
+      const manualNodes = ((await ragDb.execute(sql`
+        SELECT id, name, short_name, family as entity_type, mentions, created_at FROM kgra_manual_nodes WHERE status = 'active' AND created_at <= ${at}
+      `)) as any).rows || [];
+      const nodes = [...autoNodes, ...manualNodes];
 
       const edges = ((await ragDb.execute(sql`
         SELECT r.id, src.name as source, tgt.name as target, r.relationship_type as type, r.created_at
@@ -46,13 +46,13 @@ export function registerSnapshotRoutes(app: Express) {
       const to = req.query.to as string;
       if (!from || !to) return res.status(400).json({ error: "from and to required" });
 
-      const nodes = ((await ragDb.execute(sql`
-        SELECT id, name, short_name, entity_type, mentions, created_at
-        FROM kgra_entities WHERE created_at >= ${from} AND created_at <= ${to}
-        UNION ALL
-        SELECT id, name, short_name, family, mentions, created_at
-        FROM kgra_manual_nodes WHERE status = 'active' AND created_at >= ${from} AND created_at <= ${to}
+      const autoNodes = ((await ragDb.execute(sql`
+        SELECT id, name, short_name, entity_type, mentions, created_at FROM kgra_entities WHERE created_at >= ${from} AND created_at <= ${to}
       `)) as any).rows || [];
+      const manualNodes = ((await ragDb.execute(sql`
+        SELECT id, name, short_name, family as entity_type, mentions, created_at FROM kgra_manual_nodes WHERE status = 'active' AND created_at >= ${from} AND created_at <= ${to}
+      `)) as any).rows || [];
+      const nodes = [...autoNodes, ...manualNodes];
 
       const edges = ((await ragDb.execute(sql`
         SELECT r.id, src.name as source, tgt.name as target, r.relationship_type as type, r.created_at
