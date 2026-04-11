@@ -1914,10 +1914,10 @@ async function chatSend() {
   el.scrollTop = el.scrollHeight;
 
   try {
-    // Try hybrid search first
-    const r = await fetch(`${API}/v1/search`, {
+    // Call KGRA reasoning agent
+    const r = await fetch(`${API}/run`, {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ query, top_k: 5 }),
+      body: JSON.stringify({ query }),
     });
     const data = await r.json();
 
@@ -1925,17 +1925,31 @@ async function chatSend() {
     const thinking = document.getElementById(thinkingId);
     if (thinking) thinking.remove();
 
-    // Build assistant response
+    // Build assistant response from KGRAAnswer
     let response = data.answer || 'No answer found.';
-    if (data.citations?.length) {
-      response += '<br><br><strong>Citations:</strong><br>';
-      response += data.citations.map(c =>
-        `<code>${c.doc_id?.slice(0,8)}:${c.chunk_id?.slice(0,8)}</code> ${c.snippet || ''}`
+
+    // Evidence
+    if (data.observed_facts?.length) {
+      response += '<br><br><strong>Evidence:</strong><br>';
+      response += data.observed_facts.map(f =>
+        `<code>${f.id}</code> ${f.label || ''}`
       ).join('<br>');
     }
-    if (data.metadata) {
-      response += `<br><br><span style="font-size:11px; color:var(--text-muted);">Mode: ${data.metadata.mode} · Retrieval: ${data.metadata.retrieval_latency_ms}ms · Generation: ${data.metadata.generation_latency_ms}ms</span>`;
+
+    // Provenance
+    if (data.provenance?.length) {
+      response += '<br><br><strong>Provenance:</strong><br>';
+      response += data.provenance.map(p =>
+        `[${p.source_type}] ${p.source_ref}`
+      ).join('<br>');
     }
+
+    // Metadata line
+    const conf = data.confidence != null ? (data.confidence * 100).toFixed(0) + '%' : '?';
+    const mode = data.mode || '?';
+    const verdict = data.governance?.verdict || '?';
+    const tokens = data.cost_estimate?.llm_tokens || 0;
+    response += `<br><br><span style="font-size:11px; color:var(--text-muted);">Mode: ${mode} · Confidence: ${conf} · Governance: ${verdict} · Tokens: ${tokens}</span>`;
 
     chatAddMessage('assistant', response);
   } catch(e) {
