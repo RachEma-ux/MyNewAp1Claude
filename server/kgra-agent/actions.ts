@@ -184,12 +184,14 @@ export async function buildKnowledgeGraph(): Promise<ActionResult> {
     const db = getDb();
     if (!db) return { action: "build_graph", success: false, summary: "Database unavailable", data: {} };
 
+    // Read first chunk per file (chunk_index=0) — captures imports/exports/definitions
     const chunkRows = (await db.execute(sql`
       SELECT dc.id, dc.content, dc.heading, d.filename
       FROM document_chunks dc
       JOIN documents d ON d.id = dc."documentId"
+      WHERE dc."chunkIndex" = 0
       ORDER BY dc.id
-      LIMIT 10000
+      LIMIT 2000
     `) as any).rows || [];
 
     if (chunkRows.length === 0) {
