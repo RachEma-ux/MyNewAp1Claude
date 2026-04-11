@@ -16,12 +16,13 @@ export function registerSnapshotRoutes(app: Express) {
       if (!ragDb) return res.json({ nodes: [], edges: [] });
       const at = req.query.at as string;
       if (!at) return res.status(400).json({ error: "at parameter required (ISO timestamp)" });
+      const atTs = at.includes('T') ? at : at + 'T23:59:59Z';
 
       const autoNodes = ((await ragDb.execute(sql`
-        SELECT id, name, short_name, entity_type, mentions, created_at FROM kgra_entities WHERE created_at <= ${at}
+        SELECT id, name, short_name, entity_type, mentions, created_at FROM kgra_entities WHERE created_at <= ${atTs}::timestamp
       `)) as any).rows || [];
       const manualNodes = ((await ragDb.execute(sql`
-        SELECT id, name, short_name, family as entity_type, mentions, created_at FROM kgra_manual_nodes WHERE status = 'active' AND created_at <= ${at}
+        SELECT id, name, short_name, family as entity_type, mentions, created_at FROM kgra_manual_nodes WHERE status = 'active' AND created_at <= ${atTs}::timestamp
       `)) as any).rows || [];
       const nodes = [...autoNodes, ...manualNodes];
 
@@ -30,7 +31,7 @@ export function registerSnapshotRoutes(app: Express) {
         FROM kgra_relationships r
         JOIN kgra_entities src ON src.id = r.source_entity_id
         JOIN kgra_entities tgt ON tgt.id = r.target_entity_id
-        WHERE r.created_at <= ${at}
+        WHERE r.created_at <= ${atTs}::timestamp
       `)) as any).rows || [];
 
       res.json({ nodes, edges, at });
@@ -45,12 +46,14 @@ export function registerSnapshotRoutes(app: Express) {
       const from = req.query.from as string;
       const to = req.query.to as string;
       if (!from || !to) return res.status(400).json({ error: "from and to required" });
+      const fromTs = from.includes('T') ? from : from + 'T00:00:00Z';
+      const toTs = to.includes('T') ? to : to + 'T23:59:59Z';
 
       const autoNodes = ((await ragDb.execute(sql`
-        SELECT id, name, short_name, entity_type, mentions, created_at FROM kgra_entities WHERE created_at >= ${from} AND created_at <= ${to}
+        SELECT id, name, short_name, entity_type, mentions, created_at FROM kgra_entities WHERE created_at >= ${fromTs}::timestamp AND created_at <= ${toTs}::timestamp
       `)) as any).rows || [];
       const manualNodes = ((await ragDb.execute(sql`
-        SELECT id, name, short_name, family as entity_type, mentions, created_at FROM kgra_manual_nodes WHERE status = 'active' AND created_at >= ${from} AND created_at <= ${to}
+        SELECT id, name, short_name, family as entity_type, mentions, created_at FROM kgra_manual_nodes WHERE status = 'active' AND created_at >= ${fromTs}::timestamp AND created_at <= ${toTs}::timestamp
       `)) as any).rows || [];
       const nodes = [...autoNodes, ...manualNodes];
 
@@ -59,7 +62,7 @@ export function registerSnapshotRoutes(app: Express) {
         FROM kgra_relationships r
         JOIN kgra_entities src ON src.id = r.source_entity_id
         JOIN kgra_entities tgt ON tgt.id = r.target_entity_id
-        WHERE r.created_at >= ${from} AND r.created_at <= ${to}
+        WHERE r.created_at >= ${fromTs}::timestamp AND r.created_at <= ${toTs}::timestamp
       `)) as any).rows || [];
 
       res.json({ nodes, edges, from, to });
