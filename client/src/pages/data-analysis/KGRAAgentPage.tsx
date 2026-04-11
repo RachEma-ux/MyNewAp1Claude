@@ -30,19 +30,26 @@ export default function KGRAAgentPage() {
         // Remove inline script tags (we load app.js separately to avoid duplication)
         container.querySelectorAll("script").forEach((s) => s.remove());
 
-        // Load app.js — NOT async, so functions are available when tabs are clicked
-        const existing = document.querySelector('script[src="/kgra-ui/app.js"]');
-        if (existing) existing.remove();
-        const script = document.createElement("script");
-        script.src = "/kgra-ui/app.js";
-        document.body.appendChild(script);
-
-        // Load designer.js after app.js (depends on shared globals like API, showToast)
-        const existingDesigner = document.querySelector('script[src="/kgra-ui/designer.js"]');
-        if (existingDesigner) existingDesigner.remove();
-        const designerScript = document.createElement("script");
-        designerScript.src = "/kgra-ui/designer.js";
-        document.body.appendChild(designerScript);
+        // Load all KGRA scripts in order: core → subsystems → app → designer
+        const scripts = [
+          "/kgra-ui/graph-state.js",
+          "/kgra-ui/graph-animation.js",
+          "/kgra-ui/graph-camera.js",
+          "/kgra-ui/graph-api.js",
+          "/kgra-ui/graph-renderer.js",
+          "/kgra-ui/graph-interaction.js",
+          "/kgra-ui/graph-inspector.js",
+          "/kgra-ui/graph-workbench.js",
+          "/kgra-ui/app.js",
+          "/kgra-ui/designer.js",
+        ];
+        for (const src of scripts) {
+          const old = document.querySelector(`script[src="${src}"]`);
+          if (old) old.remove();
+          const s = document.createElement("script");
+          s.src = src;
+          document.body.appendChild(s);
+        }
       })
       .catch((err) => {
         container.innerHTML = `<div style="padding:2rem;color:#f87171;">Failed to load KGRA Agent UI: ${err.message}</div>`;

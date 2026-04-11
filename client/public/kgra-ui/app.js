@@ -1068,6 +1068,12 @@ async function loadGraphStats() {
 
 function renderGraphTab() {
   const body = document.getElementById('main-body');
+  // Use new Graph Workbench if available
+  if (typeof GraphWorkbench !== 'undefined') {
+    GraphWorkbench.mount(body);
+    return;
+  }
+  // Fallback: legacy graph rendering
   body.innerHTML = `
     <div style="display:flex; flex-direction:column; height:100%; margin:-24px -20px;">
       <!-- Toolbar Row 1 -->
