@@ -408,20 +408,30 @@ All procedures require authentication (`protectedProcedure`).
 ### Database Architecture
 
 ```
-mynewap1claude (main DB)          ragdb (dedicated RAG DB)
-├── documents                     ├── kgra_entities
-├── document_chunks               ├── kgra_relationships
-├── system_settings               └── kgra_build_runs
-└── 248 other app tables
+mynewap1claude (main DB)          ragdb (dedicated RAG DB) — 11 tables
+├── documents                     ├── kgra_entities (auto graph)
+├── document_chunks               ├── kgra_relationships (auto graph)
+├── system_settings               ├── kgra_build_runs (auto graph)
+└── 248 other app tables          ├── kgra_manual_nodes (user-designed)
+                                  ├── kgra_manual_edges (user-designed)
+                                  ├── kgra_templates (reusable overlays)
+                                  ├── kgra_template_nodes
+                                  ├── kgra_template_edges
+                                  ├── kgra_applied_templates
+                                  ├── kgra_modes (persona views)
+                                  └── kgra_mode_compositions
 
-Flow: ingestProject() writes to main DB (documents, chunks)
-      buildKnowledgeGraph() reads chunks from main DB, writes graph to ragdb
-      Visualization reads from ragdb via /v1/analytics/* endpoints
+3 Layers: AUTO (regex-extracted) + MANUAL (user-designed) + TEMPLATE (reusable)
+4 Modes: Coder | User | Architect | Diagnosis (+ custom)
 ```
 
 **Connection:** `server/rag/connection.ts` exports `getRagDb()` (lazy Drizzle instance)
-**Seed:** `server/rag/seed.ts` creates tables + migrates JSON blob on first run
-**Schema:** `drizzle/tables/ragdb.ts` defines table types
+**Seed:** `server/rag/seed.ts` creates 11 tables + seeds default ontology + 4 modes
+**Schema:** `drizzle/tables/ragdb.ts` defines all table types
+**Routes:** `server/rag/designer-routes.ts` — 33+ endpoints (manual CRUD, templates, modes, reference)
+**Ontology:** `server/rag/default-ontology.json` — 14 families, 95+ kinds, 60+ relationship types
+**Modes:** `server/rag/default-modes.json` — 4 persona modes + 2 compositions
+**Frontend:** `client/public/kgra-ui/designer.js` — Designer sub-page UI
 
 ### `kgra_entities` table (ragdb)
 

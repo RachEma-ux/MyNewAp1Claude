@@ -86,6 +86,31 @@ async function showDesigner() {
         <div id="designer-edge-list" style="font-size:12px;">Loading...</div>
       </div>
 
+      <!-- Templates -->
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:14px;">📋</span>
+            <span class="card-title" style="margin:0;">Templates</span>
+          </div>
+          <div style="display:flex; gap:4px;">
+            <button class="btn" onclick="saveManualAsTemplate()" style="font-size:10px; padding:3px 8px;">Save Manual As...</button>
+          </div>
+        </div>
+        <div id="designer-template-list" style="font-size:12px;">Loading...</div>
+      </div>
+
+      <!-- Modes -->
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:14px;">👁</span>
+            <span class="card-title" style="margin:0;">Modes</span>
+          </div>
+        </div>
+        <div id="designer-mode-list" style="font-size:12px;">Loading...</div>
+      </div>
+
       <!-- Design Guide -->
       <div class="card" style="margin-bottom:12px;">
         <details>
@@ -111,13 +136,20 @@ async function showDesigner() {
 
 // ── Data Loading ────────────────────────────────────────────────
 
+let designerTemplates = [];
+let designerModes = [];
+
 async function loadDesignerData() {
   try {
     designerNodes = await fetch(`${DESIGNER_API}/nodes?status=active`).then(r => r.json());
     designerEdges = await fetch(`${DESIGNER_API}/edges?status=active`).then(r => r.json());
-  } catch { designerNodes = []; designerEdges = []; }
+    designerTemplates = await fetch(`${API}/templates`).then(r => r.json()).catch(() => []);
+    designerModes = await fetch(`${API}/modes`).then(r => r.json()).catch(() => []);
+  } catch { designerNodes = []; designerEdges = []; designerTemplates = []; designerModes = []; }
   renderNodeList();
   renderEdgeList();
+  renderTemplateList();
+  renderModeList();
 }
 
 // ── Node List ───────────────────────────────────────────────────
@@ -692,4 +724,114 @@ async function deleteEdge(id) {
     showToast('Link deleted');
     await loadDesignerData();
   } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ── Template List ───────────────────────────────────────────────
+
+function renderTemplateList() {
+  const el = document.getElementById('designer-template-list');
+  if (!el) return;
+  if (designerTemplates.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-muted); padding:8px 0;">No templates.</div>';
+    return;
+  }
+  el.innerHTML = designerTemplates.map(t => {
+    const isDefault = t.is_default === 'true';
+    const isApplied = false; // TODO: check kgra_applied_templates
+    return `
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border);">
+        <div>
+          ${isDefault ? '<span style="color:#f59e0b; margin-right:4px;">⭐</span>' : ''}
+          <span style="color:var(--text); font-weight:500;">${t.name}</span>
+          ${t.version ? `<span style="color:var(--text-muted); font-size:10px; margin-left:4px;">v${t.version}</span>` : ''}
+        </div>
+        <div style="display:flex; gap:4px;">
+          <button onclick="applyTemplate(${t.id})" class="btn" style="font-size:10px; padding:2px 6px;">Apply</button>
+          <button onclick="duplicateTemplate(${t.id})" class="btn" style="font-size:10px; padding:2px 6px;">Duplicate</button>
+          ${!isDefault ? `<button onclick="deleteTemplate(${t.id})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:12px;">🗑</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function applyTemplate(id) {
+  try {
+    const resp = await fetch(`${API}/templates/${id}/apply`, { method: 'POST' });
+    const data = await resp.json();
+    showToast(`Template applied: ${data.nodes_copied} nodes, ${data.edges_copied} edges`);
+    await loadDesignerData();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function unapplyTemplate(id) {
+  try {
+    await fetch(`${API}/templates/${id}/unapply`, { method: 'POST' });
+    showToast('Template unapplied');
+    await loadDesignerData();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function duplicateTemplate(id) {
+  try {
+    const resp = await fetch(`${API}/templates/${id}/duplicate`, { method: 'POST' });
+    const data = await resp.json();
+    showToast(`Template duplicated (id: ${data.new_template_id})`);
+    await loadDesignerData();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('Delete this template? This cannot be undone.')) return;
+  try {
+    const resp = await fetch(`${API}/templates/${id}`, { method: 'DELETE' });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error, 'error'); return; }
+    showToast('Template deleted');
+    await loadDesignerData();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function saveManualAsTemplate() {
+  const name = prompt('Template name:');
+  if (!name) return;
+  try {
+    const resp = await fetch(`${API}/templates/from-manual`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description: `Saved from manual entries on ${new Date().toISOString().split('T')[0]}` }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error, 'error'); return; }
+    showToast(`Template "${name}" saved: ${data.nodes} nodes, ${data.edges} edges`);
+    await loadDesignerData();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ── Mode List ───────────────────────────────────────────────────
+
+function renderModeList() {
+  const el = document.getElementById('designer-mode-list');
+  if (!el) return;
+  if (designerModes.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-muted); padding:8px 0;">No modes defined.</div>';
+    return;
+  }
+  el.innerHTML = designerModes.map(m => {
+    const isDefault = m.is_default === 'true';
+    const families = (m.includes?.node_families || []).join(', ');
+    return `
+      <div style="padding:6px 0; border-bottom:1px solid var(--border);">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <span style="color:var(--text); font-weight:500;">${m.name}</span>
+            ${isDefault ? '<span style="font-size:9px; color:var(--text-muted); margin-left:4px;">(default)</span>' : ''}
+            <span style="color:var(--text-dim); font-size:10px; margin-left:6px;">${m.default_view_layout || ''}</span>
+          </div>
+        </div>
+        <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">${m.primary_question || ''}</div>
+        <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">Families: ${families || 'all'}</div>
+      </div>
+    `;
+  }).join('');
 }

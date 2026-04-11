@@ -205,6 +205,85 @@ At the bottom of the chat input:
 
 ---
 
+## Step 5: Design Custom Nodes & Links
+
+The **Designer** lets you add your own nodes and links to the knowledge graph -- things the auto-ingest can't detect (external services, business relationships, architectural decisions).
+
+### Open the Designer
+
+OmniGraph tab --> Services panel --> **Designer** card --> Designer sub-page opens.
+
+### Create a Node
+
+1. Click **"+ New Node"**
+2. Fill in:
+   - **Name**: e.g., "Payment Gateway"
+   - **Unique ID**: auto-generated from name, editable
+   - **Family**: choose from 14 families (System, Element, Data, External, etc.)
+   - **Kind**: filtered by family (e.g., External --> external_api, llm_provider)
+   - **Properties**: add key-value pairs (e.g., provider=Stripe, env=prod)
+3. Click **Create Node**
+
+Your node appears on the Visualization tab with a **dashed border** and **green M badge**.
+
+### Create a Link
+
+1. Click **"+ New Link"**
+2. Fill in:
+   - **Relationship Name**: choose a verb (USES, DEPENDS_ON, READS, etc.)
+   - **From (Source)**: pick any node (auto or manual)
+   - **To (Target)**: pick any node
+   - **Strength**: Hard (confirmed) or Soft (inferred, needs confidence score)
+3. Click **Create Link**
+
+### Design Principles
+
+- **Node** = entity with Family + Kind + Identity + Properties
+- **Link** = directional verb with rules + properties
+- Good link names: USES, OWNS, DEPENDS_ON, GOVERNED_BY
+- Bad link names: RELATED_TO, CONNECTED_TO (too vague)
+
+---
+
+## Step 6: Use Templates
+
+Templates are reusable graph overlays -- a saved set of nodes and links you can apply to any RAG.
+
+- **Default template**: "Universal App Graph Ontology" ships pre-loaded with 14 families, 60+ relationship types, and 4 persona modes. Cannot be deleted.
+- **Apply**: copies template nodes/links into your manual graph
+- **Unapply**: removes the copied entries
+- **Save Manual As Template**: saves your current manual nodes/links as a new reusable template
+- **Duplicate**: creates a copy you can customize
+
+---
+
+## Step 7: Switch Persona Modes
+
+Modes are filtered views of the same graph. Each mode shows only the node families and relationship types relevant to a specific persona.
+
+### Available Modes (Visualization toolbar)
+
+| Mode | Persona | Shows | Layout |
+|------|---------|-------|--------|
+| **All** | Everyone | Everything, no filter | Force |
+| **Coder** | Developer | Artifact, Element, Interface, External (lib/sdk) | Hierarchical |
+| **User** | End-user, QA | System, Interface (ui), Element (page/handler), Data | Force |
+| **Architect** | Tech lead | System, Element (service/module), Data, Runtime, Control, Risk | Circular |
+| **Diagnosis** | SRE, on-call | Element (service), Interface (errors), Evidence, Incident, Risk | Force |
+
+### How to Switch
+
+Click any mode button in the Visualization toolbar. The graph reloads with only the relevant nodes. A **mode legend** appears in the bottom-left showing what's visible and what's hidden.
+
+### Emphasis Rules
+
+Each mode applies visual emphasis:
+- **Collapse**: irrelevant node families shrink to tiny dots
+- **Dim**: low-priority nodes fade to 30% opacity
+- **Highlight**: important nodes get a glow
+
+---
+
 ## Tips
 
 1. **First time?** Start with Chat and type `"create a RAG"` to auto-ingest

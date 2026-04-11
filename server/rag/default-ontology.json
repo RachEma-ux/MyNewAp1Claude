@@ -1,0 +1,52 @@
+{
+  "name": "Universal App Graph Ontology",
+  "version": "2.1",
+  "description": "Universal ontology for visualizing any software system across its entire lifecycle",
+  "purpose": "Support code, runtime, infra, data, governance, docs, evidence, change, risk, config — adapt view to different user personas",
+  "design_principles": ["use_case_first","small_stable_core","directed_typed_edges","provenance_on_everything","overlays_not_schema_explosion","hard_links_vs_soft_links","lazy_expand_for_scale","time_as_first_class","immutable_historical_facts"],
+  "overlays": ["structure","software","interface","data","runtime","deployment","control","docs","observability","evidence","change","risk_security","configuration"],
+  "visualization_rules": ["default to aggregated views","collapse by system/module/service/runtime tier","allow overlay toggles","show confidence badges for inferred edges","allow filters by family/kind/layer/owner/environment/status/time","support mode switching via filtering predicates"],
+  "quality_guards": ["no generic RELATED_TO edges","no symmetric duplicate edges unless semantics differ","every important link must have provenance","every inferred node or edge must have confidence","no deletion of historical facts"],
+  "portability_profiles": ["monolith","modular_monolith","microservices","event_driven","serverless","mobile","desktop","data_platform","ai_platform","hybrid_enterprise_suite"],
+  "maturity_levels": {
+    "level_1_basic": ["nodes have stable ids","edges are typed","provenance exists"],
+    "level_2_overlays": ["at least 5 overlays active","hard vs soft links distinguished"],
+    "level_3_temporal": ["valid_from/until on critical edges","Change nodes captured"],
+    "level_4_risk_config": ["Risk and Incident tracking","Configuration overlay active"],
+    "level_5_predictive": ["historical patterns used for impact prediction"]
+  },
+  "example_queries": [
+    "What changed in the data layer between release v2.3.0 and v2.4.0?",
+    "Which running services are still using the deprecated API endpoint?",
+    "Show me all incidents in the last 30 days that touched the payment service",
+    "Which feature flags are currently routing traffic to the new recommendation engine?",
+    "What would break if we decommission host X at time T?"
+  ],
+  "node_families": {
+    "System": {"description":"top-level system boundary","kinds":["application","service_group","workspace","platform","subsystem"]},
+    "Artifact": {"description":"files and containers of source truth","kinds":["repository","package","directory","file","manifest","config_file","workflow_file","document","schema_file","migration_file"]},
+    "Element": {"description":"semantic software building blocks","kinds":["module","package","service","library_unit","class","interface_type","function","method","component","page","screen","route_host","handler","workflow","workflow_step","job","task","agent","orchestrator","model_adapter"]},
+    "Interface": {"description":"callable or enterable surfaces","kinds":["ui_route","http_endpoint","rpc_method","graphql_field","cli_command","webhook","event_contract","stream_contract","batch_entry"]},
+    "Data": {"description":"data stores, schemas, messages, business records","kinds":["database","schema","table","view","column","collection","document_type","cache","object_store","bucket","topic","queue","event","message_schema","feature_store","vector_index","knowledge_graph"]},
+    "Runtime": {"description":"where software actually runs","kinds":["environment","process","container","pod","vm","host","cluster","region","function_runtime","scheduled_runtime"]},
+    "External": {"description":"third-party or outside dependencies","kinds":["library","sdk","external_api","provider","saas","identity_provider","payment_gateway","llm_provider"]},
+    "Control": {"description":"permissions, policy, governance, testing, checks, lifecycle, SLOs","kinds":["permission","role","policy","rule","gate","lifecycle_stage","test","check","monitor","alert","approval","slo","sli","budget","quota"]},
+    "Evidence": {"description":"proof and telemetry","kinds":["audit_event","log","trace","metric","report","ci_artifact","issue","pull_request","run_result","incident","outage","post_mortem"]},
+    "Change": {"description":"system evolution over time","kinds":["release","deployment","migration","rollback","refactor","version_upgrade","config_change","schema_migration"]},
+    "Configuration": {"description":"runtime and build-time knobs","kinds":["feature_flag","environment_variable","property","secret_ref","dynamic_route_rule","scaling_policy","retry_policy","timeout_setting","rate_limit","circuit_breaker"]},
+    "Constraint": {"description":"non-functional boundaries","kinds":["rate_limit","timeout","quota","size_limit","latency_budget","availability_target","rpo","rto"]},
+    "Risk": {"description":"threats, vulnerabilities, mitigations","kinds":["vulnerability","threat","compliance_requirement","risk_register_entry","security_finding","audit_finding"]},
+    "Incident": {"description":"past or ongoing failures","kinds":["outage","performance_degradation","data_corruption","security_breach","false_positive_alert"]}
+  },
+  "relationship_types": {
+    "structural": ["CONTAINS","PART_OF","DECLARES","DEFINES","EXPORTS"],
+    "dependency": ["IMPORTS","USES","DEPENDS_ON","EXTENDS","IMPLEMENTS","COMPOSES","MIGRATED_FROM","REPLACES","DEPRECATES","SUPERSEDED_BY"],
+    "interface_flow": ["EXPOSES","ROUTES_TO","HANDLES","INVOKES","CALLS","TRIGGERS","ROUTES_CONDITIONALLY"],
+    "data_flow": ["READS","WRITES","UPDATES","DELETES","EMITS","CONSUMES","TRANSFORMS","PERSISTS_TO"],
+    "runtime_flow": ["RUNS_IN","DEPLOYS_TO","HOSTED_ON","SCALES_WITH","CONNECTS_TO","DEPLOYED_AT","ROLLED_BACK_FROM"],
+    "control_flow": ["REQUIRES","PROTECTED_BY","VALIDATED_BY","CHECKED_BY","TESTED_BY","BLOCKED_BY","APPROVED_BY","OBSERVED_BY","GOVERNED_BY_SLO","LIMITED_BY"],
+    "traceability": ["DOCUMENTED_BY","OWNED_BY","GENERATES","EVIDENCED_BY","RELATES_TO_DECISION","INTRODUCED_IN","REMOVED_IN"],
+    "risk_incident": ["VULNERABLE_TO","MITIGATED_BY","EXPLOITED_IN","CAUSED_INCIDENT","AFFECTED_BY_INCIDENT","REMEDIATED_BY"],
+    "configuration": ["CONFIGURED_BY","OVERRIDES","OVERRIDDEN_BY","CONDITIONALLY_ENABLED_BY"]
+  }
+}

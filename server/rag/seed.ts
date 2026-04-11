@@ -122,9 +122,183 @@ export async function seedRagDb() {
       CREATE INDEX IF NOT EXISTS idx_kgra_me_category ON kgra_manual_edges(relationship_category);
     `);
 
-    console.log("[RAGDB Seed] Tables created/verified (5 tables)");
+    // ── Templates ────────────────────────────────────────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kgra_templates (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        version VARCHAR(20),
+        description TEXT,
+        purpose TEXT,
+        is_default VARCHAR(5) NOT NULL DEFAULT 'false',
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        design_principles JSONB,
+        overlays JSONB,
+        visualization_rules JSONB,
+        quality_guards JSONB,
+        portability_profiles JSONB,
+        maturity_levels JSONB,
+        example_queries JSONB,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kgra_template_nodes (
+        id SERIAL PRIMARY KEY,
+        template_id INTEGER NOT NULL,
+        unique_id VARCHAR(255),
+        name TEXT NOT NULL,
+        short_name VARCHAR(500),
+        family VARCHAR(50) NOT NULL,
+        kind VARCHAR(50) NOT NULL,
+        description TEXT,
+        properties JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_kgra_tn_template ON kgra_template_nodes(template_id);
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kgra_template_edges (
+        id SERIAL PRIMARY KEY,
+        template_id INTEGER NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        source_node_id INTEGER NOT NULL,
+        target_node_id INTEGER NOT NULL,
+        relationship_type VARCHAR(50) NOT NULL,
+        relationship_category VARCHAR(30),
+        weight INTEGER NOT NULL DEFAULT 1,
+        link_strength VARCHAR(10) NOT NULL DEFAULT 'hard',
+        description TEXT,
+        properties JSONB DEFAULT '{}',
+        rules JSONB,
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_kgra_te_template ON kgra_template_edges(template_id);
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kgra_applied_templates (
+        id SERIAL PRIMARY KEY,
+        template_id INTEGER NOT NULL,
+        applied_at TIMESTAMP DEFAULT now() NOT NULL,
+        applied_by VARCHAR(100),
+        status VARCHAR(20) NOT NULL DEFAULT 'active'
+      );
+    `);
+
+    // ── Modes ───────────────────────────────────────────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kgra_modes (
+        id SERIAL PRIMARY KEY,
+        template_id INTEGER,
+        mode_id VARCHAR(50) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        persona VARCHAR(255),
+        primary_question TEXT,
+        includes JSONB NOT NULL,
+        emphasis_rules JSONB,
+        default_view_layout VARCHAR(30),
+        example_use_case TEXT,
+        is_default VARCHAR(5) NOT NULL DEFAULT 'false',
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_kgra_modes_template ON kgra_modes(template_id);
+      CREATE INDEX IF NOT EXISTS idx_kgra_modes_mode_id ON kgra_modes(mode_id);
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kgra_mode_compositions (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        mode_ids JSONB NOT NULL,
+        merge_strategy VARCHAR(30) NOT NULL DEFAULT 'union',
+        conflict_resolution VARCHAR(50),
+        zoom_level VARCHAR(30),
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+    `);
+
+    console.log("[RAGDB Seed] Tables created/verified (11 tables)");
+
+    // ── Seed default ontology template + modes ──────────────────
+    await seedDefaultOntology(db);
+
   } catch (error: any) {
     console.warn(`[RAGDB Seed] Failed: ${error.message}`);
+  }
+}
+
+async function seedDefaultOntology(db: any) {
+  // Check if default template already exists
+  const existing = ((await db.execute(sql`SELECT id FROM kgra_templates WHERE is_default = 'true' LIMIT 1`)) as any).rows;
+  if (existing?.length > 0) {
+    console.log("[RAGDB] Default ontology already seeded — skipping");
+    return;
+  }
+
+  try {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+
+    // Read ontology JSON
+    const ontologyPath = join(process.cwd(), "server/rag/default-ontology.json");
+    const ontology = JSON.parse(readFileSync(ontologyPath, "utf-8"));
+
+    // Insert template
+    const result = ((await db.execute(sql`
+      INSERT INTO kgra_templates (name, version, description, purpose, is_default, design_principles, overlays, visualization_rules, quality_guards, portability_profiles, maturity_levels, example_queries)
+      VALUES (
+        ${ontology.name}, ${ontology.version}, ${ontology.description}, ${ontology.purpose}, 'true',
+        ${JSON.stringify(ontology.design_principles)}::jsonb,
+        ${JSON.stringify(ontology.overlays)}::jsonb,
+        ${JSON.stringify(ontology.visualization_rules)}::jsonb,
+        ${JSON.stringify(ontology.quality_guards)}::jsonb,
+        ${JSON.stringify(ontology.portability_profiles)}::jsonb,
+        ${JSON.stringify(ontology.maturity_levels)}::jsonb,
+        ${JSON.stringify(ontology.example_queries)}::jsonb
+      ) RETURNING id
+    `)) as any).rows?.[0];
+    const templateId = result?.id;
+
+    if (!templateId) {
+      console.warn("[RAGDB] Failed to insert default template");
+      return;
+    }
+
+    // Read modes JSON
+    const modesPath = join(process.cwd(), "server/rag/default-modes.json");
+    const modesData = JSON.parse(readFileSync(modesPath, "utf-8"));
+
+    // Insert 4 default modes
+    for (const mode of modesData.modes || []) {
+      await db.execute(sql`
+        INSERT INTO kgra_modes (template_id, mode_id, name, persona, primary_question, includes, emphasis_rules, default_view_layout, example_use_case, is_default, sort_order)
+        VALUES (
+          ${templateId}, ${mode.mode_id}, ${mode.name}, ${mode.persona}, ${mode.primary_question},
+          ${JSON.stringify(mode.includes)}::jsonb, ${JSON.stringify(mode.emphasis_rules)}::jsonb,
+          ${mode.default_view_layout}, ${mode.example_use_case}, 'true', ${mode.sort_order || 0}
+        )
+      `);
+    }
+
+    // Insert 2 default compositions
+    for (const comp of modesData.compositions || []) {
+      await db.execute(sql`
+        INSERT INTO kgra_mode_compositions (name, mode_ids, merge_strategy, conflict_resolution, zoom_level)
+        VALUES (${comp.name}, ${JSON.stringify(comp.mode_ids)}::jsonb, ${comp.merge_strategy}, ${comp.conflict_resolution}, ${comp.zoom_level})
+      `);
+    }
+
+    console.log(`[RAGDB] Default ontology seeded: template id=${templateId}, ${modesData.modes?.length || 0} modes, ${modesData.compositions?.length || 0} compositions`);
+  } catch (err: any) {
+    console.warn(`[RAGDB] Default ontology seed failed: ${err.message}`);
   }
 }
 

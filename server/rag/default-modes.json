@@ -1,0 +1,93 @@
+{
+  "modes": [
+    {
+      "mode_id": "coder_mode",
+      "name": "Coder",
+      "persona": "Developer writing or reviewing code",
+      "primary_question": "Which files, functions, and classes depend on this one? What implements this interface?",
+      "includes": {
+        "node_families": ["Artifact","Element","Interface","External"],
+        "node_kinds": {"External":["library","sdk"]},
+        "relationship_types": ["CONTAINS","DECLARES","DEFINES","IMPORTS","CALLS","INVOKES","IMPLEMENTS","EXTENDS","EXPOSES"],
+        "overlays": ["structure","software","interface"]
+      },
+      "emphasis_rules": [
+        {"type":"highlight","condition":"callers_callees_of_selected"},
+        {"type":"collapse","families":["Data","Runtime","Control","Evidence","Change","Configuration","Constraint","Risk","Incident"]},
+        {"type":"color_by","field":"language"},
+        {"type":"badge","field":"test_coverage","source":"Evidence"}
+      ],
+      "default_view_layout": "hierarchical",
+      "example_use_case": "Find all usages of a deprecated function across the codebase.",
+      "sort_order": 1
+    },
+    {
+      "mode_id": "user_mode",
+      "name": "User",
+      "persona": "End-user, QA, product owner testing workflows",
+      "primary_question": "What happens when I click this button? Which APIs are called? Where is my data stored?",
+      "includes": {
+        "node_families": ["System","Interface","Element","Data"],
+        "node_kinds": {"Interface":["ui_route","http_endpoint","graphql_field","cli_command"],"Element":["page","screen","handler","service"],"Data":["database","table","cache","topic"]},
+        "relationship_types": ["EXPOSES","ROUTES_TO","HANDLES","CALLS","READS","WRITES","EMITS"],
+        "overlays": ["interface","data","runtime"]
+      },
+      "emphasis_rules": [
+        {"type":"highlight","condition":"ui_routes_as_entry_points"},
+        {"type":"collapse","families":["Artifact","Control","Evidence","Change","Configuration","Constraint","Risk","Incident"]},
+        {"type":"badge","field":"auth_requirement","source":"Control"}
+      ],
+      "default_view_layout": "force",
+      "example_use_case": "Trace a user's registration flow from sign-up click to database insert.",
+      "sort_order": 2
+    },
+    {
+      "mode_id": "architect_mode",
+      "name": "Architect",
+      "persona": "System architect, tech lead",
+      "primary_question": "What are the major components, how do they communicate, and where are the risks/constraints?",
+      "includes": {
+        "node_families": ["System","Element","Interface","Data","Runtime","External","Control","Constraint","Risk"],
+        "node_kinds": {"Element":["service","module","component","agent","orchestrator"],"Interface":["http_endpoint","event_contract"]},
+        "relationship_types": ["PART_OF","DEPENDS_ON","CALLS","EMITS","CONSUMES","READS","WRITES","RUNS_IN","DEPLOYS_TO","PROTECTED_BY","GOVERNED_BY_SLO","LIMITED_BY","VULNERABLE_TO"],
+        "overlays": ["structure","data","runtime","deployment","control","risk_security"]
+      },
+      "emphasis_rules": [
+        {"type":"collapse","families":["Artifact"]},
+        {"type":"highlight","condition":"constraints_and_risks"},
+        {"type":"dim","condition":"soft_links"},
+        {"type":"badge","field":"slo_status","source":"Control"}
+      ],
+      "default_view_layout": "circular",
+      "example_use_case": "Which services have a circular dependency? What are the SLOs and data retention policies?",
+      "sort_order": 3
+    },
+    {
+      "mode_id": "diagnosis_mode",
+      "name": "Diagnosis",
+      "persona": "On-call engineer, SRE, troubleshooter",
+      "primary_question": "What is broken, degraded, or risky? Which nodes/edges are causing the problem, and what depends on them?",
+      "includes": {
+        "node_families": ["Element","Interface","Data","Runtime","Control","Evidence","Incident","Risk","Configuration"],
+        "node_kinds": {"Element":["service","handler","workflow"],"Interface":["http_endpoint","rpc_method"],"Data":["database","cache","topic"],"Runtime":["environment","container","pod"],"Control":["alert","monitor","gate"],"Evidence":["incident","outage","metric","log","trace"],"Risk":["vulnerability","security_finding"],"Configuration":["feature_flag","circuit_breaker"]},
+        "relationship_types": ["CAUSED_INCIDENT","AFFECTED_BY_INCIDENT","DEPENDS_ON","CALLS","READS","WRITES","BLOCKED_BY","CHECKED_BY","OBSERVED_BY","REMEDIATED_BY"],
+        "overlays": ["observability","evidence","risk_security","configuration"]
+      },
+      "emphasis_rules": [
+        {"type":"highlight","condition":"active_incidents","color":"#ef4444"},
+        {"type":"highlight","condition":"recent_errors","color":"#f97316"},
+        {"type":"highlight","condition":"high_latency","color":"#f59e0b"},
+        {"type":"dim","condition":"healthy_not_critical_path"},
+        {"type":"expand","hops":3,"from":"failing_node"},
+        {"type":"badge","field":"incident_severity","source":"Evidence"}
+      ],
+      "default_view_layout": "force",
+      "example_use_case": "Given a 500 error spike on API gateway, show all downstream services, recent deploys, and feature flags that changed.",
+      "sort_order": 4
+    }
+  ],
+  "compositions": [
+    {"name":"coder+diagnosis","mode_ids":["coder_mode","diagnosis_mode"],"merge_strategy":"union","conflict_resolution":"diagnosis","zoom_level":"file"},
+    {"name":"architect+diagnosis","mode_ids":["architect_mode","diagnosis_mode"],"merge_strategy":"union","conflict_resolution":"diagnosis","zoom_level":"service"}
+  ]
+}

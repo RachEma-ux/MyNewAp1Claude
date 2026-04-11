@@ -13,6 +13,9 @@ let chatMessages = [];
 let healthData = null;
 let lastIngestResultHTML = null; // persist auto-ingest result across tab switches
 let hubCount = 10; // default hub count for visualization
+let activeMode = 'all'; // active persona mode for visualization
+let activeModeData = null; // full mode object from API
+let emphasisState = { highlight: new Set(), collapse: new Set(), dim: new Set(), badges: new Map() };
 
 // ─── Colors for pipeline avatars ───
 const COLORS = ['#6b1f4a','#1a5f4a','#3b2f80','#7c4a1e','#1a4a6b','#6b1a2f','#2f6b1a','#4a1a6b'];
@@ -1080,6 +1083,13 @@ function renderGraphTab() {
           <span id="hub-count-display" style="font-size:11px; color:var(--text); min-width:18px; text-align:center;">${hubCount}</span>
         </div>
         <button class="btn btn-primary" onclick="loadDemo()" style="font-size:11px; padding:4px 10px;">Demo</button>
+        <div style="display:flex; gap:2px; border:1px solid var(--border); border-radius:4px; padding:1px;">
+          <button class="btn ${activeMode === 'all' ? 'btn-primary' : ''}" id="mode-all" onclick="setMode('all')" style="font-size:10px; padding:2px 6px; border-radius:3px;">All</button>
+          <button class="btn ${activeMode === 'coder_mode' ? 'btn-primary' : ''}" id="mode-coder" onclick="setMode('coder_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">Coder</button>
+          <button class="btn ${activeMode === 'user_mode' ? 'btn-primary' : ''}" id="mode-user" onclick="setMode('user_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">User</button>
+          <button class="btn ${activeMode === 'architect_mode' ? 'btn-primary' : ''}" id="mode-architect" onclick="setMode('architect_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">Architect</button>
+          <button class="btn ${activeMode === 'diagnosis_mode' ? 'btn-primary' : ''}" id="mode-diagnosis" onclick="setMode('diagnosis_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">Diagnosis</button>
+        </div>
         <button class="btn" id="filter-toggle-btn" onclick="toggleFilterPanel()" style="font-size:11px; padding:4px 10px;">☰ Filter</button>
         <select id="layout-select" onchange="switchLayout(this.value)" class="input" style="width:auto; font-size:11px; padding:4px 6px;">
           <option value="force">Force</option>
@@ -1134,6 +1144,8 @@ function renderGraphTab() {
           <div id="node-detail" style="display:none; position:absolute; bottom:8px; left:8px; right:8px; background:rgba(13,13,13,0.95); border:1px solid var(--border); border-radius:8px; padding:10px; font-size:11px; max-height:40%; overflow-y:auto;"></div>
           <!-- Path info -->
           <div id="path-info" style="display:none; position:absolute; top:8px; left:8px; background:rgba(99,102,241,0.15); border:1px solid #6366f1; border-radius:6px; padding:6px 10px; font-size:11px; color:var(--text);"></div>
+          <!-- Mode Legend -->
+          <div id="mode-legend" style="display:none; position:absolute; bottom:8px; left:8px; background:rgba(13,13,13,0.92); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:10px; color:var(--text-dim); max-width:220px;"></div>
           <!-- Stats -->
           <div id="graph-canvas-stats" style="position:absolute; bottom:8px; right:8px; font-size:9px; color:#444;"></div>
         </div>
@@ -1384,11 +1396,26 @@ function drawGraph() {
 
   // Nodes
   for (const n of visibleNodes) {
+    // Emphasis: collapsed nodes render as tiny stubs
+    if (emphasisState.collapse.has(n.id)) {
+      const p = toScreen(n.x, n.y);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2 * scale, 0, Math.PI * 2);
+      ctx.fillStyle = '#333';
+      ctx.fill();
+      continue;
+    }
+
     const p = toScreen(n.x, n.y);
     const r = (n.radius || 14) * scale;
     const isSelected = selected && selected.id === n.id;
     const isPath = pathNodes.has(n.id);
     const color = getNodeColor(n);
+
+    // Emphasis: dimmed nodes
+    if (emphasisState.dim.has(n.id)) {
+      ctx.globalAlpha = 0.3;
+    }
 
     // Path glow
     if (isPath) {
@@ -1460,6 +1487,8 @@ function drawGraph() {
       ctx.textAlign = 'center';
       ctx.fillText(n.label, p.x, p.y + r + 11 * scale);
     }
+
+    ctx.globalAlpha = 1.0; // reset after each node
   }
 
   // Stats
@@ -1507,6 +1536,42 @@ function runForceLayout(iterations = 100) {
   drawGraph();
 }
 
+function setMode(mode) {
+  activeMode = mode;
+  document.querySelectorAll('[id^="mode-"]').forEach(b => b.classList.remove('btn-primary'));
+  const btnId = mode === 'all' ? 'mode-all' : 'mode-' + mode.replace('_mode', '');
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.add('btn-primary');
+  // Fetch mode data for emphasis rules
+  if (mode !== 'all') {
+    fetch(`${API}/modes`).then(r => r.json()).then(modes => {
+      activeModeData = modes.find(m => m.mode_id === mode) || null;
+      loadGraphData();
+    }).catch(() => { activeModeData = null; loadGraphData(); });
+  } else {
+    activeModeData = null;
+    emphasisState = { highlight: new Set(), collapse: new Set(), dim: new Set(), badges: new Map() };
+    loadGraphData();
+  }
+}
+
+function computeEmphasis(modeData, nodes) {
+  emphasisState = { highlight: new Set(), collapse: new Set(), dim: new Set(), badges: new Map() };
+  if (!modeData || !modeData.emphasis_rules) return;
+  for (const rule of modeData.emphasis_rules) {
+    if (rule.type === 'collapse' && rule.families) {
+      for (const n of nodes) {
+        if (rule.families.includes(n.community)) emphasisState.collapse.add(n.id);
+      }
+    }
+    if (rule.type === 'dim' && rule.condition === 'healthy_not_critical_path') {
+      for (const n of nodes) {
+        if (!emphasisState.highlight.has(n.id)) emphasisState.dim.add(n.id);
+      }
+    }
+  }
+}
+
 function updateHubCount(value) {
   hubCount = parseInt(value) || 10;
   const display = document.getElementById('hub-count-display');
@@ -1519,8 +1584,9 @@ async function loadGraphData() {
   const stats = document.getElementById('graph-canvas-stats');
   if (stats) stats.textContent = 'Loading graph data...';
   try {
-    // Server does hub+neighbor filtering — just pass hub_count
-    const entities = await fetch(`${API}/v1/analytics/entities?hub_count=${hubCount}`).then(r => r.json()).catch(() => []);
+    // Server does hub+neighbor filtering — pass hub_count + mode
+    const modeParam = activeMode !== 'all' ? `&mode=${activeMode}` : '';
+    const entities = await fetch(`${API}/v1/analytics/entities?hub_count=${hubCount}${modeParam}`).then(r => r.json()).catch(() => []);
     const rels = await fetch(`${API}/v1/analytics/relationships`).then(r => r.json()).catch(() => []);
 
     const nodeIdSet = new Set(entities.map(e => e.id));
@@ -1549,12 +1615,38 @@ async function loadGraphData() {
 
     graphViz._nodeMap = new Map(graphViz.nodes.map(n => [n.id, n]));
 
+    const modeLabel = activeMode !== 'all' ? ` · ${activeMode.replace('_mode','')}` : '';
     if (stats) {
-      stats.textContent = `${graphViz.nodes.length} nodes · ${graphViz.edges.length} edges (top ${hubCount} hubs)`;
+      stats.textContent = `${graphViz.nodes.length} nodes · ${graphViz.edges.length} edges (${hubCount} hubs${modeLabel})`;
+    }
+
+    // Compute emphasis from active mode
+    computeEmphasis(activeModeData, graphViz.nodes);
+
+    // Update mode legend
+    const legendEl = document.getElementById('mode-legend');
+    if (legendEl) {
+      if (activeModeData) {
+        const families = (activeModeData.includes?.node_families || []).join(', ');
+        legendEl.style.display = 'block';
+        legendEl.innerHTML = `
+          <div style="font-weight:600; color:var(--text); margin-bottom:3px;">Mode: ${activeModeData.name}</div>
+          <div style="margin-bottom:2px;">Showing: ${families || 'all'}</div>
+          <div style="margin-bottom:2px;">Layout: ${activeModeData.default_view_layout || 'force'}</div>
+          <div style="font-size:9px; color:var(--text-muted);">${activeModeData.primary_question || ''}</div>
+        `;
+      } else {
+        legendEl.style.display = 'none';
+      }
     }
 
     buildFilterUI();
     if (graphViz.nodes.length > 0) {
+      // Switch layout if mode specifies one
+      if (activeModeData && activeModeData.default_view_layout) {
+        const layoutSel = document.getElementById('layout-select');
+        if (layoutSel) layoutSel.value = activeModeData.default_view_layout;
+      }
       runForceLayoutAnimated();
     } else {
       drawGraph();

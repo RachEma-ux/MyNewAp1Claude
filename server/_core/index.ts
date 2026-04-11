@@ -673,6 +673,16 @@ async function startServer() {
 
       const hubCount = Math.min(50, Math.max(5, parseInt(req.query.hub_count as string) || 10));
       const maxNodes = 300;
+      const modeId = req.query.mode as string;
+
+      // Load mode filter if specified
+      let modeFilter: { node_families?: string[]; node_kinds?: Record<string, string[]>; relationship_types?: string[] } | null = null;
+      if (modeId) {
+        const modeRow = ((await ragDb.execute(sql`SELECT includes FROM kgra_modes WHERE mode_id = ${modeId} LIMIT 1`)) as any).rows?.[0];
+        if (modeRow?.includes) {
+          modeFilter = typeof modeRow.includes === "string" ? JSON.parse(modeRow.includes) : modeRow.includes;
+        }
+      }
 
       // Get all entities with connection degree (in+out)
       const allEntities = ((await ragDb.execute(sql`
@@ -717,13 +727,28 @@ async function startServer() {
         finalIds = visibleIds;
       }
 
-      const result = allEntities
+      // Map auto entity types to ontology families for mode filtering
+      const typeToFamily: Record<string, string> = {
+        page: "Element", component: "Element", hook: "Element", function: "Element",
+        server: "Element", service: "Element", lib: "Element", router: "Element",
+        file: "Artifact", schema: "Data", db_table: "Data", module: "Artifact",
+        route: "Interface", trpc_router: "Interface",
+      };
+
+      let result = allEntities
         .filter((e: any) => finalIds.has(e.id))
         .map((e: any) => ({
           id: e.name, name: e.short_name || e.name.split("/").pop() || e.name,
           type: (e.entity_type || "entity").toUpperCase(), connections: Number(e.connections) || e.mentions || 1,
           community: e.entity_type || "default", source: "auto",
+          _family: typeToFamily[e.entity_type] || "Artifact",
         }));
+
+      // Apply mode family filter
+      if (modeFilter?.node_families) {
+        const allowedFamilies = new Set(modeFilter.node_families);
+        result = result.filter((e: any) => allowedFamilies.has(e._family));
+      }
 
       // UNION: add active manual nodes
       const manualNodes = ((await ragDb.execute(sql`
