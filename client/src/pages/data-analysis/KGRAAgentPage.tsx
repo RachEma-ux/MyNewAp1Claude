@@ -32,10 +32,17 @@ export default function KGRAAgentPage() {
 
         // Load app.js — NOT async, so functions are available when tabs are clicked
         const existing = document.querySelector('script[src="/kgra-ui/app.js"]');
-        if (existing) existing.remove(); // remove stale copy from previous navigation
+        if (existing) existing.remove();
         const script = document.createElement("script");
         script.src = "/kgra-ui/app.js";
         document.body.appendChild(script);
+
+        // Load designer.js after app.js (depends on shared globals like API, showToast)
+        const existingDesigner = document.querySelector('script[src="/kgra-ui/designer.js"]');
+        if (existingDesigner) existingDesigner.remove();
+        const designerScript = document.createElement("script");
+        designerScript.src = "/kgra-ui/designer.js";
+        document.body.appendChild(designerScript);
       })
       .catch((err) => {
         container.innerHTML = `<div style="padding:2rem;color:#f87171;">Failed to load KGRA Agent UI: ${err.message}</div>`;
