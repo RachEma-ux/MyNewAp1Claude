@@ -442,5 +442,41 @@ td code { word-break: break-all; white-space: normal; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 3px; }
 
+/* ─── Designer ─────────────────────────────────────────── */
+
+.designer-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  display: block;
+  margin-bottom: 3px;
+}
+
+.designer-section {
+  margin-bottom: 12px;
+}
+
+.ctx-menu-item:hover {
+  background: var(--bg-hover, #2a2a4a);
+}
+
+.mode-btn-bar {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px;
+}
+
+.mode-btn-bar .btn {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* Responsive: stack Designer columns on mobile */
+@media (max-width: 600px) {
+  .designer-columns { flex-direction: column !important; }
+}
+
 @media (hover: none) and (pointer: coarse) { input, select, textarea { font-size: 16px !important; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; } }

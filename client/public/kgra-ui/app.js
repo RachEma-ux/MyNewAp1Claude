@@ -1089,6 +1089,9 @@ function renderGraphTab() {
           <button class="btn ${activeMode === 'user_mode' ? 'btn-primary' : ''}" id="mode-user" onclick="setMode('user_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">User</button>
           <button class="btn ${activeMode === 'architect_mode' ? 'btn-primary' : ''}" id="mode-architect" onclick="setMode('architect_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">Architect</button>
           <button class="btn ${activeMode === 'diagnosis_mode' ? 'btn-primary' : ''}" id="mode-diagnosis" onclick="setMode('diagnosis_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">Diagnosis</button>
+          <select id="mode-compose-select" onchange="if(this.value)setComposedMode(this.value)" class="input" style="width:auto; font-size:10px; padding:2px 4px;">
+            <option value="">Compose...</option>
+          </select>
         </div>
         <button class="btn" id="filter-toggle-btn" onclick="toggleFilterPanel()" style="font-size:11px; padding:4px 10px;">☰ Filter</button>
         <select id="layout-select" onchange="switchLayout(this.value)" class="input" style="width:auto; font-size:11px; padding:4px 6px;">
@@ -1154,6 +1157,7 @@ function renderGraphTab() {
   `;
   initGraphCanvas();
   loadGraphData();
+  loadCompositions();
 }
 
 // ─── Knowledge Graph Visualization (V1–V8 Full Engine) ───
@@ -1215,6 +1219,77 @@ function initGraphCanvas() {
   canvas.addEventListener('touchmove', graphTouchMove, {passive:false});
   canvas.addEventListener('touchend', graphTouchEnd);
   canvas.addEventListener('dblclick', graphDblClick);
+  canvas.addEventListener('contextmenu', graphContextMenu);
+}
+
+// ─── Context Menu (right-click on canvas) ───
+
+function graphContextMenu(e) {
+  e.preventDefault();
+  const rect = graphViz.canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const world = toWorld(sx, sy);
+
+  // Find clicked node
+  let clickedNode = null;
+  for (const n of graphViz.nodes) {
+    const dx = n.x - world.x, dy = n.y - world.y;
+    if (Math.sqrt(dx*dx + dy*dy) < (n.radius || 14)) { clickedNode = n; break; }
+  }
+
+  // Remove existing context menu
+  const existing = document.getElementById('graph-ctx-menu');
+  if (existing) existing.remove();
+
+  if (!clickedNode) return;
+
+  const isManual = clickedNode.source === 'manual';
+  const isTemplate = clickedNode.source === 'template';
+  const isEditable = isManual || isTemplate;
+
+  const menu = document.createElement('div');
+  menu.id = 'graph-ctx-menu';
+  menu.className = 'graph-context-menu';
+  menu.style.cssText = `position:fixed; left:${e.clientX}px; top:${e.clientY}px; background:var(--bg-elevated, #1a1a2e); border:1px solid var(--border); border-radius:6px; padding:4px 0; min-width:140px; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,0.4);`;
+
+  const items = [
+    { label: `${clickedNode.label}`, disabled: true, style: 'font-weight:600; color:var(--text); padding:4px 12px; font-size:11px; border-bottom:1px solid var(--border);' },
+    { label: `Type: ${clickedNode.type}`, disabled: true, style: 'color:var(--text-dim); padding:2px 12px; font-size:10px;' },
+    { label: `Source: ${clickedNode.source || 'auto'}`, disabled: true, style: 'color:var(--text-dim); padding:2px 12px; font-size:10px; border-bottom:1px solid var(--border);' },
+    { label: `Connections: ${clickedNode.connections || 0}`, disabled: true, style: 'color:var(--text-dim); padding:2px 12px; font-size:10px;' },
+  ];
+
+  if (isEditable) {
+    const manualId = clickedNode.id.replace('manual_', '');
+    items.push(
+      { label: '---', separator: true },
+      { label: '✎ Edit', onclick: () => { menu.remove(); showEditNodeForm(parseInt(manualId)); switchMainTab('graphrag'); } },
+      { label: '📦 Archive', onclick: () => { menu.remove(); archiveNode(parseInt(manualId)); } },
+      { label: '🗑 Delete', onclick: () => { menu.remove(); deleteNode(parseInt(manualId)); }, style: 'color:#ef4444;' },
+    );
+  }
+
+  menu.innerHTML = items.map(item => {
+    if (item.separator) return '<div style="border-top:1px solid var(--border); margin:2px 0;"></div>';
+    if (item.disabled) return `<div style="${item.style || 'padding:4px 12px; font-size:11px; color:var(--text-dim);'}">${item.label}</div>`;
+    return `<div class="ctx-menu-item" style="padding:4px 12px; font-size:11px; cursor:pointer; color:var(--text); ${item.style || ''}">${item.label}</div>`;
+  }).join('');
+
+  document.body.appendChild(menu);
+
+  // Wire up click handlers
+  const clickables = menu.querySelectorAll('.ctx-menu-item');
+  const editableItems = items.filter(i => i.onclick);
+  clickables.forEach((el, i) => {
+    if (editableItems[i]) el.addEventListener('click', editableItems[i].onclick);
+    el.addEventListener('mouseenter', () => { el.style.background = 'var(--bg-hover, #2a2a4a)'; });
+    el.addEventListener('mouseleave', () => { el.style.background = 'none'; });
+  });
+
+  // Close on click outside
+  const closeHandler = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', closeHandler); } };
+  setTimeout(() => document.addEventListener('click', closeHandler), 10);
 }
 
 function toScreen(x, y) {
@@ -1317,6 +1392,8 @@ function graphDblClick(e) {
 function selectNode(node) {
   if (graphViz.pathMode) { handlePathClick(node); return; }
   graphViz.selected = node;
+  // Re-compute emphasis for callers/callees highlight
+  if (activeModeData) { computeEmphasis(activeModeData, graphViz.nodes); drawGraph(); }
   const detail = document.getElementById('node-detail');
   if (!detail) return;
   const neighbors = graphViz.edges.filter(e => e.source === node.id || e.target === node.id);
@@ -1480,6 +1557,19 @@ function drawGraph() {
       ctx.fillText(comments, p.x + r * 0.7, p.y - r * 0.7 + 3 * scale);
     }
 
+    // Emphasis badge (connection count or other data)
+    const emBadge = emphasisState.badges.get(n.id);
+    if (emBadge && scale > 0.4) {
+      ctx.fillStyle = '#06b6d4';
+      ctx.beginPath();
+      ctx.arc(p.x - r * 0.7, p.y - r * 0.7, 7 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.font = `bold ${Math.max(5, 6 * scale)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(emBadge > 99 ? '99+' : emBadge, p.x - r * 0.7, p.y - r * 0.7 + 2.5 * scale);
+    }
+
     // Label
     if (scale > 0.4) {
       ctx.fillStyle = '#d0d0d0';
@@ -1542,6 +1632,9 @@ function setMode(mode) {
   const btnId = mode === 'all' ? 'mode-all' : 'mode-' + mode.replace('_mode', '');
   const btn = document.getElementById(btnId);
   if (btn) btn.classList.add('btn-primary');
+  // Reset compose dropdown
+  const compSel = document.getElementById('mode-compose-select');
+  if (compSel) compSel.value = '';
   // Fetch mode data for emphasis rules
   if (mode !== 'all') {
     fetch(`${API}/modes`).then(r => r.json()).then(modes => {
@@ -1555,18 +1648,102 @@ function setMode(mode) {
   }
 }
 
+function setComposedMode(compositionName) {
+  // Composed mode: pass comma-separated mode IDs
+  fetch(`${API}/modes/compositions`).then(r => r.json()).then(comps => {
+    const comp = comps.find(c => c.name === compositionName);
+    if (!comp) return;
+    const modeIds = comp.mode_ids || [];
+    activeMode = modeIds.join(',');
+    // Clear single-mode highlights
+    document.querySelectorAll('[id^="mode-"]').forEach(b => b.classList.remove('btn-primary'));
+    // Merge mode data for emphasis
+    fetch(`${API}/modes`).then(r => r.json()).then(modes => {
+      const matched = modes.filter(m => modeIds.includes(m.mode_id));
+      // Union includes
+      const mergedFamilies = new Set();
+      const mergedRels = new Set();
+      const mergedEmphasis = [];
+      for (const m of matched) {
+        for (const f of m.includes?.node_families || []) mergedFamilies.add(f);
+        for (const r of m.includes?.relationship_types || []) mergedRels.add(r);
+        for (const e of m.emphasis_rules || []) mergedEmphasis.push(e);
+      }
+      activeModeData = {
+        name: compositionName,
+        includes: { node_families: [...mergedFamilies], relationship_types: [...mergedRels] },
+        emphasis_rules: mergedEmphasis,
+        default_view_layout: matched[0]?.default_view_layout || 'force',
+        primary_question: matched.map(m => m.primary_question).filter(Boolean).join(' + '),
+      };
+      loadGraphData();
+    });
+  }).catch(() => {});
+}
+
+// Load composition options into dropdown
+function loadCompositions() {
+  fetch(`${API}/modes/compositions`).then(r => r.json()).then(comps => {
+    const sel = document.getElementById('mode-compose-select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Compose...</option>' +
+      comps.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  }).catch(() => {});
+}
+
 function computeEmphasis(modeData, nodes) {
   emphasisState = { highlight: new Set(), collapse: new Set(), dim: new Set(), badges: new Map() };
   if (!modeData || !modeData.emphasis_rules) return;
+
+  // Build edge map for caller/callee highlighting
+  const callers = new Map(); // target -> [source IDs]
+  const callees = new Map(); // source -> [target IDs]
+  for (const e of graphViz.edges) {
+    if (!callees.has(e.source)) callees.set(e.source, []);
+    callees.get(e.source).push(e.target);
+    if (!callers.has(e.target)) callers.set(e.target, []);
+    callers.get(e.target).push(e.source);
+  }
+
   for (const rule of modeData.emphasis_rules) {
     if (rule.type === 'collapse' && rule.families) {
       for (const n of nodes) {
         if (rule.families.includes(n.community)) emphasisState.collapse.add(n.id);
       }
     }
-    if (rule.type === 'dim' && rule.condition === 'healthy_not_critical_path') {
+    if (rule.type === 'highlight' && rule.condition === 'callers_callees_of_selected') {
+      // Highlight callers and callees of selected node
+      const sel = graphViz.selected;
+      if (sel) {
+        emphasisState.highlight.add(sel.id);
+        for (const id of (callers.get(sel.id) || [])) emphasisState.highlight.add(id);
+        for (const id of (callees.get(sel.id) || [])) emphasisState.highlight.add(id);
+      }
+    }
+    if (rule.type === 'highlight' && rule.condition === 'constraints_and_risks') {
       for (const n of nodes) {
-        if (!emphasisState.highlight.has(n.id)) emphasisState.dim.add(n.id);
+        if (['Constraint', 'Risk', 'Incident'].includes(n.community)) emphasisState.highlight.add(n.id);
+      }
+    }
+    if (rule.type === 'highlight' && (rule.condition === 'active_incidents' || rule.condition === 'recent_errors' || rule.condition === 'high_latency')) {
+      // These would need real incident/error data — for now highlight Incident/Evidence family nodes
+      for (const n of nodes) {
+        if (['Incident', 'Evidence'].includes(n.community)) emphasisState.highlight.add(n.id);
+      }
+    }
+    if (rule.type === 'dim') {
+      if (rule.condition === 'healthy_not_critical_path' || rule.condition === 'soft_links') {
+        for (const n of nodes) {
+          if (!emphasisState.highlight.has(n.id) && !emphasisState.collapse.has(n.id)) {
+            emphasisState.dim.add(n.id);
+          }
+        }
+      }
+    }
+    if (rule.type === 'badge' && rule.field) {
+      // Show connection count as badge for high-connection nodes
+      for (const n of nodes) {
+        if (n.connections >= 10) emphasisState.badges.set(n.id, n.connections);
       }
     }
   }

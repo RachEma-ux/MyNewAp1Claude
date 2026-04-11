@@ -107,6 +107,7 @@ async function showDesigner() {
             <span style="font-size:14px;">👁</span>
             <span class="card-title" style="margin:0;">Modes</span>
           </div>
+          <button class="btn" onclick="showCreateMode()" style="font-size:10px; padding:3px 8px;">+ Custom Mode</button>
         </div>
         <div id="designer-mode-list" style="font-size:12px;">Loading...</div>
       </div>
@@ -746,6 +747,7 @@ function renderTemplateList() {
           ${t.version ? `<span style="color:var(--text-muted); font-size:10px; margin-left:4px;">v${t.version}</span>` : ''}
         </div>
         <div style="display:flex; gap:4px;">
+          <button onclick="showTemplateDetail(${t.id})" class="btn" style="font-size:10px; padding:2px 6px;">View</button>
           <button onclick="applyTemplate(${t.id})" class="btn" style="font-size:10px; padding:2px 6px;">Apply</button>
           <button onclick="duplicateTemplate(${t.id})" class="btn" style="font-size:10px; padding:2px 6px;">Duplicate</button>
           ${!isDefault ? `<button onclick="deleteTemplate(${t.id})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:12px;">🗑</button>` : ''}
@@ -828,10 +830,423 @@ function renderModeList() {
             ${isDefault ? '<span style="font-size:9px; color:var(--text-muted); margin-left:4px;">(default)</span>' : ''}
             <span style="color:var(--text-dim); font-size:10px; margin-left:6px;">${m.default_view_layout || ''}</span>
           </div>
+          <div style="display:flex; gap:4px;">
+            <button onclick="showModeEditor(${m.id})" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:12px;" title="Edit">✎</button>
+            ${!isDefault ? `<button onclick="deleteMode(${m.id})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:12px;" title="Delete">🗑</button>` : ''}
+          </div>
         </div>
         <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">${m.primary_question || ''}</div>
         <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">Families: ${families || 'all'}</div>
       </div>
     `;
   }).join('');
+}
+
+// ── Create Mode Form ────────────────────────────────────────────
+
+function showCreateMode() {
+  const familyCheckboxes = Object.keys(NODE_FAMILIES).map(f =>
+    `<label style="display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-dim);">
+      <input type="checkbox" class="mode-family-cb" value="${f}"> ${f}
+    </label>`
+  ).join('');
+
+  const relCheckboxes = Object.entries(LINK_TYPES).map(([cat, types]) =>
+    `<div style="margin-bottom:4px;">
+      <div style="font-size:10px; font-weight:600; color:var(--text); margin-bottom:2px;">${cat}</div>
+      ${types.map(t => `<label style="display:inline-flex; align-items:center; gap:3px; font-size:10px; color:var(--text-dim); margin-right:6px;">
+        <input type="checkbox" class="mode-rel-cb" value="${t}"> ${t}
+      </label>`).join('')}
+    </div>`
+  ).join('');
+
+  const body = document.getElementById('main-body');
+  body.innerHTML = `
+    <div style="max-width:600px;">
+      <div style="padding:0 0 12px;">
+        <button onclick="showDesigner()" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:none;border:none;color:var(--text-dim);cursor:pointer;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+      </div>
+      <h2 style="font-size:16px; font-weight:600; color:var(--text); margin-bottom:12px;">New Custom Mode</h2>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1;">
+            <label class="designer-label">Mode ID *</label>
+            <input class="input" id="mode-id" placeholder="e.g. security_mode" />
+          </div>
+          <div style="flex:1;">
+            <label class="designer-label">Name *</label>
+            <input class="input" id="mode-name" placeholder="e.g. Security" />
+          </div>
+        </div>
+        <div>
+          <label class="designer-label">Persona</label>
+          <input class="input" id="mode-persona" placeholder="e.g. Security engineer, auditor" />
+        </div>
+        <div>
+          <label class="designer-label">Primary Question</label>
+          <input class="input" id="mode-question" placeholder="What question does this mode answer?" />
+        </div>
+        <div>
+          <label class="designer-label">Layout</label>
+          <select class="input" id="mode-layout">
+            <option value="force">Force</option>
+            <option value="hierarchical">Hierarchical</option>
+            <option value="circular">Circular</option>
+          </select>
+        </div>
+        <div>
+          <label class="designer-label">Include Node Families</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:2px; max-height:150px; overflow-y:auto; padding:4px; border:1px solid var(--border); border-radius:4px;">
+            ${familyCheckboxes}
+          </div>
+        </div>
+        <div>
+          <label class="designer-label">Include Relationship Types</label>
+          <div style="max-height:200px; overflow-y:auto; padding:4px; border:1px solid var(--border); border-radius:4px;">
+            ${relCheckboxes}
+          </div>
+        </div>
+        <div>
+          <label class="designer-label">Example Use Case</label>
+          <textarea class="input" id="mode-usecase" rows="2" placeholder="Concrete scenario..."></textarea>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-primary" onclick="submitNewMode()" style="font-size:12px; padding:6px 16px;">Create Mode</button>
+          <button class="btn" onclick="showDesigner()" style="font-size:12px; padding:6px 16px;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function submitNewMode() {
+  const mode_id = document.getElementById('mode-id')?.value?.trim();
+  const name = document.getElementById('mode-name')?.value?.trim();
+  const persona = document.getElementById('mode-persona')?.value?.trim();
+  const primary_question = document.getElementById('mode-question')?.value?.trim();
+  const default_view_layout = document.getElementById('mode-layout')?.value;
+  const example_use_case = document.getElementById('mode-usecase')?.value?.trim();
+
+  if (!mode_id || !name) { showToast('Mode ID and Name are required', 'error'); return; }
+
+  const node_families = [...document.querySelectorAll('.mode-family-cb:checked')].map(cb => cb.value);
+  const relationship_types = [...document.querySelectorAll('.mode-rel-cb:checked')].map(cb => cb.value);
+
+  const includes = { node_families, relationship_types, node_kinds: {}, overlays: [] };
+  const emphasis_rules = [
+    { type: 'collapse', families: Object.keys(NODE_FAMILIES).filter(f => !node_families.includes(f)) }
+  ];
+
+  try {
+    const resp = await fetch(`${API}/modes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode_id, name, persona, primary_question, includes, emphasis_rules, default_view_layout, example_use_case }),
+    });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error, 'error'); return; }
+    showToast(`Mode "${name}" created`);
+    showDesigner();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ── Edit Mode Form ──────────────────────────────────────────────
+
+async function showModeEditor(id) {
+  const mode = designerModes.find(m => m.id === id);
+  if (!mode) return;
+  const includedFamilies = new Set(mode.includes?.node_families || []);
+  const includedRels = new Set(mode.includes?.relationship_types || []);
+
+  const familyCheckboxes = Object.keys(NODE_FAMILIES).map(f =>
+    `<label style="display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-dim);">
+      <input type="checkbox" class="mode-family-cb" value="${f}" ${includedFamilies.has(f) ? 'checked' : ''}> ${f}
+    </label>`
+  ).join('');
+
+  const relCheckboxes = Object.entries(LINK_TYPES).map(([cat, types]) =>
+    `<div style="margin-bottom:4px;">
+      <div style="font-size:10px; font-weight:600; color:var(--text); margin-bottom:2px;">${cat}</div>
+      ${types.map(t => `<label style="display:inline-flex; align-items:center; gap:3px; font-size:10px; color:var(--text-dim); margin-right:6px;">
+        <input type="checkbox" class="mode-rel-cb" value="${t}" ${includedRels.has(t) ? 'checked' : ''}> ${t}
+      </label>`).join('')}
+    </div>`
+  ).join('');
+
+  const body = document.getElementById('main-body');
+  body.innerHTML = `
+    <div style="max-width:600px;">
+      <div style="padding:0 0 12px;">
+        <button onclick="showDesigner()" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:none;border:none;color:var(--text-dim);cursor:pointer;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+      </div>
+      <h2 style="font-size:16px; font-weight:600; color:var(--text); margin-bottom:12px;">Edit Mode: ${mode.name}</h2>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1;">
+            <label class="designer-label">Name</label>
+            <input class="input" id="edit-mode-name" value="${mode.name}" />
+          </div>
+          <div style="flex:1;">
+            <label class="designer-label">Layout</label>
+            <select class="input" id="edit-mode-layout">
+              <option value="force" ${mode.default_view_layout === 'force' ? 'selected' : ''}>Force</option>
+              <option value="hierarchical" ${mode.default_view_layout === 'hierarchical' ? 'selected' : ''}>Hierarchical</option>
+              <option value="circular" ${mode.default_view_layout === 'circular' ? 'selected' : ''}>Circular</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="designer-label">Persona</label>
+          <input class="input" id="edit-mode-persona" value="${mode.persona || ''}" />
+        </div>
+        <div>
+          <label class="designer-label">Primary Question</label>
+          <input class="input" id="edit-mode-question" value="${mode.primary_question || ''}" />
+        </div>
+        <div>
+          <label class="designer-label">Include Node Families</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:2px; max-height:150px; overflow-y:auto; padding:4px; border:1px solid var(--border); border-radius:4px;">
+            ${familyCheckboxes}
+          </div>
+        </div>
+        <div>
+          <label class="designer-label">Include Relationship Types</label>
+          <div style="max-height:200px; overflow-y:auto; padding:4px; border:1px solid var(--border); border-radius:4px;">
+            ${relCheckboxes}
+          </div>
+        </div>
+        <div>
+          <label class="designer-label">Example Use Case</label>
+          <textarea class="input" id="edit-mode-usecase" rows="2">${mode.example_use_case || ''}</textarea>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-primary" onclick="submitEditMode(${id})" style="font-size:12px; padding:6px 16px;">Save</button>
+          <button class="btn" onclick="showDesigner()" style="font-size:12px; padding:6px 16px;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function submitEditMode(id) {
+  const name = document.getElementById('edit-mode-name')?.value?.trim();
+  const persona = document.getElementById('edit-mode-persona')?.value?.trim();
+  const primary_question = document.getElementById('edit-mode-question')?.value?.trim();
+  const default_view_layout = document.getElementById('edit-mode-layout')?.value;
+  const example_use_case = document.getElementById('edit-mode-usecase')?.value?.trim();
+  const node_families = [...document.querySelectorAll('.mode-family-cb:checked')].map(cb => cb.value);
+  const relationship_types = [...document.querySelectorAll('.mode-rel-cb:checked')].map(cb => cb.value);
+  const includes = { node_families, relationship_types, node_kinds: {}, overlays: [] };
+  const emphasis_rules = [
+    { type: 'collapse', families: Object.keys(NODE_FAMILIES).filter(f => !node_families.includes(f)) }
+  ];
+
+  try {
+    await fetch(`${API}/modes/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, persona, primary_question, includes, emphasis_rules, default_view_layout, example_use_case }),
+    });
+    showToast('Mode updated');
+    showDesigner();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteMode(id) {
+  if (!confirm('Delete this mode?')) return;
+  try {
+    const resp = await fetch(`${API}/modes/${id}`, { method: 'DELETE' });
+    const data = await resp.json();
+    if (data.error) { showToast(data.error, 'error'); return; }
+    showToast('Mode deleted');
+    await loadDesignerData();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ── Template Detail View ────────────────────────────────────────
+
+async function showTemplateDetail(id) {
+  const body = document.getElementById('main-body');
+  body.innerHTML = '<div style="padding:20px; color:var(--text-dim);">Loading template...</div>';
+
+  try {
+    const tmpl = await fetch(`${API}/templates/${id}`).then(r => r.json());
+    const isDefault = tmpl.is_default === 'true';
+    const nodes = tmpl.nodes || [];
+    const edges = tmpl.edges || [];
+    const modes = tmpl.modes || [];
+
+    body.innerHTML = `
+      <div style="max-width:700px;">
+        <div style="padding:0 0 12px;">
+          <button onclick="showDesigner()" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:none;border:none;color:var(--text-dim);cursor:pointer;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <h2 style="font-size:16px; font-weight:600; color:var(--text); margin:0;">
+            ${isDefault ? '⭐ ' : ''}${tmpl.name} ${tmpl.version ? `<span style="font-size:11px; color:var(--text-muted);">v${tmpl.version}</span>` : ''}
+          </h2>
+          <div style="display:flex; gap:4px;">
+            <button class="btn btn-primary" onclick="applyTemplate(${id})" style="font-size:10px; padding:3px 8px;">Apply</button>
+            <button class="btn" onclick="duplicateTemplate(${id})" style="font-size:10px; padding:3px 8px;">Duplicate</button>
+          </div>
+        </div>
+        ${tmpl.description ? `<p style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">${tmpl.description}</p>` : ''}
+
+        <!-- Template Nodes -->
+        <div class="card" style="margin-bottom:10px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <span style="font-size:13px; font-weight:600; color:var(--text);">Nodes (${nodes.length})</span>
+            ${!isDefault ? `<button class="btn" onclick="showAddTemplateNode(${id})" style="font-size:10px; padding:2px 8px;">+ Add</button>` : ''}
+          </div>
+          ${nodes.length === 0 ? '<div style="font-size:11px; color:var(--text-muted);">No nodes in this template.</div>' :
+            nodes.map(n => `
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border); font-size:11px;">
+                <span><span style="color:var(--text);">${n.name}</span> <span class="badge badge-info" style="font-size:8px;">${n.family}/${n.kind}</span></span>
+                ${!isDefault ? `<button onclick="deleteTemplateNode(${id},${n.id})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:11px;">✕</button>` : ''}
+              </div>
+            `).join('')}
+        </div>
+
+        <!-- Template Edges -->
+        <div class="card" style="margin-bottom:10px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <span style="font-size:13px; font-weight:600; color:var(--text);">Edges (${edges.length})</span>
+            ${!isDefault ? `<button class="btn" onclick="showAddTemplateEdge(${id})" style="font-size:10px; padding:2px 8px;">+ Add</button>` : ''}
+          </div>
+          ${edges.length === 0 ? '<div style="font-size:11px; color:var(--text-muted);">No edges in this template.</div>' :
+            edges.map(e => `
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border); font-size:11px;">
+                <span>#${e.source_node_id} <span style="color:#6366f1; font-weight:600;">→ ${e.name} →</span> #${e.target_node_id}</span>
+                ${!isDefault ? `<button onclick="deleteTemplateEdge(${id},${e.id})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:11px;">✕</button>` : ''}
+              </div>
+            `).join('')}
+        </div>
+
+        <!-- Template Modes -->
+        <div class="card" style="margin-bottom:10px;">
+          <span style="font-size:13px; font-weight:600; color:var(--text);">Modes (${modes.length})</span>
+          ${modes.map(m => `
+            <div style="padding:3px 0; border-bottom:1px solid var(--border); font-size:11px;">
+              <span style="color:var(--text); font-weight:500;">${m.name}</span>
+              <span style="color:var(--text-dim); margin-left:6px;">${m.default_view_layout || ''}</span>
+              <div style="font-size:9px; color:var(--text-muted);">${m.primary_question || ''}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Ontology Info -->
+        ${tmpl.overlays ? `
+          <div class="card" style="margin-bottom:10px;">
+            <span style="font-size:13px; font-weight:600; color:var(--text);">Overlays</span>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+              ${(tmpl.overlays || []).map(o => `<span class="badge badge-info" style="font-size:9px;">${o}</span>`).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<div style="color:#ef4444; padding:20px;">${err.message}</div>`;
+  }
+}
+
+async function showAddTemplateNode(templateId) {
+  const familyOptions = Object.keys(NODE_FAMILIES).map(f => `<option value="${f}">${f}</option>`).join('');
+  const firstFamily = Object.keys(NODE_FAMILIES)[0];
+  const kindOptions = NODE_FAMILIES[firstFamily].map(k => `<option value="${k}">${k}</option>`).join('');
+
+  const body = document.getElementById('main-body');
+  body.innerHTML = `
+    <div style="max-width:500px;">
+      <div style="padding:0 0 12px;"><button onclick="showTemplateDetail(${templateId})" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:none;border:none;color:var(--text-dim);cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button></div>
+      <h2 style="font-size:16px; font-weight:600; color:var(--text); margin-bottom:12px;">Add Template Node</h2>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div><label class="designer-label">Name *</label><input class="input" id="tn-name" /></div>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1;"><label class="designer-label">Family *</label><select class="input" id="tn-family" onchange="document.getElementById('tn-kind').innerHTML=NODE_FAMILIES[this.value].map(k=>'<option>'+k+'</option>').join('')">${familyOptions}</select></div>
+          <div style="flex:1;"><label class="designer-label">Kind *</label><select class="input" id="tn-kind">${kindOptions}</select></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-primary" onclick="submitTemplateNode(${templateId})" style="font-size:12px; padding:6px 16px;">Add</button>
+          <button class="btn" onclick="showTemplateDetail(${templateId})" style="font-size:12px; padding:6px 16px;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function submitTemplateNode(templateId) {
+  const name = document.getElementById('tn-name')?.value?.trim();
+  const family = document.getElementById('tn-family')?.value;
+  const kind = document.getElementById('tn-kind')?.value;
+  if (!name || !family || !kind) { showToast('Name, family, kind required', 'error'); return; }
+  try {
+    await fetch(`${API}/templates/${templateId}/nodes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, unique_id: slugify(name), family, kind, short_name: name }),
+    });
+    showToast('Node added to template');
+    showTemplateDetail(templateId);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteTemplateNode(templateId, nodeId) {
+  try {
+    await fetch(`${API}/templates/${templateId}/nodes/${nodeId}`, { method: 'DELETE' });
+    showToast('Node removed');
+    showTemplateDetail(templateId);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function showAddTemplateEdge(templateId) {
+  const nodes = await fetch(`${API}/templates/${templateId}/nodes`).then(r => r.json()).catch(() => []);
+  const nodeOpts = nodes.map(n => `<option value="${n.id}">${n.name} [${n.family}/${n.kind}]</option>`).join('');
+  let linkOptions = '';
+  for (const [cat, types] of Object.entries(LINK_TYPES)) {
+    linkOptions += `<optgroup label="${cat}">${types.map(t => `<option value="${t}">${t}</option>`).join('')}</optgroup>`;
+  }
+
+  const body = document.getElementById('main-body');
+  body.innerHTML = `
+    <div style="max-width:500px;">
+      <div style="padding:0 0 12px;"><button onclick="showTemplateDetail(${templateId})" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:none;border:none;color:var(--text-dim);cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button></div>
+      <h2 style="font-size:16px; font-weight:600; color:var(--text); margin-bottom:12px;">Add Template Edge</h2>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div><label class="designer-label">Relationship *</label><select class="input" id="te-name">${linkOptions}</select></div>
+        <div><label class="designer-label">From (Source) *</label><select class="input" id="te-source">${nodeOpts}</select></div>
+        <div><label class="designer-label">To (Target) *</label><select class="input" id="te-target">${nodeOpts}</select></div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-primary" onclick="submitTemplateEdge(${templateId})" style="font-size:12px; padding:6px 16px;">Add</button>
+          <button class="btn" onclick="showTemplateDetail(${templateId})" style="font-size:12px; padding:6px 16px;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function submitTemplateEdge(templateId) {
+  const name = document.getElementById('te-name')?.value;
+  const source_node_id = parseInt(document.getElementById('te-source')?.value);
+  const target_node_id = parseInt(document.getElementById('te-target')?.value);
+  if (!name || !source_node_id || !target_node_id) { showToast('All fields required', 'error'); return; }
+  try {
+    await fetch(`${API}/templates/${templateId}/edges`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, source_node_id, target_node_id, relationship_type: name }),
+    });
+    showToast('Edge added to template');
+    showTemplateDetail(templateId);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteTemplateEdge(templateId, edgeId) {
+  try {
+    await fetch(`${API}/templates/${templateId}/edges/${edgeId}`, { method: 'DELETE' });
+    showToast('Edge removed');
+    showTemplateDetail(templateId);
+  } catch (err) { showToast(err.message, 'error'); }
 }
