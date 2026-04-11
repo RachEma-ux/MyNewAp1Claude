@@ -1851,17 +1851,15 @@ async function loadGraphData() {
     buildFilterUI();
     if (graphViz.nodes.length > 0) {
       // Switch layout if mode specifies one
-      let targetLayout = graphViz.layout || 'force';
       if (activeModeData && activeModeData.default_view_layout) {
-        targetLayout = activeModeData.default_view_layout;
+        graphViz.layout = activeModeData.default_view_layout;
         const layoutSel = document.getElementById('layout-select');
-        if (layoutSel) layoutSel.value = targetLayout;
+        if (layoutSel) layoutSel.value = activeModeData.default_view_layout;
       }
-      // Reset viewport for fresh layout
-      graphViz.offsetX = 0;
-      graphViz.offsetY = 0;
-      graphViz.scale = 1;
-      switchLayout(targetLayout);
+      // Run the active layout
+      if (graphViz.layout === 'hierarchy') runHierarchyLayout();
+      else if (graphViz.layout === 'circular') runCircularLayout();
+      else runForceLayoutAnimated();
     } else {
       drawGraph();
     }
@@ -2011,13 +2009,13 @@ function toggleFilterPanel() {
 
 function switchLayout(layout) {
   graphViz.layout = layout;
-  // Reset viewport to center
-  graphViz.offsetX = 0;
-  graphViz.offsetY = 0;
-  graphViz.scale = 1;
-  if (layout === 'force') runForceLayoutAnimated();
-  else if (layout === 'hierarchy') runHierarchyLayout();
-  else if (layout === 'circular') runCircularLayout();
+  if (layout === 'force') {
+    runForceLayoutAnimated();
+  } else if (layout === 'hierarchy') {
+    runHierarchyLayout();
+  } else if (layout === 'circular') {
+    runCircularLayout();
+  }
 }
 
 function runHierarchyLayout() {
