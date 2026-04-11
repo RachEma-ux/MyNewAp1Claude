@@ -1,11 +1,9 @@
 /**
- * KGRA Agent Adapter — server-side proxy to the KGRA Python service.
- * All calls are server-side only. No browser-direct calls to KGRA.
- * Same pattern as the OmniRAG adapter.
+ * KGRA Agent Adapter — native TypeScript engine.
+ * No Python proxy. Calls the KGRA engine directly.
  */
 
-const KGRA_URL = process.env.KGRA_URL || "http://localhost:8000";
-const KGRA_TIMEOUT = 45_000; // 45s — matches p99 latency target
+import { executeKGRARun } from "./engine";
 
 export interface KGRARunRequest {
   query: string;
@@ -47,79 +45,42 @@ export interface KGRAHealthResult {
 }
 
 /**
- * Check if the KGRA Python service is running.
+ * Health check — always healthy (native engine).
  */
 export async function kgraHealth(): Promise<KGRAHealthResult> {
-  const start = Date.now();
-  try {
-    const res = await fetch(`${KGRA_URL}/health`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    const latencyMs = Date.now() - start;
-
-    if (!res.ok) {
-      return { healthy: false, status: "error", version: "", error: `HTTP ${res.status}`, latencyMs };
-    }
-
-    const data = await res.json();
-    return { healthy: true, status: data.status, version: data.version || "2.0", latencyMs };
-  } catch (err) {
-    return {
-      healthy: false,
-      status: "offline",
-      version: "",
-      error: (err as Error).message,
-      latencyMs: Date.now() - start,
-    };
-  }
+  return {
+    healthy: true,
+    status: "healthy",
+    version: "2.0.0-native",
+    latencyMs: 0,
+  };
 }
 
 /**
- * Run a KGRA query (synchronous).
+ * Run a KGRA query through the native 12-node pipeline.
  */
 export async function kgraRun(request: KGRARunRequest): Promise<KGRAAnswer> {
-  const res = await fetch(`${KGRA_URL}/run`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-    signal: AbortSignal.timeout(KGRA_TIMEOUT),
+  return executeKGRARun({
+    query: request.query,
+    mode: request.mode,
+    workspace_id: request.workspace_id,
+    session_id: request.session_id,
   });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`KGRA ${res.status}: ${body.slice(0, 300)}`);
-  }
-
-  return res.json();
 }
 
 /**
- * Evaluate a knowledge bundle.
+ * Evaluate a knowledge bundle using the bundle evaluation subgraph.
  */
 export async function kgraEvaluateBundle(request: KGRABundleRequest): Promise<KGRAAnswer> {
-  const res = await fetch(`${KGRA_URL}/evaluate_bundle`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-    signal: AbortSignal.timeout(KGRA_TIMEOUT),
+  return executeKGRARun({
+    query: `Evaluate knowledge bundle: ${request.bundle_name || "unnamed"}`,
+    mode: "bundle_evaluation",
   });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`KGRA evaluate ${res.status}: ${body.slice(0, 300)}`);
-  }
-
-  return res.json();
 }
 
 /**
- * Get a reasoning path by ID.
+ * Get a reasoning path by ID (stub — returns empty).
  */
 export async function kgraGetReasoningPath(pathId: string): Promise<any> {
-  const res = await fetch(`${KGRA_URL}/reasoning_path/${pathId}`, {
-    signal: AbortSignal.timeout(10_000),
-  });
-
-  if (!res.ok) throw new Error(`KGRA path ${res.status}`);
-  return res.json();
+  return { path_id: pathId, nodes: [], edges: [], status: "not_found" };
 }

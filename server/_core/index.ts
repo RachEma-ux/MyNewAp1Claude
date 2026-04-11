@@ -541,21 +541,208 @@ async function startServer() {
 
   // KGRA Agent UI — moved to early mount (see below, before Vite)
 
-  // KGRA Agent API proxy — forwards all /api/kgra-proxy/* to KGRA Python on port 8000
-  app.use("/api/kgra-proxy", async (req, res) => {
-    const kgraUrl = process.env.KGRA_URL || "http://localhost:8000";
-    const path = req.url || "/";
+  // KGRA Agent API — native TypeScript engine (12-node pipeline)
+  app.get("/api/kgra-proxy/health", (_req, res) => {
+    res.json({ status: "healthy", version: "2.0.0-native", engine: "typescript" });
+  });
+
+  app.post("/api/kgra-proxy/run", async (req, res) => {
+    const { query, mode, workspace_id, session_id } = req.body || {};
+    if (!query) return res.status(400).json({ error: "query is required" });
+
     try {
-      const upstream = await fetch(`${kgraUrl}${path}`, {
-        method: req.method,
-        headers: { "Content-Type": "application/json" },
-        body: req.method !== "GET" && req.method !== "HEAD" ? JSON.stringify(req.body) : undefined,
-      });
-      const data = await upstream.text();
-      res.status(upstream.status).set("Content-Type", upstream.headers.get("content-type") || "application/json").send(data);
+      const { executeKGRARun } = await import("../kgra-agent/engine");
+      const answer = await executeKGRARun({ query, mode, workspace_id, session_id });
+      res.json(answer);
     } catch (err) {
-      res.status(502).json({ error: "KGRA service unavailable", detail: (err as Error).message });
+      res.status(500).json({
+        answer: "KGRA engine error.",
+        mode: mode || "direct_query",
+        confidence: 0,
+        error: { code: "ENGINE_ERROR", message: (err as Error).message, failedSteps: [], fallbackUsed: "none" },
+        run_id: `kgra-err-${Date.now()}`,
+        request_id: `req-err-${Date.now()}`,
+      });
     }
+  });
+
+  // GraphRAG stats — serves real knowledge graph data to OmniGraph + Visualization tabs
+  app.get("/api/kgra-proxy/graphrag/stats", async (_req, res) => {
+    try {
+      const { getGraphStats } = await import("../kgra-agent/actions");
+      const result = await getGraphStats();
+      const d = result.data as any;
+      res.json({
+        graph: {
+          entities: d.entityCount || 0,
+          relationships: d.relationshipCount || 0,
+          communities: Object.keys(d.typeCounts || {}).length,
+          reports: 0,
+        },
+        cache: { hits: 0 },
+        stale_communities: 0,
+        typeCounts: d.typeCounts || {},
+        builtAt: d.builtAt,
+      });
+    } catch {
+      res.json({ graph: { entities: 0, relationships: 0, communities: 0, reports: 0 }, cache: { hits: 0 }, stale_communities: 0 });
+    }
+  });
+
+  // GraphRAG query — runs through the KGRA engine
+  app.post("/api/kgra-proxy/graphrag/query/:mode", async (req, res) => {
+    const mode = req.params.mode;
+    const { query } = req.body || {};
+    try {
+      const { executeKGRARun } = await import("../kgra-agent/engine");
+      const answer = await executeKGRARun({ query: query || "graph stats", mode: `graphrag_${mode}` });
+      res.json({ answer: answer.answer, mode, latency_ms: 0, cache_hit: false, citations: [] });
+    } catch (err) {
+      res.status(500).json({ answer: "Query failed", mode, error: (err as Error).message });
+    }
+  });
+
+  // Graph data for visualization tab
+  app.get("/api/kgra-proxy/graph/data", async (_req, res) => {
+    try {
+      const { getDb } = await import("../db/connection");
+      const db = getDb();
+      if (!db) return res.json({ nodes: [], edges: [] });
+      const row = ((await db.execute(sql`SELECT "settingValue" FROM system_settings WHERE "settingKey" = 'kgra_graph_data'`)) as any).rows?.[0];
+      if (!row?.settingValue) return res.json({ nodes: [], edges: [] });
+      const graph = typeof row.settingValue === "string" ? JSON.parse(row.settingValue) : row.settingValue;
+      // Convert to visualization format
+      const nodes = (graph.entities || []).map((e: any, i: number) => ({
+        id: e.name,
+        label: e.name.split("/").pop() || e.name,
+        type: e.type,
+        mentions: e.mentions,
+        x: 0, y: 0,
+      }));
+      const edges = (graph.relationships || []).map((r: any, i: number) => ({
+        id: `e${i}`,
+        source: r.from,
+        target: r.to,
+        type: r.type,
+        weight: 1,
+      }));
+      res.json({ nodes, edges });
+    } catch {
+      res.json({ nodes: [], edges: [] });
+    }
+  });
+
+  // Pipelines — for the RAG tab home page
+  app.get("/api/kgra-proxy/pipelines/", async (_req, res) => {
+    try {
+      const { getDb } = await import("../db/connection");
+      const db = getDb();
+      if (!db) return res.json([]);
+      const docCount = ((await db.execute(sql`SELECT count(*) as cnt FROM documents`)) as any).rows?.[0]?.cnt || 0;
+      const chunkCount = ((await db.execute(sql`SELECT count(*) as cnt FROM document_chunks`)) as any).rows?.[0]?.cnt || 0;
+      if (Number(docCount) === 0) return res.json([]);
+      res.json([{
+        name: "MyNewAp1Claude-RAG",
+        strategy: "recursive_split",
+        stage_count: 4,
+        version: "1.0",
+        stages: ["file_loader", "recursive_splitter", "embedder", "vector_store"],
+        stats: { documents: Number(docCount), chunks: Number(chunkCount) },
+      }]);
+    } catch { res.json([]); }
+  });
+
+  // Intake — ingest endpoint for the RAG tab
+  app.post("/api/kgra-proxy/intake", async (req, res) => {
+    try {
+      const { ingestProject } = await import("../kgra-agent/actions");
+      const result = await ingestProject();
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // Analytics entities — for the Visualization tab
+  app.get("/api/kgra-proxy/v1/analytics/entities", async (_req, res) => {
+    try {
+      const { getDb } = await import("../db/connection");
+      const db = getDb();
+      if (!db) return res.json([]);
+      const row = ((await db.execute(sql`SELECT "settingValue" FROM system_settings WHERE "settingKey" = 'kgra_graph_data'`)) as any).rows?.[0];
+      if (!row?.settingValue) return res.json([]);
+      const graph = typeof row.settingValue === "string" ? JSON.parse(row.settingValue) : row.settingValue;
+      const entities = (graph.entities || []).map((e: any, i: number) => ({
+        id: e.name,
+        name: e.name.split("/").pop() || e.name,
+        type: e.type?.toUpperCase() || "ENTITY",
+        connections: e.mentions || 1,
+        community: e.type || "default",
+      }));
+      res.json(entities);
+    } catch { res.json([]); }
+  });
+
+  // Analytics relationships — for the Visualization tab
+  app.get("/api/kgra-proxy/v1/analytics/relationships", async (_req, res) => {
+    try {
+      const { getDb } = await import("../db/connection");
+      const db = getDb();
+      if (!db) return res.json([]);
+      const row = ((await db.execute(sql`SELECT "settingValue" FROM system_settings WHERE "settingKey" = 'kgra_graph_data'`)) as any).rows?.[0];
+      if (!row?.settingValue) return res.json([]);
+      const graph = typeof row.settingValue === "string" ? JSON.parse(row.settingValue) : row.settingValue;
+      const rels = (graph.relationships || []).map((r: any) => ({
+        source_id: r.from,
+        target_id: r.to,
+        source_name: (r.from || "").split("/").pop() || r.from,
+        target_name: (r.to || "").split("/").pop() || r.to,
+        type: r.type?.toUpperCase() || "RELATED_TO",
+        weight: 1,
+      }));
+      res.json(rels);
+    } catch { res.json([]); }
+  });
+
+  // Analytics summary — for the OmniGraph services panel
+  app.get("/api/kgra-proxy/v1/analytics/summary", async (_req, res) => {
+    try {
+      const { getGraphStats } = await import("../kgra-agent/actions");
+      const result = await getGraphStats();
+      const d = result.data as any;
+      res.json({
+        entities: d.entityCount || 0,
+        relationships: d.relationshipCount || 0,
+        communities: Object.keys(d.typeCounts || {}).length,
+        reports: 0,
+        traces: 0,
+      });
+    } catch { res.json({ entities: 0, relationships: 0, communities: 0, reports: 0, traces: 0 }); }
+  });
+
+  // Lineage/traces — for the OmniGraph traces panel
+  app.get("/api/kgra-proxy/lineage", (_req, res) => {
+    res.json({ counts: { events: 0, tombstones: 0 }, events: [] });
+  });
+
+  // MCP tools list
+  app.get("/api/kgra-proxy/v1/mcp/tools", (_req, res) => {
+    res.json([
+      { name: "query_kgra", description: "Ask KGRA a natural language question — returns structured answer with evidence" },
+      { name: "get_reasoning_path", description: "Retrieve a stored reasoning path by ID" },
+      { name: "get_learning_graph_slice", description: "Get subgraph from the permanent learning graph" },
+      { name: "evaluate_knowledge_bundle", description: "Evaluate a document bundle for coherence and readiness" },
+      { name: "ingest_project", description: "Scan and ingest a project folder into the RAG knowledge base" },
+    ]);
+  });
+
+  // Workflows list
+  app.get("/api/kgra-proxy/v1/workflows", (_req, res) => {
+    res.json({ available: ["ingest_and_graph", "query_pipeline", "bundle_evaluation"], runs: [] });
+  });
+
+  app.use("/api/kgra-proxy", (_req, res) => {
+    res.status(404).json({ error: "KGRA endpoint not found" });
   });
 
   // File upload endpoint

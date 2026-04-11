@@ -1952,6 +1952,55 @@ async function chatSend() {
     response += `<br><br><span style="font-size:11px; color:var(--text-muted);">Mode: ${mode} · Confidence: ${conf} · Governance: ${verdict} · Tokens: ${tokens}</span>`;
 
     chatAddMessage('assistant', response);
+
+    // ── Post-action: drive the UI tabs based on what KGRA did ──
+    const facts = data.observed_facts || [];
+    const answerLower = (data.answer || '').toLowerCase();
+    const didIngest = facts.some(f => f.id === 'action_ingest_project');
+    const didBuildGraph = facts.some(f => f.id === 'action_build_graph');
+
+    if (didIngest || didBuildGraph) {
+      // 1. Refresh pipeline + graph data
+      await loadPipelines();
+      checkHealth();
+
+      // 2. Extract real stats from facts
+      const ingestFact = facts.find(f => f.id === 'action_ingest_project');
+      const graphFact = facts.find(f => f.id === 'action_build_graph');
+      const docsFact = facts.find(f => f.id === 'docs');
+      const docsCount = docsFact ? docsFact.label.match(/\d+/)?.[0] || '0' : '0';
+
+      // 3. Switch to RAG tab and populate the Source URI + result
+      switchMainTab('rag');
+      await new Promise(r => setTimeout(r, 300)); // wait for DOM render
+
+      const sourceInput = document.getElementById('intake-source');
+      if (sourceInput) sourceInput.value = 'file://MyNewAp1Claude/**';
+
+      const intakeResult = document.getElementById('intake-result');
+      if (intakeResult && ingestFact) {
+        intakeResult.innerHTML = `
+          <div class="card" style="margin:8px 0 0; padding:12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+              <span style="font-size:13px; font-weight:500; color:var(--text);">KGRA Auto-Ingest</span>
+              <span class="badge badge-success">completed</span>
+            </div>
+            <div style="font-size:12px; color:var(--text-dim); display:flex; gap:16px; flex-wrap:wrap;">
+              <span>Source: MyNewAp1Claude/</span>
+              <span>${ingestFact.label}</span>
+            </div>
+            ${graphFact ? `<div style="font-size:12px; color:var(--text-dim); margin-top:4px;">${graphFact.label}</div>` : ''}
+            <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="switchMainTab('graphrag')" style="font-size:11px; padding:3px 10px;">View OmniGraph</button>
+              <button class="btn" onclick="switchMainTab('graph')" style="font-size:11px; padding:3px 10px;">View Visualization</button>
+              <button class="btn" onclick="switchMainTab('chat')" style="font-size:11px; padding:3px 10px;">Back to Chat</button>
+            </div>
+          </div>
+        `;
+      }
+
+      showToast(`Ingested ${docsCount} docs into RAG knowledge base`);
+    }
   } catch(e) {
     const thinking = document.getElementById(thinkingId);
     if (thinking) thinking.remove();
