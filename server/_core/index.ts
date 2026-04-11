@@ -903,6 +903,30 @@ async function startServer() {
     console.warn("[KGRA Snapshot] Routes not loaded:", (err as Error).message);
   }
 
+  // KGRA Path routes (shortest path, chain, impact)
+  try {
+    const { registerPathRoutes } = await import("../rag/graph-paths");
+    registerPathRoutes(app);
+  } catch (err) {
+    console.warn("[KGRA Paths] Routes not loaded:", (err as Error).message);
+  }
+
+  // KGRA Cluster routes (community detection)
+  try {
+    const { registerClusterRoutes } = await import("../rag/graph-clusters");
+    registerClusterRoutes(app);
+  } catch (err) {
+    console.warn("[KGRA Clusters] Routes not loaded:", (err as Error).message);
+  }
+
+  // KGRA Live routes (SSE stream, performance)
+  try {
+    const { registerLiveRoutes } = await import("../rag/graph-live");
+    registerLiveRoutes(app);
+  } catch (err) {
+    console.warn("[KGRA Live] Routes not loaded:", (err as Error).message);
+  }
+
   app.use("/api/kgra-proxy", (_req, res) => {
     res.status(404).json({ error: "KGRA endpoint not found" });
   });
