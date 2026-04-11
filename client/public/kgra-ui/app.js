@@ -11,6 +11,7 @@ let pipelines = [];
 let activeMainTab = 'rag';
 let chatMessages = [];
 let healthData = null;
+let lastIngestResultHTML = null; // persist auto-ingest result across tab switches
 
 // ─── Colors for pipeline avatars ───
 const COLORS = ['#6b1f4a','#1a5f4a','#3b2f80','#7c4a1e','#1a4a6b','#6b1a2f','#2f6b1a','#4a1a6b'];
@@ -329,6 +330,14 @@ function renderHome() {
       </div>
     </div>
   `;
+
+  // Restore auto-ingest result if it was previously completed
+  if (lastIngestResultHTML) {
+    const intakeResult = document.getElementById('intake-result');
+    const sourceInput = document.getElementById('intake-source');
+    if (intakeResult) intakeResult.innerHTML = lastIngestResultHTML;
+    if (sourceInput) sourceInput.value = 'file://MyNewAp1Claude/**';
+  }
 
   // Clear desktop panel when on home
   document.getElementById('panel-header').innerHTML = '';
@@ -862,7 +871,10 @@ function renderGraphRAGTab() {
             <span style="font-size:14px;">📊</span>
             <span class="card-title" style="margin:0;">Knowledge Graph</span>
           </div>
-          <button class="btn" onclick="loadGraphStats()" style="font-size:11px; padding:3px 8px;">Refresh</button>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-primary" onclick="switchMainTab('graph')" style="font-size:11px; padding:3px 8px;">View Graph</button>
+            <button class="btn" onclick="loadGraphStats()" style="font-size:11px; padding:3px 8px;">Refresh</button>
+          </div>
         </div>
         <div id="graphrag-stats">Loading...</div>
       </div>
@@ -1145,6 +1157,10 @@ const TYPE_COLORS = {
   PERSON: '#6366f1', ORG: '#4caf50', PRODUCT: '#f59e0b',
   PROJECT: '#ef4444', CONCEPT: '#06b6d4', LOCATION: '#a855f7',
   EVENT: '#ec4899', REGULATORY_TERM: '#f97316', ENTITY: '#888',
+  // Code graph types
+  FILE: '#3b82f6', PAGE: '#8b5cf6', COMPONENT: '#10b981',
+  HOOK: '#f59e0b', ROUTE: '#ef4444', TABLE: '#06b6d4',
+  MODULE: '#6366f1',
 };
 
 function initGraphCanvas() {
@@ -1316,9 +1332,10 @@ function drawGraph() {
   const visibleEdges = edges.filter(e => isEdgeVisible(e));
 
   // Edges
+  const nodeMap = graphViz._nodeMap || new Map(nodes.map(n => [n.id, n]));
   for (const e of visibleEdges) {
-    const src = nodes.find(n => n.id === e.source);
-    const tgt = nodes.find(n => n.id === e.target);
+    const src = nodeMap.get(e.source);
+    const tgt = nodeMap.get(e.target);
     if (!src || !tgt) continue;
     const p1 = toScreen(src.x, src.y);
     const p2 = toScreen(tgt.x, tgt.y);
@@ -1407,9 +1424,9 @@ function drawGraph() {
 function runForceLayout(iterations = 100) {
   const {nodes, edges} = graphViz;
   if (nodes.length === 0) return;
+  const nodeMap = graphViz._nodeMap || new Map(nodes.map(n => [n.id, n]));
 
   for (let iter = 0; iter < iterations; iter++) {
-    // Repulsion (nodes push each other)
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         let dx = nodes[j].x - nodes[i].x;
@@ -1422,10 +1439,9 @@ function runForceLayout(iterations = 100) {
         nodes[j].y += dy / dist * force;
       }
     }
-    // Attraction (edges pull connected nodes)
     for (const e of edges) {
-      const src = nodes.find(n => n.id === e.source);
-      const tgt = nodes.find(n => n.id === e.target);
+      const src = nodeMap.get(e.source);
+      const tgt = nodeMap.get(e.target);
       if (!src || !tgt) continue;
       let dx = tgt.x - src.x;
       let dy = tgt.y - src.y;
@@ -1436,7 +1452,6 @@ function runForceLayout(iterations = 100) {
       tgt.x -= dx / dist * force;
       tgt.y -= dy / dist * force;
     }
-    // Center gravity
     for (const n of nodes) {
       n.x *= 0.99;
       n.y *= 0.99;
@@ -1446,33 +1461,107 @@ function runForceLayout(iterations = 100) {
 }
 
 async function loadGraphData() {
+  const MAX_VIS_NODES = 200; // cap for interactive performance
+  const stats = document.getElementById('graph-canvas-stats');
+  if (stats) stats.textContent = 'Loading graph data...';
   try {
     const data = await fetch(`${API}/graphrag/stats`).then(r => r.json());
-    // Load entities from analytics
     const entities = await fetch(`${API}/v1/analytics/entities`).then(r => r.json()).catch(() => []);
     const rels = await fetch(`${API}/v1/analytics/relationships`).then(r => r.json()).catch(() => []);
 
-    graphViz.nodes = entities.map((e, i) => ({
+    // If too many entities, keep only the top N by connection count
+    let topEntities = entities;
+    let trimmed = false;
+    if (entities.length > MAX_VIS_NODES) {
+      topEntities = entities.slice().sort((a, b) => (b.connections || 0) - (a.connections || 0)).slice(0, MAX_VIS_NODES);
+      trimmed = true;
+    }
+    const nodeIdSet = new Set(topEntities.map(e => e.id));
+
+    graphViz.nodes = topEntities.map(e => ({
       id: e.id, label: e.name, type: e.type || 'ENTITY',
       aliases: [], connections: e.connections || 0,
       community: e.community || '',
-      x: (Math.random() - 0.5) * 300, y: (Math.random() - 0.5) * 300,
-      radius: Math.max(10, Math.min(22, 10 + (e.connections || 0) * 2)),
+      x: (Math.random() - 0.5) * 600, y: (Math.random() - 0.5) * 600,
+      radius: Math.max(10, Math.min(22, 10 + (e.connections || 0) * 0.5)),
     }));
 
-    graphViz.edges = rels.map(r => ({
-      source: r.source_id, target: r.target_id,
-      sourceLabel: r.source_name, targetLabel: r.target_name,
-      type: r.type || 'RELATED_TO', weight: r.weight || 1,
-    }));
+    // Only keep edges where both endpoints are in the visible set
+    graphViz.edges = rels
+      .filter(r => nodeIdSet.has(r.source_id) && nodeIdSet.has(r.target_id))
+      .map(r => ({
+        source: r.source_id, target: r.target_id,
+        sourceLabel: r.source_name, targetLabel: r.target_name,
+        type: r.type || 'RELATED_TO', weight: r.weight || 1,
+      }));
+
+    // Build lookup map for fast edge→node resolution
+    graphViz._nodeMap = new Map(graphViz.nodes.map(n => [n.id, n]));
+
+    if (trimmed && stats) {
+      stats.textContent = `Showing top ${MAX_VIS_NODES} of ${entities.length} entities (${graphViz.edges.length} edges)`;
+    }
 
     buildFilterUI();
     if (graphViz.nodes.length > 0) {
-      runForceLayout(150);
+      runForceLayoutAnimated();
     } else {
       drawGraph();
     }
   } catch(e) { console.error('loadGraphData:', e); drawGraph(); }
+}
+
+// Animated force layout — runs in frames so the browser doesn't freeze
+function runForceLayoutAnimated() {
+  const {nodes, edges} = graphViz;
+  if (nodes.length === 0) return;
+  const nodeMap = graphViz._nodeMap || new Map(nodes.map(n => [n.id, n]));
+  let iter = 0;
+  const maxIter = Math.min(120, Math.max(40, 8000 / nodes.length)); // fewer iters for more nodes
+  const alpha = 0.3;
+
+  function step() {
+    const decay = 1 - iter / maxIter;
+    // Repulsion (all pairs)
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        let dx = nodes[j].x - nodes[i].x;
+        let dy = nodes[j].y - nodes[i].y;
+        let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+        let force = (1200 * decay) / (dist * dist);
+        nodes[i].x -= dx / dist * force;
+        nodes[i].y -= dy / dist * force;
+        nodes[j].x += dx / dist * force;
+        nodes[j].y += dy / dist * force;
+      }
+    }
+    // Attraction (edges)
+    for (const e of edges) {
+      const src = nodeMap.get(e.source);
+      const tgt = nodeMap.get(e.target);
+      if (!src || !tgt) continue;
+      let dx = tgt.x - src.x;
+      let dy = tgt.y - src.y;
+      let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      let force = (dist - 100) * 0.008 * decay;
+      src.x += dx / dist * force;
+      src.y += dy / dist * force;
+      tgt.x -= dx / dist * force;
+      tgt.y -= dy / dist * force;
+    }
+    // Center gravity
+    for (const n of nodes) {
+      n.x *= 0.995;
+      n.y *= 0.995;
+    }
+
+    drawGraph();
+    iter++;
+    if (iter < maxIter) {
+      requestAnimationFrame(step);
+    }
+  }
+  requestAnimationFrame(step);
 }
 
 function searchAndFocusEntity() {
@@ -1979,7 +2068,7 @@ async function chatSend() {
 
       const intakeResult = document.getElementById('intake-result');
       if (intakeResult && ingestFact) {
-        intakeResult.innerHTML = `
+        const resultHTML = `
           <div class="card" style="margin:8px 0 0; padding:12px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
               <span style="font-size:13px; font-weight:500; color:var(--text);">KGRA Auto-Ingest</span>
@@ -1997,6 +2086,8 @@ async function chatSend() {
             </div>
           </div>
         `;
+        intakeResult.innerHTML = resultHTML;
+        lastIngestResultHTML = resultHTML; // persist for tab re-entry
       }
 
       showToast(`Ingested ${docsCount} docs into RAG knowledge base`);
