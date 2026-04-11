@@ -27,13 +27,14 @@ export default function KGRAAgentPage() {
         const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
         container.innerHTML = bodyMatch ? bodyMatch[1] : html;
 
-        // Remove any script tags from the HTML (we'll load app.js separately)
+        // Remove inline script tags (we load app.js separately to avoid duplication)
         container.querySelectorAll("script").forEach((s) => s.remove());
 
-        // Load app.js
+        // Load app.js — NOT async, so functions are available when tabs are clicked
+        const existing = document.querySelector('script[src="/kgra-ui/app.js"]');
+        if (existing) existing.remove(); // remove stale copy from previous navigation
         const script = document.createElement("script");
         script.src = "/kgra-ui/app.js";
-        script.async = true;
         document.body.appendChild(script);
       })
       .catch((err) => {
