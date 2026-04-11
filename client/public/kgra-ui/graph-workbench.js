@@ -33,10 +33,26 @@ const GraphWorkbench = (() => {
             <option value="hierarchy">Hierarchy</option>
             <option value="circular">Circular</option>
           </select>
+          <select id="wb-preset-select" onchange="if(this.value){GraphLayout.applyPreset(this.value);this.value='';}" class="input" style="width:auto; font-size:10px; padding:2px 4px;">
+            <option value="">Presets...</option>
+            <option value="balanced">Balanced</option>
+            <option value="compact">Compact</option>
+            <option value="spread">Spread</option>
+            <option value="investigation">Investigation</option>
+            <option value="dense-safe">Dense Safe</option>
+          </select>
+          <button class="btn" onclick="GraphLayout.freeze()" style="font-size:10px; padding:3px 8px;" title="Freeze layout">❄</button>
+          <button class="btn" onclick="GraphLayout.unfreeze()" style="font-size:10px; padding:3px 8px;" title="Unfreeze layout">▶</button>
+          <button class="btn" onclick="GraphLayout.restart()" style="font-size:10px; padding:3px 8px;" title="Rerun layout">↻</button>
           <button class="btn" onclick="GraphCamera.fitAll(400)" style="font-size:10px; padding:3px 8px;">Fit</button>
+          <button class="btn" id="wb-filter-toggle" onclick="GraphWorkbench.toggleFilters()" style="font-size:10px; padding:3px 8px;">☰ Filter</button>
         </div>
         <!-- Body -->
         <div style="flex:1; display:flex; overflow:hidden;">
+          <!-- Left Filter Panel -->
+          <div id="wb-filter-panel" style="width:0; flex-shrink:0; background:var(--bg-base); border-right:1px solid var(--border); overflow:hidden; transition:width 200ms ease-out;">
+            <div id="wb-filter-content" style="width:180px; overflow-y:auto; scrollbar-width:none; height:100%;"></div>
+          </div>
           <!-- Canvas -->
           <div style="flex:1; position:relative; overflow:hidden; background:#0a0c0f;">
             <canvas id="wb-canvas" style="width:100%; height:100%; cursor:grab;"></canvas>
@@ -311,9 +327,14 @@ const GraphWorkbench = (() => {
 
   function setLayout(layout) {
     GraphState.dispatch('SET_LAYOUT', { layout });
-    if (layout === 'force') _runForceAnimated();
-    else if (layout === 'hierarchy') _runHierarchy();
-    else if (layout === 'circular') _runCircular();
+    if (typeof GraphLayout !== 'undefined') {
+      GraphLayout.switchLayout(layout);
+    } else {
+      // Fallback to built-in
+      if (layout === 'force') _runForceAnimated();
+      else if (layout === 'hierarchy') _runHierarchy();
+      else if (layout === 'circular') _runCircular();
+    }
   }
 
   function reload() { loadData(); }
@@ -416,8 +437,20 @@ const GraphWorkbench = (() => {
     if (layoutEl) layoutEl.textContent = `Layout: ${s.layout}${s.layoutStabilized ? ' (stable)' : ''}`;
   }
 
+  let _filtersOpen = false;
+  function toggleFilters() {
+    _filtersOpen = !_filtersOpen;
+    const panel = document.getElementById('wb-filter-panel');
+    if (panel) {
+      panel.style.width = _filtersOpen ? '180px' : '0';
+      if (_filtersOpen && typeof GraphFilters !== 'undefined') {
+        GraphFilters.renderFilterPanel('wb-filter-content');
+      }
+    }
+  }
+
   return {
-    mount, unmount, loadData, reload,
+    mount, unmount, loadData, reload, toggleFilters,
     setHubCount, setLayout, setMode, setComposition, searchFocus,
   };
 })();
