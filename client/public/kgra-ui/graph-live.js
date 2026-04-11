@@ -116,6 +116,35 @@ const GraphLive = (() => {
           }
           break;
         }
+        case 'node-removed': {
+          const payload = event.payload;
+          if (!payload || !payload.id) break;
+          const idx = state.nodes.findIndex(n => n.id === payload.id);
+          if (idx >= 0) {
+            if (animated) {
+              GraphAnimation.fadeOut(state.nodes[idx].id, 'normal');
+              setTimeout(() => {
+                state.nodes.splice(idx, 1);
+                state.nodeMap.delete(payload.id);
+                // Remove connected edges
+                for (let i = state.edges.length - 1; i >= 0; i--) {
+                  if (state.edges[i].source === payload.id || state.edges[i].target === payload.id) {
+                    state.edges.splice(i, 1);
+                  }
+                }
+              }, 300);
+            } else {
+              state.nodes.splice(idx, 1);
+              state.nodeMap.delete(payload.id);
+              for (let i = state.edges.length - 1; i >= 0; i--) {
+                if (state.edges[i].source === payload.id || state.edges[i].target === payload.id) {
+                  state.edges.splice(i, 1);
+                }
+              }
+            }
+          }
+          break;
+        }
         case 'edge-added': {
           const payload = event.payload;
           if (!payload) break;

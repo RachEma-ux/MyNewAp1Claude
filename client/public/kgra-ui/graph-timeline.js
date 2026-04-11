@@ -208,9 +208,7 @@ const GraphTimeline = (() => {
   // ── Temporal Heat ─────────────────────────────────────────────
 
   async function loadActivityData() {
-    _activityData = await GraphAPI.fetchSnapshot('activity').catch(() => []);
-    // Actually use the activity endpoint
-    _activityData = await fetch('/api/kgra-proxy/graph/activity?bucket=day').then(r => r.json()).catch(() => []);
+    _activityData = await GraphAPI.fetchActivity(null, null, 'day');
   }
 
   function getHeatIntensity(nodeId, timestamp) {

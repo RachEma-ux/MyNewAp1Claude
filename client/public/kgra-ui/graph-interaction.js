@@ -174,6 +174,7 @@ const GraphInteraction = (() => {
     const state = GraphState.getState();
     const edges = state.edges;
     const connectedIds = new Set([nodeId]);
+    const canDim = typeof GraphPerf === 'undefined' || GraphPerf.can('hoverDim');
 
     for (const e of edges) {
       if (e.source === nodeId) connectedIds.add(e.target);
@@ -184,7 +185,7 @@ const GraphInteraction = (() => {
       if (connectedIds.has(n.id)) {
         n.highlightState = n.id === nodeId ? 'hovered' : 'related';
         GraphAnimation.restore(n.id, 'fast');
-      } else {
+      } else if (canDim) {
         GraphAnimation.dimTo(n.id, 0.2, 'fast');
       }
     }
@@ -211,7 +212,8 @@ const GraphInteraction = (() => {
     const node = GraphState.getState().nodeMap.get(nodeId);
     if (node) {
       node.highlightState = 'selected';
-      GraphAnimation.pulse(nodeId, 300);
+      const canPulse = typeof GraphPerf === 'undefined' || GraphPerf.can('pulse');
+      if (canPulse) GraphAnimation.pulse(nodeId, 300);
     }
 
     // Smooth camera focus
@@ -275,8 +277,8 @@ const GraphInteraction = (() => {
         const action = el.dataset.action;
         menu.remove();
         if (action === 'focus') GraphCamera.focusNode(node.id, 300);
-        else if (action === 'trace') { /* future: path tracing */ }
-        else if (action === 'ripple') { /* future: dependency ripple */ }
+        else if (action === 'trace') { _startPathTrace(node.id); }
+        else if (action === 'ripple') { if (typeof GraphPaths !== 'undefined') GraphPaths.showRipple(node.id, 3); }
         else if (action === 'edit') { if (typeof showEditNodeForm === 'function') { switchMainTab('graphrag'); showEditNodeForm(parseInt(el.dataset.id)); } }
         else if (action === 'archive') { if (typeof archiveNode === 'function') archiveNode(parseInt(el.dataset.id)); }
         else if (action === 'delete') { if (typeof deleteNode === 'function') deleteNode(parseInt(el.dataset.id)); }
@@ -287,5 +289,53 @@ const GraphInteraction = (() => {
     setTimeout(() => document.addEventListener('click', close), 10);
   }
 
-  return { bind };
+  // ── Path Trace Mode ────────────────────────────────────────────
+
+  let _traceSource = null;
+
+  function _startPathTrace(nodeId) {
+    _traceSource = nodeId;
+    _canvas.style.cursor = 'crosshair';
+    const node = GraphState.getState().nodeMap.get(nodeId);
+    if (typeof showToast === 'function') showToast(`Click a target node to trace path from ${node?.label || nodeId}`, 'info');
+    // Next click on a node will complete the trace
+    const handler = (e) => {
+      const rect = _canvas.getBoundingClientRect();
+      const target = GraphRenderer.getNodeAt(e.clientX - rect.left, e.clientY - rect.top);
+      if (target && target.id !== _traceSource) {
+        if (typeof GraphPaths !== 'undefined') GraphPaths.tracePath(_traceSource, target.id);
+      }
+      _traceSource = null;
+      _canvas.style.cursor = 'grab';
+      _canvas.removeEventListener('click', handler);
+    };
+    setTimeout(() => _canvas.addEventListener('click', handler, { once: true }), 50);
+  }
+
+  // ── Keyboard Navigation ──────────────────────────────────────
+
+  function _initKeyboard() {
+    document.addEventListener('keydown', (e) => {
+      // Escape → deselect
+      if (e.key === 'Escape') {
+        _deselectNode();
+        if (_traceSource) { _traceSource = null; _canvas.style.cursor = 'grab'; }
+      }
+      // Tab → focus search (when workbench mounted)
+      if (e.key === 'Tab' && !e.shiftKey) {
+        const search = document.getElementById('wb-search');
+        if (search && document.activeElement !== search) {
+          e.preventDefault();
+          search.focus();
+        }
+      }
+    });
+  }
+
+  function init(canvas) {
+    bind(canvas);
+    _initKeyboard();
+  }
+
+  return { bind, init };
 })();

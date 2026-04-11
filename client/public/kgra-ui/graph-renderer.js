@@ -5,6 +5,7 @@
 const GraphRenderer = (() => {
   let _canvas = null;
   let _ctx = null;
+  let _dashOffset = 0; // For edge tracing animation
 
   const TYPE_COLORS = {
     FILE: '#3b82f6', PAGE: '#8b5cf6', COMPONENT: '#10b981',
@@ -33,6 +34,7 @@ const GraphRenderer = (() => {
     const cam = state.camera;
     const w = GraphCamera.getWidth();
     const h = GraphCamera.getHeight();
+    _dashOffset = (_dashOffset + 0.5) % 20; // Animate edge tracing
 
     // Clear
     _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
@@ -47,6 +49,15 @@ const GraphRenderer = (() => {
     function inView(x, y) {
       return x >= viewLeft && x <= viewRight && y >= viewTop && y <= viewBottom;
     }
+
+    // Performance capability checks
+    const perfCan = typeof GraphPerf !== 'undefined' ? GraphPerf.can.bind(GraphPerf) : () => true;
+    const canEdgeLabels = perfCan('edgeLabels');
+    const canHoverDim = perfCan('hoverDim');
+    const canPulse = perfCan('pulse');
+    const canBadges = perfCan('badges');
+    const canNodeLabels = perfCan('nodeLabels');
+    const canSoftOpacity = perfCan('softEdgeOpacity');
 
     // ── Edges ──────────────────────────────────────────────────
     for (const e of edges) {
@@ -73,7 +84,8 @@ const GraphRenderer = (() => {
       _ctx.globalAlpha = opacity * (isSoft ? 0.5 : 1);
 
       // Line dash based on source layer
-      if (isManual) _ctx.setLineDash([6, 4]);
+      if (isPathActive) { _ctx.setLineDash([10, 6]); _ctx.lineDashOffset = -_dashOffset; }
+      else if (isManual) _ctx.setLineDash([6, 4]);
       else if (isTemplate) _ctx.setLineDash([2, 2]);
       else _ctx.setLineDash([]);
 
@@ -84,16 +96,16 @@ const GraphRenderer = (() => {
       _ctx.lineWidth = isPathActive ? Math.max(2, 3 * cam.zoom) : Math.max(0.5, (e.weight || 1) * 0.4 * cam.zoom);
       _ctx.stroke();
       _ctx.setLineDash([]);
+      _ctx.lineDashOffset = 0;
 
-      // Edge label
-      if (cam.zoom > 0.6) {
+      // Edge label (gated by performance mode)
+      if (canEdgeLabels && cam.zoom > 0.6) {
         const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
         _ctx.fillStyle = isPathActive ? '#818cf8' : '#333';
         _ctx.font = `${Math.max(7, 8 * cam.zoom)}px sans-serif`;
         _ctx.textAlign = 'center';
         _ctx.fillText(e.type, mx, my - 3);
-        // Confidence for soft links
-        if (isSoft && e.confidence && cam.zoom > 0.6) {
+        if (canSoftOpacity && isSoft && e.confidence && cam.zoom > 0.6) {
           _ctx.fillStyle = '#f59e0b';
           _ctx.font = `${Math.max(6, 7 * cam.zoom)}px sans-serif`;
           _ctx.fillText(`${Math.round(parseFloat(e.confidence) * 100)}%`, mx, my + 8 * cam.zoom);
@@ -129,10 +141,37 @@ const GraphRenderer = (() => {
       const isHovered = hoveredNodeId === n.id;
       const isRelated = n.highlightState === 'related';
       const isPathActive = n.highlightState === 'path-active';
+      const isLiveUpdated = n.highlightState === 'live-updated';
+      const isClusterActive = n.highlightState === 'cluster-active';
+      const isEntering = n.visibilityState === 'entering';
       const color = TYPE_COLORS[n.type] || TYPE_COLORS[n.family?.toUpperCase()] || '#888';
 
       _ctx.globalAlpha = opacity;
 
+      // Glow for live-updated (green pulse)
+      if (isLiveUpdated) {
+        _ctx.beginPath();
+        _ctx.arc(p.x, p.y, r + 6, 0, Math.PI * 2);
+        _ctx.fillStyle = 'rgba(16,185,129,0.3)';
+        _ctx.fill();
+        _ctx.beginPath();
+        _ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        _ctx.strokeStyle = '#10b981';
+        _ctx.lineWidth = 2;
+        _ctx.stroke();
+      }
+      // Glow for cluster-active (community color)
+      if (isClusterActive) {
+        _ctx.beginPath();
+        _ctx.arc(p.x, p.y, r + 5, 0, Math.PI * 2);
+        _ctx.fillStyle = 'rgba(99,102,241,0.2)';
+        _ctx.fill();
+        _ctx.beginPath();
+        _ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        _ctx.strokeStyle = '#818cf8';
+        _ctx.lineWidth = 2;
+        _ctx.stroke();
+      }
       // Glow for path/selected/hovered
       if (isPathActive) {
         _ctx.beginPath();
@@ -150,6 +189,13 @@ const GraphRenderer = (() => {
         _ctx.beginPath();
         _ctx.arc(p.x, p.y, r + 3, 0, Math.PI * 2);
         _ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        _ctx.fill();
+      }
+      // Brief flash for entering nodes
+      if (isEntering) {
+        _ctx.beginPath();
+        _ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
+        _ctx.fillStyle = 'rgba(255,255,255,0.12)';
         _ctx.fill();
       }
 
@@ -190,8 +236,8 @@ const GraphRenderer = (() => {
         }
       }
 
-      // Connection count badge (emphasis)
-      if (n._badge && cam.zoom > 0.4) {
+      // Connection count badge (gated by performance mode)
+      if (canBadges && n._badge && cam.zoom > 0.4) {
         _ctx.fillStyle = '#06b6d4';
         _ctx.beginPath();
         _ctx.arc(p.x - r * 0.7, p.y - r * 0.7, 7 * cam.zoom, 0, Math.PI * 2);
@@ -202,8 +248,8 @@ const GraphRenderer = (() => {
         _ctx.fillText(n._badge > 99 ? '99+' : n._badge, p.x - r * 0.7, p.y - r * 0.7 + 2.5 * cam.zoom);
       }
 
-      // Label
-      if (cam.zoom > 0.4) {
+      // Label (gated by performance mode)
+      if (canNodeLabels && cam.zoom > 0.4) {
         _ctx.fillStyle = isRelated ? '#999' : '#d0d0d0';
         _ctx.font = `${Math.max(8, 10 * cam.zoom)}px sans-serif`;
         _ctx.textAlign = 'center';

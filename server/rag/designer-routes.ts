@@ -9,6 +9,14 @@ import { sql } from "drizzle-orm";
 import type { Express } from "express";
 import { getRagDb } from "./connection";
 
+// Lazy import for live broadcast (avoid circular deps)
+async function broadcast(type: string, payload: unknown) {
+  try {
+    const { broadcastGraphEvent } = await import("./graph-live");
+    broadcastGraphEvent({ type, payload });
+  } catch { /* live module not loaded */ }
+}
+
 function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -59,6 +67,7 @@ export function registerDesignerRoutes(app: Express) {
         VALUES (${uid}, ${name}, ${short_name || name}, ${family}, ${kind}, ${description || null}, ${JSON.stringify(properties || {})}::jsonb)
         RETURNING *
       `)) as any).rows?.[0];
+      broadcast('node-added', { id: `manual_${result?.id}`, name, type: kind, family, source: 'manual' });
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
@@ -88,6 +97,7 @@ export function registerDesignerRoutes(app: Express) {
         RETURNING *
       `)) as any).rows?.[0];
       if (!result) return res.status(404).json({ error: "Node not found" });
+      broadcast('node-updated', { id: `manual_${id}`, updates: { name: result.name, family: result.family, kind: result.kind, status: result.status } });
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
@@ -103,6 +113,7 @@ export function registerDesignerRoutes(app: Express) {
       // Also delete edges referencing this node
       await ragDb.execute(sql`DELETE FROM kgra_manual_edges WHERE (source_node_id = ${id} AND source_is_auto = 'false') OR (target_node_id = ${id} AND target_is_auto = 'false')`);
       await ragDb.execute(sql`DELETE FROM kgra_manual_nodes WHERE id = ${id}`);
+      broadcast('node-removed', { id: `manual_${id}` });
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
@@ -188,6 +199,7 @@ export function registerDesignerRoutes(app: Express) {
         )
         RETURNING *
       `)) as any).rows?.[0];
+      broadcast('edge-added', { id: result?.id, source: source_node_id, target: target_node_id, type: name });
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
@@ -233,6 +245,7 @@ export function registerDesignerRoutes(app: Express) {
       if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
       const id = parseInt(req.params.id);
       await ragDb.execute(sql`DELETE FROM kgra_manual_edges WHERE id = ${id}`);
+      broadcast('edge-removed', { id: `manual_edge_${id}` });
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });

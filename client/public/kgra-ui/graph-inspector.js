@@ -57,6 +57,14 @@ const GraphInspector = (() => {
         <button class="btn" onclick="GraphCamera.focusNode('${nodeId}',300)" style="font-size:9px; padding:2px 6px;">Center</button>
         <button class="btn" onclick="GraphCamera.fitAll(400)" style="font-size:9px; padding:2px 6px;">Fit All</button>
       </div>
+      <div style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+        <div style="font-size:10px; font-weight:600; color:var(--text); margin-bottom:4px;">Analysis</div>
+        <div style="display:flex; gap:4px; flex-wrap:wrap;">
+          <button class="btn" onclick="GraphInspector._startTrace('${nodeId}')" style="font-size:9px; padding:2px 6px;">Trace to...</button>
+          <button class="btn" onclick="GraphPaths.showRipple('${nodeId}',3)" style="font-size:9px; padding:2px 6px;">Show ripple</button>
+          <button class="btn" onclick="GraphTimeline.loadHistory('${nodeId}')" style="font-size:9px; padding:2px 6px;">History</button>
+        </div>
+      </div>
     `;
   }
 
@@ -95,5 +103,22 @@ const GraphInspector = (() => {
     }
   }
 
-  return { setContainer, showNode, showEdge, clear };
+  function _startTrace(nodeId) {
+    if (typeof showToast === 'function') showToast('Click a target node to trace path', 'info');
+    const canvas = document.getElementById('wb-canvas');
+    if (!canvas) return;
+    canvas.style.cursor = 'crosshair';
+    const handler = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const target = GraphRenderer.getNodeAt(e.clientX - rect.left, e.clientY - rect.top);
+      if (target && target.id !== nodeId && typeof GraphPaths !== 'undefined') {
+        GraphPaths.tracePath(nodeId, target.id);
+      }
+      canvas.style.cursor = 'grab';
+      canvas.removeEventListener('click', handler);
+    };
+    setTimeout(() => canvas.addEventListener('click', handler, { once: true }), 50);
+  }
+
+  return { setContainer, showNode, showEdge, clear, _startTrace };
 })();

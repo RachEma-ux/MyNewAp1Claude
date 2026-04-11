@@ -45,8 +45,12 @@ const GraphWorkbench = (() => {
           <button class="btn" onclick="GraphLayout.unfreeze()" style="font-size:10px; padding:3px 8px;" title="Unfreeze layout">▶</button>
           <button class="btn" onclick="GraphLayout.restart()" style="font-size:10px; padding:3px 8px;" title="Rerun layout">↻</button>
           <button class="btn" onclick="GraphCamera.fitAll(400)" style="font-size:10px; padding:3px 8px;">Fit</button>
+          <button class="btn" onclick="GraphWorkbench.showCompare()" style="font-size:10px; padding:3px 8px;">Compare</button>
+          <button class="btn" id="wb-live-btn" onclick="GraphWorkbench.toggleLive()" style="font-size:10px; padding:3px 8px;">● Live</button>
           <button class="btn" id="wb-filter-toggle" onclick="GraphWorkbench.toggleFilters()" style="font-size:10px; padding:3px 8px;">☰ Filter</button>
         </div>
+        <!-- Playback Bar (visible when timeline enabled) -->
+        <div id="wb-playback-bar" style="display:none; padding:4px 12px; border-bottom:1px solid var(--border); background:var(--bg-base);"></div>
         <!-- Body -->
         <div style="flex:1; display:flex; overflow:hidden;">
           <!-- Left Filter Panel -->
@@ -66,6 +70,8 @@ const GraphWorkbench = (() => {
               <span id="wb-status-graph"></span>
               <span id="wb-status-mode"></span>
               <span id="wb-status-layout"></span>
+              <span id="wb-status-live"></span>
+              <span id="wb-status-timeline"></span>
             </div>
           </div>
         </div>
@@ -82,7 +88,8 @@ const GraphWorkbench = (() => {
 
     GraphCamera.setCanvas(canvas);
     GraphRenderer.setCanvas(canvas);
-    GraphInteraction.bind(canvas);
+    if (typeof GraphInteraction.init === 'function') GraphInteraction.init(canvas);
+    else GraphInteraction.bind(canvas);
     GraphInspector.setContainer(document.getElementById('wb-inspector'));
 
     // Resize handler
@@ -148,6 +155,7 @@ const GraphWorkbench = (() => {
       id: e.id, label: e.name, type: e.type || 'ENTITY',
       family: e._family || e.community || '', community: e.community || '',
       source: e.source || 'auto', connections: e.connections || 0,
+      createdAt: e.created_at || null, updatedAt: e.updated_at || null,
       x: (Math.random() - 0.5) * 800, y: (Math.random() - 0.5) * 800,
       radius: Math.max(6, Math.min(28, 6 + Math.sqrt((e.connections || 1) / maxConn) * 22)),
       animOpacity: 1, animScale: 1, highlightState: 'default', visibilityState: 'visible',
@@ -161,6 +169,7 @@ const GraphWorkbench = (() => {
         type: r.type || 'RELATED_TO', category: r.relationship_category || '',
         weight: r.weight || 1, sourceLayer: r.source || 'auto',
         linkStrength: r.link_strength || 'hard', confidence: r.confidence,
+        createdAt: r.created_at || null,
         animOpacity: 1, highlightState: 'default', visibilityState: 'visible',
       }));
 
@@ -444,6 +453,30 @@ const GraphWorkbench = (() => {
       modeEl.textContent = modeText;
     }
     if (layoutEl) layoutEl.textContent = `Layout: ${s.layout}${s.layoutFrozen ? ' (frozen)' : s.layoutStabilized ? ' (stable)' : ''}`;
+
+    const liveEl = document.getElementById('wb-status-live');
+    if (liveEl) {
+      if (s.liveMode) {
+        const status = typeof GraphLive !== 'undefined' ? GraphLive.getStatus() : {};
+        liveEl.textContent = s.liveConnected
+          ? `Live: connected${status.paused ? ` (${status.buffered} buffered)` : ''}`
+          : 'Live: disconnected';
+        liveEl.style.color = s.liveConnected ? '#10b981' : '#ef4444';
+      } else {
+        liveEl.textContent = '';
+      }
+    }
+
+    const timeEl = document.getElementById('wb-status-timeline');
+    if (timeEl) {
+      if (s.timeline.enabled) {
+        timeEl.textContent = `Timeline: ${s.timeline.playing ? '▶' : '❚❚'} ${s.timeline.position ? new Date(s.timeline.position).toLocaleString() : ''}`;
+      } else {
+        timeEl.textContent = '';
+      }
+    }
+
+    _updateLiveButton();
   }
 
   let _filtersOpen = false;
@@ -451,15 +484,204 @@ const GraphWorkbench = (() => {
     _filtersOpen = !_filtersOpen;
     const panel = document.getElementById('wb-filter-panel');
     if (panel) {
-      panel.style.width = _filtersOpen ? '180px' : '0';
-      if (_filtersOpen && typeof GraphFilters !== 'undefined') {
-        GraphFilters.renderFilterPanel('wb-filter-content');
-      }
+      panel.style.width = _filtersOpen ? '200px' : '0';
+      if (_filtersOpen) _renderFullLeftPanel();
     }
+  }
+
+  function _renderFullLeftPanel() {
+    const container = document.getElementById('wb-filter-content');
+    if (!container) return;
+    const s = GraphState.getState();
+    const params = s.layoutParams;
+
+    container.innerHTML = `
+      <div style="padding:8px; font-size:11px;">
+        <div style="font-weight:600; color:var(--text); margin-bottom:8px;">Controls</div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--text-dim); margin-bottom:3px; font-size:10px; font-weight:600;">Search</div>
+          <input class="input" id="wb-panel-search" placeholder="Search nodes..." style="width:100%; font-size:10px; padding:3px 6px;" onkeydown="if(event.key==='Enter')GraphWorkbench.searchFocus()" />
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--text-dim); margin-bottom:3px; font-size:10px; font-weight:600;">Filters</div>
+          <div id="wb-panel-filters"></div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--text-dim); margin-bottom:3px; font-size:10px; font-weight:600;">Depth from selected</div>
+          <input type="range" min="1" max="10" value="10" style="width:100%;" oninput="GraphFilters.setDepth(this.value==10?'':this.value);this.nextElementSibling.textContent=this.value==10?'All':this.value">
+          <span style="font-size:9px; color:var(--text-muted);">All</span>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--text-dim); margin-bottom:3px; font-size:10px; font-weight:600;">Layout</div>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <label style="font-size:9px; color:var(--text-dim); width:50px;">Repel</label>
+              <input type="range" min="100" max="2000" value="${params.repel}" style="flex:1;" oninput="GraphLayout.setParams({repel:parseInt(this.value)})">
+            </div>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <label style="font-size:9px; color:var(--text-dim); width:50px;">Distance</label>
+              <input type="range" min="20" max="200" value="${params.linkDist}" style="flex:1;" oninput="GraphLayout.setParams({linkDist:parseInt(this.value)})">
+            </div>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <label style="font-size:9px; color:var(--text-dim); width:50px;">Center</label>
+              <input type="range" min="1" max="100" value="${Math.round(params.centerForce * 1000)}" style="flex:1;" oninput="GraphLayout.setParams({centerForce:parseInt(this.value)/1000})">
+            </div>
+            <label style="display:flex; align-items:center; gap:4px; font-size:9px; color:var(--text-dim); cursor:pointer;">
+              <input type="checkbox" ${s.layoutFrozen ? 'checked' : ''} onchange="this.checked ? GraphLayout.freeze() : GraphLayout.unfreeze()"> Stabilize (freeze)
+            </label>
+          </div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--text-dim); margin-bottom:3px; font-size:10px; font-weight:600;">Clusters</div>
+          <label style="display:flex; align-items:center; gap:4px; font-size:9px; color:var(--text-dim); cursor:pointer; margin-bottom:4px;">
+            <input type="checkbox" ${s.clusterMode ? 'checked' : ''} onchange="GraphClusters.toggleClusterMode()"> Cluster mode
+          </label>
+          <button class="btn" onclick="GraphClusters.startSweep()" style="font-size:9px; padding:2px 6px; width:100%;">Sweep communities</button>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--text-dim); margin-bottom:3px; font-size:10px; font-weight:600;">Timeline</div>
+          <label style="display:flex; align-items:center; gap:4px; font-size:9px; color:var(--text-dim); cursor:pointer; margin-bottom:4px;">
+            <input type="checkbox" ${s.timeline.enabled ? 'checked' : ''} onchange="GraphWorkbench.toggleTimeline(this.checked)"> Timeline mode
+          </label>
+          <div id="wb-panel-playback"></div>
+          ${s.timeline.enabled ? `
+            <div style="margin-top:6px;">
+              <div style="display:flex; gap:4px;">
+                <button class="btn" onclick="GraphTimeline.restart()" style="font-size:9px; padding:2px 6px;">|◀</button>
+                <button class="btn" onclick="${s.timeline.playing ? 'GraphTimeline.pause()' : 'GraphTimeline.play()'}" style="font-size:9px; padding:2px 6px;">${s.timeline.playing ? '❚❚' : '▶'}</button>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--text-dim); margin-bottom:3px; font-size:10px; font-weight:600;">Live Updates</div>
+          <label style="display:flex; align-items:center; gap:4px; font-size:9px; color:var(--text-dim); cursor:pointer;">
+            <input type="checkbox" ${s.liveMode ? 'checked' : ''} onchange="GraphWorkbench.toggleLive()"> Live mode
+          </label>
+          ${s.liveMode ? `
+            <div style="font-size:9px; color:${s.liveConnected ? '#10b981' : '#ef4444'}; margin-top:2px;">${s.liveConnected ? '● Connected' : '○ Disconnected'}</div>
+            <div style="display:flex; gap:4px; margin-top:4px;">
+              <button class="btn" onclick="GraphLive.pause()" style="font-size:9px; padding:2px 6px;">Pause</button>
+              <button class="btn" onclick="GraphLive.resume()" style="font-size:9px; padding:2px 6px;">Resume</button>
+              <button class="btn" onclick="GraphLive.jumpToLatest()" style="font-size:9px; padding:2px 6px;">Jump Latest</button>
+            </div>
+          ` : ''}
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--text-dim); margin-bottom:3px; font-size:10px; font-weight:600;">Accessibility</div>
+          <label style="display:flex; align-items:center; gap:4px; font-size:9px; color:var(--text-dim); cursor:pointer; margin-bottom:4px;">
+            <input type="checkbox" ${!s.animationEnabled ? 'checked' : ''} onchange="GraphA11y.setAnimationEnabled(!this.checked)"> Disable animation
+          </label>
+          <label style="display:flex; align-items:center; gap:4px; font-size:9px; color:var(--text-dim); cursor:pointer;">
+            <input type="checkbox" ${s.reducedMotion ? 'checked' : ''} onchange="GraphA11y.setReducedMotion(this.checked)"> Reduced motion
+          </label>
+        </div>
+
+        <button class="btn" onclick="GraphFilters.clearFilters()" style="font-size:9px; padding:3px 6px; width:100%;">Reset All Filters</button>
+      </div>
+    `;
+
+    // Render filter checkboxes
+    if (typeof GraphFilters !== 'undefined') {
+      GraphFilters.renderFilterPanel('wb-panel-filters');
+    }
+
+    // Render playback bar if timeline enabled
+    if (s.timeline.enabled && typeof GraphTimeline !== 'undefined') {
+      GraphTimeline.renderPlaybackBar('wb-panel-playback');
+    }
+  }
+
+  // ── Compare Mode ──────────────────────────────────────────────
+
+  function showCompare() {
+    const container = document.getElementById('wb-inspector');
+    if (!container) return;
+    container.style.display = 'block';
+    container.innerHTML = `
+      <div style="font-weight:600; color:var(--text); margin-bottom:8px;">Compare States</div>
+      <div style="font-size:10px; color:var(--text-dim);">
+        <div style="margin-bottom:4px;">
+          <label style="display:block; margin-bottom:2px;">State A (from):</label>
+          <input type="date" id="wb-compare-a" class="input" style="width:100%; font-size:10px; padding:3px 6px;" />
+        </div>
+        <div style="margin-bottom:6px;">
+          <label style="display:block; margin-bottom:2px;">State B (to):</label>
+          <input type="date" id="wb-compare-b" class="input" style="width:100%; font-size:10px; padding:3px 6px;" />
+        </div>
+        <button class="btn btn-primary" onclick="GraphWorkbench.runCompare()" style="font-size:10px; padding:3px 8px; width:100%;">Compare</button>
+        <button class="btn" onclick="GraphTimeline.clearCompare();GraphInspector.clear()" style="font-size:10px; padding:3px 8px; width:100%; margin-top:4px;">Clear</button>
+      </div>
+    `;
+  }
+
+  function runCompare() {
+    const a = document.getElementById('wb-compare-a')?.value;
+    const b = document.getElementById('wb-compare-b')?.value;
+    if (!a || !b) { if (typeof showToast === 'function') showToast('Select both dates', 'error'); return; }
+    GraphTimeline.compareStates(a, b);
+  }
+
+  // ── Live Toggle ──────────────────────────────────────────────
+
+  function toggleLive() {
+    const state = GraphState.getState();
+    if (state.liveMode) {
+      GraphLive.disconnect();
+    } else {
+      GraphLive.connect();
+    }
+    _updateLiveButton();
+  }
+
+  function _updateLiveButton() {
+    const btn = document.getElementById('wb-live-btn');
+    if (!btn) return;
+    const s = GraphState.getState();
+    btn.textContent = s.liveMode ? (s.liveConnected ? '● Live' : '○ Live') : '● Live';
+    btn.style.color = s.liveConnected ? '#10b981' : '';
+  }
+
+  // ── Timeline Toggle from Left Panel ──────────────────────────
+
+  function toggleTimeline(enabled) {
+    if (enabled) {
+      GraphTimeline.enable();
+      const bar = document.getElementById('wb-playback-bar');
+      if (bar) { bar.style.display = 'block'; GraphTimeline.renderPlaybackBar('wb-playback-bar'); }
+    } else {
+      GraphTimeline.disable();
+      const bar = document.getElementById('wb-playback-bar');
+      if (bar) bar.style.display = 'none';
+    }
+  }
+
+  // ── Feature Flags (G-047) ────────────────────────────────────
+
+  const FEATURE_FLAGS = {
+    GRAPH_WORKBENCH_V2: true,        // Release 1: core + interaction
+    GRAPH_WORKBENCH_LAYOUT: true,    // Release 2: layout + visual
+    GRAPH_WORKBENCH_TIMELINE: true,  // Release 3: temporal
+    GRAPH_WORKBENCH_ANALYSIS: true,  // Release 4: analysis + live
+    GRAPH_WORKBENCH_PERF: true,      // Release 5: hardening
+  };
+
+  function isFeatureEnabled(flag) {
+    return FEATURE_FLAGS[flag] !== false;
   }
 
   return {
     mount, unmount, loadData, reload, toggleFilters,
     setHubCount, setLayout, setMode, setComposition, searchFocus,
+    showCompare, runCompare, toggleLive, toggleTimeline,
+    isFeatureEnabled, FEATURE_FLAGS,
   };
 })();
