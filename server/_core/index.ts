@@ -539,6 +539,28 @@ async function startServer() {
   // Must be mounted BEFORE body-parsing middleware interferes with proxied streams
   app.use("/api/code-studio/ide", ideProxyRouter);
 
+  // KGRA Agent UI — serves the cloned OmniRAG-style interface
+  app.get("/kgra-ui", (req, res) => {
+    res.sendFile("kgra-ui/index.html", { root: process.cwd() + "/client/public" });
+  });
+
+  // KGRA Agent API proxy — forwards all /api/kgra-proxy/* to KGRA Python on port 8000
+  app.use("/api/kgra-proxy", async (req, res) => {
+    const kgraUrl = process.env.KGRA_URL || "http://localhost:8000";
+    const path = req.url || "/";
+    try {
+      const upstream = await fetch(`${kgraUrl}${path}`, {
+        method: req.method,
+        headers: { "Content-Type": "application/json" },
+        body: req.method !== "GET" && req.method !== "HEAD" ? JSON.stringify(req.body) : undefined,
+      });
+      const data = await upstream.text();
+      res.status(upstream.status).set("Content-Type", upstream.headers.get("content-type") || "application/json").send(data);
+    } catch (err) {
+      res.status(502).json({ error: "KGRA service unavailable", detail: (err as Error).message });
+    }
+  });
+
   // File upload endpoint
   app.use("/api", uploadRouter);
   // Chat streaming endpoint

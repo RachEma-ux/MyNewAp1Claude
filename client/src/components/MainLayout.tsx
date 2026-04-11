@@ -276,6 +276,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Benchmarks", icon: <BarChart3 className="w-4 h-4" />, href: "/kgia/benchmarks" },
         { label: "Governance", icon: <ShieldCheck className="w-4 h-4" />, href: "/kgia/governance" },
         { label: "Oversight", icon: <Activity className="w-4 h-4" />, href: "/kgia/oversight" },
+        { label: "KGRA Agent", icon: <BrainCircuit className="w-4 h-4" />, href: "/kgra-ui" },
       ],
     },
     {
