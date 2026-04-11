@@ -1739,7 +1739,7 @@ function computeEmphasis(modeData, nodes) {
   for (const rule of modeData.emphasis_rules) {
     if (rule.type === 'collapse' && rule.families) {
       for (const n of nodes) {
-        if (rule.families.includes(n.community)) emphasisState.collapse.add(n.id);
+        if (rule.families.includes(n.family)) emphasisState.collapse.add(n.id);
       }
     }
     if (rule.type === 'highlight' && rule.condition === 'callers_callees_of_selected') {
@@ -1753,13 +1753,13 @@ function computeEmphasis(modeData, nodes) {
     }
     if (rule.type === 'highlight' && rule.condition === 'constraints_and_risks') {
       for (const n of nodes) {
-        if (['Constraint', 'Risk', 'Incident'].includes(n.community)) emphasisState.highlight.add(n.id);
+        if (['Constraint', 'Risk', 'Incident'].includes(n.family)) emphasisState.highlight.add(n.id);
       }
     }
     if (rule.type === 'highlight' && (rule.condition === 'active_incidents' || rule.condition === 'recent_errors' || rule.condition === 'high_latency')) {
       // These would need real incident/error data — for now highlight Incident/Evidence family nodes
       for (const n of nodes) {
-        if (['Incident', 'Evidence'].includes(n.community)) emphasisState.highlight.add(n.id);
+        if (['Incident', 'Evidence'].includes(n.family)) emphasisState.highlight.add(n.id);
       }
     }
     if (rule.type === 'dim') {
@@ -1804,7 +1804,7 @@ async function loadGraphData() {
     graphViz.nodes = entities.map(e => ({
       id: e.id, label: e.name, type: e.type || 'ENTITY',
       aliases: [], connections: e.connections || 0,
-      community: e.community || '', source: e.source || 'auto',
+      community: e.community || '', family: e._family || e.community || '', source: e.source || 'auto',
       x: (Math.random() - 0.5) * 800, y: (Math.random() - 0.5) * 800,
       radius: Math.max(6, Math.min(28, 6 + Math.sqrt((e.connections || 1) / maxConn) * 22)),
     }));
