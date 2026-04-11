@@ -110,6 +110,10 @@ const GraphWorkbench = (() => {
       });
     }
 
+    // Initialize subsystems
+    if (typeof GraphA11y !== 'undefined') GraphA11y.init();
+    if (typeof GraphPerf !== 'undefined') GraphPerf.init();
+
     // Load data + start render loop
     _loadModeButtons();
     _loadCompositions();
@@ -305,12 +309,8 @@ const GraphWorkbench = (() => {
       GraphState.dispatch('SET_PERFORMANCE', { fps });
       _fpsFrames = 0;
       _fpsLast = now;
-      // Auto performance mode
-      const nc = GraphState.get('nodeCount');
-      let mode = 'full';
-      if (nc > 1000 || fps < 15) mode = 'safe';
-      else if (nc > 500 || fps < 30) mode = 'balanced';
-      GraphState.dispatch('SET_PERFORMANCE', { performanceMode: mode });
+      // Feed to performance guard
+      if (typeof GraphPerf !== 'undefined') GraphPerf.recordFps(fps);
       _updateStatus();
     }
   }
@@ -431,10 +431,19 @@ const GraphWorkbench = (() => {
     const graphEl = document.getElementById('wb-status-graph');
     const modeEl = document.getElementById('wb-status-mode');
     const layoutEl = document.getElementById('wb-status-layout');
-    if (fpsEl) fpsEl.textContent = `${s.fps}fps [${s.performanceMode}]`;
+    if (fpsEl) {
+      const rmIcon = s.reducedMotion ? ' 🔇' : '';
+      const animIcon = s.animationEnabled ? '' : ' ⏸';
+      fpsEl.textContent = `${s.fps}fps [${s.performanceMode}]${rmIcon}${animIcon}`;
+    }
     if (graphEl) graphEl.textContent = `${s.nodeCount} nodes · ${s.edgeCount} edges`;
-    if (modeEl) modeEl.textContent = s.activeMode !== 'all' ? `Mode: ${s.activeModeData?.name || s.activeMode}` : '';
-    if (layoutEl) layoutEl.textContent = `Layout: ${s.layout}${s.layoutStabilized ? ' (stable)' : ''}`;
+    if (modeEl) {
+      let modeText = s.activeMode !== 'all' ? `Mode: ${s.activeModeData?.name || s.activeMode}` : '';
+      if (s.liveMode) modeText += s.liveConnected ? ' · Live: ●' : ' · Live: ○';
+      if (s.timeline.enabled) modeText += ` · Timeline: ${s.timeline.playing ? '▶' : '❚❚'}`;
+      modeEl.textContent = modeText;
+    }
+    if (layoutEl) layoutEl.textContent = `Layout: ${s.layout}${s.layoutFrozen ? ' (frozen)' : s.layoutStabilized ? ' (stable)' : ''}`;
   }
 
   let _filtersOpen = false;

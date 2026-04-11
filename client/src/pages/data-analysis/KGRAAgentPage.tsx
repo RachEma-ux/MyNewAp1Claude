@@ -43,6 +43,8 @@ export default function KGRAAgentPage() {
           "/kgra-ui/graph-paths.js",
           "/kgra-ui/graph-clusters.js",
           "/kgra-ui/graph-live.js",
+          "/kgra-ui/graph-perf.js",
+          "/kgra-ui/graph-a11y.js",
           "/kgra-ui/graph-interaction.js",
           "/kgra-ui/graph-inspector.js",
           "/kgra-ui/graph-workbench.js",
