@@ -39,6 +39,7 @@ export default function KGRAAgentPage() {
           "/kgra-ui/graph-renderer.js",
           "/kgra-ui/graph-layout.js",
           "/kgra-ui/graph-filters.js",
+          "/kgra-ui/graph-timeline.js",
           "/kgra-ui/graph-interaction.js",
           "/kgra-ui/graph-inspector.js",
           "/kgra-ui/graph-workbench.js",

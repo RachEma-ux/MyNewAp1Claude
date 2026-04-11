@@ -887,12 +887,20 @@ async function startServer() {
     res.json({ available: ["ingest_and_graph", "query_pipeline", "bundle_evaluation"], runs: [] });
   });
 
-  // KGRA Designer routes (manual nodes/edges CRUD)
+  // KGRA Designer routes (manual nodes/edges CRUD + templates + modes)
   try {
     const { registerDesignerRoutes } = await import("../rag/designer-routes");
     registerDesignerRoutes(app);
   } catch (err) {
     console.warn("[KGRA Designer] Routes not loaded:", (err as Error).message);
+  }
+
+  // KGRA Snapshot routes (timeline, diff, history, activity)
+  try {
+    const { registerSnapshotRoutes } = await import("../rag/graph-snapshot");
+    registerSnapshotRoutes(app);
+  } catch (err) {
+    console.warn("[KGRA Snapshot] Routes not loaded:", (err as Error).message);
   }
 
   app.use("/api/kgra-proxy", (_req, res) => {
