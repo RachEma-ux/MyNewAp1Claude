@@ -264,7 +264,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       icon: <BrainCircuit className="w-5 h-5" />,
       children: [
         { label: "GraphRAG", icon: <BrainCircuit className="w-4 h-4" />, href: "/data-analysis/graphrag" },
-        { label: "KGRA Agent", icon: <BrainCircuit className="w-4 h-4" />, href: "/kgra-ui" },
+        { label: "KGRA Agent", icon: <BrainCircuit className="w-4 h-4" />, href: "/data-analysis/kgra-agent" },
         { label: "Data Warehouse", icon: <Database className="w-4 h-4" />, href: "/data-analysis/data-warehouse" },
       ],
     },

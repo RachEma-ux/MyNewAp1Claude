@@ -216,6 +216,8 @@ const KGIAShellPage = lazy(() => import("@/pages/kgia/KGIAShellPage"));
 const OpenRouterShellPage = lazy(() => import("@/pages/openrouter/OpenRouterShellPage"));
 // Data Analysis — GraphRAG
 const GraphRAGPage = lazy(() => import("@/pages/data-analysis/GraphRAGPage"));
+// Data Analysis — KGRA Agent
+const KGRAAgentPage = lazy(() => import("@/pages/data-analysis/KGRAAgentPage"));
 // Data Analysis — Data Warehouse
 const DataWarehousePage = lazy(() => import("@/pages/data-analysis/DataWarehousePage"));
 
@@ -503,6 +505,8 @@ function Router() {
       <Route path="/openrouter/health" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
       <Route path="/openrouter/activity" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
       <Route path="/openrouter" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
+      {/* KGRA Agent — embedded OmniRAG-style UI inside app shell */}
+      <Route path="/data-analysis/kgra-agent" component={() => <ProtectedRoute component={KGRAAgentPage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
       <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
