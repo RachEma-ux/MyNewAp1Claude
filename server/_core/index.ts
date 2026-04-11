@@ -539,10 +539,7 @@ async function startServer() {
   // Must be mounted BEFORE body-parsing middleware interferes with proxied streams
   app.use("/api/code-studio/ide", ideProxyRouter);
 
-  // KGRA Agent UI — serves the cloned OmniRAG-style interface
-  app.get("/kgra-ui", (req, res) => {
-    res.sendFile("kgra-ui/index.html", { root: process.cwd() + "/client/public" });
-  });
+  // KGRA Agent UI — moved to early mount (see below, before Vite)
 
   // KGRA Agent API proxy — forwards all /api/kgra-proxy/* to KGRA Python on port 8000
   app.use("/api/kgra-proxy", async (req, res) => {
@@ -805,6 +802,12 @@ async function startServer() {
     })
   );
   // development mode uses Vite, production mode uses static files
+  // KGRA Agent UI — must be mounted BEFORE Vite to avoid SPA catch-all
+  app.get("/kgra-ui", (req, res) => {
+    res.sendFile("kgra-ui/index.html", { root: process.cwd() + "/client/public" });
+  });
+  app.use("/kgra-ui", express.static(process.cwd() + "/client/public/kgra-ui"));
+
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
