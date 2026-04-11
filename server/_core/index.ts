@@ -722,8 +722,24 @@ async function startServer() {
         .map((e: any) => ({
           id: e.name, name: e.short_name || e.name.split("/").pop() || e.name,
           type: (e.entity_type || "entity").toUpperCase(), connections: Number(e.connections) || e.mentions || 1,
-          community: e.entity_type || "default",
+          community: e.entity_type || "default", source: "auto",
         }));
+
+      // UNION: add active manual nodes
+      const manualNodes = ((await ragDb.execute(sql`
+        SELECT * FROM kgra_manual_nodes WHERE status = 'active'
+      `)) as any).rows || [];
+      for (const mn of manualNodes) {
+        result.push({
+          id: `manual_${mn.id}`,
+          name: mn.short_name || mn.name,
+          type: (mn.kind || mn.family || "entity").toUpperCase(),
+          connections: 0,
+          community: mn.family || "default",
+          source: mn.applied_template_id ? "template" : "manual",
+          _manualId: mn.id,
+        });
+      }
 
       res.json(result);
     } catch (err) { console.error("analytics/entities:", err); res.json([]); }
@@ -743,14 +759,52 @@ async function startServer() {
         JOIN kgra_entities src ON src.id = r.source_entity_id
         JOIN kgra_entities tgt ON tgt.id = r.target_entity_id
       `)) as any).rows || [];
-      res.json(rels.map((r: any) => ({
+      const result = rels.map((r: any) => ({
         source_id: r.source_name,
         target_id: r.target_name,
         source_name: r.source_short || (r.source_name || "").split("/").pop() || r.source_name,
         target_name: r.target_short || (r.target_name || "").split("/").pop() || r.target_name,
         type: (r.relationship_type || "RELATED_TO").toUpperCase(),
         weight: r.weight || 1,
-      })));
+        source: "auto",
+      }));
+
+      // UNION: add active manual edges
+      const manualEdges = ((await ragDb.execute(sql`
+        SELECT * FROM kgra_manual_edges WHERE status = 'active'
+      `)) as any).rows || [];
+      for (const me of manualEdges) {
+        // Resolve source/target names based on is_auto flag
+        let srcName = `manual_${me.source_node_id}`;
+        let tgtName = `manual_${me.target_node_id}`;
+        if (me.source_is_auto === "true") {
+          const src = ((await ragDb.execute(sql`SELECT name, short_name FROM kgra_entities WHERE id = ${me.source_node_id}`)) as any).rows?.[0];
+          if (src) srcName = src.name;
+        } else {
+          const src = ((await ragDb.execute(sql`SELECT name, short_name FROM kgra_manual_nodes WHERE id = ${me.source_node_id}`)) as any).rows?.[0];
+          if (src) srcName = `manual_${me.source_node_id}`;
+        }
+        if (me.target_is_auto === "true") {
+          const tgt = ((await ragDb.execute(sql`SELECT name, short_name FROM kgra_entities WHERE id = ${me.target_node_id}`)) as any).rows?.[0];
+          if (tgt) tgtName = tgt.name;
+        } else {
+          const tgt = ((await ragDb.execute(sql`SELECT name, short_name FROM kgra_manual_nodes WHERE id = ${me.target_node_id}`)) as any).rows?.[0];
+          if (tgt) tgtName = `manual_${me.target_node_id}`;
+        }
+        result.push({
+          source_id: srcName,
+          target_id: tgtName,
+          source_name: me.name,
+          target_name: me.name,
+          type: (me.relationship_type || "RELATED_TO").toUpperCase(),
+          weight: me.weight || 1,
+          source: me.applied_template_id ? "template" : "manual",
+          link_strength: me.link_strength || "hard",
+          confidence: me.confidence,
+        });
+      }
+
+      res.json(result);
     } catch { res.json([]); }
   });
 
@@ -790,6 +844,14 @@ async function startServer() {
   app.get("/api/kgra-proxy/v1/workflows", (_req, res) => {
     res.json({ available: ["ingest_and_graph", "query_pipeline", "bundle_evaluation"], runs: [] });
   });
+
+  // KGRA Designer routes (manual nodes/edges CRUD)
+  try {
+    const { registerDesignerRoutes } = await import("../rag/designer-routes");
+    registerDesignerRoutes(app);
+  } catch (err) {
+    console.warn("[KGRA Designer] Routes not loaded:", (err as Error).message);
+  }
 
   app.use("/api/kgra-proxy", (_req, res) => {
     res.status(404).json({ error: "KGRA endpoint not found" });

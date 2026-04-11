@@ -65,7 +65,64 @@ export async function seedRagDb() {
       );
     `);
 
-    console.log("[RAGDB Seed] Tables created/verified");
+    // ── Manual Nodes (user-designed) ─────────────────────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kgra_manual_nodes (
+        id SERIAL PRIMARY KEY,
+        unique_id VARCHAR(255) UNIQUE,
+        name TEXT NOT NULL,
+        short_name VARCHAR(500),
+        family VARCHAR(50) NOT NULL,
+        kind VARCHAR(50) NOT NULL,
+        description TEXT,
+        properties JSONB DEFAULT '{}',
+        valid_from TIMESTAMP,
+        valid_until TIMESTAMP,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        applied_template_id INTEGER,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_kgra_mn_unique_id ON kgra_manual_nodes(unique_id);
+      CREATE INDEX IF NOT EXISTS idx_kgra_mn_family ON kgra_manual_nodes(family);
+      CREATE INDEX IF NOT EXISTS idx_kgra_mn_kind ON kgra_manual_nodes(kind);
+      CREATE INDEX IF NOT EXISTS idx_kgra_mn_status ON kgra_manual_nodes(status);
+    `);
+
+    // ── Manual Edges (user-designed) ──────────────────────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kgra_manual_edges (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        source_node_id INTEGER NOT NULL,
+        target_node_id INTEGER NOT NULL,
+        source_is_auto VARCHAR(5) NOT NULL DEFAULT 'false',
+        target_is_auto VARCHAR(5) NOT NULL DEFAULT 'false',
+        relationship_type VARCHAR(50) NOT NULL,
+        relationship_category VARCHAR(30),
+        weight INTEGER NOT NULL DEFAULT 1,
+        confidence VARCHAR(10),
+        provenance VARCHAR(255),
+        link_strength VARCHAR(10) NOT NULL DEFAULT 'hard',
+        description TEXT,
+        properties JSONB DEFAULT '{}',
+        rules JSONB,
+        valid_from TIMESTAMP,
+        valid_until TIMESTAMP,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        applied_template_id INTEGER,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_kgra_me_source ON kgra_manual_edges(source_node_id);
+      CREATE INDEX IF NOT EXISTS idx_kgra_me_target ON kgra_manual_edges(target_node_id);
+      CREATE INDEX IF NOT EXISTS idx_kgra_me_status ON kgra_manual_edges(status);
+      CREATE INDEX IF NOT EXISTS idx_kgra_me_category ON kgra_manual_edges(relationship_category);
+    `);
+
+    console.log("[RAGDB Seed] Tables created/verified (5 tables)");
   } catch (error: any) {
     console.warn(`[RAGDB Seed] Failed: ${error.message}`);
   }

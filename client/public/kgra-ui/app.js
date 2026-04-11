@@ -917,6 +917,11 @@ function renderGraphRAGTab() {
             <div style="font-size:11px; color:var(--text);">Contracts</div>
             <div style="font-size:10px; color:var(--text-dim);">23 ABCs</div>
           </div>
+          <div class="card" style="padding:8px; margin:0; cursor:pointer; text-align:center;" onclick="showDesigner()">
+            <div style="font-size:16px; margin-bottom:2px;">✏️</div>
+            <div style="font-size:11px; color:var(--text);">Designer</div>
+            <div style="font-size:10px; color:var(--text-dim);">Nodes & Links</div>
+          </div>
         </div>
       </div>
 
@@ -1351,12 +1356,22 @@ function drawGraph() {
     const isPath = pathEdges.has(e);
     const isSelected = selected && (e.source === selected.id || e.target === selected.id);
 
+    // Source distinction for edges
+    if (e.source_layer === 'manual') {
+      ctx.setLineDash([6, 4]);
+    } else if (e.source_layer === 'template') {
+      ctx.setLineDash([2, 2]);
+    } else {
+      ctx.setLineDash([]);
+    }
+
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
-    ctx.strokeStyle = isPath ? '#6366f1' : isSelected ? '#4a4a6a' : '#1e1e1e';
+    ctx.strokeStyle = isPath ? '#6366f1' : e.source_layer === 'manual' ? '#10b981' : e.source_layer === 'template' ? '#6366f1' : isSelected ? '#4a4a6a' : '#1e1e1e';
     ctx.lineWidth = isPath ? Math.max(2, 3 * scale) : Math.max(0.5, e.weight * 0.4 * scale);
     ctx.stroke();
+    ctx.setLineDash([]);
 
     if (scale > 0.6) {
       const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
@@ -1399,6 +1414,30 @@ function drawGraph() {
       ctx.strokeStyle = isPath ? '#6366f1' : '#fff';
       ctx.lineWidth = 2;
       ctx.stroke();
+    }
+
+    // Source distinction (manual/template nodes)
+    if (n.source === 'manual' || n.source === 'template') {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 1, 0, Math.PI * 2);
+      ctx.setLineDash(n.source === 'manual' ? [4, 3] : [2, 2]);
+      ctx.strokeStyle = n.source === 'manual' ? '#fff' : '#6366f1';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Badge
+      const badgeColor = n.source === 'manual' ? '#10b981' : '#6366f1';
+      const badgeText = n.source === 'manual' ? 'M' : 'T';
+      if (scale > 0.4) {
+        ctx.fillStyle = badgeColor;
+        ctx.beginPath();
+        ctx.arc(p.x + r * 0.75, p.y - r * 0.75, 5 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${Math.max(5, 6 * scale)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(badgeText, p.x + r * 0.75, p.y - r * 0.75 + 2.5 * scale);
+      }
     }
 
     // Comment badge (V8)
@@ -1491,7 +1530,7 @@ async function loadGraphData() {
     graphViz.nodes = entities.map(e => ({
       id: e.id, label: e.name, type: e.type || 'ENTITY',
       aliases: [], connections: e.connections || 0,
-      community: e.community || '',
+      community: e.community || '', source: e.source || 'auto',
       x: (Math.random() - 0.5) * 800, y: (Math.random() - 0.5) * 800,
       radius: Math.max(6, Math.min(28, 6 + Math.sqrt((e.connections || 1) / maxConn) * 22)),
     }));
@@ -1503,6 +1542,9 @@ async function loadGraphData() {
         source: r.source_id, target: r.target_id,
         sourceLabel: r.source_name, targetLabel: r.target_name,
         type: r.type || 'RELATED_TO', weight: r.weight || 1,
+        source_layer: r.source || 'auto',
+        link_strength: r.link_strength || 'hard',
+        confidence: r.confidence,
       }));
 
     graphViz._nodeMap = new Map(graphViz.nodes.map(n => [n.id, n]));
