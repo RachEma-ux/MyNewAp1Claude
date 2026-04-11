@@ -264,6 +264,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       icon: <BrainCircuit className="w-5 h-5" />,
       children: [
         { label: "GraphRAG", icon: <BrainCircuit className="w-4 h-4" />, href: "/data-analysis/graphrag" },
+        { label: "KGRA Agent", icon: <BrainCircuit className="w-4 h-4" />, href: "/kgra-ui" },
         { label: "Data Warehouse", icon: <Database className="w-4 h-4" />, href: "/data-analysis/data-warehouse" },
       ],
     },
@@ -276,7 +277,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
         { label: "Benchmarks", icon: <BarChart3 className="w-4 h-4" />, href: "/kgia/benchmarks" },
         { label: "Governance", icon: <ShieldCheck className="w-4 h-4" />, href: "/kgia/governance" },
         { label: "Oversight", icon: <Activity className="w-4 h-4" />, href: "/kgia/oversight" },
-        { label: "KGRA Agent", icon: <BrainCircuit className="w-4 h-4" />, href: "/kgra-ui" },
       ],
     },
     {
