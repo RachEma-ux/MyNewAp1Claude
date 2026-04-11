@@ -1083,12 +1083,9 @@ function renderGraphTab() {
           <span id="hub-count-display" style="font-size:11px; color:var(--text); min-width:18px; text-align:center;">${hubCount}</span>
         </div>
         <button class="btn btn-primary" onclick="loadDemo()" style="font-size:11px; padding:4px 10px;">Demo</button>
-        <div style="display:flex; gap:2px; border:1px solid var(--border); border-radius:4px; padding:1px;">
-          <button class="btn ${activeMode === 'all' ? 'btn-primary' : ''}" id="mode-all" onclick="setMode('all')" style="font-size:10px; padding:2px 6px; border-radius:3px;">All</button>
-          <button class="btn ${activeMode === 'coder_mode' ? 'btn-primary' : ''}" id="mode-coder" onclick="setMode('coder_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">Coder</button>
-          <button class="btn ${activeMode === 'user_mode' ? 'btn-primary' : ''}" id="mode-user" onclick="setMode('user_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">User</button>
-          <button class="btn ${activeMode === 'architect_mode' ? 'btn-primary' : ''}" id="mode-architect" onclick="setMode('architect_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">Architect</button>
-          <button class="btn ${activeMode === 'diagnosis_mode' ? 'btn-primary' : ''}" id="mode-diagnosis" onclick="setMode('diagnosis_mode')" style="font-size:10px; padding:2px 6px; border-radius:3px;">Diagnosis</button>
+        <div id="mode-btn-container" style="display:flex; gap:2px; border:1px solid var(--border); border-radius:4px; padding:1px; flex-wrap:wrap;">
+          <button class="btn btn-primary" id="mode-all" onclick="setMode('all')" style="font-size:10px; padding:2px 6px; border-radius:3px;">All</button>
+          <!-- Mode buttons loaded dynamically -->
           <select id="mode-compose-select" onchange="if(this.value)setComposedMode(this.value)" class="input" style="width:auto; font-size:10px; padding:2px 4px;">
             <option value="">Compose...</option>
           </select>
@@ -1454,6 +1451,10 @@ function drawGraph() {
       ctx.setLineDash([]);
     }
 
+    // Soft links render at reduced opacity
+    const isSoft = e.link_strength === 'soft';
+    if (isSoft) ctx.globalAlpha = 0.5;
+
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
@@ -1468,7 +1469,14 @@ function drawGraph() {
       ctx.font = `${Math.max(7, 8 * scale)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(e.type, mx, my - 3);
+      // Show confidence percentage for soft links
+      if (isSoft && e.confidence) {
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = `${Math.max(6, 7 * scale)}px sans-serif`;
+        ctx.fillText(`${Math.round(parseFloat(e.confidence) * 100)}%`, mx, my + 8 * scale);
+      }
     }
+    if (isSoft) ctx.globalAlpha = 1.0;
   }
 
   // Nodes
@@ -1683,6 +1691,29 @@ function setComposedMode(compositionName) {
 
 // Load composition options into dropdown
 function loadCompositions() {
+  // Load mode buttons dynamically
+  fetch(`${API}/modes`).then(r => r.json()).then(modes => {
+    const container = document.getElementById('mode-btn-container');
+    if (!container) return;
+    const compSelect = document.getElementById('mode-compose-select');
+    const allBtn = document.getElementById('mode-all');
+    // Clear existing mode buttons (keep All + compose select)
+    container.innerHTML = '';
+    if (allBtn) container.appendChild(allBtn);
+    // Add a button per mode
+    for (const m of modes) {
+      const btn = document.createElement('button');
+      btn.className = 'btn' + (activeMode === m.mode_id ? ' btn-primary' : '');
+      btn.id = 'mode-' + m.mode_id.replace('_mode', '');
+      btn.style.cssText = 'font-size:10px; padding:2px 6px; border-radius:3px;';
+      btn.textContent = m.name;
+      btn.onclick = () => setMode(m.mode_id);
+      container.appendChild(btn);
+    }
+    if (compSelect) container.appendChild(compSelect);
+  }).catch(() => {});
+
+  // Load compositions dropdown
   fetch(`${API}/modes/compositions`).then(r => r.json()).then(comps => {
     const sel = document.getElementById('mode-compose-select');
     if (!sel) return;
@@ -1764,7 +1795,7 @@ async function loadGraphData() {
     // Server does hub+neighbor filtering — pass hub_count + mode
     const modeParam = activeMode !== 'all' ? `&mode=${activeMode}` : '';
     const entities = await fetch(`${API}/v1/analytics/entities?hub_count=${hubCount}${modeParam}`).then(r => r.json()).catch(() => []);
-    const rels = await fetch(`${API}/v1/analytics/relationships`).then(r => r.json()).catch(() => []);
+    const rels = await fetch(`${API}/v1/analytics/relationships${modeParam ? '?mode=' + activeMode : ''}`).then(r => r.json()).catch(() => []);
 
     const nodeIdSet = new Set(entities.map(e => e.id));
 

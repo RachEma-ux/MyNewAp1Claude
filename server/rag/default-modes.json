@@ -84,10 +84,92 @@
       "default_view_layout": "force",
       "example_use_case": "Given a 500 error spike on API gateway, show all downstream services, recent deploys, and feature flags that changed.",
       "sort_order": 4
+    },
+    {
+      "mode_id": "security_mode",
+      "name": "Security",
+      "persona": "Security engineer, auditor, compliance officer",
+      "primary_question": "What vulnerabilities exist? Which data is exposed? Are auth policies enforced?",
+      "includes": {
+        "node_families": ["Element","Interface","Data","External","Control","Risk","Incident","Configuration"],
+        "node_kinds": {"Element":["service","handler","agent"],"Interface":["http_endpoint","webhook","cli_command"],"Data":["database","table","cache","object_store"],"Control":["permission","role","policy","gate","approval"],"Risk":["vulnerability","threat","compliance_requirement","security_finding"],"Configuration":["feature_flag","secret_ref","rate_limit"]},
+        "relationship_types": ["PROTECTED_BY","REQUIRES","VULNERABLE_TO","MITIGATED_BY","EXPLOITED_IN","GOVERNED_BY_SLO","LIMITED_BY","READS","WRITES","CONFIGURED_BY"],
+        "overlays": ["control","risk_security","configuration","data"]
+      },
+      "emphasis_rules": [
+        {"type":"highlight","condition":"constraints_and_risks"},
+        {"type":"collapse","families":["Artifact","Change","Evidence"]},
+        {"type":"badge","field":"severity","source":"Risk"}
+      ],
+      "default_view_layout": "force",
+      "example_use_case": "Which endpoints are not protected by auth? What data stores have no encryption policy?",
+      "sort_order": 5
+    },
+    {
+      "mode_id": "ops_mode",
+      "name": "Operations",
+      "persona": "DevOps engineer, SRE, platform team",
+      "primary_question": "What is deployed where? How are services scaled? What is the health and cost?",
+      "includes": {
+        "node_families": ["System","Element","Runtime","External","Control","Change","Configuration","Constraint"],
+        "node_kinds": {"Element":["service","module","orchestrator","job","task"],"Runtime":["environment","container","pod","cluster","region"],"Control":["monitor","alert","slo","sli","budget"],"Change":["release","deployment","migration","rollback","config_change"],"Configuration":["scaling_policy","retry_policy","timeout_setting","circuit_breaker"]},
+        "relationship_types": ["RUNS_IN","DEPLOYS_TO","HOSTED_ON","SCALES_WITH","DEPLOYED_AT","ROLLED_BACK_FROM","GOVERNED_BY_SLO","LIMITED_BY","CHECKED_BY","OBSERVED_BY","CONFIGURED_BY"],
+        "overlays": ["runtime","deployment","control","configuration","change"]
+      },
+      "emphasis_rules": [
+        {"type":"collapse","families":["Artifact","Interface","Data","Evidence","Risk","Incident"]},
+        {"type":"highlight","condition":"constraints_and_risks"},
+        {"type":"badge","field":"deployment_status","source":"Change"}
+      ],
+      "default_view_layout": "hierarchical",
+      "example_use_case": "Which services are deployed to prod? What scaling policies are active? Show recent rollbacks.",
+      "sort_order": 6
+    },
+    {
+      "mode_id": "pm_mode",
+      "name": "Product Manager",
+      "persona": "Product manager, product owner, business analyst",
+      "primary_question": "What features exist? What user journeys are supported? What is adoption?",
+      "includes": {
+        "node_families": ["System","Element","Interface","Data","Control","Change","Configuration"],
+        "node_kinds": {"Element":["page","screen","component","workflow","workflow_step","service"],"Interface":["ui_route","http_endpoint","cli_command"],"Control":["lifecycle_stage","gate","approval"],"Change":["release","refactor","version_upgrade"],"Configuration":["feature_flag","dynamic_route_rule"]},
+        "relationship_types": ["ROUTES_TO","HANDLES","EXPOSES","PART_OF","DEPENDS_ON","CONDITIONALLY_ENABLED_BY","INTRODUCED_IN","REMOVED_IN","DOCUMENTED_BY","OWNED_BY"],
+        "overlays": ["interface","structure","change","configuration","docs"]
+      },
+      "emphasis_rules": [
+        {"type":"collapse","families":["Artifact","Runtime","External","Constraint","Risk","Incident","Evidence"]},
+        {"type":"highlight","condition":"ui_routes_as_entry_points"},
+        {"type":"badge","field":"feature_flag_status","source":"Configuration"}
+      ],
+      "default_view_layout": "force",
+      "example_use_case": "Which features are behind feature flags? What user flows changed in the last release?",
+      "sort_order": 7
+    },
+    {
+      "mode_id": "data_engineer_mode",
+      "name": "Data Engineer",
+      "persona": "Data engineer, data scientist, analytics team",
+      "primary_question": "Where does data live? How does it flow? What schemas and quality checks exist?",
+      "includes": {
+        "node_families": ["Data","Element","Interface","External","Control","Change","Constraint"],
+        "node_kinds": {"Data":["database","schema","table","view","column","collection","cache","topic","queue","event","message_schema","feature_store","vector_index","knowledge_graph"],"Element":["service","handler","workflow","job","task"],"Interface":["http_endpoint","event_contract","stream_contract","batch_entry"],"Control":["check","monitor","slo","sli"],"Change":["migration","schema_migration"],"Constraint":["size_limit","latency_budget","rpo","rto"]},
+        "relationship_types": ["READS","WRITES","UPDATES","DELETES","EMITS","CONSUMES","TRANSFORMS","PERSISTS_TO","MIGRATED_FROM","GOVERNED_BY_SLO","CHECKED_BY","LIMITED_BY"],
+        "overlays": ["data","observability","control","change"]
+      },
+      "emphasis_rules": [
+        {"type":"collapse","families":["Artifact","Runtime","Configuration","Risk","Incident"]},
+        {"type":"highlight","condition":"constraints_and_risks"},
+        {"type":"badge","field":"freshness","source":"Control"}
+      ],
+      "default_view_layout": "force",
+      "example_use_case": "Show all data lineage from source to warehouse. Which tables have no freshness SLO?",
+      "sort_order": 8
     }
   ],
   "compositions": [
     {"name":"coder+diagnosis","mode_ids":["coder_mode","diagnosis_mode"],"merge_strategy":"union","conflict_resolution":"diagnosis","zoom_level":"file"},
-    {"name":"architect+diagnosis","mode_ids":["architect_mode","diagnosis_mode"],"merge_strategy":"union","conflict_resolution":"diagnosis","zoom_level":"service"}
+    {"name":"architect+diagnosis","mode_ids":["architect_mode","diagnosis_mode"],"merge_strategy":"union","conflict_resolution":"diagnosis","zoom_level":"service"},
+    {"name":"security+ops","mode_ids":["security_mode","ops_mode"],"merge_strategy":"union","conflict_resolution":"security","zoom_level":"service"},
+    {"name":"pm+user","mode_ids":["pm_mode","user_mode"],"merge_strategy":"union","conflict_resolution":"pm","zoom_level":"page"}
   ]
 }

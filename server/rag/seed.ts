@@ -236,67 +236,127 @@ export async function seedRagDb() {
 }
 
 async function seedDefaultOntology(db: any) {
-  // Check if default template already exists
-  const existing = ((await db.execute(sql`SELECT id FROM kgra_templates WHERE is_default = 'true' LIMIT 1`)) as any).rows;
-  if (existing?.length > 0) {
-    console.log("[RAGDB] Default ontology already seeded — skipping");
-    return;
-  }
-
   try {
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
 
-    // Read ontology JSON
     const ontologyPath = join(process.cwd(), "server/rag/default-ontology.json");
     const ontology = JSON.parse(readFileSync(ontologyPath, "utf-8"));
-
-    // Insert template
-    const result = ((await db.execute(sql`
-      INSERT INTO kgra_templates (name, version, description, purpose, is_default, design_principles, overlays, visualization_rules, quality_guards, portability_profiles, maturity_levels, example_queries)
-      VALUES (
-        ${ontology.name}, ${ontology.version}, ${ontology.description}, ${ontology.purpose}, 'true',
-        ${JSON.stringify(ontology.design_principles)}::jsonb,
-        ${JSON.stringify(ontology.overlays)}::jsonb,
-        ${JSON.stringify(ontology.visualization_rules)}::jsonb,
-        ${JSON.stringify(ontology.quality_guards)}::jsonb,
-        ${JSON.stringify(ontology.portability_profiles)}::jsonb,
-        ${JSON.stringify(ontology.maturity_levels)}::jsonb,
-        ${JSON.stringify(ontology.example_queries)}::jsonb
-      ) RETURNING id
-    `)) as any).rows?.[0];
-    const templateId = result?.id;
-
-    if (!templateId) {
-      console.warn("[RAGDB] Failed to insert default template");
-      return;
-    }
-
-    // Read modes JSON
     const modesPath = join(process.cwd(), "server/rag/default-modes.json");
     const modesData = JSON.parse(readFileSync(modesPath, "utf-8"));
 
-    // Insert 4 default modes
-    for (const mode of modesData.modes || []) {
-      await db.execute(sql`
-        INSERT INTO kgra_modes (template_id, mode_id, name, persona, primary_question, includes, emphasis_rules, default_view_layout, example_use_case, is_default, sort_order)
+    // Get or create default template
+    let templateId: number;
+    const existing = ((await db.execute(sql`SELECT id FROM kgra_templates WHERE is_default = 'true' LIMIT 1`)) as any).rows;
+    if (existing?.length > 0) {
+      templateId = existing[0].id;
+    } else {
+      const result = ((await db.execute(sql`
+        INSERT INTO kgra_templates (name, version, description, purpose, is_default, design_principles, overlays, visualization_rules, quality_guards, portability_profiles, maturity_levels, example_queries)
         VALUES (
-          ${templateId}, ${mode.mode_id}, ${mode.name}, ${mode.persona}, ${mode.primary_question},
-          ${JSON.stringify(mode.includes)}::jsonb, ${JSON.stringify(mode.emphasis_rules)}::jsonb,
-          ${mode.default_view_layout}, ${mode.example_use_case}, 'true', ${mode.sort_order || 0}
-        )
-      `);
+          ${ontology.name}, ${ontology.version}, ${ontology.description}, ${ontology.purpose}, 'true',
+          ${JSON.stringify(ontology.design_principles)}::jsonb,
+          ${JSON.stringify(ontology.overlays)}::jsonb,
+          ${JSON.stringify(ontology.visualization_rules)}::jsonb,
+          ${JSON.stringify(ontology.quality_guards)}::jsonb,
+          ${JSON.stringify(ontology.portability_profiles)}::jsonb,
+          ${JSON.stringify(ontology.maturity_levels)}::jsonb,
+          ${JSON.stringify(ontology.example_queries)}::jsonb
+        ) RETURNING id
+      `)) as any).rows?.[0];
+      templateId = result?.id;
+      if (!templateId) { console.warn("[RAGDB] Failed to insert default template"); return; }
+      console.log(`[RAGDB] Default template created: id=${templateId}`);
     }
 
-    // Insert 2 default compositions
+    // Seed missing modes (idempotent — skip existing mode_ids)
+    const existingModes = ((await db.execute(sql`SELECT mode_id FROM kgra_modes WHERE template_id = ${templateId}`)) as any).rows || [];
+    const existingModeIds = new Set(existingModes.map((m: any) => m.mode_id));
+    let newModes = 0;
+    for (const mode of modesData.modes || []) {
+      if (existingModeIds.has(mode.mode_id)) continue;
+      await db.execute(sql`
+        INSERT INTO kgra_modes (template_id, mode_id, name, persona, primary_question, includes, emphasis_rules, default_view_layout, example_use_case, is_default, sort_order)
+        VALUES (${templateId}, ${mode.mode_id}, ${mode.name}, ${mode.persona}, ${mode.primary_question},
+          ${JSON.stringify(mode.includes)}::jsonb, ${JSON.stringify(mode.emphasis_rules)}::jsonb,
+          ${mode.default_view_layout}, ${mode.example_use_case}, 'true', ${mode.sort_order || 0})
+      `);
+      newModes++;
+    }
+
+    // Seed missing compositions
+    const existingComps = ((await db.execute(sql`SELECT name FROM kgra_mode_compositions`)) as any).rows || [];
+    const existingCompNames = new Set(existingComps.map((c: any) => c.name));
+    let newComps = 0;
     for (const comp of modesData.compositions || []) {
+      if (existingCompNames.has(comp.name)) continue;
       await db.execute(sql`
         INSERT INTO kgra_mode_compositions (name, mode_ids, merge_strategy, conflict_resolution, zoom_level)
         VALUES (${comp.name}, ${JSON.stringify(comp.mode_ids)}::jsonb, ${comp.merge_strategy}, ${comp.conflict_resolution}, ${comp.zoom_level})
       `);
+      newComps++;
     }
 
-    console.log(`[RAGDB] Default ontology seeded: template id=${templateId}, ${modesData.modes?.length || 0} modes, ${modesData.compositions?.length || 0} compositions`);
+    // Seed template nodes from ontology families (idempotent — skip if any exist)
+    const existingTNodes = ((await db.execute(sql`SELECT COUNT(*) as cnt FROM kgra_template_nodes WHERE template_id = ${templateId}`)) as any).rows?.[0]?.cnt;
+    if (Number(existingTNodes) === 0) {
+      let nodeCount = 0;
+      for (const [family, info] of Object.entries(ontology.node_families || {})) {
+        const kinds = (info as any).kinds || [];
+        for (const kind of kinds) {
+          await db.execute(sql`
+            INSERT INTO kgra_template_nodes (template_id, unique_id, name, short_name, family, kind, description)
+            VALUES (${templateId}, ${family.toLowerCase() + '_' + kind}, ${kind}, ${kind}, ${family}, ${kind}, ${(info as any).description || ''})
+          `);
+          nodeCount++;
+        }
+      }
+
+      // Seed template edges — one example per relationship category
+      const relTypes = ontology.relationship_types || {};
+      let edgeCount = 0;
+      const tNodes = ((await db.execute(sql`SELECT id, family, kind FROM kgra_template_nodes WHERE template_id = ${templateId}`)) as any).rows || [];
+      const nodeByKind = new Map(tNodes.map((n: any) => [n.kind, n.id]));
+
+      const exampleEdges: Array<[string, string, string, string]> = [
+        ["CONTAINS", "application", "service", "structural"],
+        ["IMPORTS", "file", "module", "dependency"],
+        ["USES", "service", "library", "dependency"],
+        ["DEPENDS_ON", "service", "database", "dependency"],
+        ["EXPOSES", "service", "http_endpoint", "interface_flow"],
+        ["ROUTES_TO", "ui_route", "handler", "interface_flow"],
+        ["READS", "service", "table", "data_flow"],
+        ["WRITES", "handler", "database", "data_flow"],
+        ["RUNS_IN", "service", "container", "runtime_flow"],
+        ["DEPLOYS_TO", "service", "cluster", "runtime_flow"],
+        ["PROTECTED_BY", "http_endpoint", "policy", "control_flow"],
+        ["GOVERNED_BY_SLO", "service", "slo", "control_flow"],
+        ["DOCUMENTED_BY", "service", "document", "traceability"],
+        ["VULNERABLE_TO", "service", "vulnerability", "risk_incident"],
+        ["CAUSED_INCIDENT", "service", "outage", "risk_incident"],
+        ["CONFIGURED_BY", "service", "feature_flag", "configuration"],
+      ];
+
+      for (const [relName, srcKind, tgtKind, category] of exampleEdges) {
+        const srcId = nodeByKind.get(srcKind);
+        const tgtId = nodeByKind.get(tgtKind);
+        if (srcId && tgtId) {
+          await db.execute(sql`
+            INSERT INTO kgra_template_edges (template_id, name, source_node_id, target_node_id, relationship_type, relationship_category)
+            VALUES (${templateId}, ${relName}, ${srcId}, ${tgtId}, ${relName}, ${category})
+          `);
+          edgeCount++;
+        }
+      }
+
+      console.log(`[RAGDB] Template nodes/edges seeded: ${nodeCount} nodes, ${edgeCount} edges`);
+    }
+
+    if (newModes > 0 || newComps > 0) {
+      console.log(`[RAGDB] Seeded ${newModes} new modes, ${newComps} new compositions`);
+    } else {
+      console.log("[RAGDB] Default ontology up to date");
+    }
   } catch (err: any) {
     console.warn(`[RAGDB] Default ontology seed failed: ${err.message}`);
   }

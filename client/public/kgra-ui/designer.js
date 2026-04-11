@@ -108,6 +108,7 @@ async function showDesigner() {
             <span class="card-title" style="margin:0;">Modes</span>
           </div>
           <button class="btn" onclick="showCreateMode()" style="font-size:10px; padding:3px 8px;">+ Custom Mode</button>
+          <button class="btn" onclick="showCreateComposition()" style="font-size:10px; padding:3px 8px;">+ Compose</button>
         </div>
         <div id="designer-mode-list" style="font-size:12px;">Loading...</div>
       </div>
@@ -252,9 +253,13 @@ function showAddNodeForm() {
           <textarea class="input" id="node-desc" rows="2" placeholder="Optional notes..."></textarea>
         </div>
         <div>
-          <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:3px;">Properties</label>
+          <label class="designer-label">Properties</label>
           <div id="node-properties"></div>
           <button class="btn" onclick="addPropertyRow('node-properties')" style="font-size:10px; padding:2px 8px; margin-top:4px;">+ Add Property</button>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1;"><label class="designer-label">Valid From</label><input class="input" id="node-valid-from" type="date" /></div>
+          <div style="flex:1;"><label class="designer-label">Valid Until</label><input class="input" id="node-valid-until" type="date" /></div>
         </div>
         <div id="node-form-warning" style="display:none; font-size:11px; color:#f59e0b; padding:4px 0;"></div>
         <div style="display:flex; gap:8px; margin-top:8px;">
@@ -515,13 +520,21 @@ async function showAddEdgeForm() {
           </div>
         </div>
         <div>
-          <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:3px;">Description</label>
+          <label class="designer-label">Provenance</label>
+          <input class="input" id="edge-provenance" placeholder="Source of this link (e.g., code review, architecture doc)" />
+        </div>
+        <div>
+          <label class="designer-label">Description</label>
           <textarea class="input" id="edge-desc" rows="2" placeholder="Optional notes..."></textarea>
         </div>
         <div>
-          <label style="font-size:11px; color:var(--text-dim); display:block; margin-bottom:3px;">Properties</label>
+          <label class="designer-label">Properties</label>
           <div id="edge-properties"></div>
           <button class="btn" onclick="addPropertyRow('edge-properties')" style="font-size:10px; padding:2px 8px; margin-top:4px;">+ Add Property</button>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1;"><label class="designer-label">Valid From</label><input class="input" id="edge-valid-from" type="date" /></div>
+          <div style="flex:1;"><label class="designer-label">Valid Until</label><input class="input" id="edge-valid-until" type="date" /></div>
         </div>
         <div id="edge-form-warning" style="display:none; font-size:11px; color:#f59e0b; padding:4px 0;"></div>
         <div style="display:flex; gap:8px; margin-top:8px;">
@@ -562,6 +575,7 @@ async function submitNewEdge() {
   const targetRef = parseNodeRef(document.getElementById('edge-target')?.value);
   const strength = document.getElementById('edge-strength')?.value || 'hard';
   const confidence = document.getElementById('edge-confidence')?.value;
+  const provenance = document.getElementById('edge-provenance')?.value?.trim();
   const description = document.getElementById('edge-desc')?.value?.trim();
   const properties = collectProperties('edge-properties');
   const warn = document.getElementById('edge-form-warning');
@@ -606,6 +620,7 @@ async function submitNewEdge() {
         relationship_category: category,
         link_strength: strength,
         confidence: strength === 'soft' ? confidence : null,
+        provenance: provenance || null,
         description,
         properties,
       }),
@@ -748,6 +763,7 @@ function renderTemplateList() {
         </div>
         <div style="display:flex; gap:4px;">
           <button onclick="showTemplateDetail(${t.id})" class="btn" style="font-size:10px; padding:2px 6px;">View</button>
+          ${!isDefault ? `<button onclick="showEditTemplate(${t.id})" class="btn" style="font-size:10px; padding:2px 6px;">Edit</button>` : ''}
           <button onclick="applyTemplate(${t.id})" class="btn" style="font-size:10px; padding:2px 6px;">Apply</button>
           <button onclick="duplicateTemplate(${t.id})" class="btn" style="font-size:10px; padding:2px 6px;">Duplicate</button>
           ${!isDefault ? `<button onclick="deleteTemplate(${t.id})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:12px;">🗑</button>` : ''}
@@ -1248,5 +1264,115 @@ async function deleteTemplateEdge(templateId, edgeId) {
     await fetch(`${API}/templates/${templateId}/edges/${edgeId}`, { method: 'DELETE' });
     showToast('Edge removed');
     showTemplateDetail(templateId);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ── Template Edit Form ──────────────────────────────────────────
+
+async function showEditTemplate(id) {
+  const tmpl = designerTemplates.find(t => t.id === id);
+  if (!tmpl) return;
+  const body = document.getElementById('main-body');
+  body.innerHTML = `
+    <div style="max-width:500px;">
+      <div style="padding:0 0 12px;"><button onclick="showDesigner()" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:none;border:none;color:var(--text-dim);cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button></div>
+      <h2 style="font-size:16px; font-weight:600; color:var(--text); margin-bottom:12px;">Edit Template</h2>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div><label class="designer-label">Name</label><input class="input" id="edit-tmpl-name" value="${tmpl.name}" /></div>
+        <div><label class="designer-label">Description</label><textarea class="input" id="edit-tmpl-desc" rows="3">${tmpl.description || ''}</textarea></div>
+        <div><label class="designer-label">Purpose</label><textarea class="input" id="edit-tmpl-purpose" rows="2">${tmpl.purpose || ''}</textarea></div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-primary" onclick="submitEditTemplate(${id})" style="font-size:12px; padding:6px 16px;">Save</button>
+          <button class="btn" onclick="showDesigner()" style="font-size:12px; padding:6px 16px;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function submitEditTemplate(id) {
+  const name = document.getElementById('edit-tmpl-name')?.value?.trim();
+  const description = document.getElementById('edit-tmpl-desc')?.value?.trim();
+  const purpose = document.getElementById('edit-tmpl-purpose')?.value?.trim();
+  try {
+    await fetch(`${API}/templates/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description, purpose }),
+    });
+    showToast('Template updated');
+    showDesigner();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ── Create Composition Form ─────────────────────────────────────
+
+async function showCreateComposition() {
+  const modes = await fetch(`${API}/modes`).then(r => r.json()).catch(() => []);
+  const modeCheckboxes = modes.map(m =>
+    `<label style="display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-dim);">
+      <input type="checkbox" class="comp-mode-cb" value="${m.mode_id}"> ${m.name} (${m.mode_id})
+    </label>`
+  ).join('');
+
+  const body = document.getElementById('main-body');
+  body.innerHTML = `
+    <div style="max-width:500px;">
+      <div style="padding:0 0 12px;"><button onclick="showDesigner()" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:none;border:none;color:var(--text-dim);cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button></div>
+      <h2 style="font-size:16px; font-weight:600; color:var(--text); margin-bottom:12px;">New Mode Composition</h2>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div><label class="designer-label">Name *</label><input class="input" id="comp-name" placeholder="e.g. security+ops" /></div>
+        <div>
+          <label class="designer-label">Select Modes to Combine *</label>
+          <div style="padding:6px; border:1px solid var(--border); border-radius:4px; max-height:200px; overflow-y:auto;">
+            ${modeCheckboxes}
+          </div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1;">
+            <label class="designer-label">Merge Strategy</label>
+            <select class="input" id="comp-strategy">
+              <option value="union">Union (show all)</option>
+              <option value="intersection">Intersection (show common)</option>
+            </select>
+          </div>
+          <div style="flex:1;">
+            <label class="designer-label">Conflict Resolution</label>
+            <input class="input" id="comp-conflict" placeholder="e.g. diagnosis" />
+          </div>
+        </div>
+        <div>
+          <label class="designer-label">Zoom Level</label>
+          <select class="input" id="comp-zoom">
+            <option value="file">File</option>
+            <option value="module">Module</option>
+            <option value="service">Service</option>
+            <option value="system">System</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-primary" onclick="submitNewComposition()" style="font-size:12px; padding:6px 16px;">Create</button>
+          <button class="btn" onclick="showDesigner()" style="font-size:12px; padding:6px 16px;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function submitNewComposition() {
+  const name = document.getElementById('comp-name')?.value?.trim();
+  const mode_ids = [...document.querySelectorAll('.comp-mode-cb:checked')].map(cb => cb.value);
+  const merge_strategy = document.getElementById('comp-strategy')?.value;
+  const conflict_resolution = document.getElementById('comp-conflict')?.value?.trim();
+  const zoom_level = document.getElementById('comp-zoom')?.value;
+
+  if (!name || mode_ids.length < 2) { showToast('Name required and select at least 2 modes', 'error'); return; }
+
+  try {
+    await fetch(`${API}/modes/compose`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, mode_ids, merge_strategy, conflict_resolution: conflict_resolution || null, zoom_level }),
+    });
+    showToast(`Composition "${name}" created`);
+    showDesigner();
   } catch (err) { showToast(err.message, 'error'); }
 }

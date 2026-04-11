@@ -771,11 +771,23 @@ async function startServer() {
   });
 
   // Analytics relationships — for the Visualization tab (reads from ragdb)
-  app.get("/api/kgra-proxy/v1/analytics/relationships", async (_req, res) => {
+  app.get("/api/kgra-proxy/v1/analytics/relationships", async (req, res) => {
     try {
       const { getRagDb } = await import("../rag/connection");
       const ragDb = getRagDb();
       if (!ragDb) return res.json([]);
+
+      // Load mode filter for relationship types
+      const modeId = req.query.mode as string;
+      let allowedRelTypes: Set<string> | null = null;
+      if (modeId) {
+        const modeRow = ((await ragDb.execute(sql`SELECT includes FROM kgra_modes WHERE mode_id = ${modeId} LIMIT 1`)) as any).rows?.[0];
+        if (modeRow?.includes) {
+          const inc = typeof modeRow.includes === "string" ? JSON.parse(modeRow.includes) : modeRow.includes;
+          if (inc.relationship_types?.length > 0) allowedRelTypes = new Set(inc.relationship_types.map((t: string) => t.toUpperCase()));
+        }
+      }
+
       const rels = ((await ragDb.execute(sql`
         SELECT src.name as source_name, tgt.name as target_name,
                src.short_name as source_short, tgt.short_name as target_short,
@@ -784,7 +796,7 @@ async function startServer() {
         JOIN kgra_entities src ON src.id = r.source_entity_id
         JOIN kgra_entities tgt ON tgt.id = r.target_entity_id
       `)) as any).rows || [];
-      const result = rels.map((r: any) => ({
+      let result = rels.map((r: any) => ({
         source_id: r.source_name,
         target_id: r.target_name,
         source_name: r.source_short || (r.source_name || "").split("/").pop() || r.source_name,
@@ -793,6 +805,11 @@ async function startServer() {
         weight: r.weight || 1,
         source: "auto",
       }));
+
+      // Apply mode relationship type filter
+      if (allowedRelTypes) {
+        result = result.filter((r: any) => allowedRelTypes!.has(r.type));
+      }
 
       // UNION: add active manual edges
       const manualEdges = ((await ragDb.execute(sql`
