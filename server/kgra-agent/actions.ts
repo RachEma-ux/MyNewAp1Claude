@@ -42,6 +42,21 @@ export function detectAction(query: string): string | null {
   return null;
 }
 
+export function detectAllActions(query: string): string[] {
+  const actions: string[] = [];
+  for (const { pattern, action } of ACTION_PATTERNS) {
+    if (pattern.test(query)) actions.push(action);
+  }
+  // If ingest is requested with visualize/graph, always chain: ingest → build_graph
+  if (actions.includes("ingest_project") && !actions.includes("build_graph")) {
+    const lower = query.toLowerCase();
+    if (lower.includes("graph") || lower.includes("visuali") || lower.includes("linked") || lower.includes("map")) {
+      actions.push("build_graph");
+    }
+  }
+  return actions;
+}
+
 // ── Action: Ingest Project Code Files ───────────────────────────
 
 const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx"]);

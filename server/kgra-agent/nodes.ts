@@ -8,7 +8,7 @@ import type { KGRAState, ToolCallEntry, CostTracker } from "./state";
 import { classifyIntent, selectMode, shouldUseHumanReview, getFallbackChain } from "./routing";
 import { getProviderRegistry } from "../providers/registry";
 import { sql } from "drizzle-orm";
-import { detectAction, executeAction } from "./actions";
+import { detectAction, detectAllActions, executeAction } from "./actions";
 
 /**
  * Gather real platform data from the database.
@@ -286,17 +286,17 @@ export async function executeRetrievalNode(state: KGRAState): Promise<KGRAState>
     return state;
   }
 
-  // 1. Detect if the query requires a real action (ingest, build graph, visualize, etc.)
-  const actionName = detectAction(state.query);
-  if (actionName) {
+  // 1. Detect ALL actions the query requires (ingest, build graph, visualize, etc.)
+  const actions = detectAllActions(state.query);
+  const actionResults: any[] = [];
+  for (const actionName of actions) {
     try {
       const result = await executeAction(actionName, state.query);
-      (state as any)._actionResult = result;
+      actionResults.push(result);
       addToolCall(state, actionName, { query: state.query }, result.summary, {
         graph_reads: actionName === "build_graph" ? 1 : 0,
         vector_queries: actionName === "ingest_project" ? 1 : 0,
       });
-      // Add action result as an observed fact
       state.observed_facts.push({
         id: `action_${actionName}`,
         label: result.summary,
@@ -306,6 +306,7 @@ export async function executeRetrievalNode(state: KGRAState): Promise<KGRAState>
       state.errors.push(`Action ${actionName} failed: ${(err as Error).message}`);
     }
   }
+  (state as any)._actionResults = actionResults;
 
   // 2. Always gather platform context for the LLM
   try {
@@ -317,11 +318,11 @@ export async function executeRetrievalNode(state: KGRAState): Promise<KGRAState>
       }
     }
 
-    // Store context + action result for LLM synthesis
+    // Store context + all action results for LLM synthesis
     let fullContext = context;
-    const actionResult = (state as any)._actionResult;
-    if (actionResult) {
-      fullContext += `\n\n═══ ACTION EXECUTED: ${actionResult.action} ═══\nResult: ${actionResult.summary}\nData: ${JSON.stringify(actionResult.data, null, 2)}`;
+    const actionResults = (state as any)._actionResults || [];
+    for (const ar of actionResults) {
+      fullContext += `\n\n═══ ACTION EXECUTED: ${ar.action} ═══\nResult: ${ar.summary}\nData: ${JSON.stringify(ar.data, null, 2)}`;
     }
     (state as any)._platformContext = fullContext;
 
