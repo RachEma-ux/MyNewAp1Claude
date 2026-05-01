@@ -1,7 +1,25 @@
+/**
+ * appRouter — root tRPC router
+ *
+ * Composition rule (post modular refactor):
+ *   - Platform core routers are explicit (auth, system, workspaces,
+ *     governance, modules registry, coordinator/orchestrator, hq, etc).
+ *   - Module routers come from the manifest barrel
+ *     (`server/platform/modules/module-routers.ts`). Adding a module is
+ *     one entry there, not here.
+ *
+ * The manifest barrel is type-preserving so the client's per-module
+ * tRPC inference (e.g. `trpc.prm.<...>.useQuery`) keeps working.
+ */
+
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+
+// ---------------------------------------------------------------------------
+// Platform core routers (explicit)
+// ---------------------------------------------------------------------------
 import { providerRouter } from "./providers/router";
 import { providerAnalyticsRouter } from "./providers/analytics-router";
 import { chatRouter } from "./chat/router";
@@ -43,22 +61,25 @@ import { modulesRouter } from "./modules/router";
 import { orchestratorRouter } from "./orchestrator/router";
 import { botsRouter } from "./routers/bots";
 import { workspaceRouter, wsCatalogRouter } from "./workspace/workspace-router";
-import { hrRouter } from "./hr/router";
 import { workforceAssignmentRouter } from "./workforce-assignment/router";
-import { organizationManagementRouter } from "./organization-management/router";
-import { cultureValuesRouter } from "./culture-values/router";
-import { psRouter } from "./ps/ps.router";
 import { dataAnalysisRouter } from "./data-analysis/router";
-import { sandboxWfRouter } from "./sandbox-wf/router";
-import { aiTypesRouter } from "./ai-types/router";
-import { prmRouter } from "./prm/prm.router";
-import { psmRouter } from "./psm/psm.router";
-import { codeStudioRouter } from "./code-studio/api/router";
-import { agentStudioRouter } from "./agent-studio/api/router";
-import { openRouterRouter } from "./openrouter/router";
-import { kgraAgentRouter } from "./kgra-agent/router";
+
+// ---------------------------------------------------------------------------
+// Module routers — manifest-driven
+// ---------------------------------------------------------------------------
+import { MODULE_ROUTERS } from "./platform/modules/module-routers";
+import { registerAllManifests } from "./platform/modules/manifests";
+
+// Side effect: populate the platform module registry so the Runtime
+// Manager and Module Gateway can see every module.
+registerAllManifests();
+
+// ---------------------------------------------------------------------------
+// appRouter — root composition
+// ---------------------------------------------------------------------------
 
 export const appRouter = router({
+  // Platform core
   system: systemRouter,
   diagnostic: diagnosticRouter, // Diagnostic endpoints for debugging
   providers: providerRouter,
@@ -88,7 +109,6 @@ export const appRouter = router({
   wiki: wikiRouter,
   llm: llmRouter, // LLM Control Plane
   deploy: deployRouter, // Deployment management
-  aiTypes: aiTypesRouter, // AI Types Module (catalog, registry, import, taxonomy, relationships)
   catalogManage: catalogManageRouter, // [DEPRECATED alias] → use aiTypes.catalog
   catalogRegistry: catalogRegistryRouter, // [DEPRECATED alias] → use aiTypes.registry
   catalogImport: catalogImportRouter, // [DEPRECATED alias] → use aiTypes.import
@@ -96,23 +116,13 @@ export const appRouter = router({
   discoveryOps: discoveryOpsRouter, // Discovery Ops: monitoring, promotion, audit
   governance: governanceRouter, // Governance Engine (CGT v2)
   hq: hqRouter, // Digital HQ aggregation
-  hr: hrRouter, // Human Resources — global workforce backbone
-  workforceAssignment: workforceAssignmentRouter, // Workforce Assignment Bridge — OM↔HR↔PS governed staffing
-  organizationManagement: organizationManagementRouter, // Organization Management — structural backbone (entities, org units, jobs, positions, authority)
-  cultureValues: cultureValuesRouter, // Culture Values — enterprise values, behaviors, translations, operationalization
-  ps: psRouter, // Projects System — project system definitions, wizard runs, catalog
-  modules: modulesRouter, // Platform Engines (PMT, Knowledge, Agents, Collaboration, Reporting, HR)
+  workforceAssignment: workforceAssignmentRouter, // OM↔HR↔PS governed staffing bridge
+  modules: modulesRouter, // Workspace Engines registry (PMT, Knowledge, …)
   orchestrator: orchestratorRouter, // Multi-Operator Autonomous Runtime
   models: modelsRouter, // Model Registry (governed)
   bots: botsRouter, // Bot Domain (governed lifecycle)
-  dataAnalysis: dataAnalysisRouter, // Data Analysis — GraphRAG engine + future analytical tools
-  prm: prmRouter, // PRM — Problem Resolution Methods (dedicated prmdb)
-  psm: psmRouter, // PSM — Problem Solving Methods (dedicated psmdb)
-  sandboxWf: sandboxWfRouter, // Sandbox WF — dedicated wfdb workflows, steps, executions, triggers
-  codeStudio: codeStudioRouter, // Code Studio — standalone coding module (dedicated codedb, OpenCode runtime)
-  agentStudio: agentStudioRouter, // AI Agent Studio — standalone agent lifecycle module (ags_* tables)
-  openRouter: openRouterRouter, // OpenRouter — unified model gateway (control plane + runtime)
-  kgraAgent: kgraAgentRouter, // KGRA — Knowledge Graph Reasoning Agent (proxy to Python service)
+  dataAnalysis: dataAnalysisRouter, // GraphRAG + analytical tools
+
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -122,18 +132,13 @@ export const appRouter = router({
     }),
   }),
 
-  // ============================================================================
-  // Workspace Management — Canonical workspace system v2
-  // ============================================================================
   workspaces: workspaceRouter,
-
-  // WS Catalog — Published workspace discovery for participants
   wsCatalog: wsCatalogRouter,
-
-  // Document CRUD (extracted from inline to documents/documents-crud-router.ts)
   documents: documentsCrudRouter,
 
-  // Note: conversations router is imported from ./routers/conversations.ts (line 35)
+  // Module routers — sourced from manifests (one entry per module in
+  // server/platform/modules/module-routers.ts).
+  ...MODULE_ROUTERS,
 });
 
 export type AppRouter = typeof appRouter;

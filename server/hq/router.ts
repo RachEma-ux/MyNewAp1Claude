@@ -10,6 +10,7 @@ import {
   isFrozen,
   getActiveControls,
 } from "../governance/scorecard";
+import { snapshotDigitalHq } from "../platform/observability";
 
 export const hqRouter = router({
   // 1. Org Authority — workspace owner, system config, governance freeze status
@@ -184,6 +185,11 @@ export const hqRouter = router({
       riskBreakdown,
       totalControls: controls.length,
     };
+  }),
+
+  // 9. Platform Modular — module/runtime/handoff/event/workflow read model
+  platformModular: protectedProcedure.query(async () => {
+    return snapshotDigitalHq();
   }),
 
   // 8. Collaboration Intel — audit trail activity, workspace member activity
