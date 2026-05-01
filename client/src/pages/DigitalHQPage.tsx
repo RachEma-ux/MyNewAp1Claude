@@ -7,6 +7,7 @@ import DiscoverabilityPanel from "./hq/DiscoverabilityPanel";
 import NotificationsPanel from "./hq/NotificationsPanel";
 import RiskBaselinesPanel from "./hq/RiskBaselinesPanel";
 import CollaborationIntelPanel from "./hq/CollaborationIntelPanel";
+import ApplicationWiringInventoryPanel from "./hq/ApplicationWiringInventoryPanel";
 
 export default function DigitalHQPage() {
   const [, params] = useRoute("/hq/:item");
@@ -29,6 +30,8 @@ export default function DigitalHQPage() {
       return <RiskBaselinesPanel />;
     case "collaboration":
       return <CollaborationIntelPanel />;
+    case "application-wiring":
+      return <ApplicationWiringInventoryPanel />;
     default:
       return <OrgAuthorityPanel />;
   }

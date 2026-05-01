@@ -29,7 +29,11 @@
     "check:wiring:runtime": "tsx scripts/check-runtime-wiring.ts",
     "check:wiring:coordinator": "tsx scripts/check-coordinator-wiring.ts",
     "check:wiring": "tsx scripts/check-module-wiring.ts && tsx scripts/check-gateway-wiring.ts && tsx scripts/check-event-wiring.ts && tsx scripts/check-handoff-wiring.ts && tsx scripts/check-frontend-module-wiring.ts && tsx scripts/check-runtime-wiring.ts && tsx scripts/check-coordinator-wiring.ts",
-    "check:architecture:full": "pnpm run check:architecture && pnpm run check:wiring"
+    "check:wiring-inventory": "tsx scripts/check-wiring-inventory.ts",
+    "check:module-readiness": "tsx scripts/check-module-readiness.ts",
+    "check:dependency-graph": "tsx scripts/check-dependency-graph.ts",
+    "check:awi": "pnpm run check:wiring-inventory && pnpm run check:module-readiness && pnpm run check:dependency-graph",
+    "check:architecture:full": "pnpm run check:architecture && pnpm run check:wiring && pnpm run check:awi"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

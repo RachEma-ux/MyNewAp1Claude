@@ -11,6 +11,7 @@ import {
   getActiveControls,
 } from "../governance/scorecard";
 import { snapshotDigitalHq } from "../platform/observability";
+import { applicationWiringRouter } from "./application-wiring-router";
 
 export const hqRouter = router({
   // 1. Org Authority — workspace owner, system config, governance freeze status
@@ -191,6 +192,10 @@ export const hqRouter = router({
   platformModular: protectedProcedure.query(async () => {
     return snapshotDigitalHq();
   }),
+
+  // 10. Application Wiring Inventory — per-module wiring matrix, dependency
+  //     graph, readiness scoring. Read-only computed view; no DB.
+  applicationWiring: applicationWiringRouter,
 
   // 8. Collaboration Intel — audit trail activity, workspace member activity
   collaborationIntel: protectedProcedure.query(async ({ ctx }) => {
