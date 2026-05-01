@@ -7,6 +7,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+REVOKE CONNECT ON DATABASE codedb FROM PUBLIC;
 GRANT CONNECT ON DATABASE codedb TO code_runtime_user;
 GRANT USAGE ON SCHEMA public TO code_runtime_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO code_runtime_user;

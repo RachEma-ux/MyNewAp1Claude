@@ -7,6 +7,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+REVOKE CONNECT ON DATABASE ragdb FROM PUBLIC;
 GRANT CONNECT ON DATABASE ragdb TO rag_runtime_user;
 GRANT USAGE ON SCHEMA public TO rag_runtime_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO rag_runtime_user;

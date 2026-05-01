@@ -7,6 +7,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+REVOKE CONNECT ON DATABASE prmdb FROM PUBLIC;
 GRANT CONNECT ON DATABASE prmdb TO prm_runtime_user;
 GRANT USAGE ON SCHEMA public TO prm_runtime_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO prm_runtime_user;

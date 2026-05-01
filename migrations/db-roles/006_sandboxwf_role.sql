@@ -7,6 +7,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+REVOKE CONNECT ON DATABASE wfdb FROM PUBLIC;
 GRANT CONNECT ON DATABASE wfdb TO sandbox_wf_runtime_user;
 GRANT USAGE ON SCHEMA public TO sandbox_wf_runtime_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sandbox_wf_runtime_user;

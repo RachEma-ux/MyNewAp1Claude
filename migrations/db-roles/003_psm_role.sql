@@ -7,6 +7,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+REVOKE CONNECT ON DATABASE psmdb FROM PUBLIC;
 GRANT CONNECT ON DATABASE psmdb TO psm_runtime_user;
 GRANT USAGE ON SCHEMA public TO psm_runtime_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO psm_runtime_user;
