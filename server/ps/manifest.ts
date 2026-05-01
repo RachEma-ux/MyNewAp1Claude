@@ -7,6 +7,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { psRouter } from "./ps.router";
 import { okHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const psManifest: ModuleManifest = {
   key: "ps",
@@ -51,4 +52,7 @@ export const psManifest: ModuleManifest = {
   handoffs: { produces: ["ps.pmCentral"], accepts: [] },
   ports: { provided: ["ps.read"], consumed: ["aiTypes.catalog"] },
   communication: { modes: ["port", "handoff", "event"] },
+  boot: async () => {
+    registerModuleHealthAction(psManifest);
+  },
 };

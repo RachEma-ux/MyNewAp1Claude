@@ -5,6 +5,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { cultureValuesRouter } from "./router";
 import { okHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const cvManifest: ModuleManifest = {
   key: "cultureValues",
@@ -38,4 +39,7 @@ export const cvManifest: ModuleManifest = {
   events: { emits: ["cv.value.published"] },
   ports: { provided: ["cv.read"], consumed: [] },
   communication: { modes: ["port", "event"] },
+  boot: async () => {
+    registerModuleHealthAction(cvManifest);
+  },
 };

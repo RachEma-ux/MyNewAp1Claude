@@ -14,6 +14,12 @@ import { useHrRole } from "@/hooks/useHrRole";
 import { trpc } from "@/lib/trpc";
 import { PMCentralChatWindow } from "./components/pm/PMCentralChatWindow";
 import { AgentStudioChatWindow } from "./components/agent-studio/AgentStudioChatWindow";
+// Frontend module manifests — side-effectful registration into the
+// client module registry. Compat mode: <ModuleRoutes /> is appended
+// after the existing Switch entries, so existing routes win and
+// modules just contribute additional metadata + nav.
+import "@/modules";
+import { ModuleRoutes } from "@/platform/modules";
 
 // Lazy-loaded page components (code splitting)
 const Home = lazy(() => import("./pages/Home"));
@@ -700,6 +706,11 @@ function Router() {
       {/* UI Showcase — living documentation for shared components */}
       <Route path="/ui-showcase" component={() => <ProtectedRoute component={UIShowcasePage} />} />
       <Route path="/404" component={NotFound} />
+      {/* Module-composed routes (compat mode): renders any routes that
+          registered modules contribute and that aren't already matched
+          above. Switch picks the first match, so existing routes always
+          take precedence. New module-only routes flow through here. */}
+      <ModuleRoutes />
       <Route component={NotFound} />
     </Switch>
   );

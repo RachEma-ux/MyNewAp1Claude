@@ -5,6 +5,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { psmRouter } from "./psm.router";
 import { dbPingHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const psmManifest: ModuleManifest = {
   key: "psm",
@@ -40,6 +41,7 @@ export const psmManifest: ModuleManifest = {
   navigation: [{ group: "knowledge", label: "PSM", order: 31 }],
 
   boot: async (ctx) => {
+    registerModuleHealthAction(psmManifest);
     try {
       const { seedPsmDb } = await import("./seed");
       await seedPsmDb();

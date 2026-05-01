@@ -7,6 +7,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { hrRouter } from "./router";
 import { okHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const hrManifest: ModuleManifest = {
   key: "hr",
@@ -40,4 +41,7 @@ export const hrManifest: ModuleManifest = {
   events: { emits: ["hr.employee.created", "hr.assignment.changed"] },
   ports: { provided: ["hr.directory.read"], consumed: ["om.read"] },
   communication: { modes: ["port", "event"] },
+  boot: async () => {
+    registerModuleHealthAction(hrManifest);
+  },
 };

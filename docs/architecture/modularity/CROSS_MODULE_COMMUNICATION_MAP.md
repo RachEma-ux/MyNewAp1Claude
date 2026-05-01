@@ -58,3 +58,34 @@ Use the coordinator only when the flow becomes a real multi-module workflow:
 Sensitive cross-module mutations require a **governance receipt** attached to
 the gateway/handoff/coordinator request. The receipt is verified by the receiving
 module's gate. Coverage is enforced by `scripts/check-governance-actions.ts`.
+
+## Worked examples
+
+The canonical worked examples live in
+`server/platform/coordinator/coordinator-examples.test.ts`. They cover:
+
+1. A 3-module sync chain (`alpha → beta → gamma`) via `gateway-call` —
+   the basic shape of a coordinator workflow.
+2. Explicit compensation: a registered compensation handler runs as a
+   normal step. Unregistered compensation steps fail loudly (A2 fix).
+3. Pure event lane: when the producer doesn't need a result, publish an
+   event instead of submitting a workflow.
+
+Read these tests alongside this map — they're executable docs, not just
+unit tests.
+
+## Lane-selection cheat sheet
+
+```
+Need a result?              Yes → gateway (sync) or coordinator (async + state)
+                            No  → event
+
+Are you transferring        Yes → handoff
+ownership of a unit
+of work?                    No  → keep ownership; gateway / event / port
+
+Multi-module flow with      Yes → coordinator
+state and rollback?         No  → single handoff or gateway-call
+
+Cross-module SQL JOIN?      Always forbidden — use port + read.
+```

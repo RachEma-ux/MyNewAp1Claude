@@ -10,6 +10,7 @@
 
 import type { ModuleManifest } from "../platform/modules/types";
 import { dbPingHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const ragManifest: ModuleManifest = {
   key: "rag",
@@ -41,6 +42,7 @@ export const ragManifest: ModuleManifest = {
   ],
 
   boot: async (ctx) => {
+    registerModuleHealthAction(ragManifest);
     try {
       const { seedRagDb, migrateJsonBlobToRagDb } = await import("./seed");
       await seedRagDb();

@@ -15,4 +15,21 @@ export {
   cancelWorkflow,
   setWorkflowStore,
   __resetCoordinatorForTests,
+  __getWorkflowStoreForTests,
 } from "./runtime";
+export {
+  registerCompensationHandler,
+  getCompensationHandler,
+  listCompensationHandlers,
+  __resetCompensationRegistryForTests,
+} from "./compensation-registry";
+export type {
+  CompensationContext,
+  CompensationHandler,
+  RegisterCompensationOptions,
+} from "./compensation-registry";
+export {
+  InMemoryWorkflowStore,
+  DbWorkflowStoreNotConfigured,
+  type WorkflowStore,
+} from "./store";

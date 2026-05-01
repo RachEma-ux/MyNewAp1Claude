@@ -9,6 +9,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { aiTypesRouter } from "./router";
 import { okHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const aiTypesManifest: ModuleManifest = {
   key: "aiTypes",
@@ -41,6 +42,7 @@ export const aiTypesManifest: ModuleManifest = {
   navigation: [{ group: "infrastructure", label: "AI Types", order: 10 }],
 
   boot: async () => {
+    registerModuleHealthAction(aiTypesManifest);
     const { bootAiTypesModule } = await import("./boot");
     bootAiTypesModule();
   },
