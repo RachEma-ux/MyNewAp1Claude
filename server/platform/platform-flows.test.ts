@@ -124,6 +124,49 @@ describe("Event Bus", () => {
     expect(stats.failed).toBe(1);
     expect(stats.deadLetter).toBe(1);
   });
+
+  it("dedupes by idempotencyKey across different eventIds", async () => {
+    let count = 0;
+    subscribeEvent("prm.method.published", "consumer-idem", () => {
+      count++;
+    });
+    // Two envelopes with different eventIds (makeEnvelope mints fresh ones)
+    // but the same idempotencyKey — second delivery must be deduped.
+    await publishEvent(
+      makeEnvelope({
+        eventType: "prm.method.published",
+        sourceModule: "prm",
+        payload: { id: 7 },
+        idempotencyKey: "method-7-v1",
+      }),
+    );
+    await publishEvent(
+      makeEnvelope({
+        eventType: "prm.method.published",
+        sourceModule: "prm",
+        payload: { id: 7 },
+        idempotencyKey: "method-7-v1",
+      }),
+    );
+    expect(count).toBe(1);
+  });
+
+  it("routes critical handler failures to critical dead-letter (not silent)", async () => {
+    subscribeEvent("crit.boom", "crit-consumer", () => {
+      throw new Error("crit-boom");
+    });
+    await publishEvent(
+      makeEnvelope({
+        eventType: "crit.boom",
+        sourceModule: "x",
+        priority: "critical",
+        payload: {},
+      }),
+    );
+    const stats = getEventStats();
+    expect(stats.criticalDeadLetter).toBe(1);
+    expect(stats.failed).toBe(1);
+  });
 });
 
 describe("Coordinator", () => {

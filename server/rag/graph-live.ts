@@ -37,7 +37,7 @@ export function registerLiveRoutes(app: Express) {
     try {
       const { getRagDb } = await import("./connection");
       const ragDb = getRagDb();
-      if (!ragDb) return res.json({ status: 'unavailable' });
+      if (!ragDb) { res.json({ status: 'unavailable' }); return; }
 
       const { sql } = await import("drizzle-orm");
       const entityCount = ((await ragDb.execute(sql`SELECT COUNT(*) as cnt FROM kgra_entities`)) as any).rows?.[0]?.cnt || 0;

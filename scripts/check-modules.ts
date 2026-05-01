@@ -114,9 +114,8 @@ async function main() {
     process.exit(1);
   }
   console.log("OK — modules check passed.");
-  // Force-exit: importing the manifest barrel pulls in modules whose top-level
-  // code starts intervals (agent-studio scheduler, mcp reconnect timer). Those
-  // keep the event loop alive indefinitely. The check itself is complete.
+  // Force-exit: the manifest barrel transitively keeps the event loop alive;
+  // root cause not isolated. Exit explicitly after synchronous check completion.
   process.exit(0);
 }
 

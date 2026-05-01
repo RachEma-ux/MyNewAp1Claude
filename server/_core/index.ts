@@ -505,7 +505,7 @@ async function startServer() {
 
   app.post("/api/kgra-proxy/run", async (req, res) => {
     const { query, mode, workspace_id, session_id } = req.body || {};
-    if (!query) return res.status(400).json({ error: "query is required" });
+    if (!query) { res.status(400).json({ error: "query is required" }); return; }
 
     try {
       const { executeKGRARun } = await import("../kgra-agent/engine");
@@ -564,7 +564,7 @@ async function startServer() {
     try {
       const { getRagDb } = await import("../rag/connection");
       const ragDb = getRagDb();
-      if (!ragDb) return res.json({ nodes: [], edges: [] });
+      if (!ragDb) { res.json({ nodes: [], edges: [] }); return; }
       const entities = ((await ragDb.execute(sql`SELECT id, name, short_name, entity_type, mentions FROM kgra_entities`)) as any).rows || [];
       const rels = ((await ragDb.execute(sql`
         SELECT src.name as source, tgt.name as target, r.relationship_type as type
@@ -586,10 +586,10 @@ async function startServer() {
     try {
       const { getDb } = await import("../db/connection");
       const db = getDb();
-      if (!db) return res.json([]);
+      if (!db) { res.json([]); return; }
       const docCount = ((await db.execute(sql`SELECT count(*) as cnt FROM documents`)) as any).rows?.[0]?.cnt || 0;
       const chunkCount = ((await db.execute(sql`SELECT count(*) as cnt FROM document_chunks`)) as any).rows?.[0]?.cnt || 0;
-      if (Number(docCount) === 0) return res.json([]);
+      if (Number(docCount) === 0) { res.json([]); return; }
       res.json([{
         name: "MyNewAp1Claude-RAG",
         strategy: "recursive_split",
@@ -617,7 +617,7 @@ async function startServer() {
     try {
       const { getRagDb } = await import("../rag/connection");
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
 
       const hubCount = Math.min(50, Math.max(5, parseInt(req.query.hub_count as string) || 10));
       const maxNodes = 300;
@@ -640,15 +640,16 @@ async function startServer() {
         ORDER BY connections DESC
       `)) as any).rows || [];
 
-      if (allEntities.length === 0) return res.json([]);
+      if (allEntities.length === 0) { res.json([]); return; }
 
       // If small graph, return all
       if (allEntities.length <= maxNodes) {
-        return res.json(allEntities.map((e: any) => ({
+        res.json(allEntities.map((e: any) => ({
           id: e.name, name: e.short_name || e.name.split("/").pop() || e.name,
           type: (e.entity_type || "entity").toUpperCase(), connections: Number(e.connections) || e.mentions || 1,
           community: e.entity_type || "default",
         })));
+        return;
       }
 
       // Hub+neighbor strategy
@@ -723,7 +724,7 @@ async function startServer() {
     try {
       const { getRagDb } = await import("../rag/connection");
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
 
       // Load mode filter for relationship types
       const modeId = req.query.mode as string;

@@ -19,6 +19,10 @@ export const EventEnvelopeSchema = z.object({
   payload: z.unknown(),
   createdAt: z.string(),
   governanceReceiptId: z.string().optional(),
+  // Optional dedup key. Producers may set this so a logical retry with a
+  // fresh `eventId` is treated as the same delivery by subscribers. The bus
+  // falls back to `eventId` when this is unset.
+  idempotencyKey: z.string().optional(),
 });
 
 export type EventEnvelope = z.infer<typeof EventEnvelopeSchema>;
@@ -35,6 +39,7 @@ export function makeEnvelope(input: {
   schemaVersion?: string;
   payload: unknown;
   governanceReceiptId?: string;
+  idempotencyKey?: string;
 }): EventEnvelope {
   return {
     eventId: randomUUID(),
@@ -48,5 +53,6 @@ export function makeEnvelope(input: {
     payload: input.payload,
     createdAt: new Date().toISOString(),
     governanceReceiptId: input.governanceReceiptId,
+    idempotencyKey: input.idempotencyKey,
   };
 }

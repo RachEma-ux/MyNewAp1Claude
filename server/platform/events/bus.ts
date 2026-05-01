@@ -27,14 +27,22 @@ interface OutboxEntry {
 }
 
 interface InboxKey {
-  eventId: string;
+  dedupId: string;
   consumer: string;
+}
+
+interface CriticalDeadLetterEntry {
+  envelope: EventEnvelope;
+  consumer: string;
+  error: string;
+  attemptedAt: string;
 }
 
 class InMemoryBus {
   private subscribers: Subscriber[] = [];
   private outbox: OutboxEntry[] = [];
   private deadLetter: OutboxEntry[] = [];
+  private criticalDeadLetter: CriticalDeadLetterEntry[] = [];
   private inbox = new Set<string>();
 
   subscribe(pattern: string, consumer: string, handler: Subscriber["handler"]) {
@@ -59,23 +67,55 @@ class InMemoryBus {
   }
 
   private inboxKey(k: InboxKey): string {
-    return `${k.consumer}::${k.eventId}`;
+    return `${k.consumer}::${k.dedupId}`;
+  }
+
+  /**
+   * Dedup id used by the inbox: prefer the producer-supplied
+   * `idempotencyKey` (allows logical retries with new eventIds), fall
+   * back to `eventId`.
+   */
+  private dedupIdOf(env: EventEnvelope): string {
+    return env.idempotencyKey ?? env.eventId;
   }
 
   private async dispatchCritical(entry: OutboxEntry): Promise<void> {
     const env = entry.envelope;
     const matched = this.match(env.eventType);
+    let anyFailed = false;
+    let lastError: string | undefined;
     for (const s of matched) {
-      const key = this.inboxKey({ eventId: env.eventId, consumer: s.consumer });
+      const key = this.inboxKey({ dedupId: this.dedupIdOf(env), consumer: s.consumer });
       if (this.inbox.has(key)) continue;
       this.inbox.add(key);
       try {
         await s.handler(env);
-      } catch {
-        /* critical fan-out should not bubble */
+      } catch (err) {
+        // Critical events must not be silently dropped. Don't rethrow
+        // (a failing consumer must not break sibling fan-out or the
+        // publish caller), but log and track in a critical dead-letter
+        // collection so failures are observable via getEventStats().
+        const msg = err instanceof Error ? err.message : String(err);
+        anyFailed = true;
+        lastError = msg;
+        console.error(
+          `[event-bus] critical handler failed: consumer='${s.consumer}' eventType='${env.eventType}' eventId='${env.eventId}' error='${msg}'`,
+        );
+        this.criticalDeadLetter.push({
+          envelope: env,
+          consumer: s.consumer,
+          error: msg,
+          attemptedAt: new Date().toISOString(),
+        });
       }
     }
-    entry.status = "delivered";
+    if (anyFailed) {
+      entry.status = "failed";
+      entry.lastError = lastError;
+      this.deadLetter.push(entry);
+    } else {
+      entry.status = "delivered";
+    }
   }
 
   private async dispatch(entry: OutboxEntry, maxAttempts = 3): Promise<void> {
@@ -83,7 +123,7 @@ class InMemoryBus {
     const matched = this.match(env.eventType);
     let allOk = true;
     for (const s of matched) {
-      const key = this.inboxKey({ eventId: env.eventId, consumer: s.consumer });
+      const key = this.inboxKey({ dedupId: this.dedupIdOf(env), consumer: s.consumer });
       if (this.inbox.has(key)) continue;
       let ok = false;
       for (let attempt = 0; attempt < maxAttempts && !ok; attempt++) {
@@ -124,10 +164,14 @@ class InMemoryBus {
   getDeadLetterSnapshot() {
     return this.deadLetter.map((e) => ({ ...e }));
   }
+  getCriticalDeadLetterSnapshot() {
+    return this.criticalDeadLetter.map((e) => ({ ...e }));
+  }
   reset() {
     this.subscribers = [];
     this.outbox = [];
     this.deadLetter = [];
+    this.criticalDeadLetter = [];
     this.inbox.clear();
   }
 }
@@ -159,12 +203,14 @@ export function getEventStats() {
   const bus = getBus();
   const out = bus.getOutboxSnapshot();
   const dlq = bus.getDeadLetterSnapshot();
+  const criticalDlq = bus.getCriticalDeadLetterSnapshot();
   return {
     outboxSize: out.length,
     pending: out.filter((e) => e.status === "pending").length,
     delivered: out.filter((e) => e.status === "delivered").length,
     failed: out.filter((e) => e.status === "failed").length,
     deadLetter: dlq.length,
+    criticalDeadLetter: criticalDlq.length,
   };
 }
 

@@ -12,10 +12,10 @@ export function registerPathRoutes(app: Express) {
   app.get("/api/kgra-proxy/graph/path", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json({ path: [], edges: [], length: 0 });
+      if (!ragDb) { res.json({ path: [], edges: [], length: 0 }); return; }
       const from = req.query.from as string;
       const to = req.query.to as string;
-      if (!from || !to) return res.status(400).json({ error: "from and to required" });
+      if (!from || !to) { res.status(400).json({ error: "from and to required" }); return; }
 
       // Build adjacency list from all edges
       const rels = ((await ragDb.execute(sql`
@@ -57,7 +57,7 @@ export function registerPathRoutes(app: Express) {
         }
       }
 
-      if (!found) return res.json({ path: [], edges: [], length: -1, error: "No path found" });
+      if (!found) { res.json({ path: [], edges: [], length: -1, error: "No path found" }); return; }
 
       // Reconstruct path
       const path: string[] = [];
@@ -78,7 +78,7 @@ export function registerPathRoutes(app: Express) {
   app.get("/api/kgra-proxy/graph/path/chain", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json({ chain: [], length: 0 });
+      if (!ragDb) { res.json({ chain: [], length: 0 }); return; }
       const start = req.query.start as string;
       const type = (req.query.type as string || 'CALLS').toUpperCase();
       const maxDepth = parseInt(req.query.depth as string) || 10;
@@ -117,7 +117,7 @@ export function registerPathRoutes(app: Express) {
   app.get("/api/kgra-proxy/graph/impact", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json({ layers: [] });
+      if (!ragDb) { res.json({ layers: [] }); return; }
       const nodeId = req.query.node_id as string;
       const maxDepth = parseInt(req.query.depth as string) || 3;
 

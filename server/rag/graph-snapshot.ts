@@ -20,9 +20,9 @@ export function registerSnapshotRoutes(app: Express) {
   app.get("/api/kgra-proxy/graph/snapshot", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json({ nodes: [], edges: [] });
+      if (!ragDb) { res.json({ nodes: [], edges: [] }); return; }
       const at = req.query.at as string;
-      if (!at) return res.status(400).json({ error: "at parameter required (ISO timestamp)" });
+      if (!at) { res.status(400).json({ error: "at parameter required (ISO timestamp)" }); return; }
       const atDate = toTs(at);
 
       const autoNodes = ((await ragDb.execute(sql`
@@ -52,10 +52,10 @@ export function registerSnapshotRoutes(app: Express) {
   app.get("/api/kgra-proxy/graph/snapshot/range", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json({ nodes: [], edges: [] });
+      if (!ragDb) { res.json({ nodes: [], edges: [] }); return; }
       const from = req.query.from as string;
       const to = req.query.to as string;
-      if (!from || !to) return res.status(400).json({ error: "from and to required" });
+      if (!from || !to) { res.status(400).json({ error: "from and to required" }); return; }
       const fromDate = toTsFrom(from);
       const toDate = toTs(to);
 
@@ -86,10 +86,10 @@ export function registerSnapshotRoutes(app: Express) {
   app.get("/api/kgra-proxy/graph/diff", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json({ added: { nodes: [], edges: [] }, removed: { nodes: [], edges: [] } });
+      if (!ragDb) { res.json({ added: { nodes: [], edges: [] }, removed: { nodes: [], edges: [] } }); return; }
       const a = req.query.a as string;
       const b = req.query.b as string;
-      if (!a || !b) return res.status(400).json({ error: "a and b timestamps required" });
+      if (!a || !b) { res.status(400).json({ error: "a and b timestamps required" }); return; }
       const aDate = toTs(a);
       const bDate = toTs(b);
 
@@ -129,9 +129,9 @@ export function registerSnapshotRoutes(app: Express) {
   app.get("/api/kgra-proxy/graph/history", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
       const nodeId = req.query.node_id as string;
-      if (!nodeId) return res.status(400).json({ error: "node_id required" });
+      if (!nodeId) { res.status(400).json({ error: "node_id required" }); return; }
 
       const autoNode = ((await ragDb.execute(sql`
         SELECT id, name, entity_type as type, created_at, 'auto' as source FROM kgra_entities WHERE name = ${nodeId}
@@ -168,7 +168,7 @@ export function registerSnapshotRoutes(app: Express) {
   app.get("/api/kgra-proxy/graph/activity", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
       const bucket = (req.query.bucket as string) || 'day';
       const trunc = bucket === 'hour' ? 'hour' : bucket === 'week' ? 'week' : 'day';
 
