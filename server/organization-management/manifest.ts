@@ -5,6 +5,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { organizationManagementRouter } from "./router";
 import { okHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const omManifest: ModuleManifest = {
   key: "organizationManagement",
@@ -39,6 +40,7 @@ export const omManifest: ModuleManifest = {
   navigation: [{ group: "people", label: "Organization", order: 11 }],
 
   boot: async (ctx) => {
+    registerModuleHealthAction(omManifest);
     try {
       const { seedOmTemplates } = await import("./seed-templates");
       const result = await seedOmTemplates();

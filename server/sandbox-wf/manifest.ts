@@ -7,6 +7,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { sandboxWfRouter } from "./router";
 import { dbPingHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const sandboxWfManifest: ModuleManifest = {
   key: "sandboxWf",
@@ -50,6 +51,7 @@ export const sandboxWfManifest: ModuleManifest = {
   navigation: [{ group: "build", label: "Workflows", order: 12 }],
 
   boot: async (ctx) => {
+    registerModuleHealthAction(sandboxWfManifest);
     try {
       const { ensureWfDbSeeded } = await import("./seed");
       const result = await ensureWfDbSeeded();

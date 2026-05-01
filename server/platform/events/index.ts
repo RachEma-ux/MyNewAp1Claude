@@ -7,3 +7,12 @@ export {
   getEventStats,
   __resetEventBusForTests,
 } from "./bus";
+export {
+  DbEventBusStoreNotConfigured,
+  type EventBusStore,
+  type OutboxStatus,
+  type OutboxRecord,
+  type DeadLetterRecord,
+  type CriticalDeadLetterRecord,
+  type InboxRecord,
+} from "./store";

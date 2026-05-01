@@ -8,6 +8,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { kgraAgentRouter } from "./router";
 import { okHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const kgraAgentManifest: ModuleManifest = {
   key: "kgraAgent",
@@ -41,4 +42,7 @@ export const kgraAgentManifest: ModuleManifest = {
   events: { emits: ["kgra.run.completed"] },
   ports: { provided: ["kgra.run"], consumed: ["rag.search"] },
   communication: { modes: ["port", "event"] },
+  boot: async () => {
+    registerModuleHealthAction(kgraAgentManifest);
+  },
 };

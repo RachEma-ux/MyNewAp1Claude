@@ -8,6 +8,8 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { prmRouter } from "./prm.router";
 import { dbPingHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
+import { registerPublicApi } from "../platform/modules/module-gateway";
 
 export const prmManifest: ModuleManifest = {
   key: "prm",
@@ -54,6 +56,25 @@ export const prmManifest: ModuleManifest = {
   navigation: [{ group: "knowledge", label: "PRM", order: 30 }],
 
   boot: async (ctx) => {
+    registerModuleHealthAction(prmManifest);
+
+    // Public-API: list PRM method-template metadata. Read-only,
+    // module-owned, no DB access — pure catalog metadata. Routed
+    // through the gateway so other modules respect the boundary.
+    registerPublicApi({
+      module: "prm",
+      action: "prm.methods.listTemplates",
+      handler: async () => {
+        const { METHOD_CATALOG } = await import("./prm.methods");
+        return METHOD_CATALOG.map((t) => ({
+          methodType: t.methodType,
+          category: t.category,
+          name: t.name,
+          description: t.description,
+        }));
+      },
+    });
+
     try {
       const { seedPrmDb } = await import("./seed");
       await seedPrmDb();

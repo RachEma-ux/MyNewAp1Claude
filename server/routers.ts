@@ -67,12 +67,11 @@ import { dataAnalysisRouter } from "./data-analysis/router";
 // ---------------------------------------------------------------------------
 // Module routers — manifest-driven
 // ---------------------------------------------------------------------------
+// Type-only / value import of MODULE_ROUTERS only. Manifest registration
+// is owned exclusively by server/_core/index.ts startup; importing this
+// file (e.g. for AppRouter type extraction or codegen) must NOT trigger
+// registry side effects. (A5)
 import { MODULE_ROUTERS } from "./platform/modules/module-routers";
-import { registerAllManifests } from "./platform/modules/manifests";
-
-// Side effect: populate the platform module registry so the Runtime
-// Manager and Module Gateway can see every module.
-registerAllManifests();
 
 // ---------------------------------------------------------------------------
 // appRouter — root composition
