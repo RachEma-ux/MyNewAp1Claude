@@ -65,6 +65,54 @@ export const codeStudioManifest: ModuleManifest = {
     } catch (err: any) {
       ctx.log("warn", `seed skipped — ${err?.message ?? err}`);
     }
+    const { registerPublicApi } = await import("../platform/modules/module-gateway");
+    registerPublicApi({
+      module: "codeStudio",
+      action: "codeStudio.template.publish",
+      handler: async (input) => {
+        const { templateId, ...patch } = input as { templateId: number; [k: string]: unknown };
+        const repo = await import("./repository");
+        return repo.updateTemplate(templateId, { ...patch, isActive: true });
+      },
+      descriptor: {
+        key: "codeStudio.template.publish",
+        description: "Publish a Code Studio template",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+    registerPublicApi({
+      module: "codeStudio",
+      action: "codeStudio.run.execute",
+      handler: async (input) => {
+        const payload = input as {
+          objective: string;
+          description?: string;
+          constraints?: Record<string, unknown>;
+          repoId?: number;
+          actorUserId?: number;
+        };
+        if (!payload?.objective) throw new Error("objective is required");
+        const repo = await import("./repository");
+        const orchestrator = await import("./worker/job-orchestrator");
+        const job = await repo.createJob({
+          title: payload.objective.slice(0, 200),
+          description: payload.description,
+          objective: payload.objective,
+          constraints: payload.constraints,
+          repoId: payload.repoId,
+          actorUserId: payload.actorUserId,
+        });
+        await orchestrator.startJob(job.id);
+        return { jobId: job.id, status: "running" };
+      },
+      descriptor: {
+        key: "codeStudio.run.execute",
+        description: "Execute a Code Studio run",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
     // Literal type string used so check:wiring:handoff can verify
     // statically; CODE_STUDIO_HANDOFFS.runRequested is the constant.
     registerHandoffAcceptor("codeStudio", "codeStudio.run.requested", async (handoff) => {
