@@ -23,6 +23,7 @@ import { validateValueSetTransition, validateValueDefTransition } from "./lifecy
 import { logCvAudit } from "./audit";
 import { validatePublishReadiness, requirePublishReady } from "./validation";
 import { logActivity } from "../modules/registry";
+import { publishValueSet } from "./service";
 
 // ── Value Sets ───────────────────────────────────────────────────────────
 
@@ -85,32 +86,18 @@ const valueSetsRouter = router({
   publish: governedProcedure
     .input(z.object({ workspaceId: z.number(), id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const db = getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-
-      const [existing] = await db.select().from(cvValueSets)
-        .where(and(eq(cvValueSets.id, input.id), eq(cvValueSets.workspaceId, input.workspaceId)))
-        .limit(1);
-      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Value set not found" });
-
-      validateValueSetTransition(existing.status, "active");
-      await requirePublishReady(input.workspaceId, input.id);
-
-      // Deprecate currently active sets
-      const activeSets = await db.select().from(cvValueSets)
-        .where(and(eq(cvValueSets.workspaceId, input.workspaceId), eq(cvValueSets.status, "active")));
-      for (const s of activeSets) {
-        await db.update(cvValueSets).set({ status: "deprecated", updatedAt: new Date() }).where(eq(cvValueSets.id, s.id));
+      try {
+        return await publishValueSet(input, ctx.user.id);
+      } catch (err) {
+        const msg = (err as Error).message;
+        if (msg === "DB unavailable") {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: msg });
+        }
+        if (msg.endsWith("not found")) {
+          throw new TRPCError({ code: "NOT_FOUND", message: msg });
+        }
+        throw err;
       }
-
-      const [published] = await db.update(cvValueSets)
-        .set({ status: "active", publishedAt: new Date(), publishedBy: ctx.user.id, updatedAt: new Date() })
-        .where(eq(cvValueSets.id, input.id))
-        .returning();
-
-      await logCvAudit({ workspaceId: input.workspaceId, actorId: ctx.user.id, action: "value_set.publish", entityType: "value_set", entityId: input.id, newValue: { status: "active" }, category: "status_change" });
-      await logActivity({ workspaceId: input.workspaceId, moduleKey: "cv", actorId: ctx.user.id, action: "value_set.publish", targetType: "value_set", targetId: input.id });
-      return published;
     }),
 
   changeStatus: governedProcedure

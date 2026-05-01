@@ -87,22 +87,97 @@ function walkServer(root: string, opts?: { includeTests?: boolean }): string[] {
   return out;
 }
 
+/**
+ * Extract balanced `{...}` body starting at `openIdx` (which must point at
+ * a `{`). Tracks string literals and template strings so braces inside
+ * strings are ignored. Returns the body (between the braces) and the
+ * index just past the closing brace, or null if unbalanced.
+ */
+function extractBalancedBody(
+  src: string,
+  openIdx: number,
+): { body: string; end: number } | null {
+  if (src[openIdx] !== "{") return null;
+  let depth = 0;
+  let i = openIdx;
+  let inStr: '"' | "'" | "`" | null = null;
+  let inLineComment = false;
+  let inBlockComment = false;
+  while (i < src.length) {
+    const c = src[i];
+    const next = src[i + 1];
+    if (inLineComment) {
+      if (c === "\n") inLineComment = false;
+      i++;
+      continue;
+    }
+    if (inBlockComment) {
+      if (c === "*" && next === "/") {
+        inBlockComment = false;
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    if (inStr) {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (c === inStr) inStr = null;
+      i++;
+      continue;
+    }
+    if (c === "/" && next === "/") {
+      inLineComment = true;
+      i += 2;
+      continue;
+    }
+    if (c === "/" && next === "*") {
+      inBlockComment = true;
+      i += 2;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") {
+      inStr = c;
+      i++;
+      continue;
+    }
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) {
+        return { body: src.slice(openIdx + 1, i), end: i + 1 };
+      }
+    }
+    i++;
+  }
+  return null;
+}
+
 function parseRegistrations(repoRoot: string): ParsedRegistration[] {
   const files = walkServer(join(repoRoot, "server"));
   const out: ParsedRegistration[] = [];
   for (const f of files) {
     const src = readSafe(f);
     if (!src.includes("registerPublicApi")) continue;
-    // Match `registerPublicApi({ module: "x", action: "y", ..., descriptor: { ..., receiptRequired: true } })`
-    const re = /registerPublicApi\s*\(\s*\{([\s\S]*?)\}\s*\)/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(src))) {
-      const body = m[1];
+    // Locate every `registerPublicApi(` then extract the balanced `{...}`
+    // that follows. Brace-counting handles handlers that contain inline
+    // object literals like `repo.update(id, { ...patch })`.
+    const callRe = /registerPublicApi\s*\(\s*/g;
+    let cm: RegExpExecArray | null;
+    while ((cm = callRe.exec(src))) {
+      const after = cm.index + cm[0].length;
+      if (src[after] !== "{") continue;
+      const balanced = extractBalancedBody(src, after);
+      if (!balanced) continue;
+      const body = balanced.body;
       const moduleName = /module\s*:\s*["'`]([^"'`]+)["'`]/.exec(body)?.[1];
       const actionName = /action\s*:\s*["'`]([^"'`]+)["'`]/.exec(body)?.[1];
       if (!moduleName || !actionName) continue;
       const receiptRequired = /receiptRequired\s*:\s*true/.test(body);
-      const lineNo = src.slice(0, m.index).split("\n").length;
+      const lineNo = src.slice(0, cm.index).split("\n").length;
       out.push({
         module: moduleName,
         action: actionName,

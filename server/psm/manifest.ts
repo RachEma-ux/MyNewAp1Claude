@@ -48,6 +48,22 @@ export const psmManifest: ModuleManifest = {
     } catch (err: any) {
       ctx.log("warn", `seed skipped — ${err?.message ?? err}`);
     }
+    const { registerPublicApi } = await import("../platform/modules/module-gateway");
+    registerPublicApi({
+      module: "psm",
+      action: "psm.method.publish",
+      handler: async (input) => {
+        const { packId, reason } = input as { packId: number; reason?: string };
+        const { publishContentPack } = await import("./psm.service");
+        return publishContentPack(packId, undefined, reason);
+      },
+      descriptor: {
+        key: "psm.method.publish",
+        description: "Publish a PSM method to the catalog",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
   },
 
   health: async () => {

@@ -41,5 +41,32 @@ export const openRouterManifest: ModuleManifest = {
   communication: { modes: ["port", "gateway", "event"] },
   boot: async () => {
     registerModuleHealthAction(openRouterManifest);
+    const { registerPublicApi } = await import("../platform/modules/module-gateway");
+    registerPublicApi({
+      module: "openRouter",
+      action: "openRouter.config.update",
+      handler: async (input) => {
+        const payload = input as {
+          id: number;
+          name?: string;
+          description?: string;
+          config?: Record<string, unknown>;
+          actorId?: number;
+        };
+        if (typeof payload?.id !== "number") throw new Error("id is required");
+        const { updateProfile } = await import("./routing-service");
+        return updateProfile(
+          payload.id,
+          { name: payload.name, description: payload.description, config: payload.config },
+          payload.actorId,
+        );
+      },
+      descriptor: {
+        key: "openRouter.config.update",
+        description: "Update OpenRouter routing configuration",
+        risk: "high",
+        receiptRequired: true,
+      },
+    });
   },
 };

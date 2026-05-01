@@ -44,5 +44,27 @@ export const kgraAgentManifest: ModuleManifest = {
   communication: { modes: ["port", "event"] },
   boot: async () => {
     registerModuleHealthAction(kgraAgentManifest);
+    const { registerPublicApi } = await import("../platform/modules/module-gateway");
+    registerPublicApi({
+      module: "kgraAgent",
+      action: "kgra.run.execute",
+      handler: async (input) => {
+        const payload = input as {
+          query: string;
+          mode?: string;
+          workspace_id?: string;
+          session_id?: string;
+        };
+        if (!payload?.query) throw new Error("query is required");
+        const { executeKGRARun } = await import("./engine");
+        return executeKGRARun(payload);
+      },
+      descriptor: {
+        key: "kgra.run.execute",
+        description: "Run a KGRA query",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
   },
 };

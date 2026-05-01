@@ -62,6 +62,44 @@ export const sandboxWfManifest: ModuleManifest = {
     } catch (err: any) {
       ctx.log("warn", `seed skipped — ${err?.message ?? err}`);
     }
+    const { registerPublicApi } = await import("../platform/modules/module-gateway");
+    registerPublicApi({
+      module: "sandboxWf",
+      action: "sandboxWf.execute",
+      handler: async (input) => {
+        const payload = input as { workflowId: number; triggerType?: string };
+        if (typeof payload?.workflowId !== "number") throw new Error("workflowId is required");
+        const { executeWorkflow } = await import("./executor");
+        const executionId = await executeWorkflow(payload.workflowId, payload.triggerType ?? "gateway");
+        return { executionId };
+      },
+      descriptor: {
+        key: "sandboxWf.execute",
+        description: "Execute a workflow",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+    // Publish a workflow — transitions status to "published". Real impl
+    // in service.publishWorkflow; receipt required per manifest.
+    registerPublicApi({
+      module: "sandboxWf",
+      action: "sandboxWf.workflow.publish",
+      handler: async (input) => {
+        const payload = input as { workflowId?: number };
+        if (typeof payload?.workflowId !== "number") {
+          throw new Error("workflowId is required");
+        }
+        const { publishWorkflow } = await import("./service");
+        return publishWorkflow(payload.workflowId);
+      },
+      descriptor: {
+        key: "sandboxWf.workflow.publish",
+        description: "Publish a workflow",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
     // Literal type string used so check:wiring:handoff can verify
     // statically; SANDBOX_WF_HANDOFFS.executeRequested is the constant.
     registerHandoffAcceptor(
