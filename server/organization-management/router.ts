@@ -60,6 +60,7 @@ import {
 import { logOmAudit } from "./audit";
 import { resolveOmAuthority, getAuthorityChain } from "./authority";
 import { logActivity } from "../modules/registry";
+import { createLegalEntity } from "./service";
 
 // ============================================================================
 // Legal Entities Sub-Router
@@ -100,43 +101,15 @@ const legalEntitiesRouter = router({
       metadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const db = getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-
-      if (input.parentEntityId) {
-        await validateLegalEntityRef(input.workspaceId, input.parentEntityId);
+      try {
+        return await createLegalEntity(input, ctx.user.id);
+      } catch (err) {
+        const msg = (err as Error).message;
+        if (msg === "DB unavailable") {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: msg });
+        }
+        throw err;
       }
-
-      const [created] = await db.insert(omLegalEntities).values({
-        workspaceId: input.workspaceId,
-        code: input.code,
-        name: input.name,
-        type: input.type,
-        parentEntityId: input.parentEntityId,
-        country: input.country,
-        registrationNumber: input.registrationNumber,
-        metadata: input.metadata,
-        createdBy: ctx.user.id,
-      }).returning();
-
-      await logOmAudit({
-        workspaceId: input.workspaceId,
-        actorId: ctx.user.id,
-        action: "legal_entity.create",
-        entityType: "legal_entity",
-        entityId: created.id,
-        newValue: { code: input.code, name: input.name, type: input.type },
-      });
-      await logActivity({
-        workspaceId: input.workspaceId,
-        moduleKey: "om",
-        actorId: ctx.user.id,
-        action: "legal_entity.create",
-        targetType: "legal_entity",
-        targetId: created.id,
-      });
-
-      return created;
     }),
 
   update: governedProcedure

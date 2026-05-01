@@ -8,6 +8,7 @@ import type { ModuleManifest } from "../platform/modules/types";
 import { hrRouter } from "./router";
 import { okHealth } from "../platform/modules/health";
 import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
+import { registerPublicApi } from "../platform/modules/module-gateway";
 
 export const hrManifest: ModuleManifest = {
   key: "hr",
@@ -43,5 +44,52 @@ export const hrManifest: ModuleManifest = {
   communication: { modes: ["port", "event"] },
   boot: async () => {
     registerModuleHealthAction(hrManifest);
+
+    // Public-API: hr.employee.create — creates a person + worker
+    // profile + initial employment record via the directory service.
+    // Receipt required (manifest declares it); enforced by gateway.
+    registerPublicApi({
+      module: "hr",
+      action: "hr.employee.create",
+      handler: async (input) => {
+        const payload = input as {
+          firstName?: string;
+          lastName?: string;
+          displayName?: string;
+          primaryEmail?: string;
+          preferredName?: string;
+          primaryPhone?: string;
+          workerType?: "employee" | "contractor" | "intern" | "consultant";
+          employeeNumber?: string;
+          employmentCategory?: string;
+          homeOrgUnitId?: number;
+          primaryPositionId?: number;
+          managerWorkerId?: number;
+          actorId?: number;
+        };
+        if (
+          !payload?.firstName ||
+          !payload?.lastName ||
+          !payload?.displayName ||
+          !payload?.primaryEmail
+        ) {
+          throw new Error(
+            "firstName, lastName, displayName, primaryEmail are required",
+          );
+        }
+        const { createWorker } = await import("./directory/service");
+        const { actorId, ...rest } = payload;
+        return createWorker(
+          rest as Parameters<typeof createWorker>[0],
+          actorId,
+        );
+      },
+      descriptor: {
+        key: "hr.employee.create",
+        description: "Create an HR employee record",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
   },
 };

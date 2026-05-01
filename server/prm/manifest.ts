@@ -75,6 +75,47 @@ export const prmManifest: ModuleManifest = {
       },
     });
 
+    // Publish a method template — flips published=true on the
+    // prm_method_templates row. Receipt required (manifest declares it).
+    registerPublicApi({
+      module: "prm",
+      action: "prm.method.publish",
+      handler: async (input) => {
+        const payload = input as { templateId?: number };
+        if (typeof payload?.templateId !== "number") {
+          throw new Error("templateId is required");
+        }
+        const { publishMethodTemplate } = await import("./prm.catalog");
+        return publishMethodTemplate(payload.templateId);
+      },
+      descriptor: {
+        key: "prm.method.publish",
+        description: "Publish a PRM method to the catalog",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
+    // Deprecate a method template — flips published=false.
+    registerPublicApi({
+      module: "prm",
+      action: "prm.method.deprecate",
+      handler: async (input) => {
+        const payload = input as { templateId?: number };
+        if (typeof payload?.templateId !== "number") {
+          throw new Error("templateId is required");
+        }
+        const { deprecateMethodTemplate } = await import("./prm.catalog");
+        return deprecateMethodTemplate(payload.templateId);
+      },
+      descriptor: {
+        key: "prm.method.deprecate",
+        description: "Deprecate a PRM method",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
     try {
       const { seedPrmDb } = await import("./seed");
       await seedPrmDb();
