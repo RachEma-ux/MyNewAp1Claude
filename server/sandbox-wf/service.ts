@@ -149,6 +149,23 @@ export async function updateWorkflow(
   return getWorkflow(id);
 }
 
+/**
+ * Publish a workflow — transitions status from `draft` (or any other
+ * non-terminal state) to `published` and bumps `updatedAt`. The
+ * gateway action `sandboxWf.workflow.publish` calls this; the
+ * scheduler/triggers only fire on workflows whose status is
+ * `published`, so this is the meaningful state change.
+ */
+export async function publishWorkflow(id: number) {
+  const existing = await getWorkflow(id);
+  if (!existing) throw new Error(`Workflow ${id} not found`);
+  await db()
+    .update(wfWorkflows)
+    .set({ status: "published", updatedAt: new Date() })
+    .where(eq(wfWorkflows.id, id));
+  return getWorkflow(id);
+}
+
 export async function deleteWorkflow(id: number) {
   // Delete steps, triggers, then workflow
   await db().delete(wfSteps).where(eq(wfSteps.workflowId, id));

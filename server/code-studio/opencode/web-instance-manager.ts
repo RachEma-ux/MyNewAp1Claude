@@ -20,6 +20,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as repo from "../repository";
 import { getWorkspaceByJobId } from "../worker/workspace-manager";
+import { getPortRegistry } from "../../platform/ports";
 import {
   OPENCODE_WEB_BASE_PORT,
   OPENCODE_WEB_MAX_PORT,
@@ -90,14 +91,57 @@ const liveProcesses = new Map<number, ChildProcess>();
 // ── Port Allocation ───────────────────────────────────────────────────────
 
 async function allocatePort(): Promise<number> {
+  // The DB is the cross-restart source of truth (CODEDB tracks every
+  // instance and its port). The platform port registry adds in-process
+  // visibility — both layers must agree before we commit to a port,
+  // otherwise two callers in the same process could race on the same
+  // free DB port.
   const usedPorts = await repo.getAllocatedPorts();
   const usedSet = new Set(usedPorts);
+  const registry = getPortRegistry();
+  const reservedInMemory = new Set(
+    registry.listReservations({ moduleKey: "codeStudio", key: "opencode-web" })
+      .map((r) => r.port),
+  );
   for (let port = OPENCODE_WEB_BASE_PORT; port <= OPENCODE_WEB_MAX_PORT; port++) {
-    if (!usedSet.has(port)) return port;
+    if (usedSet.has(port) || reservedInMemory.has(port)) continue;
+    return port;
   }
   throw new Error(
     `Port exhaustion: all ports ${OPENCODE_WEB_BASE_PORT}-${OPENCODE_WEB_MAX_PORT} are in use`
   );
+}
+
+function reserveOpenCodeWebPort(instanceId: number, port: number): void {
+  try {
+    getPortRegistry().reservePort({
+      moduleKey: "codeStudio",
+      key: "opencode-web",
+      port,
+      host: OPENCODE_WEB_HOSTNAME,
+      ownerRef: `ide-instance-${instanceId}`,
+      status: "reserved",
+    });
+  } catch (err) {
+    // Reservation is for visibility only; do not block the launch.
+    console.warn(
+      `[opencode-web] port reservation skipped for instance ${instanceId}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+}
+
+function releaseOpenCodeWebPort(instanceId: number): void {
+  try {
+    getPortRegistry().releaseByOwnerRef(
+      "codeStudio",
+      "opencode-web",
+      `ide-instance-${instanceId}`,
+    );
+  } catch {
+    /* non-fatal */
+  }
 }
 
 function generateProxyKey(): string {
@@ -319,6 +363,8 @@ export async function openForJob(jobId: number): Promise<IdeInstanceLaunchResult
     expiresAt,
   });
 
+  reserveOpenCodeWebPort(instance.id, port);
+
   // 5. Start the process
   try {
     const child = await startOpenCodeWeb(workspacePath, port);
@@ -327,6 +373,7 @@ export async function openForJob(jobId: number): Promise<IdeInstanceLaunchResult
 
     child.on("exit", async (code) => {
       liveProcesses.delete(instance.id);
+      releaseOpenCodeWebPort(instance.id);
       try {
         await repo.updateIdeInstance(instance.id, {
           status: "stopped",
@@ -338,6 +385,7 @@ export async function openForJob(jobId: number): Promise<IdeInstanceLaunchResult
 
     child.on("error", async (err) => {
       liveProcesses.delete(instance.id);
+      releaseOpenCodeWebPort(instance.id);
       try {
         await repo.updateIdeInstance(instance.id, {
           status: "failed",
@@ -367,6 +415,7 @@ export async function openForJob(jobId: number): Promise<IdeInstanceLaunchResult
       isReused: false,
     };
   } catch (err: any) {
+    releaseOpenCodeWebPort(instance.id);
     await repo.updateIdeInstance(instance.id, {
       status: "failed",
       closedAt: new Date(),
@@ -417,6 +466,7 @@ export async function closeInstance(instanceId: number): Promise<void> {
     proc.kill("SIGTERM");
   }
   liveProcesses.delete(instanceId);
+  releaseOpenCodeWebPort(instanceId);
 
   await repo.updateIdeInstance(instanceId, {
     status: "stopped",

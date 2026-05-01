@@ -65,6 +65,54 @@ export const codeStudioManifest: ModuleManifest = {
     } catch (err: any) {
       ctx.log("warn", `seed skipped — ${err?.message ?? err}`);
     }
+    const { registerPublicApi } = await import("../platform/modules/module-gateway");
+    registerPublicApi({
+      module: "codeStudio",
+      action: "codeStudio.template.publish",
+      handler: async (input) => {
+        const { templateId, ...patch } = input as { templateId: number; [k: string]: unknown };
+        const repo = await import("./repository");
+        return repo.updateTemplate(templateId, { ...patch, isActive: true });
+      },
+      descriptor: {
+        key: "codeStudio.template.publish",
+        description: "Publish a Code Studio template",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+    registerPublicApi({
+      module: "codeStudio",
+      action: "codeStudio.run.execute",
+      handler: async (input) => {
+        const payload = input as {
+          objective: string;
+          description?: string;
+          constraints?: Record<string, unknown>;
+          repoId?: number;
+          actorUserId?: number;
+        };
+        if (!payload?.objective) throw new Error("objective is required");
+        const repo = await import("./repository");
+        const orchestrator = await import("./worker/job-orchestrator");
+        const job = await repo.createJob({
+          title: payload.objective.slice(0, 200),
+          description: payload.description,
+          objective: payload.objective,
+          constraints: payload.constraints,
+          repoId: payload.repoId,
+          actorUserId: payload.actorUserId,
+        });
+        await orchestrator.startJob(job.id);
+        return { jobId: job.id, status: "running" };
+      },
+      descriptor: {
+        key: "codeStudio.run.execute",
+        description: "Execute a Code Studio run",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
     // Literal type string used so check:wiring:handoff can verify
     // statically; CODE_STUDIO_HANDOFFS.runRequested is the constant.
     registerHandoffAcceptor("codeStudio", "codeStudio.run.requested", async (handoff) => {
@@ -124,5 +172,43 @@ export const codeStudioManifest: ModuleManifest = {
   events: { emits: ["codeStudio.run.completed", "codeStudio.run.failed"] },
   handoffs: { accepts: ["codeStudio.run.requested"], produces: [] },
   ports: { provided: ["codeStudio.run"], consumed: [] },
+  runtimePorts: [
+    {
+      key: "opencode-runtime",
+      label: "OpenCode Runtime",
+      mode: "external",
+      protocol: "http",
+      env: "OPENCODE_URL",
+      defaultUrl: "http://127.0.0.1:4096",
+      defaultHost: "127.0.0.1",
+      defaultPort: 4096,
+      externallyManaged: true,
+      description: "OpenCode runtime HTTP endpoint targeted by Code Studio.",
+    },
+    {
+      key: "opencode-web",
+      label: "OpenCode Web",
+      mode: "range",
+      protocol: "http",
+      envBase: "OPENCODE_WEB_BASE_PORT",
+      envMax: "OPENCODE_WEB_MAX_PORT",
+      defaultRange: [4200, 4299],
+      defaultHost: "127.0.0.1",
+      runtimeOwned: true,
+      description: "Per-session OpenCode Web instances; one TCP port per running instance.",
+    },
+    {
+      key: "codedb",
+      label: "CODEDB (Postgres)",
+      mode: "external",
+      protocol: "postgres",
+      env: "DATABASE_URL_CODEDB",
+      defaultPort: 5432,
+      defaultHost: "127.0.0.1",
+      defaultUrl: "postgres://127.0.0.1:5432/codedb",
+      externallyManaged: true,
+      description: "Code Studio module-owned database; falls back to local Postgres.",
+    },
+  ],
   communication: { modes: ["gateway", "handoff", "event", "coordinator"] },
 };

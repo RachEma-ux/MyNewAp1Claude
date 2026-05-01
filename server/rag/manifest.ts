@@ -12,6 +12,7 @@ import type { ModuleManifest } from "../platform/modules/types";
 import { dbPingHealth } from "../platform/modules/health";
 import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 import { subscribeEvent } from "../platform/events";
+import { registerPublicApi } from "../platform/modules/module-gateway";
 
 export const ragManifest: ModuleManifest = {
   key: "rag",
@@ -44,6 +45,28 @@ export const ragManifest: ModuleManifest = {
 
   boot: async (ctx) => {
     registerModuleHealthAction(ragManifest);
+
+    // Public-API: rag.index.run — request a new RAG indexing run.
+    // Inserts a kgra_build_runs row with status="queued"; the actual
+    // graph rebuild is owned by kgra-agent. Manifest declares the
+    // action low-risk and not receipt-required, so the descriptor
+    // matches.
+    registerPublicApi({
+      module: "rag",
+      action: "rag.index.run",
+      handler: async (input) => {
+        const payload = (input ?? {}) as { reason?: string };
+        const { requestIndexRun } = await import("./indexer");
+        return requestIndexRun({ reason: payload.reason });
+      },
+      descriptor: {
+        key: "rag.index.run",
+        description: "Run a RAG indexing job",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
     try {
       const { seedRagDb, migrateJsonBlobToRagDb } = await import("./seed");
       await seedRagDb();
@@ -80,5 +103,19 @@ export const ragManifest: ModuleManifest = {
   },
   handoffs: { accepts: [], produces: [] },
   ports: { provided: ["rag.search", "rag.stats"], consumed: [] },
+  runtimePorts: [
+    {
+      key: "ragdb",
+      label: "RAGDB (Postgres)",
+      mode: "external",
+      protocol: "postgres",
+      env: "DATABASE_URL_RAGDB",
+      defaultPort: 5432,
+      defaultHost: "127.0.0.1",
+      defaultUrl: "postgres://127.0.0.1:5432/ragdb",
+      externallyManaged: true,
+      description: "RAG module-owned database; falls back to local Postgres.",
+    },
+  ],
   communication: { modes: ["event", "port"] },
 };

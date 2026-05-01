@@ -83,7 +83,66 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-scheduler] start skipped — ${message}`);
   }
 
-  // Step 4: Handoff acceptor for agentStudio.run.requested
+  // Step 4: Public API handlers for agentStudio.agent.publish + agentStudio.run.execute
+  try {
+    const { registerPublicApi } = await import("../platform/modules/module-gateway");
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.agent.publish",
+      handler: async (input) => {
+        const payload = input as {
+          agentId: number;
+          versionId: number;
+          targetEnvironment: string;
+          releaseNotes?: string;
+          publishedBy?: number;
+        };
+        const repo = await import("./repository");
+        return repo.publishRelease(payload);
+      },
+      descriptor: {
+        key: "agentStudio.agent.publish",
+        description: "Publish an agent to the catalog",
+        risk: "high",
+        receiptRequired: true,
+      },
+    });
+    registerPublicApi({
+      module: "agentStudio",
+      action: "agentStudio.run.execute",
+      handler: async (input) => {
+        const payload = input as {
+          agentId: number;
+          versionId?: number;
+          environment?: string;
+          inputPayload?: Record<string, unknown>;
+          triggeredBy?: number;
+        };
+        if (typeof payload?.agentId !== "number") throw new Error("agentId is required");
+        const repo = await import("./repository");
+        return repo.appendRuntimeRun({
+          agentId: payload.agentId,
+          versionId: payload.versionId,
+          environment: payload.environment ?? "production",
+          status: "queued",
+          triggerType: "gateway",
+          triggeredBy: payload.triggeredBy,
+          inputPayload: payload.inputPayload ?? {},
+        });
+      },
+      descriptor: {
+        key: "agentStudio.run.execute",
+        description: "Execute an agent run",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-publicApi] registration skipped — ${message}`);
+  }
+
+  // Step 5: Handoff acceptor for agentStudio.run.requested
   //
   // Receives a request from another module (PM Central, Sandbox WF, etc.)
   // to start a runtime run for a known agent. The acceptor delegates to

@@ -50,14 +50,17 @@ describe("wiring inventory", () => {
     }
   });
 
-  it("flags modules with declared but unregistered public APIs as declared-only", () => {
+  it("flags modules with declared public APIs and confirms all are wired", () => {
     const inv = buildFullInventory({ repoRoot: resolveRepoRoot() });
     // At least one module should have governanceActions declared (PRM, PSM, etc.)
     const withGov = inv.filter((i) => i.publicApi.declared.length > 0);
     expect(withGov.length).toBeGreaterThan(0);
-    // On PR #46 baseline, no module wires registerPublicApi at boot ⇒ declared-only.
+    // After PR #50, every governance-declared action is wired through
+    // registerPublicApi(). The static inventory only marks `wired`
+    // when registerPublicApi() statically registers the action — so
+    // a non-zero `declared-only` count would mean a regression.
     const declaredOnly = withGov.filter((i) => i.publicApi.status === "declared-only");
-    expect(declaredOnly.length).toBeGreaterThan(0);
+    expect(declaredOnly.map((i) => i.key)).toEqual([]);
   });
 
   it("empty inventory has the right defaults", () => {

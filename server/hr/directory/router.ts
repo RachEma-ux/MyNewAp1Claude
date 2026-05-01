@@ -10,7 +10,7 @@ import { eq, and, desc, or, ilike, sql, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, governedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db/connection";
-import { hrPeople, hrWorkerProfiles, hrEmploymentRecords } from "../../../drizzle/schema";
+import { hrPeople, hrWorkerProfiles } from "../../../drizzle/schema";
 import { logHrAudit, logSensitiveRead } from "../audit";
 import {
   maskDirectoryFields,
@@ -19,6 +19,7 @@ import {
   resolveDataScope,
   HR_ACTIONS,
 } from "../permissions";
+import { createWorker } from "./service";
 
 export const hrDirectoryRouter = router({
   list: protectedProcedure
@@ -225,47 +226,15 @@ export const hrDirectoryRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await requireHrPermission(ctx.user, HR_ACTIONS.DIRECTORY_WRITE);
-      const db = getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-
-      // Create person
-      const [person] = await db.insert(hrPeople).values({
-        firstName: input.firstName,
-        lastName: input.lastName,
-        displayName: input.displayName,
-        primaryEmail: input.primaryEmail,
-        preferredName: input.preferredName,
-        primaryPhone: input.primaryPhone,
-      }).returning();
-
-      // Create worker profile
-      const [worker] = await db.insert(hrWorkerProfiles).values({
-        personId: person.id,
-        workerType: input.workerType,
-        employeeNumber: input.employeeNumber,
-        employmentCategory: input.employmentCategory,
-        homeOrgUnitId: input.homeOrgUnitId,
-        primaryPositionId: input.primaryPositionId,
-        managerWorkerId: input.managerWorkerId,
-      }).returning();
-
-      // Create initial employment record
-      await db.insert(hrEmploymentRecords).values({
-        workerId: worker.id,
-        employmentStatus: "active",
-        contractType: "permanent",
-        startDate: new Date().toISOString().split("T")[0],
-        effectiveFrom: new Date().toISOString().split("T")[0],
-      });
-
-      await logHrAudit({
-        actorId: ctx.user.id,
-        targetWorkerId: worker.id,
-        action: "hr.worker.create",
-        metadata: { displayName: input.displayName, email: input.primaryEmail },
-      });
-
-      return { personId: person.id, workerId: worker.id };
+      try {
+        return await createWorker(input, ctx.user.id);
+      } catch (err) {
+        const msg = (err as Error).message;
+        if (msg === "DB unavailable") {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: msg });
+        }
+        throw err;
+      }
     }),
 
   update: governedProcedure

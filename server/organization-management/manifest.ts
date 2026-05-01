@@ -6,6 +6,7 @@ import type { ModuleManifest } from "../platform/modules/types";
 import { organizationManagementRouter } from "./router";
 import { okHealth } from "../platform/modules/health";
 import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
+import { registerPublicApi } from "../platform/modules/module-gateway";
 
 export const omManifest: ModuleManifest = {
   key: "organizationManagement",
@@ -41,6 +42,86 @@ export const omManifest: ModuleManifest = {
 
   boot: async (ctx) => {
     registerModuleHealthAction(omManifest);
+
+    // Public-API: om.entity.create — create a legal entity (the
+    // canonical OM org-entity). Receipt required per manifest.
+    registerPublicApi({
+      module: "organizationManagement",
+      action: "om.entity.create",
+      handler: async (input) => {
+        const payload = input as {
+          workspaceId?: number;
+          code?: string;
+          name?: string;
+          type?: "company" | "subsidiary" | "branch" | "holding";
+          parentEntityId?: number;
+          country?: string;
+          registrationNumber?: string;
+          metadata?: Record<string, unknown>;
+          actorId?: number;
+        };
+        if (
+          typeof payload?.workspaceId !== "number" ||
+          !payload?.code ||
+          !payload?.name
+        ) {
+          throw new Error("workspaceId, code, name are required");
+        }
+        const { createLegalEntity } = await import("./service");
+        const { actorId, ...rest } = payload;
+        return createLegalEntity(
+          rest as Parameters<typeof createLegalEntity>[0],
+          actorId,
+        );
+      },
+      descriptor: {
+        key: "om.entity.create",
+        description: "Create an OM entity",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
+    // Public-API: om.position.assign — reassign a position to an
+    // org unit. Validates ref + non-frozen + operability and audit-
+    // logs `position.reassign_org_unit`. Receipt required.
+    registerPublicApi({
+      module: "organizationManagement",
+      action: "om.position.assign",
+      handler: async (input) => {
+        const payload = input as {
+          workspaceId?: number;
+          positionId?: number;
+          orgUnitId?: number;
+          actorId?: number;
+        };
+        if (
+          typeof payload?.workspaceId !== "number" ||
+          typeof payload?.positionId !== "number" ||
+          typeof payload?.orgUnitId !== "number"
+        ) {
+          throw new Error(
+            "workspaceId, positionId, orgUnitId are required",
+          );
+        }
+        const { assignPositionToOrgUnit } = await import("./service");
+        return assignPositionToOrgUnit(
+          {
+            workspaceId: payload.workspaceId,
+            positionId: payload.positionId,
+            orgUnitId: payload.orgUnitId,
+          },
+          payload.actorId,
+        );
+      },
+      descriptor: {
+        key: "om.position.assign",
+        description: "Assign a position",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
     try {
       const { seedOmTemplates } = await import("./seed-templates");
       const result = await seedOmTemplates();
