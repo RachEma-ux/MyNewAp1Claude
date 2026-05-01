@@ -83,6 +83,54 @@ export async function bootAgentStudio(): Promise<void> {
     console.warn(`[ags-scheduler] start skipped — ${message}`);
   }
 
+  // Step 4: Handoff acceptor for agentStudio.run.requested
+  //
+  // Receives a request from another module (PM Central, Sandbox WF, etc.)
+  // to start a runtime run for a known agent. The acceptor delegates to
+  // the same `appendRuntimeRun` repository function the regular runtime
+  // runner uses, so the handoff path and the in-process path produce
+  // identical run records.
+  try {
+    const { registerHandoffAcceptor } = await import("../platform/handoff");
+    // Literal type string used so check:wiring:handoff can verify
+    // statically; AGENT_STUDIO_HANDOFFS.runRequested in handoffs.ts
+    // is the canonical constant.
+    registerHandoffAcceptor(
+      "agentStudio",
+      "agentStudio.run.requested",
+      async (handoff) => {
+        const payload = handoff.payload as {
+          agentId?: number;
+          versionId?: number;
+          environment?: string;
+          inputPayload?: Record<string, unknown>;
+        };
+        if (typeof payload?.agentId !== "number") {
+          return { accepted: false, reason: "agentId missing from payload" };
+        }
+        try {
+          const repo = await import("./repository");
+          await repo.appendRuntimeRun({
+            agentId: payload.agentId,
+            versionId: payload.versionId,
+            environment: payload.environment ?? "production",
+            status: "queued",
+            triggeredBy: typeof handoff.actorId === "number" ? handoff.actorId : undefined,
+            triggerType: "handoff",
+            inputPayload: payload.inputPayload ?? {},
+          });
+          return { accepted: true };
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.warn(`[ags-handoff] agentStudio.run.requested failed: ${msg}`);
+          return { accepted: false, reason: msg };
+        }
+      },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ags-handoff] acceptor registration skipped — ${message}`);
+  }
 }
 
 /**

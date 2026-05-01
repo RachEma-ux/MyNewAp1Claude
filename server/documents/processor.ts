@@ -367,6 +367,24 @@ async function processDocumentBackground(
     // Update status to completed
     await updateDocumentStatus(documentId, 'completed');
 
+    // Emit `documents.uploaded` so RAG (and any future consumer) can
+    // pick the document up for indexing without a direct call.
+    try {
+      const { publishEvent, makeEnvelope } = await import('../platform/events');
+      await publishEvent(
+        makeEnvelope({
+          eventType: 'documents.uploaded',
+          sourceModule: 'documents',
+          payload: { documentId, chunkCount: chunks.length },
+        }),
+      );
+    } catch (publishError) {
+      console.warn(
+        `[DocumentProcessor] documents.uploaded publish failed for ${documentId}:`,
+        publishError,
+      );
+    }
+
     console.log(`[DocumentProcessor] Completed processing for document ${documentId}: ${chunks.length} chunks created`);
   } catch (error) {
     console.error(`[DocumentProcessor] Error processing document ${documentId}:`, error);

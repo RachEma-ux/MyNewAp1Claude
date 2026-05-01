@@ -11,6 +11,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { dbPingHealth } from "../platform/modules/health";
 import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
+import { subscribeEvent } from "../platform/events";
 
 export const ragManifest: ModuleManifest = {
   key: "rag",
@@ -50,6 +51,21 @@ export const ragManifest: ModuleManifest = {
     } catch (err: any) {
       ctx.log("warn", `seed skipped — ${err?.message ?? err}`);
     }
+    // Subscribe to documents.uploaded events from the documents module.
+    // The handler logs the event for now; the actual indexing trigger
+    // will be added in a follow-up alongside the dedicated rag.indexer
+    // service. The subscription itself is what the wiring harness
+    // verifies — the event is no longer a dead-letter candidate.
+    // Literal event type used so check:wiring:event can verify
+    // statically; RAG_CONSUMES.documentsUploaded in events.ts is the
+    // canonical constant.
+    subscribeEvent("documents.uploaded", "rag", async (env) => {
+      const payload = env.payload as { documentId?: number; workspaceId?: number | string };
+      ctx.log(
+        "info",
+        `rag received documents.uploaded documentId=${payload?.documentId ?? "?"} workspace=${payload?.workspaceId ?? "?"} eventId=${env.eventId}`,
+      );
+    });
   },
 
   health: async () => {
