@@ -69,6 +69,7 @@ import {
   FileStack,
   Sparkles,
   Inbox,
+  Bell,
   Radio,
   Video,
   Briefcase,
@@ -245,9 +246,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
       label: "Communication",
       icon: <Radio className="w-5 h-5" />,
       children: [
-        { label: "Chat", icon: <MessageSquare className="w-4 h-4" />, href: "/chat" },
-        { label: "Conversations", icon: <MessagesSquare className="w-4 h-4" />, href: "/conversations" },
-        { label: "Video Meeting", icon: <Video className="w-4 h-4" />, href: "/video-meeting" },
+        { label: "Dashboard", icon: <Radio className="w-4 h-4" />, href: "/communication" },
+        { label: "Chat", icon: <MessageSquare className="w-4 h-4" />, href: "/communication/chat" },
+        { label: "Conversations", icon: <MessagesSquare className="w-4 h-4" />, href: "/communication/conversations" },
+        { label: "Video Meeting", icon: <Video className="w-4 h-4" />, href: "/communication/video-meeting" },
+        { label: "Notifications", icon: <Bell className="w-4 h-4" />, href: "/communication/notifications" },
       ]
     },
     {

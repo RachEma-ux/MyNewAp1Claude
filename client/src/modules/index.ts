@@ -31,6 +31,7 @@ import { organizationManagementClientManifest } from "./organization-management/
 import { cultureValuesClientManifest } from "./culture-values/manifest";
 import { aiTypesClientManifest } from "./ai-types/manifest";
 import { kgraAgentClientManifest } from "./kgra-agent/manifest";
+import { communicationClientManifest } from "./communication/manifest";
 
 const ALL_CLIENT_MANIFESTS = [
   prmClientManifest,
@@ -46,6 +47,7 @@ const ALL_CLIENT_MANIFESTS = [
   cultureValuesClientManifest,
   aiTypesClientManifest,
   kgraAgentClientManifest,
+  communicationClientManifest,
 ];
 
 let registered = false;

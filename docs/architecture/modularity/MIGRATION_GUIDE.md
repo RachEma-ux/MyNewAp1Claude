@@ -47,3 +47,52 @@ For each pilot, mark the box when complete:
 - [ ] Health check returns `ok` in dev.
 - [ ] Governance actions declared.
 - [ ] Manifest router replaces the entry in `server/routers.ts`.
+
+## Case study: Communication (chat / conversations / video-meeting / notifications)
+
+**Driver.** Chat, conversations, video-meeting, and notifications were spread
+across `server/chat/`, `server/routers/conversations.ts`, and
+`server/routers/notifications.ts`, all writing into the platform DB. Multiple
+features wrote to the same tables with different invariants. We promoted the
+domain into a single owned module, **Communication**.
+
+**Result.**
+
+- New module `server/communication/` owns `communicationdb` (5 tables:
+  `communication_conversations`, `communication_messages`,
+  `communication_meetings`, `communication_participants`,
+  `communication_notifications`).
+- One canonical service: `server/communication/communication.service.ts`. The
+  tRPC router (`appRouter.communication`) and the gateway public-API both call
+  into it — there is no second writer.
+- Old `server/chat/router.ts` and `server/routers/conversations.ts` are now
+  thin **deprecated compatibility shims** that delegate every write to the
+  Communication service. They keep the legacy response shape so existing
+  clients (`AgentChat`, `CatalogAgentChat`, `useChat`) keep working.
+- Frontend canonicalised at `/communication/{chat,conversations,video-meeting,notifications}`.
+  Old routes (`/chat`, `/conversations`, `/video-meeting`) `<Redirect>` to the
+  canonical paths.
+- Agent-linked threads are routed through Communication with
+  `conversationType="agent"`, `sourceModule="agents"`, `sourceRefId=agentId`.
+
+**Lessons for the next migration.**
+
+1. **Convert old routers to compatibility shims, don't delete.** A long-tail
+   of clients still calls `trpc.chat.*` and `trpc.conversations.*`. Deleting
+   them breaks the UI; replacing the bodies with `await svc.x()` keeps them
+   working while making Communication the single owner.
+2. **Preserve legacy response shape at the shim layer.** The old conversation
+   shape was `{id, workspaceId, userId, agentId, title}` — the new
+   Communication record is richer. The shim maps before returning so callers
+   don't need to be updated in lock-step.
+3. **Static wiring requires literal strings.** The `check:wiring` scripts
+   parse source — handoff acceptors and gateway registrations must use
+   string literals like `"communication.conversation.open"`, not constants.
+4. **Update three scripts together.** New strong module → add to
+   `STRONG_MODULES` in `scripts/check-modules.ts` and
+   `scripts/check-module-db-ownership.ts`, plus `MODULE_MAP` in
+   `scripts/lib/module-graph.ts`. Forgetting one makes the architecture
+   check ambiguous about what "owned" means.
+5. **Out-of-scope follow-up: agents/db.ts.** Agent-domain internal use of the
+   legacy `conversations`/`messages` tables in `server/agents/db.ts` is
+   intentionally **not** migrated in this PR. It is documented as a follow-up.

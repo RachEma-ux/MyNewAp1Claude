@@ -25,6 +25,7 @@ import { omManifest } from "../../organization-management/manifest";
 import { cvManifest } from "../../culture-values/manifest";
 import { aiTypesManifest } from "../../ai-types/manifest";
 import { kgraAgentManifest } from "../../kgra-agent/manifest";
+import { communicationManifest } from "../../communication/manifest";
 
 export const ALL_MANIFESTS: ModuleManifest[] = [
   // Pilot modules (priority migration set)
@@ -42,6 +43,7 @@ export const ALL_MANIFESTS: ModuleManifest[] = [
   cvManifest,
   aiTypesManifest,
   kgraAgentManifest,
+  communicationManifest,
 ];
 
 let _registered = false;

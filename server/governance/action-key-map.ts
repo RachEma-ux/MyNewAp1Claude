@@ -457,6 +457,15 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "cv.value.publish": "cv.value.publish",
   "aiTypes.catalog.publish": "aiTypes.catalog.publish",
   "kgra.run.execute": "kgra.run.execute",
+  "communication.conversation.create": "communication.conversation.create",
+  "communication.conversation.delete": "communication.conversation.delete",
+  "communication.message.add": "communication.message.add",
+  "communication.message.delete": "communication.message.delete",
+  "communication.chat.send": "communication.chat.send",
+  "communication.meeting.create": "communication.meeting.create",
+  "communication.meeting.cancel": "communication.meeting.cancel",
+  "communication.notification.create": "communication.notification.create",
+  "communication.export": "communication.export",
 };
 
 /**
