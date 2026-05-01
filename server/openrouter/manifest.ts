@@ -5,6 +5,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { openRouterRouter } from "./router";
 import { okHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const openRouterManifest: ModuleManifest = {
   key: "openRouter",
@@ -38,4 +39,7 @@ export const openRouterManifest: ModuleManifest = {
   events: { emits: ["openRouter.routing.config.updated"] },
   ports: { provided: ["openRouter.route"], consumed: [] },
   communication: { modes: ["port", "gateway", "event"] },
+  boot: async () => {
+    registerModuleHealthAction(openRouterManifest);
+  },
 };

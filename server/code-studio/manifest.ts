@@ -7,6 +7,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { codeStudioRouter } from "./api/router";
 import { dbPingHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const codeStudioManifest: ModuleManifest = {
   key: "codeStudio",
@@ -55,6 +56,7 @@ export const codeStudioManifest: ModuleManifest = {
   navigation: [{ group: "build", label: "Code Studio", order: 10 }],
 
   boot: async (ctx) => {
+    registerModuleHealthAction(codeStudioManifest);
     try {
       const { seedCodeDb } = await import("./seed");
       await seedCodeDb();

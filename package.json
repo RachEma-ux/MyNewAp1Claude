@@ -19,6 +19,7 @@
     "check:db-ownership": "tsx scripts/check-module-db-ownership.ts",
     "check:coordinator-boundaries": "tsx scripts/check-coordinator-boundaries.ts",
     "check:governance-actions": "tsx scripts/check-governance-actions.ts",
+    "check:db-roles": "tsx scripts/check-db-roles.ts",
     "check:architecture": "tsx scripts/check-architecture.ts",
     "check:wiring:module": "tsx scripts/check-module-wiring.ts",
     "check:wiring:gateway": "tsx scripts/check-gateway-wiring.ts",

@@ -7,6 +7,7 @@
 import type { ModuleManifest } from "../platform/modules/types";
 import { agentStudioRouter } from "./api/router";
 import { dbPingHealth } from "../platform/modules/health";
+import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
 
 export const agentStudioManifest: ModuleManifest = {
   key: "agentStudio",
@@ -55,6 +56,7 @@ export const agentStudioManifest: ModuleManifest = {
   navigation: [{ group: "build", label: "Agent Studio", order: 11 }],
 
   boot: async (ctx) => {
+    registerModuleHealthAction(agentStudioManifest);
     try {
       const { bootAgentStudio } = await import("./boot");
       await bootAgentStudio();

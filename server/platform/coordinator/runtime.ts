@@ -15,41 +15,14 @@ import { randomUUID } from "crypto";
 import { gatewayCall } from "../modules/module-gateway";
 import { submitHandoff } from "../handoff";
 import { publishEvent, subscribeEvent, unsubscribeEvent, makeEnvelope } from "../events";
+import { getCompensationHandler } from "./compensation-registry";
+import { InMemoryWorkflowStore, type WorkflowStore } from "./store";
 import type {
   SubmitWorkflowInput,
   Workflow,
   WorkflowStep,
   WorkflowStatus,
 } from "./types";
-
-interface WorkflowStore {
-  insert(w: Workflow): Promise<void>;
-  update(id: string, patch: Partial<Workflow>): Promise<void>;
-  get(id: string): Promise<Workflow | null>;
-  list(filter?: { workspaceId?: number | string; status?: WorkflowStatus }): Promise<Workflow[]>;
-}
-
-class InMemoryWorkflowStore implements WorkflowStore {
-  private map = new Map<string, Workflow>();
-  async insert(w: Workflow) {
-    this.map.set(w.workflowId, w);
-  }
-  async update(id: string, patch: Partial<Workflow>) {
-    const prev = this.map.get(id);
-    if (!prev) return;
-    this.map.set(id, { ...prev, ...patch, updatedAt: new Date().toISOString() });
-  }
-  async get(id: string) {
-    return this.map.get(id) ?? null;
-  }
-  async list(filter?: { workspaceId?: number | string; status?: WorkflowStatus }) {
-    return [...this.map.values()].filter((w) => {
-      if (filter?.workspaceId !== undefined && w.workspaceId !== filter.workspaceId) return false;
-      if (filter?.status && w.status !== filter.status) return false;
-      return true;
-    });
-  }
-}
 
 let _store: WorkflowStore = new InMemoryWorkflowStore();
 export function setWorkflowStore(store: WorkflowStore) {
@@ -176,10 +149,27 @@ async function runStep(wf: Workflow, step: WorkflowStep): Promise<unknown> {
         });
       });
     }
-    case "compensation":
-      // Compensation is delegated to the calling code. The runtime simply
-      // marks the step completed and the workflow status as 'compensated'.
-      return { compensation: "noop" };
+    case "compensation": {
+      // A2 — explicit compensation: look up a registered handler for
+      // (module, action). If none exists, fail the step loudly so a
+      // workflow can't silently claim it rolled back when no handler
+      // ran. Modules register handlers via
+      // `server/platform/coordinator/compensation-registry`.
+      if (!step.module || !step.action) {
+        throw new Error(
+          `compensation step '${step.stepId}' missing module/action`,
+        );
+      }
+      const handler = getCompensationHandler(step.module, step.action);
+      if (!handler) {
+        throw new Error(
+          `No compensation handler registered for '${step.module}::${step.action}'`,
+        );
+      }
+      const completedSteps = wf.steps.filter((s) => s.status === "completed");
+      const result = await handler({ workflow: wf, step, completedSteps });
+      return result;
+    }
     default:
       throw new Error(`Unknown step kind '${(step as any).kind}'`);
   }
@@ -207,4 +197,9 @@ export async function cancelWorkflow(id: string, reason?: string): Promise<void>
 /** Test-only — clears in-memory state. */
 export function __resetCoordinatorForTests(): void {
   _store = new InMemoryWorkflowStore();
+}
+
+/** Get the active store (for test introspection only). */
+export function __getWorkflowStoreForTests(): WorkflowStore {
+  return _store;
 }
