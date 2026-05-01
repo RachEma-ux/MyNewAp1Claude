@@ -93,6 +93,14 @@ domain into a single owned module, **Communication**.
    `scripts/check-module-db-ownership.ts`, plus `MODULE_MAP` in
    `scripts/lib/module-graph.ts`. Forgetting one makes the architecture
    check ambiguous about what "owned" means.
-5. **Out-of-scope follow-up: agents/db.ts.** Agent-domain internal use of the
-   legacy `conversations`/`messages` tables in `server/agents/db.ts` is
-   intentionally **not** migrated in this PR. It is documented as a follow-up.
+5. **Follow-up landed: agents/db.ts.** Agent-domain internal use of the
+   legacy `conversations`/`messages` tables in `server/agents/db.ts` was
+   migrated in a follow-up PR. The 9 conversation/message helpers there now
+   delegate to the Communication service; agent-table CRUD stays. Agent-linked
+   threads are written with `sourceModule="agents" + sourceRefId=agentId`,
+   and the legacy response shape (`{id, workspaceId, agentId, userId, title,
+   modelId, temperature, ...}`) is preserved by adapter functions
+   (`toLegacyConversation` / `toLegacyMessage`) so `server/agents/router.ts`
+   and `server/agents/executor.ts` keep working unchanged. After this
+   migration, no application code reads or writes the legacy
+   `conversations`/`messages` tables — Communication is the sole writer.

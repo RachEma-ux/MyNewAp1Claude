@@ -171,9 +171,12 @@ sole writer.
 - Application Wiring Inventory (AWI) lists the module's routes, public
   APIs, events, handoffs, and ports.
 
-## Out-of-scope follow-up
+## Follow-up landed
 
-`server/agents/db.ts` still uses the legacy `conversations`/`messages`
-tables for agent-domain internal use (separate from chat/conversations
-ownership). Migrating that to a Communication-backed read is tracked as a
-follow-up task — not part of this PR.
+`server/agents/db.ts` previously held its own copy of conversation/message
+helpers writing to the legacy `conversations`/`messages` tables. A follow-up
+PR converted those 9 helpers into thin delegates over the Communication
+service. Agent-domain extras (`tokenCount`, `retrievedChunks`, `toolCalls`,
+`modelId`, `temperature`) ride along inside Communication's `metadataJson`
+column. After this migration, no application code reads or writes the
+legacy tables — Communication is the sole writer.
