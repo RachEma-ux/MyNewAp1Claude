@@ -432,6 +432,31 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   // ── Modules (Engine Binding) ─────────────────────────────────────────────
   "modules.manage.setEnabled": "module.setEnabled",
   "modules.manage.seed": "module.seed",
+
+  // ── Platform Modular — Cross-module action keys ─────────────────────────
+  // These are not tRPC paths — they are the canonical action keys used by
+  // Module Gateway / Handoff Manager / Coordinator. Listed here so the
+  // governance coverage check (`scripts/check-governance-actions.ts`)
+  // recognises them. New cross-module mutations must add an entry here.
+  "prm.method.publish": "prm.method.publish",
+  "prm.method.deprecate": "prm.method.deprecate",
+  "psm.method.publish": "psm.method.publish",
+  "codeStudio.template.publish": "codeStudio.template.publish",
+  "codeStudio.run.execute": "codeStudio.run.execute",
+  "agentStudio.agent.publish": "agentStudio.agent.publish",
+  "agentStudio.run.execute": "agentStudio.run.execute",
+  "sandboxWf.workflow.publish": "sandboxWf.workflow.publish",
+  "sandboxWf.execute": "sandboxWf.execute",
+  "rag.index.run": "rag.index.run",
+  "openRouter.config.update": "openRouter.config.update",
+  "ps.ideation.publish": "ps.ideation.publish",
+  "ps.handoff.pmCentral": "ps.handoff.pmCentral",
+  "hr.employee.create": "hr.employee.create",
+  "om.entity.create": "om.entity.create",
+  "om.position.assign": "om.position.assign",
+  "cv.value.publish": "cv.value.publish",
+  "aiTypes.catalog.publish": "aiTypes.catalog.publish",
+  "kgra.run.execute": "kgra.run.execute",
 };
 
 /**

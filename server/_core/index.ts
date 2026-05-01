@@ -29,6 +29,8 @@ import { sdk } from "./sdk";
 import { initializeGovernance } from "../governance/governance-engine";
 import { syncCapabilitiesOnBoot } from "../workspace/seed/syncCapabilitiesOnBoot";
 import { bootAiTypesModule } from "../ai-types/boot";
+import { registerAllManifests } from "../platform/modules/manifests";
+import { configureRuntime, getRuntimeManager } from "../platform/modules/runtime-manager";
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -240,19 +242,6 @@ async function startServer() {
     console.warn(`[AgentSeed] Context Translator skipped — ${error.message}`);
   }
 
-  // Seed OM organization templates (5 structure models)
-  try {
-    const { seedOmTemplates } = await import("../organization-management/seed-templates");
-    const omResult = await seedOmTemplates();
-    if (omResult.created > 0) {
-      console.log(`[OMTemplateSeed] Seeded ${omResult.created} new templates (${omResult.skipped} existing)`);
-    } else {
-      console.log(`[OMTemplateSeed] All ${omResult.skipped} templates already present`);
-    }
-  } catch (error: any) {
-    console.warn(`[OMTemplateSeed] Skipped — ${error.message}`);
-  }
-
   // Initialize GraphRAG pilot adapters (registers Documents source in DB)
   try {
     const { initializeAdapters } = await import("../data-analysis/graphrag/service");
@@ -261,57 +250,16 @@ async function startServer() {
     console.warn(`[GraphRAG] Adapter init skipped — ${error.message}`);
   }
 
-  // Seed WfDB (dedicated workflow database — idempotent)
-  try {
-    const { ensureWfDbSeeded } = await import("../sandbox-wf/seed");
-    const wfResult = await ensureWfDbSeeded();
-    if (wfResult.seeded) {
-      console.log(`[WfDB] Seeded ${wfResult.workflows} workflows, ${wfResult.triggers} triggers, ${wfResult.steps} steps`);
-    } else {
-      console.log(`[WfDB] Already populated (${wfResult.workflows} workflows)`);
-    }
-  } catch (error: any) {
-    console.warn(`[WfDB] Seed skipped — ${error.message}`);
-  }
-
-  // Seed PRMDB (dedicated Problem Resolution Methods database — idempotent)
-  try {
-    const { seedPrmDb } = await import("../prm/seed");
-    await seedPrmDb();
-  } catch (error: any) {
-    console.warn(`[PRMDB] Seed skipped — ${error.message}`);
-  }
-
-  // Seed PSMDB (dedicated Problem Solving Methods database — idempotent)
-  try {
-    const { seedPsmDb } = await import("../psm/seed");
-    await seedPsmDb();
-  } catch (error: any) {
-    console.warn(`[PSMDB] Seed skipped — ${error.message}`);
-  }
-
-  // Seed CODEDB (dedicated Code Studio database — idempotent)
-  try {
-    const { seedCodeDb } = await import("../code-studio/seed");
-    await seedCodeDb();
-  } catch (error: any) {
-    console.warn(`[CODEDB] Seed skipped — ${error.message}`);
-  }
-
-  // Seed RAGDB (dedicated RAG Knowledge Graph database — idempotent)
-  try {
-    const { seedRagDb, migrateJsonBlobToRagDb } = await import("../rag/seed");
-    await seedRagDb();
-    await migrateJsonBlobToRagDb();
-  } catch (error: any) {
-    console.warn(`[RAGDB] Seed skipped — ${error.message}`);
-  }
-
-  // Boot Agent Studio (ASDB seed + scheduler — self-contained, idempotent)
-  await (await import("../agent-studio/boot")).bootAgentStudio();
-
   // Initialize Governance Engine (CGT v2)
   initializeGovernance();
+
+  // Platform Modular — boot self-registered modules (PRM, PSM, Code Studio,
+  // Agent Studio, Sandbox WF, RAG, OpenRouter, OM, …). Each manifest owns
+  // its own seed/boot logic. Failures of optional modules mark them as
+  // `degraded` but never block startup.
+  registerAllManifests();
+  configureRuntime(() => getDb());
+  await getRuntimeManager().boot();
 
   const app = express();
 
@@ -557,7 +505,7 @@ async function startServer() {
 
   app.post("/api/kgra-proxy/run", async (req, res) => {
     const { query, mode, workspace_id, session_id } = req.body || {};
-    if (!query) return res.status(400).json({ error: "query is required" });
+    if (!query) { res.status(400).json({ error: "query is required" }); return; }
 
     try {
       const { executeKGRARun } = await import("../kgra-agent/engine");
@@ -616,7 +564,7 @@ async function startServer() {
     try {
       const { getRagDb } = await import("../rag/connection");
       const ragDb = getRagDb();
-      if (!ragDb) return res.json({ nodes: [], edges: [] });
+      if (!ragDb) { res.json({ nodes: [], edges: [] }); return; }
       const entities = ((await ragDb.execute(sql`SELECT id, name, short_name, entity_type, mentions FROM kgra_entities`)) as any).rows || [];
       const rels = ((await ragDb.execute(sql`
         SELECT src.name as source, tgt.name as target, r.relationship_type as type
@@ -638,10 +586,10 @@ async function startServer() {
     try {
       const { getDb } = await import("../db/connection");
       const db = getDb();
-      if (!db) return res.json([]);
+      if (!db) { res.json([]); return; }
       const docCount = ((await db.execute(sql`SELECT count(*) as cnt FROM documents`)) as any).rows?.[0]?.cnt || 0;
       const chunkCount = ((await db.execute(sql`SELECT count(*) as cnt FROM document_chunks`)) as any).rows?.[0]?.cnt || 0;
-      if (Number(docCount) === 0) return res.json([]);
+      if (Number(docCount) === 0) { res.json([]); return; }
       res.json([{
         name: "MyNewAp1Claude-RAG",
         strategy: "recursive_split",
@@ -669,7 +617,7 @@ async function startServer() {
     try {
       const { getRagDb } = await import("../rag/connection");
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
 
       const hubCount = Math.min(50, Math.max(5, parseInt(req.query.hub_count as string) || 10));
       const maxNodes = 300;
@@ -692,19 +640,20 @@ async function startServer() {
         ORDER BY connections DESC
       `)) as any).rows || [];
 
-      if (allEntities.length === 0) return res.json([]);
+      if (allEntities.length === 0) { res.json([]); return; }
 
       // If small graph, return all
       if (allEntities.length <= maxNodes) {
-        return res.json(allEntities.map((e: any) => ({
+        res.json(allEntities.map((e: any) => ({
           id: e.name, name: e.short_name || e.name.split("/").pop() || e.name,
           type: (e.entity_type || "entity").toUpperCase(), connections: Number(e.connections) || e.mentions || 1,
           community: e.entity_type || "default",
         })));
+        return;
       }
 
       // Hub+neighbor strategy
-      const hubIds = new Set(allEntities.slice(0, hubCount).map((e: any) => e.id));
+      const hubIds = new Set<number>(allEntities.slice(0, hubCount).map((e: any) => e.id as number));
       const hubIdList = sql.join([...hubIds].map(id => sql`${id}`), sql`, `);
 
       const neighborRows = ((await ragDb.execute(sql`
@@ -775,7 +724,7 @@ async function startServer() {
     try {
       const { getRagDb } = await import("../rag/connection");
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
 
       // Load mode filter for relationship types
       const modeId = req.query.mode as string;
@@ -1197,26 +1146,15 @@ async function startServer() {
   server.listen(port, async () => {
     console.log(`Server running on http://localhost:${port}/`);
 
-    // Sync provider API keys to OpenCode auth.json
+    // Run all module postListen hooks (Code Studio: OpenCode key sync,
+    // Agent Studio: MCP self-attach, etc). Each manifest declares its
+    // own postListen behavior; a failure marks the module as degraded
+    // but never crashes the process.
     try {
-      const { syncProviderKeysToOpenCode } = await import("../code-studio/opencode/provider-sync");
-      const result = await syncProviderKeysToOpenCode();
-      if (result.synced.length > 0) {
-        console.log(`[OpenCode] Synced provider keys: ${result.synced.join(", ")}`);
-      }
-      if (result.errors.length > 0) {
-        console.log(`[OpenCode] Sync errors: ${result.errors.join(", ")}`);
-      }
-    } catch { /* non-fatal */ }
-
-    // Agent Studio post-listen boot: MCP server auto-reconnect.
-    // Must run AFTER server.listen resolves so studio-self (http
-    // transport targeting /api/mcp on this very process) can
-    // successfully connect.
-    try {
-      const { bootAgentStudioPostListen } = await import("../agent-studio/boot");
-      await bootAgentStudioPostListen();
-    } catch { /* non-fatal */ }
+      await getRuntimeManager().postListen();
+    } catch (err: any) {
+      console.warn(`[runtime] postListen failed — ${err?.message ?? err}`);
+    }
   });
 }
 

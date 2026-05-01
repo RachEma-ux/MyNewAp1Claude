@@ -72,7 +72,7 @@ const sourcesRouter = router({
       name: z.string().min(1).max(255),
       type: z.enum(["neo4j", "sparql", "neptune_cypher", "neptune_sparql"]),
       endpoint: z.string().min(1),
-      credentials: z.record(z.unknown()).optional(),
+      credentials: z.record(z.string(), z.unknown()).optional(),
       maxHops: z.number().min(1).max(10).default(4),
       maxRows: z.number().min(1).max(10000).default(1000),
       readOnly: z.boolean().default(true),
@@ -116,7 +116,7 @@ const sourcesRouter = router({
       workspaceId: z.number(),
       name: z.string().min(1).max(255).optional(),
       endpoint: z.string().min(1).optional(),
-      credentials: z.record(z.unknown()).optional(),
+      credentials: z.record(z.string(), z.unknown()).optional(),
       allowlisted: z.boolean().optional(),
       maxHops: z.number().min(1).max(10).optional(),
       maxRows: z.number().min(1).max(10000).optional(),
@@ -206,7 +206,7 @@ const sessionsRouter = router({
     .input(z.object({
       workspaceId: z.number(),
       title: z.string().max(500).optional(),
-      config: z.record(z.unknown()).optional(),
+      config: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireWorkspaceAccess(ctx.user.id, input.workspaceId);

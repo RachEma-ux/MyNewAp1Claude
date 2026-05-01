@@ -32,7 +32,7 @@ export function registerDesignerRoutes(app: Express) {
   app.get("/api/kgra-proxy/manual/nodes", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
       const status = (req.query.status as string) || "active";
       const rows = ((await ragDb.execute(sql`
         SELECT * FROM kgra_manual_nodes WHERE status = ${status} ORDER BY created_at DESC
@@ -47,10 +47,11 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/manual/nodes", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const { name, unique_id, family, kind, description, properties, short_name } = req.body || {};
       if (!name || !family || !kind) {
-        return res.status(400).json({ error: "name, family, and kind are required" });
+        res.status(400).json({ error: "name, family, and kind are required" });
+        return;
       }
       const uid = unique_id || slugify(name);
 
@@ -59,7 +60,8 @@ export function registerDesignerRoutes(app: Express) {
         SELECT id FROM kgra_manual_nodes WHERE unique_id = ${uid}
       `)) as any).rows;
       if (existing?.length > 0) {
-        return res.status(409).json({ error: `Node with unique_id '${uid}' already exists` });
+        res.status(409).json({ error: `Node with unique_id '${uid}' already exists` });
+        return;
       }
 
       const result = ((await ragDb.execute(sql`
@@ -78,7 +80,7 @@ export function registerDesignerRoutes(app: Express) {
   app.put("/api/kgra-proxy/manual/nodes/:id", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       const { name, short_name, family, kind, description, properties, status } = req.body || {};
 
@@ -96,7 +98,7 @@ export function registerDesignerRoutes(app: Express) {
         WHERE id = ${id}
         RETURNING *
       `)) as any).rows?.[0];
-      if (!result) return res.status(404).json({ error: "Node not found" });
+      if (!result) { res.status(404).json({ error: "Node not found" }); return; }
       broadcast('node-updated', { id: `manual_${id}`, updates: { name: result.name, family: result.family, kind: result.kind, status: result.status } });
       res.json(result);
     } catch (err) {
@@ -108,7 +110,7 @@ export function registerDesignerRoutes(app: Express) {
   app.delete("/api/kgra-proxy/manual/nodes/:id", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       // Also delete edges referencing this node
       await ragDb.execute(sql`DELETE FROM kgra_manual_edges WHERE (source_node_id = ${id} AND source_is_auto = 'false') OR (target_node_id = ${id} AND target_is_auto = 'false')`);
@@ -124,12 +126,12 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/manual/nodes/:id/archive", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       const result = ((await ragDb.execute(sql`
         UPDATE kgra_manual_nodes SET status = 'archived', updated_at = now() WHERE id = ${id} RETURNING *
       `)) as any).rows?.[0];
-      if (!result) return res.status(404).json({ error: "Node not found" });
+      if (!result) { res.status(404).json({ error: "Node not found" }); return; }
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
@@ -140,12 +142,12 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/manual/nodes/:id/restore", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       const result = ((await ragDb.execute(sql`
         UPDATE kgra_manual_nodes SET status = 'active', updated_at = now() WHERE id = ${id} RETURNING *
       `)) as any).rows?.[0];
-      if (!result) return res.status(404).json({ error: "Node not found" });
+      if (!result) { res.status(404).json({ error: "Node not found" }); return; }
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
@@ -158,7 +160,7 @@ export function registerDesignerRoutes(app: Express) {
   app.get("/api/kgra-proxy/manual/edges", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
       const status = (req.query.status as string) || "active";
       const rows = ((await ragDb.execute(sql`
         SELECT * FROM kgra_manual_edges WHERE status = ${status} ORDER BY created_at DESC
@@ -173,7 +175,7 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/manual/edges", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const {
         name, source_node_id, target_node_id, source_is_auto, target_is_auto,
         relationship_type, relationship_category, weight, confidence, provenance,
@@ -181,7 +183,8 @@ export function registerDesignerRoutes(app: Express) {
       } = req.body || {};
 
       if (!name || source_node_id == null || target_node_id == null || !relationship_type) {
-        return res.status(400).json({ error: "name, source_node_id, target_node_id, and relationship_type are required" });
+        res.status(400).json({ error: "name, source_node_id, target_node_id, and relationship_type are required" });
+        return;
       }
 
       const result = ((await ragDb.execute(sql`
@@ -210,7 +213,7 @@ export function registerDesignerRoutes(app: Express) {
   app.put("/api/kgra-proxy/manual/edges/:id", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       const { name, relationship_type, relationship_category, weight, confidence, provenance, link_strength, description, properties, rules, status } = req.body || {};
 
@@ -231,7 +234,7 @@ export function registerDesignerRoutes(app: Express) {
         WHERE id = ${id}
         RETURNING *
       `)) as any).rows?.[0];
-      if (!result) return res.status(404).json({ error: "Edge not found" });
+      if (!result) { res.status(404).json({ error: "Edge not found" }); return; }
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
@@ -242,7 +245,7 @@ export function registerDesignerRoutes(app: Express) {
   app.delete("/api/kgra-proxy/manual/edges/:id", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       await ragDb.execute(sql`DELETE FROM kgra_manual_edges WHERE id = ${id}`);
       broadcast('edge-removed', { id: `manual_edge_${id}` });
@@ -256,12 +259,12 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/manual/edges/:id/archive", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       const result = ((await ragDb.execute(sql`
         UPDATE kgra_manual_edges SET status = 'archived', updated_at = now() WHERE id = ${id} RETURNING *
       `)) as any).rows?.[0];
-      if (!result) return res.status(404).json({ error: "Edge not found" });
+      if (!result) { res.status(404).json({ error: "Edge not found" }); return; }
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
@@ -302,7 +305,7 @@ export function registerDesignerRoutes(app: Express) {
   app.get("/api/kgra-proxy/templates", async (_req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
       const rows = ((await ragDb.execute(sql`SELECT * FROM kgra_templates WHERE status = 'active' ORDER BY is_default DESC, created_at DESC`)) as any).rows || [];
       res.json(rows);
     } catch { res.json([]); }
@@ -311,9 +314,9 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/templates", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const { name, description, purpose } = req.body || {};
-      if (!name) return res.status(400).json({ error: "name is required" });
+      if (!name) { res.status(400).json({ error: "name is required" }); return; }
       const result = ((await ragDb.execute(sql`
         INSERT INTO kgra_templates (name, description, purpose) VALUES (${name}, ${description || null}, ${purpose || null}) RETURNING *
       `)) as any).rows?.[0];
@@ -324,10 +327,10 @@ export function registerDesignerRoutes(app: Express) {
   app.get("/api/kgra-proxy/templates/:id", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       const template = ((await ragDb.execute(sql`SELECT * FROM kgra_templates WHERE id = ${id}`)) as any).rows?.[0];
-      if (!template) return res.status(404).json({ error: "Template not found" });
+      if (!template) { res.status(404).json({ error: "Template not found" }); return; }
       const nodes = ((await ragDb.execute(sql`SELECT * FROM kgra_template_nodes WHERE template_id = ${id}`)) as any).rows || [];
       const edges = ((await ragDb.execute(sql`SELECT * FROM kgra_template_edges WHERE template_id = ${id}`)) as any).rows || [];
       const modes = ((await ragDb.execute(sql`SELECT * FROM kgra_modes WHERE template_id = ${id} ORDER BY sort_order`)) as any).rows || [];
@@ -338,7 +341,7 @@ export function registerDesignerRoutes(app: Express) {
   app.put("/api/kgra-proxy/templates/:id", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       const { name, description, purpose, status } = req.body || {};
       const result = ((await ragDb.execute(sql`
@@ -354,11 +357,11 @@ export function registerDesignerRoutes(app: Express) {
   app.delete("/api/kgra-proxy/templates/:id", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       // Block deletion of default template
       const tmpl = ((await ragDb.execute(sql`SELECT is_default FROM kgra_templates WHERE id = ${id}`)) as any).rows?.[0];
-      if (tmpl?.is_default === "true") return res.status(403).json({ error: "Cannot delete default template" });
+      if (tmpl?.is_default === "true") { res.status(403).json({ error: "Cannot delete default template" }); return; }
       await ragDb.execute(sql`DELETE FROM kgra_template_edges WHERE template_id = ${id}`);
       await ragDb.execute(sql`DELETE FROM kgra_template_nodes WHERE template_id = ${id}`);
       await ragDb.execute(sql`DELETE FROM kgra_modes WHERE template_id = ${id}`);
@@ -371,7 +374,7 @@ export function registerDesignerRoutes(app: Express) {
   app.get("/api/kgra-proxy/templates/:id/nodes", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
       const rows = ((await ragDb.execute(sql`SELECT * FROM kgra_template_nodes WHERE template_id = ${parseInt(req.params.id)}`)) as any).rows || [];
       res.json(rows);
     } catch { res.json([]); }
@@ -380,10 +383,10 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/templates/:id/nodes", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const templateId = parseInt(req.params.id);
       const { name, unique_id, family, kind, description, properties, short_name } = req.body || {};
-      if (!name || !family || !kind) return res.status(400).json({ error: "name, family, kind required" });
+      if (!name || !family || !kind) { res.status(400).json({ error: "name, family, kind required" }); return; }
       const result = ((await ragDb.execute(sql`
         INSERT INTO kgra_template_nodes (template_id, unique_id, name, short_name, family, kind, description, properties)
         VALUES (${templateId}, ${unique_id || slugify(name)}, ${name}, ${short_name || name}, ${family}, ${kind}, ${description || null}, ${JSON.stringify(properties || {})}::jsonb) RETURNING *
@@ -395,7 +398,7 @@ export function registerDesignerRoutes(app: Express) {
   app.delete("/api/kgra-proxy/templates/:id/nodes/:nid", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       await ragDb.execute(sql`DELETE FROM kgra_template_nodes WHERE id = ${parseInt(req.params.nid)} AND template_id = ${parseInt(req.params.id)}`);
       res.json({ success: true });
     } catch (err) { res.status(500).json({ error: (err as Error).message }); }
@@ -405,7 +408,7 @@ export function registerDesignerRoutes(app: Express) {
   app.get("/api/kgra-proxy/templates/:id/edges", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
       const rows = ((await ragDb.execute(sql`SELECT * FROM kgra_template_edges WHERE template_id = ${parseInt(req.params.id)}`)) as any).rows || [];
       res.json(rows);
     } catch { res.json([]); }
@@ -414,10 +417,10 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/templates/:id/edges", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const templateId = parseInt(req.params.id);
       const { name, source_node_id, target_node_id, relationship_type, relationship_category, link_strength, description, properties, rules } = req.body || {};
-      if (!name || !source_node_id || !target_node_id || !relationship_type) return res.status(400).json({ error: "name, source, target, type required" });
+      if (!name || !source_node_id || !target_node_id || !relationship_type) { res.status(400).json({ error: "name, source, target, type required" }); return; }
       const result = ((await ragDb.execute(sql`
         INSERT INTO kgra_template_edges (template_id, name, source_node_id, target_node_id, relationship_type, relationship_category, link_strength, description, properties, rules)
         VALUES (${templateId}, ${name}, ${source_node_id}, ${target_node_id}, ${relationship_type}, ${relationship_category || null}, ${link_strength || "hard"}, ${description || null}, ${JSON.stringify(properties || {})}::jsonb, ${rules ? JSON.stringify(rules) : null}::jsonb) RETURNING *
@@ -429,7 +432,7 @@ export function registerDesignerRoutes(app: Express) {
   app.delete("/api/kgra-proxy/templates/:id/edges/:eid", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       await ragDb.execute(sql`DELETE FROM kgra_template_edges WHERE id = ${parseInt(req.params.eid)} AND template_id = ${parseInt(req.params.id)}`);
       res.json({ success: true });
     } catch (err) { res.status(500).json({ error: (err as Error).message }); }
@@ -439,7 +442,7 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/templates/:id/apply", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const templateId = parseInt(req.params.id);
 
       // Record application
@@ -483,7 +486,7 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/templates/:id/unapply", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const templateId = parseInt(req.params.id);
       // Find applied_template entries
       const applied = ((await ragDb.execute(sql`SELECT id FROM kgra_applied_templates WHERE template_id = ${templateId} AND status = 'active'`)) as any).rows || [];
@@ -500,15 +503,15 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/templates/from-manual", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const { name, description } = req.body || {};
-      if (!name) return res.status(400).json({ error: "name required" });
+      if (!name) { res.status(400).json({ error: "name required" }); return; }
 
       // Create template
       const tmpl = ((await ragDb.execute(sql`
         INSERT INTO kgra_templates (name, description) VALUES (${name}, ${description || null}) RETURNING id
       `)) as any).rows?.[0];
-      if (!tmpl) return res.status(500).json({ error: "Failed to create template" });
+      if (!tmpl) { res.status(500).json({ error: "Failed to create template" }); return; }
 
       // Copy all active manual nodes into template
       const manualNodes = ((await ragDb.execute(sql`SELECT * FROM kgra_manual_nodes WHERE status = 'active' AND applied_template_id IS NULL`)) as any).rows || [];
@@ -543,10 +546,10 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/templates/:id/duplicate", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const srcId = parseInt(req.params.id);
       const src = ((await ragDb.execute(sql`SELECT * FROM kgra_templates WHERE id = ${srcId}`)) as any).rows?.[0];
-      if (!src) return res.status(404).json({ error: "Template not found" });
+      if (!src) { res.status(404).json({ error: "Template not found" }); return; }
 
       const newTmpl = ((await ragDb.execute(sql`
         INSERT INTO kgra_templates (name, version, description, purpose, design_principles, overlays, visualization_rules, quality_guards, portability_profiles, maturity_levels, example_queries)
@@ -556,7 +559,7 @@ export function registerDesignerRoutes(app: Express) {
           ${JSON.stringify(src.portability_profiles || [])}::jsonb, ${JSON.stringify(src.maturity_levels || {})}::jsonb,
           ${JSON.stringify(src.example_queries || [])}::jsonb) RETURNING id
       `)) as any).rows?.[0];
-      if (!newTmpl) return res.status(500).json({ error: "Failed to duplicate" });
+      if (!newTmpl) { res.status(500).json({ error: "Failed to duplicate" }); return; }
 
       // Copy nodes
       const srcNodes = ((await ragDb.execute(sql`SELECT * FROM kgra_template_nodes WHERE template_id = ${srcId}`)) as any).rows || [];
@@ -596,7 +599,7 @@ export function registerDesignerRoutes(app: Express) {
   app.get("/api/kgra-proxy/modes", async (_req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
       const rows = ((await ragDb.execute(sql`SELECT * FROM kgra_modes ORDER BY sort_order, created_at`)) as any).rows || [];
       res.json(rows);
     } catch { res.json([]); }
@@ -605,9 +608,9 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/modes", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const { mode_id, name, persona, primary_question, includes, emphasis_rules, default_view_layout, example_use_case } = req.body || {};
-      if (!mode_id || !name || !includes) return res.status(400).json({ error: "mode_id, name, includes required" });
+      if (!mode_id || !name || !includes) { res.status(400).json({ error: "mode_id, name, includes required" }); return; }
       const result = ((await ragDb.execute(sql`
         INSERT INTO kgra_modes (mode_id, name, persona, primary_question, includes, emphasis_rules, default_view_layout, example_use_case)
         VALUES (${mode_id}, ${name}, ${persona || null}, ${primary_question || null}, ${JSON.stringify(includes)}::jsonb, ${JSON.stringify(emphasis_rules || [])}::jsonb, ${default_view_layout || "force"}, ${example_use_case || null}) RETURNING *
@@ -619,7 +622,7 @@ export function registerDesignerRoutes(app: Express) {
   app.put("/api/kgra-proxy/modes/:id", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       const { name, persona, primary_question, includes, emphasis_rules, default_view_layout, example_use_case } = req.body || {};
       const result = ((await ragDb.execute(sql`
@@ -639,10 +642,10 @@ export function registerDesignerRoutes(app: Express) {
   app.delete("/api/kgra-proxy/modes/:id", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const id = parseInt(req.params.id);
       const mode = ((await ragDb.execute(sql`SELECT is_default FROM kgra_modes WHERE id = ${id}`)) as any).rows?.[0];
-      if (mode?.is_default === "true") return res.status(403).json({ error: "Cannot delete default mode" });
+      if (mode?.is_default === "true") { res.status(403).json({ error: "Cannot delete default mode" }); return; }
       await ragDb.execute(sql`DELETE FROM kgra_modes WHERE id = ${id}`);
       res.json({ success: true });
     } catch (err) { res.status(500).json({ error: (err as Error).message }); }
@@ -651,7 +654,7 @@ export function registerDesignerRoutes(app: Express) {
   app.get("/api/kgra-proxy/modes/compositions", async (_req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
       const rows = ((await ragDb.execute(sql`SELECT * FROM kgra_mode_compositions ORDER BY created_at`)) as any).rows || [];
       res.json(rows);
     } catch { res.json([]); }
@@ -660,9 +663,9 @@ export function registerDesignerRoutes(app: Express) {
   app.post("/api/kgra-proxy/modes/compose", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
       const { name, mode_ids, merge_strategy, conflict_resolution, zoom_level } = req.body || {};
-      if (!name || !mode_ids) return res.status(400).json({ error: "name, mode_ids required" });
+      if (!name || !mode_ids) { res.status(400).json({ error: "name, mode_ids required" }); return; }
       const result = ((await ragDb.execute(sql`
         INSERT INTO kgra_mode_compositions (name, mode_ids, merge_strategy, conflict_resolution, zoom_level)
         VALUES (${name}, ${JSON.stringify(mode_ids)}::jsonb, ${merge_strategy || "union"}, ${conflict_resolution || null}, ${zoom_level || null}) RETURNING *

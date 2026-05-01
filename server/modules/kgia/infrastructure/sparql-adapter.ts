@@ -23,7 +23,7 @@ export async function readSparqlSchema(
   source: GraphSource
 ): Promise<Record<string, unknown>> {
   if (source.schemaSnapshot) {
-    return source.schemaSnapshot;
+    return source.schemaSnapshot as unknown as Record<string, unknown>;
   }
 
   // In production: query for classes and properties

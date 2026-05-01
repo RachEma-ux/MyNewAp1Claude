@@ -25,12 +25,20 @@ import {
 // Cached module references — populated by async pre-load at boot,
 // used synchronously at execution time (always resolved by then).
 let _registryMod: any = null;
+let _booted = false;
 
 /**
  * Initialize the AI Types module by wiring external dependencies.
  * Must be called before any catalog execution or governance operation.
+ *
+ * Idempotent: invoked from two paths today — the direct call in
+ * server/_core/index.ts (early, so subsequent startup steps can use
+ * the ports) and the manifest's `boot()` hook driven by RuntimeManager.
+ * The second call is a no-op.
  */
 export function bootAiTypesModule() {
+  if (_booted) return;
+  _booted = true;
   // Pre-load the provider registry module. By the time any user
   // triggers catalog execution, this import will have resolved.
   import("../providers/registry").then((mod) => {

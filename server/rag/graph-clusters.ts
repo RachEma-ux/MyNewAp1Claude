@@ -12,7 +12,7 @@ export function registerClusterRoutes(app: Express) {
   app.get("/api/kgra-proxy/graph/clusters", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.json([]);
+      if (!ragDb) { res.json([]); return; }
 
       // Group by entity_type as community
       const clusters = ((await ragDb.execute(sql`
@@ -58,7 +58,7 @@ export function registerClusterRoutes(app: Express) {
   app.get("/api/kgra-proxy/graph/clusters/:id", async (req, res) => {
     try {
       const ragDb = getRagDb();
-      if (!ragDb) return res.status(500).json({ error: "RAGDB unavailable" });
+      if (!ragDb) { res.status(500).json({ error: "RAGDB unavailable" }); return; }
 
       // Get all clusters then filter by id
       const clusters = ((await ragDb.execute(sql`
@@ -68,7 +68,7 @@ export function registerClusterRoutes(app: Express) {
       `)) as any).rows || [];
 
       const idx = parseInt(req.params.id) - 1;
-      if (idx < 0 || idx >= clusters.length) return res.status(404).json({ error: "Cluster not found" });
+      if (idx < 0 || idx >= clusters.length) { res.status(404).json({ error: "Cluster not found" }); return; }
 
       const c = clusters[idx];
       const memberNames = c.members || [];

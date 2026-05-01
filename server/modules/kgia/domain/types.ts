@@ -17,6 +17,8 @@ export interface GraphSource {
   maxHops: number;
   maxRows: number;
   readOnly: boolean;
+  schemaSnapshot?: SchemaSlice;
+  credentials?: Record<string, string>;
 }
 
 // ── Schema Slice ─────────────────────────────────────────────────
@@ -103,6 +105,8 @@ export interface PathCandidate {
 export interface ProvenanceRef {
   sourceId: number;
   sourceName: string;
+  sourceType?: string;
+  sourceRef?: string;
   queryText?: string;
   resultIndex?: number;
   timestamp: string;

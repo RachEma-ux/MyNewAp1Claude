@@ -1,0 +1,60 @@
+# Cross-Module Communication Map
+
+This document defines how modules talk to each other and which lane each
+flow uses.
+
+## Lanes
+
+| Lane            | Sync? | Governance | Persistence | Use case                                                        |
+|-----------------|-------|------------|-------------|-----------------------------------------------------------------|
+| Port / Adapter  | yes   | none       | none        | Same-process explicit interface, fast, no network.              |
+| Module Gateway  | yes   | optional   | audit       | Governed cross-module command (e.g. PRM tells AI Types to publish a method). |
+| Handoff         | async | required   | yes         | One module asks another to own a unit of work.                  |
+| Event           | async | optional   | outbox/inbox| Notification fan-out, eventual consistency.                     |
+| Coordinator     | async | required   | yes         | Multi-module workflow with state, retry, correlation.           |
+
+## Important rule
+
+> Do **not** use the coordinator for every cross-module action.
+
+Simple ownership transfer (e.g. `PS → PM Central`) uses **handoff only**.
+
+Use the coordinator only when the flow becomes a real multi-module workflow:
+
+- `PS → PM Central → Code Studio`
+- `PS → PM Central → Governance → Digital HQ`
+- `Agent Studio → Code Studio → Governance`
+- `Document Upload → RAG/KGRA indexing → Digital HQ`
+
+## Catalog (Communication Map)
+
+| Source          | Target          | Lane         | Governance           | Notes                                                  |
+|-----------------|-----------------|--------------|----------------------|--------------------------------------------------------|
+| PS              | PM Central      | handoff      | required             | Project ideation handoff. No coordinator unless multi-step. |
+| PS              | Coordinator     | coordinator  | required             | Only for multi-module flows after handoff is accepted. |
+| PM Central      | Code Studio     | handoff      | required             | "Build this" handoff.                                  |
+| Agent Studio    | Code Studio     | gateway      | required             | Run a coding skill on behalf of agent.                 |
+| Agent Studio    | Sandbox WF      | gateway      | required             | Execute a workflow as part of an agent run.            |
+| Sandbox WF      | Code Studio     | gateway      | required             | Workflow step calls a code action.                     |
+| Document upload | RAG/KGRA        | event        | optional             | `documents.uploaded` → indexing.                       |
+| RAG/KGRA        | Digital HQ      | event        | none                 | `kgra.index.completed` → observability.                |
+| Governance      | All modules     | event        | n/a                  | `governance.freeze` (critical), `governance.policy.updated` (high). |
+| All modules     | Digital HQ      | event        | none                 | health summaries, metrics (low/batched).               |
+| OpenRouter      | Code Studio     | port         | none                 | Provider routing — a port the providers feature exposes. |
+| AI Types        | All modules     | port         | none                 | `catalogPort.resolveBySource()` etc. via public API.   |
+| Coordinator     | any module      | gateway/handoff/event | required for sensitive | Coordinator never imports module internals.            |
+| Workspace/RBAC  | All modules     | port         | n/a                  | Auth context propagated, not pulled.                   |
+
+## Forbidden flows
+
+- Module → another module's repository file.
+- Module → another module's `getXxxDb()` connection.
+- Module → another module's Drizzle schema file.
+- Coordinator → any module's repository / connection / schema / private service.
+- Module → cross-module SQL (raw `JOIN` across two module DBs).
+
+## Receipts
+
+Sensitive cross-module mutations require a **governance receipt** attached to
+the gateway/handoff/coordinator request. The receipt is verified by the receiving
+module's gate. Coverage is enforced by `scripts/check-governance-actions.ts`.
