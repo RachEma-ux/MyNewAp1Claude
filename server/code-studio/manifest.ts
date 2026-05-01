@@ -8,6 +8,8 @@ import type { ModuleManifest } from "../platform/modules/types";
 import { codeStudioRouter } from "./api/router";
 import { dbPingHealth } from "../platform/modules/health";
 import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
+import { registerHandoffAcceptor } from "../platform/handoff";
+import type { CodeStudioRunHandoffPayload } from "./handoffs";
 
 export const codeStudioManifest: ModuleManifest = {
   key: "codeStudio",
@@ -63,6 +65,39 @@ export const codeStudioManifest: ModuleManifest = {
     } catch (err: any) {
       ctx.log("warn", `seed skipped — ${err?.message ?? err}`);
     }
+    // Literal type string used so check:wiring:handoff can verify
+    // statically; CODE_STUDIO_HANDOFFS.runRequested is the constant.
+    registerHandoffAcceptor("codeStudio", "codeStudio.run.requested", async (handoff) => {
+      const payload = handoff.payload as Partial<CodeStudioRunHandoffPayload>;
+      const templateKey = payload?.templateKey;
+      if (!templateKey) {
+        return { accepted: false, reason: "templateKey missing from payload" };
+      }
+      try {
+        const repo = await import("./repository");
+        const orchestrator = await import("./worker/job-orchestrator");
+        const job = await repo.createJob({
+          title: `${templateKey} (handoff ${handoff.handoffId.slice(0, 8)})`,
+          description: `Handoff from ${handoff.fromModule}`,
+          objective: templateKey,
+          constraints: payload.inputs,
+          sourceModule: handoff.fromModule,
+          sourceWorkflowId: handoff.correlationId,
+          actorUserId: typeof handoff.actorId === "number" ? handoff.actorId : undefined,
+        });
+        await repo.createHandoff({
+          jobId: job.id,
+          direction: "inbound",
+          sourceModule: handoff.fromModule,
+          payload: { handoffId: handoff.handoffId, ...payload },
+        });
+        await orchestrator.startJob(job.id);
+        return { accepted: true };
+      } catch (err: any) {
+        ctx.log("warn", `codeStudio.run.requested handoff failed: ${err?.message ?? err}`);
+        return { accepted: false, reason: err?.message ?? "internal error" };
+      }
+    });
   },
 
   postListen: async (ctx) => {

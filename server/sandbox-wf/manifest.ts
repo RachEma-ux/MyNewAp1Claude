@@ -8,6 +8,7 @@ import type { ModuleManifest } from "../platform/modules/types";
 import { sandboxWfRouter } from "./router";
 import { dbPingHealth } from "../platform/modules/health";
 import { registerModuleHealthAction } from "../platform/modules/register-module-health-action";
+import { registerHandoffAcceptor } from "../platform/handoff";
 
 export const sandboxWfManifest: ModuleManifest = {
   key: "sandboxWf",
@@ -61,6 +62,38 @@ export const sandboxWfManifest: ModuleManifest = {
     } catch (err: any) {
       ctx.log("warn", `seed skipped — ${err?.message ?? err}`);
     }
+    // Literal type string used so check:wiring:handoff can verify
+    // statically; SANDBOX_WF_HANDOFFS.executeRequested is the constant.
+    registerHandoffAcceptor(
+      "sandboxWf",
+      "sandboxWf.execute.requested",
+      async (handoff) => {
+        const payload = handoff.payload as {
+          workflowId?: number;
+          triggerType?: string;
+        };
+        if (typeof payload?.workflowId !== "number") {
+          return { accepted: false, reason: "workflowId missing from payload" };
+        }
+        try {
+          const { executeWorkflow } = await import("./executor");
+          // Fire and forget — executeWorkflow runs synchronously through
+          // its step loop but we don't block the acceptor on completion.
+          // The handoff is "accepted" when the execution record exists;
+          // run-completion lifecycle is signalled via sandboxWf events.
+          void executeWorkflow(payload.workflowId, payload.triggerType ?? "handoff").catch(
+            (err: unknown) => {
+              const msg = err instanceof Error ? err.message : String(err);
+              ctx.log("warn", `sandboxWf execution ${payload.workflowId} failed: ${msg}`);
+            },
+          );
+          return { accepted: true };
+        } catch (err: any) {
+          ctx.log("warn", `sandboxWf.execute.requested handoff failed: ${err?.message ?? err}`);
+          return { accepted: false, reason: err?.message ?? "internal error" };
+        }
+      },
+    );
   },
 
   health: async () => {

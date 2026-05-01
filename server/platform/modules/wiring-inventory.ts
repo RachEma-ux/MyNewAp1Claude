@@ -192,12 +192,18 @@ export function buildInventoryFor(
   inv.publicApi = buildPublicApi(govActions, registeredApis);
 
   /* ----- events ----- */
-  inv.events = parseEvents(manifestSrc, [bootPath, eventsPath].map((p) => safeRead(p) ?? ""));
+  // Include the manifest source itself — modules that don't have a
+  // separate boot.ts often subscribe inline in the manifest's boot
+  // hook (e.g. rag).
+  inv.events = parseEvents(
+    manifestSrc,
+    [manifestSrc, ...[bootPath, eventsPath].map((p) => safeRead(p) ?? "")],
+  );
 
   /* ----- handoffs ----- */
   inv.handoffs = parseHandoffs(
     manifestSrc,
-    [bootPath, handoffsPath, publicApiPath].map((p) => safeRead(p) ?? ""),
+    [manifestSrc, ...[bootPath, handoffsPath, publicApiPath].map((p) => safeRead(p) ?? "")],
   );
 
   /* ----- routes / nav ----- */
