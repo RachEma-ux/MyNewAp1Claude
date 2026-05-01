@@ -83,5 +83,19 @@ export const agentStudioManifest: ModuleManifest = {
   events: { emits: ["agentStudio.run.completed", "agentStudio.run.failed"] },
   handoffs: { accepts: ["agentStudio.run.requested"], produces: ["agentStudio.codeStudio.handoff"] },
   ports: { provided: ["agentStudio.run"], consumed: ["codeStudio.run", "sandboxWf.execute"] },
+  runtimePorts: [
+    {
+      key: "asdb",
+      label: "ASDB (Postgres)",
+      mode: "external",
+      protocol: "postgres",
+      env: "DATABASE_URL_ASDB",
+      defaultPort: 5432,
+      defaultHost: "127.0.0.1",
+      defaultUrl: "postgres://127.0.0.1:5432/asdb",
+      externallyManaged: true,
+      description: "Agent Studio module-owned database; falls back to local Postgres.",
+    },
+  ],
   communication: { modes: ["gateway", "handoff", "event", "coordinator"] },
 };

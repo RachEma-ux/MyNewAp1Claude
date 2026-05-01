@@ -80,5 +80,19 @@ export const ragManifest: ModuleManifest = {
   },
   handoffs: { accepts: [], produces: [] },
   ports: { provided: ["rag.search", "rag.stats"], consumed: [] },
+  runtimePorts: [
+    {
+      key: "ragdb",
+      label: "RAGDB (Postgres)",
+      mode: "external",
+      protocol: "postgres",
+      env: "DATABASE_URL_RAGDB",
+      defaultPort: 5432,
+      defaultHost: "127.0.0.1",
+      defaultUrl: "postgres://127.0.0.1:5432/ragdb",
+      externallyManaged: true,
+      description: "RAG module-owned database; falls back to local Postgres.",
+    },
+  ],
   communication: { modes: ["event", "port"] },
 };

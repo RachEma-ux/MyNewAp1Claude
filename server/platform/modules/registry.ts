@@ -20,10 +20,13 @@ import type {
   ModuleRuntimeStateName,
   ModuleHealthReport,
 } from "./types";
+import { getPortRegistry } from "../ports";
+import { registerDefaultPortDeclarations } from "../ports/default-declarations";
 
 class ModuleRegistry {
   private manifests = new Map<ModuleKey, ModuleManifest>();
   private states = new Map<ModuleKey, ModuleRuntimeState>();
+  private portsSeeded = false;
 
   register(manifest: ModuleManifest): void {
     if (!manifest.key) {
@@ -45,6 +48,8 @@ class ModuleRegistry {
       key: manifest.key,
       state: this.isEnabled(manifest) ? "registered" : "disabled",
     });
+    this.seedPortRegistry();
+    this.registerManifestPorts(manifest);
   }
 
   registerAll(manifests: Iterable<ModuleManifest>): void {
@@ -116,6 +121,26 @@ class ModuleRegistry {
 
     for (const key of [...remaining.keys()]) visit(key, []);
     return out;
+  }
+
+  private seedPortRegistry(): void {
+    if (this.portsSeeded) return;
+    try {
+      registerDefaultPortDeclarations(getPortRegistry());
+      this.portsSeeded = true;
+    } catch (err) {
+      // Re-seeding with the same shape is a no-op; only schema drift
+      // throws. Surface the error so it can't be swallowed silently.
+      throw err;
+    }
+  }
+
+  private registerManifestPorts(manifest: ModuleManifest): void {
+    if (!manifest.runtimePorts || manifest.runtimePorts.length === 0) return;
+    const ports = getPortRegistry();
+    for (const decl of manifest.runtimePorts) {
+      ports.registerDeclaration({ ...decl, moduleKey: manifest.key });
+    }
   }
 
   private isEnabled(manifest: ModuleManifest): boolean {

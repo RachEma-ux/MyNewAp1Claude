@@ -107,5 +107,19 @@ export const sandboxWfManifest: ModuleManifest = {
   },
   handoffs: { accepts: ["sandboxWf.execute.requested"], produces: [] },
   ports: { provided: ["sandboxWf.execute"], consumed: ["codeStudio.run"] },
+  runtimePorts: [
+    {
+      key: "wfdb",
+      label: "WFDB (Postgres)",
+      mode: "external",
+      protocol: "postgres",
+      env: "DATABASE_URL_WFDB",
+      defaultPort: 5432,
+      defaultHost: "127.0.0.1",
+      defaultUrl: "postgres://127.0.0.1:5432/wfdb",
+      externallyManaged: true,
+      description: "Sandbox WF module-owned database; falls back to local Postgres.",
+    },
+  ],
   communication: { modes: ["gateway", "handoff", "event", "coordinator"] },
 };

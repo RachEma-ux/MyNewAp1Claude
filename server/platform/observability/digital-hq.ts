@@ -16,6 +16,8 @@ import { getEventStats } from "../events";
 import { listHandoffs } from "../handoff";
 import { listWorkflows, listCompensationHandlers } from "../coordinator";
 import { listRegisteredActions } from "../modules/module-gateway";
+import { getPortRegistry } from "../ports";
+import type { PortStatusSnapshot } from "../ports";
 
 export interface DigitalHqSnapshot {
   generatedAt: string;
@@ -84,6 +86,17 @@ export interface DigitalHqSnapshot {
     handlers: number;
     /** Per-module breakdown of registered compensation handlers. */
     byModule: Record<string, number>;
+  };
+  ports: {
+    total: number;
+    healthy: number;
+    reserved: number;
+    unreachable: number;
+    conflict: number;
+    disabled: number;
+    /** Declarations whose host:port is in conflict with another. */
+    conflictKeys: string[];
+    items: PortStatusSnapshot[];
   };
 }
 
@@ -167,6 +180,20 @@ export async function snapshotDigitalHq(): Promise<DigitalHqSnapshot> {
     compByModule[h.module] = (compByModule[h.module] ?? 0) + 1;
   }
 
+  const portItems = getPortRegistry().snapshot();
+  const portSummary = {
+    total: portItems.length,
+    healthy: portItems.filter((p) => p.health === "healthy").length,
+    reserved: portItems.filter((p) => p.health === "reserved").length,
+    unreachable: portItems.filter((p) => p.health === "unreachable").length,
+    conflict: portItems.filter((p) => p.health === "conflict").length,
+    disabled: portItems.filter((p) => p.health === "disabled").length,
+    conflictKeys: portItems
+      .filter((p) => p.health === "conflict")
+      .map((p) => `${p.moduleKey}/${p.key}`),
+    items: portItems,
+  };
+
   return {
     generatedAt: new Date().toISOString(),
     modules: moduleSummary,
@@ -181,5 +208,6 @@ export async function snapshotDigitalHq(): Promise<DigitalHqSnapshot> {
       handlers: compHandlers.length,
       byModule: compByModule,
     },
+    ports: portSummary,
   };
 }
