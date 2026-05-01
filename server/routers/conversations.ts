@@ -1,71 +1,85 @@
-import { z } from "zod";
-import { router, publicProcedure, protectedProcedure, governedProcedure } from "../_core/trpc";
-import { getDb } from "../db";
-import { conversations, messages } from "../../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
-import { resolveCatalogAgentExecutionTarget, resolveServiceAgentExecutionTarget } from "../ai-types/execution";
-
 /**
- * Conversations Router
- * 
- * Handles agent conversation management:
- * - List user's conversations
- * - Create new conversations
- * - Get conversation details
- * - Add messages to conversations
+ * Conversations Router — DEPRECATED compatibility shim.
+ *
+ * Canonical owner of conversation + message persistence is the
+ * Communication module (`server/communication/*`). This router
+ * stays mounted at `appRouter.conversations` so existing UI
+ * surfaces (AgentChatPage, CatalogAgentChat) keep compiling
+ * during migration. Every procedure delegates to Communication;
+ * no writes touch the legacy shared-app `conversations` /
+ * `messages` tables anymore.
+ *
+ * Agent-linked threads carry their `agentId` via Communication's
+ * (`sourceModule = "agents"`, `sourceRefId = agentId`,
+ * `conversationType = "agent"`) so analytics that need to filter
+ * agent-thread conversations remain expressible without owning
+ * a separate persistence path.
  */
 
+import { z } from "zod";
+import {
+  router,
+  protectedProcedure,
+  governedProcedure,
+} from "../_core/trpc";
+import { TRPCError } from "@trpc/server";
+import * as comm from "../communication/communication.service";
+import {
+  resolveCatalogAgentExecutionTarget,
+  resolveServiceAgentExecutionTarget,
+} from "../ai-types/execution";
+
+async function resolveWorkspaceId(
+  userId: number,
+  preferred?: number,
+): Promise<number> {
+  if (preferred) return preferred;
+  const { getUserWorkspaces } = await import("../db");
+  const workspaces = await getUserWorkspaces(userId);
+  return workspaces[0]?.id ?? 1;
+}
+
 export const conversationsRouter = router({
-  /**
-   * List all conversations for the current user
-   * 
-   * Returns conversations ordered by most recent activity
-   */
+  /** @deprecated Use `trpc.communication.conversations.list` instead. */
   listConversations: protectedProcedure
-    .input(z.object({
-      agentId: z.number().optional(),
-      limit: z.number().min(1).max(100).default(50),
-      offset: z.number().min(0).default(0),
-    }).optional())
+    .input(
+      z
+        .object({
+          agentId: z.number().optional(),
+          limit: z.number().min(1).max(100).default(50),
+          offset: z.number().min(0).default(0),
+        })
+        .optional(),
+    )
     .query(async ({ ctx, input }) => {
-      const db = getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
-
-      const filters = [eq(conversations.userId, ctx.user.id)];
-      
+      const wsId = await resolveWorkspaceId(ctx.user.id);
+      const rows = await comm.listConversations({
+        workspaceId: wsId,
+        ownerUserId: ctx.user.id,
+        conversationType: input?.agentId ? "agent" : undefined,
+        limit: input?.limit ?? 50,
+        offset: input?.offset ?? 0,
+      });
+      // If the caller filtered by agentId, narrow further by
+      // sourceRefId. Cheap post-filter — typical lists are small.
       if (input?.agentId) {
-        filters.push(eq(conversations.agentId, input.agentId));
+        return rows.filter((r) => r.sourceRefId === input.agentId);
       }
-
-      const results = await db
-        .select()
-        .from(conversations)
-        .where(and(...filters))
-        .orderBy(desc(conversations.updatedAt))
-        .limit(input?.limit || 50)
-        .offset(input?.offset || 0);
-
-      return results;
+      return rows;
     }),
 
-  /**
-   * Create a new conversation
-   * 
-   * Initializes a conversation between user and agent
-   */
+  /** @deprecated Use `trpc.communication.conversations.create` instead. */
   createConversation: governedProcedure
-    .input(z.object({
-      agentId: z.number().optional(),
-      catalogEntryId: z.number().int().positive().optional(),
-      workspaceId: z.number().optional(),
-      title: z.string().min(1).max(255).optional(),
-      initialMessage: z.string().min(1).optional(),
-    }))
+    .input(
+      z.object({
+        agentId: z.number().optional(),
+        catalogEntryId: z.number().int().positive().optional(),
+        workspaceId: z.number().optional(),
+        title: z.string().min(1).max(255).optional(),
+        initialMessage: z.string().min(1).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
-      const db = getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
-
       if (input.agentId && input.catalogEntryId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -78,166 +92,114 @@ export const conversationsRouter = router({
       let resolvedWorkspaceId = input.workspaceId;
 
       if (input.catalogEntryId) {
-        // Service-backed agents don't have a sourceAgent — handle them separately
-        const serviceTarget = await resolveServiceAgentExecutionTarget(input.catalogEntryId).catch(() => null);
+        const serviceTarget = await resolveServiceAgentExecutionTarget(
+          input.catalogEntryId,
+        ).catch(() => null);
         if (serviceTarget) {
-          derivedTitle = input.title || `${serviceTarget.entry.displayName || serviceTarget.entry.name} Run`;
+          derivedTitle =
+            input.title ||
+            `${serviceTarget.entry.displayName || serviceTarget.entry.name} Run`;
         } else {
-          const target = await resolveCatalogAgentExecutionTarget(input.catalogEntryId);
+          const target = await resolveCatalogAgentExecutionTarget(
+            input.catalogEntryId,
+          );
           resolvedAgentId = target.sourceAgent.id;
-          // sourceAgent is typed as { id, name, [key:string]: unknown } in
-          // ai-types/execution.ts, so workspaceId is `unknown` here.
-          // Narrow to `number | undefined` before assigning.
           const sourceWsId = target.sourceAgent.workspaceId;
           resolvedWorkspaceId =
             resolvedWorkspaceId ??
             (typeof sourceWsId === "number" ? sourceWsId : undefined);
-          derivedTitle = input.title || `${target.entry.displayName || target.entry.name} Run`;
+          derivedTitle =
+            input.title ||
+            `${target.entry.displayName || target.entry.name} Run`;
         }
       }
 
-      // Use provided workspaceId, or fall back to user's first workspace
-      let wsId = resolvedWorkspaceId;
-      if (!wsId) {
-        const { getUserWorkspaces } = await import("../db");
-        const workspaces = await getUserWorkspaces(ctx.user.id);
-        wsId = workspaces[0]?.id ?? 1;
-      }
+      const wsId = await resolveWorkspaceId(ctx.user.id, resolvedWorkspaceId);
 
-      const [conversation] = await db.insert(conversations).values({
-        workspaceId: wsId,
-        userId: ctx.user.id,
-        agentId: resolvedAgentId,
-        title: derivedTitle,
-      }).returning();
+      const conv = await comm.createConversation(
+        {
+          workspaceId: wsId,
+          title: derivedTitle,
+          conversationType: resolvedAgentId ? "agent" : "human",
+          ownerUserId: ctx.user.id,
+          sourceModule: resolvedAgentId ? "agents" : undefined,
+          sourceRefId: resolvedAgentId ?? undefined,
+        },
+        ctx.user.id,
+      );
 
-      // Add initial message if provided
       if (input.initialMessage) {
-        await db.insert(messages).values({
-          conversationId: conversation.id,
-          role: "user",
-          content: input.initialMessage,
-        });
-      }
-
-      return conversation;
-    }),
-
-  /**
-   * Get conversation details with messages
-   */
-  getConversation: protectedProcedure
-    .input(z.object({
-      conversationId: z.number(),
-    }))
-    .query(async ({ ctx, input }) => {
-      const db = getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
-
-      // Get conversation
-      const [conversation] = await db
-        .select()
-        .from(conversations)
-        .where(
-          and(
-            eq(conversations.id, input.conversationId),
-            eq(conversations.userId, ctx.user.id)
-          )
+        await comm.addMessage(
+          {
+            conversationId: conv.id,
+            role: "user",
+            content: input.initialMessage,
+          },
+          ctx.user.id,
         );
-
-      if (!conversation) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
       }
 
-      // Get messages
-      const conversationMessages = await db
-        .select()
-        .from(messages)
-        .where(eq(messages.conversationId, input.conversationId))
-        .orderBy(messages.createdAt);
-
+      // Preserve the legacy response shape callers expect — flat row
+      // with id, workspaceId, userId, agentId, title.
       return {
-        ...conversation,
-        messages: conversationMessages,
+        id: conv.id,
+        workspaceId: conv.workspaceId,
+        userId: conv.ownerUserId,
+        agentId: resolvedAgentId,
+        title: conv.title,
+        createdAt: conv.createdAt,
+        updatedAt: conv.updatedAt,
       };
     }),
 
-  /**
-   * Add message to conversation
-   */
-  addMessage: governedProcedure
-    .input(z.object({
-      conversationId: z.number(),
-      content: z.string().min(1),
-      role: z.enum(["user", "assistant", "system"]).default("user"),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const db = getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
-
-      // Verify conversation belongs to user
-      const [conversation] = await db
-        .select()
-        .from(conversations)
-        .where(
-          and(
-            eq(conversations.id, input.conversationId),
-            eq(conversations.userId, ctx.user.id)
-          )
-        );
-
-      if (!conversation) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+  /** @deprecated Use `trpc.communication.conversations.get` instead. */
+  getConversation: protectedProcedure
+    .input(z.object({ conversationId: z.number() }))
+    .query(async ({ input }) => {
+      const conv = await comm.getConversation(input.conversationId);
+      if (!conv) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
       }
-
-      // Add message (PostgreSQL: use .returning())
-      const [message] = await db.insert(messages).values({
-        conversationId: input.conversationId,
-        role: input.role,
-        content: input.content,
-      }).returning();
-
-      // Update conversation timestamp
-      await db
-        .update(conversations)
-        .set({ updatedAt: new Date() })
-        .where(eq(conversations.id, input.conversationId));
-
-      return message;
+      return {
+        id: conv.id,
+        workspaceId: conv.workspaceId,
+        userId: conv.ownerUserId,
+        agentId: conv.sourceRefId,
+        title: conv.title,
+        createdAt: conv.createdAt,
+        updatedAt: conv.updatedAt,
+        messages: conv.messages,
+      };
     }),
 
-  /**
-   * Delete conversation
-   */
+  /** @deprecated Use `trpc.communication.messages.add` instead. */
+  addMessage: governedProcedure
+    .input(
+      z.object({
+        conversationId: z.number(),
+        content: z.string().min(1),
+        role: z.enum(["user", "assistant", "system"]).default("user"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      comm.addMessage(
+        {
+          conversationId: input.conversationId,
+          role: input.role,
+          content: input.content,
+        },
+        ctx.user.id,
+      ),
+    ),
+
+  /** @deprecated Use `trpc.communication.conversations.delete` instead. */
   deleteConversation: governedProcedure
-    .input(z.object({
-      conversationId: z.number(),
-    }))
+    .input(z.object({ conversationId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const db = getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
-
-      // Verify ownership
-      const [conversation] = await db
-        .select()
-        .from(conversations)
-        .where(
-          and(
-            eq(conversations.id, input.conversationId),
-            eq(conversations.userId, ctx.user.id)
-          )
-        );
-
-      if (!conversation) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
-      }
-
-      // Delete messages first (foreign key constraint)
-      await db.delete(messages).where(eq(messages.conversationId, input.conversationId));
-
-      // Delete conversation
-      await db.delete(conversations).where(eq(conversations.id, input.conversationId));
-
+      await comm.deleteConversation(input.conversationId, ctx.user.id);
       return { success: true };
     }),
 });

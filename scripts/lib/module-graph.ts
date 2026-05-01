@@ -119,6 +119,12 @@ export const MODULE_MAP: ModuleDescriptor[] = [
     privateSchemas: [],
     connectionAccessors: [],
   },
+  {
+    key: "communication",
+    folder: "communication",
+    privateSchemas: ["communicationdb"],
+    connectionAccessors: ["getCommunicationDb"],
+  },
 ];
 
 /** Files that — regardless of their location — are public per-module. */

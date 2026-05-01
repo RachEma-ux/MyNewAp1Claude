@@ -44,6 +44,10 @@ Use the coordinator only when the flow becomes a real multi-module workflow:
 | AI Types        | All modules     | port         | none                 | `catalogPort.resolveBySource()` etc. via public API.   |
 | Coordinator     | any module      | gateway/handoff/event | required for sensitive | Coordinator never imports module internals.            |
 | Workspace/RBAC  | All modules     | port         | n/a                  | Auth context propagated, not pulled.                   |
+| Agents (chat)   | Communication   | gateway      | none for `chat.send` | Agent-linked threads created via `communication.conversation.open` handoff with `sourceModule="agents"`, `sourceRefId=agentId`. |
+| Any module      | Communication   | handoff      | none for `notification.create` | Send a user notification: `communication.notification.create` (also exposed via gateway). |
+| Any module      | Communication   | handoff      | none for `meeting.schedule` | Schedule an external/embedded meeting: `communication.meeting.schedule`. |
+| Communication   | All modules     | event        | none                 | `communication.message.sent`, `communication.notification.created`, `communication.conversation.*`, `communication.meeting.*` — fan-out to subscribers (HQ, agents, audit). |
 
 ## Forbidden flows
 

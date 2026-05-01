@@ -29,7 +29,13 @@ const Documents = lazy(() => import("./pages/Documents"));
 // Agents page replaced by AgentsPage (governance-aware)
 const AgentChat = lazy(() => import("./pages/AgentChat"));
 const CatalogAgentChat = lazy(() => import("./pages/CatalogAgentChat"));
-const Chat = lazy(() => import("./pages/Chat"));
+// Legacy Chat/Conversations pages removed — `/chat`, `/conversations`, `/video-meeting`
+// now redirect to canonical /communication/* routes (Communication module owner).
+const CommunicationDashboardPage = lazy(() => import("./modules/communication/pages/CommunicationDashboardPage"));
+const CommunicationChatPage = lazy(() => import("./modules/communication/pages/CommunicationChatPage"));
+const CommunicationConversationsPage = lazy(() => import("./modules/communication/pages/CommunicationConversationsPage"));
+const CommunicationVideoMeetingPage = lazy(() => import("./modules/communication/pages/CommunicationVideoMeetingPage"));
+const CommunicationNotificationsPage = lazy(() => import("./modules/communication/pages/CommunicationNotificationsPage"));
 const Automation = lazy(() => import("./pages/Automation"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Providers = lazy(() => import("./pages/Providers"));
@@ -58,7 +64,6 @@ const DocumentUpload = lazy(() => import("./pages/DocumentUpload"));
 const CodeEditor = lazy(() => import("./pages/CodeEditor"));
 const EmbeddingsManagement = lazy(() => import("./pages/EmbeddingsManagement"));
 const VectorDBManagement = lazy(() => import("./pages/VectorDBManagement"));
-const Conversations = lazy(() => import("./pages/Conversations"));
 const DocumentsDashboard = lazy(() => import("./pages/DocumentsDashboard"));
 const ResourceMonitor = lazy(() => import("./pages/ResourceMonitor"));
 const HardwarePage = lazy(() => import("./pages/infrastructure/HardwarePage"));
@@ -572,8 +577,16 @@ function Router() {
       <Route path="/agents/:agentId/chat" component={() => <ProtectedRoute component={AgentChat} />} />
       <Route path="/catalog/agents/:catalogEntryId/chat" component={() => <ProtectedRoute component={CatalogAgentChat} />} />
       <Route path="/setup/ollama" component={() => <ProtectedRoute component={OllamaSetup} />} />
-      <Route path="/chat" component={() => <ProtectedRoute component={Chat} />} />
-      <Route path="/conversations" component={() => <ProtectedRoute component={Conversations} />} />
+      {/* Communication module — canonical routes (owned by server/communication) */}
+      <Route path="/communication" component={() => <ProtectedRoute component={CommunicationDashboardPage} />} />
+      <Route path="/communication/chat" component={() => <ProtectedRoute component={CommunicationChatPage} />} />
+      <Route path="/communication/conversations" component={() => <ProtectedRoute component={CommunicationConversationsPage} />} />
+      <Route path="/communication/video-meeting" component={() => <ProtectedRoute component={CommunicationVideoMeetingPage} />} />
+      <Route path="/communication/notifications" component={() => <ProtectedRoute component={CommunicationNotificationsPage} />} />
+      {/* Legacy chat / conversations routes — redirect to canonical Communication routes */}
+      <Route path="/chat"><Redirect to="/communication/chat" /></Route>
+      <Route path="/conversations"><Redirect to="/communication/conversations" /></Route>
+      <Route path="/video-meeting"><Redirect to="/communication/video-meeting" /></Route>
       <Route path="/automation" component={() => <ProtectedRoute component={Automation} />} />
       <Route path="/wcp/workflows" component={() => <ProtectedRoute component={WCPWorkflowsList} />} />
       <Route path="/wcp/workflows/builder" component={() => <ProtectedRoute component={WCPWorkflowBuilder} />} />

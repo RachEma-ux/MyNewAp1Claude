@@ -23,6 +23,7 @@ import { organizationManagementRouter } from "../../organization-management/rout
 import { cultureValuesRouter } from "../../culture-values/router";
 import { aiTypesRouter } from "../../ai-types/router";
 import { kgraAgentRouter } from "../../kgra-agent/router";
+import { communicationRouter } from "../../communication/router";
 
 export const MODULE_ROUTERS = {
   prm: prmRouter,
@@ -37,6 +38,7 @@ export const MODULE_ROUTERS = {
   cultureValues: cultureValuesRouter,
   aiTypes: aiTypesRouter,
   kgraAgent: kgraAgentRouter,
+  communication: communicationRouter,
 } as const;
 
 export type ModuleRoutersRecord = typeof MODULE_ROUTERS;

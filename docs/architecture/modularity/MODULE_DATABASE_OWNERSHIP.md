@@ -21,6 +21,7 @@ module. Cross-module SQL is forbidden — see `FORBIDDEN_ACCESS_AUDIT.md`.
 | OM                 | `appdb` (om tables)   | shares `getDb` — target `omdb`              | Schema today      |
 | CV                 | `appdb` (cv tables)   | shares `getDb` — target `cvdb`              | Schema today      |
 | OpenRouter         | `appdb`               | shares `getDb`                              | Schema today      |
+| Communication      | `communicationdb`     | `server/communication/connection.ts` (`getCommunicationDb`) | Owned |
 
 ## Rules
 
@@ -46,3 +47,4 @@ module. Cross-module SQL is forbidden — see `FORBIDDEN_ACCESS_AUDIT.md`.
 | Agent Studio| `DATABASE_URL_ASDB`        | `${DATABASE_URL → /asdb}`                                   |
 | Sandbox WF  | `DATABASE_URL_WFDB`        | `${DATABASE_URL → /wfdb}`                                   |
 | RAG         | `DATABASE_URL_RAGDB`       | `${DATABASE_URL → /ragdb}`                                  |
+| Communication | `DATABASE_URL_COMMUNICATIONDB` | `${DATABASE_URL → /communicationdb}`                  |
