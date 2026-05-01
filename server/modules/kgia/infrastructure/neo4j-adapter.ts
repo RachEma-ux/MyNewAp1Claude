@@ -37,7 +37,7 @@ export async function readNeo4jSchema(
   // CALL db.schema.visualization() or CALL apoc.meta.schema()
   // For now, return from schema snapshot if available
   if (source.schemaSnapshot) {
-    return source.schemaSnapshot;
+    return source.schemaSnapshot as unknown as Record<string, unknown>;
   }
 
   // Return a placeholder schema indicating the source needs schema discovery

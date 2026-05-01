@@ -6,7 +6,7 @@
  * Future: Write to dedicated graph store (Neo4j/Neptune).
  */
 
-import { getDb } from "../../../../db/connection";
+import { getDb } from "../../../../../db/connection";
 import { kgiaIngestionChunks } from "../../../schema";
 
 export interface GraphWritePayload {

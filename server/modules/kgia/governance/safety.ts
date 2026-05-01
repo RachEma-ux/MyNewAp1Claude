@@ -8,8 +8,8 @@
 
 import { getDb } from "../../../db/connection";
 import { kgiaPolicyDecisions } from "../schema";
-import type { SafetyVerdict, GraphSource, KgiaPolicyConfig } from "../domain/types";
-import { evaluateQuerySafety, DEFAULT_POLICY } from "./policies";
+import type { SafetyVerdict, GraphSource } from "../domain/types";
+import { evaluateQuerySafety, DEFAULT_POLICY, type KgiaPolicyConfig } from "./policies";
 
 // ── Policy Decision Persistence ──────────────────────────────────
 

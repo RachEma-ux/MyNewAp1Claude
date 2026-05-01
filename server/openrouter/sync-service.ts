@@ -89,7 +89,13 @@ export async function syncModels(): Promise<{
             completionPricing: raw.pricing?.completion ? parseFloat(raw.pricing.completion) * 1_000_000 : null,
             imagePricing: raw.pricing?.image ? parseFloat(raw.pricing.image) : null,
             architecture: raw.architecture ?? null,
-            topProvider: raw.top_provider ?? null,
+            topProvider: raw.top_provider
+            ? {
+                maxCompletionTokens: raw.top_provider.max_completion_tokens,
+                isModerated: raw.top_provider.is_moderated,
+                contextLength: raw.top_provider.context_length,
+              }
+            : null,
             capabilities,
             providerSlug,
             updatedAt: new Date(),
@@ -106,7 +112,13 @@ export async function syncModels(): Promise<{
           completionPricing: raw.pricing?.completion ? parseFloat(raw.pricing.completion) * 1_000_000 : null,
           imagePricing: raw.pricing?.image ? parseFloat(raw.pricing.image) : null,
           architecture: raw.architecture ?? null,
-          topProvider: raw.top_provider ?? null,
+          topProvider: raw.top_provider
+            ? {
+                maxCompletionTokens: raw.top_provider.max_completion_tokens,
+                isModerated: raw.top_provider.is_moderated,
+                contextLength: raw.top_provider.context_length,
+              }
+            : null,
           capabilities,
           providerSlug,
         });
