@@ -15,6 +15,7 @@ import type {
   ModuleManifest,
 } from "./types";
 import { getModuleRegistry } from "./registry";
+import { getPortRegistry } from "../ports";
 
 export interface RuntimeManagerOptions {
   /** Optional override for `appdb` accessor (used in tests). */
@@ -37,11 +38,40 @@ export class RuntimeManager {
     if (this.booted) return;
     this.booted = true;
 
+    this.checkPortConflicts();
+
     const registry = getModuleRegistry();
     const order = registry.resolveBootOrder();
 
     for (const manifest of order) {
       await this.bootOne(manifest);
+    }
+  }
+
+  /**
+   * Surface declared port conflicts before any module boots. Static
+   * (declaration-only) conflicts are always logged; whether they
+   * abort startup is left to the caller via the optional
+   * `failOnPortConflict` flag (default false to match prior behaviour
+   * — modules with required=false never aborted startup before).
+   */
+  private checkPortConflicts(): void {
+    try {
+      const conflicts = getPortRegistry().detectConflicts();
+      for (const c of conflicts) {
+        const a = `${c.declarationA.moduleKey}/${c.declarationA.key}`;
+        const b = c.declarationB
+          ? `${c.declarationB.moduleKey}/${c.declarationB.key}`
+          : c.reservationB
+            ? `${c.reservationB.moduleKey}/${c.reservationB.key}`
+            : "?";
+        this.log(
+          "warn",
+          `[runtime] port conflict on ${c.host}:${c.port} between ${a} and ${b} — ${c.reason}`,
+        );
+      }
+    } catch (err) {
+      this.log("warn", `[runtime] port conflict check skipped — ${errMsg(err)}`);
     }
   }
 

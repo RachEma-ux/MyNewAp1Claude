@@ -1,7 +1,6 @@
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
-import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -98,23 +97,17 @@ async function runMigrations(maxRetries = 3) {
   }
 }
 
-function isPortAvailable(port: number): Promise<boolean> {
-  return new Promise(resolve => {
-    const server = net.createServer();
-    server.listen(port, () => {
-      server.close(() => resolve(true));
-    });
-    server.on("error", () => resolve(false));
-  });
-}
-
 async function findAvailablePort(startPort: number = 3000): Promise<number> {
-  for (let port = startPort; port < startPort + 20; port++) {
-    if (await isPortAvailable(port)) {
-      return port;
-    }
+  // Delegate to the platform port registry so reservations + conflict
+  // detection are recorded in one place. The registry probes via the
+  // same net.createServer/listen handshake the original implementation
+  // used; behaviour is preserved (scan forward 20 ports from startPort).
+  const { getPortRegistry } = await import("../platform/ports");
+  const port = await getPortRegistry().findFreePortFrom(startPort, { attempts: 20 });
+  if (port === null) {
+    throw new Error(`No available port found starting from ${startPort}`);
   }
-  throw new Error(`No available port found starting from ${startPort}`);
+  return port;
 }
 
 const ENV_PROVIDER_MAP = [
@@ -1141,6 +1134,20 @@ async function startServer() {
 
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+  }
+
+  try {
+    const { getPortRegistry } = await import("../platform/ports");
+    getPortRegistry().reservePort({
+      moduleKey: "platform",
+      key: "http",
+      port,
+      host: "0.0.0.0",
+      ownerRef: "main-server",
+      status: "healthy",
+    });
+  } catch (err) {
+    console.warn(`[platform/http] reservation skipped — ${err instanceof Error ? err.message : String(err)}`);
   }
 
   server.listen(port, async () => {

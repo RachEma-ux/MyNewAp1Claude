@@ -20,6 +20,7 @@
     "check:coordinator-boundaries": "tsx scripts/check-coordinator-boundaries.ts",
     "check:governance-actions": "tsx scripts/check-governance-actions.ts",
     "check:db-roles": "tsx scripts/check-db-roles.ts",
+    "check:ports": "tsx scripts/check-port-registry.ts",
     "check:architecture": "tsx scripts/check-architecture.ts",
     "check:wiring:module": "tsx scripts/check-module-wiring.ts",
     "check:wiring:gateway": "tsx scripts/check-gateway-wiring.ts",
@@ -29,7 +30,7 @@
     "check:wiring:runtime": "tsx scripts/check-runtime-wiring.ts",
     "check:wiring:coordinator": "tsx scripts/check-coordinator-wiring.ts",
     "check:wiring": "tsx scripts/check-module-wiring.ts && tsx scripts/check-gateway-wiring.ts && tsx scripts/check-event-wiring.ts && tsx scripts/check-handoff-wiring.ts && tsx scripts/check-frontend-module-wiring.ts && tsx scripts/check-runtime-wiring.ts && tsx scripts/check-coordinator-wiring.ts",
-    "check:architecture:full": "pnpm run check:architecture && pnpm run check:wiring"
+    "check:architecture:full": "pnpm run check:architecture && pnpm run check:wiring && pnpm run check:ports"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

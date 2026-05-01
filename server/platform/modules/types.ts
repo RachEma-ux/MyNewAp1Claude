@@ -21,6 +21,7 @@
  */
 
 import type { AnyRouter } from "@trpc/server";
+import type { ModulePortDeclaration } from "../ports/types";
 
 /* ------------------------------------------------------------------ */
 /*  Identity                                                          */
@@ -212,6 +213,13 @@ export interface ModuleManifest {
   events?: ModuleEventDescriptor;
   handoffs?: ModuleHandoffDescriptor;
   ports?: ModulePortDescriptor;
+  /**
+   * Runtime endpoint declarations (TCP ports / URLs). Distinct from
+   * `ports` above — that's for logical service contracts. These feed
+   * the platform Port Registry. moduleKey is supplied by the registry
+   * from the manifest's `key`, so callers omit it here.
+   */
+  runtimePorts?: Array<Omit<ModulePortDeclaration, "moduleKey">>;
   communication?: ModuleCommunicationDescriptor;
 
   /** Optional disable flag, e.g. driven by env. */

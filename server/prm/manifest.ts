@@ -133,5 +133,19 @@ export const prmManifest: ModuleManifest = {
   events: { emits: ["prm.method.published", "prm.method.deprecated"] },
   handoffs: { accepts: [], produces: [] },
   ports: { provided: ["prm.read", "prm.search"], consumed: ["aiTypes.catalog"] },
+  runtimePorts: [
+    {
+      key: "prmdb",
+      label: "PRMDB (Postgres)",
+      mode: "external",
+      protocol: "postgres",
+      env: "DATABASE_URL_PRMDB",
+      defaultPort: 5432,
+      defaultHost: "127.0.0.1",
+      defaultUrl: "postgres://127.0.0.1:5432/prmdb",
+      externallyManaged: true,
+      description: "PRM module-owned database; falls back to local Postgres.",
+    },
+  ],
   communication: { modes: ["port", "gateway", "event"] },
 };
