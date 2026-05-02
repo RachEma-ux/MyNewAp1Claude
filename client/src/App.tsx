@@ -187,11 +187,10 @@ const KGIAShellPage = lazy(() => import("@/pages/kgia/KGIAShellPage"));
 // are now mounted by the Data Analysis capsule via <ModuleRoutes />.
 // See `client/src/modules/data-analysis/`.
 //
-// KGRA Agent is a separate RTLM and continues to be mounted directly
-// here — its UI lives at `/data-analysis/kgra-agent` because that's
-// the historical canonical path; KGRA does not own a Data Analysis
-// subdomain.
-const KGRAAgentPage = lazy(() => import("@/pages/data-analysis/KGRAAgentPage"));
+// KGRA Agent — migrated to capsule (PR #75). Mounted by <ModuleRoutes />
+// from `client/src/modules/kgra-agent/`. KGRA Agent's UI lives at
+// `/data-analysis/kgra-agent` because that's the historical canonical
+// path; KGRA is its own RTLM (separate from Data Analysis).
 
 /**
  * Compatibility redirect for the legacy PM Central RTLM project
@@ -313,8 +312,8 @@ function Router() {
       <Route path="/kgia" component={() => <ProtectedRoute component={KGIAShellPage} />} />
       {/* OpenRouter — migrated to capsule (PR #72). Routes /openrouter/*
           now rendered by <ModuleRoutes /> via the capsule manifest. */}
-      {/* KGRA Agent — embedded OmniRAG-style UI inside app shell */}
-      <Route path="/data-analysis/kgra-agent" component={() => <ProtectedRoute component={KGRAAgentPage} />} />
+      {/* KGRA Agent — migrated to capsule (PR #75). Route /data-analysis/kgra-agent
+          now rendered by <ModuleRoutes /> via the capsule manifest. */}
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
       <Route path="/w/:workspaceId/*" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
       <Route path="/w/:workspaceId" component={() => <ProtectedRoute component={WorkspaceExecutionShell} />} />
@@ -528,8 +527,10 @@ function Router() {
           The bare /data-analysis path redirects to
           /data-analysis/graphrag inside the capsule itself.
 
-          The /data-analysis/kgra-agent route above is owned by the
-          KGRA Agent RTLM (a separate module), not by Data Analysis. */}
+          The /data-analysis/kgra-agent route is owned by the KGRA
+          Agent RTLM (a separate module), not by Data Analysis — it
+          is mounted by <ModuleRoutes /> via the KGRA Agent capsule
+          manifest (`client/src/modules/kgra-agent/`). */}
       {/* UI Showcase — living documentation for shared components */}
       <Route path="/ui-showcase" component={() => <ProtectedRoute component={UIShowcasePage} />} />
       <Route path="/404" component={NotFound} />

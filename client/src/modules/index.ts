@@ -36,13 +36,12 @@ import { registerAITypesClientModule } from "./ai-types/client";
 import { registerOpenRouterClientModule } from "./openrouter/client";
 import { registerAgentStudioClientModule } from "./agent-studio/client";
 import { registerSandboxWfClientModule } from "./sandbox-wf/client";
+import { registerKgraAgentClientModule } from "./kgra-agent/client";
 
 import { ragClientManifest } from "./rag/manifest";
-import { kgraAgentClientManifest } from "./kgra-agent/manifest";
 
 const LEGACY_CLIENT_MANIFESTS = [
   ragClientManifest,
-  kgraAgentClientManifest,
 ];
 
 let registered = false;
@@ -73,6 +72,7 @@ export function registerAllClientModules(): void {
   registerOpenRouterClientModule();
   registerAgentStudioClientModule();
   registerSandboxWfClientModule();
+  registerKgraAgentClientModule();
 
   // Legacy manifests.
   for (const manifest of LEGACY_CLIENT_MANIFESTS) {

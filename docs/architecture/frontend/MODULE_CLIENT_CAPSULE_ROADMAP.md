@@ -330,6 +330,45 @@ its own internal routing, layout, and nav.
   FINAL RTLM. After that PR merges, the full Production Readiness
   Verification Protocol unlocks per the user's standing rules.
 
+### Phase 3.14 — KGRA Agent ✅ MERGED — MIGRATION SEQUENCE COMPLETE
+- **Goal:** migrate the fifteenth and FINAL Real-Time Lifecycle
+  Module to the capsule pattern. KGRA Agent's UI lives at
+  `/data-analysis/kgra-agent` for historical reasons; Data Analysis
+  (PR #60) explicitly left this route untouched so KGRA could
+  migrate as its own capsule. Migrated
+  `client/src/modules/kgra-agent/` to the capsule layout.
+- 2 pages relocated from `client/src/pages/data-analysis/`
+  (`KGRAAgentPage` and `KGRAQueryLab`) to
+  `client/src/modules/kgra-agent/pages/`. The empty
+  `client/src/pages/data-analysis/` directory is removed.
+- 1 canonical path covered: `/data-analysis/kgra-agent`. The
+  capsule's baseRoute is the sub-prefix
+  `/data-analysis/kgra-agent`, NOT `/data-analysis` — same
+  sub-prefix-inside-shared-parent pattern as Sandbox WF (PR #74,
+  `/automation/sandbox-wf` inside `/automation`). This keeps the
+  Data Analysis capsule unaffected.
+- `mod.tsx` is a Suspense wrapper that renders `KGRAAgentPage`
+  directly. The page hosts the OmniRAG-cloned UI by injecting
+  HTML/CSS/JS from `/kgra-ui` into a container ref; no further
+  internal routing is needed.
+- **Server stale-route fix:** `server/kgra-agent/manifest.ts`
+  declared `routes: [{ path: "/kgra" }]` which never matched the
+  canonical baseRoute. Fixed to `/data-analysis/kgra-agent` (PR
+  #61/#63/#69/#70/#74 pattern).
+- **Stale prior-test patch:** `tests/data-analysis-capsule/structure.test.ts`
+  had asserted `kgraAgent NOT migrated` since PR #60. Flipped to
+  expect `true`.
+- `MIGRATED_MODULES = [..., "kgraAgent"]`. AWI: `kgraAgent` wired
+  (mostly-wired or fully-wired), blockers=[]. Every RTLM in the
+  matrix is now wired or better.
+
+**With Phase 3.14 merged, the Module Client Capsule migration
+sequence is complete: 15 / 15 RTLMs are capsules.** Frontend
+modularity checks run strict for every module; the readiness phase
+gate (`audit:production-readiness`) now unblocks per the user's
+standing rules. The next step is to run the full Production
+Readiness Verification Protocol — out of scope for this PR.
+
 ### Subsequent migrations (one PR each)
 
 The order is intentional — modules with the largest blast radius
@@ -350,7 +389,7 @@ long tail.
 12. OpenRouter                     _(Phase 3.11, merged)_
 13. Agent Studio                   _(Phase 3.12, merged)_
 14. Sandbox WF                     _(Phase 3.13, merged)_
-15. KGRA Agent                     _(Phase 3.14, next — final RTLM)_
+15. KGRA Agent                     _(Phase 3.14, merged — final RTLM ✅)_
 
 ## Definition of Done per migration
 
