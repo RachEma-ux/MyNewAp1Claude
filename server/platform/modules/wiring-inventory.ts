@@ -61,6 +61,7 @@ export const KNOWN_MODULES: DiscoveredModule[] = [
   { key: "kgraAgent", name: "KGRA Agent", folder: "kgra-agent" },
   { key: "communication", name: "Communication", folder: "communication" },
   { key: "pmCentral", name: "PM Central", folder: "pm-central" },
+  { key: "dataAnalysis", name: "Data Analysis", folder: "data-analysis" },
 ];
 
 /* ------------------------------------------------------------------ */

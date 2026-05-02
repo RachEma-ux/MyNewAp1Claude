@@ -2735,3 +2735,141 @@ actions:
     stage: mutate
     approval: none
     evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DATA ANALYSIS — GraphRAG (OmniGraph)
+  # ═══════════════════════════════════════════════════════════════════════════
+  dataAnalysis.graphRag.registerSource:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.graphRag.syncSource:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.graphRag.buildIndex:
+    domain: dataAnalysis
+    risk: R3
+    capability: knowledge.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  dataAnalysis.graphRag.query:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DATA ANALYSIS — Data Acquisition subdomain
+  # Universal, governed, source-agnostic and data-type-agnostic
+  # acquisition layer. Document Intelligence is one specialized
+  # pipeline; sensor/stream/api/database/saas/web/git/manual/webhook
+  # share the same governance surface.
+  # ═══════════════════════════════════════════════════════════════════════════
+  dataAnalysis.dataAcquisition.registerSource:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.dataAcquisition.updateSource:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.dataAcquisition.disableSource:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.dataAcquisition.runAcquisition:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.dataAcquisition.classifyItem:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.dataAcquisition.routeItem:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.dataAcquisition.runProcessing:
+    domain: dataAnalysis
+    risk: R3
+    capability: knowledge.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  dataAnalysis.dataAcquisition.runOutputPipeline:
+    domain: dataAnalysis
+    risk: R3
+    capability: knowledge.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  dataAnalysis.dataAcquisition.exportCanonicalRecord:
+    domain: dataAnalysis
+    risk: R3
+    capability: knowledge.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  dataAnalysis.dataAcquisition.document.runParser:
+    domain: dataAnalysis
+    risk: R3
+    capability: knowledge.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }
+
+  dataAnalysis.dataAcquisition.document.validate:
+    domain: dataAnalysis
+    risk: R2
+    capability: knowledge.manage
+    stage: mutate
+    approval: none
+    evidence: { required: false }
+
+  dataAnalysis.dataAcquisition.document.runOutputPipeline:
+    domain: dataAnalysis
+    risk: R3
+    capability: knowledge.manage
+    stage: mutate
+    approval: role_any
+    evidence: { required: true, types: [reason] }

@@ -33,6 +33,7 @@ import { aiTypesClientManifest } from "./ai-types/manifest";
 import { kgraAgentClientManifest } from "./kgra-agent/manifest";
 import { communicationClientManifest } from "./communication/manifest";
 import { pmCentralClientManifest } from "./pm-central/manifest";
+import { dataAnalysisClientManifest } from "./data-analysis/manifest";
 
 const ALL_CLIENT_MANIFESTS = [
   prmClientManifest,
@@ -50,6 +51,7 @@ const ALL_CLIENT_MANIFESTS = [
   kgraAgentClientManifest,
   communicationClientManifest,
   pmCentralClientManifest,
+  dataAnalysisClientManifest,
 ];
 
 let registered = false;

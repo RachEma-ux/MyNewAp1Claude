@@ -1,19 +1,19 @@
 # Application Wiring Inventory
 
-Generated: 2026-05-02T02:08:15.251Z
+Generated: 2026-05-02T05:57:40.155Z
 
 ## Summary
 
-- Modules: **15**
-- Fully wired: **9**
+- Modules: **16**
+- Fully wired: **10**
 - Mostly wired: **6**
 - Partially wired: **0**
 - Declared only: **0**
 - Blocked: **0**
 - Average readiness score: **92**
 - Blockers: **0**
-- Warnings: **5**
-- Missing required wires: **0**
+- Warnings: **6**
+- Missing required wires: **1**
 
 ## Module readiness
 
@@ -34,6 +34,7 @@ Generated: 2026-05-02T02:08:15.251Z
 | KGRA Agent (kgraAgent) | 85 | mostly-wired | 0 | 1 |
 | Communication (communication) | 94 | fully-wired | 0 | 1 |
 | PM Central (pmCentral) | 96 | fully-wired | 0 | 0 |
+| Data Analysis (dataAnalysis) | 95 | fully-wired | 0 | 1 |
 
 ## Wiring matrix
 
@@ -56,6 +57,7 @@ Status legend: ✅ wired · 🟡 partial · ⚪ declared-only · 🚫 missing/br
 | kgraAgent | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ⚪ | ✅ | 🚫 | 🚫 |
 | communication | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ⚪ | ✅ | ✅ | 🚫 |
 | pmCentral | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | 🚫 |
+| dataAnalysis | ✅ | ✅ | 🟡 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | 🚫 |
 
 ## Warnings
 
@@ -64,4 +66,5 @@ Status legend: ✅ wired · 🟡 partial · ⚪ declared-only · 🚫 missing/br
 - `aiTypes` — agent-provider: declared-only (aiTypes.catalog port consumption)
 - `kgraAgent` — agent-provider: declared-only (aiTypes.catalog port consumption)
 - `communication` — agent-provider: declared-only (aiTypes.catalog port consumption)
+- `dataAnalysis` — client-route: partial (/data-analysis)
 

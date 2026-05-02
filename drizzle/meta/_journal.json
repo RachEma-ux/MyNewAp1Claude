@@ -232,6 +232,13 @@
       "when": 1775116800000,
       "tag": "0033_ps_wizard_phase_a",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1778976000000,
+      "tag": "0034_data_acquisition",
+      "breakpoints": true
     }
   ]
 }

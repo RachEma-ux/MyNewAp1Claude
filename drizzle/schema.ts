@@ -42,6 +42,7 @@ export * from './tables/culture-values';
 export * from './tables/ps';
 export * from './tables/ps-translator';
 export * from './tables/graphrag';
+export * from './tables/data-acquisition';
 export * from './tables/ai-types';
 export * from './tables/data-warehouse';
 export * from './tables/agent-studio';

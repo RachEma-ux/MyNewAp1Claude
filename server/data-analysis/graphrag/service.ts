@@ -5,7 +5,7 @@
  * Enforces module isolation, delegates to jobs/worker.
  */
 
-import { getDb } from "../../db/connection";
+import { getDataAnalysisDb as getDb } from "../connection";
 import { eq, and, desc } from "drizzle-orm";
 import {
   graphragSources,
@@ -23,6 +23,8 @@ import {
 import { runSyncJob, runIndexJob, runQueryJob } from "./jobs";
 import { checkWorkerHealth } from "./worker-client";
 import type { GraphRagSourceAdapter, GraphRagQueryMethod } from "./types";
+import { publishEvent, makeEnvelope } from "../../platform/events";
+import { DATA_ANALYSIS_EVENTS } from "../events";
 
 // ── Source Management ────────────────────────────────────────────────────────
 
@@ -57,6 +59,21 @@ export async function registerSource(adapter: GraphRagSourceAdapter) {
         enabled: true,
       })
       .returning();
+    try {
+      await publishEvent(
+        makeEnvelope({
+          eventType: DATA_ANALYSIS_EVENTS.graphRagSourceRegistered,
+          sourceModule: "dataAnalysis",
+          payload: {
+            sourceId: created.id,
+            moduleSlug: created.moduleSlug,
+            datasetKey: created.datasetKey,
+          },
+        }),
+      );
+    } catch {
+      /* event bus failure must not mask the primary write */
+    }
     return created;
   }
 
