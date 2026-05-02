@@ -108,6 +108,10 @@ temp/
 # Claude MCP Configuration (may contain API references)
 .claude/mcp.json
 
+# Claude Code local workflow files
+.claude/settings.local.json
+.claude/tmp/
+
 # Runtime governance artifacts
 artifacts/
 
