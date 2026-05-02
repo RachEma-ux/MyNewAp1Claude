@@ -32,6 +32,7 @@ const STRONG_MODULES = new Set([
   "sandboxWf",
   "rag",
   "communication",
+  "pmCentral",
 ]);
 
 // 1. Each strong module must have a manifest with kind: "owned".

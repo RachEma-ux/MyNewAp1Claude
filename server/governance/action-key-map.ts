@@ -466,6 +466,20 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "communication.meeting.cancel": "communication.meeting.cancel",
   "communication.notification.create": "communication.notification.create",
   "communication.export": "communication.export",
+  "pmCentral.project.create": "pmCentral.project.create",
+  "pmCentral.project.update": "pmCentral.project.update",
+  "pmCentral.project.archive": "pmCentral.project.archive",
+  "pmCentral.project.status.update": "pmCentral.project.status.update",
+  "pmCentral.plan.approve": "pmCentral.plan.approve",
+  "pmCentral.task.create": "pmCentral.task.create",
+  "pmCentral.task.assign": "pmCentral.task.assign",
+  "pmCentral.task.status.update": "pmCentral.task.status.update",
+  "pmCentral.risk.create": "pmCentral.risk.create",
+  "pmCentral.issue.create": "pmCentral.issue.create",
+  "pmCentral.decision.record": "pmCentral.decision.record",
+  "pmCentral.handoff.accept": "pmCentral.handoff.accept",
+  "pmCentral.handoff.reject": "pmCentral.handoff.reject",
+  "pmCentral.handoff.convert": "pmCentral.handoff.convert",
 };
 
 /**

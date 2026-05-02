@@ -66,6 +66,7 @@ async function main() {
       "sandboxWf",
       "rag",
       "communication",
+      "pmCentral",
     ]);
     for (const m of list as any[]) {
       if (STRONG.has(m.key) && m.database?.kind !== "owned") {
@@ -100,6 +101,7 @@ async function main() {
       "aiTypes",
       "kgraAgent",
       "communication",
+      "pmCentral",
     ];
     for (const k of expected) {
       if (!literalKeys.includes(k)) {

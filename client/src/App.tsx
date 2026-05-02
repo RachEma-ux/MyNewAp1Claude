@@ -219,6 +219,17 @@ const MethodesPage = lazy(() => import("@/pages/pm-central/MethodesPage"));
 const ShellClonePage = lazy(() => import("@/pages/pm-central/ShellClonePage"));
 const AgentRunDetailPanel = lazy(() => import("@/pages/pm-central/AgentRunDetailPanel"));
 const IdeaBuilderWizard = lazy(() => import("@/pages/pm-central/IdeaBuilderWizard"));
+// PM Central RTLM — canonical registered module frontend (lives under /pm-central/rtlm/*)
+const PMCentralRtlmDashboardPage = lazy(() => import("@/modules/pm-central/pages/PMCentralDashboardPage"));
+const PMCentralRtlmProjectsPage = lazy(() => import("@/modules/pm-central/pages/PMProjectsPage"));
+const PMCentralRtlmProjectDetailPage = lazy(() => import("@/modules/pm-central/pages/PMProjectDetailPage"));
+const PMCentralRtlmTasksPage = lazy(() => import("@/modules/pm-central/pages/PMTasksPage"));
+const PMCentralRtlmMilestonesPage = lazy(() => import("@/modules/pm-central/pages/PMMilestonesPage"));
+const PMCentralRtlmRisksPage = lazy(() => import("@/modules/pm-central/pages/PMRisksPage"));
+const PMCentralRtlmIssuesPage = lazy(() => import("@/modules/pm-central/pages/PMIssuesPage"));
+const PMCentralRtlmDecisionsPage = lazy(() => import("@/modules/pm-central/pages/PMDecisionsPage"));
+const PMCentralRtlmHandoffsPage = lazy(() => import("@/modules/pm-central/pages/PMHandoffsPage"));
+const PMCentralRtlmSettingsPage = lazy(() => import("@/modules/pm-central/pages/PMSettingsPage"));
 // AI Agent Studio — Standalone agent lifecycle module
 const AgentStudioShellPage = lazy(() => import("@/pages/agent-studio/AgentStudioShellPage"));
 // KGIA — Knowledge Graph Interpretation Agent
@@ -694,6 +705,17 @@ function Router() {
       <Route path="/pm-central/project/:id" component={() => <ProtectedRoute component={ProjectPage} />} />
       {/* PM Central — Agent Engine run detail (must be before shell catch-all) */}
       <Route path="/pm-central/agent-engine/run/:id" component={() => <ProtectedRoute component={AgentRunDetailPanel} />} />
+      {/* PM Central RTLM — canonical module frontend (must be before /pm-central/:item catch-all) */}
+      <Route path="/pm-central/rtlm/projects/:id" component={() => <ProtectedRoute component={PMCentralRtlmProjectDetailPage} />} />
+      <Route path="/pm-central/rtlm/projects" component={() => <ProtectedRoute component={PMCentralRtlmProjectsPage} />} />
+      <Route path="/pm-central/rtlm/tasks" component={() => <ProtectedRoute component={PMCentralRtlmTasksPage} />} />
+      <Route path="/pm-central/rtlm/milestones" component={() => <ProtectedRoute component={PMCentralRtlmMilestonesPage} />} />
+      <Route path="/pm-central/rtlm/risks" component={() => <ProtectedRoute component={PMCentralRtlmRisksPage} />} />
+      <Route path="/pm-central/rtlm/issues" component={() => <ProtectedRoute component={PMCentralRtlmIssuesPage} />} />
+      <Route path="/pm-central/rtlm/decisions" component={() => <ProtectedRoute component={PMCentralRtlmDecisionsPage} />} />
+      <Route path="/pm-central/rtlm/handoffs" component={() => <ProtectedRoute component={PMCentralRtlmHandoffsPage} />} />
+      <Route path="/pm-central/rtlm/settings" component={() => <ProtectedRoute component={PMCentralRtlmSettingsPage} />} />
+      <Route path="/pm-central/rtlm" component={() => <ProtectedRoute component={PMCentralRtlmDashboardPage} />} />
       {/* PM Central — Simple IBM Shell (sidebar + content) */}
       <Route path="/pm-central/dashboard" component={() => <ProtectedRoute component={PMCentralShellPage} />} />
       <Route path="/pm-central/projects" component={() => <ProtectedRoute component={PMCentralShellPage} />} />

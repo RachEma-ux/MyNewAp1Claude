@@ -380,11 +380,24 @@ export default function MainLayout({ children }: MainLayoutProps) {
     {
       label: "PM Central",
       icon: <FolderKanban className="w-5 h-5" />,
-      children: PM_NAV_CONFIG.sections.map((section) => ({
-        label: section.label,
-        icon: <FolderKanban className="w-4 h-4" />,
-        href: section.currentRoute ?? section.href,
-      })),
+      children: [
+        // Canonical RTLM module frontend (registered top-level module).
+        { label: "Module Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, href: "/pm-central/rtlm" },
+        { label: "Projects (RTLM)", icon: <FolderKanban className="w-4 h-4" />, href: "/pm-central/rtlm/projects" },
+        { label: "Tasks (RTLM)", icon: <FolderKanban className="w-4 h-4" />, href: "/pm-central/rtlm/tasks" },
+        { label: "Milestones (RTLM)", icon: <FolderKanban className="w-4 h-4" />, href: "/pm-central/rtlm/milestones" },
+        { label: "Risks (RTLM)", icon: <FolderKanban className="w-4 h-4" />, href: "/pm-central/rtlm/risks" },
+        { label: "Issues (RTLM)", icon: <FolderKanban className="w-4 h-4" />, href: "/pm-central/rtlm/issues" },
+        { label: "Decisions (RTLM)", icon: <FolderKanban className="w-4 h-4" />, href: "/pm-central/rtlm/decisions" },
+        { label: "Handoffs (RTLM)", icon: <FolderKanban className="w-4 h-4" />, href: "/pm-central/rtlm/handoffs" },
+        { label: "Module Settings", icon: <Settings className="w-4 h-4" />, href: "/pm-central/rtlm/settings" },
+        // Legacy shell sections (PM_NAV_CONFIG-driven). Kept for back-compat.
+        ...PM_NAV_CONFIG.sections.map((section) => ({
+          label: `Legacy: ${section.label}`,
+          icon: <FolderKanban className="w-4 h-4" />,
+          href: section.currentRoute ?? section.href,
+        })),
+      ],
     },
     {
       label: "PRM",

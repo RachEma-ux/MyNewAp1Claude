@@ -1,28 +1,50 @@
 /**
- * PS → PM Bridge
+ * PS → PM Central Bridge
  *
- * Sends a validated (VALIDATED) PS project to PM Central,
- * creating a PMT project and locking the PS classification.
+ * Sends a validated (VALIDATED) PS project to PM Central via the
+ * canonical handoff lane and the Module Gateway. PS does **not**
+ * write PMDB and does **not** import any PM Central private file —
+ * it goes through the platform handoff manager and the gateway
+ * public-api surface only.
  *
- * Rule: PS = Decision, PM Central = Execution.
- * After handoff, PS classification is locked (status = SENT_TO_PM).
+ * Boundary rule: PS = Decision, PM Central = Execution.
+ * After successful handoff, PS classification is locked
+ * (status = SENT_TO_PM) and `pmProjectId` points at the new
+ * PM Central `pm_projects` row (NOT at the legacy `pmt_projects`).
  */
 
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "../db/connection";
-import { psProjects, type PsProject } from "../../drizzle/tables/ps";
-import { projects as pmtProjects } from "../modules/pmt/schema";
+import { psProjects } from "../../drizzle/tables/ps";
 import { logPsAudit } from "./ps.audit";
 import { sendToPMCentral } from "./ps.lifecycle";
+import { submitHandoff } from "../platform/handoff";
+import { gatewayCall } from "../platform/modules/module-gateway";
+
+const PM_HANDOFF_TYPE = "pmCentral.project.convertFromPS";
+
+interface PmProjectListEntry {
+  id: number;
+  name: string;
+  workspaceId: number;
+  sourceModule: string | null;
+  sourceRefId: number | null;
+  status: string;
+}
 
 /**
  * Create a PM Central project from a validated PS project.
  *
  * 1. Validates PS project status = VALIDATED
- * 2. Inserts into pmt_projects with PS metadata
- * 3. Transitions PS project: VALIDATED → SENT_TO_PM + links pmProjectId
- * 4. Returns the created PM project and locked PS project
+ * 2. Submits PS → PM Central handoff (`pmCentral.project.convertFromPS`)
+ *    via the platform handoff manager. The acceptor (registered by PM
+ *    Central) records the handoff in `pm_handoffs` and converts it
+ *    into a `pm_projects` row inside pmdb.
+ * 3. Looks up the resulting `pm_projects` row through the Module
+ *    Gateway (`pmCentral.projects.list` filtered by source attribution).
+ * 4. Transitions PS project: VALIDATED → SENT_TO_PM and links
+ *    `pmProjectId` to the new PM Central project id.
  */
 export async function createPMProjectFromPS(
   psProjectId: number,
@@ -49,14 +71,12 @@ export async function createPMProjectFromPS(
       message: "PS project not found",
     });
   }
-
   if (psProject.status !== "VALIDATED") {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: `PS project must be validated (approved) before sending to PM. Current status: "${psProject.status}"`,
     });
   }
-
   if (psProject.pmProjectId) {
     throw new TRPCError({
       code: "CONFLICT",
@@ -64,66 +84,85 @@ export async function createPMProjectFromPS(
     });
   }
 
-  // 2. Transaction: create PM project + lock PS project
-  const result = await db.transaction(async (tx) => {
-    // Create PMT project
-    const [pmProject] = await tx
-      .insert(pmtProjects)
-      .values({
-        workspaceId,
-        name: psProject.name,
-        description: buildPMDescription(psProject),
-        status: "draft",
-        ownerId: actorId,
-        governanceStage: "initiation",
-        metadata: {
-          psProjectId: psProject.id,
-          psSelectedScopeCode: psProject.selectedScopeCode,
-          psConfidence: psProject.confidence,
-          psMatrixVersionId: psProject.matrixVersionId,
-          psWizardRunId: psProject.wizardRunId,
-          origin: "ps_bridge",
-        },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Link PM project ID to PS project
-    await tx
-      .update(psProjects)
-      .set({ pmProjectId: pmProject.id })
-      .where(eq(psProjects.id, psProjectId));
-
-    return pmProject;
+  // 2. Submit handoff. The PM Central handoff acceptor records it in
+  //    pm_handoffs and converts it to a pm_projects row. PS performs
+  //    no writes against pmdb.
+  const handoffPayload = {
+    workspaceId,
+    sourceModule: "ps" as const,
+    sourceProjectId: psProjectId,
+    sourceWizardRunId: psProject.wizardRunId ?? undefined,
+    name: psProject.name,
+    scenario: psProject.scenario ?? undefined,
+    selectedScopeCode: psProject.selectedScopeCode ?? undefined,
+    confidence: psProject.confidence ?? undefined,
+    context: {
+      psMatrixVersionId: psProject.matrixVersionId,
+      origin: "ps_bridge",
+    },
+  };
+  const handoff = await submitHandoff({
+    fromModule: "ps",
+    toModule: "pmCentral",
+    type: PM_HANDOFF_TYPE,
+    payload: handoffPayload as Record<string, unknown>,
+    actorId,
+    workspaceId,
   });
+  if (handoff.status !== "accepted") {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `PS → PM handoff was not accepted (status=${handoff.status}, reason=${handoff.failureReason ?? "unknown"})`,
+    });
+  }
 
-  // 3. Lifecycle transition: VALIDATED → SENT_TO_PM
+  // 3. Resolve the resulting pm_projects row via the Module Gateway.
+  //    No direct PM Central imports — only the public action surface.
+  const matches = (await gatewayCall<unknown, PmProjectListEntry[]>({
+    ctx: {
+      sourceModule: "ps",
+      targetModule: "pmCentral",
+      actionKey: "pmCentral.project.list",
+      workspaceId,
+      actorId,
+    },
+    input: {
+      workspaceId,
+      sourceModule: "ps",
+      sourceRefId: psProjectId,
+      limit: 1,
+    },
+  })) ?? [];
+  const pmProject = matches[0];
+  if (!pmProject) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `PS → PM handoff was accepted but the resulting pm_projects row could not be located for ps#${psProjectId}.`,
+    });
+  }
+
+  // 4. Link the new PM Central project id back onto the PS row.
+  await db
+    .update(psProjects)
+    .set({ pmProjectId: pmProject.id })
+    .where(eq(psProjects.id, psProjectId));
+
+  // 5. Lifecycle transition: VALIDATED → SENT_TO_PM
   const locked = await sendToPMCentral(psProjectId, actorId);
 
-  // 4. Audit
+  // 6. PS-side audit
   await logPsAudit({
     actorId,
     action: "bridge.send_to_pm",
     entityType: "ps_project",
     entityId: psProjectId,
     newValue: {
-      pmProjectId: result.id,
-      pmProjectName: result.name,
+      pmProjectId: pmProject.id,
+      pmProjectName: pmProject.name,
+      pmHandoffId: handoff.handoffId,
       lockedScopeCode: psProject.selectedScopeCode,
     },
   });
 
-  return { pmProject: result, psProject: locked };
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-function buildPMDescription(ps: PsProject): string {
-  const lines: string[] = [];
-  lines.push(`Created from PS Project #${ps.id}`);
-  lines.push(`Scope: ${ps.selectedScopeCode}`);
-  if (ps.confidence) lines.push(`Confidence: ${ps.confidence}`);
-  if (ps.scenario) lines.push(`\nScenario:\n${ps.scenario}`);
-  return lines.join("\n");
+  return { pmProject, psProject: locked };
 }
