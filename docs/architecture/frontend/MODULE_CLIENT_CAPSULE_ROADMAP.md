@@ -217,6 +217,39 @@ its own internal routing, layout, and nav.
   (mostly-wired or fully-wired), blockers=[]. The next module to
   migrate is **OpenRouter** at Phase 3.11.
 
+### Phase 3.11 — OpenRouter ✅ MERGED
+- **Goal:** prove the capsule shape works for an RTLM whose existing
+  shell already does view-based dispatch off `useLocation()` (the
+  same pattern as Code Studio and AI Types). Migrated
+  `client/src/modules/openrouter/` to the capsule layout.
+- Pages relocated from `client/src/pages/openrouter/` to
+  `client/src/modules/openrouter/pages/` (9 view pages: Home,
+  Connect, Models, Routing, Guardrails, Playground, Usage, Health,
+  Activity). Shell components relocated from
+  `client/src/components/openrouter/` to
+  `client/src/modules/openrouter/components/` (`OpenRouterShell`,
+  `OpenRouterSidebar`, `OpenRouterStatusBar`).
+- The legacy 9-line `OpenRouterShellPage.tsx` wrapper is dropped —
+  `mod.tsx` carries the `flex/calc(100vh - 4rem)` chrome directly
+  and Suspense-wraps `<OpenRouterShell />`. The shell continues to
+  drive its existing S1 sidebar + view dispatch off `useLocation()`,
+  preserving the Connect / Models / Routing / Guardrails /
+  Playground / Usage / Health / Activity UX. `routes.tsx` exists
+  alongside as the canonical path list for
+  `check:module-route-inventory`.
+- 9 canonical routes covered: `/openrouter`, `/openrouter/connect`,
+  `/openrouter/models`, `/openrouter/routing`,
+  `/openrouter/guardrails`, `/openrouter/playground`,
+  `/openrouter/usage`, `/openrouter/health`, `/openrouter/activity`.
+- Server `openrouter/manifest.ts` already declared
+  `routes: [{ path: "/openrouter" }]` consistent with the capsule
+  baseRoute, so no server-manifest stale-route fix was needed.
+- `MIGRATED_MODULES = ["communication", "dataAnalysis", "pmCentral",
+  "codeStudio", "ps", "prm", "psm", "hr", "organizationManagement",
+  "cultureValues", "aiTypes", "openRouter"]`. AWI: `openRouter`
+  wired (mostly-wired or fully-wired), blockers=[]. The next module
+  to migrate is **Agent Studio** at Phase 3.12.
+
 ### Subsequent migrations (one PR each)
 
 The order is intentional — modules with the largest blast radius
@@ -234,8 +267,8 @@ long tail.
 9. Organization Management         _(Phase 3.8, merged)_
 10. Culture Values                 _(Phase 3.9, merged)_
 11. AI Types                       _(Phase 3.10, merged)_
-12. OpenRouter                     _(Phase 3.11, next)_
-13. Agent Studio
+12. OpenRouter                     _(Phase 3.11, merged)_
+13. Agent Studio                   _(Phase 3.12, next)_
 14. Sandbox WF
 15. KGRA Agent
 

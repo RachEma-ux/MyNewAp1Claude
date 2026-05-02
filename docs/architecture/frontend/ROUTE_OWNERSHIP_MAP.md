@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T19:59:58.129Z
+Generated: 2026-05-02T20:35:20.416Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -32,7 +32,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | organizationManagement | ✅ migrated | 13 | `/om` |
 | cultureValues | ✅ migrated | 7 | `/cv` |
 | aiTypes | ✅ migrated | 20 | `/ai-types` |
-| openRouter | ⏳ pending | 9 | `—` |
+| openRouter | ✅ migrated | 18 | `—` |
 | agentStudio | ⏳ pending | 7 | `—` |
 | sandboxWf | ⏳ pending | 3 | `—` |
 | kgraAgent | ⏳ pending | 1 | `—` |
@@ -266,15 +266,15 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/om/settings` | organizationManagement | module-manifest | `module:organizationManagement` | ✅ canonical |  |
 | `/om/templates` | organizationManagement | module-manifest | `module:organizationManagement` | ✅ canonical |  |
 | `/om/wizard` | organizationManagement | module-manifest | `module:organizationManagement` | ✅ canonical |  |
-| `/openrouter` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
-| `/openrouter/activity` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
-| `/openrouter/connect` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
-| `/openrouter/guardrails` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
-| `/openrouter/health` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
-| `/openrouter/models` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
-| `/openrouter/playground` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
-| `/openrouter/routing` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
-| `/openrouter/usage` | openRouter | module-manifest | `OpenRouterShellPage` | ✅ canonical |  |
+| `/openrouter` | openRouter | module-manifest | `module:openRouter` | ✅ canonical |  |
+| `/openrouter/activity` | openRouter | module-manifest | `module:openRouter` | ✅ canonical |  |
+| `/openrouter/connect` | openRouter | module-manifest | `module:openRouter` | ✅ canonical |  |
+| `/openrouter/guardrails` | openRouter | module-manifest | `module:openRouter` | ✅ canonical |  |
+| `/openrouter/health` | openRouter | module-manifest | `module:openRouter` | ✅ canonical |  |
+| `/openrouter/models` | openRouter | module-manifest | `module:openRouter` | ✅ canonical |  |
+| `/openrouter/playground` | openRouter | module-manifest | `module:openRouter` | ✅ canonical |  |
+| `/openrouter/routing` | openRouter | module-manifest | `module:openRouter` | ✅ canonical |  |
+| `/openrouter/usage` | openRouter | module-manifest | `module:openRouter` | ✅ canonical |  |
 | `/personal/:workspaceId` | — | unknown | — | ❓ unknown |  |
 | `/personal/:workspaceId/*` | — | unknown | — | ❓ unknown |  |
 | `/pm` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |

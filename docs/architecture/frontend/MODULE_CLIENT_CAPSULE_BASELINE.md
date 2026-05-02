@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T19:59:58.134Z
+Generated: 2026-05-02T20:35:20.423Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **204**
+Total `<Route>` declarations in App.tsx: **195**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -25,7 +25,7 @@ Compatibility redirects in App.tsx: **25**
 | organization-management | 0 | 7 | 6 | 0 |
 | culture-values | 0 | 4 | 3 | 0 |
 | ai-types | 0 | 13 | 7 | 0 |
-| openrouter | 9 | 0 | 0 | 4 |
+| openrouter | 0 | 9 | 9 | 0 |
 | agent-studio | 7 | 0 | 0 | 4 |
 | sandbox-wf | 3 | 0 | 0 | 4 |
 | kgra-agent | 1 | 0 | 0 | 4 |
@@ -156,15 +156,15 @@ Compatibility redirects in App.tsx: **25**
 | `/om/settings` | routeInventory:organization-management, routes.tsx:organization-management |
 | `/om/templates` | routeInventory:organization-management, routes.tsx:organization-management |
 | `/om/wizard` | routeInventory:organization-management, routes.tsx:organization-management |
-| `/openrouter` | App.tsx, manifest:openrouter |
-| `/openrouter/activity` | App.tsx, manifest:openrouter |
-| `/openrouter/connect` | App.tsx, manifest:openrouter |
-| `/openrouter/guardrails` | App.tsx, manifest:openrouter |
-| `/openrouter/health` | App.tsx, manifest:openrouter |
-| `/openrouter/models` | App.tsx, manifest:openrouter |
-| `/openrouter/playground` | App.tsx, manifest:openrouter |
-| `/openrouter/routing` | App.tsx, manifest:openrouter |
-| `/openrouter/usage` | App.tsx, manifest:openrouter |
+| `/openrouter` | routeInventory:openrouter, routes.tsx:openrouter |
+| `/openrouter/activity` | routeInventory:openrouter, routes.tsx:openrouter |
+| `/openrouter/connect` | routeInventory:openrouter, routes.tsx:openrouter |
+| `/openrouter/guardrails` | routeInventory:openrouter, routes.tsx:openrouter |
+| `/openrouter/health` | routeInventory:openrouter, routes.tsx:openrouter |
+| `/openrouter/models` | routeInventory:openrouter, routes.tsx:openrouter |
+| `/openrouter/playground` | routeInventory:openrouter, routes.tsx:openrouter |
+| `/openrouter/routing` | routeInventory:openrouter, routes.tsx:openrouter |
+| `/openrouter/usage` | routeInventory:openrouter, routes.tsx:openrouter |
 | `/pm` | routeInventory:pm-central, routes.tsx:pm-central |
 | `/pm/decisions` | routeInventory:pm-central, routes.tsx:pm-central |
 | `/pm/handoffs` | routeInventory:pm-central, routes.tsx:pm-central |
@@ -386,7 +386,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | organization-management | ✅ | ✅ | ✅ | ✅ | ✅ |
 | culture-values | ✅ | ✅ | ✅ | ✅ | ✅ |
 | ai-types | ✅ | ✅ | ✅ | ✅ | ✅ |
-| openrouter | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| openrouter | ✅ | ✅ | ✅ | ✅ | ✅ |
 | agent-studio | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | sandbox-wf | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | kgra-agent | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |

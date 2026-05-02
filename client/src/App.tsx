@@ -181,8 +181,8 @@ const IdeaBuilderWizard = lazy(() => import("@/pages/pm-central/IdeaBuilderWizar
 const AgentStudioShellPage = lazy(() => import("@/pages/agent-studio/AgentStudioShellPage"));
 // KGIA — Knowledge Graph Interpretation Agent
 const KGIAShellPage = lazy(() => import("@/pages/kgia/KGIAShellPage"));
-// OpenRouter — Unified model gateway
-const OpenRouterShellPage = lazy(() => import("@/pages/openrouter/OpenRouterShellPage"));
+// OpenRouter — migrated to capsule (PR #72). Mounted by <ModuleRoutes />
+// from `client/src/modules/openrouter/`.
 // Data Analysis — GraphRAG, Data Acquisition, and Data Warehouse pages
 // are now mounted by the Data Analysis capsule via <ModuleRoutes />.
 // See `client/src/modules/data-analysis/`.
@@ -323,16 +323,8 @@ function Router() {
       <Route path="/kgia/governance" component={() => <ProtectedRoute component={KGIAShellPage} />} />
       <Route path="/kgia/oversight" component={() => <ProtectedRoute component={KGIAShellPage} />} />
       <Route path="/kgia" component={() => <ProtectedRoute component={KGIAShellPage} />} />
-      {/* OpenRouter — Unified model gateway (shell handles internal routing) */}
-      <Route path="/openrouter/connect" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
-      <Route path="/openrouter/models" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
-      <Route path="/openrouter/routing" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
-      <Route path="/openrouter/guardrails" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
-      <Route path="/openrouter/playground" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
-      <Route path="/openrouter/usage" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
-      <Route path="/openrouter/health" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
-      <Route path="/openrouter/activity" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
-      <Route path="/openrouter" component={() => <ProtectedRoute component={OpenRouterShellPage} />} />
+      {/* OpenRouter — migrated to capsule (PR #72). Routes /openrouter/*
+          now rendered by <ModuleRoutes /> via the capsule manifest. */}
       {/* KGRA Agent — embedded OmniRAG-style UI inside app shell */}
       <Route path="/data-analysis/kgra-agent" component={() => <ProtectedRoute component={KGRAAgentPage} />} />
       {/* Workspace Execution Shell — NEW context-first shell architecture */}
