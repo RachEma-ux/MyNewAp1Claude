@@ -83,8 +83,8 @@ describe("Code Studio migration state", () => {
   it("pmCentral remains migrated", () => {
     expect(isMigrated("pmCentral")).toBe(true);
   });
-  it("agentStudio is NOT migrated (separate RTLM, future PR)", () => {
-    expect(isMigrated("agentStudio")).toBe(false);
+  it("agentStudio is migrated (PR #73 / Phase 3.12)", () => {
+    expect(isMigrated("agentStudio")).toBe(true);
   });
 });
 

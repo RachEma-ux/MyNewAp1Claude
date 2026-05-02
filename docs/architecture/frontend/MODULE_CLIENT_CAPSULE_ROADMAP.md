@@ -250,6 +250,47 @@ its own internal routing, layout, and nav.
   wired (mostly-wired or fully-wired), blockers=[]. The next module
   to migrate is **Agent Studio** at Phase 3.12.
 
+### Phase 3.12 — Agent Studio ✅ MERGED
+- **Goal:** prove the capsule shape works for the largest in-capsule
+  shell yet — Agent Studio drives an S1 sidebar + top action bar +
+  right oversight drawer + bottom status bar, parses `useLocation()`
+  itself with regex (numeric `:agentId`, `/:agentId/:section`,
+  `/:agentId/runs/:runId`, `/:agentId/versions/compare`), and
+  dispatches among ~20 internal views. Migrated
+  `client/src/modules/agent-studio/` to the capsule layout.
+- 25 pages relocated from `client/src/pages/agent-studio/` to
+  `client/src/modules/agent-studio/pages/`. 7 shell components
+  (`AgentStudioShell`, `AgentStudioSidebar`, `AgentStudioTopBar`,
+  `AgentStudioStatusBar`, `AgentStudioOversightDrawer`,
+  `AgentStudioChatWindow`, `OrchestrationCanvas`) plus the local
+  `ui/` subfolder (8 internal UI primitives) relocated from
+  `client/src/components/agent-studio/` to
+  `client/src/modules/agent-studio/components/`. The legacy 9-line
+  `AgentStudioShellPage.tsx` wrapper is dropped — `mod.tsx` carries
+  the `flex/calc(100vh - 4rem)` chrome directly.
+- 11 canonical path patterns covered: `/agent-studio`,
+  `/agent-studio/{new,templates,import,catalog,marketplace}`,
+  `/agent-studio/catalog/:section`,
+  `/agent-studio/:agentId`, `/agent-studio/:agentId/:section`,
+  `/agent-studio/:agentId/runs/:runId`,
+  `/agent-studio/:agentId/versions/compare`. Order in `routes.tsx`
+  mirrors the App.tsx mount order (literal sub-routes first, then
+  3-segment deep-links, then the generic 2-segment catch, then
+  bare).
+- **Public-export pattern:** App.tsx mounts an `AgentStudioChatFAB`
+  overlay at root level so the studio chat window stays available
+  across all `/agent-studio/*` routes. Its `AgentStudioChatWindow`
+  import previously came from `./components/agent-studio/...` —
+  after migration it routes through the capsule's public
+  `index.ts`, keeping the no-private-import boundary rule clean
+  while preserving the FAB UX.
+- Server `agent-studio/manifest.ts` already declared `routes:`
+  consistent with the capsule baseRoute, so no server-manifest
+  stale-route fix was needed.
+- `MIGRATED_MODULES = [..., "agentStudio"]`. AWI: `agentStudio`
+  wired (mostly-wired or fully-wired), blockers=[]. The next module
+  to migrate is **Sandbox WF** at Phase 3.13.
+
 ### Subsequent migrations (one PR each)
 
 The order is intentional — modules with the largest blast radius
@@ -268,8 +309,8 @@ long tail.
 10. Culture Values                 _(Phase 3.9, merged)_
 11. AI Types                       _(Phase 3.10, merged)_
 12. OpenRouter                     _(Phase 3.11, merged)_
-13. Agent Studio                   _(Phase 3.12, next)_
-14. Sandbox WF
+13. Agent Studio                   _(Phase 3.12, merged)_
+14. Sandbox WF                     _(Phase 3.13, next)_
 15. KGRA Agent
 
 ## Definition of Done per migration
