@@ -42,7 +42,10 @@ export const psManifest: ModuleManifest = {
     },
   ],
 
-  routes: [{ path: "/projects", label: "Projects" }],
+  // PS canonical surface lives at `/ps`. The client capsule manifest
+  // (PR #63) declares `baseRoute: "/ps"` and the AWI capsule-aware
+  // route counter covers every path under that subtree.
+  routes: [{ path: "/ps", label: "Projects" }],
   navigation: [{ group: "delivery", label: "Projects", order: 10 }],
 
   health: async () => okHealth("PS ready"),

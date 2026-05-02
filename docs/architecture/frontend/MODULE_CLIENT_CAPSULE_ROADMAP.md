@@ -106,6 +106,42 @@ its own internal routing, layout, and nav.
   "codeStudio"]`. AWI: `codeStudio` fully-wired, blockers=[]. The
   next module to migrate is **Projects System** (`ps`) at Phase 3.4.
 
+### Phase 3.4 — Projects System ✅ MERGED
+- **Goal:** prove the capsule shape works for an RTLM whose surface
+  mixes shell-managed views (catalog/ideation list/control-panel/
+  wizard/list/ai-catalog) with standalone deep-link routes
+  (`/ps/ideation/:id` and `/ps/ideation/:id/convert`) that historically
+  rendered without the shell.
+- Migrated `client/src/modules/ps/` to the capsule layout. 22 pages
+  relocated from `client/src/pages/projects-system/` to
+  `client/src/modules/ps/pages/`; 29 components (PSShell, PSSidebar,
+  control-panel/, ideation/, wizard/) relocated from
+  `client/src/components/projects-system/` to
+  `client/src/modules/ps/components/`. The legacy 12-line
+  `PSShellPage.tsx` wrapper is dropped — `mod.tsx` carries the
+  flex/`calc(100vh - 4rem)` chrome directly.
+- 9 canonical routes covered: 8 spec paths plus the long-standing
+  `/ps/ai-catalog` extra (kept for UX continuity). No legacy
+  `/projects-system/*` paths existed in App.tsx, so
+  `compatibilityRoutes` is empty.
+- `mod.tsx` is a thin Wouter `<Switch>`: dynamic ideation routes
+  (`:id` and `:id/convert`) dispatch to their dedicated pages
+  WITHOUT PSShell to preserve their full-page UX; everything else
+  falls through to `<PSShell />` which keeps its existing internal
+  view dispatch off `useLocation()`.
+- **PS → PM Central boundary preserved.** PS UI calls only
+  `trpc.ps.*`. The Ideation Chat Window's pre-existing round-table
+  call (previously `trpc.sandboxWf.maestro.roundTable`) was
+  refactored to call `trpc.ps.chat.roundTable`, a thin PS-side proxy
+  that delegates to the Sandbox WF service server-side. This
+  preserves the frontend cross-module boundary; no UX change.
+- WorkspaceExecutionShell (a workspace platform component, not a
+  module) had its 4 PS page imports updated to the new
+  `@/modules/ps/pages/` paths.
+- `MIGRATED_MODULES = ["communication", "dataAnalysis", "pmCentral",
+  "codeStudio", "ps"]`. AWI: `ps` fully-wired, blockers=[]. The
+  next module to migrate is **PRM** at Phase 3.5.
+
 ### Phase 3.1 — Data Analysis ✅ MERGED
 - **Goal:** prove the capsule shape scales to a multi-subdomain
   RTLM. Data Analysis owns three subdomains (GraphRAG, Data
@@ -149,8 +185,8 @@ long tail.
 2. Data Analysis                   _(Phase 3.1, merged)_
 3. PM Central                      _(Phase 3.2, merged)_
 4. Code Studio                     _(Phase 3.3, merged)_
-5. Projects System (`ps`)          _(Phase 3.4, next)_
-6. PRM
+5. Projects System (`ps`)          _(Phase 3.4, merged)_
+6. PRM                             _(Phase 3.5, next)_
 7. PSM
 8. HR
 9. Organization Management

@@ -124,6 +124,43 @@ import { loadActiveMatrix } from "./ps.matrix-engine";
 import { ideationRouter } from "./ps.ideation-router";
 import { analyzeScenarioText } from "./ps.text-analysis";
 
+/**
+ * PS chat sub-router — round-table multi-agent chat used by the
+ * Ideation Chat Window. Delegates to the Sandbox WF round-table
+ * service so the PS frontend can stay inside `trpc.ps.*`. The PS UI
+ * MUST NOT call `trpc.sandboxWf.*` directly; this proxy preserves
+ * the frontend cross-module boundary while keeping the existing UX.
+ */
+const chatRouter = router({
+  roundTable: protectedProcedure
+    .input(
+      z.object({
+        message: z.string(),
+        participants: z.array(
+          z.object({
+            catalogEntryId: z.number(),
+            name: z.string(),
+          }),
+        ),
+        conversationHistory: z
+          .array(
+            z.object({
+              role: z.string(),
+              sender: z.string(),
+              content: z.string(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const { executeRoundTable } = await import(
+        "../sandbox-wf/service"
+      );
+      return executeRoundTable(input);
+    }),
+});
+
 const systemsRouter = router({
   create: governedProcedure
     .input(createSystemSchema)
@@ -1105,6 +1142,7 @@ export const psRouter = router({
   governance: governanceRouter,
   pmBridge: pmBridgeRouter,
   ideation: ideationRouter,
+  chat: chatRouter,
 
   getActiveQuestions: protectedProcedure
     .input(z.void())

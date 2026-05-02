@@ -96,27 +96,37 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * the legacy `/pm-central/*` shell routes are not RTLM canonical
  * and continue to be mounted directly in App.tsx.
  *
- * Phase 3.3 (this PR): Code Studio migrates to the capsule shape,
- * adding `codeStudio` as the fourth migrated module. Frontend
+ * Phase 3.3 (Code Studio, merged in PR #62): added `codeStudio` as
+ * the fourth migrated module. Code Studio owns the code execution /
+ * build / development workbench UI (jobs, sessions, approvals,
+ * repos, agents, policies, control panel, how-to, and the AI catalog
+ * / OpenCode settings / templates sub-surfaces that pre-date the
+ * canonical roadmap list). Port reservations remain backend-mediated
+ * through the Port Registry lane; Governance enforcement remains on
+ * the backend. Code Studio does not own the legacy `/code` Monaco
+ * editor — that route serves a separate non-RTLM page.
+ *
+ * Phase 3.4 (this PR): Projects System migrates to the capsule
+ * shape, adding `ps` as the fifth migrated module. Frontend
  * modularity checks now run strict for `communication`,
- * `dataAnalysis`, `pmCentral`, and `codeStudio`. The remaining 11
- * RTLMs continue in report-only mode until their own migration
+ * `dataAnalysis`, `pmCentral`, `codeStudio`, and `ps`. The remaining
+ * 10 RTLMs continue in report-only mode until their own migration
  * PRs land.
  *
- * Code Studio owns the code execution / build / development
- * workbench UI (jobs, sessions, approvals, repos, agents,
- * policies, control panel, how-to, and the AI catalog / OpenCode
- * settings / templates sub-surfaces that pre-date the canonical
- * roadmap list). Port reservations remain backend-mediated through
- * the Port Registry lane; Governance enforcement remains on the
- * backend. Code Studio does not own the legacy `/code` Monaco
- * editor — that route serves a separate non-RTLM page.
+ * PS owns intake, ideation (incl. detail and convert deep links),
+ * classification, wizard execution, PS project/system records,
+ * catalog/reference views, and the PS control panel. PS → PM
+ * Central is a backend handoff: PS UI calls only `trpc.ps.*`; the
+ * PS backend hops to PM Central via Handoff Manager / public API.
+ * The frontend never reaches across `trpc.pmCentral.*` from inside
+ * the PS capsule.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
   "communication",
   "dataAnalysis",
   "pmCentral",
   "codeStudio",
+  "ps",
 ];
 
 /**

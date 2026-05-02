@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T14:36:50.705Z
+Generated: 2026-05-02T15:23:01.144Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -9,12 +9,12 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | Status | Count |
 |---|---|
-| ✅ canonical | 99 |
+| ✅ canonical | 100 |
 | ↪️ compatibility-redirect | 22 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
 | ⚠️ orphan | 0 |
-| ❓ unknown | 202 |
+| ❓ unknown | 201 |
 | **Total** | **337** |
 
 ## Per-RTLM
@@ -25,7 +25,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | communication | ✅ migrated | 10 | `/communication` |
 | pmCentral | ✅ migrated | 19 | `/pm` |
 | codeStudio | ✅ migrated | 26 | `/code-studio` |
-| ps | ⏳ pending | 8 | `—` |
+| ps | ✅ migrated | 15 | `/ps` |
 | prm | ⏳ pending | 8 | `—` |
 | psm | ⏳ pending | 10 | `—` |
 | hr | ⏳ pending | 4 | `—` |
@@ -329,15 +329,15 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/providers/dashboard` | — | unknown | — | ❓ unknown |  |
 | `/providers/list` | — | unknown | — | ❓ unknown |  |
 | `/providers/wizard` | — | unknown | — | ❓ unknown |  |
-| `/ps` | ps | module-manifest | `PSShellPage` | ✅ canonical |  |
-| `/ps/ai-catalog` | ps | unknown | — | ❓ unknown |  |
-| `/ps/catalog` | ps | module-manifest | `PSShellPage` | ✅ canonical |  |
-| `/ps/control-panel` | ps | module-manifest | `PSShellPage` | ✅ canonical |  |
-| `/ps/ideation` | ps | module-manifest | `PSShellPage` | ✅ canonical |  |
-| `/ps/ideation/:id` | ps | module-manifest | `PSIdeationDetailPage` | ✅ canonical |  |
-| `/ps/ideation/:id/convert` | ps | module-manifest | `PSIdeationConvertPage` | ✅ canonical |  |
-| `/ps/list` | ps | module-manifest | `PSShellPage` | ✅ canonical |  |
-| `/ps/wizard` | ps | module-manifest | `PSShellPage` | ✅ canonical |  |
+| `/ps` | ps | module-manifest | `module:ps` | ✅ canonical |  |
+| `/ps/ai-catalog` | ps | module-manifest | `module:ps` | ✅ canonical |  |
+| `/ps/catalog` | ps | module-manifest | `module:ps` | ✅ canonical |  |
+| `/ps/control-panel` | ps | module-manifest | `module:ps` | ✅ canonical |  |
+| `/ps/ideation` | ps | module-manifest | `module:ps` | ✅ canonical |  |
+| `/ps/ideation/:id` | ps | module-manifest | `module:ps` | ✅ canonical |  |
+| `/ps/ideation/:id/convert` | ps | module-manifest | `module:ps` | ✅ canonical |  |
+| `/ps/list` | ps | module-manifest | `module:ps` | ✅ canonical |  |
+| `/ps/wizard` | ps | module-manifest | `module:ps` | ✅ canonical |  |
 | `/psm` | psm | module-manifest | `PSMShellPage` | ✅ canonical |  |
 | `/psm/admin` | psm | module-manifest | `PSMShellPage` | ✅ canonical |  |
 | `/psm/ai-catalog` | psm | unknown | — | ❓ unknown |  |
@@ -560,7 +560,6 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/providers/dashboard` | unknown | — |  |
 | `/providers/list` | unknown | — |  |
 | `/providers/wizard` | unknown | — |  |
-| `/ps/ai-catalog` | unknown | ps |  |
 | `/psm/ai-catalog` | unknown | psm |  |
 | `/research/:workspaceId` | unknown | — |  |
 | `/research/:workspaceId/*` | unknown | — |  |

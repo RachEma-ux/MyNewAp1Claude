@@ -93,7 +93,10 @@ export function PSIdeationChatWindow({ catalogImports }: PSIdeationChatWindowPro
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const roundTableMutation = trpc.sandboxWf.maestro.roundTable.useMutation();
+  // PS UI calls only `trpc.ps.*` — round-table delegates through the
+  // PS backend (`ps.chat.roundTable`) which proxies to Sandbox WF
+  // server-side. Preserves the frontend cross-module boundary.
+  const roundTableMutation = trpc.ps.chat.roundTable.useMutation();
 
   // Auto-scroll on new messages
   useEffect(() => {

@@ -6,10 +6,10 @@
  *
  * All tab content + state is now in PSControlPanelShell (Fragment pattern).
  */
-import { PSControlPanelShell } from "@/components/projects-system/control-panel/PSControlPanelShell";
+import { PSControlPanelShell } from "../components/control-panel/PSControlPanelShell";
 
 // Re-export for backwards compatibility (child tabs import from here)
-export { PSVersionSelector } from "@/components/projects-system/control-panel/PSVersionSelector";
+export { PSVersionSelector } from "../components/control-panel/PSVersionSelector";
 
 // ── Main Component ───────────────────────────────────────────────────
 

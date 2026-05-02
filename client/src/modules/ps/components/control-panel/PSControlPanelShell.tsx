@@ -32,13 +32,13 @@ import {
 import { PSControlPanelSidebar, type ControlPanelView } from "./PSControlPanelSidebar";
 
 // ── Tab Components ────────────────────────────────────────────────────
-import { PSMatrixVersionManager } from "@/pages/projects-system/PSMatrixVersionManager";
-import { PSImportPreviewPanel } from "@/pages/projects-system/PSImportPreviewPanel";
-import { PSScopeRegistryEditor } from "@/pages/projects-system/PSScopeRegistryEditor";
-import { PSQuestionEditor } from "@/pages/projects-system/PSQuestionEditor";
-import { PSDimensionEditor } from "@/pages/projects-system/PSDimensionEditor";
-import { PSMatrixGridEditor } from "@/pages/projects-system/PSMatrixGridEditor";
-import { PSValidationQueueTab } from "@/pages/projects-system/PSValidationQueueTab";
+import { PSMatrixVersionManager } from "../../pages/PSMatrixVersionManager";
+import { PSImportPreviewPanel } from "../../pages/PSImportPreviewPanel";
+import { PSScopeRegistryEditor } from "../../pages/PSScopeRegistryEditor";
+import { PSQuestionEditor } from "../../pages/PSQuestionEditor";
+import { PSDimensionEditor } from "../../pages/PSDimensionEditor";
+import { PSMatrixGridEditor } from "../../pages/PSMatrixGridEditor";
+import { PSValidationQueueTab } from "../../pages/PSValidationQueueTab";
 import { PSVersionSelector } from "./PSVersionSelector";
 
 // ── Helpers ──────────────────────────────────────────────────────────

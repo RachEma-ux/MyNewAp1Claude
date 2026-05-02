@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T14:36:50.719Z
+Generated: 2026-05-02T15:23:01.161Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **294**
+Total `<Route>` declarations in App.tsx: **285**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -18,7 +18,7 @@ Compatibility redirects in App.tsx: **25**
 | communication | 0 | 5 | 5 | 0 |
 | pm-central | 0 | 10 | 9 | 0 |
 | code-studio | 0 | 14 | 12 | 0 |
-| ps | 8 | 0 | 0 | 4 |
+| ps | 0 | 9 | 6 | 0 |
 | prm | 8 | 0 | 0 | 4 |
 | psm | 10 | 0 | 0 | 4 |
 | hr | 4 | 0 | 0 | 4 |
@@ -115,14 +115,15 @@ Compatibility redirects in App.tsx: **25**
 | `/prm/dashboard` | App.tsx, manifest:prm |
 | `/prm/methods` | App.tsx, manifest:prm |
 | `/prm/playbooks` | App.tsx, manifest:prm |
-| `/ps` | App.tsx, manifest:ps |
-| `/ps/catalog` | App.tsx, manifest:ps |
-| `/ps/control-panel` | App.tsx, manifest:ps |
-| `/ps/ideation` | App.tsx, manifest:ps |
-| `/ps/ideation/:id` | App.tsx, manifest:ps |
-| `/ps/ideation/:id/convert` | App.tsx, manifest:ps |
-| `/ps/list` | App.tsx, manifest:ps |
-| `/ps/wizard` | App.tsx, manifest:ps |
+| `/ps` | routeInventory:ps, routes.tsx:ps |
+| `/ps/ai-catalog` | routeInventory:ps, routes.tsx:ps |
+| `/ps/catalog` | routeInventory:ps, routes.tsx:ps |
+| `/ps/control-panel` | routeInventory:ps, routes.tsx:ps |
+| `/ps/ideation` | routeInventory:ps, routes.tsx:ps |
+| `/ps/ideation/:id` | routeInventory:ps, routes.tsx:ps |
+| `/ps/ideation/:id/convert` | routeInventory:ps, routes.tsx:ps |
+| `/ps/list` | routeInventory:ps, routes.tsx:ps |
+| `/ps/wizard` | routeInventory:ps, routes.tsx:ps |
 | `/psm` | App.tsx, manifest:psm |
 | `/psm/admin` | App.tsx, manifest:psm |
 | `/psm/analytics` | App.tsx, manifest:psm |
@@ -315,7 +316,6 @@ Compatibility redirects in App.tsx: **25**
 | `/providers/dashboard` | unknown | — |  |
 | `/providers/list` | unknown | — |  |
 | `/providers/wizard` | unknown | — |  |
-| `/ps/ai-catalog` | unknown | ps |  |
 | `/psm/ai-catalog` | unknown | psm |  |
 | `/research/:workspaceId` | unknown | — |  |
 | `/research/:workspaceId/*` | unknown | — |  |
@@ -361,7 +361,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | communication | ✅ | ✅ | ✅ | ✅ | ✅ |
 | pm-central | ✅ | ✅ | ✅ | ✅ | ✅ |
 | code-studio | ✅ | ✅ | ✅ | ✅ | ✅ |
-| ps | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| ps | ✅ | ✅ | ✅ | ✅ | ✅ |
 | prm | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | psm | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | hr | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |

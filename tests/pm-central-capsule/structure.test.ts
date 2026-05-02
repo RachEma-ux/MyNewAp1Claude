@@ -74,8 +74,8 @@ describe("PM Central migration state", () => {
   it("dataAnalysis remains migrated", () => {
     expect(isMigrated("dataAnalysis")).toBe(true);
   });
-  it("ps is NOT migrated (separate RTLM, future PR)", () => {
-    expect(isMigrated("ps")).toBe(false);
+  it("ps is migrated (PR #63 — Phase 3.4) — PS → PM Central remains a backend handoff", () => {
+    expect(isMigrated("ps")).toBe(true);
   });
 });
 
