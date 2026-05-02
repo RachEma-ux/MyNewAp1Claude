@@ -175,6 +175,48 @@ its own internal routing, layout, and nav.
   Analysis. AWI: `dataAnalysis` 95 fully-wired (improved from
   warnings=1 → warnings=0).
 
+### Phase 3.10 — AI Types ✅ MERGED
+- **Goal:** prove the capsule shape works for an RTLM whose existing
+  shell drives an in-capsule sidebar + view dispatch off
+  `useLocation()` and where one shell view (catalog) covers six
+  legacy URL slugs (`catalog`, `providers`, `llms`, `models`,
+  `agents`, `bots`). Migrated `client/src/modules/ai-types/` to the
+  capsule layout.
+- Pages relocated from `client/src/pages/ai-types/` to
+  `client/src/modules/ai-types/pages/` (7 view pages: AITypesShell,
+  AITypesOverviewPage, AITypesTaxonomyPage, AITypesRelationshipsPage,
+  AITypesValidationPage, AITypesGovernancePage,
+  AITypesControlPanelPage). The catalog page
+  `client/src/pages/AITypesPage.tsx` (the App.tsx top-level
+  AITypesPage, not the per-folder one) was relocated to
+  `modules/ai-types/pages/AITypesPage.tsx` since it serves as the
+  catalog view rendered by AITypesShell. Sidebar relocated from
+  `client/src/components/ai-types/AITypesSidebar.tsx` to
+  `modules/ai-types/components/AITypesSidebar.tsx`.
+- 13 canonical routes covered: `/ai-types`, `/ai-types/overview`,
+  `/ai-types/catalog`, `/ai-types/providers`, `/ai-types/llms`,
+  `/ai-types/models`, `/ai-types/agents`, `/ai-types/bots`,
+  `/ai-types/taxonomy`, `/ai-types/relationships`,
+  `/ai-types/validation`, `/ai-types/governance`,
+  `/ai-types/control-panel`. The six legacy slugs
+  (`catalog`/`providers`/`llms`/`models`/`agents`/`bots`) all
+  dispatch to the same `AITypesPage` catalog view inside the shell;
+  this preserves the existing UX without expanding scope.
+- `mod.tsx` is a thin Suspense wrapper around `<AITypesShell />`;
+  the shell does its own internal view dispatch via `useLocation()`,
+  same pattern as Code Studio's `CodeStudioShell`. `routes.tsx`
+  exists alongside as the canonical path list for
+  `check:module-route-inventory`.
+- Server `ai-types/manifest.ts` already declared `routes: [{ path:
+  "/ai-types", label: "AI Types" }]` consistent with the capsule
+  baseRoute, so no server-manifest stale-route fix was needed
+  (unlike OM/CV which had stale `/organization` and `/culture`).
+- `MIGRATED_MODULES = ["communication", "dataAnalysis", "pmCentral",
+  "codeStudio", "ps", "prm", "psm", "hr", "organizationManagement",
+  "cultureValues", "aiTypes"]`. AWI: `aiTypes` wired
+  (mostly-wired or fully-wired), blockers=[]. The next module to
+  migrate is **OpenRouter** at Phase 3.11.
+
 ### Subsequent migrations (one PR each)
 
 The order is intentional — modules with the largest blast radius
@@ -191,8 +233,8 @@ long tail.
 8. HR                              _(Phase 3.7, merged)_
 9. Organization Management         _(Phase 3.8, merged)_
 10. Culture Values                 _(Phase 3.9, merged)_
-11. AI Types                       _(Phase 3.10, next)_
-12. OpenRouter
+11. AI Types                       _(Phase 3.10, merged)_
+12. OpenRouter                     _(Phase 3.11, next)_
 13. Agent Studio
 14. Sandbox WF
 15. KGRA Agent

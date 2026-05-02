@@ -142,7 +142,7 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * (PR #61/#63 pattern). `WorkspaceExecutionShell.tsx` OM imports
  * tracked the move.
  *
- * Phase 3.9 (this PR): Culture & Values migrates to the capsule
+ * Phase 3.9 (PR #70): Culture & Values migrated to the capsule
  * shape, adding `cultureValues` as the tenth migrated module. CV
  * owns 4 canonical paths (`/cv` plus 3 item slugs: portfolio,
  * wizard, settings). Same dispatcher pattern as OM —
@@ -150,11 +150,22 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * matching sub-page. Server `culture-values/manifest.ts` had a
  * stale `routes:` declaration of `/culture`; fixed to `/cv` (same
  * PR #61/#63 pattern). `WorkspaceExecutionShell.tsx` CV imports
- * (Portfolio / Wizard / Settings) tracked the move. Frontend
- * modularity checks now run strict for the ten migrated modules;
- * the remaining 5 RTLMs (aiTypes, openRouter, agentStudio,
- * sandboxWf, kgraAgent) continue in report-only mode until their
- * own migration PRs land.
+ * (Portfolio / Wizard / Settings) tracked the move.
+ *
+ * Phase 3.10 (this PR): AI Types migrates to the capsule shape,
+ * adding `aiTypes` as the eleventh migrated module. AI Types owns
+ * 13 canonical paths (`/ai-types` plus 12 item slugs: overview,
+ * catalog, providers, llms, models, agents, bots, taxonomy,
+ * relationships, validation, governance, control-panel). Unlike
+ * OM/CV, AI Types uses an in-capsule `AITypesShell` that drives an
+ * S1 sidebar and dispatches to one of seven views via
+ * `useLocation()`; the catalog view (`AITypesPage.tsx`, formerly
+ * at `client/src/pages/AITypesPage.tsx`) covers six legacy slugs
+ * (`catalog`, `providers`, `llms`, `models`, `agents`, `bots`).
+ * Frontend modularity checks now run strict for the eleven
+ * migrated modules; the remaining 4 RTLMs (openRouter,
+ * agentStudio, sandboxWf, kgraAgent) continue in report-only mode
+ * until their own migration PRs land.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
   "communication",
@@ -167,6 +178,7 @@ export const MIGRATED_MODULES: RtlmKey[] = [
   "hr",
   "organizationManagement",
   "cultureValues",
+  "aiTypes",
 ];
 
 /**
