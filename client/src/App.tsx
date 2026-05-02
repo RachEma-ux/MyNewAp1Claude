@@ -29,13 +29,11 @@ const Documents = lazy(() => import("./pages/Documents"));
 // Agents page replaced by AgentsPage (governance-aware)
 const AgentChat = lazy(() => import("./pages/AgentChat"));
 const CatalogAgentChat = lazy(() => import("./pages/CatalogAgentChat"));
-// Legacy Chat/Conversations pages removed — `/chat`, `/conversations`, `/video-meeting`
-// now redirect to canonical /communication/* routes (Communication module owner).
-const CommunicationDashboardPage = lazy(() => import("./modules/communication/pages/CommunicationDashboardPage"));
-const CommunicationChatPage = lazy(() => import("./modules/communication/pages/CommunicationChatPage"));
-const CommunicationConversationsPage = lazy(() => import("./modules/communication/pages/CommunicationConversationsPage"));
-const CommunicationVideoMeetingPage = lazy(() => import("./modules/communication/pages/CommunicationVideoMeetingPage"));
-const CommunicationNotificationsPage = lazy(() => import("./modules/communication/pages/CommunicationNotificationsPage"));
+// Communication is a Module Client Capsule. App.tsx no longer imports
+// Communication private pages — the capsule is mounted by
+// <ModuleRoutes /> via `client/src/modules/communication/client.ts`.
+// Only the legacy `/chat`, `/conversations`, `/video-meeting` paths
+// remain in App.tsx, as Wouter <Redirect> compatibility shims.
 const Automation = lazy(() => import("./pages/Automation"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Providers = lazy(() => import("./pages/Providers"));
@@ -588,13 +586,10 @@ function Router() {
       <Route path="/agents/:agentId/chat" component={() => <ProtectedRoute component={AgentChat} />} />
       <Route path="/catalog/agents/:catalogEntryId/chat" component={() => <ProtectedRoute component={CatalogAgentChat} />} />
       <Route path="/setup/ollama" component={() => <ProtectedRoute component={OllamaSetup} />} />
-      {/* Communication module — canonical routes (owned by server/communication) */}
-      <Route path="/communication" component={() => <ProtectedRoute component={CommunicationDashboardPage} />} />
-      <Route path="/communication/chat" component={() => <ProtectedRoute component={CommunicationChatPage} />} />
-      <Route path="/communication/conversations" component={() => <ProtectedRoute component={CommunicationConversationsPage} />} />
-      <Route path="/communication/video-meeting" component={() => <ProtectedRoute component={CommunicationVideoMeetingPage} />} />
-      <Route path="/communication/notifications" component={() => <ProtectedRoute component={CommunicationNotificationsPage} />} />
-      {/* Legacy chat / conversations routes — redirect to canonical Communication routes */}
+      {/* Communication module — canonical /communication/* routes are
+          mounted by <ModuleRoutes /> below via the Communication
+          client capsule. App.tsx only keeps the legacy compatibility
+          redirects so existing deep links keep working. */}
       <Route path="/chat"><Redirect to="/communication/chat" /></Route>
       <Route path="/conversations"><Redirect to="/communication/conversations" /></Route>
       <Route path="/video-meeting"><Redirect to="/communication/video-meeting" /></Route>

@@ -1,21 +1,21 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T10:56:03.559Z
+Generated: 2026-05-02T11:33:23.661Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **316**
+Total `<Route>` declarations in App.tsx: **311**
 
-Compatibility redirects in App.tsx: **18**
+Compatibility redirects in App.tsx: **17**
 
 ## Module manifest routes
 
 | Module | manifest.routes | routeInventory | nav.ts hrefs | warnings |
 |---|---|---|---|---|
 | data-analysis | 12 | 0 | 0 | 4 |
-| communication | 5 | 0 | 0 | 4 |
+| communication | 0 | 5 | 5 | 0 |
 | pm-central | 10 | 0 | 0 | 4 |
 | code-studio | 11 | 0 | 0 | 4 |
 | ps | 8 | 0 | 0 | 4 |
@@ -57,11 +57,11 @@ Compatibility redirects in App.tsx: **18**
 | `/code-studio/repos` | App.tsx, manifest:code-studio |
 | `/code-studio/sessions` | App.tsx, manifest:code-studio |
 | `/code-studio/templates` | App.tsx, manifest:code-studio |
-| `/communication` | App.tsx, manifest:communication |
-| `/communication/chat` | App.tsx, manifest:communication |
-| `/communication/conversations` | App.tsx, manifest:communication |
-| `/communication/notifications` | App.tsx, manifest:communication |
-| `/communication/video-meeting` | App.tsx, manifest:communication |
+| `/communication` | routeInventory:communication, routes.tsx:communication |
+| `/communication/chat` | routeInventory:communication, routes.tsx:communication |
+| `/communication/conversations` | routeInventory:communication, routes.tsx:communication |
+| `/communication/notifications` | routeInventory:communication, routes.tsx:communication |
+| `/communication/video-meeting` | routeInventory:communication, routes.tsx:communication |
 | `/cv` | App.tsx, manifest:culture-values |
 | `/cv/:item` | App.tsx, manifest:culture-values |
 | `/data-analysis/graphrag` | App.tsx, manifest:data-analysis |
@@ -345,7 +345,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | Module | manifest | baseRoute | capsuleEntrypoint | layoutMode | routeInventory |
 |---|---|---|---|---|---|
 | data-analysis | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
-| communication | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| communication | ✅ | ✅ | ✅ | ✅ | ✅ |
 | pm-central | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | code-studio | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | ps | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |

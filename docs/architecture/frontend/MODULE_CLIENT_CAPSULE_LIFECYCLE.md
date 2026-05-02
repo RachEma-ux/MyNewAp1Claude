@@ -3,6 +3,12 @@
 What every file inside `client/src/modules/<folder>/` does, when
 it is loaded, and what it is allowed to import.
 
+**Pilot module: `communication`.** Communication is the first RTLM
+to fully implement the capsule pattern (`MIGRATED_MODULES = ["communication"]`).
+Use `client/src/modules/communication/` as the reference shape when
+migrating subsequent modules. The next module to migrate is
+**Data Analysis** (PR 3 / Phase 3.1).
+
 ## Files at a glance
 
 ```

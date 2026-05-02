@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T10:56:03.543Z
+Generated: 2026-05-02T11:33:23.654Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -9,8 +9,8 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | Status | Count |
 |---|---|
-| ✅ canonical | 93 |
-| ↪️ compatibility-redirect | 15 |
+| ✅ canonical | 94 |
+| ↪️ compatibility-redirect | 14 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
 | ⚠️ orphan | 0 |
@@ -22,7 +22,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | RTLM | Migration | Declared paths | Manifest baseRoute |
 |---|---|---|---|
 | dataAnalysis | ⏳ pending | 12 | `—` |
-| communication | ⏳ pending | 5 | `—` |
+| communication | ✅ migrated | 10 | `/communication` |
 | pmCentral | ⏳ pending | 10 | `—` |
 | codeStudio | ⏳ pending | 11 | `—` |
 | ps | ⏳ pending | 8 | `—` |
@@ -108,11 +108,11 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/code-studio/sessions` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
 | `/code-studio/templates` | codeStudio | module-manifest | `CodeStudioShellPage` | ✅ canonical |  |
 | `/collaboration` | — | unknown | — | ❓ unknown |  |
-| `/communication` | communication | module-manifest | `CommunicationDashboardPage` | ✅ canonical |  |
-| `/communication/chat` | communication | module-manifest | `CommunicationChatPage` | ✅ canonical |  |
-| `/communication/conversations` | communication | module-manifest | `CommunicationConversationsPage` | ✅ canonical |  |
-| `/communication/notifications` | communication | app-compatibility-redirect | `/communication/chat` | ↪️ compatibility-redirect | redirects to /communication/chat |
-| `/communication/video-meeting` | communication | module-manifest | `CommunicationVideoMeetingPage` | ✅ canonical |  |
+| `/communication` | communication | module-manifest | `module:communication` | ✅ canonical |  |
+| `/communication/chat` | communication | module-manifest | `module:communication` | ✅ canonical |  |
+| `/communication/conversations` | communication | module-manifest | `module:communication` | ✅ canonical |  |
+| `/communication/notifications` | communication | module-manifest | `module:communication` | ✅ canonical |  |
+| `/communication/video-meeting` | communication | module-manifest | `module:communication` | ✅ canonical |  |
 | `/compliance-export` | — | unknown | — | ❓ unknown |  |
 | `/components/ai-catalog` | — | unknown | — | ❓ unknown |  |
 | `/components/double-shell` | — | unknown | — | ❓ unknown |  |

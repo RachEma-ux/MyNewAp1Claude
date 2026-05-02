@@ -18,6 +18,12 @@
 
 import { registerClientModule } from "@/platform/modules/registry";
 
+// Migrated modules expose a `client.ts` bootstrap that registers the
+// manifest itself. Unmigrated modules still export the manifest from
+// `./<folder>/manifest.ts`; we keep that path alive during the
+// migration window so existing modules don't need to change.
+import { registerCommunicationClientModule } from "./communication/client";
+
 import { prmClientManifest } from "./prm/manifest";
 import { psmClientManifest } from "./psm/manifest";
 import { codeStudioClientManifest } from "./code-studio/manifest";
@@ -31,11 +37,10 @@ import { organizationManagementClientManifest } from "./organization-management/
 import { cultureValuesClientManifest } from "./culture-values/manifest";
 import { aiTypesClientManifest } from "./ai-types/manifest";
 import { kgraAgentClientManifest } from "./kgra-agent/manifest";
-import { communicationClientManifest } from "./communication/manifest";
 import { pmCentralClientManifest } from "./pm-central/manifest";
 import { dataAnalysisClientManifest } from "./data-analysis/manifest";
 
-const ALL_CLIENT_MANIFESTS = [
+const LEGACY_CLIENT_MANIFESTS = [
   prmClientManifest,
   psmClientManifest,
   codeStudioClientManifest,
@@ -49,7 +54,6 @@ const ALL_CLIENT_MANIFESTS = [
   cultureValuesClientManifest,
   aiTypesClientManifest,
   kgraAgentClientManifest,
-  communicationClientManifest,
   pmCentralClientManifest,
   dataAnalysisClientManifest,
 ];
@@ -59,12 +63,22 @@ let registered = false;
 /**
  * Register every per-module client manifest with the shared registry.
  * Idempotent — safe to call multiple times.
+ *
+ * Migrated modules go through their own `client.ts` (which lets the
+ * `check:module-registration` script verify the bootstrap shape).
+ * Legacy modules continue to register their manifests directly.
  */
 export function registerAllClientModules(): void {
   if (registered) return;
-  for (const manifest of ALL_CLIENT_MANIFESTS) {
+
+  // Migrated capsules.
+  registerCommunicationClientModule();
+
+  // Legacy manifests.
+  for (const manifest of LEGACY_CLIENT_MANIFESTS) {
     registerClientModule(manifest);
   }
+
   registered = true;
 }
 

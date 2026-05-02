@@ -4,6 +4,11 @@ One module's UI may not reach into another module's internals.
 This is the operational contract; the rules are enforced by the
 `check:frontend-modularity` suite.
 
+**Status:** Strict mode is currently active for **`communication`**
+(`MIGRATED_MODULES = ["communication"]`). Every rule below fails the
+build for any Communication-side violation. Other RTLMs continue in
+report-only mode until their own migration PR flips them to strict.
+
 ## Allowed
 
 | From `client/src/modules/<self>/...` | Example |
