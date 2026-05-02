@@ -30,12 +30,12 @@ import { registerProjectsSystemClientModule } from "./ps/client";
 import { registerPRMClientModule } from "./prm/client";
 import { registerPSMClientModule } from "./psm/client";
 import { registerHRClientModule } from "./hr/client";
+import { registerOrganizationManagementClientModule } from "./organization-management/client";
 
 import { agentStudioClientManifest } from "./agent-studio/manifest";
 import { sandboxWfClientManifest } from "./sandbox-wf/manifest";
 import { ragClientManifest } from "./rag/manifest";
 import { openRouterClientManifest } from "./openrouter/manifest";
-import { organizationManagementClientManifest } from "./organization-management/manifest";
 import { cultureValuesClientManifest } from "./culture-values/manifest";
 import { aiTypesClientManifest } from "./ai-types/manifest";
 import { kgraAgentClientManifest } from "./kgra-agent/manifest";
@@ -45,7 +45,6 @@ const LEGACY_CLIENT_MANIFESTS = [
   sandboxWfClientManifest,
   ragClientManifest,
   openRouterClientManifest,
-  organizationManagementClientManifest,
   cultureValuesClientManifest,
   aiTypesClientManifest,
   kgraAgentClientManifest,
@@ -73,6 +72,7 @@ export function registerAllClientModules(): void {
   registerPRMClientModule();
   registerPSMClientModule();
   registerHRClientModule();
+  registerOrganizationManagementClientModule();
 
   // Legacy manifests.
   for (const manifest of LEGACY_CLIENT_MANIFESTS) {

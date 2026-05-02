@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T18:16:37.843Z
+Generated: 2026-05-02T18:42:54.095Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **210**
+Total `<Route>` declarations in App.tsx: **208**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -22,7 +22,7 @@ Compatibility redirects in App.tsx: **25**
 | prm | 0 | 10 | 8 | 0 |
 | psm | 0 | 11 | 7 | 0 |
 | hr | 0 | 54 | 1 | 0 |
-| organization-management | 2 | 0 | 0 | 4 |
+| organization-management | 0 | 7 | 6 | 0 |
 | culture-values | 2 | 0 | 0 | 4 |
 | ai-types | 2 | 0 | 0 | 4 |
 | openrouter | 9 | 0 | 0 | 4 |
@@ -136,8 +136,13 @@ Compatibility redirects in App.tsx: **25**
 | `/hr/wellbeing-engagement` | routeInventory:hr, routes.tsx:hr |
 | `/hr/workforce-planning` | routeInventory:hr, routes.tsx:hr |
 | `/hr/workforce-planning/job-architecture` | routeInventory:hr, routes.tsx:hr |
-| `/om` | App.tsx, manifest:organization-management |
-| `/om/:item` | App.tsx, manifest:organization-management |
+| `/om` | routeInventory:organization-management, routes.tsx:organization-management |
+| `/om/control-panel` | routeInventory:organization-management, routes.tsx:organization-management |
+| `/om/list` | routeInventory:organization-management, routes.tsx:organization-management |
+| `/om/portfolio` | routeInventory:organization-management, routes.tsx:organization-management |
+| `/om/settings` | routeInventory:organization-management, routes.tsx:organization-management |
+| `/om/templates` | routeInventory:organization-management, routes.tsx:organization-management |
+| `/om/wizard` | routeInventory:organization-management, routes.tsx:organization-management |
 | `/openrouter` | App.tsx, manifest:openrouter |
 | `/openrouter/activity` | App.tsx, manifest:openrouter |
 | `/openrouter/connect` | App.tsx, manifest:openrouter |
@@ -365,7 +370,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | prm | ✅ | ✅ | ✅ | ✅ | ✅ |
 | psm | ✅ | ✅ | ✅ | ✅ | ✅ |
 | hr | ✅ | ✅ | ✅ | ✅ | ✅ |
-| organization-management | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| organization-management | ✅ | ✅ | ✅ | ✅ | ✅ |
 | culture-values | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | ai-types | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | openrouter | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |

@@ -113,8 +113,8 @@ const NewProviderPage = lazy(() => import("@/pages/NewProviderPage"));
 const LLMCataloguePage = lazy(() => import("@/pages/LLMCataloguePage"));
 // HR — migrated to capsule (PR #68). Mounted by <ModuleRoutes />
 // from `client/src/modules/hr/`.
-// OM / CV / PS Modules — top-level pages (auto-select default workspace)
-const OMTopLevelPage = lazy(() => import("@/pages/organization-management/OMTopLevelPage"));
+// OM — migrated to capsule (PR #69). Mounted by <ModuleRoutes />
+// from `client/src/modules/organization-management/`.
 const CVTopLevelPage = lazy(() => import("@/pages/culture-values/CVTopLevelPage"));
 // PRM — migrated to capsule (PR #65). Mounted by <ModuleRoutes />
 // from `client/src/modules/prm/`.
@@ -283,9 +283,8 @@ function Router() {
       <Route path="/ws/catalog" component={() => <ProtectedRoute component={WSCatalogPage} />} />
       {/* HR — migrated to capsule (PR #68). Routes /hr/* now rendered
           by <ModuleRoutes /> via the capsule manifest. */}
-      {/* Organization Management — top-level (auto-selects default workspace) */}
-      <Route path="/om/:item" component={() => <ProtectedRoute component={OMTopLevelPage} />} />
-      <Route path="/om" component={() => <ProtectedRoute component={OMTopLevelPage} />} />
+      {/* OM — migrated to capsule (PR #69). Routes /om/* now rendered
+          by <ModuleRoutes /> via the capsule manifest. */}
       {/* Culture Values — top-level (auto-selects default workspace) */}
       <Route path="/cv/:item" component={() => <ProtectedRoute component={CVTopLevelPage} />} />
       <Route path="/cv" component={() => <ProtectedRoute component={CVTopLevelPage} />} />

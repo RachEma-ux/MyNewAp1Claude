@@ -77,12 +77,12 @@ import { WSRulesPage } from "@/pages/workspace/WSRulesPage";
 import { OversightPage } from "@/pages/workspace/OversightPage";
 
 // OM — Organization Management
-import { OMPortfolioPage } from "@/pages/organization-management/OMPortfolioPage";
-import { OMControlPanelPage } from "@/pages/organization-management/OMControlPanelPage";
-import { OMListPage } from "@/pages/organization-management/OMListPage";
-import { OMWizardPage } from "@/pages/organization-management/OMWizardPage";
-import { OMSettingsPage } from "@/pages/organization-management/OMSettingsPage";
-import { OMTemplatesPage } from "@/pages/organization-management/OMTemplatesPage";
+import { OMPortfolioPage } from "@/modules/organization-management/pages/OMPortfolioPage";
+import { OMControlPanelPage } from "@/modules/organization-management/pages/OMControlPanelPage";
+import { OMListPage } from "@/modules/organization-management/pages/OMListPage";
+import { OMWizardPage } from "@/modules/organization-management/pages/OMWizardPage";
+import { OMSettingsPage } from "@/modules/organization-management/pages/OMSettingsPage";
+import { OMTemplatesPage } from "@/modules/organization-management/pages/OMTemplatesPage";
 
 // CV — Culture Values
 import { CVPortfolioPage } from "@/pages/culture-values/CVPortfolioPage";

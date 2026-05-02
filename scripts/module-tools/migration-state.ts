@@ -123,17 +123,29 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * detail deep link), method detail and run detail deep links, AI
  * catalog, admin, and analytics.
  *
- * Phase 3.7 (this PR): HR migrates to the capsule shape, adding
+ * Phase 3.7 (PR #68): HR migrated to the capsule shape, adding
  * `hr` as the eighth migrated module. HR is the largest surface
- * yet — 55 canonical paths spanning section landings, employee
+ * yet — 54 canonical paths spanning section landings, employee
  * self-service, admin/role-gated pages, Phase-4 expansion leaves,
  * and role-definitions deep links. The `HrGate` / `hrGated`
  * gating helpers — previously inlined in `App.tsx` — moved into
  * `client/src/modules/hr/components/HrGate.tsx`. The shared
  * `useHrRole` hook stays in `client/src/hooks/` because non-module
- * platform code (MainLayout, HRSideNav) also reads it. Frontend
- * modularity checks now run strict for the eight migrated modules;
- * the remaining 7 RTLMs continue in report-only mode until their
+ * platform code (MainLayout, HRSideNav) also reads it.
+ *
+ * Phase 3.8 (this PR): Organization Management migrates to the
+ * capsule shape, adding `organizationManagement` as the ninth
+ * migrated module. OM owns 7 canonical paths (`/om` plus 6 item
+ * slugs: portfolio, control-panel, wizard, list, settings,
+ * templates) — `OMTopLevelPage` is a single dispatcher that reads
+ * `useParams().item` and renders the matching sub-page. Server
+ * `organization-management/manifest.ts` had a stale `routes:`
+ * declaration of `/organization` (legacy mismatch); fixed to `/om`
+ * to match the canonical baseRoute (PR #61/#63 pattern).
+ * `WorkspaceExecutionShell.tsx` import paths updated to
+ * `@/modules/organization-management/pages/...`. Frontend
+ * modularity checks now run strict for the nine migrated modules;
+ * the remaining 6 RTLMs continue in report-only mode until their
  * own migration PRs land.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
@@ -145,6 +157,7 @@ export const MIGRATED_MODULES: RtlmKey[] = [
   "prm",
   "psm",
   "hr",
+  "organizationManagement",
 ];
 
 /**

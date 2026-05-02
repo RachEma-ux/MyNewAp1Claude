@@ -37,7 +37,7 @@ export const omManifest: ModuleManifest = {
     },
   ],
 
-  routes: [{ path: "/organization", label: "Organization" }],
+  routes: [{ path: "/om", label: "Organization" }],
   navigation: [{ group: "people", label: "Organization", order: 11 }],
 
   boot: async (ctx) => {
