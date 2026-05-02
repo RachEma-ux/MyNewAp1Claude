@@ -30,7 +30,7 @@ Use the coordinator only when the flow becomes a real multi-module workflow:
 
 | Source          | Target          | Lane         | Governance           | Notes                                                  |
 |-----------------|-----------------|--------------|----------------------|--------------------------------------------------------|
-| PS              | PM Central      | handoff      | required             | Project ideation handoff. No coordinator unless multi-step. |
+| PS              | PM Central      | handoff      | required             | PS approves a project (`VALIDATED`), the PS pm-bridge submits `pmCentral.project.receiveFromPS` then converts via `pmCentral.handoffs.convertToProject`. PS performs no PMDB writes. |
 | PS              | Coordinator     | coordinator  | required             | Only for multi-module flows after handoff is accepted. |
 | PM Central      | Code Studio     | handoff      | required             | "Build this" handoff.                                  |
 | Agent Studio    | Code Studio     | gateway      | required             | Run a coding skill on behalf of agent.                 |
@@ -48,6 +48,8 @@ Use the coordinator only when the flow becomes a real multi-module workflow:
 | Any module      | Communication   | handoff      | none for `notification.create` | Send a user notification: `communication.notification.create` (also exposed via gateway). |
 | Any module      | Communication   | handoff      | none for `meeting.schedule` | Schedule an external/embedded meeting: `communication.meeting.schedule`. |
 | Communication   | All modules     | event        | none                 | `communication.message.sent`, `communication.notification.created`, `communication.conversation.*`, `communication.meeting.*` — fan-out to subscribers (HQ, agents, audit). |
+| Any module      | PM Central      | gateway      | receipt for `pm.handoff.convert`, `pm.project.archive`, `pm.project.status.update`, `pm.plan.approve` | Create/update PM records exclusively through `pmCentral.*` gateway actions. Direct PMDB writes from non-PM modules are forbidden. |
+| PM Central      | All modules     | event        | none                 | `pm.project.*`, `pm.task.*`, `pm.milestone.*`, `pm.handoff.*` etc. — fan-out to subscribers (HQ, governance, audit). |
 
 ## Forbidden flows
 

@@ -104,3 +104,57 @@ domain into a single owned module, **Communication**.
    and `server/agents/executor.ts` keep working unchanged. After this
    migration, no application code reads or writes the legacy
    `conversations`/`messages` tables — Communication is the sole writer.
+
+## Case study: PM Central (project management RTLM)
+
+**Driver.** PM Central existed only as a UI/navigation section
+(`PM_NAV_CONFIG`, `client/src/pages/pm-central/*`, `PMCentralShellPage`) with
+no registered backend module. PS → PM bridge wrote directly into
+`pmt_projects` (a `server/modules/pmt/schema` table belonging to a different
+platform engine). This violated the modular boundary: PS was writing PM data
+through a non-PM owner, and there was no canonical PM RTLM.
+
+**Result.**
+
+- New module `server/pm-central/` owns dedicated `pmdb` (9 tables: `pm_projects`,
+  `pm_plans`, `pm_milestones`, `pm_tasks`, `pm_risks`, `pm_issues`,
+  `pm_decisions`, `pm_handoffs`, `pm_activity_log`).
+- One canonical service: `server/pm-central/pm.service.ts`. The tRPC router
+  (`appRouter.pmCentral`) and the gateway public-API both call into it.
+- Twelve gateway public-API actions; four governance-receipted
+  (`pm.project.archive`, `pm.project.status.update`, `pm.plan.approve`,
+  `pm.handoff.convert`).
+- Two accepted handoff types (`pmCentral.project.receiveFromPS`,
+  `pmCentral.project.convertFromPS`).
+- Sixteen emitted events, all namespaced `pm.*`.
+- Frontend RTLM module mounted at `/pm-central/rtlm/*` (10 pages + 6 shared
+  components). Existing `PMCentralShellPage` routes stay intact for back-compat.
+- `server/ps/ps.pm-bridge.ts` rewritten so it (a) submits a handoff payload,
+  (b) calls the convert path, (c) links the new `pm_projects.id` onto the PS
+  row. PS no longer writes any PM table directly.
+
+**Deviations from spec, with rationale.**
+
+1. **Base route `/pm-central` instead of `/pm`.** Existing UI had 30+ live
+   `/pm-central/*` routes wired before this module was registered. Switching
+   to `/pm` would have broken the live UI. New canonical RTLM pages live
+   under `/pm-central/rtlm/*` to avoid colliding with the legacy
+   `PMCentralShellPage` catch-all.
+2. **Legacy `pmt_projects` retained.** The `server/modules/pmt` platform
+   engine (a different subsystem) keeps its `pmt_projects` table. PS no
+   longer writes there — only the pmt engine itself does. Migrating the pmt
+   engine to PM Central reads is tracked as a separate follow-up.
+
+**Lessons for the next migration.**
+
+1. **Audit existing UI before picking a base route.** A naïve `/pm` would
+   have orphaned every `/pm-central/*` link. The architecture-consistent
+   choice was to keep the existing prefix and namespace new RTLM pages
+   under `/<base>/rtlm/*`.
+2. **Refactor cross-module write paths first.** The PS pm-bridge had to flip
+   from direct write to handoff *before* anything else could trust the
+   boundary. The five-place registration came second.
+3. **Two handoff types are sometimes worth it.** `receiveFromPS` is for
+   queued review; `convertFromPS` is the auto-accept variant for trusted
+   producers. PS bridge uses the second; UIs that queue work for review
+   would use the first.

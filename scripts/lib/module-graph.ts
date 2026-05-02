@@ -125,6 +125,12 @@ export const MODULE_MAP: ModuleDescriptor[] = [
     privateSchemas: ["communicationdb"],
     connectionAccessors: ["getCommunicationDb"],
   },
+  {
+    key: "pmCentral",
+    folder: "pm-central",
+    privateSchemas: ["pmdb"],
+    connectionAccessors: ["getPmDb"],
+  },
 ];
 
 /** Files that — regardless of their location — are public per-module. */

@@ -1,16 +1,16 @@
 # Application Wiring Inventory
 
-Generated: 2026-05-01T23:07:17.559Z
+Generated: 2026-05-02T02:08:15.251Z
 
 ## Summary
 
-- Modules: **14**
-- Fully wired: **8**
+- Modules: **15**
+- Fully wired: **9**
 - Mostly wired: **6**
 - Partially wired: **0**
 - Declared only: **0**
 - Blocked: **0**
-- Average readiness score: **91**
+- Average readiness score: **92**
 - Blockers: **0**
 - Warnings: **5**
 - Missing required wires: **0**
@@ -33,6 +33,7 @@ Generated: 2026-05-01T23:07:17.559Z
 | AI Types (aiTypes) | 94 | fully-wired | 0 | 1 |
 | KGRA Agent (kgraAgent) | 85 | mostly-wired | 0 | 1 |
 | Communication (communication) | 94 | fully-wired | 0 | 1 |
+| PM Central (pmCentral) | 96 | fully-wired | 0 | 0 |
 
 ## Wiring matrix
 
@@ -54,6 +55,7 @@ Status legend: ✅ wired · 🟡 partial · ⚪ declared-only · 🚫 missing/br
 | aiTypes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ⚪ | ✅ | ✅ | 🚫 |
 | kgraAgent | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ⚪ | ✅ | 🚫 | 🚫 |
 | communication | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ⚪ | ✅ | ✅ | 🚫 |
+| pmCentral | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | 🚫 |
 
 ## Warnings
 

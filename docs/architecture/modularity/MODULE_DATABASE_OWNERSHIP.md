@@ -22,6 +22,7 @@ module. Cross-module SQL is forbidden — see `FORBIDDEN_ACCESS_AUDIT.md`.
 | CV                 | `appdb` (cv tables)   | shares `getDb` — target `cvdb`              | Schema today      |
 | OpenRouter         | `appdb`               | shares `getDb`                              | Schema today      |
 | Communication      | `communicationdb`     | `server/communication/connection.ts` (`getCommunicationDb`) | Owned |
+| PM Central         | `pmdb`                | `server/pm-central/connection.ts` (`getPmDb`) | Owned |
 
 ## Rules
 
@@ -48,3 +49,4 @@ module. Cross-module SQL is forbidden — see `FORBIDDEN_ACCESS_AUDIT.md`.
 | Sandbox WF  | `DATABASE_URL_WFDB`        | `${DATABASE_URL → /wfdb}`                                   |
 | RAG         | `DATABASE_URL_RAGDB`       | `${DATABASE_URL → /ragdb}`                                  |
 | Communication | `DATABASE_URL_COMMUNICATIONDB` | `${DATABASE_URL → /communicationdb}`                  |
+| PM Central  | `DATABASE_URL_PMDB`        | `${DATABASE_URL → /pmdb}`                                   |
