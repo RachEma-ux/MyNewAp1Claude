@@ -11,7 +11,7 @@ import MainLayout from "./components/MainLayout";
 import InstallPrompt from "./components/InstallPrompt";
 import { trpc } from "@/lib/trpc";
 import { PMCentralChatWindow } from "./components/pm/PMCentralChatWindow";
-import { AgentStudioChatWindow } from "./components/agent-studio/AgentStudioChatWindow";
+import { AgentStudioChatWindow } from "@/modules/agent-studio";
 // Frontend module manifests — side-effectful registration into the
 // client module registry. Compat mode: <ModuleRoutes /> is appended
 // after the existing Switch entries, so existing routes win and
@@ -177,8 +177,8 @@ const IdeaBuilderWizard = lazy(() => import("@/pages/pm-central/IdeaBuilderWizar
 // The legacy /pm-central/* shell (PMCentralShellPage and friends
 // imported above) is NOT a PM Central RTLM canonical surface and
 // continues to be mounted directly here.
-// AI Agent Studio — Standalone agent lifecycle module
-const AgentStudioShellPage = lazy(() => import("@/pages/agent-studio/AgentStudioShellPage"));
+// Agent Studio — migrated to capsule (PR #73). Mounted by <ModuleRoutes />
+// from `client/src/modules/agent-studio/`.
 // KGIA — Knowledge Graph Interpretation Agent
 const KGIAShellPage = lazy(() => import("@/pages/kgia/KGIAShellPage"));
 // OpenRouter — migrated to capsule (PR #72). Mounted by <ModuleRoutes />
@@ -301,20 +301,8 @@ function Router() {
           by <ModuleRoutes /> via the capsule manifest. */}
       {/* Code Studio — migrated to capsule (PR #62). Routes /code-studio/*
           now rendered by <ModuleRoutes /> via the capsule manifest. */}
-      {/* AI Agent Studio — Standalone agent lifecycle module (shell handles internal routing) */}
-      {/* Order matters in wouter — literal sub-routes must precede :agentId patterns */}
-      <Route path="/agent-studio/new" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      <Route path="/agent-studio/templates" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      <Route path="/agent-studio/import" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      <Route path="/agent-studio/catalog/:section" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      <Route path="/agent-studio/catalog" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      <Route path="/agent-studio/marketplace" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      {/* Deeper sub-routes (3 segments) must come before generic :section catch */}
-      <Route path="/agent-studio/:agentId/runs/:runId" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      <Route path="/agent-studio/:agentId/versions/compare" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      <Route path="/agent-studio/:agentId/:section" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      <Route path="/agent-studio/:agentId" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
-      <Route path="/agent-studio" component={() => <ProtectedRoute component={AgentStudioShellPage} />} />
+      {/* Agent Studio — migrated to capsule (PR #73). Routes /agent-studio/*
+          now rendered by <ModuleRoutes /> via the capsule manifest. */}
       {/* Projects System — migrated to capsule (PR #63). Routes /ps/*
           now rendered by <ModuleRoutes /> via the capsule manifest. */}
       {/* KGIA — Knowledge Graph Interpretation Agent (shell handles internal routing) */}

@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T20:35:20.423Z
+Generated: 2026-05-02T20:53:31.669Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **195**
+Total `<Route>` declarations in App.tsx: **184**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -26,7 +26,7 @@ Compatibility redirects in App.tsx: **25**
 | culture-values | 0 | 4 | 3 | 0 |
 | ai-types | 0 | 13 | 7 | 0 |
 | openrouter | 0 | 9 | 9 | 0 |
-| agent-studio | 7 | 0 | 0 | 4 |
+| agent-studio | 0 | 11 | 6 | 0 |
 | sandbox-wf | 3 | 0 | 0 | 4 |
 | kgra-agent | 1 | 0 | 0 | 4 |
 
@@ -34,13 +34,17 @@ Compatibility redirects in App.tsx: **25**
 
 | Path | Sources |
 |---|---|
-| `/agent-studio` | App.tsx, manifest:agent-studio |
-| `/agent-studio/:agentId` | App.tsx, manifest:agent-studio |
-| `/agent-studio/catalog` | App.tsx, manifest:agent-studio |
-| `/agent-studio/import` | App.tsx, manifest:agent-studio |
-| `/agent-studio/marketplace` | App.tsx, manifest:agent-studio |
-| `/agent-studio/new` | App.tsx, manifest:agent-studio |
-| `/agent-studio/templates` | App.tsx, manifest:agent-studio |
+| `/agent-studio` | routeInventory:agent-studio, routes.tsx:agent-studio |
+| `/agent-studio/:agentId` | routeInventory:agent-studio, routes.tsx:agent-studio |
+| `/agent-studio/:agentId/:section` | routeInventory:agent-studio, routes.tsx:agent-studio |
+| `/agent-studio/:agentId/runs/:runId` | routeInventory:agent-studio, routes.tsx:agent-studio |
+| `/agent-studio/:agentId/versions/compare` | routeInventory:agent-studio, routes.tsx:agent-studio |
+| `/agent-studio/catalog` | routeInventory:agent-studio, routes.tsx:agent-studio |
+| `/agent-studio/catalog/:section` | routeInventory:agent-studio, routes.tsx:agent-studio |
+| `/agent-studio/import` | routeInventory:agent-studio, routes.tsx:agent-studio |
+| `/agent-studio/marketplace` | routeInventory:agent-studio, routes.tsx:agent-studio |
+| `/agent-studio/new` | routeInventory:agent-studio, routes.tsx:agent-studio |
+| `/agent-studio/templates` | routeInventory:agent-studio, routes.tsx:agent-studio |
 | `/ai-types` | routeInventory:ai-types, routes.tsx:ai-types |
 | `/ai-types/agents` | routeInventory:ai-types, routes.tsx:ai-types |
 | `/ai-types/bots` | routeInventory:ai-types, routes.tsx:ai-types |
@@ -214,10 +218,8 @@ Compatibility redirects in App.tsx: **25**
 | `/404` | unknown | — |  |
 | `/agent-dashboard` | unknown | — |  |
 | `/agent-detail/:id` | unknown | — |  |
-| `/agent-studio/:agentId/:section` | unknown | agentStudio |  |
-| `/agent-studio/:agentId/runs/:runId` | unknown | agentStudio |  |
-| `/agent-studio/:agentId/versions/compare` | unknown | agentStudio |  |
-| `/agent-studio/catalog/:section` | unknown | agentStudio |  |
+| `/agent-studio/catalog/skills` | module-nav | agentStudio | nav points to a path no manifest declares |
+| `/agent-studio/catalog/tools` | module-nav | agentStudio | nav points to a path no manifest declares |
 | `/agents` | unknown | — |  |
 | `/agents/:agentId/chat` | unknown | — |  |
 | `/agents/:id` | unknown | — |  |
@@ -387,7 +389,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | culture-values | ✅ | ✅ | ✅ | ✅ | ✅ |
 | ai-types | ✅ | ✅ | ✅ | ✅ | ✅ |
 | openrouter | ✅ | ✅ | ✅ | ✅ | ✅ |
-| agent-studio | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| agent-studio | ✅ | ✅ | ✅ | ✅ | ✅ |
 | sandbox-wf | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | kgra-agent | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 

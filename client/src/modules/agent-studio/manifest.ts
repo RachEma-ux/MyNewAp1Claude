@@ -1,24 +1,64 @@
 /**
- * Agent Studio — Frontend Module Manifest
+ * Agent Studio — Frontend Module Manifest (capsule shape).
+ *
+ * Agent Studio is the thirteenth Module Client Capsule. The
+ * manifest:
+ *   - declares the canonical subtree (`/agent-studio`)
+ *   - points at `mod.tsx` as the capsule entrypoint
+ *   - lists every canonical path under `routeInventory`
+ *
+ * Agent Studio uses an in-capsule `AgentStudioShell` that drives an
+ * S1 sidebar + top action bar + right oversight drawer + bottom
+ * status bar, and dispatches to one of ~20 views by parsing
+ * `useLocation()` (home, new, templates, import, catalog/skills,
+ * catalog/tools, marketplace, mcp-manager, plus per-agent: overview,
+ * identity, behavior, prompts, tools, knowledge, memory, workflows,
+ * governance, simulation, testing, runs, versions, publish, runtime,
+ * hooks, mcp, subagents, chat).
+ *
+ * App.tsx no longer mounts Agent Studio canonical pages. The capsule
+ * renders via `<ModuleRoutes />` once `client.ts` registers this
+ * manifest. App.tsx still mounts an `AgentStudioChatFAB` overlay
+ * that imports `AgentStudioChatWindow` through the capsule's public
+ * `index.ts` so the chat window stays available across all
+ * `/agent-studio/*` routes — the public-export path keeps it
+ * boundary-clean.
  */
 
 import { lazy } from "react";
+
 import type { ClientModuleManifest } from "@/platform/modules/types";
 
-const AgentStudioShellPage = lazy(() => import("@/pages/agent-studio/AgentStudioShellPage"));
+const AgentStudioCapsule = lazy(() => import("./mod"));
 
 export const agentStudioClientManifest: ClientModuleManifest = {
   key: "agentStudio",
   name: "Agent Studio",
-  routes: [
-    { path: "/agent-studio", label: "Agent Studio", component: AgentStudioShellPage },
-    { path: "/agent-studio/new", label: "New Agent", component: AgentStudioShellPage },
-    { path: "/agent-studio/templates", label: "Templates", component: AgentStudioShellPage },
-    { path: "/agent-studio/import", label: "Import", component: AgentStudioShellPage },
-    { path: "/agent-studio/catalog", label: "Catalog", component: AgentStudioShellPage },
-    { path: "/agent-studio/marketplace", label: "Marketplace", component: AgentStudioShellPage },
-    { path: "/agent-studio/:agentId", label: "Agent Detail", component: AgentStudioShellPage },
+
+  /* ---- Capsule fields (Phase-1+) ---- */
+  baseRoute: "/agent-studio",
+  capsuleEntrypoint: AgentStudioCapsule,
+  layoutMode: "inside-main-layout",
+  routeInventory: [
+    "/agent-studio",
+    "/agent-studio/new",
+    "/agent-studio/templates",
+    "/agent-studio/import",
+    "/agent-studio/catalog",
+    "/agent-studio/catalog/:section",
+    "/agent-studio/marketplace",
+    "/agent-studio/:agentId",
+    "/agent-studio/:agentId/:section",
+    "/agent-studio/:agentId/runs/:runId",
+    "/agent-studio/:agentId/versions/compare",
   ],
-  navigation: [{ group: "build", label: "Agent Studio", order: 20 }],
+  compatibilityRoutes: [],
+  deprecatedRoutes: [],
+
+  routes: [],
+
+  navigation: [
+    { group: "build", label: "Agent Studio", order: 20 },
+  ],
   requiredPermissions: ["agentStudio.read"],
 };

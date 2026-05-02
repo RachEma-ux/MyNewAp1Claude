@@ -163,7 +163,7 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * at `client/src/pages/AITypesPage.tsx`) covers six legacy slugs
  * (`catalog`, `providers`, `llms`, `models`, `agents`, `bots`).
  *
- * Phase 3.11 (this PR): OpenRouter migrates to the capsule shape,
+ * Phase 3.11 (PR #72): OpenRouter migrated to the capsule shape,
  * adding `openRouter` as the twelfth migrated module. OpenRouter
  * owns 9 canonical paths (`/openrouter` plus 8 view slugs: connect,
  * models, routing, guardrails, playground, usage, health,
@@ -175,10 +175,29 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * `openrouter/manifest.ts` already declared
  * `routes: [{ path: "/openrouter" }]` consistent with the capsule
  * baseRoute, so no server-manifest stale-route fix was needed.
- * Frontend modularity checks now run strict for the twelve
- * migrated modules; the remaining 3 RTLMs (agentStudio, sandboxWf,
- * kgraAgent) continue in report-only mode until their own
- * migration PRs land.
+ *
+ * Phase 3.12 (this PR): Agent Studio migrates to the capsule shape,
+ * adding `agentStudio` as the thirteenth migrated module. Agent
+ * Studio owns 11 canonical path patterns (`/agent-studio` plus
+ * literal sub-routes new/templates/import/catalog/marketplace,
+ * the deep-link patterns `/:agentId/runs/:runId` and
+ * `/:agentId/versions/compare`, and the generic catch-alls
+ * `/:agentId/:section` and `/:agentId`). Same in-capsule shell
+ * pattern as AI Types / OpenRouter / Code Studio:
+ * `AgentStudioShell` already drove the S1 sidebar + top-action-bar
+ * + right-oversight-drawer + bottom-status-bar layout and parses
+ * the URL itself to dispatch among ~20 internal views. The legacy
+ * 9-line `AgentStudioShellPage.tsx` wrapper is dropped — `mod.tsx`
+ * carries the `flex/calc(100vh - 4rem)` chrome. The capsule
+ * exposes `AgentStudioChatWindow` via its public `index.ts` so
+ * App.tsx can mount the studio chat FAB above all
+ * `/agent-studio/*` routes without breaking the no-private-import
+ * boundary rule. Server `agent-studio/manifest.ts` already
+ * declared `routes:` consistent with the capsule baseRoute.
+ * Frontend modularity checks now run strict for the thirteen
+ * migrated modules; the remaining 2 RTLMs (sandboxWf, kgraAgent)
+ * continue in report-only mode until their own migration PRs
+ * land.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
   "communication",
@@ -193,6 +212,7 @@ export const MIGRATED_MODULES: RtlmKey[] = [
   "cultureValues",
   "aiTypes",
   "openRouter",
+  "agentStudio",
 ];
 
 /**
