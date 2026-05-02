@@ -117,13 +117,24 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * cases (incl. case workspace deep link), method library, playbooks,
  * catalog, AI catalog, and control panel.
  *
- * Phase 3.6 (this PR): PSM migrates to the capsule shape, adding
+ * Phase 3.6 (PR #67): PSM migrated to the capsule shape, adding
  * `psm` as the seventh migrated module. PSM owns problem-solving
  * methods: dashboard, method library, selector, cases (incl. case
  * detail deep link), method detail and run detail deep links, AI
- * catalog, admin, and analytics. Frontend modularity checks now run
- * strict for the seven migrated modules; the remaining 8 RTLMs
- * continue in report-only mode until their own migration PRs land.
+ * catalog, admin, and analytics.
+ *
+ * Phase 3.7 (this PR): HR migrates to the capsule shape, adding
+ * `hr` as the eighth migrated module. HR is the largest surface
+ * yet — 55 canonical paths spanning section landings, employee
+ * self-service, admin/role-gated pages, Phase-4 expansion leaves,
+ * and role-definitions deep links. The `HrGate` / `hrGated`
+ * gating helpers — previously inlined in `App.tsx` — moved into
+ * `client/src/modules/hr/components/HrGate.tsx`. The shared
+ * `useHrRole` hook stays in `client/src/hooks/` because non-module
+ * platform code (MainLayout, HRSideNav) also reads it. Frontend
+ * modularity checks now run strict for the eight migrated modules;
+ * the remaining 7 RTLMs continue in report-only mode until their
+ * own migration PRs land.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
   "communication",
@@ -133,6 +144,7 @@ export const MIGRATED_MODULES: RtlmKey[] = [
   "ps",
   "prm",
   "psm",
+  "hr",
 ];
 
 /**

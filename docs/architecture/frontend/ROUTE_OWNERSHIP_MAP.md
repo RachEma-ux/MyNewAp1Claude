@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T17:58:33.193Z
+Generated: 2026-05-02T18:16:37.837Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -9,12 +9,12 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | Status | Count |
 |---|---|
-| ✅ canonical | 103 |
+| ✅ canonical | 153 |
 | ↪️ compatibility-redirect | 22 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
 | ⚠️ orphan | 0 |
-| ❓ unknown | 198 |
+| ❓ unknown | 148 |
 | **Total** | **337** |
 
 ## Per-RTLM
@@ -28,7 +28,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | ps | ✅ migrated | 15 | `/ps` |
 | prm | ✅ migrated | 18 | `/prm` |
 | psm | ✅ migrated | 18 | `/psm` |
-| hr | ⏳ pending | 4 | `—` |
+| hr | ✅ migrated | 55 | `/hr` |
 | organizationManagement | ⏳ pending | 2 | `—` |
 | cultureValues | ⏳ pending | 2 | `—` |
 | aiTypes | ⏳ pending | 2 | `—` |
@@ -156,60 +156,60 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/governance/scorecard` | platform-core | app-platform-core | `GovernanceScorecard` | 🏛 platform-core |  |
 | `/hardware` | — | unknown | — | ❓ unknown |  |
 | `/hq/:item` | platform-core | app-platform-core | `DigitalHQPage` | 🏛 platform-core |  |
-| `/hr` | hr | module-manifest | `HRHomePage` | ✅ canonical |  |
-| `/hr/analytics` | hr | unknown | — | ❓ unknown |  |
-| `/hr/analytics-reporting` | hr | unknown | — | ❓ unknown |  |
-| `/hr/benefits` | hr | unknown | — | ❓ unknown |  |
-| `/hr/certifications` | hr | unknown | — | ❓ unknown |  |
-| `/hr/compensation` | hr | unknown | — | ❓ unknown |  |
-| `/hr/compensation-benefits` | hr | unknown | — | ❓ unknown |  |
-| `/hr/compliance` | hr | unknown | — | ❓ unknown |  |
-| `/hr/compliance-mgmt` | hr | unknown | — | ❓ unknown |  |
-| `/hr/compliance/risk-management` | hr | unknown | — | ❓ unknown |  |
-| `/hr/directory` | hr | module-manifest | `HrDirectoryGated` | ✅ canonical |  |
-| `/hr/employee-records` | hr | unknown | — | ❓ unknown |  |
-| `/hr/employee-records/letters-certificates` | hr | unknown | — | ❓ unknown |  |
-| `/hr/employee-records/work-permits` | hr | unknown | — | ❓ unknown |  |
-| `/hr/employee-relations` | hr | unknown | — | ❓ unknown |  |
-| `/hr/engagement` | hr | unknown | — | ❓ unknown |  |
-| `/hr/goals` | hr | unknown | — | ❓ unknown |  |
-| `/hr/grievances` | hr | unknown | — | ❓ unknown |  |
-| `/hr/incidents` | hr | unknown | — | ❓ unknown |  |
-| `/hr/learning-development` | hr | unknown | — | ❓ unknown |  |
-| `/hr/leave` | hr | unknown | — | ❓ unknown |  |
-| `/hr/lifecycle` | hr | unknown | — | ❓ unknown |  |
-| `/hr/offboarding` | hr | unknown | — | ❓ unknown |  |
-| `/hr/onboarding` | hr | unknown | — | ❓ unknown |  |
-| `/hr/organization` | hr | module-manifest | `HrOrganizationGated` | ✅ canonical |  |
-| `/hr/overtime` | hr | unknown | — | ❓ unknown |  |
-| `/hr/performance-talent` | hr | unknown | — | ❓ unknown |  |
-| `/hr/policies` | hr | unknown | — | ❓ unknown |  |
-| `/hr/positions` | hr | unknown | — | ❓ unknown |  |
-| `/hr/recruitment` | hr | unknown | — | ❓ unknown |  |
-| `/hr/reports` | hr | module-manifest | `HrReportsGated` | ✅ canonical |  |
-| `/hr/reviews` | hr | unknown | — | ❓ unknown |  |
-| `/hr/role-definitions` | hr | unknown | — | ❓ unknown |  |
-| `/hr/role-definitions/:id` | hr | unknown | — | ❓ unknown |  |
-| `/hr/role-definitions/:id/compare` | hr | unknown | — | ❓ unknown |  |
-| `/hr/role-definitions/:id/edit` | hr | unknown | — | ❓ unknown |  |
-| `/hr/role-definitions/new` | hr | unknown | — | ❓ unknown |  |
-| `/hr/role-definitions/review` | hr | unknown | — | ❓ unknown |  |
-| `/hr/security-access` | hr | unknown | — | ❓ unknown |  |
-| `/hr/security-access/access-controls` | hr | unknown | — | ❓ unknown |  |
-| `/hr/security-access/audit-logs` | hr | unknown | — | ❓ unknown |  |
-| `/hr/settings` | hr | unknown | — | ❓ unknown |  |
-| `/hr/shifts` | hr | unknown | — | ❓ unknown |  |
-| `/hr/skills` | hr | unknown | — | ❓ unknown |  |
-| `/hr/staffing` | hr | unknown | — | ❓ unknown |  |
-| `/hr/surveys` | hr | unknown | — | ❓ unknown |  |
-| `/hr/talent` | hr | unknown | — | ❓ unknown |  |
-| `/hr/talent-acquisition` | hr | unknown | — | ❓ unknown |  |
-| `/hr/time-attendance` | hr | unknown | — | ❓ unknown |  |
-| `/hr/timesheet` | hr | unknown | — | ❓ unknown |  |
-| `/hr/training` | hr | unknown | — | ❓ unknown |  |
-| `/hr/wellbeing-engagement` | hr | unknown | — | ❓ unknown |  |
-| `/hr/workforce-planning` | hr | unknown | — | ❓ unknown |  |
-| `/hr/workforce-planning/job-architecture` | hr | unknown | — | ❓ unknown |  |
+| `/hr` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/analytics` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/analytics-reporting` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/benefits` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/certifications` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/compensation` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/compensation-benefits` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/compliance` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/compliance-mgmt` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/compliance/risk-management` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/directory` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/employee-records` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/employee-records/letters-certificates` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/employee-records/work-permits` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/employee-relations` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/engagement` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/goals` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/grievances` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/incidents` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/learning-development` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/leave` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/lifecycle` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/offboarding` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/onboarding` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/organization` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/overtime` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/performance-talent` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/policies` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/positions` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/recruitment` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/reports` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/reviews` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/role-definitions` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/role-definitions/:id` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/role-definitions/:id/compare` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/role-definitions/:id/edit` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/role-definitions/new` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/role-definitions/review` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/security-access` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/security-access/access-controls` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/security-access/audit-logs` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/settings` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/shifts` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/skills` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/staffing` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/surveys` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/talent` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/talent-acquisition` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/time-attendance` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/timesheet` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/training` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/wellbeing-engagement` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/workforce-planning` | hr | module-manifest | `module:hr` | ✅ canonical |  |
+| `/hr/workforce-planning/job-architecture` | hr | module-manifest | `module:hr` | ✅ canonical |  |
 | `/inference` | — | unknown | — | ❓ unknown |  |
 | `/infrastructure/hardware/:category` | — | unknown | — | ❓ unknown |  |
 | `/infrastructure/software/:item` | — | unknown | — | ❓ unknown |  |
@@ -440,56 +440,6 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/error-analysis` | unknown | — |  |
 | `/governance-center/:item` | unknown | — |  |
 | `/hardware` | unknown | — |  |
-| `/hr/analytics` | unknown | hr |  |
-| `/hr/analytics-reporting` | unknown | hr |  |
-| `/hr/benefits` | unknown | hr |  |
-| `/hr/certifications` | unknown | hr |  |
-| `/hr/compensation` | unknown | hr |  |
-| `/hr/compensation-benefits` | unknown | hr |  |
-| `/hr/compliance` | unknown | hr |  |
-| `/hr/compliance-mgmt` | unknown | hr |  |
-| `/hr/compliance/risk-management` | unknown | hr |  |
-| `/hr/employee-records` | unknown | hr |  |
-| `/hr/employee-records/letters-certificates` | unknown | hr |  |
-| `/hr/employee-records/work-permits` | unknown | hr |  |
-| `/hr/employee-relations` | unknown | hr |  |
-| `/hr/engagement` | unknown | hr |  |
-| `/hr/goals` | unknown | hr |  |
-| `/hr/grievances` | unknown | hr |  |
-| `/hr/incidents` | unknown | hr |  |
-| `/hr/learning-development` | unknown | hr |  |
-| `/hr/leave` | unknown | hr |  |
-| `/hr/lifecycle` | unknown | hr |  |
-| `/hr/offboarding` | unknown | hr |  |
-| `/hr/onboarding` | unknown | hr |  |
-| `/hr/overtime` | unknown | hr |  |
-| `/hr/performance-talent` | unknown | hr |  |
-| `/hr/policies` | unknown | hr |  |
-| `/hr/positions` | unknown | hr |  |
-| `/hr/recruitment` | unknown | hr |  |
-| `/hr/reviews` | unknown | hr |  |
-| `/hr/role-definitions` | unknown | hr |  |
-| `/hr/role-definitions/:id` | unknown | hr |  |
-| `/hr/role-definitions/:id/compare` | unknown | hr |  |
-| `/hr/role-definitions/:id/edit` | unknown | hr |  |
-| `/hr/role-definitions/new` | unknown | hr |  |
-| `/hr/role-definitions/review` | unknown | hr |  |
-| `/hr/security-access` | unknown | hr |  |
-| `/hr/security-access/access-controls` | unknown | hr |  |
-| `/hr/security-access/audit-logs` | unknown | hr |  |
-| `/hr/settings` | unknown | hr |  |
-| `/hr/shifts` | unknown | hr |  |
-| `/hr/skills` | unknown | hr |  |
-| `/hr/staffing` | unknown | hr |  |
-| `/hr/surveys` | unknown | hr |  |
-| `/hr/talent` | unknown | hr |  |
-| `/hr/talent-acquisition` | unknown | hr |  |
-| `/hr/time-attendance` | unknown | hr |  |
-| `/hr/timesheet` | unknown | hr |  |
-| `/hr/training` | unknown | hr |  |
-| `/hr/wellbeing-engagement` | unknown | hr |  |
-| `/hr/workforce-planning` | unknown | hr |  |
-| `/hr/workforce-planning/job-architecture` | unknown | hr |  |
 | `/inference` | unknown | — |  |
 | `/infrastructure/hardware/:category` | unknown | — |  |
 | `/infrastructure/software/:item` | unknown | — |  |

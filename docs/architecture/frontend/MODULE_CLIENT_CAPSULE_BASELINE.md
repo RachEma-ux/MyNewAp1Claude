@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T17:58:33.199Z
+Generated: 2026-05-02T18:16:37.843Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **264**
+Total `<Route>` declarations in App.tsx: **210**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -21,7 +21,7 @@ Compatibility redirects in App.tsx: **25**
 | ps | 0 | 9 | 6 | 0 |
 | prm | 0 | 10 | 8 | 0 |
 | psm | 0 | 11 | 7 | 0 |
-| hr | 4 | 0 | 0 | 4 |
+| hr | 0 | 54 | 1 | 0 |
 | organization-management | 2 | 0 | 0 | 4 |
 | culture-values | 2 | 0 | 0 | 4 |
 | ai-types | 2 | 0 | 0 | 4 |
@@ -82,10 +82,60 @@ Compatibility redirects in App.tsx: **25**
 | `/data-analysis/data-warehouse` | routeInventory:data-analysis, routes.tsx:data-analysis |
 | `/data-analysis/graphrag` | routeInventory:data-analysis, routes.tsx:data-analysis |
 | `/data-analysis/kgra-agent` | App.tsx, manifest:kgra-agent |
-| `/hr` | App.tsx, manifest:hr |
-| `/hr/directory` | App.tsx, manifest:hr |
-| `/hr/organization` | App.tsx, manifest:hr |
-| `/hr/reports` | App.tsx, manifest:hr |
+| `/hr` | routeInventory:hr, routes.tsx:hr |
+| `/hr/analytics` | routeInventory:hr, routes.tsx:hr |
+| `/hr/analytics-reporting` | routeInventory:hr, routes.tsx:hr |
+| `/hr/benefits` | routeInventory:hr, routes.tsx:hr |
+| `/hr/certifications` | routeInventory:hr, routes.tsx:hr |
+| `/hr/compensation` | routeInventory:hr, routes.tsx:hr |
+| `/hr/compensation-benefits` | routeInventory:hr, routes.tsx:hr |
+| `/hr/compliance` | routeInventory:hr, routes.tsx:hr |
+| `/hr/compliance-mgmt` | routeInventory:hr, routes.tsx:hr |
+| `/hr/compliance/risk-management` | routeInventory:hr, routes.tsx:hr |
+| `/hr/directory` | routeInventory:hr, routes.tsx:hr |
+| `/hr/employee-records` | routeInventory:hr, routes.tsx:hr |
+| `/hr/employee-records/letters-certificates` | routeInventory:hr, routes.tsx:hr |
+| `/hr/employee-records/work-permits` | routeInventory:hr, routes.tsx:hr |
+| `/hr/employee-relations` | routeInventory:hr, routes.tsx:hr |
+| `/hr/engagement` | routeInventory:hr, routes.tsx:hr |
+| `/hr/goals` | routeInventory:hr, routes.tsx:hr |
+| `/hr/grievances` | routeInventory:hr, routes.tsx:hr |
+| `/hr/incidents` | routeInventory:hr, routes.tsx:hr |
+| `/hr/learning-development` | routeInventory:hr, routes.tsx:hr |
+| `/hr/leave` | routeInventory:hr, routes.tsx:hr |
+| `/hr/lifecycle` | routeInventory:hr, routes.tsx:hr |
+| `/hr/offboarding` | routeInventory:hr, routes.tsx:hr |
+| `/hr/onboarding` | routeInventory:hr, routes.tsx:hr |
+| `/hr/organization` | routeInventory:hr, routes.tsx:hr |
+| `/hr/overtime` | routeInventory:hr, routes.tsx:hr |
+| `/hr/performance-talent` | routeInventory:hr, routes.tsx:hr |
+| `/hr/policies` | routeInventory:hr, routes.tsx:hr |
+| `/hr/positions` | routeInventory:hr, routes.tsx:hr |
+| `/hr/recruitment` | routeInventory:hr, routes.tsx:hr |
+| `/hr/reports` | routeInventory:hr, routes.tsx:hr |
+| `/hr/reviews` | routeInventory:hr, routes.tsx:hr |
+| `/hr/role-definitions` | routeInventory:hr, routes.tsx:hr |
+| `/hr/role-definitions/:id` | routeInventory:hr, routes.tsx:hr |
+| `/hr/role-definitions/:id/compare` | routeInventory:hr, routes.tsx:hr |
+| `/hr/role-definitions/:id/edit` | routeInventory:hr, routes.tsx:hr |
+| `/hr/role-definitions/new` | routeInventory:hr, routes.tsx:hr |
+| `/hr/role-definitions/review` | routeInventory:hr, routes.tsx:hr |
+| `/hr/security-access` | routeInventory:hr, routes.tsx:hr |
+| `/hr/security-access/access-controls` | routeInventory:hr, routes.tsx:hr |
+| `/hr/security-access/audit-logs` | routeInventory:hr, routes.tsx:hr |
+| `/hr/settings` | routeInventory:hr, routes.tsx:hr |
+| `/hr/shifts` | routeInventory:hr, routes.tsx:hr |
+| `/hr/skills` | routeInventory:hr, routes.tsx:hr |
+| `/hr/staffing` | routeInventory:hr, routes.tsx:hr |
+| `/hr/surveys` | routeInventory:hr, routes.tsx:hr |
+| `/hr/talent` | routeInventory:hr, routes.tsx:hr |
+| `/hr/talent-acquisition` | routeInventory:hr, routes.tsx:hr |
+| `/hr/time-attendance` | routeInventory:hr, routes.tsx:hr |
+| `/hr/timesheet` | routeInventory:hr, routes.tsx:hr |
+| `/hr/training` | routeInventory:hr, routes.tsx:hr |
+| `/hr/wellbeing-engagement` | routeInventory:hr, routes.tsx:hr |
+| `/hr/workforce-planning` | routeInventory:hr, routes.tsx:hr |
+| `/hr/workforce-planning/job-architecture` | routeInventory:hr, routes.tsx:hr |
 | `/om` | App.tsx, manifest:organization-management |
 | `/om/:item` | App.tsx, manifest:organization-management |
 | `/openrouter` | App.tsx, manifest:openrouter |
@@ -199,56 +249,6 @@ Compatibility redirects in App.tsx: **25**
 | `/error-analysis` | unknown | — |  |
 | `/governance-center/:item` | unknown | — |  |
 | `/hardware` | unknown | — |  |
-| `/hr/analytics` | unknown | hr |  |
-| `/hr/analytics-reporting` | unknown | hr |  |
-| `/hr/benefits` | unknown | hr |  |
-| `/hr/certifications` | unknown | hr |  |
-| `/hr/compensation` | unknown | hr |  |
-| `/hr/compensation-benefits` | unknown | hr |  |
-| `/hr/compliance` | unknown | hr |  |
-| `/hr/compliance-mgmt` | unknown | hr |  |
-| `/hr/compliance/risk-management` | unknown | hr |  |
-| `/hr/employee-records` | unknown | hr |  |
-| `/hr/employee-records/letters-certificates` | unknown | hr |  |
-| `/hr/employee-records/work-permits` | unknown | hr |  |
-| `/hr/employee-relations` | unknown | hr |  |
-| `/hr/engagement` | unknown | hr |  |
-| `/hr/goals` | unknown | hr |  |
-| `/hr/grievances` | unknown | hr |  |
-| `/hr/incidents` | unknown | hr |  |
-| `/hr/learning-development` | unknown | hr |  |
-| `/hr/leave` | unknown | hr |  |
-| `/hr/lifecycle` | unknown | hr |  |
-| `/hr/offboarding` | unknown | hr |  |
-| `/hr/onboarding` | unknown | hr |  |
-| `/hr/overtime` | unknown | hr |  |
-| `/hr/performance-talent` | unknown | hr |  |
-| `/hr/policies` | unknown | hr |  |
-| `/hr/positions` | unknown | hr |  |
-| `/hr/recruitment` | unknown | hr |  |
-| `/hr/reviews` | unknown | hr |  |
-| `/hr/role-definitions` | unknown | hr |  |
-| `/hr/role-definitions/:id` | unknown | hr |  |
-| `/hr/role-definitions/:id/compare` | unknown | hr |  |
-| `/hr/role-definitions/:id/edit` | unknown | hr |  |
-| `/hr/role-definitions/new` | unknown | hr |  |
-| `/hr/role-definitions/review` | unknown | hr |  |
-| `/hr/security-access` | unknown | hr |  |
-| `/hr/security-access/access-controls` | unknown | hr |  |
-| `/hr/security-access/audit-logs` | unknown | hr |  |
-| `/hr/settings` | unknown | hr |  |
-| `/hr/shifts` | unknown | hr |  |
-| `/hr/skills` | unknown | hr |  |
-| `/hr/staffing` | unknown | hr |  |
-| `/hr/surveys` | unknown | hr |  |
-| `/hr/talent` | unknown | hr |  |
-| `/hr/talent-acquisition` | unknown | hr |  |
-| `/hr/time-attendance` | unknown | hr |  |
-| `/hr/timesheet` | unknown | hr |  |
-| `/hr/training` | unknown | hr |  |
-| `/hr/wellbeing-engagement` | unknown | hr |  |
-| `/hr/workforce-planning` | unknown | hr |  |
-| `/hr/workforce-planning/job-architecture` | unknown | hr |  |
 | `/inference` | unknown | — |  |
 | `/infrastructure/hardware/:category` | unknown | — |  |
 | `/infrastructure/software/:item` | unknown | — |  |
@@ -364,7 +364,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | ps | ✅ | ✅ | ✅ | ✅ | ✅ |
 | prm | ✅ | ✅ | ✅ | ✅ | ✅ |
 | psm | ✅ | ✅ | ✅ | ✅ | ✅ |
-| hr | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| hr | ✅ | ✅ | ✅ | ✅ | ✅ |
 | organization-management | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | culture-values | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | ai-types | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
