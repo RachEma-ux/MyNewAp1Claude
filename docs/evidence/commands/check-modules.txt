@@ -1,0 +1,16 @@
+# check:modules
+timestamp: 2026-05-02T21:48:47Z
+commit: 86a1ffe
+command: pnpm run check:modules
+---
+
+> mynewap1claude@1.0.0 check:modules /root/MyNewAp1Claude
+> tsx scripts/check-modules.ts
+
+[1/5] Checking manifest files exist…
+[2/5] Checking barrel files exist…
+[3/5] Loading manifest barrel + registry (may pull in module side-effects)…
+[4/5] Validating strong-module DB declarations and health()…
+[5/5] Validating MODULE_ROUTERS keys…
+OK — modules check passed.
+exit=0

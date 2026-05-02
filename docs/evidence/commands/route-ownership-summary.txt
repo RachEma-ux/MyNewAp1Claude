@@ -1,0 +1,23 @@
+# route-ownership-summary
+timestamp: 2026-05-02T22:03:31Z
+commit: 86a1ffe
+command: pnpm run generate:route-ownership-map
+---
+
+> mynewap1claude@1.0.0 generate:route-ownership-map /root/MyNewAp1Claude
+> tsx scripts/generate-route-ownership-map.ts
+
+Route Ownership Map
+===================
+App routes:           180
+Compatibility redirs: 25
+Manifests scanned:    15
+Total path rows:      357
+Duplicate paths:      175
+Cross-module trpc:    0
+MainLayout in modules:0
+
+Wrote:
+  docs/architecture/frontend/ROUTE_OWNERSHIP_MAP.md
+  docs/architecture/frontend/MODULE_CLIENT_CAPSULE_BASELINE.md
+exit=0

@@ -1,0 +1,11 @@
+# check:db-roles
+timestamp: 2026-05-02T21:49:19Z
+commit: 86a1ffe
+command: pnpm run check:db-roles
+---
+
+> mynewap1claude@1.0.0 check:db-roles /root/MyNewAp1Claude
+> tsx scripts/check-db-roles.ts
+
+[skip] check:db-roles — DATABASE_URL is not set. Local dev sandboxes are allowed.
+exit=0

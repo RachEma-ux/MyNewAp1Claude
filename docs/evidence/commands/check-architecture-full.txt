@@ -1,0 +1,377 @@
+# check:architecture:full
+timestamp: 2026-05-02T21:47:08Z
+commit: 86a1ffe4c2b5d17dad82fa81000ba4d8e7cee0d9
+branch: chore/production-readiness-verification
+command: pnpm run check:architecture:full
+---
+
+> mynewap1claude@1.0.0 check:architecture:full /root/MyNewAp1Claude
+> pnpm run check:architecture && pnpm run check:wiring && pnpm run check:ports && pnpm run check:awi && pnpm run check:frontend-modularity
+
+
+> mynewap1claude@1.0.0 check:architecture /root/MyNewAp1Claude
+> tsx scripts/check-architecture.ts
+
+
+=== check:modules ===
+[1/5] Checking manifest files exist…
+[2/5] Checking barrel files exist…
+[3/5] Loading manifest barrel + registry (may pull in module side-effects)…
+[4/5] Validating strong-module DB declarations and health()…
+[5/5] Validating MODULE_ROUTERS keys…
+OK — modules check passed.
+
+=== check:boundaries ===
+OK — boundary check passed (0 warning(s)).
+
+=== check:sql-boundaries ===
+OK — cross-module SQL/connection check passed.
+
+=== check:db-ownership ===
+OK — DB ownership check passed.
+
+=== check:coordinator-boundaries ===
+OK — coordinator boundary check passed.
+
+=== check:governance-actions ===
+OK — governance-actions: 58 declared, 58 covered, 0 uncovered (warning).
+
+=== check:db-roles ===
+[skip] check:db-roles — DATABASE_URL is not set. Local dev sandboxes are allowed.
+
+OK — all architecture checks passed.
+
+> mynewap1claude@1.0.0 check:wiring /root/MyNewAp1Claude
+> tsx scripts/check-module-wiring.ts && tsx scripts/check-gateway-wiring.ts && tsx scripts/check-event-wiring.ts && tsx scripts/check-handoff-wiring.ts && tsx scripts/check-frontend-module-wiring.ts && tsx scripts/check-runtime-wiring.ts && tsx scripts/check-coordinator-wiring.ts
+
+=== check:wiring (module level) ===
+
+# Module Wiring Report
+
+Generated: 2026-05-02T21:47:48.503Z
+
+## Totals
+
+- Modules tracked: **16**
+- Fully wired: **16**
+- Declared-only: **0**
+- Blockers: **0**
+- Follow-ups: **0**
+
+## Per-module status
+
+| Module | Manifest | Router | Runtime | DB | PublicAPI | Events | Handoffs | Routes | Gov | HQ |
+|---|---|---|---|---|---|---|---|---|---|---|
+| prm | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| psm | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| codeStudio | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| agentStudio | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| sandboxWf | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| rag | ✓ | ✗ | WIRED | WIRED | WIRED | WIRED | n/a | n/a | WIRED | WIRED |
+| openRouter | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| ps | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| hr | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| organizationManagement | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| cultureValues | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| aiTypes | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| kgraAgent | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+| communication | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| pmCentral | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED | WIRED |
+| dataAnalysis | ✓ | ✓ | WIRED | WIRED | WIRED | WIRED | n/a | WIRED | WIRED | WIRED |
+
+## Findings
+
+No findings. Every declared lane has a runtime registration.
+
+
+Report snapshot written to /root/MyNewAp1Claude/docs/architecture/modularity/MODULE_WIRING_REPORT.md
+
+OK — module wiring within tolerance.
+=== check:gateway-wiring ===
+
+Discovered 82 registerPublicApi() call(s).
+  agentStudio.agentStudio.agent.publish [receipt]  (server/agent-studio/boot.ts:89)
+  agentStudio.agentStudio.run.execute [receipt]  (server/agent-studio/boot.ts:110)
+  aiTypes.aiTypes.catalog.publish [receipt]  (server/ai-types/manifest.ts:55)
+  codeStudio.codeStudio.template.publish [receipt]  (server/code-studio/manifest.ts:69)
+  codeStudio.codeStudio.run.execute [receipt]  (server/code-studio/manifest.ts:84)
+  communication.communication.conversation.create  (server/communication/manifest.ts:138)
+  communication.communication.conversations.list  (server/communication/manifest.ts:175)
+  communication.communication.conversations.get  (server/communication/manifest.ts:195)
+  communication.communication.message.add  (server/communication/manifest.ts:209)
+  communication.communication.messages.list  (server/communication/manifest.ts:241)
+  communication.communication.chat.send  (server/communication/manifest.ts:259)
+  communication.communication.meeting.create  (server/communication/manifest.ts:302)
+  communication.communication.meetings.list  (server/communication/manifest.ts:345)
+  communication.communication.notification.create  (server/communication/manifest.ts:364)
+  communication.communication.notifications.list  (server/communication/manifest.ts:403)
+  communication.communication.conversation.delete [receipt]  (server/communication/manifest.ts:429)
+  communication.communication.message.delete [receipt]  (server/communication/manifest.ts:448)
+  communication.communication.meeting.cancel [receipt]  (server/communication/manifest.ts:467)
+  communication.communication.export [receipt]  (server/communication/manifest.ts:490)
+  communication.communication.health  (server/communication/manifest.ts:527)
+  cultureValues.cv.value.publish [receipt]  (server/culture-values/manifest.ts:50)
+  dataAnalysis.dataAnalysis.graphRag.workerStatus  (server/data-analysis/manifest.ts:244)
+  dataAnalysis.dataAnalysis.graphRag.listSources  (server/data-analysis/manifest.ts:255)
+  dataAnalysis.dataAnalysis.graphRag.listSyncRuns  (server/data-analysis/manifest.ts:264)
+  dataAnalysis.dataAnalysis.graphRag.listIndexRuns  (server/data-analysis/manifest.ts:274)
+  dataAnalysis.dataAnalysis.graphRag.listQueryRuns  (server/data-analysis/manifest.ts:284)
+  dataAnalysis.dataAnalysis.graphRag.registerSource  (server/data-analysis/manifest.ts:294)
+  dataAnalysis.dataAnalysis.graphRag.syncSource  (server/data-analysis/manifest.ts:325)
+  dataAnalysis.dataAnalysis.graphRag.buildIndex [receipt]  (server/data-analysis/manifest.ts:345)
+  dataAnalysis.dataAnalysis.graphRag.query  (server/data-analysis/manifest.ts:368)
+  dataAnalysis.dataAnalysis.dataAcquisition.workerStatus  (server/data-analysis/manifest.ts:412)
+  dataAnalysis.dataAnalysis.dataAcquisition.summary  (server/data-analysis/manifest.ts:423)
+  dataAnalysis.dataAnalysis.dataAcquisition.updateSource  (server/data-analysis/manifest.ts:432)
+  dataAnalysis.dataAnalysis.dataAcquisition.disableSource  (server/data-analysis/manifest.ts:447)
+  dataAnalysis.dataAnalysis.dataAcquisition.exportCanonicalRecord [receipt]  (server/data-analysis/manifest.ts:462)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.runOutputPipeline [receipt]  (server/data-analysis/manifest.ts:489)
+  dataAnalysis.dataAnalysis.dataAcquisition.registerSource  (server/data-analysis/manifest.ts:504)
+  dataAnalysis.dataAnalysis.dataAcquisition.runAcquisition  (server/data-analysis/manifest.ts:519)
+  dataAnalysis.dataAnalysis.dataAcquisition.discoverItems  (server/data-analysis/manifest.ts:534)
+  dataAnalysis.dataAnalysis.dataAcquisition.classifyItem  (server/data-analysis/manifest.ts:559)
+  dataAnalysis.dataAnalysis.dataAcquisition.routeItem  (server/data-analysis/manifest.ts:574)
+  dataAnalysis.dataAnalysis.dataAcquisition.runProcessing [receipt]  (server/data-analysis/manifest.ts:589)
+  dataAnalysis.dataAnalysis.dataAcquisition.runOutputPipeline [receipt]  (server/data-analysis/manifest.ts:605)
+  dataAnalysis.dataAnalysis.dataAcquisition.getCanonicalRecord  (server/data-analysis/manifest.ts:621)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.classify  (server/data-analysis/manifest.ts:631)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.routeParser  (server/data-analysis/manifest.ts:646)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.runParser [receipt]  (server/data-analysis/manifest.ts:661)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.validate  (server/data-analysis/manifest.ts:676)
+  dataAnalysis.dataAnalysis.dataAcquisition.document.getCanonical  (server/data-analysis/manifest.ts:691)
+  hr.hr.employee.create [receipt]  (server/hr/manifest.ts:51)
+  kgraAgent.kgra.run.execute  (server/kgra-agent/manifest.ts:48)
+  openRouter.openRouter.config.update [receipt]  (server/openrouter/manifest.ts:45)
+  organizationManagement.om.entity.create [receipt]  (server/organization-management/manifest.ts:48)
+  organizationManagement.om.position.assign [receipt]  (server/organization-management/manifest.ts:88)
+  pmCentral.pmCentral.health  (server/pm-central/manifest.ts:180)
+  pmCentral.pmCentral.summary  (server/pm-central/manifest.ts:189)
+  pmCentral.pmCentral.project.create  (server/pm-central/manifest.ts:203)
+  pmCentral.pmCentral.project.get  (server/pm-central/manifest.ts:234)
+  pmCentral.pmCentral.project.list  (server/pm-central/manifest.ts:245)
+  pmCentral.pmCentral.project.status.update [receipt]  (server/pm-central/manifest.ts:265)
+  pmCentral.pmCentral.task.create  (server/pm-central/manifest.ts:297)
+  pmCentral.pmCentral.task.status.update  (server/pm-central/manifest.ts:329)
+  pmCentral.pmCentral.project.update  (server/pm-central/manifest.ts:360)
+  pmCentral.pmCentral.project.archive [receipt]  (server/pm-central/manifest.ts:390)
+  pmCentral.pmCentral.plan.approve [receipt]  (server/pm-central/manifest.ts:412)
+  pmCentral.pmCentral.task.assign  (server/pm-central/manifest.ts:434)
+  pmCentral.pmCentral.risk.create  (server/pm-central/manifest.ts:461)
+  pmCentral.pmCentral.issue.create  (server/pm-central/manifest.ts:494)
+  pmCentral.pmCentral.decision.record  (server/pm-central/manifest.ts:525)
+  pmCentral.pmCentral.handoff.receiveFromPS  (server/pm-central/manifest.ts:556)
+  pmCentral.pmCentral.handoff.accept  (server/pm-central/manifest.ts:567)
+  pmCentral.pmCentral.handoff.reject  (server/pm-central/manifest.ts:589)
+  pmCentral.pmCentral.handoff.convert [receipt]  (server/pm-central/manifest.ts:616)
+  prm.prm.methods.listTemplates  (server/prm/manifest.ts:64)
+  prm.prm.method.publish [receipt]  (server/prm/manifest.ts:80)
+  prm.prm.method.deprecate [receipt]  (server/prm/manifest.ts:100)
+  ps.ps.ideation.publish [receipt]  (server/ps/manifest.ts:61)
+  ps.ps.handoff.pmCentral [receipt]  (server/ps/manifest.ts:79)
+  psm.psm.method.publish [receipt]  (server/psm/manifest.ts:52)
+  rag.rag.index.run  (server/rag/manifest.ts:54)
+  sandboxWf.sandboxWf.execute [receipt]  (server/sandbox-wf/manifest.ts:66)
+  sandboxWf.sandboxWf.workflow.publish [receipt]  (server/sandbox-wf/manifest.ts:85)
+
+0 finding(s):
+
+OK — gateway wiring within tolerance.
+=== check:event-wiring ===
+
+0 finding(s):
+
+OK — event wiring within tolerance.
+=== check:handoff-wiring ===
+
+Discovered 8 registerHandoffAcceptor() call(s).
+  agentStudio::agentStudio.run.requested
+  codeStudio::codeStudio.run.requested
+  communication::communication.conversation.open
+  communication::communication.meeting.schedule
+  communication::communication.notification.create
+  pmCentral::pmCentral.project.receiveFromPS
+  pmCentral::pmCentral.project.convertFromPS
+  sandboxWf::sandboxWf.execute.requested
+
+0 finding(s):
+
+OK — handoff wiring within tolerance.
+=== check:frontend-wiring ===
+
+0 finding(s):
+
+OK — frontend wiring within tolerance.
+=== check:runtime-wiring ===
+
+Modules tracked: 16 (KNOWN_MODULES=16).
+
+0 finding(s):
+
+OK — runtime wiring within tolerance.
+=== check:coordinator-wiring ===
+
+0 finding(s):
+
+OK — coordinator wiring within tolerance.
+
+> mynewap1claude@1.0.0 check:ports /root/MyNewAp1Claude
+> tsx scripts/check-port-registry.ts
+
+Port Registry Audit
+===================
+Declarations: 11
+Conflicts:    0
+Blockers:     0
+High:         0
+
+All declarations valid; no conflicts detected.
+
+> mynewap1claude@1.0.0 check:awi /root/MyNewAp1Claude
+> pnpm run check:wiring-inventory && pnpm run check:module-readiness && pnpm run check:dependency-graph
+
+
+> mynewap1claude@1.0.0 check:wiring-inventory /root/MyNewAp1Claude
+> tsx scripts/check-wiring-inventory.ts
+
+Application Wiring Inventory
+============================
+Modules:           16
+Fully wired:       10
+Mostly / partial:  6
+Declared-only:     0
+Blocked:           0
+Avg readiness:     92
+Missing required:  0
+
+  prm                      mostly-wired       86  
+  psm                      mostly-wired       86  
+  codeStudio               fully-wired        98  
+  agentStudio              fully-wired        98   warnings=1
+  sandboxWf                mostly-wired       87  
+  rag                      mostly-wired       83  
+  openRouter               mostly-wired       85   warnings=1
+  ps                       fully-wired        96  
+  hr                       fully-wired        100 
+  organizationManagement   fully-wired        93  
+  cultureValues            fully-wired        93  
+  aiTypes                  fully-wired        94   warnings=1
+  kgraAgent                mostly-wired       85   warnings=1
+  communication            fully-wired        94   warnings=1
+  pmCentral                fully-wired        96  
+  dataAnalysis             fully-wired        95  
+
+Inventory machinery healthy.
+
+> mynewap1claude@1.0.0 check:module-readiness /root/MyNewAp1Claude
+> tsx scripts/check-module-readiness.ts
+
+Module readiness
+================
+  prm                        86  mostly-wired       blockers=0 warnings=0
+  psm                        86  mostly-wired       blockers=0 warnings=0
+  codeStudio                 98  fully-wired        blockers=0 warnings=0
+  agentStudio                98  fully-wired        blockers=0 warnings=1
+  sandboxWf                  87  mostly-wired       blockers=0 warnings=0
+  rag                        83  mostly-wired       blockers=0 warnings=0
+  openRouter                 85  mostly-wired       blockers=0 warnings=1
+  ps                         96  fully-wired        blockers=0 warnings=0
+  hr                        100  fully-wired        blockers=0 warnings=0
+  organizationManagement     93  fully-wired        blockers=0 warnings=0
+  cultureValues              93  fully-wired        blockers=0 warnings=0
+  aiTypes                    94  fully-wired        blockers=0 warnings=1
+  kgraAgent                  85  mostly-wired       blockers=0 warnings=1
+  communication              94  fully-wired        blockers=0 warnings=1
+  pmCentral                  96  fully-wired        blockers=0 warnings=0
+  dataAnalysis               95  fully-wired        blockers=0 warnings=0
+
+Readiness scoring is internally consistent.
+
+> mynewap1claude@1.0.0 check:dependency-graph /root/MyNewAp1Claude
+> tsx scripts/check-dependency-graph.ts
+
+Dependency Graph
+================
+Nodes:  133
+Edges:  124
+Cycles: 0
+
+Graph healthy.
+
+> mynewap1claude@1.0.0 check:frontend-modularity /root/MyNewAp1Claude
+> pnpm run check:client-capsules && pnpm run check:module-routes-conflict && pnpm run check:module-registration && pnpm run check:app-route-ownership && pnpm run check:module-route-inventory && pnpm run check:module-api-boundaries && pnpm run check:cross-module-links
+
+
+> mynewap1claude@1.0.0 check:client-capsules /root/MyNewAp1Claude
+> tsx scripts/check-client-capsules.ts
+
+Module Client Capsules
+======================
+
+Failures: 0
+Baseline warnings: 0
+OK — every migrated module has a complete capsule.
+
+> mynewap1claude@1.0.0 check:module-routes-conflict /root/MyNewAp1Claude
+> tsx scripts/check-module-routes-conflict.ts
+
+Module Routes Conflict
+======================
+  [warn] baseRoute /data-analysis/kgra-agent (kgraAgent) is nested under /data-analysis (dataAnalysis); resolved by longest-first matching
+
+Failures: 0
+Baseline warnings: 1
+OK — no conflicting canonical route ownership.
+
+> mynewap1claude@1.0.0 check:module-registration /root/MyNewAp1Claude
+> tsx scripts/check-module-registration.ts
+
+Module Registration
+===================
+
+Failures: 0
+Baseline warnings: 0
+OK — module registration consistent.
+
+> mynewap1claude@1.0.0 check:app-route-ownership /root/MyNewAp1Claude
+> tsx scripts/check-app-route-ownership.ts
+
+App Route Ownership
+===================
+App.tsx routes:        180
+App.tsx redirects:     25
+
+
+Failures: 0
+Baseline warnings: 0
+OK — App.tsx ownership within tolerance.
+
+> mynewap1claude@1.0.0 check:module-route-inventory /root/MyNewAp1Claude
+> tsx scripts/check-module-route-inventory.ts
+
+Module Route Inventory
+======================
+
+Failures: 0
+Baseline warnings: 0
+OK — route inventory consistent for migrated modules.
+
+> mynewap1claude@1.0.0 check:module-api-boundaries /root/MyNewAp1Claude
+> tsx scripts/check-module-api-boundaries.ts
+
+Module API Boundaries
+=====================
+
+Failures: 0
+Baseline warnings: 0
+OK — no cross-module boundary violations from migrated modules.
+
+> mynewap1claude@1.0.0 check:cross-module-links /root/MyNewAp1Claude
+> tsx scripts/check-cross-module-links.ts
+
+Cross-Module Links
+==================
+
+Failures: 0
+Baseline warnings: 0
+OK — no migrated-module link violations.
+exit=0

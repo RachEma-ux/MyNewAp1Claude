@@ -1,0 +1,38 @@
+# check:wiring-inventory
+timestamp: 2026-05-02T21:50:04Z
+commit: 86a1ffe
+command: pnpm run check:wiring-inventory
+---
+
+> mynewap1claude@1.0.0 check:wiring-inventory /root/MyNewAp1Claude
+> tsx scripts/check-wiring-inventory.ts
+
+Application Wiring Inventory
+============================
+Modules:           16
+Fully wired:       10
+Mostly / partial:  6
+Declared-only:     0
+Blocked:           0
+Avg readiness:     92
+Missing required:  0
+
+  prm                      mostly-wired       86  
+  psm                      mostly-wired       86  
+  codeStudio               fully-wired        98  
+  agentStudio              fully-wired        98   warnings=1
+  sandboxWf                mostly-wired       87  
+  rag                      mostly-wired       83  
+  openRouter               mostly-wired       85   warnings=1
+  ps                       fully-wired        96  
+  hr                       fully-wired        100 
+  organizationManagement   fully-wired        93  
+  cultureValues            fully-wired        93  
+  aiTypes                  fully-wired        94   warnings=1
+  kgraAgent                mostly-wired       85   warnings=1
+  communication            fully-wired        94   warnings=1
+  pmCentral                fully-wired        96  
+  dataAnalysis             fully-wired        95  
+
+Inventory machinery healthy.
+exit=0

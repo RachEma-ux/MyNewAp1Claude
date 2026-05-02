@@ -1,0 +1,17 @@
+# check:dependency-graph
+timestamp: 2026-05-02T21:50:07Z
+commit: 86a1ffe
+command: pnpm run check:dependency-graph
+---
+
+> mynewap1claude@1.0.0 check:dependency-graph /root/MyNewAp1Claude
+> tsx scripts/check-dependency-graph.ts
+
+Dependency Graph
+================
+Nodes:  133
+Edges:  124
+Cycles: 0
+
+Graph healthy.
+exit=0

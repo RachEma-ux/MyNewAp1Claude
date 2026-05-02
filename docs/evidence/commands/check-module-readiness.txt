@@ -1,0 +1,30 @@
+# check:module-readiness
+timestamp: 2026-05-02T21:50:05Z
+commit: 86a1ffe
+command: pnpm run check:module-readiness
+---
+
+> mynewap1claude@1.0.0 check:module-readiness /root/MyNewAp1Claude
+> tsx scripts/check-module-readiness.ts
+
+Module readiness
+================
+  prm                        86  mostly-wired       blockers=0 warnings=0
+  psm                        86  mostly-wired       blockers=0 warnings=0
+  codeStudio                 98  fully-wired        blockers=0 warnings=0
+  agentStudio                98  fully-wired        blockers=0 warnings=1
+  sandboxWf                  87  mostly-wired       blockers=0 warnings=0
+  rag                        83  mostly-wired       blockers=0 warnings=0
+  openRouter                 85  mostly-wired       blockers=0 warnings=1
+  ps                         96  fully-wired        blockers=0 warnings=0
+  hr                        100  fully-wired        blockers=0 warnings=0
+  organizationManagement     93  fully-wired        blockers=0 warnings=0
+  cultureValues              93  fully-wired        blockers=0 warnings=0
+  aiTypes                    94  fully-wired        blockers=0 warnings=1
+  kgraAgent                  85  mostly-wired       blockers=0 warnings=1
+  communication              94  fully-wired        blockers=0 warnings=1
+  pmCentral                  96  fully-wired        blockers=0 warnings=0
+  dataAnalysis               95  fully-wired        blockers=0 warnings=0
+
+Readiness scoring is internally consistent.
+exit=0

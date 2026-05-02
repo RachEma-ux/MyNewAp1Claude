@@ -1,0 +1,16 @@
+# test (15 capsule suites + AWI wiring suite)
+timestamp: 2026-05-02T22:05:39Z
+commit: 86a1ffe
+command: vitest run tests/<each>-capsule + server/platform/wiring
+---
+ ✓ server/platform/wiring/sandbox-wf-client-route.test.ts (16 tests) 15ms
+ ✓ server/platform/wiring/organization-management-client-route.test.ts (11 tests) 14ms
+ ✓ server/platform/wiring/communication-client-route.test.ts (3 tests) 6ms
+ ✓ server/platform/wiring/prm-client-route.test.ts (8 tests) 9ms
+
+ Test Files  35 passed (35)
+      Tests  809 passed (809)
+   Start at  22:05:43
+   Duration  12.96s (transform 3.91s, setup 0ms, collect 15.61s, tests 14.19s, environment 14ms, prepare 17.00s)
+
+exit=0

@@ -1,0 +1,11 @@
+# check:governance-actions
+timestamp: 2026-05-02T21:49:21Z
+commit: 86a1ffe
+command: pnpm run check:governance-actions
+---
+
+> mynewap1claude@1.0.0 check:governance-actions /root/MyNewAp1Claude
+> tsx scripts/check-governance-actions.ts
+
+OK — governance-actions: 58 declared, 58 covered, 0 uncovered (warning).
+exit=0
