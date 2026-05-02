@@ -43,7 +43,10 @@
     "check:cross-module-links": "tsx scripts/check-cross-module-links.ts",
     "check:frontend-modularity": "pnpm run check:client-capsules && pnpm run check:module-routes-conflict && pnpm run check:module-registration && pnpm run check:app-route-ownership && pnpm run check:module-route-inventory && pnpm run check:module-api-boundaries && pnpm run check:cross-module-links",
     "generate:route-ownership-map": "tsx scripts/generate-route-ownership-map.ts",
-    "check:architecture:full": "pnpm run check:architecture && pnpm run check:wiring && pnpm run check:ports && pnpm run check:awi && pnpm run check:frontend-modularity"
+    "check:architecture:full": "pnpm run check:architecture && pnpm run check:wiring && pnpm run check:ports && pnpm run check:awi && pnpm run check:frontend-modularity",
+    "check:readiness-phase-gate": "tsx scripts/check-readiness-phase-gate.ts",
+    "audit:development-baseline": "tsx scripts/check-readiness-phase-gate.ts --mode=development-baseline",
+    "audit:production-readiness": "tsx scripts/check-readiness-phase-gate.ts --mode=production-readiness"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
