@@ -6,14 +6,14 @@ import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 import PRMSidebar, { type PRMView } from "./PRMSidebar";
 
-const PRMDashboardPage = lazy(() => import("@/pages/prm/PRMDashboardPage"));
-const PRMNewCasePage = lazy(() => import("@/pages/prm/PRMNewCasePage"));
-const PRMCaseListPage = lazy(() => import("@/pages/prm/PRMCaseListPage"));
-const PRMMethodsLibraryPage = lazy(() => import("@/pages/prm/PRMMethodsLibraryPage"));
-const PRMPlaybooksPage = lazy(() => import("@/pages/prm/PRMPlaybooksPage"));
-const PRMCatalogPage = lazy(() => import("@/pages/prm/PRMCatalogPage"));
-const PRMAICatalogPage = lazy(() => import("@/pages/prm/PRMAICatalogPage"));
-const PRMControlPanelPage = lazy(() => import("@/pages/prm/PRMControlPanelPage"));
+const PRMDashboardPage = lazy(() => import("../pages/PRMDashboardPage"));
+const PRMNewCasePage = lazy(() => import("../pages/PRMNewCasePage"));
+const PRMCaseListPage = lazy(() => import("../pages/PRMCaseListPage"));
+const PRMMethodsLibraryPage = lazy(() => import("../pages/PRMMethodsLibraryPage"));
+const PRMPlaybooksPage = lazy(() => import("../pages/PRMPlaybooksPage"));
+const PRMCatalogPage = lazy(() => import("../pages/PRMCatalogPage"));
+const PRMAICatalogPage = lazy(() => import("../pages/PRMAICatalogPage"));
+const PRMControlPanelPage = lazy(() => import("../pages/PRMControlPanelPage"));
 
 const routeMap: Record<PRMView, string> = {
   dashboard: "/prm/dashboard",

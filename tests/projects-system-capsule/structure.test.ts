@@ -77,8 +77,8 @@ describe("Projects System migration state", () => {
   it("codeStudio remains migrated", () => {
     expect(isMigrated("codeStudio")).toBe(true);
   });
-  it("prm is NOT migrated (separate RTLM, future PR)", () => {
-    expect(isMigrated("prm")).toBe(false);
+  it("prm is migrated (PR #65 — Phase 3.5)", () => {
+    expect(isMigrated("prm")).toBe(true);
   });
 });
 

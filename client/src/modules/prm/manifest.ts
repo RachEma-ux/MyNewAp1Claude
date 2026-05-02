@@ -1,32 +1,54 @@
 /**
- * PRM — Frontend Module Manifest
+ * PRM — Frontend Module Manifest (capsule shape).
  *
- * Mirrors the canonical PRM routes that exist in App.tsx. App.tsx remains
- * the runtime authority during compatibility mode (Switch picks the first
- * match), so this manifest is additive metadata: it contributes nav
- * entries and documents which routes belong to PRM, but does not hijack
- * existing routing.
+ * PRM is the sixth Module Client Capsule. The manifest:
+ *   - declares the canonical subtree (`/prm`)
+ *   - points at `mod.tsx` as the capsule entrypoint
+ *   - lists every canonical path under `routeInventory` so AWI and
+ *     `check:module-route-inventory` know the full surface
+ *
+ * Surfaces owned by PRM:
+ *   - Dashboard, New Case, Cases (incl. case workspace detail),
+ *     Methods Library, Playbooks, Catalog, AI Catalog,
+ *     Control Panel.
+ *
+ * App.tsx no longer mounts PRM canonical pages. The capsule renders
+ * via `<ModuleRoutes />` once `client.ts` registers this manifest.
  */
 
 import { lazy } from "react";
+
 import type { ClientModuleManifest } from "@/platform/modules/types";
 
-const PRMShellPage = lazy(() => import("@/pages/prm/PRMShellPage"));
-const PRMCaseWorkspacePage = lazy(() => import("@/pages/prm/PRMCaseWorkspacePage"));
+const PRMCapsule = lazy(() => import("./mod"));
 
 export const prmClientManifest: ClientModuleManifest = {
   key: "prm",
   name: "PRM — Problem Resolution Methods",
-  routes: [
-    { path: "/prm", label: "PRM", component: PRMShellPage },
-    { path: "/prm/dashboard", label: "PRM Dashboard", component: PRMShellPage },
-    { path: "/prm/cases", label: "PRM Cases", component: PRMShellPage },
-    { path: "/prm/cases/:id", label: "PRM Case", component: PRMCaseWorkspacePage },
-    { path: "/prm/methods", label: "PRM Methods", component: PRMShellPage },
-    { path: "/prm/playbooks", label: "PRM Playbooks", component: PRMShellPage },
-    { path: "/prm/catalog", label: "PRM Catalog", component: PRMShellPage },
-    { path: "/prm/control-panel", label: "PRM Control Panel", component: PRMShellPage },
+
+  /* ---- Capsule fields (Phase-1+) ---- */
+  baseRoute: "/prm",
+  capsuleEntrypoint: PRMCapsule,
+  layoutMode: "inside-main-layout",
+  routeInventory: [
+    "/prm",
+    "/prm/dashboard",
+    "/prm/new",
+    "/prm/cases",
+    "/prm/cases/:id",
+    "/prm/methods",
+    "/prm/playbooks",
+    "/prm/catalog",
+    "/prm/ai-catalog",
+    "/prm/control-panel",
   ],
-  navigation: [{ group: "knowledge", label: "PRM", order: 30 }],
+  compatibilityRoutes: [],
+  deprecatedRoutes: [],
+
+  routes: [],
+
+  navigation: [
+    { group: "knowledge", label: "PRM", order: 30 },
+  ],
   requiredPermissions: ["prm.read"],
 };

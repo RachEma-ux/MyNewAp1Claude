@@ -1,6 +1,6 @@
 # Route Ownership Map
 
-Generated: 2026-05-02T15:23:01.144Z
+Generated: 2026-05-02T17:03:55.844Z
 
 Authoritative view of every URL the app exposes and which surface
 owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
@@ -9,12 +9,12 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 
 | Status | Count |
 |---|---|
-| ✅ canonical | 100 |
+| ✅ canonical | 102 |
 | ↪️ compatibility-redirect | 22 |
 | 🚫 deprecated | 0 |
 | 🏛 platform-core | 14 |
 | ⚠️ orphan | 0 |
-| ❓ unknown | 201 |
+| ❓ unknown | 199 |
 | **Total** | **337** |
 
 ## Per-RTLM
@@ -26,7 +26,7 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | pmCentral | ✅ migrated | 19 | `/pm` |
 | codeStudio | ✅ migrated | 26 | `/code-studio` |
 | ps | ✅ migrated | 15 | `/ps` |
-| prm | ⏳ pending | 8 | `—` |
+| prm | ✅ migrated | 18 | `/prm` |
 | psm | ⏳ pending | 10 | `—` |
 | hr | ⏳ pending | 4 | `—` |
 | organizationManagement | ⏳ pending | 2 | `—` |
@@ -307,16 +307,16 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/pm/settings` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
 | `/pm/tasks` | pmCentral | module-manifest | `module:pmCentral` | ✅ canonical |  |
 | `/policies` | platform-core | app-platform-core | `PolicyManagement` | 🏛 platform-core |  |
-| `/prm` | prm | module-manifest | `PRMShellPage` | ✅ canonical |  |
-| `/prm/ai-catalog` | prm | unknown | — | ❓ unknown |  |
-| `/prm/cases` | prm | module-manifest | `PRMShellPage` | ✅ canonical |  |
-| `/prm/cases/:id` | prm | module-manifest | `PRMCaseWorkspacePage` | ✅ canonical |  |
-| `/prm/catalog` | prm | module-manifest | `PRMShellPage` | ✅ canonical |  |
-| `/prm/control-panel` | prm | module-manifest | `PRMShellPage` | ✅ canonical |  |
-| `/prm/dashboard` | prm | module-manifest | `PRMShellPage` | ✅ canonical |  |
-| `/prm/methods` | prm | module-manifest | `PRMShellPage` | ✅ canonical |  |
-| `/prm/new` | prm | unknown | — | ❓ unknown |  |
-| `/prm/playbooks` | prm | module-manifest | `PRMShellPage` | ✅ canonical |  |
+| `/prm` | prm | module-manifest | `module:prm` | ✅ canonical |  |
+| `/prm/ai-catalog` | prm | module-manifest | `module:prm` | ✅ canonical |  |
+| `/prm/cases` | prm | module-manifest | `module:prm` | ✅ canonical |  |
+| `/prm/cases/:id` | prm | module-manifest | `module:prm` | ✅ canonical |  |
+| `/prm/catalog` | prm | module-manifest | `module:prm` | ✅ canonical |  |
+| `/prm/control-panel` | prm | module-manifest | `module:prm` | ✅ canonical |  |
+| `/prm/dashboard` | prm | module-manifest | `module:prm` | ✅ canonical |  |
+| `/prm/methods` | prm | module-manifest | `module:prm` | ✅ canonical |  |
+| `/prm/new` | prm | module-manifest | `module:prm` | ✅ canonical |  |
+| `/prm/playbooks` | prm | module-manifest | `module:prm` | ✅ canonical |  |
 | `/project/:workspaceId` | — | unknown | — | ❓ unknown |  |
 | `/project/:workspaceId/*` | — | unknown | — | ❓ unknown |  |
 | `/promotion-requests` | — | unknown | — | ❓ unknown |  |
@@ -546,8 +546,6 @@ owns it. Regenerate with `tsx scripts/generate-route-ownership-map.ts`.
 | `/pm-central/shell/clone/:sourceId` | unknown | — |  |
 | `/pm-central/shell/new` | unknown | — |  |
 | `/pm-central/templates` | unknown | — |  |
-| `/prm/ai-catalog` | unknown | prm |  |
-| `/prm/new` | unknown | prm |  |
 | `/project/:workspaceId` | unknown | — |  |
 | `/project/:workspaceId/*` | unknown | — |  |
 | `/promotion-requests` | unknown | — |  |

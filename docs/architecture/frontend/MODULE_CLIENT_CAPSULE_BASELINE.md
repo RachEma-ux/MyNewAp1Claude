@@ -1,12 +1,12 @@
 # Module Client Capsule — Baseline
 
-Generated: 2026-05-02T15:23:01.161Z
+Generated: 2026-05-02T17:03:55.863Z
 
 Snapshot of the frontend modularity surface at the start of the migration. Each subsequent migration PR should drive these counts down.
 
 ## App.tsx hardcoded routes
 
-Total `<Route>` declarations in App.tsx: **285**
+Total `<Route>` declarations in App.tsx: **275**
 
 Compatibility redirects in App.tsx: **25**
 
@@ -19,7 +19,7 @@ Compatibility redirects in App.tsx: **25**
 | pm-central | 0 | 10 | 9 | 0 |
 | code-studio | 0 | 14 | 12 | 0 |
 | ps | 0 | 9 | 6 | 0 |
-| prm | 8 | 0 | 0 | 4 |
+| prm | 0 | 10 | 8 | 0 |
 | psm | 10 | 0 | 0 | 4 |
 | hr | 4 | 0 | 0 | 4 |
 | organization-management | 2 | 0 | 0 | 4 |
@@ -107,14 +107,16 @@ Compatibility redirects in App.tsx: **25**
 | `/pm/risks` | routeInventory:pm-central, routes.tsx:pm-central |
 | `/pm/settings` | routeInventory:pm-central, routes.tsx:pm-central |
 | `/pm/tasks` | routeInventory:pm-central, routes.tsx:pm-central |
-| `/prm` | App.tsx, manifest:prm |
-| `/prm/cases` | App.tsx, manifest:prm |
-| `/prm/cases/:id` | App.tsx, manifest:prm |
-| `/prm/catalog` | App.tsx, manifest:prm |
-| `/prm/control-panel` | App.tsx, manifest:prm |
-| `/prm/dashboard` | App.tsx, manifest:prm |
-| `/prm/methods` | App.tsx, manifest:prm |
-| `/prm/playbooks` | App.tsx, manifest:prm |
+| `/prm` | routeInventory:prm, routes.tsx:prm |
+| `/prm/ai-catalog` | routeInventory:prm, routes.tsx:prm |
+| `/prm/cases` | routeInventory:prm, routes.tsx:prm |
+| `/prm/cases/:id` | routeInventory:prm, routes.tsx:prm |
+| `/prm/catalog` | routeInventory:prm, routes.tsx:prm |
+| `/prm/control-panel` | routeInventory:prm, routes.tsx:prm |
+| `/prm/dashboard` | routeInventory:prm, routes.tsx:prm |
+| `/prm/methods` | routeInventory:prm, routes.tsx:prm |
+| `/prm/new` | routeInventory:prm, routes.tsx:prm |
+| `/prm/playbooks` | routeInventory:prm, routes.tsx:prm |
 | `/ps` | routeInventory:ps, routes.tsx:ps |
 | `/ps/ai-catalog` | routeInventory:ps, routes.tsx:ps |
 | `/ps/catalog` | routeInventory:ps, routes.tsx:ps |
@@ -302,8 +304,6 @@ Compatibility redirects in App.tsx: **25**
 | `/pm-central/shell/clone/:sourceId` | unknown | — |  |
 | `/pm-central/shell/new` | unknown | — |  |
 | `/pm-central/templates` | unknown | — |  |
-| `/prm/ai-catalog` | unknown | prm |  |
-| `/prm/new` | unknown | prm |  |
 | `/project/:workspaceId` | unknown | — |  |
 | `/project/:workspaceId/*` | unknown | — |  |
 | `/promotion-requests` | unknown | — |  |
@@ -362,7 +362,7 @@ Tracked separately by `pnpm run check:awi` and the wiring inventory.
 | pm-central | ✅ | ✅ | ✅ | ✅ | ✅ |
 | code-studio | ✅ | ✅ | ✅ | ✅ | ✅ |
 | ps | ✅ | ✅ | ✅ | ✅ | ✅ |
-| prm | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| prm | ✅ | ✅ | ✅ | ✅ | ✅ |
 | psm | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | hr | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
 | organization-management | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
