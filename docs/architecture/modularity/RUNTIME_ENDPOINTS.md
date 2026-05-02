@@ -15,6 +15,7 @@ render a clean unavailable banner.
 | Module | Endpoint key | Env var | Default URL | Mode | Required | Notes |
 |---|---|---|---|---|---|---|
 | `dataAnalysis` | `graphRagWorker` | `GRAPHRAG_WORKER_URL` | `http://localhost:8484` | external | no | Microsoft `graphrag` Python worker. Required for `buildIndex` / `query` happy path. Missing → Data Analysis health = `degraded`. |
+| `dataAnalysis` | `dataAcquisitionWorker` | `DATA_ACQUISITION_WORKER_URL` | `http://localhost:8485` | external | no | Data Acquisition worker (subdomain). Capabilities: `classify / route / parse / ocr / reconstruct / validate / output`. Required for Document Intelligence + per-mode processing happy path. Missing → processing runs recorded as `failed`/`degraded` with the worker error preserved; no fake success. UI banner renders the degraded state. |
 
 (Additional runtime endpoints are declared in each module's
 `ports.ts` and surfaced here as they land.)

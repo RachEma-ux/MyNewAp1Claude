@@ -134,11 +134,12 @@ export const MODULE_MAP: ModuleDescriptor[] = [
   {
     key: "dataAnalysis",
     folder: "data-analysis",
-    // Phase-1 staged ownership: graphrag tables physically live in the
-    // shared platform DB but are declared Data Analysis-owned via the
-    // manifest. The dedicated `dataanalysisdb` connector is in
+    // Phase-1 staged ownership: graphrag and data_acquisition tables
+    // physically live in the shared platform DB but are declared
+    // Data Analysis-owned via the manifest. The dedicated
+    // `dataanalysisdb` connector lives in
     // server/data-analysis/connection.ts (`getDataAnalysisDb`).
-    privateSchemas: ["graphrag"],
+    privateSchemas: ["graphrag", "data_acquisition"],
     connectionAccessors: ["getDataAnalysisDb"],
   },
 ];

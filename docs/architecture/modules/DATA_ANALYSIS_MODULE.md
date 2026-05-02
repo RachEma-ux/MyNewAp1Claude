@@ -1,7 +1,9 @@
 # Data Analysis Module
 
-> Canonical RTLM owner of the **GraphRAG** subdomain.
-> GraphRAG is a *subdomain inside Data Analysis*, **not** its own RTLM.
+> Canonical RTLM owner of the **GraphRAG** and **Data Acquisition**
+> subdomains. Both are *subdomains inside Data Analysis*, **not** RTLMs
+> of their own. Document Intelligence is one specialized pipeline
+> inside Data Acquisition; it is not its own RTLM either.
 
 ## Identity
 
@@ -19,27 +21,49 @@
 ```
 Data Analysis (RTLM)
 ├── GraphRAG                       — knowledge-graph index/query (Microsoft graphrag worker)
+├── Data Acquisition               — universal, source-agnostic, data-type-agnostic acquisition layer
+│   └── Document Intelligence      — one specialized pipeline (parser routing + canonical document model)
 ├── Data Warehouse                 — analytical fact tables
 ├── OmniRAG adapter                — Phase-1 external OmniRAG facade
 └── (future) ...
 ```
 
-GraphRAG is the only subdomain currently exposed via the manifest's
-public-API surface. Data Warehouse + OmniRAG remain accessible through
-the legacy sub-routers (`dataAnalysis.dataWarehouse.*`,
+GraphRAG and Data Acquisition are exposed via the manifest's public-API
+surface. Data Warehouse + OmniRAG remain accessible through the legacy
+sub-routers (`dataAnalysis.dataWarehouse.*`,
 `dataAnalysis.graphRag.omnirag*`) and will be promoted into the
 manifest as their own ownership work lands.
+
+For the Data Acquisition design — connectors, pipelines, canonical
+model, worker contract, DB ownership, governance, events, AWI visibility —
+see [`DATA_ACQUISITION_SUBDOMAIN.md`](../modularity/DATA_ACQUISITION_SUBDOMAIN.md).
 
 ## Database ownership (Phase-1 staged)
 
 Data Analysis declares `database.kind: "shared"` over the platform DB
 and lists these tables as `ownedTables`:
 
+GraphRAG tables:
+
 - `graphrag_sources`
 - `graphrag_sync_runs`
 - `graphrag_index_runs`
 - `graphrag_query_runs`
 - `graphrag_artifact_registry`
+
+Data Acquisition tables (subdomain — owned by Data Analysis):
+
+- `data_acquisition_sources`
+- `data_acquisition_runs`
+- `data_acquisition_items`
+- `data_acquisition_classifications`
+- `data_acquisition_routes`
+- `data_acquisition_processing_runs`
+- `data_acquisition_quality_results`
+- `data_acquisition_canonical_records`
+- `data_acquisition_output_runs`
+- `data_acquisition_audit_events`
+- `data_acquisition_documents` *(Document Intelligence specialization)*
 
 Physical migration to a dedicated `dataanalysisdb` (env:
 `DATABASE_URL_DATA_ANALYSISDB`) is tracked under the follow-up:

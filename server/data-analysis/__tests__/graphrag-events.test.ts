@@ -25,10 +25,15 @@ describe("Data Analysis events catalog", () => {
     }
   });
 
-  it("manifest.events.emits is an exact match of DATA_ANALYSIS_EVENT_NAMES", () => {
-    const emits = (dataAnalysisManifest.events?.emits ?? []).slice().sort();
-    const names = DATA_ANALYSIS_EVENT_NAMES.slice().sort();
-    expect(emits).toEqual(names);
+  it("manifest.events.emits is a superset that includes every GraphRAG event", () => {
+    // Data Analysis emits both `graphRag.*` and `dataAcquisition.*`
+    // events (the latter is the Data Acquisition subdomain). This
+    // assertion enforces the GraphRAG subset; the Data Acquisition
+    // events have their own catalog test.
+    const emits = dataAnalysisManifest.events?.emits ?? [];
+    for (const name of DATA_ANALYSIS_EVENT_NAMES) {
+      expect(emits).toContain(name);
+    }
   });
 
   it("includes both worker availability transitions", () => {

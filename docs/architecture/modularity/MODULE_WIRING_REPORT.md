@@ -1,6 +1,6 @@
 # Application Wiring Inventory
 
-Generated: 2026-05-02T04:08:25.559Z
+Generated: 2026-05-02T05:57:40.155Z
 
 ## Summary
 
@@ -34,7 +34,7 @@ Generated: 2026-05-02T04:08:25.559Z
 | KGRA Agent (kgraAgent) | 85 | mostly-wired | 0 | 1 |
 | Communication (communication) | 94 | fully-wired | 0 | 1 |
 | PM Central (pmCentral) | 96 | fully-wired | 0 | 0 |
-| Data Analysis (dataAnalysis) | 92 | fully-wired | 0 | 1 |
+| Data Analysis (dataAnalysis) | 95 | fully-wired | 0 | 1 |
 
 ## Wiring matrix
 

@@ -484,6 +484,24 @@ export const ACTION_KEY_MAP: Record<string, string> = {
   "dataAnalysis.graphRag.syncSource": "dataAnalysis.graphRag.syncSource",
   "dataAnalysis.graphRag.buildIndex": "dataAnalysis.graphRag.buildIndex",
   "dataAnalysis.graphRag.query": "dataAnalysis.graphRag.query",
+
+  // ── Data Analysis — Data Acquisition subdomain ──────────────────────────
+  "dataAnalysis.dataAcquisition.registerSource": "dataAnalysis.dataAcquisition.registerSource",
+  "dataAnalysis.dataAcquisition.updateSource": "dataAnalysis.dataAcquisition.updateSource",
+  "dataAnalysis.dataAcquisition.disableSource": "dataAnalysis.dataAcquisition.disableSource",
+  "dataAnalysis.dataAcquisition.runAcquisition": "dataAnalysis.dataAcquisition.runAcquisition",
+  "dataAnalysis.dataAcquisition.discoverItems": "dataAnalysis.dataAcquisition.runAcquisition",
+  "dataAnalysis.dataAcquisition.classifyItem": "dataAnalysis.dataAcquisition.classifyItem",
+  "dataAnalysis.dataAcquisition.routeItem": "dataAnalysis.dataAcquisition.routeItem",
+  "dataAnalysis.dataAcquisition.runProcessing": "dataAnalysis.dataAcquisition.runProcessing",
+  "dataAnalysis.dataAcquisition.runOutputPipeline": "dataAnalysis.dataAcquisition.runOutputPipeline",
+  "dataAnalysis.dataAcquisition.cancelRun": "dataAnalysis.dataAcquisition.runAcquisition",
+  "dataAnalysis.dataAcquisition.document.classify": "dataAnalysis.dataAcquisition.classifyItem",
+  "dataAnalysis.dataAcquisition.document.routeParser": "dataAnalysis.dataAcquisition.routeItem",
+  "dataAnalysis.dataAcquisition.document.runParser": "dataAnalysis.dataAcquisition.document.runParser",
+  "dataAnalysis.dataAcquisition.document.validate": "dataAnalysis.dataAcquisition.document.validate",
+  "dataAnalysis.dataAcquisition.document.runOutputPipeline": "dataAnalysis.dataAcquisition.document.runOutputPipeline",
+  "dataAnalysis.dataAcquisition.exportCanonicalRecord": "dataAnalysis.dataAcquisition.exportCanonicalRecord",
 };
 
 /**

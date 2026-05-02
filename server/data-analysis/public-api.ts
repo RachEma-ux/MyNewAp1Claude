@@ -38,3 +38,35 @@ export {
   getDataAnalysisDbMode,
 } from "./connection";
 export { getGraphRagWorkerStatus } from "./graphrag/graphRag.worker";
+
+// ── Data Acquisition subdomain ─────────────────────────────────────
+export {
+  DATA_ACQUISITION_EVENTS,
+  DATA_ACQUISITION_EVENT_NAMES,
+  type DataAcquisitionEventName,
+} from "./data-acquisition/dataAcquisition.events";
+export {
+  DATA_ACQUISITION_OWNED_TABLES,
+  DATA_ACQUISITION_WORKER_DEFAULT_URL,
+  DATA_ACQUISITION_WORKER_ENV,
+} from "./data-acquisition/dataAcquisition.constants";
+export {
+  dataAcquisitionWorkerContract,
+  getDataAcquisitionWorkerStatus,
+  getDataAcquisitionWorkerUrl,
+} from "./data-acquisition/dataAcquisition.worker";
+export type {
+  DataAcquisitionWorkerStatus,
+  DataAcquisitionWorkerContract,
+  DataAcquisitionSourceSummary,
+  DataAcquisitionRunSummary,
+  DataAcquisitionItemSummary,
+  DataAcquisitionClassificationSummary,
+  DataAcquisitionRouteSummary,
+  DataAcquisitionProcessingRunSummary,
+  DataAcquisitionOutputRunSummary,
+  CanonicalAcquisitionRecord,
+  CanonicalDocumentModel,
+  AcquisitionConnectorRuntime,
+  DataAcquisitionSummary,
+} from "./data-acquisition/dataAcquisition.contracts";

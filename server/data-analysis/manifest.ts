@@ -30,6 +30,8 @@ import {
   DATA_ANALYSIS_PROVIDED_PORTS,
   DATA_ANALYSIS_RUNTIME_ENDPOINTS,
 } from "./ports";
+import { DATA_ACQUISITION_EVENT_NAMES } from "./data-acquisition/dataAcquisition.events";
+import { DATA_ACQUISITION_OWNED_TABLES } from "./data-acquisition/dataAcquisition.constants";
 
 export const dataAnalysisManifest: ModuleManifest = {
   key: "dataAnalysis",
@@ -40,7 +42,8 @@ export const dataAnalysisManifest: ModuleManifest = {
 
   database: {
     // Phase-1 staged ownership — physical tables live in the shared
-    // platform DB; Data Analysis is the canonical declared owner.
+    // platform DB; Data Analysis is the canonical declared owner of
+    // both GraphRAG and Data Acquisition tables.
     kind: "shared",
     schema: "public",
     ownedTables: [
@@ -49,6 +52,7 @@ export const dataAnalysisManifest: ModuleManifest = {
       "graphrag_index_runs",
       "graphrag_query_runs",
       "graphrag_artifact_registry",
+      ...DATA_ACQUISITION_OWNED_TABLES,
     ],
   },
 
@@ -61,6 +65,9 @@ export const dataAnalysisManifest: ModuleManifest = {
       "dataAnalysis.graphRag.read",
       "dataAnalysis.graphRag.write",
       "dataAnalysis.graphRag.admin",
+      "dataAnalysis.dataAcquisition.read",
+      "dataAnalysis.dataAcquisition.write",
+      "dataAnalysis.dataAcquisition.admin",
     ],
   },
 
@@ -92,11 +99,138 @@ export const dataAnalysisManifest: ModuleManifest = {
       risk: "low",
       receiptRequired: false,
     },
+
+    /* ── Data Acquisition subdomain (universal acquisition layer) ─────── */
+    {
+      key: "dataAnalysis.dataAcquisition.registerSource",
+      description:
+        "Register a Data Acquisition source (any type: document, sensor, stream, api, database, saas, web, git, manual_form, webhook, media, object_storage).",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.updateSource",
+      description: "Update an existing Data Acquisition source.",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.disableSource",
+      description: "Disable a Data Acquisition source.",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.runAcquisition",
+      description:
+        "Trigger an acquisition run for a source — discovers and acquires items via the source's connector.",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.classifyItem",
+      description:
+        "Classify a discovered item — picks data type, complexity, and recommended processor.",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.routeItem",
+      description:
+        "Route an item to a processing pipeline + processor + fallback chain.",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.runProcessing",
+      description:
+        "Run a processing pipeline against an item (parser, normalizer, CDC sync, etc.). Calls external worker.",
+      risk: "medium",
+      receiptRequired: true,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.runOutputPipeline",
+      description:
+        "Emit a canonical record into an output pipeline (rag/graphrag/analytics/warehouse/alerts/reports/markdown/html/pdf).",
+      risk: "medium",
+      receiptRequired: true,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.exportCanonicalRecord",
+      description: "Export a canonical record outside the platform.",
+      risk: "medium",
+      receiptRequired: true,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.document.runParser",
+      description:
+        "Run the document-intelligence parser pipeline (Document Intelligence is one specialized pipeline inside Data Acquisition).",
+      risk: "medium",
+      receiptRequired: true,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.document.validate",
+      description:
+        "Validate a parsed document and write a canonical document record.",
+      risk: "low",
+      receiptRequired: false,
+    },
+    {
+      key: "dataAnalysis.dataAcquisition.document.runOutputPipeline",
+      description:
+        "Run an output pipeline for a canonical document record.",
+      risk: "medium",
+      receiptRequired: true,
+    },
   ],
 
   routes: [
     { path: "/data-analysis", label: "Data Analysis" },
     { path: "/data-analysis/graphrag", label: "GraphRAG (OmniGraph)" },
+    {
+      path: "/data-analysis/data-acquisition",
+      label: "Data Acquisition",
+    },
+    {
+      path: "/data-analysis/data-acquisition/sources",
+      label: "Sources",
+    },
+    {
+      path: "/data-analysis/data-acquisition/runs",
+      label: "Runs",
+    },
+    {
+      path: "/data-analysis/data-acquisition/items",
+      label: "Items",
+    },
+    {
+      path: "/data-analysis/data-acquisition/classification",
+      label: "Classification",
+    },
+    {
+      path: "/data-analysis/data-acquisition/routing",
+      label: "Routing",
+    },
+    {
+      path: "/data-analysis/data-acquisition/processing",
+      label: "Processing",
+    },
+    {
+      path: "/data-analysis/data-acquisition/document-intelligence",
+      label: "Document Intelligence",
+    },
+    {
+      path: "/data-analysis/data-acquisition/canonical-records",
+      label: "Canonical Records",
+    },
+    {
+      path: "/data-analysis/data-acquisition/outputs",
+      label: "Outputs",
+    },
+    {
+      path: "/data-analysis/data-acquisition/settings",
+      label: "Settings",
+    },
   ],
   navigation: [{ group: "dataAnalysis", label: "Data Analysis", order: 5 }],
 
@@ -270,7 +404,303 @@ export const dataAnalysisManifest: ModuleManifest = {
       },
     });
 
-    ctx.log("info", "Data Analysis manifest booted (GraphRAG subdomain owner)");
+    // ── Public API: Data Acquisition subdomain ──────────────────────
+    // Universal acquisition layer — all source types, all data types.
+    // Document Intelligence is one specialized pipeline, exposed via
+    // `dataAnalysis.dataAcquisition.document.*`.
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.workerStatus",
+      handler: async () => {
+        const { getDataAcquisitionWorkerStatus } = await import(
+          "./data-acquisition/dataAcquisition.worker"
+        );
+        return getDataAcquisitionWorkerStatus();
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.summary",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.summary((input ?? {}) as any);
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.updateSource",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.updateSource(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.updateSource",
+        description: "Update a Data Acquisition source.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.disableSource",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.disableSource(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.disableSource",
+        description: "Disable a Data Acquisition source.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.exportCanonicalRecord",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        const payload = (input ?? {}) as {
+          id: number;
+          workspaceId: number;
+          targetRef?: string;
+        };
+        // Export = run an output pipeline of type "markdown" against
+        // the canonical record. The output run is the audit trail.
+        return service.runOutputPipeline({
+          workspaceId: payload.workspaceId,
+          outputType: "markdown",
+          canonicalRecordId: payload.id,
+          targetRef: payload.targetRef,
+        });
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.exportCanonicalRecord",
+        description: "Export a canonical record outside the platform.",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.document.runOutputPipeline",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.runOutputPipeline(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.document.runOutputPipeline",
+        description: "Run an output pipeline for a canonical document record.",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.registerSource",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.registerSource(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.registerSource",
+        description: "Register a Data Acquisition source.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.runAcquisition",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.runAcquisition(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.runAcquisition",
+        description: "Trigger an acquisition run for a source.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.discoverItems",
+      handler: async (input) => {
+        const payload = (input ?? {}) as {
+          sourceId: number;
+          workspaceId: number;
+          path?: string;
+        };
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.runAcquisition({
+          sourceId: payload.sourceId,
+          workspaceId: payload.workspaceId,
+          runType: "discover",
+          path: payload.path,
+        });
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.runAcquisition",
+        description: "Discover items via the source's connector.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.classifyItem",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.classifyItem(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.classifyItem",
+        description: "Classify a discovered item.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.routeItem",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.routeItem(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.routeItem",
+        description: "Route an item to a pipeline + processor + fallback chain.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.runProcessing",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.runProcessing(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.runProcessing",
+        description:
+          "Run a processing pipeline against an item. Calls external worker — missing worker is recorded as a failed run.",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.runOutputPipeline",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.runOutputPipeline(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.runOutputPipeline",
+        description:
+          "Emit a canonical record into an output pipeline (rag/graphrag/analytics/warehouse/alerts/reports/markdown/html/pdf).",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.getCanonicalRecord",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.getCanonicalRecord(input as any);
+      },
+    });
+
+    /* Document-specific actions. */
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.document.classify",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.classifyDocumentItem(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.classifyItem",
+        description: "Classify an item as a document.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.document.routeParser",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.routeParserForItem(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.routeItem",
+        description: "Route a document item to a parser + fallback chain.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.document.runParser",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.runParser(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.document.runParser",
+        description: "Run the document parser pipeline (Document Intelligence).",
+        risk: "medium",
+        receiptRequired: true,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.document.validate",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.validateDocument(input as any);
+      },
+      descriptor: {
+        key: "dataAnalysis.dataAcquisition.document.validate",
+        description: "Validate a parsed document and write a canonical record.",
+        risk: "low",
+        receiptRequired: false,
+      },
+    });
+
+    registerPublicApi({
+      module: "dataAnalysis",
+      action: "dataAnalysis.dataAcquisition.document.getCanonical",
+      handler: async (input) => {
+        const service = await import("./data-acquisition/dataAcquisition.service");
+        return service.getCanonicalDocument(input as any);
+      },
+    });
+
+    ctx.log(
+      "info",
+      "Data Analysis manifest booted (GraphRAG + Data Acquisition subdomains)",
+    );
   },
 
   health: dataAnalysisHealth,
@@ -291,6 +721,28 @@ export const dataAnalysisManifest: ModuleManifest = {
       "dataAnalysis.graphRag.queryFailed",
       "dataAnalysis.graphRag.workerUnavailable",
       "dataAnalysis.graphRag.workerRecovered",
+      // Data Acquisition subdomain
+      "dataAnalysis.dataAcquisition.sourceRegistered",
+      "dataAnalysis.dataAcquisition.acquisitionStarted",
+      "dataAnalysis.dataAcquisition.acquisitionCompleted",
+      "dataAnalysis.dataAcquisition.acquisitionFailed",
+      "dataAnalysis.dataAcquisition.itemDiscovered",
+      "dataAnalysis.dataAcquisition.itemClassified",
+      "dataAnalysis.dataAcquisition.itemRouted",
+      "dataAnalysis.dataAcquisition.processingStarted",
+      "dataAnalysis.dataAcquisition.processingCompleted",
+      "dataAnalysis.dataAcquisition.processingFailed",
+      "dataAnalysis.dataAcquisition.canonicalRecordCreated",
+      "dataAnalysis.dataAcquisition.qualityValidated",
+      "dataAnalysis.dataAcquisition.outputPipelineStarted",
+      "dataAnalysis.dataAcquisition.outputPipelineCompleted",
+      "dataAnalysis.dataAcquisition.outputPipelineFailed",
+      "dataAnalysis.dataAcquisition.workerUnavailable",
+      "dataAnalysis.dataAcquisition.workerRecovered",
+      "dataAnalysis.dataAcquisition.document.parserSelected",
+      "dataAnalysis.dataAcquisition.document.parserFallbackTriggered",
+      "dataAnalysis.dataAcquisition.document.reconstructed",
+      "dataAnalysis.dataAcquisition.document.validated",
     ],
   },
 
@@ -300,7 +752,11 @@ export const dataAnalysisManifest: ModuleManifest = {
   },
 
   ports: {
-    provided: ["dataAnalysis.read", "dataAnalysis.graphRag.read"],
+    provided: [
+      "dataAnalysis.read",
+      "dataAnalysis.graphRag.read",
+      "dataAnalysis.dataAcquisition.read",
+    ],
     consumed: [],
   },
 
@@ -313,4 +769,6 @@ export {
   DATA_ANALYSIS_EVENT_NAMES,
   DATA_ANALYSIS_PROVIDED_PORTS,
   DATA_ANALYSIS_RUNTIME_ENDPOINTS,
+  DATA_ACQUISITION_EVENT_NAMES,
+  DATA_ACQUISITION_OWNED_TABLES,
 };

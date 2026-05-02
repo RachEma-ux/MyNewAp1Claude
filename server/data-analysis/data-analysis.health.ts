@@ -12,6 +12,7 @@
 import type { ModuleHealthReport } from "../platform/modules/types";
 import { getDataAnalysisDb, getDataAnalysisDbMode } from "./connection";
 import { getGraphRagWorkerStatus } from "./graphrag/graphRag.worker";
+import { getDataAcquisitionWorkerStatus } from "./data-acquisition/dataAcquisition.worker";
 
 export async function dataAnalysisHealth(): Promise<ModuleHealthReport> {
   let dbOk = false;
@@ -28,20 +29,33 @@ export async function dataAnalysisHealth(): Promise<ModuleHealthReport> {
     dbDetail = err?.message ?? "DB probe threw";
   }
 
-  let workerStatus: { healthy: boolean; url: string; message: string };
+  let graphRagStatus: { healthy: boolean; url: string; message: string };
   try {
-    workerStatus = await getGraphRagWorkerStatus();
+    graphRagStatus = await getGraphRagWorkerStatus();
   } catch (err: any) {
-    workerStatus = {
+    graphRagStatus = {
       healthy: false,
       url: process.env.GRAPHRAG_WORKER_URL || "http://localhost:8484",
       message: err?.message ?? "worker status threw",
     };
   }
 
+  let acquisitionStatus: { healthy: boolean; url: string; message: string };
+  try {
+    acquisitionStatus = await getDataAcquisitionWorkerStatus();
+  } catch (err: any) {
+    acquisitionStatus = {
+      healthy: false,
+      url:
+        process.env.DATA_ACQUISITION_WORKER_URL || "http://localhost:8485",
+      message: err?.message ?? "worker status threw",
+    };
+  }
+
+  const allWorkersHealthy = graphRagStatus.healthy && acquisitionStatus.healthy;
   const state: ModuleHealthReport["state"] = !dbOk
     ? "failed"
-    : workerStatus.healthy
+    : allWorkersHealthy
       ? "ok"
       : "degraded";
 
@@ -49,15 +63,17 @@ export async function dataAnalysisHealth(): Promise<ModuleHealthReport> {
     state,
     message: [
       dbDetail ? `db=${dbDetail}` : null,
-      `graphRagWorker=${workerStatus.healthy ? "healthy" : "unavailable"}`,
-      `graphRagWorker.url=${workerStatus.url}`,
-      workerStatus.message ? `graphRagWorker.message=${workerStatus.message}` : null,
+      `graphRagWorker=${graphRagStatus.healthy ? "healthy" : "unavailable"}`,
+      `dataAcquisitionWorker=${
+        acquisitionStatus.healthy ? "healthy" : "unavailable"
+      }`,
     ]
       .filter(Boolean)
       .join("; "),
     details: {
       db: { ok: dbOk, detail: dbDetail ?? null },
-      graphRagWorker: workerStatus,
+      graphRagWorker: graphRagStatus,
+      dataAcquisitionWorker: acquisitionStatus,
     },
     checkedAt: new Date().toISOString(),
   };

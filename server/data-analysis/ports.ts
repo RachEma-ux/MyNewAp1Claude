@@ -12,6 +12,10 @@
  */
 
 import type { GraphRagWorkerContract } from "./contracts";
+import {
+  DATA_ACQUISITION_WORKER_DEFAULT_URL,
+  DATA_ACQUISITION_WORKER_ENV,
+} from "./data-acquisition/dataAcquisition.constants";
 
 /** Default worker URL — external Python service. */
 export const GRAPHRAG_WORKER_DEFAULT_URL = "http://localhost:8484";
@@ -41,6 +45,7 @@ export function getGraphRagWorkerUrl(): string {
 export const DATA_ANALYSIS_PROVIDED_PORTS = [
   "dataAnalysis.read",
   "dataAnalysis.graphRag.read",
+  "dataAnalysis.dataAcquisition.read",
 ] as const;
 
 /** Runtime endpoints exposed by Data Analysis (external dependencies). */
@@ -53,5 +58,14 @@ export const DATA_ANALYSIS_RUNTIME_ENDPOINTS = [
     required: false,
     description:
       "Python GraphRAG worker (Microsoft graphrag library). Required for buildIndex / query happy path; missing worker keeps Data Analysis in degraded state.",
+  },
+  {
+    key: "dataAcquisitionWorker",
+    env: DATA_ACQUISITION_WORKER_ENV,
+    defaultUrl: DATA_ACQUISITION_WORKER_DEFAULT_URL,
+    mode: "external" as const,
+    required: false,
+    description:
+      "Data Acquisition worker (classify / route / parse / ocr / reconstruct / validate / output). Missing worker keeps the Data Acquisition subdomain in degraded state; processing runs are recorded as failed/degraded with the worker error preserved.",
   },
 ] as const;
