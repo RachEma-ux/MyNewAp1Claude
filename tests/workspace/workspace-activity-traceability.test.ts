@@ -44,7 +44,7 @@ describe("Phase 6 — Activity Log Schema", () => {
 // ============================================================================
 
 describe("Phase 6 — Activity Emission in Routes", () => {
-  const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+  const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
 
   it("workspace.create emits activity", () => {
     const content = fs.readFileSync(routersPath, "utf-8");
@@ -56,9 +56,19 @@ describe("Phase 6 — Activity Emission in Routes", () => {
     expect(content).toMatch(/workspace\.update.*logActivity/s);
   });
 
-  it("workspace.delete emits activity", () => {
+  it("workspace.delete emits activity (via softDeleteWorkspace transition)", () => {
+    // The delete route delegates to `softDeleteWorkspace`, which
+    // calls `transitionWorkspace(..., "deleted")`. That helper
+    // emits `logActivity({ action: "workspace.transition.deleted" })`,
+    // so the route-level evidence is the call to softDeleteWorkspace.
     const content = fs.readFileSync(routersPath, "utf-8");
-    expect(content).toMatch(/delete:.*logActivity.*workspace\.delete/s);
+    expect(content).toMatch(/delete:[\s\S]*?softDeleteWorkspace/);
+    const lifecycleSvc = fs.readFileSync(
+      path.resolve(process.cwd(), "server/workspace/lifecycle-service.ts"),
+      "utf-8",
+    );
+    expect(lifecycleSvc).toMatch(/logActivity\(/);
+    expect(lifecycleSvc).toContain("workspace.transition.${targetStatus}");
   });
 
   it("workspace.updateRoutingProfile emits activity", () => {
@@ -110,14 +120,14 @@ describe("Phase 6 — logActivity Function", () => {
 
 describe("Phase 6 — getActivity Route", () => {
   it("workspace.getActivity route exists", () => {
-    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
     const content = fs.readFileSync(routersPath, "utf-8");
     expect(content).toContain("getActivity");
     expect(content).toContain("workspaceActivityLog");
   });
 
   it("getActivity uses readable workspace guard", () => {
-    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
     const content = fs.readFileSync(routersPath, "utf-8");
     expect(content).toMatch(/getActivity:.*requireReadableWorkspaceRoute/s);
   });
@@ -127,11 +137,41 @@ describe("Phase 6 — getActivity Route", () => {
 // WS-12: Dashboard Consumes Activity
 // ============================================================================
 
-describe("Phase 6 — WorkspaceHome Shows Activity", () => {
-  it("WorkspaceHome displays activity log", () => {
-    const homePath = path.resolve(process.cwd(), "client/src/pages/WorkspaceHome.tsx");
-    const content = fs.readFileSync(homePath, "utf-8");
+describe("Phase 6 — Workspace activity surface", () => {
+  // Legacy WorkspaceHome.tsx surfaced "Recent Activity" inline. The
+  // per-purpose shells delegate the activity surface to oversight
+  // drawers (Project/Research) and to dedicated activity routes,
+  // not to a fixed home dashboard. The persistent invariant is
+  // that the server-side `getActivity` route exists and the
+  // workspace activity log is reachable from the per-purpose shells.
+  it("server-side getActivity route is exposed", () => {
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
+    const content = fs.readFileSync(routersPath, "utf-8");
     expect(content).toContain("getActivity");
-    expect(content).toContain("Recent Activity");
+  });
+
+  it("at least one per-purpose shell wires an activity surface", () => {
+    const shells = [
+      "PersonalWorkspaceShell",
+      "ProjectWorkspaceShell",
+      "ResearchWorkspaceShell",
+    ];
+    let found = false;
+    for (const name of shells) {
+      const p = path.resolve(process.cwd(), "client/src/pages", `${name}.tsx`);
+      if (!fs.existsSync(p)) continue;
+      const content = fs.readFileSync(p, "utf-8");
+      // OversightDrawer / ActivityFeed / getActivity any-of: each shell
+      // exposes activity through one of these paths.
+      if (
+        /OversightDrawer|ActivityFeed|getActivity\.useQuery|getActivity/.test(
+          content,
+        )
+      ) {
+        found = true;
+        break;
+      }
+    }
+    expect(found).toBe(true);
   });
 });

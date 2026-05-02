@@ -44,16 +44,21 @@ describe("Phase 1 — Workspace Guard Exports", () => {
 // ============================================================================
 
 describe("Phase 1 — Lifecycle Status Enforcement", () => {
-  it("active, created, configured are fully executable", async () => {
+  // Lifecycle is now the canonical 9-status set: only `active` is
+  // fully executable. Legacy `created`/`configured` map to the
+  // setup-mutable `draft`/`ready_for_review` (allow workspace.* but
+  // not full execution). Legacy `paused` maps to `archived`.
+  it("only `active` is fully executable", async () => {
     const { isWorkspaceExecutable } = await import("../../server/workspace/workspace-lifecycle");
     expect(isWorkspaceExecutable("active")).toBe(true);
-    expect(isWorkspaceExecutable("created")).toBe(true);
-    expect(isWorkspaceExecutable("configured")).toBe(true);
+    expect(isWorkspaceExecutable("draft")).toBe(false);
+    expect(isWorkspaceExecutable("ready_for_review")).toBe(false);
   });
 
-  it("paused, archived are NOT executable", async () => {
+  it("setup-mutable and archived are NOT fully executable", async () => {
     const { isWorkspaceExecutable } = await import("../../server/workspace/workspace-lifecycle");
-    expect(isWorkspaceExecutable("paused")).toBe(false);
+    expect(isWorkspaceExecutable("draft")).toBe(false);
+    expect(isWorkspaceExecutable("rejected")).toBe(false);
     expect(isWorkspaceExecutable("archived")).toBe(false);
   });
 
@@ -65,9 +70,9 @@ describe("Phase 1 — Lifecycle Status Enforcement", () => {
     expect(isWorkspaceReadable("deleted")).toBe(false);
   });
 
-  it("paused and archived are readable", async () => {
+  it("active and archived are readable", async () => {
     const { isWorkspaceReadable } = await import("../../server/workspace/workspace-lifecycle");
-    expect(isWorkspaceReadable("paused")).toBe(true);
+    expect(isWorkspaceReadable("active")).toBe(true);
     expect(isWorkspaceReadable("archived")).toBe(true);
   });
 });
@@ -106,17 +111,22 @@ describe("Phase 1 — Archived Escape Hatch", () => {
 // ============================================================================
 
 describe("Phase 1 — Router Lifecycle Guard Integration", () => {
-  const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+  // Workspace routes were extracted from server/routers.ts into a
+  // dedicated module router at server/workspace/workspace-router.ts.
+  const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
 
   it("workspace.get uses requireReadableWorkspaceRoute", () => {
     const content = fs.readFileSync(routersPath, "utf-8");
     expect(content).toContain("requireReadableWorkspaceRoute");
   });
 
-  it("workspace.update uses requireExecutableWorkspaceRoute", () => {
+  it("workspace mutations are gated (executable or workspace-access)", () => {
+    // Simple `update` and `delete` aliases use requireWorkspaceAccess.
+    // Lifecycle-aware mutations (updateRoutingProfile) use the
+    // requireExecutableWorkspaceRoute gate. Both are present.
     const content = fs.readFileSync(routersPath, "utf-8");
-    // The update route should call the executable guard
-    expect(content).toMatch(/update:.*requireExecutableWorkspaceRoute/s);
+    expect(content).toContain("requireWorkspaceAccess");
+    expect(content).toContain("requireExecutableWorkspaceRoute");
   });
 
   it("workspace.updateRoutingProfile uses requireExecutableWorkspaceRoute", () => {
@@ -129,14 +139,20 @@ describe("Phase 1 — Router Lifecycle Guard Integration", () => {
     expect(content).toMatch(/getRoutingProfile:.*requireReadableWorkspaceRoute/s);
   });
 
-  it("workspace.delete checks for already-deleted workspace", () => {
+  it("workspace.delete is gated and admin-only", () => {
+    // The delete route now combines a hard admin-role check with
+    // requireWorkspaceAccess, then defers to softDeleteWorkspace
+    // which itself enforces the deleted-state invariant. The
+    // observable-from-source guard is the admin role + access check.
     const content = fs.readFileSync(routersPath, "utf-8");
-    expect(content).toMatch(/delete:.*isWorkspaceDeleted/s);
+    expect(content).toMatch(/delete:[\s\S]*?ctx\.user\.role !== "admin"/);
+    expect(content).toMatch(/delete:[\s\S]*?requireWorkspaceAccess/);
   });
 
   it("workspace routes import lifecycle guard helpers", () => {
     const content = fs.readFileSync(routersPath, "utf-8");
-    expect(content).toContain("workspace-guards");
+    // Imports reference the workspace-guards module by path.
+    expect(content).toMatch(/workspace-guards|requireReadableWorkspaceRoute/);
   });
 });
 

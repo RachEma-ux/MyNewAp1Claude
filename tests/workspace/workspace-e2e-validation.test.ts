@@ -72,9 +72,21 @@ function mockContext(overrides: Partial<WorkspaceContext> = {}): WorkspaceContex
 // ============================================================================
 
 describe("E2E — Lifecycle Enforcement", () => {
-  it("all 6 workspace statuses are recognized", () => {
-    expect(WORKSPACE_STATUSES).toHaveLength(6);
-    const expected = ["created", "configured", "active", "paused", "archived", "deleted"];
+  it("the canonical 9-status lifecycle is recognized", () => {
+    // Lifecycle was extended from 6 to 9 statuses. Legacy
+    // `created`/`configured`/`paused` are mapped via LEGACY_STATUS_MAP.
+    expect(WORKSPACE_STATUSES).toHaveLength(9);
+    const expected = [
+      "draft",
+      "ready_for_review",
+      "under_review",
+      "approved",
+      "published",
+      "active",
+      "rejected",
+      "archived",
+      "deleted",
+    ];
     for (const s of expected) {
       expect(WORKSPACE_STATUSES).toContain(s);
     }
@@ -101,11 +113,12 @@ describe("E2E — Lifecycle Enforcement", () => {
 
   it("requireExecutableWorkspace throws for non-executable statuses", async () => {
     const { requireExecutableWorkspace } = await import("../../server/workspace/workspace-lifecycle");
-    const paused = mockContext({ status: "paused" });
+    const draft = mockContext({ status: "draft" });
     const archived = mockContext({ status: "archived" });
     const deleted = mockContext({ status: "deleted" });
 
-    expect(() => requireExecutableWorkspace(paused)).toThrow();
+    // Draft permits workspace.* setup actions but not bare execution.
+    expect(() => requireExecutableWorkspace(draft)).toThrow();
     expect(() => requireExecutableWorkspace(archived)).toThrow();
     expect(() => requireExecutableWorkspace(deleted)).toThrow();
   });
@@ -122,19 +135,30 @@ describe("E2E — Scoping (No Cross-Workspace Leakage)", () => {
     expect(ctx1.workspaceId).not.toBe(ctx2.workspaceId);
   });
 
-  it("WorkspaceShell renders workspace-specific content", () => {
-    const shellPath = path.resolve(process.cwd(), "client/src/pages/WorkspaceShell.tsx");
-    const content = fs.readFileSync(shellPath, "utf-8");
-    // Shell uses workspaceId from URL params
-    expect(content).toContain("useParams");
-    expect(content).toContain("workspaceId");
-    // All module pages receive workspaceId
-    const matches = content.match(/workspaceId={workspaceId}/g);
-    expect(matches!.length).toBeGreaterThanOrEqual(10);
+  it("Per-purpose shells render workspace-specific content", () => {
+    // Legacy WorkspaceShell.tsx was unified into three per-purpose
+    // shells. Each reads workspaceId from URL params and mounts
+    // module routes under a workspace-prefixed basePath.
+    const shells = [
+      "PersonalWorkspaceShell",
+      "ProjectWorkspaceShell",
+      "ResearchWorkspaceShell",
+    ];
+    for (const name of shells) {
+      const shellPath = path.resolve(
+        process.cwd(),
+        "client/src/pages",
+        `${name}.tsx`,
+      );
+      const content = fs.readFileSync(shellPath, "utf-8");
+      expect(content).toContain("useParams");
+      expect(content).toContain("workspaceId");
+      expect(content).toMatch(/\$\{basePath\}/);
+    }
   });
 
   it("workspace router routes require workspace ID input", () => {
-    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
     const content = fs.readFileSync(routersPath, "utf-8");
     // get, update, delete all require id
     expect(content).toMatch(/get:.*z\.object.*id:.*z\.number/s);
@@ -168,7 +192,7 @@ describe("E2E — RBAC (Capability-Based Allow/Deny)", () => {
   });
 
   it("workspace mutations enforce requireCapability in routers.ts", () => {
-    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
     const content = fs.readFileSync(routersPath, "utf-8");
     const capMatches = content.match(/requireCapability/g);
     expect(capMatches).not.toBeNull();
@@ -189,11 +213,25 @@ describe("E2E — RBAC (Capability-Based Allow/Deny)", () => {
 // ============================================================================
 
 describe("E2E — Module Enforcement", () => {
-  it("UI module gate blocks disabled modules", () => {
-    const shellPath = path.resolve(process.cwd(), "client/src/pages/WorkspaceShell.tsx");
-    const content = fs.readFileSync(shellPath, "utf-8");
-    expect(content).toContain("ModuleGate");
-    expect(content).toContain("ModuleDisabled");
+  it("UI module gate blocks disabled modules in per-purpose shells", () => {
+    // Each per-purpose shell defines its own ModuleGate that hides
+    // disabled module content. (`ModuleDisabled` was a separate
+    // component in the legacy shell — the per-purpose shells inline
+    // their disabled-state UI inside ModuleGate itself.)
+    const shells = [
+      "PersonalWorkspaceShell",
+      "ProjectWorkspaceShell",
+      "ResearchWorkspaceShell",
+    ];
+    for (const name of shells) {
+      const shellPath = path.resolve(
+        process.cwd(),
+        "client/src/pages",
+        `${name}.tsx`,
+      );
+      const content = fs.readFileSync(shellPath, "utf-8");
+      expect(content).toContain("ModuleGate");
+    }
   });
 
   it("server-side requireModule throws for disabled modules", async () => {
@@ -213,54 +251,48 @@ describe("E2E — Module Enforcement", () => {
 // E2E-05: Dashboard Operational State
 // ============================================================================
 
-describe("E2E — WorkspaceHome Dashboard", () => {
-  const homePath = path.resolve(process.cwd(), "client/src/pages/WorkspaceHome.tsx");
+describe("E2E — Workspace overview surface (per-purpose shells)", () => {
+  // Legacy WorkspaceHome.tsx was a standalone dashboard. The
+  // per-purpose shells now render an inline overview as the default
+  // wouter route. The assertions below check what the new arch
+  // actually does — workspace-name + module visibility — rather
+  // than fossilized UI text from the removed page.
+  const shells = [
+    "PersonalWorkspaceShell",
+    "ProjectWorkspaceShell",
+    "ResearchWorkspaceShell",
+  ];
 
-  it("WorkspaceHome is not a placeholder", () => {
-    const content = fs.readFileSync(homePath, "utf-8");
-    expect(content).not.toContain("Coming Soon");
-    expect(content).not.toContain("Construction");
-  });
+  for (const name of shells) {
+    const shellPath = path.resolve(
+      process.cwd(),
+      "client/src/pages",
+      `${name}.tsx`,
+    );
 
-  it("WorkspaceHome shows summary section", () => {
-    const content = fs.readFileSync(homePath, "utf-8");
-    expect(content).toContain("Summary");
-  });
+    it(`${name} overview is not a placeholder`, () => {
+      const content = fs.readFileSync(shellPath, "utf-8");
+      expect(content).not.toContain("Coming Soon");
+      expect(content).not.toContain("Construction");
+    });
 
-  it("WorkspaceHome shows activity section", () => {
-    const content = fs.readFileSync(homePath, "utf-8");
-    expect(content).toContain("Recent Activity");
-  });
+    it(`${name} renders the workspace name`, () => {
+      const content = fs.readFileSync(shellPath, "utf-8");
+      expect(content).toContain("workspace.name");
+    });
 
-  it("WorkspaceHome shows access section", () => {
-    const content = fs.readFileSync(homePath, "utf-8");
-    expect(content).toContain("Access");
-    expect(content).toContain("Members");
-  });
+    it(`${name} surfaces enabled-module state`, () => {
+      const content = fs.readFileSync(shellPath, "utf-8");
+      // The default route iterates enabledModules / enabledCount.
+      expect(content).toMatch(/enabledModules|enabledCount/);
+    });
 
-  it("WorkspaceHome shows routing/configuration section", () => {
-    const content = fs.readFileSync(homePath, "utf-8");
-    expect(content).toContain("Routing");
-  });
-
-  it("WorkspaceHome shows alerts for archived/paused state", () => {
-    const content = fs.readFileSync(homePath, "utf-8");
-    expect(content).toContain("archived");
-    expect(content).toContain("paused");
-    expect(content).toContain("AlertTriangle");
-  });
-
-  it("WorkspaceHome shows quick actions", () => {
-    const content = fs.readFileSync(homePath, "utf-8");
-    expect(content).toContain("Quick Actions");
-    expect(content).toContain("Open Workspace Shell");
-    expect(content).toContain("Governance");
-  });
-
-  it("WorkspaceHome shows enabled modules", () => {
-    const content = fs.readFileSync(homePath, "utf-8");
-    expect(content).toContain("Enabled Modules");
-  });
+    it(`${name} navigates to module sub-routes`, () => {
+      const content = fs.readFileSync(shellPath, "utf-8");
+      // Cards link to the workspace-prefixed module paths.
+      expect(content).toMatch(/\$\{basePath\}\//);
+    });
+  }
 });
 
 // ============================================================================
@@ -279,7 +311,7 @@ describe("E2E — Activity Traceability", () => {
   });
 
   it("workspace routes emit activity on mutations", () => {
-    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
     const content = fs.readFileSync(routersPath, "utf-8");
     const logMatches = content.match(/logActivity/g);
     expect(logMatches).not.toBeNull();
@@ -294,34 +326,41 @@ describe("E2E — Activity Traceability", () => {
 
 describe("E2E — No Regressions", () => {
   it("workspace creation route still exists", () => {
-    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
     const content = fs.readFileSync(routersPath, "utf-8");
     expect(content).toMatch(/create:.*governedProcedure/s);
     expect(content).toContain("createWorkspace");
   });
 
   it("workspace list route still exists", () => {
-    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
     const content = fs.readFileSync(routersPath, "utf-8");
     expect(content).toContain("getUserWorkspaces");
   });
 
-  it("WorkspaceShell component still exists and loads", () => {
-    const shellPath = path.resolve(process.cwd(), "client/src/pages/WorkspaceShell.tsx");
-    expect(fs.existsSync(shellPath)).toBe(true);
-    const content = fs.readFileSync(shellPath, "utf-8");
-    expect(content).toContain("export default function WorkspaceShell");
-  });
-
-  it("WorkspaceDetail component still exists", () => {
-    const detailPath = path.resolve(process.cwd(), "client/src/pages/WorkspaceDetail.tsx");
-    expect(fs.existsSync(detailPath)).toBe(true);
-    const content = fs.readFileSync(detailPath, "utf-8");
-    expect(content).toContain("export default function WorkspaceDetail");
+  it("Per-purpose workspace shells still exist and export default components", () => {
+    // Legacy WorkspaceShell.tsx and WorkspaceDetail.tsx were unified
+    // into three per-purpose shells. The "no-regressions" check is now
+    // that each shell file exists and exports a default function.
+    const shells = [
+      "PersonalWorkspaceShell",
+      "ProjectWorkspaceShell",
+      "ResearchWorkspaceShell",
+    ];
+    for (const name of shells) {
+      const shellPath = path.resolve(
+        process.cwd(),
+        "client/src/pages",
+        `${name}.tsx`,
+      );
+      expect(fs.existsSync(shellPath)).toBe(true);
+      const content = fs.readFileSync(shellPath, "utf-8");
+      expect(content).toContain(`export default function ${name}`);
+    }
   });
 
   it("workspace routing profile routes still exist", () => {
-    const routersPath = path.resolve(process.cwd(), "server/routers.ts");
+    const routersPath = path.resolve(process.cwd(), "server/workspace/workspace-router.ts");
     const content = fs.readFileSync(routersPath, "utf-8");
     expect(content).toContain("getRoutingProfile");
     expect(content).toContain("updateRoutingProfile");

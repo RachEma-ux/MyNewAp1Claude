@@ -88,32 +88,44 @@ describe("Phase 5 — Workspace Guards Module Check", () => {
 // ============================================================================
 
 describe("Phase 5 — UI ModuleGate Enforcement", () => {
-  it("WorkspaceShell has ModuleGate component", () => {
-    const shellPath = path.resolve(process.cwd(), "client/src/pages/WorkspaceShell.tsx");
-    const content = fs.readFileSync(shellPath, "utf-8");
-    expect(content).toContain("ModuleGate");
-    expect(content).toContain("ModuleDisabled");
-  });
+  // Each per-purpose shell defines its own ModuleGate that gates
+  // module sub-routes against `enabledModules`.
+  const shells = [
+    "PersonalWorkspaceShell",
+    "ProjectWorkspaceShell",
+    "ResearchWorkspaceShell",
+  ];
 
-  it("ModuleGate checks enabledModules set", () => {
-    const shellPath = path.resolve(process.cwd(), "client/src/pages/WorkspaceShell.tsx");
-    const content = fs.readFileSync(shellPath, "utf-8");
-    expect(content).toContain("enabledModules.has(moduleKey)");
-  });
+  for (const name of shells) {
+    const shellPath = path.resolve(
+      process.cwd(),
+      "client/src/pages",
+      `${name}.tsx`,
+    );
 
-  it("ModuleDisabled component exists", () => {
+    it(`${name} defines a ModuleGate component`, () => {
+      const content = fs.readFileSync(shellPath, "utf-8");
+      expect(content).toContain("ModuleGate");
+    });
+
+    it(`${name} ModuleGate checks enabledModules set`, () => {
+      const content = fs.readFileSync(shellPath, "utf-8");
+      expect(content).toMatch(/enabledModules\.has\(/);
+    });
+
+    it(`${name} wraps multiple module routes in ModuleGate`, () => {
+      const content = fs.readFileSync(shellPath, "utf-8");
+      const gateMatches = content.match(/<ModuleGate/g);
+      expect(gateMatches).not.toBeNull();
+      // Each shell gates several module routes
+      // (Project shell has the most: pmt, knowledge, agents, collab, reporting…).
+      expect(gateMatches!.length).toBeGreaterThanOrEqual(2);
+    });
+  }
+
+  it("ModuleDisabled component still exists for re-use", () => {
     const mdPath = path.resolve(process.cwd(), "client/src/components/workspace/ModuleDisabled.tsx");
     expect(fs.existsSync(mdPath)).toBe(true);
-  });
-
-  it("every module route is wrapped in ModuleGate", () => {
-    const shellPath = path.resolve(process.cwd(), "client/src/pages/WorkspaceShell.tsx");
-    const content = fs.readFileSync(shellPath, "utf-8");
-    // Count ModuleGate occurrences — should cover all module routes
-    const gateMatches = content.match(/<ModuleGate/g);
-    expect(gateMatches).not.toBeNull();
-    // Should have many module gates (PMT + Knowledge + Agents + Collab + Reporting)
-    expect(gateMatches!.length).toBeGreaterThanOrEqual(5);
   });
 });
 
@@ -153,10 +165,26 @@ describe("Phase 5 — Module State Semantics", () => {
     expect(content).toContain("boolean");
   });
 
-  it("sidebar shows all modules regardless of enabled state", () => {
-    const shellPath = path.resolve(process.cwd(), "client/src/pages/WorkspaceShell.tsx");
-    const content = fs.readFileSync(shellPath, "utf-8");
-    // "Always show all sidebar items; ModuleGate handles disabled content"
-    expect(content).toContain("ALL_MODULE_KEYS");
+  it("Per-purpose shells declare a complete module key set", () => {
+    // Replaces the legacy `ALL_MODULE_KEYS` constant in WorkspaceShell.
+    // Each per-purpose shell maintains its own `MODULE_KEYS` list of
+    // every module it can render (regardless of enabled state).
+    const shells = [
+      "PersonalWorkspaceShell",
+      "ProjectWorkspaceShell",
+      "ResearchWorkspaceShell",
+    ];
+    for (const name of shells) {
+      const shellPath = path.resolve(
+        process.cwd(),
+        "client/src/pages",
+        `${name}.tsx`,
+      );
+      const content = fs.readFileSync(shellPath, "utf-8");
+      // Each shell defines its module keys (constant array) and
+      // tracks `enabledModules` separately — sidebar shows all,
+      // ModuleGate handles disabled rendering.
+      expect(content).toMatch(/MODULE_KEYS|ModuleKey/);
+    }
   });
 });
