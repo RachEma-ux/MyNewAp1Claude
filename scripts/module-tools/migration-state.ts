@@ -133,19 +133,27 @@ export const RTLM_FOLDER_MAP: Record<RtlmKey, string> = {
  * `useHrRole` hook stays in `client/src/hooks/` because non-module
  * platform code (MainLayout, HRSideNav) also reads it.
  *
- * Phase 3.8 (this PR): Organization Management migrates to the
+ * Phase 3.8 (PR #69): Organization Management migrated to the
  * capsule shape, adding `organizationManagement` as the ninth
  * migrated module. OM owns 7 canonical paths (`/om` plus 6 item
  * slugs: portfolio, control-panel, wizard, list, settings,
- * templates) — `OMTopLevelPage` is a single dispatcher that reads
- * `useParams().item` and renders the matching sub-page. Server
- * `organization-management/manifest.ts` had a stale `routes:`
- * declaration of `/organization` (legacy mismatch); fixed to `/om`
- * to match the canonical baseRoute (PR #61/#63 pattern).
- * `WorkspaceExecutionShell.tsx` import paths updated to
- * `@/modules/organization-management/pages/...`. Frontend
- * modularity checks now run strict for the nine migrated modules;
- * the remaining 6 RTLMs continue in report-only mode until their
+ * templates). Server `organization-management/manifest.ts` had a
+ * stale `routes:` declaration of `/organization`; fixed to `/om`
+ * (PR #61/#63 pattern). `WorkspaceExecutionShell.tsx` OM imports
+ * tracked the move.
+ *
+ * Phase 3.9 (this PR): Culture & Values migrates to the capsule
+ * shape, adding `cultureValues` as the tenth migrated module. CV
+ * owns 4 canonical paths (`/cv` plus 3 item slugs: portfolio,
+ * wizard, settings). Same dispatcher pattern as OM —
+ * `CVTopLevelPage` reads `useParams().item` and renders the
+ * matching sub-page. Server `culture-values/manifest.ts` had a
+ * stale `routes:` declaration of `/culture`; fixed to `/cv` (same
+ * PR #61/#63 pattern). `WorkspaceExecutionShell.tsx` CV imports
+ * (Portfolio / Wizard / Settings) tracked the move. Frontend
+ * modularity checks now run strict for the ten migrated modules;
+ * the remaining 5 RTLMs (aiTypes, openRouter, agentStudio,
+ * sandboxWf, kgraAgent) continue in report-only mode until their
  * own migration PRs land.
  */
 export const MIGRATED_MODULES: RtlmKey[] = [
@@ -158,6 +166,7 @@ export const MIGRATED_MODULES: RtlmKey[] = [
   "psm",
   "hr",
   "organizationManagement",
+  "cultureValues",
 ];
 
 /**

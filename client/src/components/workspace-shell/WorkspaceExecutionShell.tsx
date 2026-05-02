@@ -85,9 +85,9 @@ import { OMSettingsPage } from "@/modules/organization-management/pages/OMSettin
 import { OMTemplatesPage } from "@/modules/organization-management/pages/OMTemplatesPage";
 
 // CV — Culture Values
-import { CVPortfolioPage } from "@/pages/culture-values/CVPortfolioPage";
-import { CVWizardPage } from "@/pages/culture-values/CVWizardPage";
-import { CVSettingsPage } from "@/pages/culture-values/CVSettingsPage";
+import { CVPortfolioPage } from "@/modules/culture-values/pages/CVPortfolioPage";
+import { CVWizardPage } from "@/modules/culture-values/pages/CVWizardPage";
+import { CVSettingsPage } from "@/modules/culture-values/pages/CVSettingsPage";
 
 // PS — Projects System
 import { PSCatalogPage } from "@/modules/ps/pages/PSCatalogPage";

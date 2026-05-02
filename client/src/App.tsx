@@ -115,7 +115,8 @@ const LLMCataloguePage = lazy(() => import("@/pages/LLMCataloguePage"));
 // from `client/src/modules/hr/`.
 // OM — migrated to capsule (PR #69). Mounted by <ModuleRoutes />
 // from `client/src/modules/organization-management/`.
-const CVTopLevelPage = lazy(() => import("@/pages/culture-values/CVTopLevelPage"));
+// CV — migrated to capsule (PR #70). Mounted by <ModuleRoutes />
+// from `client/src/modules/culture-values/`.
 // PRM — migrated to capsule (PR #65). Mounted by <ModuleRoutes />
 // from `client/src/modules/prm/`.
 // PSM — migrated to capsule (PR #67). Mounted by <ModuleRoutes />
@@ -285,9 +286,8 @@ function Router() {
           by <ModuleRoutes /> via the capsule manifest. */}
       {/* OM — migrated to capsule (PR #69). Routes /om/* now rendered
           by <ModuleRoutes /> via the capsule manifest. */}
-      {/* Culture Values — top-level (auto-selects default workspace) */}
-      <Route path="/cv/:item" component={() => <ProtectedRoute component={CVTopLevelPage} />} />
-      <Route path="/cv" component={() => <ProtectedRoute component={CVTopLevelPage} />} />
+      {/* CV — migrated to capsule (PR #70). Routes /cv/* now rendered
+          by <ModuleRoutes /> via the capsule manifest. */}
       {/* App Components — Shell demos */}
       <Route path="/components/simple-shell" component={() => <ProtectedRoute component={SimpleShellPage} />} />
       <Route path="/components/double-shell" component={() => <ProtectedRoute component={DoubleShellPage} />} />
